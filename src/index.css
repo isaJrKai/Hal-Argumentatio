@@ -1,0 +1,379 @@
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,300..800;1,300..800&family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --color-bg-base: var(--bg-base);
+  --color-bg-raised: var(--bg-raised);
+  --color-bg-overlay: var(--bg-overlay);
+  --color-bg-subtle: var(--bg-subtle);
+
+  --color-border-dim: var(--border-dim);
+  --color-border-default: var(--border-default);
+  --color-border-strong: var(--border-strong);
+
+  --color-text-primary: var(--text-primary);
+  --color-text-secondary: var(--text-secondary);
+  --color-text-tertiary: var(--text-tertiary);
+
+  --color-accent: var(--accent);
+  --color-accent-dim: var(--accent-dim);
+  --color-accent-mid: var(--accent-mid);
+  --color-accent-contrast: var(--accent-contrast);
+
+  --color-positive: #10b981;
+  --color-positive-dim: rgba(16, 185, 129, 0.1);
+  --color-warning: #f59e0b;
+  --color-warning-dim: rgba(245, 158, 11, 0.1);
+  --color-negative: #ef4444;
+  --color-negative-dim: rgba(239, 68, 68, 0.1);
+  --color-neutral: #64748b;
+
+  --font-sans: var(--font-sans);
+  --font-mono: var(--font-mono);
+
+  /* Aliases for seamless retrocompatibility across widgets */
+  --color-brand: var(--accent);
+  --color-brand-dim: var(--accent-dim);
+  --color-brand-glow: var(--accent-dim);
+  --color-bg-dark: var(--bg-base);
+  --color-panel-dark: var(--bg-raised);
+  --color-card-dark: var(--bg-overlay);
+  --color-card-inner: var(--bg-raised);
+  --color-card-highlight: var(--bg-subtle);
+  --color-border-dark: var(--border-dim);
+  --color-border-highlight: var(--border-default);
+  --color-border-subtle: var(--border-dim);
+  --color-text-dim: var(--text-tertiary);
+}
+
+:root, .dark-theme {
+  --bg-base: #05070c;
+  --bg-raised: #090b11;
+  --bg-overlay: #0d1017;
+  --bg-subtle: #121620;
+
+  --border-dim: #151a24;
+  --border-default: #1b2230;
+  --border-strong: #2a3447;
+
+  --text-primary: #f8fafc;
+  --text-secondary: #94a3b8;
+  --text-tertiary: #475569;
+
+  --accent: #c8f542;
+  --accent-dim: rgba(200, 245, 66, 0.08);
+  --accent-mid: rgba(200, 245, 66, 0.15);
+  --accent-contrast: #05070c;
+
+  --font-sans: "Plus Jakarta Sans", "Inter", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+}
+
+.light-theme {
+  --bg-base: #f1f5f9;       /* Slate 100 - clean, distinct neutral canvas */
+  --bg-raised: #ffffff;     /* Pure white cards with strong contrast */
+  --bg-overlay: #ffffff;    /* Pure white overlays and headers */
+  --bg-subtle: #e2e8f0;     /* Slate 200 - clear hover and active background */
+
+  --border-dim: #cbd5e1;     /* Slate 300 - clear, visible borders */
+  --border-default: #94a3b8; /* Slate 400 - distinct boundaries */
+  --border-strong: #475569;  /* Pronounced outlines */
+
+  --text-primary: #0f172a;   /* Rich slate 900 */
+  --text-secondary: #334155; /* Slate 700 */
+  --text-tertiary: #64748b;  /* Slate 500 */
+
+  --accent: #4f46e5;         /* Premium Indigo accent */
+  --accent-dim: rgba(79, 70, 229, 0.08);
+  --accent-mid: rgba(79, 70, 229, 0.16);
+  --accent-contrast: #ffffff;
+
+  --font-sans: "Plus Jakarta Sans", "Inter", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+}
+
+body {
+  background-color: var(--bg-base);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+}
+
+/* Custom Typography Utility classes */
+.metric-value {
+  font-family: var(--font-mono);
+  font-size: 26px;
+  font-weight: 500;
+  letter-spacing: -0.04em;
+  color: var(--text-primary);
+  line-height: 1;
+}
+
+.metric-label {
+  font-family: var(--font-sans);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+.data-cell {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--text-primary);
+}
+
+.label {
+  font-family: var(--font-sans);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+.body {
+  font-family: var(--font-sans);
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 1.6;
+  color: var(--text-secondary);
+}
+
+/* Custom components classes */
+.btn-primary {
+  background: var(--accent);
+  color: var(--accent-contrast);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 0 16px;
+  height: 32px;
+  border-radius: 3px;
+  border: none;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: opacity 120ms cubic-bezier(0.16, 1, 0.3, 1), transform 80ms ease;
+}
+.btn-primary:hover:not(:disabled) {
+  opacity: 0.88;
+}
+.btn-primary:active:not(:disabled) {
+  opacity: 0.75;
+  transform: scale(0.98);
+}
+.btn-primary:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.btn-ghost {
+  background: transparent;
+  color: var(--text-secondary);
+  border: 1px solid var(--border-default);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 0 16px;
+  height: 32px;
+  border-radius: 3px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: border-color 120ms, color 120ms, transform 80ms ease;
+}
+.btn-ghost:hover:not(:disabled) {
+  border-color: var(--border-strong);
+  color: var(--text-primary);
+}
+.btn-ghost:active:not(:disabled) {
+  transform: scale(0.98);
+}
+.btn-ghost:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.btn-danger {
+  background: rgba(239, 68, 68, 0.08);
+  color: #ef4444;
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 0 16px;
+  height: 32px;
+  border-radius: 3px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: background 120ms, border-color 120ms, transform 80ms ease;
+}
+.btn-danger:hover:not(:disabled) {
+  background: rgba(239, 68, 68, 0.15);
+  border-color: rgba(239, 68, 68, 0.4);
+}
+.btn-danger:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 3px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+.badge-new { background: var(--accent-dim); color: var(--accent); border: 1px solid var(--accent-mid); }
+.badge-active { background: rgba(16, 185, 129, 0.08); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.15); }
+.badge-warning { background: rgba(245, 158, 11, 0.08); color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.15); }
+.badge-danger { background: rgba(239, 68, 68, 0.08); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.15); }
+.badge-neutral { background: var(--bg-subtle); color: var(--text-secondary); border: 1px solid var(--border-default); }
+
+.input {
+  background: var(--bg-raised);
+  border: 1px solid var(--border-default);
+  border-radius: 3px;
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  height: 36px;
+  padding: 0 12px;
+  outline: none;
+  transition: border-color 120ms cubic-bezier(0.16, 1, 0.3, 1), box-shadow 120ms;
+}
+.input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-dim);
+}
+.input::placeholder {
+  color: var(--text-tertiary);
+}
+
+/* Custom Scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: var(--bg-base);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border-dim);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--accent);
+}
+
+/* Intelligence Scan Bar */
+.hal-intelligence-bar {
+  height: 1px;
+  background: var(--border-dim);
+  position: relative;
+  overflow: hidden;
+  width: 100%;
+}
+
+.hal-intelligence-bar::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -30%;
+  width: 30%;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    var(--accent),
+    transparent
+  );
+  animation: halScan 2.4s cubic-bezier(0.16, 1, 0.3, 1) infinite;
+}
+
+@keyframes halScan {
+  from { left: -30%; }
+  to   { left: 130%; }
+}
+
+/* Live Dot Pulse */
+.live-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #10b981;
+  animation: livePulse 2s ease-in-out infinite;
+}
+
+@keyframes livePulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%       { opacity: 0.4; transform: scale(0.85); }
+}
+
+/* Panel Entrance Animations */
+@keyframes panelEnter {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.panel {
+  animation: panelEnter 200ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Shimmer Skeletal Loading */
+@keyframes shimmer {
+  from { background-position: -200% 0; }
+  to   { background-position: 200% 0; }
+}
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--bg-raised) 25%,
+    var(--bg-subtle) 50%,
+    var(--bg-raised) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+  border-radius: 3px;
+}
+
+/* Legacy Class Adaptive Mappings to Preserve Brand Integrity in Light/Dark Mode */
+.bg-card-dark, .bg-card-inner, .bg-panel-dark, .bg-card-highlight {
+  background-color: var(--bg-raised) !important;
+}
+.bg-panel-dark {
+  background-color: var(--bg-subtle) !important;
+}
+.border-border-dark, 
+.border-border-dark\/60, 
+.border-border-dark\/40, 
+.border-border-dark\/50 {
+  border-color: var(--border-dim) !important;
+}
+.text-brand {
+  color: var(--accent) !important;
+}
+.text-text-dim {
+  color: var(--text-secondary) !important;
+}
+.text-white:not(.btn-primary):not(.btn-primary *):not(.bg-accent *):not(.bg-positive *):not(.bg-negative *):not(.bg-warning *):not(button):not(button *) {
+  color: var(--text-primary) !important;
+}

@@ -1,0 +1,1149 @@
+{
+  "contractors": [
+    {
+      "id": "con_admin_seed",
+      "email": "admin@kaislead.com",
+      "passwordHash": "7226c4b969c30fa022abdeefaf2af7b4b712b191db44192be342ade8fb95652af03faf4d4248d273c0bf676f973cba32693618c9bc8a42038bfb5a1f7440c7cc",
+      "name": "Isaac (Admin)",
+      "role": "admin",
+      "marketId": "market_winnipeg_calgary",
+      "createdAt": "2026-07-06T10:42:30.990Z",
+      "updatedAt": "2026-07-06T10:42:30.990Z"
+    },
+    {
+      "id": "con_isaac_seed",
+      "email": "kaisoisaac@gmail.com",
+      "passwordHash": "7226c4b969c30fa022abdeefaf2af7b4b712b191db44192be342ade8fb95652af03faf4d4248d273c0bf676f973cba32693618c9bc8a42038bfb5a1f7440c7cc",
+      "name": "Isaac",
+      "role": "admin",
+      "marketId": "market_winnipeg_calgary",
+      "createdAt": "2026-08-15T09:59:14.706Z",
+      "updatedAt": "2026-08-15T09:59:14.707Z"
+    }
+  ],
+  "sessions": [
+    {
+      "id": "sess_e65f312070ad153c",
+      "contractorId": "con_admin_seed",
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb250cmFjdG9ySWQiOiJjb25fYWRtaW5fc2VlZCIsImVtYWlsIjoiYWRtaW5Aa2Fpc2xlYWQuY29tIiwicm9sZSI6ImFkbWluIiwiZXhwIjoxNzg0MDMwNDgzfQ.8b0oiDZXT-83uAcVLb06vBo86v8YPKXpvQ5oJqJw5B8",
+      "expiresAt": "2026-07-14T12:01:23.411Z",
+      "createdAt": "2026-07-13T12:01:23.411Z"
+    },
+    {
+      "id": "sess_98a386708933e017",
+      "contractorId": "con_admin_seed",
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb250cmFjdG9ySWQiOiJjb25fYWRtaW5fc2VlZCIsImVtYWlsIjoiYWRtaW5Aa2Fpc2xlYWQuY29tIiwicm9sZSI6ImFkbWluIiwiZXhwIjoxNzg2ODczMzY1fQ.xkO_3tcaM7aWlr34RAhom-03GcN0bQJu0DEKesfZ14E",
+      "expiresAt": "2026-08-16T09:42:45.573Z",
+      "createdAt": "2026-08-15T09:42:45.574Z"
+    },
+    {
+      "id": "sess_c0fe9f2b0121d564",
+      "contractorId": "con_admin_seed",
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb250cmFjdG9ySWQiOiJjb25fYWRtaW5fc2VlZCIsImVtYWlsIjoiYWRtaW5Aa2Fpc2xlYWQuY29tIiwicm9sZSI6ImFkbWluIiwiZXhwIjoxNzg2ODczMzczfQ.NeqbLOZbl32hxSs43P5e94OtlrmwNe54KA2p-v9Rnyg",
+      "expiresAt": "2026-08-16T09:42:53.020Z",
+      "createdAt": "2026-08-15T09:42:53.020Z"
+    },
+    {
+      "id": "sess_792c93be42b8fbfc",
+      "contractorId": "con_admin_seed",
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb250cmFjdG9ySWQiOiJjb25fYWRtaW5fc2VlZCIsImVtYWlsIjoiYWRtaW5Aa2Fpc2xlYWQuY29tIiwicm9sZSI6ImFkbWluIiwiZXhwIjoxNzg2ODczNDY4fQ.6qEHazTPEwkWNj7F2UjpcEGMbCDUS7LavbubXvK9vGw",
+      "expiresAt": "2026-08-16T09:44:28.145Z",
+      "createdAt": "2026-08-15T09:44:28.145Z"
+    },
+    {
+      "id": "sess_8d522886c318b235",
+      "contractorId": "con_admin_seed",
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb250cmFjdG9ySWQiOiJjb25fYWRtaW5fc2VlZCIsImVtYWlsIjoiYWRtaW5Aa2Fpc2xlYWQuY29tIiwicm9sZSI6ImFkbWluIiwiZXhwIjoxNzg2ODc0MTkwfQ.H3jSjKqE2fCSAbgeciLQfsAsYYrC20mjolN2kmH1nCM",
+      "expiresAt": "2026-08-16T09:56:30.500Z",
+      "createdAt": "2026-08-15T09:56:30.501Z"
+    },
+    {
+      "id": "sess_bfbd5fb4727fac1e",
+      "contractorId": "con_admin_seed",
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb250cmFjdG9ySWQiOiJjb25fYWRtaW5fc2VlZCIsImVtYWlsIjoiYWRtaW5Aa2Fpc2xlYWQuY29tIiwicm9sZSI6ImFkbWluIiwiZXhwIjoxNzg2ODc0MTk5fQ.QuXaEQGhLcY1AEHdgs1ZHhjIpaOjBy9aJ298jaQMq40",
+      "expiresAt": "2026-08-16T09:56:39.240Z",
+      "createdAt": "2026-08-15T09:56:39.240Z"
+    },
+    {
+      "id": "sess_8d46f4b56776dd46",
+      "contractorId": "con_admin_seed",
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb250cmFjdG9ySWQiOiJjb25fYWRtaW5fc2VlZCIsImVtYWlsIjoiYWRtaW5Aa2Fpc2xlYWQuY29tIiwicm9sZSI6ImFkbWluIiwiZXhwIjoxNzg2ODc0MjQwfQ.X0_e-rfyD49DemGgFOz23zc4Fvt6dRhr2AtxiXKspo4",
+      "expiresAt": "2026-08-16T09:57:20.327Z",
+      "createdAt": "2026-08-15T09:57:20.327Z"
+    }
+  ],
+  "passwordResets": [],
+  "leads": [
+    {
+      "id": "lead_seed_3",
+      "contractorId": "con_admin_seed",
+      "businessName": "Pump-Tech Plumbing",
+      "ownerName": "Matthew",
+      "emailEncrypted": "2cf4bb9de70ac858ada33942:52f366875c3ee3aeaac4ee34d832637bb4b51681089435605d8d8a68:92dc196756573c2bd1a19027301bb1c4",
+      "city": "Winnipeg",
+      "serviceType": "sump pump",
+      "source": "cold_outreach",
+      "status": "new",
+      "urgencyScore": 6.1,
+      "predictedLtvUsd": 2034,
+      "notes": "Seeded lead for Pump-Tech Plumbing in Winnipeg. Niche: sump pump.",
+      "createdAt": "2026-06-09T10:42:30.993Z",
+      "updatedAt": "2026-07-06T10:42:30.990Z"
+    },
+    {
+      "id": "lead_seed_5",
+      "contractorId": "con_admin_seed",
+      "businessName": "The Pleasant Plumber",
+      "ownerName": "Barrett Ferguson",
+      "emailEncrypted": "c6dbec08aadf64a38384a321:3e7731174485fc8d684bd4a586cdedd33d95eebcc7f172b2f99784aab9:373f0dabe7779089210e306cdb777fb2",
+      "city": "Winnipeg",
+      "serviceType": "plumbing",
+      "source": "cold_outreach",
+      "status": "new",
+      "urgencyScore": 7.8,
+      "predictedLtvUsd": 2449,
+      "notes": "Seeded lead for The Pleasant Plumber in Winnipeg. Niche: plumbing.",
+      "createdAt": "2026-06-11T10:42:30.993Z",
+      "updatedAt": "2026-07-06T10:42:30.990Z"
+    },
+    {
+      "id": "lead_seed_8",
+      "contractorId": "con_admin_seed",
+      "businessName": "Guardian Plumbing & Heating",
+      "ownerName": "Dylan",
+      "emailEncrypted": "832012090dc3870d05e8c175:76d134f7b0276928b7b38b60980c2800da3b01bb644e713b54bd308d:f2537491f1ad353ac44fb2cb9d3dfad0",
+      "city": "Landmark",
+      "serviceType": "plumbing & heating",
+      "source": "cold_outreach",
+      "status": "new",
+      "urgencyScore": 6.2,
+      "predictedLtvUsd": 3455,
+      "notes": "Seeded lead for Guardian Plumbing & Heating in Landmark. Niche: plumbing & heating.",
+      "createdAt": "2026-06-14T10:42:30.993Z",
+      "updatedAt": "2026-07-06T10:42:30.990Z"
+    },
+    {
+      "id": "lead_seed_9",
+      "contractorId": "con_admin_seed",
+      "businessName": "River Park South Plumbing",
+      "emailEncrypted": "68450758e407a38f03b449ca:1d535ec02c329fe2a69c0d015a0173b3655ee33349e53224ef40a03b8c316341:b1f3de60def34626a7823652dfebcb91",
+      "city": "Winnipeg",
+      "serviceType": "plumbing",
+      "source": "cold_outreach",
+      "status": "new",
+      "urgencyScore": 8.4,
+      "predictedLtvUsd": 1503,
+      "notes": "Seeded lead for River Park South Plumbing in Winnipeg. Niche: plumbing.",
+      "createdAt": "2026-06-15T10:42:30.993Z",
+      "updatedAt": "2026-07-06T10:42:30.990Z"
+    },
+    {
+      "id": "lead_seed_11",
+      "contractorId": "con_admin_seed",
+      "businessName": "Polar Plumbing & Heating",
+      "ownerName": "Gord",
+      "emailEncrypted": "d2e5c7f5964cfcb91e6e43dd:f9521fd89f070fe089ea6ce02934340d574a0c4978:a0ac520382dcb4e48df6701ed7bc7bd6",
+      "city": "Winkler",
+      "serviceType": "plumbing & heating",
+      "source": "cold_outreach",
+      "status": "new",
+      "urgencyScore": 7.3,
+      "predictedLtvUsd": 3488,
+      "notes": "Seeded lead for Polar Plumbing & Heating in Winkler. Niche: plumbing & heating.",
+      "createdAt": "2026-06-17T10:42:30.993Z",
+      "updatedAt": "2026-07-06T10:42:30.990Z"
+    },
+    {
+      "id": "lead_seed_12",
+      "contractorId": "con_admin_seed",
+      "businessName": "Brown's Plumbing & Heating",
+      "ownerName": "Chad",
+      "emailEncrypted": "5c9502096e17e887548e86ed:18266ba28b1969823e6514a30b8ad7a3d44b6259bbc0:2e21d1de6a45c8955ab428c19dd89273",
+      "city": "Morris",
+      "serviceType": "plumbing",
+      "source": "cold_outreach",
+      "status": "new",
+      "urgencyScore": 6,
+      "predictedLtvUsd": 2048,
+      "notes": "Seeded lead for Brown's Plumbing & Heating in Morris. Niche: plumbing.",
+      "createdAt": "2026-06-18T10:42:30.993Z",
+      "updatedAt": "2026-07-06T10:42:30.990Z"
+    },
+    {
+      "id": "lead_seed_13",
+      "contractorId": "con_admin_seed",
+      "businessName": "Grand Slam Plumbing",
+      "emailEncrypted": "775c0fa4b25542058cc09cff:6b2b352fbe58e418a4ad1f84329c7c6e656e4745fe17aa23a635:3d8fc67d4e1266a433aaf221d5d46b1d",
+      "city": "Brandon",
+      "serviceType": "plumbing",
+      "source": "cold_outreach",
+      "status": "new",
+      "urgencyScore": 6.4,
+      "predictedLtvUsd": 2189,
+      "notes": "Seeded lead for Grand Slam Plumbing in Brandon. Niche: plumbing.",
+      "createdAt": "2026-06-19T10:42:30.993Z",
+      "updatedAt": "2026-07-06T10:42:30.990Z"
+    },
+    {
+      "id": "lead_seed_17",
+      "contractorId": "con_admin_seed",
+      "businessName": "Adam Arbeau Plumbing",
+      "ownerName": "Adam Arbeau",
+      "emailEncrypted": "58c3decfbb13a9a0ffec0203:b8961d053b265ebb4f24c9d2879a481b568bec:e1e5c5c2eabfe9f9e6ed7d6a20b55364",
+      "city": "Fredericton",
+      "serviceType": "plumbing",
+      "source": "cold_outreach",
+      "status": "new",
+      "urgencyScore": 6.2,
+      "predictedLtvUsd": 3083,
+      "notes": "Tier C. Adam Arbeau Plumbing has no website or online presence. Skip cold email, do not waste time here.",
+      "createdAt": "2026-06-23T10:42:30.994Z",
+      "updatedAt": "2026-07-06T10:42:30.990Z"
+    },
+    {
+      "id": "lead_seed_18",
+      "contractorId": "con_admin_seed",
+      "businessName": "Phil Dixon Plumbing",
+      "ownerName": "Phil Dixon",
+      "emailEncrypted": "d1caf673d799e5b88a39cc58:3e45a0e0d8199a1926c34887ef91e3022501dd4f4a7b:44fcfbb2ed66feac8da6ee5472c1512b",
+      "city": "Fredericton",
+      "serviceType": "plumbing",
+      "source": "cold_outreach",
+      "status": "new",
+      "urgencyScore": 8.8,
+      "predictedLtvUsd": 2072,
+      "notes": "Tier C. Phil Dixon Plumbing has no website or online presence. Skip cold email, do not waste time here.",
+      "createdAt": "2026-06-24T10:42:30.994Z",
+      "updatedAt": "2026-07-06T10:42:30.990Z"
+    },
+    {
+      "id": "lead_seed_19",
+      "contractorId": "con_admin_seed",
+      "businessName": "Grant West Plumbing",
+      "ownerName": "Grant West",
+      "emailEncrypted": "f8d5c462cb945f0e4c6bf729:ea156453a4e9ff88a0251c4bf01d2ce5291007085a8b0803567bc5:6aea73e1ece3500a2550cdb508b83358",
+      "city": "Fredericton",
+      "serviceType": "plumbing",
+      "source": "cold_outreach",
+      "status": "new",
+      "urgencyScore": 5.2,
+      "predictedLtvUsd": 2066,
+      "notes": "Tier C. Grant West Plumbing has no website or online presence. Skip cold email, do not waste time here.",
+      "createdAt": "2026-06-25T10:42:30.995Z",
+      "updatedAt": "2026-07-06T10:42:30.990Z"
+    },
+    {
+      "id": "lead_seed_22",
+      "contractorId": "con_admin_seed",
+      "businessName": "Wise Cracks Fredericton",
+      "emailEncrypted": "028d40817d9e776450e9052d:01ef6148dc087f7354961c0d79c8c5bf7f9cbf:4061d6085ddb1e1dc9734663e391c363",
+      "city": "Fredericton",
+      "serviceType": "basement waterproofing",
+      "source": "cold_outreach",
+      "status": "new",
+      "urgencyScore": 7.1,
+      "predictedLtvUsd": 2818,
+      "notes": "Tier B. Wise Cracks Fredericton (wisecracks.com). Basement waterproofing franchise. No active local Google search ads.",
+      "createdAt": "2026-06-28T10:42:30.995Z",
+      "updatedAt": "2026-07-06T10:42:30.990Z"
+    },
+    {
+      "id": "lead_seed_23",
+      "contractorId": "con_admin_seed",
+      "businessName": "WINMAR Fredericton",
+      "emailEncrypted": "3bef25d02e687afa797b4a3b:4cbc77dacbf12e2e335279af3c0c3ef9796e45c38d:ce0e94df1564abcfbb2cea7fe9bec7d4",
+      "city": "Fredericton",
+      "serviceType": "flood restoration",
+      "source": "cold_outreach",
+      "status": "new",
+      "urgencyScore": 7.7,
+      "predictedLtvUsd": 2811,
+      "notes": "Tier A. WINMAR Fredericton (winmarfredericton.com). Restoration giant. Verified website but corporate franchise boundaries. Good backup for high-intent weather trigger campaigns.",
+      "createdAt": "2026-06-29T10:42:30.995Z",
+      "updatedAt": "2026-07-06T10:42:30.990Z"
+    },
+    {
+      "id": "lead_seed_34",
+      "contractorId": "con_admin_seed",
+      "businessName": "Kingstree Plumbing",
+      "ownerName": "Brett Kingstree",
+      "emailEncrypted": "73e7b2b2cf6d0809af129fe2:1549fb6ee31b7241c7a0b0801d9217c210bb5517cf81126673c7:10dcc03f841348b9cca3f0b7f7ea8fb6",
+      "city": "Sherwood Park",
+      "serviceType": "plumbing",
+      "source": "cold_outreach",
+      "status": "new",
+      "urgencyScore": 5.6,
+      "predictedLtvUsd": 2536,
+      "notes": "Seeded lead for Kingstree Plumbing in Sherwood Park. Niche: plumbing.",
+      "createdAt": "2026-07-10T10:42:30.995Z",
+      "updatedAt": "2026-07-06T10:42:30.990Z"
+    },
+    {
+      "id": "lead_seed_35",
+      "contractorId": "con_admin_seed",
+      "businessName": "The Gentlemen Pros Calgary",
+      "ownerName": "Brham Trim",
+      "emailEncrypted": "2dbda3c510ddc3ffcc232811:3f15012773cf6ef946423bd40c7f11:cf742135cea29a03f4addc12519ec0e4",
+      "city": "Calgary",
+      "serviceType": "home services",
+      "source": "cold_outreach",
+      "status": "new",
+      "urgencyScore": 7.8,
+      "predictedLtvUsd": 3359,
+      "notes": "Seeded lead for The Gentlemen Pros Calgary in Calgary. Niche: home services.",
+      "createdAt": "2026-07-11T10:42:30.995Z",
+      "updatedAt": "2026-07-06T10:42:30.990Z"
+    },
+    {
+      "id": "lead_seed_43",
+      "contractorId": "con_admin_seed",
+      "businessName": "Nordic Plumbing",
+      "ownerName": "Dennis Baldwin",
+      "emailEncrypted": "576d324728e4b61bf5c7259c:d66e88375fec2e9a60e0e5596a0c4abe6b501c9962d04ddb5e57:0b84838a526a795f5c390cdc2ce11c5f",
+      "city": "Winnipeg",
+      "serviceType": "plumbing",
+      "source": "cold_outreach",
+      "status": "new",
+      "urgencyScore": 6,
+      "predictedLtvUsd": 3057,
+      "notes": "Seeded lead for Nordic Plumbing in Winnipeg. Niche: plumbing.",
+      "createdAt": "2026-07-19T10:42:30.995Z",
+      "updatedAt": "2026-07-06T10:42:30.990Z"
+    },
+    {
+      "id": "lead_seed_45",
+      "contractorId": "con_admin_seed",
+      "businessName": "Aloha Plumbing & Drain",
+      "ownerName": "Angel Sanchez",
+      "emailEncrypted": "72258130f0541b4cfdef303b:b22dfbfa5b9428045897e80e8cdc4ca027bea2345dbd016bc3:64e7deed5995fbd38452ad16966c631a",
+      "city": "Winnipeg",
+      "serviceType": "plumbing",
+      "source": "cold_outreach",
+      "status": "new",
+      "urgencyScore": 7.3,
+      "predictedLtvUsd": 2320,
+      "notes": "Seeded lead for Aloha Plumbing & Drain in Winnipeg. Niche: plumbing.",
+      "createdAt": "2026-07-21T10:42:30.995Z",
+      "updatedAt": "2026-07-06T10:42:30.990Z"
+    },
+    {
+      "id": "lead_seed_48",
+      "contractorId": "con_admin_seed",
+      "businessName": "Northern Concrete Repair",
+      "ownerName": "Joel Smith",
+      "emailEncrypted": "57ab6a2ef07199480a0c2eb0:41f73340c0b3ab6a197e6ed79d7c67677b430688d531d87c81f9a138921284766fafed6f:ff9c7daba744f0dc9d930799e6ac7d26",
+      "city": "Fredericton",
+      "serviceType": "waterproofing & concrete",
+      "source": "cold_outreach",
+      "status": "new",
+      "urgencyScore": 8.4,
+      "predictedLtvUsd": 2757,
+      "notes": "Tier B/C. Northern Concrete Repair (northernconstruction.ca). Concrete & foundation repair. Low review profile.",
+      "createdAt": "2026-07-24T10:42:30.995Z",
+      "updatedAt": "2026-07-06T10:42:30.990Z"
+    },
+    {
+      "id": "lead_seed_2",
+      "contractorId": "con_admin_seed",
+      "businessName": "ILV Plumbing Services",
+      "ownerName": "Ilias",
+      "emailEncrypted": "d9f2e190a972deb0a5ae31d7:12d6d531db905fd47bf8cc808f2b94cb894c403443:754d4f3e9851a1d091fccd489980aa40",
+      "city": "Winnipeg",
+      "serviceType": "plumbing",
+      "source": "cold_outreach",
+      "status": "contacted",
+      "urgencyScore": 8.5,
+      "predictedLtvUsd": 1828,
+      "notes": "Seeded lead for ILV Plumbing Services in Winnipeg. Niche: plumbing.",
+      "createdAt": "2026-06-08T10:42:30.996Z",
+      "updatedAt": "2026-07-06T10:42:30.990Z"
+    },
+    {
+      "id": "lead_seed_4",
+      "contractorId": "con_admin_seed",
+      "businessName": "Worthy Pick Plumbing",
+      "emailEncrypted": "f966872d7ae6ca20ed5f1ceb:de2c5cab3064dd90549df26ed36fdc1d3421:8877e091d6f7e67460915e0415c06694",
+      "city": "Winnipeg",
+      "serviceType": "plumbing",
+      "source": "cold_outreach",
+      "status": "contacted",
+      "urgencyScore": 7.3,
+      "predictedLtvUsd": 2354,
+      "notes": "Seeded lead for Worthy Pick Plumbing in Winnipeg. Niche: plumbing.",
+      "createdAt": "2026-06-10T10:42:30.996Z",
+      "updatedAt": "2026-07-06T10:42:30.990Z"
+    },
+    {
+      "id": "lead_seed_6",
+      "contractorId": "con_admin_seed",
+      "businessName": "Next-Gen Plumbing & Heating",
+      "emailEncrypted": "62962950cf6df00962f230ef:e534fe37fcdd88c38734987154e1502034417506eb12a3:48b56acfe63ee2b8cc93e1e777cfd14b",
+      "city": "Winnipeg",
+      "serviceType": "plumbing",
+      "source": "cold_outreach",
+      "status": "converted",
+      "urgencyScore": 7.2,
+      "predictedLtvUsd": 3500,
+      "notes": "Seeded lead for Next-Gen Plumbing & Heating in Winnipeg. Niche: plumbing.",
+      "createdAt": "2026-06-12T10:42:30.996Z",
+      "updatedAt": "2026-07-06T10:42:30.990Z"
+    }
+  ],
+  "leadEvents": [],
+  "campaigns": [
+    {
+      "id": "camp_seed_winnipeg",
+      "contractorId": "con_admin_seed",
+      "marketId": "market_winnipeg",
+      "name": "Winnipeg Sump Pump & Plumbing",
+      "platform": "google_ads",
+      "budget": 1800,
+      "spent": 1250,
+      "status": "active",
+      "startDate": "2026-06-06T10:42:30.996Z",
+      "createdAt": "2026-06-06T10:42:30.996Z",
+      "updatedAt": "2026-07-06T10:42:30.990Z"
+    },
+    {
+      "id": "camp_seed_calgary",
+      "contractorId": "con_admin_seed",
+      "marketId": "market_calgary",
+      "name": "Calgary General Plumbing",
+      "platform": "google_ads",
+      "budget": 2200,
+      "spent": 1400,
+      "status": "active",
+      "startDate": "2026-06-21T10:42:30.996Z",
+      "createdAt": "2026-06-21T10:42:30.996Z",
+      "updatedAt": "2026-07-06T10:42:30.990Z"
+    }
+  ],
+  "performanceSnapshots": [
+    {
+      "id": "snap_w_7",
+      "campaignId": "camp_seed_winnipeg",
+      "date": "2026-06-29",
+      "leads": 4,
+      "spend": 47.99373607463,
+      "cpl": 12,
+      "clicks": 34,
+      "impressions": 287,
+      "createdAt": "2026-07-06T10:42:30.990Z"
+    },
+    {
+      "id": "snap_c_7",
+      "campaignId": "camp_seed_calgary",
+      "date": "2026-06-29",
+      "leads": 2,
+      "spend": 65.13145709478692,
+      "cpl": 32.57,
+      "clicks": 12,
+      "impressions": 384,
+      "createdAt": "2026-07-06T10:42:30.990Z"
+    },
+    {
+      "id": "snap_w_6",
+      "campaignId": "camp_seed_winnipeg",
+      "date": "2026-06-30",
+      "leads": 5,
+      "spend": 44.73488196758265,
+      "cpl": 8.95,
+      "clicks": 21,
+      "impressions": 317,
+      "createdAt": "2026-07-06T10:42:30.990Z"
+    },
+    {
+      "id": "snap_c_6",
+      "campaignId": "camp_seed_calgary",
+      "date": "2026-06-30",
+      "leads": 2,
+      "spend": 62.577120189885534,
+      "cpl": 31.29,
+      "clicks": 17,
+      "impressions": 262,
+      "createdAt": "2026-07-06T10:42:30.990Z"
+    },
+    {
+      "id": "snap_w_5",
+      "campaignId": "camp_seed_winnipeg",
+      "date": "2026-07-01",
+      "leads": 5,
+      "spend": 42.12225659496403,
+      "cpl": 8.42,
+      "clicks": 26,
+      "impressions": 360,
+      "createdAt": "2026-07-06T10:42:30.990Z"
+    },
+    {
+      "id": "snap_c_5",
+      "campaignId": "camp_seed_calgary",
+      "date": "2026-07-01",
+      "leads": 3,
+      "spend": 68.09144130567199,
+      "cpl": 22.7,
+      "clicks": 26,
+      "impressions": 594,
+      "createdAt": "2026-07-06T10:42:30.990Z"
+    },
+    {
+      "id": "snap_w_4",
+      "campaignId": "camp_seed_winnipeg",
+      "date": "2026-07-02",
+      "leads": 2,
+      "spend": 41.87810056369572,
+      "cpl": 20.94,
+      "clicks": 31,
+      "impressions": 371,
+      "createdAt": "2026-07-06T10:42:30.990Z"
+    },
+    {
+      "id": "snap_c_4",
+      "campaignId": "camp_seed_calgary",
+      "date": "2026-07-02",
+      "leads": 1,
+      "spend": 69.37295576468784,
+      "cpl": 69.37,
+      "clicks": 20,
+      "impressions": 395,
+      "createdAt": "2026-07-06T10:42:30.990Z"
+    },
+    {
+      "id": "snap_w_3",
+      "campaignId": "camp_seed_winnipeg",
+      "date": "2026-07-03",
+      "leads": 4,
+      "spend": 45.56304628115393,
+      "cpl": 11.39,
+      "clicks": 18,
+      "impressions": 310,
+      "createdAt": "2026-07-06T10:42:30.990Z"
+    },
+    {
+      "id": "snap_c_3",
+      "campaignId": "camp_seed_calgary",
+      "date": "2026-07-03",
+      "leads": 2,
+      "spend": 66.2514717717425,
+      "cpl": 33.13,
+      "clicks": 31,
+      "impressions": 551,
+      "createdAt": "2026-07-06T10:42:30.990Z"
+    },
+    {
+      "id": "snap_w_2",
+      "campaignId": "camp_seed_winnipeg",
+      "date": "2026-07-04",
+      "leads": 4,
+      "spend": 46.8714235998927,
+      "cpl": 11.72,
+      "clicks": 24,
+      "impressions": 349,
+      "createdAt": "2026-07-06T10:42:30.990Z"
+    },
+    {
+      "id": "snap_c_2",
+      "campaignId": "camp_seed_calgary",
+      "date": "2026-07-04",
+      "leads": 2,
+      "spend": 55.736745695210985,
+      "cpl": 27.87,
+      "clicks": 27,
+      "impressions": 595,
+      "createdAt": "2026-07-06T10:42:30.990Z"
+    },
+    {
+      "id": "snap_w_1",
+      "campaignId": "camp_seed_winnipeg",
+      "date": "2026-07-05",
+      "leads": 2,
+      "spend": 40.22138698184188,
+      "cpl": 20.11,
+      "clicks": 15,
+      "impressions": 327,
+      "createdAt": "2026-07-06T10:42:30.990Z"
+    },
+    {
+      "id": "snap_c_1",
+      "campaignId": "camp_seed_calgary",
+      "date": "2026-07-05",
+      "leads": 3,
+      "spend": 55.557862886141244,
+      "cpl": 18.52,
+      "clicks": 27,
+      "impressions": 518,
+      "createdAt": "2026-07-06T10:42:30.990Z"
+    }
+  ],
+  "revenues": [
+    {
+      "id": "rev_seed_6",
+      "leadId": "lead_seed_6",
+      "contractorId": "con_admin_seed",
+      "amountUsd": 3500,
+      "source": "manual_entry",
+      "recordedAt": "2026-07-04T10:42:30.996Z"
+    }
+  ],
+  "forecasts": [
+    {
+      "id": "fc_seed_expired",
+      "contractorId": "con_admin_seed",
+      "metric": "lead_volume",
+      "predicted": 25,
+      "confidenceScore": 0.82,
+      "targetDate": "2026-07-05T10:42:30.996Z",
+      "modelVersion": "v1_manual",
+      "evaluated": false,
+      "assumptions": "Assumed high interest due to local rain and weather flooding warnings.",
+      "createdAt": "2026-06-28T10:42:30.996Z"
+    },
+    {
+      "id": "fc_seed_future",
+      "contractorId": "con_admin_seed",
+      "metric": "cpl",
+      "predicted": 18.5,
+      "confidenceScore": 0.74,
+      "targetDate": "2026-07-11T10:42:30.996Z",
+      "modelVersion": "v1_auto",
+      "evaluated": false,
+      "assumptions": "Predicted based on seasonal optimization adjustments and lowered bidding competition.",
+      "createdAt": "2026-07-04T10:42:30.996Z"
+    }
+  ],
+  "predictionOutcomes": [],
+  "learningInsights": [
+    {
+      "id": "insight_seed_1",
+      "category": "weather_elasticity",
+      "insight": "Sump pump lead generation volume is highly elastic to local daily rainfall exceeding 10mm (elasticity factor: 2.8x volume increase within 12 hours).",
+      "confidence": 0.94,
+      "observedCount": 4,
+      "createdAt": "2026-07-06T10:42:30.990Z",
+      "updatedAt": "2026-07-06T10:42:30.990Z"
+    },
+    {
+      "id": "insight_seed_2",
+      "category": "competition_decay",
+      "insight": "Weekend Cost-Per-Click (CPC) drops by 24% across Winnipeg home services because competitors pause budgets, but conversion rates remain within 5% of weekday levels.",
+      "confidence": 0.88,
+      "observedCount": 8,
+      "createdAt": "2026-07-06T10:42:30.990Z",
+      "updatedAt": "2026-07-06T10:42:30.990Z"
+    }
+  ],
+  "recommendations": [
+    {
+      "id": "rec_seed_1",
+      "contractorId": "con_admin_seed",
+      "category": "budget_allocation",
+      "action": "Shift $400 from Calgary General Plumbing to Winnipeg Sump Pump Campaign",
+      "rationale": "Winnipeg campaign shows a Cost-Per-Lead (CPL) of $12.50 vs Calgary's $22.40. Reallocating budget maximizes total generated leads within the same aggregate budget constraint.",
+      "confidence": 0.91,
+      "evidence": "Cost efficiency difference is statistically significant (p < 0.01) based on performance over the last 14 days.",
+      "status": "pending",
+      "createdAt": "2026-07-06T10:42:30.990Z",
+      "updatedAt": "2026-07-06T10:42:30.990Z"
+    },
+    {
+      "id": "rec_seed_2",
+      "contractorId": "con_admin_seed",
+      "category": "bidding_strategy",
+      "action": "Enable Enhanced CPC for emergency basement flood waterproofing keywords",
+      "rationale": "Search queries peak during night hours due to current weather conditions in Fredericton. Automated bid multipliers will capture high-intent emergency traffic.",
+      "confidence": 0.85,
+      "evidence": "Conversion rate of night-time queries is 3.5x higher than daytime counterparts during raining days.",
+      "status": "pending",
+      "createdAt": "2026-07-06T10:42:30.990Z",
+      "updatedAt": "2026-07-06T10:42:30.990Z"
+    }
+  ],
+  "lessons": [],
+  "outcomeRecords": [],
+  "apiKeys": [],
+  "notifications": [],
+  "systemAuditLogs": [
+    {
+      "contractorId": "con_admin_seed",
+      "action": "LOGIN_SUCCESS",
+      "ipAddress": "127.0.0.1",
+      "details": "Contractor logged in successfully: admin@kaislead.com",
+      "id": "log_54da84eddbbff67c",
+      "createdAt": "2026-07-13T12:01:23.412Z"
+    },
+    {
+      "contractorId": "con_admin_seed",
+      "action": "LOGIN_SUCCESS",
+      "ipAddress": "127.0.0.1",
+      "details": "Contractor logged in successfully: admin@kaislead.com",
+      "id": "log_8d1be1a122e9c5ba",
+      "createdAt": "2026-08-15T09:42:45.574Z"
+    },
+    {
+      "contractorId": "con_admin_seed",
+      "action": "LOGIN_SUCCESS",
+      "ipAddress": "127.0.0.1",
+      "details": "Contractor logged in successfully: admin@kaislead.com",
+      "id": "log_2763f9cb32da2655",
+      "createdAt": "2026-08-15T09:42:53.021Z"
+    },
+    {
+      "contractorId": "con_admin_seed",
+      "action": "LOGIN_SUCCESS",
+      "ipAddress": "127.0.0.1",
+      "details": "Contractor logged in successfully: admin@kaislead.com",
+      "id": "log_0797847970b011da",
+      "createdAt": "2026-08-15T09:44:28.145Z"
+    },
+    {
+      "contractorId": "con_admin_seed",
+      "action": "LEADS_VIEW_CHANGED",
+      "details": "Switched lead directory workspace view to: LIST",
+      "ipAddress": "127.0.0.1",
+      "id": "log_3a18b094da3d0635",
+      "createdAt": "2026-08-15T09:48:12.798Z"
+    },
+    {
+      "contractorId": "con_admin_seed",
+      "action": "LEADS_VIEW_CHANGED",
+      "details": "Switched lead directory workspace view to: LIST",
+      "ipAddress": "127.0.0.1",
+      "id": "log_8b34697afc429a2f",
+      "createdAt": "2026-08-15T09:48:12.800Z"
+    },
+    {
+      "contractorId": "con_admin_seed",
+      "action": "MAP_DASHBOARD_MOUNTED",
+      "details": "Conquest Map opened via OpenStreetMap Real Tile Engine. Available entries: 20",
+      "ipAddress": "127.0.0.1",
+      "id": "log_6a7398619947504b",
+      "createdAt": "2026-08-15T09:48:17.954Z"
+    },
+    {
+      "contractorId": "con_admin_seed",
+      "action": "MAP_DASHBOARD_MOUNTED",
+      "details": "Conquest Map opened via OpenStreetMap Real Tile Engine. Available entries: 20",
+      "ipAddress": "127.0.0.1",
+      "id": "log_e6e5874bf558f03a",
+      "createdAt": "2026-08-15T09:48:17.964Z"
+    },
+    {
+      "contractorId": "con_admin_seed",
+      "action": "MAP_DASHBOARD_MOUNTED",
+      "details": "Conquest Map opened via OpenStreetMap Real Tile Engine. Available entries: 20",
+      "ipAddress": "127.0.0.1",
+      "id": "log_2541b4fb8d758f42",
+      "createdAt": "2026-08-15T09:52:32.975Z"
+    },
+    {
+      "contractorId": "con_admin_seed",
+      "action": "MAP_DASHBOARD_MOUNTED",
+      "details": "Conquest Map opened via OpenStreetMap Real Tile Engine. Available entries: 20",
+      "ipAddress": "127.0.0.1",
+      "id": "log_0af65339b7073bf5",
+      "createdAt": "2026-08-15T09:52:32.989Z"
+    },
+    {
+      "contractorId": "con_admin_seed",
+      "action": "MAP_DASHBOARD_MOUNTED",
+      "details": "Conquest Map opened via OpenStreetMap Real Tile Engine. Available entries: 20",
+      "ipAddress": "127.0.0.1",
+      "id": "log_9a7e71663c1d8f0b",
+      "createdAt": "2026-08-15T09:52:39.835Z"
+    },
+    {
+      "contractorId": "con_admin_seed",
+      "action": "MAP_DASHBOARD_MOUNTED",
+      "details": "Conquest Map opened via OpenStreetMap Real Tile Engine. Available entries: 20",
+      "ipAddress": "127.0.0.1",
+      "id": "log_9d4aba9b8d0943a9",
+      "createdAt": "2026-08-15T09:52:39.838Z"
+    },
+    {
+      "contractorId": "con_admin_seed",
+      "action": "LEADS_VIEW_CHANGED",
+      "details": "Switched lead directory workspace view to: LIST",
+      "ipAddress": "127.0.0.1",
+      "id": "log_37e853ee844ff8f7",
+      "createdAt": "2026-08-15T09:52:55.312Z"
+    },
+    {
+      "contractorId": "con_admin_seed",
+      "action": "LEADS_VIEW_CHANGED",
+      "details": "Switched lead directory workspace view to: LIST",
+      "ipAddress": "127.0.0.1",
+      "id": "log_a128ca3f849619d1",
+      "createdAt": "2026-08-15T09:52:55.313Z"
+    },
+    {
+      "contractorId": "con_admin_seed",
+      "action": "LOGIN_SUCCESS",
+      "ipAddress": "127.0.0.1",
+      "details": "Contractor logged in successfully: admin@kaislead.com",
+      "id": "log_9fc327657d7cf720",
+      "createdAt": "2026-08-15T09:56:30.501Z"
+    },
+    {
+      "contractorId": "con_admin_seed",
+      "action": "LOGIN_SUCCESS",
+      "ipAddress": "127.0.0.1",
+      "details": "Contractor logged in successfully: admin@kaislead.com",
+      "id": "log_49f29ff76909c4ea",
+      "createdAt": "2026-08-15T09:56:39.240Z"
+    },
+    {
+      "contractorId": "con_admin_seed",
+      "action": "LOGIN_SUCCESS",
+      "ipAddress": "127.0.0.1",
+      "details": "Contractor logged in successfully: admin@kaislead.com",
+      "id": "log_b30986d70f2dc22d",
+      "createdAt": "2026-08-15T09:57:20.328Z"
+    },
+    {
+      "contractorId": "con_admin_seed",
+      "action": "TIMESFM_INFERENCE_TEST",
+      "details": "TimesFM forward demand synthesis executed for roofing across Calgary (12-week horizon).",
+      "id": "log_127f226eb14358c2",
+      "createdAt": "2026-09-01T09:14:04.034Z"
+    },
+    {
+      "contractorId": "con_admin_seed",
+      "action": "TIMESFM_INFERENCE_TEST",
+      "details": "TimesFM forward demand synthesis executed for roofing across Calgary (12-week horizon).",
+      "id": "log_ed734dda8381003f",
+      "createdAt": "2026-09-01T09:14:04.039Z"
+    },
+    {
+      "contractorId": "con_admin_seed",
+      "action": "TIMESFM_INFERENCE_TEST",
+      "details": "TimesFM forward demand synthesis executed for roofing across Calgary (12-week horizon).",
+      "id": "log_00e6a71d36702d84",
+      "createdAt": "2026-09-01T09:48:58.870Z"
+    },
+    {
+      "contractorId": "con_admin_seed",
+      "action": "TIMESFM_INFERENCE_TEST",
+      "details": "TimesFM forward demand synthesis executed for roofing across Calgary (12-week horizon).",
+      "id": "log_933d3698311e2415",
+      "createdAt": "2026-09-01T09:48:58.898Z"
+    },
+    {
+      "contractorId": "con_admin_seed",
+      "action": "TIMESFM_INFERENCE_TEST",
+      "details": "TimesFM forward demand synthesis executed for roofing across Calgary (12-week horizon).",
+      "id": "log_c791befdc2b70709",
+      "createdAt": "2026-09-01T09:49:03.130Z"
+    },
+    {
+      "contractorId": "con_admin_seed",
+      "action": "TIMESFM_INFERENCE_TEST",
+      "details": "TimesFM forward demand synthesis executed for roofing across Calgary (12-week horizon).",
+      "id": "log_fd68adf95776e1dd",
+      "createdAt": "2026-09-01T09:49:03.132Z"
+    },
+    {
+      "contractorId": "con_admin_seed",
+      "action": "TIMESFM_INFERENCE_TEST",
+      "details": "TimesFM forward demand synthesis executed for roofing across Calgary (12-week horizon).",
+      "id": "log_3be517537ed0678f",
+      "createdAt": "2026-09-01T09:49:03.700Z"
+    },
+    {
+      "contractorId": "con_admin_seed",
+      "action": "TIMESFM_INFERENCE_TEST",
+      "details": "TimesFM forward demand synthesis executed for roofing across Calgary (12-week horizon).",
+      "id": "log_52e1edabb9095c7a",
+      "createdAt": "2026-09-01T09:49:03.703Z"
+    },
+    {
+      "contractorId": "con_admin_seed",
+      "action": "TIMESFM_INFERENCE_TEST",
+      "details": "TimesFM forward demand synthesis executed for roofing across Calgary (12-week horizon).",
+      "id": "log_b9168e0fd69d11de",
+      "createdAt": "2026-09-01T09:49:04.792Z"
+    },
+    {
+      "contractorId": "con_admin_seed",
+      "action": "TIMESFM_INFERENCE_TEST",
+      "details": "TimesFM forward demand synthesis executed for roofing across Calgary (12-week horizon).",
+      "id": "log_a04476ff294c6e55",
+      "createdAt": "2026-09-01T09:49:04.794Z"
+    },
+    {
+      "contractorId": "con_admin_seed",
+      "action": "TIMESFM_INFERENCE_TEST",
+      "details": "TimesFM forward demand synthesis executed for roofing across Calgary (12-week horizon).",
+      "id": "log_2c1b653a7fd956b5",
+      "createdAt": "2026-09-01T09:49:05.275Z"
+    },
+    {
+      "contractorId": "con_admin_seed",
+      "action": "TIMESFM_INFERENCE_TEST",
+      "details": "TimesFM forward demand synthesis executed for roofing across Calgary (12-week horizon).",
+      "id": "log_6bce7aeed47358f6",
+      "createdAt": "2026-09-01T09:49:05.277Z"
+    },
+    {
+      "contractorId": "con_admin_seed",
+      "action": "TIMESFM_INFERENCE_TEST",
+      "details": "TimesFM forward demand synthesis executed for roofing across Calgary (12-week horizon).",
+      "id": "log_c4c38d58b792ed1d",
+      "createdAt": "2026-09-01T09:49:07.404Z"
+    },
+    {
+      "contractorId": "con_admin_seed",
+      "action": "TIMESFM_INFERENCE_TEST",
+      "details": "TimesFM forward demand synthesis executed for roofing across Calgary (12-week horizon).",
+      "id": "log_7fea4437226e3d2b",
+      "createdAt": "2026-09-01T09:49:07.405Z"
+    },
+    {
+      "contractorId": "con_admin_seed",
+      "action": "TIMESFM_INFERENCE_TEST",
+      "details": "TimesFM forward demand synthesis executed for roofing across Calgary (12-week horizon).",
+      "id": "log_945b4f861c0c0b49",
+      "createdAt": "2026-09-01T09:49:13.869Z"
+    },
+    {
+      "contractorId": "con_admin_seed",
+      "action": "TIMESFM_INFERENCE_TEST",
+      "details": "TimesFM forward demand synthesis executed for roofing across Calgary (12-week horizon).",
+      "id": "log_faab30be48a2fc74",
+      "createdAt": "2026-09-01T09:49:13.878Z"
+    },
+    {
+      "contractorId": "con_admin_seed",
+      "action": "MAP_DASHBOARD_MOUNTED",
+      "details": "Conquest Map opened via OpenStreetMap Real Tile Engine. Available entries: 20",
+      "ipAddress": "127.0.0.1",
+      "id": "log_9d048d5162cb3cf3",
+      "createdAt": "2026-09-01T09:55:52.534Z"
+    },
+    {
+      "contractorId": "con_admin_seed",
+      "action": "MAP_DASHBOARD_MOUNTED",
+      "details": "Conquest Map opened via OpenStreetMap Real Tile Engine. Available entries: 20",
+      "ipAddress": "127.0.0.1",
+      "id": "log_a51484c40afcec45",
+      "createdAt": "2026-09-01T09:55:53.259Z"
+    },
+    {
+      "contractorId": "con_admin_seed",
+      "action": "LEADS_VIEW_CHANGED",
+      "details": "Switched lead directory workspace view to: LIST",
+      "ipAddress": "127.0.0.1",
+      "id": "log_a223e496dd845d73",
+      "createdAt": "2026-09-01T09:56:02.838Z"
+    },
+    {
+      "contractorId": "con_admin_seed",
+      "action": "LEADS_VIEW_CHANGED",
+      "details": "Switched lead directory workspace view to: LIST",
+      "ipAddress": "127.0.0.1",
+      "id": "log_75c01cc8709562f8",
+      "createdAt": "2026-09-01T09:56:02.844Z"
+    },
+    {
+      "contractorId": "con_admin_seed",
+      "action": "TIMESFM_INFERENCE_TEST",
+      "details": "TimesFM forward demand synthesis executed for roofing across Calgary (12-week horizon).",
+      "id": "log_a0df8548e1135c0d",
+      "createdAt": "2026-09-01T09:56:14.576Z"
+    },
+    {
+      "contractorId": "con_admin_seed",
+      "action": "TIMESFM_INFERENCE_TEST",
+      "details": "TimesFM forward demand synthesis executed for roofing across Calgary (12-week horizon).",
+      "id": "log_eb7bf0a991660d24",
+      "createdAt": "2026-09-01T09:56:14.579Z"
+    },
+    {
+      "contractorId": "con_admin_seed",
+      "action": "LEADS_VIEW_CHANGED",
+      "details": "Switched lead directory workspace view to: LIST",
+      "ipAddress": "127.0.0.1",
+      "id": "log_3aa752aa5e715e6d",
+      "createdAt": "2026-09-01T09:56:39.145Z"
+    },
+    {
+      "contractorId": "con_admin_seed",
+      "action": "LEADS_VIEW_CHANGED",
+      "details": "Switched lead directory workspace view to: LIST",
+      "ipAddress": "127.0.0.1",
+      "id": "log_9943cb2d7f3e590a",
+      "createdAt": "2026-09-01T09:56:39.159Z"
+    }
+  ],
+  "schedulerJobs": [],
+  "missions": [
+    {
+      "id": "mis_seed_fredericton",
+      "contractorId": "con_admin_seed",
+      "title": "Territory Penetration Mission: Fredericton Plumbing",
+      "description": "Automated multi-agent sequence to harvest active businesses, evaluate digital speed/SEO gaps, and compile custom outreach copy.",
+      "status": "completed",
+      "city": "Fredericton",
+      "niche": "plumbing",
+      "createdAt": "2026-07-06T10:42:30.990Z",
+      "updatedAt": "2026-07-06T10:42:30.990Z",
+      "steps": [
+        {
+          "id": "mstep_fred_1",
+          "missionId": "mis_seed_fredericton",
+          "title": "Territory Intelligence Harvest",
+          "description": "Scans the regional business registry to extract email, phone, and owner listings.",
+          "status": "completed",
+          "result": "Successfully identified 5 premium local plumber profiles with contact records.",
+          "updatedAt": "2026-07-06T10:42:30.990Z"
+        },
+        {
+          "id": "mstep_fred_2",
+          "missionId": "mis_seed_fredericton",
+          "title": "Technical Web Speed Audits",
+          "description": "Analyzes render latency, mobile responsiveness, and SSL security indicators.",
+          "status": "completed",
+          "result": "Completed 5 automated audits. Identified 2 critical sites lacking mobile CTAs.",
+          "updatedAt": "2026-07-06T10:42:30.990Z"
+        },
+        {
+          "id": "mstep_fred_3",
+          "missionId": "mis_seed_fredericton",
+          "title": "Personalized Value Outreach Drafting",
+          "description": "Drafts cold outreach angles detailing exact performance scores and conversion gains.",
+          "status": "completed",
+          "result": "Outbound pitch documents constructed using custom speed parameters.",
+          "updatedAt": "2026-07-06T10:42:30.990Z"
+        }
+      ]
+    },
+    {
+      "id": "mis_seed_winnipeg",
+      "contractorId": "con_admin_seed",
+      "title": "Weather-Triggered Sump Pump Ad Campaign",
+      "description": "Real-time rain warning trigger to bid aggressively on emergency waterproofing terms during high precipitation hours.",
+      "status": "running",
+      "city": "Winnipeg",
+      "niche": "sump pump",
+      "createdAt": "2026-07-06T10:42:30.990Z",
+      "updatedAt": "2026-07-06T10:42:30.990Z",
+      "steps": [
+        {
+          "id": "mstep_wpg_1",
+          "missionId": "mis_seed_winnipeg",
+          "title": "Open-Meteo Rainfall Threshold Check",
+          "description": "Queries live weather data to verify if regional rainfall exceeds 10mm.",
+          "status": "completed",
+          "result": "Precipitation threshold met: 12.4mm rainfall recorded in Winnipeg.",
+          "updatedAt": "2026-07-06T10:42:30.990Z"
+        },
+        {
+          "id": "mstep_wpg_2",
+          "missionId": "mis_seed_winnipeg",
+          "title": "Sump Pump Sourced Leads Query",
+          "description": "Retrieves high-priority regional waterproofing and pump service leads.",
+          "status": "completed",
+          "result": "Loaded 4 sourced leads with active digital weaknesses.",
+          "updatedAt": "2026-07-06T10:42:30.990Z"
+        },
+        {
+          "id": "mstep_wpg_3",
+          "missionId": "mis_seed_winnipeg",
+          "title": "Weather-Triggered Ad Bid Increase",
+          "description": "Injects CPC bid multiplier (1.4x) on emergency plumbing terms.",
+          "status": "pending",
+          "result": "Waiting for manual review or automatic API trigger.",
+          "updatedAt": "2026-07-06T10:42:30.990Z"
+        }
+      ]
+    }
+  ],
+  "chatMessages": [],
+  "connectorCredentials": {},
+  "clientProjects": [
+    {
+      "id": "proj_222398a2e7e9",
+      "contractorId": "con_admin_seed",
+      "leadId": "lead_seed_6",
+      "clientName": "David Miller",
+      "businessName": "Next-Gen Plumbing & Heating",
+      "city": "Winnipeg",
+      "serviceType": "plumbing",
+      "packageTier": "Dominance",
+      "monthlyRetainerUsd": 2400,
+      "startDate": "2026-08-18",
+      "status": "active_delivery",
+      "initialAuditScore": 48,
+      "currentScore": 84,
+      "targetScore": 95,
+      "portalAccessToken": "5806ae52434fe40bba205f70",
+      "createdAt": "2026-08-18T09:14:06.056Z",
+      "updatedAt": "2026-09-01T09:14:06.056Z",
+      "notes": "Client authorized complete technical infrastructure acceleration and geo-rank pack setup.",
+      "assets": [
+        {
+          "id": "ast_1",
+          "name": "High-Res Vector Brand Logo",
+          "category": "logo",
+          "status": "verified",
+          "uploadedAt": "2026-08-20T09:14:06.056Z"
+        },
+        {
+          "id": "ast_2",
+          "name": "DNS & Domain Control Registrar Access",
+          "category": "domain_access",
+          "status": "verified",
+          "uploadedAt": "2026-08-21T09:14:06.056Z"
+        },
+        {
+          "id": "ast_3",
+          "name": "Google Business Profile Manager Delegation",
+          "category": "analytics_access",
+          "status": "verified",
+          "uploadedAt": "2026-08-22T09:14:06.056Z"
+        },
+        {
+          "id": "ast_4",
+          "name": "Jobsite Before & After High-Res Photography",
+          "category": "photos",
+          "status": "received",
+          "uploadedAt": "2026-08-27T09:14:06.056Z"
+        }
+      ],
+      "milestones": [
+        {
+          "id": "ms_1",
+          "title": "Onboarding & Asset Verification",
+          "description": "Intake domain registrar credentials, brand guidelines, and target geo-service territory zones.",
+          "status": "completed",
+          "completedAt": "2026-08-22T09:14:06.056Z",
+          "deliverablesProof": "All assets intake forms validated. Primary domain authorized."
+        },
+        {
+          "id": "ms_2",
+          "title": "TLS 1.3 SSL & Core Web Vitals Acceleration",
+          "description": "Hardened security certificates, compressed asset payloads, and achieved sub-1.2s mobile load speeds.",
+          "status": "completed",
+          "completedAt": "2026-08-28T09:14:06.056Z",
+          "deliverablesProof": "Mobile PageSpeed improved from 48/100 to 84/100. SSL Grade A+."
+        },
+        {
+          "id": "ms_3",
+          "title": "Local Geo-SEO Schema & Google Map Pack Push",
+          "description": "Injected JSON-LD LocalBusiness schema, synchronized 40+ directory citations, and updated service areas.",
+          "status": "in_progress"
+        },
+        {
+          "id": "ms_4",
+          "title": "Autonomous Lead Funnel & SMS Notification Flow",
+          "description": "Configured high-converting click-to-call mobile lead magnet and instant dispatcher notifications.",
+          "status": "pending"
+        },
+        {
+          "id": "ms_5",
+          "title": "Monthly Executive ROI Review & Proof of Work Delivery",
+          "description": "Generate white-label performance PDF with before-and-after conversion comparisons and ranking metrics.",
+          "status": "pending"
+        }
+      ]
+    }
+  ]
+}

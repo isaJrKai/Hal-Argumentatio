@@ -1,0 +1,6 @@
+{
+  "name": "HALBiz",
+  "description": "AI Business Operating Intelligence System with advanced forecasting, decision engines, real-time dashboards, and secure isolation.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

@@ -1,0 +1,50 @@
+import { drizzle } from 'drizzle-orm/node-postgres';
+import { Pool } from 'pg';
+import * as schema from './schema.ts';
+import { bootstrapPostgresTables } from './postgres.ts';
+
+// Add global connection pool caching to persist across hot-reloads
+declare global {
+  var _postgresPool: Pool | undefined;
+}
+
+// Function to create or retrieve the connection pool.
+export const createPool = () => {
+  if (!global._postgresPool) {
+    const connectionString = process.env.DATABASE_URL || process.env.NEON_DATABASE_URL;
+    if (connectionString) {
+      global._postgresPool = new Pool({
+        connectionString,
+        ssl: connectionString.includes('neon.tech') || connectionString.includes('sslmode=require') ? { rejectUnauthorized: false } : undefined,
+        max: 10,
+        connectionTimeoutMillis: 15000,
+      });
+    } else {
+      global._postgresPool = new Pool({
+        host: process.env.SQL_HOST || 'localhost',
+        user: process.env.SQL_USER || 'postgres',
+        password: process.env.SQL_PASSWORD || '',
+        database: process.env.SQL_DB_NAME || 'postgres',
+        max: 10,
+        connectionTimeoutMillis: 15000,
+      });
+    }
+
+    // Prevent unhandled pool-level errors from crashing the application
+    global._postgresPool.on('error', (err) => {
+      console.error('Unexpected error on idle SQL pool client:', err);
+    });
+
+    // Automatically bootstrap tables on pool creation
+    bootstrapPostgresTables(global._postgresPool).catch((err) => {
+      console.warn('[HAL PostgreSQL] Auto-bootstrap warning on pool creation:', err.message);
+    });
+  }
+  return global._postgresPool;
+};
+
+// Create or retrieve the pool instance.
+const pool = createPool();
+
+// Initialize Drizzle with the pool and schema.
+export const db = drizzle(pool, { schema });
