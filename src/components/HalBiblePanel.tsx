@@ -98,7 +98,8 @@ export default function HalBiblePanel() {
     { id: '20', number: '20', title: 'Roadmap', description: 'Strategic milestones to transition from regional MVP to multi-territory business brain.', status: 'planned', phase: 'product', icon: LineChart },
     { id: '21', number: '21', title: 'UI Library', description: 'Standardized layout files, typography maps, and reusable pattern libraries.', status: 'planned', phase: 'product', icon: Layers },
     { id: '22', number: '22', title: 'Workspaces', description: 'Contractor dashboard orchestration, campaign builders, and leads flow.', status: 'canonical', phase: 'product', icon: Briefcase },
-    { id: '23', number: '23', title: 'Future Vision', description: 'Autonomous market expansion and self-optimizing outreach campaigns.', status: 'planned', phase: 'product', icon: Sparkles }
+    { id: '23', number: '23', title: 'Future Vision', description: 'Autonomous market expansion and self-optimizing outreach campaigns.', status: 'planned', phase: 'product', icon: Sparkles },
+    { id: '24', number: '24', title: 'Hermes Engine', description: 'Nous Research Hermes synthesis: dynamic anti-AI landing pages, diagnostic scripts, and event-bus dispatch.', status: 'canonical', phase: 'intelligence', icon: Sparkles }
   ], []);
 
   // Filter documents based on search query

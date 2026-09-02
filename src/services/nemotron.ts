@@ -50,11 +50,12 @@ export async function callNemotron(
     throw new Error("NVIDIA_API_KEY is not defined.");
   }
 
-  // Model cascade to prevent 404 unauthorized account errors on restricted model names
+  // Active models available on NVIDIA NIM API catalog
   const candidateModels = [
-    "meta/llama-3.1-70b-instruct",            // Fully active, 70B state-of-the-art model
-    "nvidia/nemotron-mini-4b-instruct",       // Active, Nemotron lightweight option
-    "nvidia/llama-3.1-nemotron-70b-instruct"  // Original requested model
+    "meta/llama-3.3-70b-instruct",            // Active flagship 70B instruct model
+    "meta/llama-3.1-8b-instruct",             // Fast, widely available lightweight instruct
+    "mistralai/mistral-large-2-instruct",     // High reasoning fallback
+    "deepseek-ai/deepseek-r1"                 // Deep reasoning fallback
   ];
 
   let lastError: any = null;

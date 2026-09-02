@@ -1,7 +1,7 @@
 export interface CityConfig {
   id: string;
   name: string;
-  country: 'Canada' | 'USA';
+  country: 'Canada' | 'USA' | 'UAE' | 'Uganda' | 'UK' | string;
   provinceOrState: string;
   coords: { lat: number; lng: number };
   defaultZoom: number;
@@ -499,6 +499,70 @@ export const CITIES_CONFIG: CityConfig[] = [
     defaultZoom: 12,
     timezone: 'America/New_York',
     nicheFocus: ['historic brick repointing', 'biotech laboratory cleanrooms', 'underground utility tunneling']
+  },
+  {
+    id: 'dubai',
+    name: 'Dubai',
+    country: 'UAE',
+    provinceOrState: 'Dubai Emirate',
+    coords: { lat: 25.2048, lng: 55.2708 },
+    defaultZoom: 11,
+    timezone: 'Asia/Dubai',
+    nicheFocus: ['extreme thermal HVAC chiller maintenance', 'luxury villa swimming pool engineering', 'commercial high-rise facade cladding', 'industrial desalination electrical'],
+    defaultPolygonPoints: [
+      { lat: 25.3200, lng: 55.1500 },
+      { lat: 25.3200, lng: 55.4500 },
+      { lat: 25.0200, lng: 55.4500 },
+      { lat: 25.0200, lng: 55.1500 }
+    ]
+  },
+  {
+    id: 'kampala',
+    name: 'Kampala',
+    country: 'Uganda',
+    provinceOrState: 'Central',
+    coords: { lat: 0.3476, lng: 32.5825 },
+    defaultZoom: 12,
+    timezone: 'Africa/Kampala',
+    nicheFocus: ['commercial diesel generator & solar hybrid power', 'deep borehole drilling & water treatment', 'commercial steel structural fabrication', 'telecom tower civil engineering'],
+    defaultPolygonPoints: [
+      { lat: 0.4200, lng: 32.5000 },
+      { lat: 0.4200, lng: 32.6800 },
+      { lat: 0.2500, lng: 32.6800 },
+      { lat: 0.2500, lng: 32.5000 }
+    ]
+  },
+  {
+    id: 'london',
+    name: 'London',
+    country: 'UK',
+    provinceOrState: 'Greater London',
+    coords: { lat: 51.5074, lng: -0.1278 },
+    defaultZoom: 11,
+    timezone: 'Europe/London',
+    nicheFocus: ['victorian conservation plumbing & gas safe', 'period slate & lead roof restoration', 'commercial acoustic glazing', 'smart home hydronic heating'],
+    defaultPolygonPoints: [
+      { lat: 51.6200, lng: -0.3200 },
+      { lat: 51.6200, lng: 0.0500 },
+      { lat: 51.3800, lng: 0.0500 },
+      { lat: 51.3800, lng: -0.3200 }
+    ]
+  },
+  {
+    id: 'calgary',
+    name: 'Calgary',
+    country: 'Canada',
+    provinceOrState: 'AB',
+    coords: { lat: 51.0447, lng: -114.0719 },
+    defaultZoom: 11,
+    timezone: 'America/Edmonton',
+    nicheFocus: ['class 4 hail impact roofing', 'severe cold climate furnace conversion', 'commercial pipeline inspection', 'building envelope waterproofing'],
+    defaultPolygonPoints: [
+      { lat: 51.1800, lng: -114.2500 },
+      { lat: 51.1800, lng: -113.9000 },
+      { lat: 50.9000, lng: -113.9000 },
+      { lat: 50.9000, lng: -114.2500 }
+    ]
   }
 ];
 

@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { INDUSTRY_TAXONOMY, IndustryProfile, getIndustryProfile } from '../config/industryTaxonomy';
+import { GLOBAL_REGIONS, RegionalProfile, resolveRegionalProfile } from '../config/worldModel';
 
 export interface WorkspaceConfig {
   agencyName: string;
@@ -13,6 +14,9 @@ export interface WorkspaceConfig {
   customCities: string[];
   customNiches: string[];
   ltvMultiplier: number; // Formula tuning multiplier (e.g. 1.0)
+  targetCAC: number; // Configurable operational target CAC
+  budgetMultiplier: number; // Budget scaling factor
+  autoDeployHermesAssets: boolean; // Dynamic cross-system deployment
 }
 
 export interface BusinessContextType {
@@ -20,6 +24,11 @@ export interface BusinessContextType {
   activeIndustry: IndustryProfile;
   activeCity: string;
   activeNiche: string;
+  
+  // World Model & Regional Heuristics
+  regionalProfile: RegionalProfile;
+  setRegionalProfileByCity: (city: string, country?: string) => void;
+  formatCurrency: (amount: number) => string;
   
   // State setters
   setActiveIndustry: (industryId: string) => void;
@@ -30,6 +39,7 @@ export interface BusinessContextType {
   supportedIndustries: IndustryProfile[];
   supportedCities: string[];
   supportedNiches: string[];
+  globalRegions: Record<string, RegionalProfile>;
 
   // Dynamic customization actions
   addCustomCity: (city: string) => void;
@@ -43,8 +53,8 @@ export interface BusinessContextType {
 const BusinessContext = createContext<BusinessContextType | undefined>(undefined);
 
 export const BusinessProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  // Default Base Lists
-  const defaultCities = ['Winnipeg', 'Calgary', 'Fredericton', 'Winkler', 'Morris', 'Brandon', 'Landmark', 'Sherwood Park', 'Toronto', 'Vancouver'];
+  // Default Base Lists spanning diverse global proving grounds
+  const defaultCities = ['Dallas', 'Winnipeg', 'Columbus', 'Dubai', 'Kampala', 'London', 'Calgary', 'Toronto'];
 
   // Persistent Active Industry
   const [activeIndustryId, setActiveIndustryIdState] = useState<string>(() => {
@@ -55,7 +65,12 @@ export const BusinessProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
   // Persistent Active City
   const [activeCity, setActiveCityState] = useState<string>(() => {
-    return localStorage.getItem('hal_active_city') || 'Winnipeg';
+    return localStorage.getItem('hal_active_city') || 'Dallas';
+  });
+
+  // Derived Dynamic World Model Regional Profile
+  const [regionalProfile, setRegionalProfile] = useState<RegionalProfile>(() => {
+    return resolveRegionalProfile(activeCity);
   });
 
   // Persistent Active Niche
@@ -76,14 +91,17 @@ export const BusinessProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     return {
       agencyName: 'HAL Intelligence',
       operatorName: 'Workspace Operator',
-      brandColor: '#3b82f6',
+      brandColor: '#2563eb',
       tagline: 'AI Business Operating Intelligence Platform',
       bookingUrl: 'https://cal.com/hal-strategy',
-      contactPhone: '(204) 555-0199',
-      contactEmail: 'advisory@hal-agency.com',
+      contactPhone: '(214) 555-0199',
+      contactEmail: 'advisory@hal-operating.com',
       customCities: [],
       customNiches: [],
-      ltvMultiplier: 1.0
+      ltvMultiplier: 1.0,
+      targetCAC: 145,
+      budgetMultiplier: 1.0,
+      autoDeployHermesAssets: true
     };
   });
 
@@ -110,6 +128,23 @@ export const BusinessProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     if (!cleanCity) return;
     setActiveCityState(cleanCity);
     localStorage.setItem('hal_active_city', cleanCity);
+
+    // Synchronize the World Model regional profile immediately
+    const resolved = resolveRegionalProfile(cleanCity);
+    setRegionalProfile(resolved);
+  };
+
+  const setRegionalProfileByCity = (city: string, country?: string) => {
+    const cleanCity = city.trim();
+    if (!cleanCity) return;
+    setActiveCityState(cleanCity);
+    localStorage.setItem('hal_active_city', cleanCity);
+    const resolved = resolveRegionalProfile(cleanCity, country);
+    setRegionalProfile(resolved);
+  };
+
+  const formatCurrency = (amount: number) => {
+    return regionalProfile.currencyFormat(amount);
   };
 
   const setActiveNiche = (niche: string) => {
@@ -151,15 +186,13 @@ export const BusinessProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       const hex = workspaceConfig.brandColor;
       const root = document.documentElement;
       
-      // Calculate rgb components for accurate alpha blending
-      let r = 59, g = 130, b = 246;
+      let r = 37, g = 99, b = 235;
       if (/^#[0-9A-Fa-f]{6}$/.test(hex)) {
         r = parseInt(hex.slice(1, 3), 16);
         g = parseInt(hex.slice(3, 5), 16);
         b = parseInt(hex.slice(5, 7), 16);
       }
       
-      // Determine high-contrast text color based on perceived brightness (YIQ formula)
       const yiq = (r * 299 + g * 587 + b * 114) / 1000;
       const contrastText = yiq >= 150 ? '#05070c' : '#ffffff';
 
@@ -172,17 +205,27 @@ export const BusinessProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     }
   }, [workspaceConfig.brandColor]);
 
+  // Keep Regional Profile synchronized with activeCity
+  useEffect(() => {
+    const resolved = resolveRegionalProfile(activeCity);
+    setRegionalProfile(resolved);
+  }, [activeCity]);
+
   return (
     <BusinessContext.Provider value={{
       activeIndustry,
       activeCity,
       activeNiche,
+      regionalProfile,
+      setRegionalProfileByCity,
+      formatCurrency,
       setActiveIndustry,
       setActiveCity,
       setActiveNiche,
       supportedIndustries: INDUSTRY_TAXONOMY,
       supportedCities,
       supportedNiches,
+      globalRegions: GLOBAL_REGIONS,
       addCustomCity,
       addCustomNiche,
       workspaceConfig,

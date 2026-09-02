@@ -44,7 +44,7 @@ export interface BatchItem {
 }
 
 export default function OutreachQueue({ leads, token, onRefresh }: OutreachQueueProps) {
-  const { workspaceConfig, activeIndustry } = useBusinessContext();
+  const { workspaceConfig, activeIndustry, activeCity, activeNiche, regionalProfile } = useBusinessContext();
   const [selectedLeadIds, setSelectedLeadIds] = useState<string[]>([]);
   const [activeChannelFilter, setActiveChannelFilter] = useState<'all' | 'email' | 'sms' | 'call'>('all');
   const [activeStatusFilter, setActiveStatusFilter] = useState<string>('all');
@@ -57,13 +57,21 @@ export default function OutreachQueue({ leads, token, onRefresh }: OutreachQueue
 
   // Template customizer state
   const [templateSubject, setTemplateSubject] = useState(
-    'Actionable Performance & Speed Audit for {{businessName}} ({{city}})'
+    'Actionable Speed & Revenue Leakage Audit for {{businessName}} ({{city}})'
   );
   const [templateBody, setTemplateBody] = useState(
-    `Hi {{ownerName}},\n\nI ran a diagnostic on {{businessName}}'s digital presence in {{city}} and identified immediate technical optimizations (Core Web Vitals acceleration & Google Map Pack visibility).\n\nWe prepared a custom live revenue leakage breakdown. Would you have 5 minutes this week for a walkthrough?\n\nBest,\n${workspaceConfig.operatorName}\n${workspaceConfig.agencyName}`
+    `Hi {{ownerName}},\n\nI conducted a preliminary diagnostic on {{businessName}}'s digital presence in {{city}} and identified immediate technical optimizations (Core Web Vitals acceleration & Google Map Pack visibility for ${activeIndustry.name}).\n\nGiven current ${regionalProfile.currentSeasonalFocus.toLowerCase()}, we prepared a live technical teardown showing how to capture high-intent ${activeNiche} inquiries before competitors.\n\nWould you have 5 minutes this week for a quick walkthrough?\n\nBest regards,\n${workspaceConfig.operatorName}\n${workspaceConfig.agencyName}`
   );
   const [targetFollowUpDays, setTargetFollowUpDays] = useState(3);
   const [autoAdvanceStatus, setAutoAdvanceStatus] = useState(true);
+
+  // Quick preset loader
+  const handleLoadRegionalAngle = () => {
+    setTemplateSubject(`Seasonal Growth Audit: Capture High-Intent ${activeNiche.toUpperCase()} Inquiries in ${activeCity}`);
+    setTemplateBody(
+      `Hi {{ownerName}},\n\nOur system detected that {{businessName}} serves the ${activeCity} market. With ${regionalProfile.climateZone.toLowerCase()} seasonal load underway, homeowners are seeking verified ${activeNiche} specialists.\n\nOur audit revealed technical bottlenecks in mobile load times and local search ranking.\n\nMay I share a 1-page breakdown outlining the 3 fastest fixes to increase inbound calls?\n\nRegards,\n${workspaceConfig.operatorName}\n${workspaceConfig.agencyName}`
+    );
+  };
 
   // Quick inspect preview
   const [previewLead, setPreviewLead] = useState<Lead | null>(null);
@@ -232,7 +240,16 @@ export default function OutreachQueue({ leads, token, onRefresh }: OutreachQueue
             </div>
 
             <div className="space-y-1">
-              <label className="text-[10px] font-mono text-text-secondary uppercase font-bold">Outreach Pitch Body</label>
+              <div className="flex items-center justify-between">
+                <label className="text-[10px] font-mono text-text-secondary uppercase font-bold">Outreach Pitch Body</label>
+                <button
+                  type="button"
+                  onClick={handleLoadRegionalAngle}
+                  className="text-[9.5px] font-mono text-brand hover:underline font-bold uppercase cursor-pointer"
+                >
+                  Load {activeCity} Angle
+                </button>
+              </div>
               <textarea
                 rows={7}
                 value={templateBody}

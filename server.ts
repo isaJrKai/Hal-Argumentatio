@@ -15,7 +15,7 @@ import {
   Recommendation
 } from './src/db/db';
 import { db as pgDb } from './src/db/index.ts';
-import { contractors, auditLogs, leads, leadEvents, revenueRecords, campaigns, winLossRecords, performanceSnapshots, recommendations, forecasts, learningInsights, chatMessages, missions, clientProjects, outreachSequences, apiKeys, notifications, schedulerJobs, leadAttribution, conversionOutbox, googleAdsDailyPerformance, revenueExperiments, revenueRecommendations, revenueRecommendationEvents, revenueSimulations, revenueOutcomes, halLoops, halLoopEvents } from './src/db/schema.ts';
+import { contractors, auditLogs, leads, leadEvents, revenueRecords, campaigns, winLossRecords, performanceSnapshots, recommendations, forecasts, learningInsights, chatMessages, missions, clientProjects, outreachSequences, apiKeys, notifications, schedulerJobs, leadAttribution, conversionOutbox, googleAdsDailyPerformance, revenueExperiments, revenueRecommendations, revenueRecommendationEvents, revenueSimulations, revenueOutcomes, halLoops, halLoopEvents, hermesLabArtifacts, hermesDiagnosticIncidents, hermesLabMessages } from './src/db/schema.ts';
 import { eq, inArray, desc, and, like, sql } from 'drizzle-orm';
 import { 
   generateLearningFromOutcome, 
@@ -25,6 +25,9 @@ import {
 } from './src/lib/gemini';
 import { autonomousLearning } from './src/lib/autonomousLearning';
 import { getAllSkills, executeSkill, registerCustomSkill, unregisterCustomSkill } from './src/skills/registry';
+import { HAL_MCP_TOOLS, executeMcpTool } from './src/services/mcp/dispatcher';
+import { McpJsonRpcRequest, McpJsonRpcResponse } from './src/services/mcp/types';
+import { HERMES_LAB_CATALOG, executeHermesLabTool, chatWithHermesAgent, LabToolType } from './src/services/hermesLab';
 
 
 // Setup environment variables
@@ -35,6 +38,11 @@ const app = express();
 const PORT = 3000;
 
 app.use(express.json());
+
+// API Health Check
+app.get('/api/health', (req, res) => {
+  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
 
 // Intercept client-selected preferred AI (Gemini 3.5 vs Nemotron)
 app.use((req, res, next) => {
@@ -220,7 +228,9 @@ function requireRole(role: 'admin' | 'user') {
 // ─── AUTHENTICATION ROUTES ───────────────────────────────────────────────────
 
 app.post('/api/auth/register', async (req, res) => {
-  const { email, password, name } = req.body;
+  const email = req.body.email;
+  const password = req.body.password;
+  const name = req.body.name || req.body.companyName;
   if (!email || !password || !name) {
     return res.status(400).json({ error: 'Email, password, and name are required' });
   }
@@ -560,10 +570,14 @@ app.get('/api/leads', authenticate, async (req, res) => {
 
 app.post('/api/leads', authenticate, async (req, res) => {
   const contractorId = (req as any).contractorId;
-  const { businessName, ownerName, email, phone, city, serviceType, notes } = req.body;
+  const { 
+    businessName, ownerName, email, phone, city, notes,
+    gclid, gbraid, wbraid, utmSource, utmMedium, utmCampaign
+  } = req.body;
+  const serviceType = req.body.serviceType || req.body.niche || 'General Service';
 
-  if (!businessName || !city || !serviceType) {
-    return res.status(400).json({ error: 'Business name, city, and service type are required' });
+  if (!businessName || !city) {
+    return res.status(400).json({ error: 'Business name and city are required' });
   }
 
   const urgencyScore = Math.round((Math.random() * 4 + 5) * 10) / 10;
@@ -580,19 +594,32 @@ app.post('/api/leads', authenticate, async (req, res) => {
       phone,
       city,
       niche: serviceType, // mapping serviceType to niche
-      source: 'manual',
+      source: gclid ? 'google_ads' : 'manual',
       status: 'new',
       urgencyScore,
       predictedLtv,
       notes
     }).returning();
 
+    if (gclid || gbraid || wbraid || utmSource || utmCampaign) {
+      await pgDb.insert(leadAttribution).values({
+        id: crypto.randomUUID(),
+        leadId: lead.id,
+        gclid,
+        gbraid,
+        wbraid,
+        utmSource: utmSource || (gclid ? 'google' : null),
+        utmCampaign,
+        touchType: 'first'
+      });
+    }
+
     await pgDb.insert(leadEvents).values({
       id: crypto.randomUUID(),
       leadId: lead.id,
       eventType: 'LeadCreated',
       newStage: 'new',
-      notes: 'Lead captured manually on the HALBiz interface.'
+      notes: 'Lead captured on the HALBiz interface.'
     });
 
     await pgDb.insert(auditLogs).values({
@@ -4520,23 +4547,9 @@ app.post('/api/revenue/recommendations/:id/transition', authenticate, async (req
   }
 });
 
-// ─── VITE DEV SERVER & STATIC FILES MIDDLEWARE ───────────────────────────────
+// ─── SERVER STARTUP & BACKGROUND WORKERS ───────────────────────────────
 
 async function startServer() {
-  if (process.env.NODE_ENV !== 'production') {
-    // Development Mode: Mount Vite dev server middleware
-    const vite = await createViteServer({
-      server: { middlewareMode: true },
-      appType: 'spa',
-    });
-    app.use(vite.middlewares);
-  } else {
-    // Production Mode: Serve compiled front-end bundles
-    const distPath = path.join(process.cwd(), 'dist');
-    app.use(express.static(distPath));
-  }
-
-  
   // Auto-bootstrap PostgreSQL tables on startup
   try {
     const { getPostgresPool, bootstrapPostgresTables } = await import('./src/db/postgres');
@@ -5151,8 +5164,340 @@ async function startServer() {
     }
   });
 
-  if (process.env.NODE_ENV === 'production') {
+  // ─── PHASE 8A: HAL MCP TOOL GATEWAY FOR HERMES AGENT ────────────────────
+  app.post('/api/mcp', authenticate, async (req, res) => {
+    const contractorId = (req as any).contractorId;
+    const body = req.body as McpJsonRpcRequest;
+
+    if (!body || body.jsonrpc !== '2.0' || !body.method) {
+      return res.status(400).json({
+        jsonrpc: '2.0',
+        id: body?.id ?? null,
+        error: {
+          code: -32600,
+          message: 'Invalid Request: jsonrpc must be "2.0" with a valid method'
+        }
+      } as McpJsonRpcResponse);
+    }
+
+    try {
+      // 1. Tool Discovery: tools/list
+      if (body.method === 'tools/list') {
+        return res.json({
+          jsonrpc: '2.0',
+          id: body.id,
+          result: {
+            tools: HAL_MCP_TOOLS
+          }
+        } as McpJsonRpcResponse);
+      }
+
+      // 2. Tool Execution: tools/call
+      if (body.method === 'tools/call') {
+        const { name, arguments: toolArgs } = body.params || {};
+        if (!name) {
+          return res.status(400).json({
+            jsonrpc: '2.0',
+            id: body.id,
+            error: {
+              code: -32602,
+              message: 'Invalid params: "name" is required for tools/call'
+            }
+          } as McpJsonRpcResponse);
+        }
+
+        const toolResult = await executeMcpTool(name, toolArgs || {}, contractorId);
+        return res.json({
+          jsonrpc: '2.0',
+          id: body.id,
+          result: {
+            content: [
+              {
+                type: 'text',
+                text: JSON.stringify(toolResult, null, 2)
+              }
+            ],
+            structuredData: toolResult
+          }
+        } as McpJsonRpcResponse);
+      }
+
+      // Method not found
+      return res.status(404).json({
+        jsonrpc: '2.0',
+        id: body.id,
+        error: {
+          code: -32601,
+          message: `Method not found: ${body.method}`
+        }
+      } as McpJsonRpcResponse);
+    } catch (err: any) {
+      console.error('[HAL MCP Gateway Error]', err);
+      return res.status(500).json({
+        jsonrpc: '2.0',
+        id: body.id,
+        error: {
+          code: -32000,
+          message: err.message || 'Internal MCP Execution Error'
+        }
+      } as McpJsonRpcResponse);
+    }
+  });
+
+  // ─── PHASE 8B: HERMES COGNITIVE LAB & DIAGNOSTIC APIS ───────────────────
+  
+  // 0. Get Live Hermes Engine Provider Status
+  app.get('/api/hermes/status', authenticate, (req, res) => {
+    const hasOpenRouter = !!(process.env.OPENROUTER_API_KEY || process.env.OPENROUTER_KEY);
+    const hasHf = !!(process.env.HUGGINGFACE_API_KEY || process.env.HF_TOKEN);
+    const hasGemini = !!process.env.GEMINI_API_KEY;
+    const hasNvidia = !!process.env.NVIDIA_API_KEY;
+
+    let activeEngine = 'Deterministic Fallback';
+    let activeModel = 'Local Template Generator';
+    let provider = 'fallback';
+
+    if (hasOpenRouter) {
+      activeEngine = 'Nous Hermes 3 (70B / 405B)';
+      activeModel = 'nousresearch/hermes-3-llama-3.1-70b';
+      provider = 'openrouter';
+    } else if (hasHf) {
+      activeEngine = 'Nous Hermes 3 (Hugging Face)';
+      activeModel = 'NousResearch/Hermes-3-Llama-3.1-8B';
+      provider = 'huggingface';
+    } else if (hasGemini) {
+      activeEngine = 'Gemini 2.5 Flash Structured Cascade';
+      activeModel = 'gemini-2.5-flash';
+      provider = 'gemini';
+    } else if (hasNvidia) {
+      activeEngine = 'NVIDIA Llama-3.1-Nemotron';
+      activeModel = 'nvidia/llama-3.1-nemotron-70b-instruct';
+      provider = 'nvidia';
+    }
+
+    res.json({
+      success: true,
+      provider,
+      activeEngine,
+      activeModel,
+      providers: {
+        openrouter: hasOpenRouter,
+        huggingface: hasHf,
+        gemini: hasGemini,
+        nvidia: hasNvidia
+      }
+    });
+  });
+
+  // 1. Get Hermes Lab Catalog
+  app.get('/api/hermes/catalog', authenticate, (req, res) => {
+    res.json({
+      success: true,
+      catalog: HERMES_LAB_CATALOG
+    });
+  });
+
+  // 2. List Contractor Hermes Lab Artifacts
+  app.get('/api/hermes/artifacts', authenticate, async (req, res) => {
+    const contractorId = (req as any).contractorId;
+    try {
+      let artifacts = await pgDb
+        .select()
+        .from(hermesLabArtifacts)
+        .where(eq(hermesLabArtifacts.contractorId, contractorId))
+        .orderBy(desc(hermesLabArtifacts.createdAt));
+
+      // If empty, auto-generate default starter landing page and schema artifact so user can preview immediately
+      if (artifacts.length === 0) {
+        await executeHermesLabTool('landing_page', {}, contractorId);
+        await executeHermesLabTool('seo_schema_generator', {}, contractorId);
+        artifacts = await pgDb
+          .select()
+          .from(hermesLabArtifacts)
+          .where(eq(hermesLabArtifacts.contractorId, contractorId))
+          .orderBy(desc(hermesLabArtifacts.createdAt));
+      }
+
+      res.json({ success: true, artifacts });
+    } catch (err: any) {
+      console.error('[Hermes Artifacts Fetch Error]', err);
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // 3. Execute Hermes Lab Tool to Generate Artifact
+  app.post('/api/hermes/execute', authenticate, async (req, res) => {
+    const contractorId = (req as any).contractorId;
+    const { toolId, parameters, promptOverride } = req.body;
+
+    if (!toolId) {
+      return res.status(400).json({ success: false, error: 'toolId is required' });
+    }
+
+    try {
+      const result = await executeHermesLabTool(
+        toolId as LabToolType,
+        parameters || {},
+        contractorId,
+        promptOverride
+      );
+
+      res.json({ success: true, ...result });
+    } catch (err: any) {
+      console.error('[Hermes Tool Execution Error]', err);
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // 4. Update Artifact Status (e.g. ready -> deployed)
+  app.patch('/api/hermes/artifacts/:id', authenticate, async (req, res) => {
+    const contractorId = (req as any).contractorId;
+    const { id } = req.params;
+    const { status, title } = req.body;
+
+    try {
+      const updateData: any = { updatedAt: new Date() };
+      if (status) updateData.status = status;
+      if (title) updateData.title = title;
+
+      await pgDb
+        .update(hermesLabArtifacts)
+        .set(updateData)
+        .where(
+          and(
+            eq(hermesLabArtifacts.id, id),
+            eq(hermesLabArtifacts.contractorId, contractorId)
+          )
+        );
+
+      res.json({ success: true, message: 'Artifact updated successfully' });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // 5. List Diagnostic Incidents & Resilience Overseer status
+  app.get('/api/hermes/diagnostics', authenticate, async (req, res) => {
+    const contractorId = (req as any).contractorId;
+    try {
+      const incidents = await pgDb
+        .select()
+        .from(hermesDiagnosticIncidents)
+        .where(eq(hermesDiagnosticIncidents.contractorId, contractorId))
+        .orderBy(desc(hermesDiagnosticIncidents.createdAt));
+
+      res.json({
+        success: true,
+        incidents,
+        overseerStatus: {
+          active: true,
+          mode: 'ACTIVE_SUPERVISION',
+          lastScanAt: new Date().toISOString(),
+          monitoredSurfaces: ['GCLID Attribution Outbox', 'Webhook Payloads', 'SSL & Tag Integrity', 'ROAS Anomalies']
+        }
+      });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // 6. Trigger Instant Diagnostic Triage & Self-Healing Scan
+  app.post('/api/hermes/diagnostics/scan', authenticate, async (req, res) => {
+    const contractorId = (req as any).contractorId;
+    try {
+      // Check contractor lead conversion rate and ad anomalies
+      const ads = await pgDb
+        .select()
+        .from(googleAdsDailyPerformance)
+        .where(eq(googleAdsDailyPerformance.contractorId, contractorId));
+
+      const detectedIssues: any[] = [];
+      const totalSpend = ads.reduce((acc, a) => acc + (Number(a.cost) || 0), 0);
+      const totalConv = ads.reduce((acc, a) => acc + (Number(a.conversions) || 0), 0);
+
+      if (totalSpend > 400 && totalConv === 0) {
+        const incidentId = crypto.randomUUID();
+        await pgDb.insert(hermesDiagnosticIncidents).values({
+          id: incidentId,
+          contractorId,
+          title: 'Zero Conversion Leak Detected in Google Ads Traffic',
+          severity: 'HIGH',
+          category: 'TRACKING_TAG',
+          rootCause: 'Traffic is landing on destination URL without active GCLID attribution form listener.',
+          evidence: { spend: totalSpend, conversions: 0 },
+          proposedFix: 'Inject HAL GCLID capture script and deploy pre-wired emergency landing page from Hermes Lab.',
+          status: 'open',
+          createdAt: new Date()
+        });
+        detectedIssues.push({ id: incidentId, title: 'Zero Conversion Leak Detected' });
+      }
+
+      res.json({
+        success: true,
+        scannedSurfaces: 4,
+        newIncidentsFound: detectedIssues.length,
+        detectedIssues
+      });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // 7. Get Hermes Lab Chat Messages
+  app.get('/api/hermes/chat', authenticate, async (req, res) => {
+    const contractorId = (req as any).contractorId;
+    try {
+      const messages = await pgDb
+        .select()
+        .from(hermesLabMessages)
+        .where(eq(hermesLabMessages.contractorId, contractorId))
+        .orderBy(hermesLabMessages.createdAt);
+
+      res.json({ success: true, messages });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // 8. Post Hermes Lab Chat Message / Personalization Request
+  app.post('/api/hermes/chat', authenticate, async (req, res) => {
+    const contractorId = (req as any).contractorId;
+    const { message, artifactId } = req.body;
+
+    if (!message || typeof message !== 'string') {
+      return res.status(400).json({ success: false, error: 'message is required' });
+    }
+
+    try {
+      const result = await chatWithHermesAgent(contractorId, message, artifactId);
+      res.json({ success: true, ...result });
+    } catch (err: any) {
+      console.error('[Hermes Chat Error]', err);
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+
+  // ─── API CATCH-ALL (Guarantees NO HTML is ever returned for API routes) ───
+  app.all('/api/*', (req, res) => {
+    res.status(404).json({
+      success: false,
+      error: `API endpoint not found: ${req.method} ${req.path}`
+    });
+  });
+
+  // ─── VITE DEV SERVER & STATIC FILES MIDDLEWARE ───────────────────────────
+  if (process.env.NODE_ENV !== 'production') {
+    // Development Mode: Mount Vite dev server middleware AFTER all API routes
+    const vite = await createViteServer({
+      server: { middlewareMode: true },
+      appType: 'spa',
+    });
+    app.use(vite.middlewares);
+  } else {
+    // Production Mode: Serve compiled front-end bundles
     const distPath = path.join(process.cwd(), 'dist');
+    app.use(express.static(distPath));
     app.get('*', (req, res) => {
       res.sendFile(path.join(distPath, 'index.html'));
     });

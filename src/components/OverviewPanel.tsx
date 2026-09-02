@@ -15,6 +15,7 @@ import {
   Clock, 
   Flame, 
   Shield, 
+  ShieldCheck, 
   Lightbulb,
   CheckCircle2,
   AlertCircle,
@@ -62,6 +63,7 @@ export default function OverviewPanel({
   setActiveTab,
   theme = 'dark'
 }: OverviewPanelProps) {
+  const { workspaceConfig, activeIndustry, activeCity, activeNiche, regionalProfile, formatCurrency } = useBusinessContext();
   
   // Interactive Pipeline Stage Selection
   const [selectedStage, setSelectedStage] = useState<'all' | 'new' | 'contacted' | 'proposal' | 'converted' | null>(null);
@@ -206,13 +208,13 @@ export default function OverviewPanel({
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${localStorage.getItem('halbiz_auth_token') || localStorage.getItem('token')}`
           },
-          body: JSON.stringify({ city: 'Calgary', niche: 'roofing', horizonWeeks: 12 })
+          body: JSON.stringify({ city: activeCity, niche: activeNiche, horizonWeeks: 12 })
         });
         const data = await res.json();
-        if (data.success && data.curve) {
-          const formatted = data.curve.map((c: any) => ({
+        if (data.success && data.forecastCurve) {
+          const formatted = data.forecastCurve.map((c: any) => ({
             day: c.week,
-            v: c.projectedCplUsd * c.predictedDemandIndex * 15 // Rough revenue metric synthesis
+            v: Math.round(c.projectedCplUsd * c.predictedDemandIndex * (workspaceConfig.budgetMultiplier || 1.0) * (regionalProfile.territoryMetrics.typicalCPC / 4.5) * 14)
           }));
           setForecastChartData(formatted);
         }
@@ -221,7 +223,7 @@ export default function OverviewPanel({
       }
     };
     fetchForecast();
-  }, []);
+  }, [activeCity, activeNiche, workspaceConfig.budgetMultiplier, regionalProfile.territoryMetrics.typicalCPC]);
 
   // Activities list dynamic
   const recentActivities = leads.slice(0, 5).map((l, idx) => {
@@ -245,11 +247,11 @@ export default function OverviewPanel({
   });
 
   const displayActivities = recentActivities.length > 0 ? recentActivities : [
-    { id: '1', activity: 'New lead captured', type: 'Lead', entity: 'Calgary Roof Pros', time: '10 mins ago', status: 'New' },
-    { id: '2', activity: 'Website audit completed', type: 'Audit', entity: 'Summit Roofing', time: '1 hour ago', status: 'Completed' },
-    { id: '3', activity: 'Proposal sent', type: 'Proposal', entity: 'Elite Exteriors', time: '2 hours ago', status: 'Sent' },
-    { id: '4', activity: 'New review detected', type: 'Reputation', entity: 'Peak Roofing', time: '3 hours ago', status: 'Positive' },
-    { id: '5', activity: 'Campaign performance updated', type: 'Campaign', entity: 'Roofing SEO May', time: '4 hours ago', status: 'Updated' },
+    { id: '1', activity: 'New prospect captured', type: 'Lead', entity: `${activeCity} Prime ${activeNiche.toUpperCase()}`, time: '10 mins ago', status: 'New' },
+    { id: '2', activity: 'Speed & SSL audit completed', type: 'Audit', entity: `${activeCity} Apex ${activeIndustry.name}`, time: '1 hour ago', status: 'Completed' },
+    { id: '3', activity: 'Growth proposal prepared', type: 'Proposal', entity: `Elite ${activeNiche} Solutions`, time: '2 hours ago', status: 'Sent' },
+    { id: '4', activity: 'High sentiment review detected', type: 'Reputation', entity: `${activeCity} ${activeNiche} Masters`, time: '4 hours ago', status: 'Positive' },
+    { id: '5', activity: 'Territory crawl synchronized', type: 'Campaign', entity: `${regionalProfile.countryCode} Regional Sector`, time: '5 hours ago', status: 'Updated' },
   ];
 
   // Dynamic Theme Styling Classes
@@ -260,8 +262,6 @@ export default function OverviewPanel({
   const borderCol = 'border-border-dim';
   const borderColDim = 'border-border-dim/50';
   const innerBg = 'bg-bg-subtle';
-
-  const { workspaceConfig, activeIndustry, activeCity, activeNiche } = useBusinessContext();
 
   // Read first name dynamically from workspaceConfig or local contractor auth
   const savedContractor = localStorage.getItem('halbiz_auth_contractor');
@@ -362,14 +362,23 @@ export default function OverviewPanel({
             </div>
             
             <div className="space-y-3">
-              <div className="text-xs font-semibold">Active Recommendation</div>
+              <div className="text-xs font-semibold">Active Territory Synthesis</div>
               <p className="text-[11px] text-text-secondary leading-relaxed">
-                HAL's Council has generated 3 high-impact recommendations based on active territory scans.
+                Synthesizing real-time market indicators for <strong className="text-text-primary">{activeNiche.toUpperCase()}</strong> across <strong className="text-text-primary">{activeCity}, {regionalProfile.countryCode}</strong>.
               </p>
               
-              <div className={`p-3 rounded-lg border border-dashed border-border-dim bg-bg-base/30 text-[10px] text-text-secondary`}>
-                <span className="text-accent font-mono font-bold block mb-1">TERRITORY METRIC</span>
-                Google Ads optimization recommended for 8 local businesses in {activeCity}.
+              <div className={`p-3 rounded-lg border border-dashed border-border-dim bg-bg-base/30 text-[10px] text-text-secondary space-y-1.5`}>
+                <div className="flex items-center justify-between">
+                  <span className="text-accent font-mono font-bold uppercase text-[9px]">CLIMATE & SURGE HEURISTIC</span>
+                  <span className="font-mono text-[9px] text-text-tertiary">{regionalProfile.climateZone}</span>
+                </div>
+                <p className="text-text-primary font-medium leading-snug">
+                  {regionalProfile.currentSeasonalFocus}
+                </p>
+                <div className="flex items-center justify-between text-[9.5px] text-text-tertiary pt-1 border-t border-border-dim/40 font-mono">
+                  <span>Target CAC: <strong className="text-accent">{formatCurrency(regionalProfile.territoryMetrics.averageCAC)}</strong></span>
+                  <span>Bench CPC: <strong className="text-text-primary">{formatCurrency(regionalProfile.territoryMetrics.typicalCPC)}</strong></span>
+                </div>
               </div>
             </div>
           </div>
@@ -399,7 +408,7 @@ export default function OverviewPanel({
                 <span className="text-[10px] text-text-secondary font-medium tracking-wide uppercase group-hover:text-text-primary">Revenue (MTD)</span>
                 <ArrowUpRight className="w-3 h-3 text-text-tertiary opacity-0 group-hover:opacity-100 transition-opacity" />
               </div>
-              <div className="text-xl font-mono tracking-tight font-light">${displayRevenueVal.toLocaleString()}</div>
+              <div className="text-xl font-mono tracking-tight font-light">{formatCurrency(displayRevenueVal)}</div>
               <div className="text-[10px] font-mono text-positive flex items-center gap-1">↑ 18.6%</div>
             </div>
 
@@ -425,7 +434,7 @@ export default function OverviewPanel({
                 <span className="text-[10px] text-text-secondary font-medium tracking-wide uppercase group-hover:text-text-primary">Avg. Deal Value</span>
                 <ArrowUpRight className="w-3 h-3 text-text-tertiary opacity-0 group-hover:opacity-100 transition-opacity" />
               </div>
-              <div className="text-xl font-mono tracking-tight font-light">${displayAvgDealVal.toLocaleString()}</div>
+              <div className="text-xl font-mono tracking-tight font-light">{formatCurrency(displayAvgDealVal)}</div>
               <div className="text-[10px] font-mono text-positive flex items-center gap-1">↑ 8.2%</div>
             </div>
 
@@ -1045,7 +1054,7 @@ export default function OverviewPanel({
         <section className={`border rounded-xl p-5 shadow-sm space-y-3 ${cardBg}`}>
           <div className="flex justify-between items-center">
             <span className="text-[10px] font-mono tracking-widest text-text-tertiary uppercase font-bold">TERRITORY SIGNALS</span>
-            <span className="text-[9px] font-mono text-text-tertiary">{activeCity}</span>
+            <span className="text-[9px] font-mono text-text-tertiary">{activeCity}, {regionalProfile.countryCode}</span>
           </div>
 
           <div className="space-y-3 text-[11px] font-sans">
@@ -1055,9 +1064,21 @@ export default function OverviewPanel({
               </div>
               <div className="space-y-0.5">
                 <p className="leading-tight text-text-secondary">
-                  <span className="font-semibold text-text-primary">15 {activeNiche} sites</span> fail Google PageSpeed mobile threshold.
+                  <span className="font-semibold text-text-primary">{activeNiche} operators</span> facing {regionalProfile.climateZone.toLowerCase()} seasonal load.
                 </p>
-                <p className="text-[9px] font-mono text-amber-500 font-bold uppercase">High conversion pitch angle</p>
+                <p className="text-[9px] font-mono text-amber-500 font-bold uppercase">{regionalProfile.currentSeasonalFocus}</p>
+              </div>
+            </div>
+
+            <div className="flex gap-2.5 items-start">
+              <div className="w-5 h-5 rounded bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 shrink-0 mt-0.5">
+                <ShieldCheck className="w-3 h-3" />
+              </div>
+              <div className="space-y-0.5">
+                <p className="leading-tight text-text-secondary">
+                  Jurisdiction mandate: <strong className="text-text-primary font-mono text-[10px]">{regionalProfile.regulatoryBodies[0]?.code || 'REG'}</strong> standard compliance active.
+                </p>
+                <p className="text-[9px] font-mono text-emerald-400 font-bold uppercase">Licensure Verification Angle</p>
               </div>
             </div>
 
@@ -1067,21 +1088,9 @@ export default function OverviewPanel({
               </div>
               <div className="space-y-0.5">
                 <p className="leading-tight text-text-secondary">
-                  Local search demand for <span className="font-semibold text-text-primary">{activeNiche}</span> surged 22% this week.
+                  Competitive density in {activeCity}: <strong className="text-text-primary font-mono">{regionalProfile.territoryMetrics.activeCompetitorDensity}</strong>.
                 </p>
-                <p className="text-[9px] font-mono text-sky-400 font-bold uppercase">Increase ad allocation</p>
-              </div>
-            </div>
-
-            <div className="flex gap-2.5 items-start">
-              <div className="w-5 h-5 rounded bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-accent shrink-0 mt-0.5">
-                <Flame className="w-3 h-3" />
-              </div>
-              <div className="space-y-0.5">
-                <p className="leading-tight text-text-secondary">
-                  <span className="font-semibold text-text-primary">8 uncontacted businesses</span> received recent negative Google reviews.
-                </p>
-                <p className="text-[9px] font-mono text-accent font-bold uppercase">Reputation recovery trigger</p>
+                <p className="text-[9px] font-mono text-sky-400 font-bold uppercase">CAC Target: {formatCurrency(regionalProfile.territoryMetrics.averageCAC)}</p>
               </div>
             </div>
 

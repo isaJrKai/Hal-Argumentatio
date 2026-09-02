@@ -50,8 +50,10 @@ export function getDrizzleDb() {
   return pgDb;
 }
 
-export async function bootstrapPostgresTables(poolInstance: Pool): Promise<void> {
-  const client = await poolInstance.connect();
+export async function bootstrapPostgresTables(poolInstance?: Pool): Promise<void> {
+  const p = poolInstance || getPostgresPool();
+  if (!p) return;
+  const client = await p.connect();
   try {
     await client.query(`
       CREATE TABLE IF NOT EXISTS contractors (
@@ -471,6 +473,53 @@ export async function bootstrapPostgresTables(poolInstance: Pool): Promise<void>
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
       );
 
+      CREATE TABLE IF NOT EXISTS hal_loops (
+        id TEXT PRIMARY KEY,
+        contractor_id TEXT NOT NULL,
+        status TEXT NOT NULL,
+        current_stage TEXT NOT NULL,
+        trigger TEXT NOT NULL,
+        context_data JSONB,
+        state_snapshot JSONB,
+        recommendation_id TEXT,
+        simulation_id TEXT,
+        critic_findings JSONB,
+        execution_reference TEXT,
+        verification_result JSONB,
+        learning_signals JSONB,
+        iteration_count INTEGER DEFAULT 1 NOT NULL,
+        started_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+        completed_at TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
+      );
+
+      CREATE TABLE IF NOT EXISTS hal_loop_events (
+        id TEXT PRIMARY KEY,
+        loop_id TEXT NOT NULL,
+        contractor_id TEXT NOT NULL,
+        previous_state TEXT,
+        new_state TEXT NOT NULL,
+        event_type TEXT NOT NULL,
+        actor TEXT NOT NULL,
+        metadata JSONB,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
+      );
+
+      ALTER TABLE contractors ADD COLUMN IF NOT EXISTS company_name TEXT;
+      ALTER TABLE contractors ADD COLUMN IF NOT EXISTS email TEXT;
+      ALTER TABLE contractors ADD COLUMN IF NOT EXISTS phone TEXT;
+      ALTER TABLE contractors ADD COLUMN IF NOT EXISTS city TEXT;
+      ALTER TABLE contractors ADD COLUMN IF NOT EXISTS province_state TEXT;
+      ALTER TABLE contractors ADD COLUMN IF NOT EXISTS service_type TEXT;
+      ALTER TABLE contractors ADD COLUMN IF NOT EXISTS current_monthly_revenue_usd INTEGER DEFAULT 0;
+      ALTER TABLE contractors ADD COLUMN IF NOT EXISTS target_monthly_revenue_usd INTEGER DEFAULT 0;
+      ALTER TABLE contractors ADD COLUMN IF NOT EXISTS active_territories TEXT[];
+      ALTER TABLE contractors ADD COLUMN IF NOT EXISTS role TEXT DEFAULT 'user';
+      ALTER TABLE contractors ADD COLUMN IF NOT EXISTS password_hash TEXT;
+      ALTER TABLE contractors ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
+      ALTER TABLE contractors ADD COLUMN IF NOT EXISTS last_login_at TIMESTAMP;
+
       ALTER TABLE revenue_recommendations ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'proposed';
       ALTER TABLE revenue_recommendations ADD COLUMN IF NOT EXISTS confidence_score DOUBLE PRECISION DEFAULT 85.0;
       ALTER TABLE revenue_recommendations ADD COLUMN IF NOT EXISTS expected_impact TEXT DEFAULT 'Positive economic lift';
@@ -487,6 +536,22 @@ export async function bootstrapPostgresTables(poolInstance: Pool): Promise<void>
 
       ALTER TABLE leads ADD COLUMN IF NOT EXISTS external_crm_id TEXT;
       ALTER TABLE leads ADD COLUMN IF NOT EXISTS external_source TEXT;
+      ALTER TABLE leads ADD COLUMN IF NOT EXISTS website_url TEXT;
+      ALTER TABLE leads ADD COLUMN IF NOT EXISTS gmb_listing_url TEXT;
+      ALTER TABLE leads ADD COLUMN IF NOT EXISTS review_count INTEGER DEFAULT 0;
+      ALTER TABLE leads ADD COLUMN IF NOT EXISTS review_score DOUBLE PRECISION DEFAULT 0;
+      ALTER TABLE leads ADD COLUMN IF NOT EXISTS predicted_monthly_lost_revenue_usd INTEGER DEFAULT 0;
+      ALTER TABLE leads ADD COLUMN IF NOT EXISTS assigned_contractor_id TEXT;
+      ALTER TABLE leads ADD COLUMN IF NOT EXISTS performance_score INTEGER DEFAULT 0;
+      ALTER TABLE leads ADD COLUMN IF NOT EXISTS ssl_status TEXT DEFAULT 'secure';
+      ALTER TABLE leads ADD COLUMN IF NOT EXISTS mobile_friendly BOOLEAN DEFAULT TRUE;
+      ALTER TABLE leads ADD COLUMN IF NOT EXISTS urgency_score DOUBLE PRECISION DEFAULT 5.0;
+      ALTER TABLE leads ADD COLUMN IF NOT EXISTS predicted_ltv INTEGER DEFAULT 1500;
+      ALTER TABLE leads ADD COLUMN IF NOT EXISTS seo_score INTEGER DEFAULT 0;
+      ALTER TABLE leads ADD COLUMN IF NOT EXISTS google_rating DOUBLE PRECISION DEFAULT 0;
+      ALTER TABLE leads ADD COLUMN IF NOT EXISTS sentiment_score DOUBLE PRECISION DEFAULT 0;
+      ALTER TABLE leads ADD COLUMN IF NOT EXISTS outreach_strategy TEXT;
+      ALTER TABLE leads ADD COLUMN IF NOT EXISTS notes TEXT;
 
       ALTER TABLE lead_events ADD COLUMN IF NOT EXISTS external_event_id TEXT;
       ALTER TABLE lead_events ADD COLUMN IF NOT EXISTS event_type TEXT;
@@ -497,6 +562,47 @@ export async function bootstrapPostgresTables(poolInstance: Pool): Promise<void>
       ALTER TABLE lead_events ADD COLUMN IF NOT EXISTS metadata JSONB;
       ALTER TABLE lead_events ADD COLUMN IF NOT EXISTS created_by TEXT DEFAULT 'system';
       ALTER TABLE lead_events ADD COLUMN IF NOT EXISTS occurred_at TIMESTAMP;
+      ALTER TABLE lead_events ALTER COLUMN type DROP NOT NULL;
+
+      CREATE TABLE IF NOT EXISTS hermes_lab_artifacts (
+        id TEXT PRIMARY KEY,
+        contractor_id TEXT NOT NULL,
+        tool_id TEXT NOT NULL,
+        title TEXT NOT NULL,
+        category TEXT NOT NULL,
+        content JSONB NOT NULL,
+        status TEXT DEFAULT 'draft' NOT NULL,
+        metadata JSONB,
+        created_by TEXT DEFAULT 'hermes_agent' NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
+      );
+
+      CREATE TABLE IF NOT EXISTS hermes_diagnostic_incidents (
+        id TEXT PRIMARY KEY,
+        contractor_id TEXT NOT NULL,
+        title TEXT NOT NULL,
+        severity TEXT NOT NULL,
+        category TEXT NOT NULL,
+        root_cause TEXT NOT NULL,
+        evidence JSONB,
+        proposed_fix TEXT NOT NULL,
+        fix_artifact_id TEXT,
+        status TEXT DEFAULT 'open' NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+        resolved_at TIMESTAMP
+      );
+
+      CREATE TABLE IF NOT EXISTS hermes_lab_messages (
+        id TEXT PRIMARY KEY,
+        contractor_id TEXT NOT NULL,
+        artifact_id TEXT,
+        role TEXT NOT NULL,
+        content TEXT NOT NULL,
+        attached_artifact JSONB,
+        thought_process TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
+      );
     `);
   } finally {
     client.release();

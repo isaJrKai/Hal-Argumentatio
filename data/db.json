@@ -70,6 +70,181 @@
       "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb250cmFjdG9ySWQiOiJjb25fYWRtaW5fc2VlZCIsImVtYWlsIjoiYWRtaW5Aa2Fpc2xlYWQuY29tIiwicm9sZSI6ImFkbWluIiwiZXhwIjoxNzg2ODc0MjQwfQ.X0_e-rfyD49DemGgFOz23zc4Fvt6dRhr2AtxiXKspo4",
       "expiresAt": "2026-08-16T09:57:20.327Z",
       "createdAt": "2026-08-15T09:57:20.327Z"
+    },
+    {
+      "id": "sess_c479db2715bd5634",
+      "contractorId": "7b0b24e3-019a-44b1-bf52-b8b904604a0e",
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb250cmFjdG9ySWQiOiI3YjBiMjRlMy0wMTlhLTQ0YjEtYmY1Mi1iOGI5MDQ2MDRhMGUiLCJlbWFpbCI6ImF1ZGl0X2FscGhhXzE3ODgyOTkyMDE5MzZAZXhhbXBsZS5jb20iLCJyb2xlIjoidXNlciIsImV4cCI6MTc4ODM4NTYwMn0.ueLcBJ3_C5yFSi2-ZLs1YoQZzIDoACSh9XJmT-XPHMc",
+      "expiresAt": "2026-09-02T21:46:42.550Z",
+      "createdAt": "2026-09-01T21:46:42.550Z"
+    },
+    {
+      "id": "sess_e6bdf33cd1dbecdf",
+      "contractorId": "023f43b2-5fb2-4299-b37e-abb80e628ebc",
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb250cmFjdG9ySWQiOiIwMjNmNDNiMi01ZmIyLTQyOTktYjM3ZS1hYmI4MGU2MjhlYmMiLCJlbWFpbCI6ImF1ZGl0X2JldGFfMTc4ODI5OTIwMTkzNkBleGFtcGxlLmNvbSIsInJvbGUiOiJ1c2VyIiwiZXhwIjoxNzg4Mzg1NjAzfQ.f1rw0nJc9wAzb9Qb7r-tVm0fF9x10ZEApRbOuUoo2ok",
+      "expiresAt": "2026-09-02T21:46:43.150Z",
+      "createdAt": "2026-09-01T21:46:43.150Z"
+    },
+    {
+      "id": "sess_f01490c9bc399101",
+      "contractorId": "3dc4f8c3-d234-4ee1-a1e0-4367e03fcc7a",
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb250cmFjdG9ySWQiOiIzZGM0ZjhjMy1kMjM0LTRlZTEtYTFlMC00MzY3ZTAzZmNjN2EiLCJlbWFpbCI6ImF1ZGl0X2FscGhhXzE3ODgyOTkyMjY1ODVAZXhhbXBsZS5jb20iLCJyb2xlIjoidXNlciIsImV4cCI6MTc4ODM4NTYyNn0.6sfN-m1yFAdv0GqQJ7vS3bWSxSfAjV-7Fvm28AgLdeQ",
+      "expiresAt": "2026-09-02T21:47:06.694Z",
+      "createdAt": "2026-09-01T21:47:06.694Z"
+    },
+    {
+      "id": "sess_32f0831026724966",
+      "contractorId": "9b248963-0d16-4022-a0b0-15387d46a0a5",
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb250cmFjdG9ySWQiOiI5YjI0ODk2My0wZDE2LTQwMjItYTBiMC0xNTM4N2Q0NmEwYTUiLCJlbWFpbCI6ImF1ZGl0X2JldGFfMTc4ODI5OTIyNjU4NUBleGFtcGxlLmNvbSIsInJvbGUiOiJ1c2VyIiwiZXhwIjoxNzg4Mzg1NjI3fQ.yTcCT_7mt-2WsklVrU0POPCK0SfjcQbP_q5nV1DFH28",
+      "expiresAt": "2026-09-02T21:47:07.294Z",
+      "createdAt": "2026-09-01T21:47:07.295Z"
+    },
+    {
+      "id": "sess_49a29ab92277ff1d",
+      "contractorId": "3dddfba5-193d-451e-92b8-abcc149857ea",
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb250cmFjdG9ySWQiOiIzZGRkZmJhNS0xOTNkLTQ1MWUtOTJiOC1hYmNjMTQ5ODU3ZWEiLCJlbWFpbCI6ImF1ZGl0X2FscGhhXzE3ODgyOTkyNTQzMjdAZXhhbXBsZS5jb20iLCJyb2xlIjoidXNlciIsImV4cCI6MTc4ODM4NTY1NH0.Qk5D1D-kxNJNm3WUs1Ns9ex9XhomKiHaD8AkQNcZN6w",
+      "expiresAt": "2026-09-02T21:47:34.434Z",
+      "createdAt": "2026-09-01T21:47:34.434Z"
+    },
+    {
+      "id": "sess_0757e23ab2b643e6",
+      "contractorId": "9ec8cd76-3791-46da-aed6-74f4b151adef",
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb250cmFjdG9ySWQiOiI5ZWM4Y2Q3Ni0zNzkxLTQ2ZGEtYWVkNi03NGY0YjE1MWFkZWYiLCJlbWFpbCI6ImF1ZGl0X2JldGFfMTc4ODI5OTI1NDMyN0BleGFtcGxlLmNvbSIsInJvbGUiOiJ1c2VyIiwiZXhwIjoxNzg4Mzg1NjU1fQ.MmaSTb998LC3bdo-hkEdLltFn5TAagljNiqc2ZPzD7Q",
+      "expiresAt": "2026-09-02T21:47:35.035Z",
+      "createdAt": "2026-09-01T21:47:35.035Z"
+    },
+    {
+      "id": "sess_910602331eb325c7",
+      "contractorId": "f44fb365-9216-41bc-8ac8-dca07a1f51ce",
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb250cmFjdG9ySWQiOiJmNDRmYjM2NS05MjE2LTQxYmMtOGFjOC1kY2EwN2ExZjUxY2UiLCJlbWFpbCI6ImF1ZGl0X2FscGhhXzE3ODgyOTkyNzU5ODBAZXhhbXBsZS5jb20iLCJyb2xlIjoidXNlciIsImV4cCI6MTc4ODM4NTY3Nn0.CzbeHnU9LysXeLqaRmI9qbBrT4A0uLaugBei4FtnDe8",
+      "expiresAt": "2026-09-02T21:47:56.197Z",
+      "createdAt": "2026-09-01T21:47:56.197Z"
+    },
+    {
+      "id": "sess_e31cd0644568dc5f",
+      "contractorId": "1ce1c7b9-bfbb-4365-beae-b58eb210a1bf",
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb250cmFjdG9ySWQiOiIxY2UxYzdiOS1iZmJiLTQzNjUtYmVhZS1iNThlYjIxMGExYmYiLCJlbWFpbCI6ImF1ZGl0X2JldGFfMTc4ODI5OTI3NTk4MEBleGFtcGxlLmNvbSIsInJvbGUiOiJ1c2VyIiwiZXhwIjoxNzg4Mzg1Njc2fQ._zDcadJMzEeygx0FIY_xUVBwDHIBvnjV1V9SCn3hlyw",
+      "expiresAt": "2026-09-02T21:47:56.465Z",
+      "createdAt": "2026-09-01T21:47:56.465Z"
+    },
+    {
+      "id": "sess_9e61a31a08533b22",
+      "contractorId": "c594d11e-d880-49d9-b90c-57e401ebad61",
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb250cmFjdG9ySWQiOiJjNTk0ZDExZS1kODgwLTQ5ZDktYjkwYy01N2U0MDFlYmFkNjEiLCJlbWFpbCI6ImF1ZGl0X2FscGhhXzE3ODgyOTkyODcyMDdAZXhhbXBsZS5jb20iLCJyb2xlIjoidXNlciIsImV4cCI6MTc4ODM4NTY4N30.jsfwL7eGFASKL0QcAnUjTQlGTx5BNY9OJ1MXXsG27oY",
+      "expiresAt": "2026-09-02T21:48:07.922Z",
+      "createdAt": "2026-09-01T21:48:07.922Z"
+    },
+    {
+      "id": "sess_48c16fb6ab6959f2",
+      "contractorId": "90ad6691-84ec-4726-ab84-a27ee64e5244",
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb250cmFjdG9ySWQiOiI5MGFkNjY5MS04NGVjLTQ3MjYtYWI4NC1hMjdlZTY0ZTUyNDQiLCJlbWFpbCI6ImF1ZGl0X2JldGFfMTc4ODI5OTI4NzIwN0BleGFtcGxlLmNvbSIsInJvbGUiOiJ1c2VyIiwiZXhwIjoxNzg4Mzg1Njg4fQ.aZp9xoC2ODFDlTpSv5df96GXqzS6FpFBk22aqkQXTiY",
+      "expiresAt": "2026-09-02T21:48:08.201Z",
+      "createdAt": "2026-09-01T21:48:08.201Z"
+    },
+    {
+      "id": "sess_0ad228b3defce301",
+      "contractorId": "ddda98bc-2a65-4376-b4cc-45b4288f8e43",
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb250cmFjdG9ySWQiOiJkZGRhOThiYy0yYTY1LTQzNzYtYjRjYy00NWI0Mjg4ZjhlNDMiLCJlbWFpbCI6InRlc3RfZGlhZ18xNzg4Mjk5MzQzNDc2QGV4YW1wbGUuY29tIiwicm9sZSI6InVzZXIiLCJleHAiOjE3ODgzODU3NDR9.k8rgjRfF02pkwFNjvlrjVSLwhb5OqzFmI9VP3MPyWHk",
+      "expiresAt": "2026-09-02T21:49:04.242Z",
+      "createdAt": "2026-09-01T21:49:04.242Z"
+    },
+    {
+      "id": "sess_4b4cb6b9c5a4d021",
+      "contractorId": "5af9d274-1925-4368-bcac-3fe0b7f2d341",
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb250cmFjdG9ySWQiOiI1YWY5ZDI3NC0xOTI1LTQzNjgtYmNhYy0zZmUwYjdmMmQzNDEiLCJlbWFpbCI6InRlc3RfZGlhZ18xNzg4Mjk5MzUxMzI0QGV4YW1wbGUuY29tIiwicm9sZSI6InVzZXIiLCJleHAiOjE3ODgzODU3NTJ9.Z0I7XSMEtlmtbkzrX18gM_A8SZ_RTsGPzbK0rHW8zUU",
+      "expiresAt": "2026-09-02T21:49:12.097Z",
+      "createdAt": "2026-09-01T21:49:12.097Z"
+    },
+    {
+      "id": "sess_f882c8733e669315",
+      "contractorId": "ab36c7e8-3d41-41f9-974f-cb948160f740",
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb250cmFjdG9ySWQiOiJhYjM2YzdlOC0zZDQxLTQxZjktOTc0Zi1jYjk0ODE2MGY3NDAiLCJlbWFpbCI6InRlc3RfZGlhZ18xNzg4Mjk5NDE0MDk3QGV4YW1wbGUuY29tIiwicm9sZSI6InVzZXIiLCJleHAiOjE3ODgzODU4MTR9.yu45iTNakURSvNChFfCex8BsK8Qjnr1n0IcdqpqX6V8",
+      "expiresAt": "2026-09-02T21:50:14.419Z",
+      "createdAt": "2026-09-01T21:50:14.419Z"
+    },
+    {
+      "id": "sess_c60c11d4cb150057",
+      "contractorId": "f6ad23a1-f5de-4ddf-9f32-788b2a0ab5f8",
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb250cmFjdG9ySWQiOiJmNmFkMjNhMS1mNWRlLTRkZGYtOWYzMi03ODhiMmEwYWI1ZjgiLCJlbWFpbCI6ImF1ZGl0X2FscGhhXzE3ODgyOTk0MjUyNjBAZXhhbXBsZS5jb20iLCJyb2xlIjoidXNlciIsImV4cCI6MTc4ODM4NTgyNX0.4V9bDZ1DonMqDIoeQ20zh3dzzH5LjrXLFTctDYbT4U8",
+      "expiresAt": "2026-09-02T21:50:25.436Z",
+      "createdAt": "2026-09-01T21:50:25.437Z"
+    },
+    {
+      "id": "sess_9238e58fa2b98e9c",
+      "contractorId": "b737e3b9-9fda-4fc4-b136-9392276683ca",
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb250cmFjdG9ySWQiOiJiNzM3ZTNiOS05ZmRhLTRmYzQtYjEzNi05MzkyMjc2NjgzY2EiLCJlbWFpbCI6ImF1ZGl0X2JldGFfMTc4ODI5OTQyNTI2MEBleGFtcGxlLmNvbSIsInJvbGUiOiJ1c2VyIiwiZXhwIjoxNzg4Mzg1ODI1fQ.Ltlcls7tXGBEbtQqkMNZDNPfno4znYprlWhwHmOy8uU",
+      "expiresAt": "2026-09-02T21:50:25.705Z",
+      "createdAt": "2026-09-01T21:50:25.705Z"
+    },
+    {
+      "id": "sess_19712139090686f4",
+      "contractorId": "f7beba09-fa7d-4291-99b0-522a11fb03f0",
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb250cmFjdG9ySWQiOiJmN2JlYmEwOS1mYTdkLTQyOTEtOTliMC01MjJhMTFmYjAzZjAiLCJlbWFpbCI6InRlc3RfZGlhZ18xNzg4Mjk5NDk1NDA5QGV4YW1wbGUuY29tIiwicm9sZSI6InVzZXIiLCJleHAiOjE3ODgzODU4OTZ9.iKRzN8MSK_UeFj7UTW0O2PImTxW9XqaDNljrj8A0EDU",
+      "expiresAt": "2026-09-02T21:51:36.183Z",
+      "createdAt": "2026-09-01T21:51:36.183Z"
+    },
+    {
+      "id": "sess_9c4cd8ae9d204dc1",
+      "contractorId": "aee75fe9-81c6-4d15-a47e-1784438a966a",
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb250cmFjdG9ySWQiOiJhZWU3NWZlOS04MWM2LTRkMTUtYTQ3ZS0xNzg0NDM4YTk2NmEiLCJlbWFpbCI6ImF1ZGl0X2FscGhhXzE3ODgyOTk1MTE2MjJAZXhhbXBsZS5jb20iLCJyb2xlIjoidXNlciIsImV4cCI6MTc4ODM4NTkxMn0.TDLZlaP0vPpDnudWBc8c-Nn5KHm2n8u2188xsVeGbgA",
+      "expiresAt": "2026-09-02T21:51:52.319Z",
+      "createdAt": "2026-09-01T21:51:52.319Z"
+    },
+    {
+      "id": "sess_c4d155f21b7be546",
+      "contractorId": "4d669821-7a9d-4a41-be0e-67489512f1a4",
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb250cmFjdG9ySWQiOiI0ZDY2OTgyMS03YTlkLTRhNDEtYmUwZS02NzQ4OTUxMmYxYTQiLCJlbWFpbCI6ImF1ZGl0X2JldGFfMTc4ODI5OTUxMTYyMkBleGFtcGxlLmNvbSIsInJvbGUiOiJ1c2VyIiwiZXhwIjoxNzg4Mzg1OTEyfQ.2lJQteUiGlGRqkMbQkQw3HZVgcjZT3P_5_QiYpUWpVk",
+      "expiresAt": "2026-09-02T21:51:52.587Z",
+      "createdAt": "2026-09-01T21:51:52.587Z"
+    },
+    {
+      "id": "sess_3f395419b1ed338a",
+      "contractorId": "8abe0157-cb2c-4ea7-b574-33800aa3b078",
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb250cmFjdG9ySWQiOiI4YWJlMDE1Ny1jYjJjLTRlYTctYjU3NC0zMzgwMGFhM2IwNzgiLCJlbWFpbCI6InRlc3RfZGlhZ18xNzg4Mjk5NTc2MjQyQGV4YW1wbGUuY29tIiwicm9sZSI6InVzZXIiLCJleHAiOjE3ODgzODU5Nzd9.P657pFtiDZ85OSbtzHN2SvKP_q4jVQACtnRSjwDQ6fU",
+      "expiresAt": "2026-09-02T21:52:57.014Z",
+      "createdAt": "2026-09-01T21:52:57.014Z"
+    },
+    {
+      "id": "sess_0e7e6eb893563ca2",
+      "contractorId": "4f9bd5b3-cde1-418f-bde7-f4e1baf59177",
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb250cmFjdG9ySWQiOiI0ZjliZDViMy1jZGUxLTQxOGYtYmRlNy1mNGUxYmFmNTkxNzciLCJlbWFpbCI6ImF1ZGl0X2FscGhhXzE3ODgyOTk1OTQzOTdAZXhhbXBsZS5jb20iLCJyb2xlIjoidXNlciIsImV4cCI6MTc4ODM4NTk5NH0.1rFBfa3Jr-aCzYNwcwIPg842IvUk3yGkkOuXgaPctdY",
+      "expiresAt": "2026-09-02T21:53:14.583Z",
+      "createdAt": "2026-09-01T21:53:14.583Z"
+    },
+    {
+      "id": "sess_65ef06c4a897836c",
+      "contractorId": "ccf7b78d-de19-47cf-802e-1b2f61de86b5",
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb250cmFjdG9ySWQiOiJjY2Y3Yjc4ZC1kZTE5LTQ3Y2YtODAyZS0xYjJmNjFkZTg2YjUiLCJlbWFpbCI6ImF1ZGl0X2JldGFfMTc4ODI5OTU5NDM5N0BleGFtcGxlLmNvbSIsInJvbGUiOiJ1c2VyIiwiZXhwIjoxNzg4Mzg1OTk0fQ.Eh_1QSTkGWYFqo6WI8dmqvWsHCEvQULclgSZO8x2P1Y",
+      "expiresAt": "2026-09-02T21:53:14.856Z",
+      "createdAt": "2026-09-01T21:53:14.856Z"
+    },
+    {
+      "id": "sess_611fd0e669c232fd",
+      "contractorId": "f3b14515-094f-4e6a-8d3b-f5e5a2984cff",
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb250cmFjdG9ySWQiOiJmM2IxNDUxNS0wOTRmLTRlNmEtOGQzYi1mNWU1YTI5ODRjZmYiLCJlbWFpbCI6ImF1ZGl0X2FscGhhXzE3ODgyOTk2MTIxMDdAZXhhbXBsZS5jb20iLCJyb2xlIjoidXNlciIsImV4cCI6MTc4ODM4NjAxMn0.i8Nz6ZVDZt7tYD631G9uPJlTN7Kgrs5rvDWoymGEMEw",
+      "expiresAt": "2026-09-02T21:53:32.792Z",
+      "createdAt": "2026-09-01T21:53:32.792Z"
+    },
+    {
+      "id": "sess_8f5c1453a2e7047e",
+      "contractorId": "93ab0a04-6590-4469-920c-27531e9a6a4e",
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb250cmFjdG9ySWQiOiI5M2FiMGEwNC02NTkwLTQ0NjktOTIwYy0yNzUzMWU5YTZhNGUiLCJlbWFpbCI6ImF1ZGl0X2JldGFfMTc4ODI5OTYxMjEwN0BleGFtcGxlLmNvbSIsInJvbGUiOiJ1c2VyIiwiZXhwIjoxNzg4Mzg2MDEzfQ.FlBz0a_hA8w96r4j__lPKDeUUZo9Aw4xBQWXYbrjLIQ",
+      "expiresAt": "2026-09-02T21:53:33.054Z",
+      "createdAt": "2026-09-01T21:53:33.055Z"
+    },
+    {
+      "id": "sess_0b29a9932a8698e1",
+      "contractorId": "1ba6d8e1-1be1-4306-9ba7-e9ce0913ea4a",
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb250cmFjdG9ySWQiOiIxYmE2ZDhlMS0xYmUxLTQzMDYtOWJhNy1lOWNlMDkxM2VhNGEiLCJlbWFpbCI6Imhlcm1lc190ZW5hbnRfMTc4ODMwMDQ5MTkzN0BleGFtcGxlLmNvbSIsInJvbGUiOiJ1c2VyIiwiZXhwIjoxNzg4Mzg2ODkyfQ.8VD0ssWB5xDIsHWhObQo1JyFq9yvUSmdUXTbp07yva4",
+      "expiresAt": "2026-09-02T22:08:12.651Z",
+      "createdAt": "2026-09-01T22:08:12.651Z"
+    },
+    {
+      "id": "sess_5b1be4f8d78a1fbc",
+      "contractorId": "51613c75-48cb-4f3b-938d-6c6d25c811b2",
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb250cmFjdG9ySWQiOiI1MTYxM2M3NS00OGNiLTRmM2ItOTM4ZC02YzZkMjVjODExYjIiLCJlbWFpbCI6Imhlcm1lc190ZW5hbnRfMTc4ODMwMDcxNzg0MkBleGFtcGxlLmNvbSIsInJvbGUiOiJ1c2VyIiwiZXhwIjoxNzg4Mzg3MTE4fQ.FXYElWeEe1-KF01LbK5UN0ta3BSF0wMJCwqWo5V3y6s",
+      "expiresAt": "2026-09-02T22:11:58.067Z",
+      "createdAt": "2026-09-01T22:11:58.068Z"
     }
   ],
   "passwordResets": [],
@@ -660,7 +835,35 @@
   "lessons": [],
   "outcomeRecords": [],
   "apiKeys": [],
-  "notifications": [],
+  "notifications": [
+    {
+      "contractorId": "8abe0157-cb2c-4ea7-b574-33800aa3b078",
+      "type": "success",
+      "title": "Lead Captured",
+      "message": "Successfully created lead profile for Diag Lead Corp in Austin.",
+      "read": false,
+      "id": "not_ccf738c98ef93210",
+      "createdAt": "2026-09-01T21:52:57.474Z"
+    },
+    {
+      "contractorId": "4f9bd5b3-cde1-418f-bde7-f4e1baf59177",
+      "type": "success",
+      "title": "Lead Captured",
+      "message": "Successfully created lead profile for Apex Commercial Plaza in Austin.",
+      "read": false,
+      "id": "not_2b05a31af7c2c511",
+      "createdAt": "2026-09-01T21:53:15.298Z"
+    },
+    {
+      "contractorId": "f3b14515-094f-4e6a-8d3b-f5e5a2984cff",
+      "type": "success",
+      "title": "Lead Captured",
+      "message": "Successfully created lead profile for Apex Commercial Plaza in Austin.",
+      "read": false,
+      "id": "not_098bbab8e168c1e1",
+      "createdAt": "2026-09-01T21:53:33.489Z"
+    }
+  ],
   "systemAuditLogs": [
     {
       "contractorId": "con_admin_seed",
@@ -971,6 +1174,34 @@
       "ipAddress": "127.0.0.1",
       "id": "log_9943cb2d7f3e590a",
       "createdAt": "2026-09-01T09:56:39.159Z"
+    },
+    {
+      "contractorId": "con_admin_seed",
+      "action": "TIMESFM_INFERENCE_TEST",
+      "details": "TimesFM forward demand synthesis executed for roofing across Calgary (12-week horizon).",
+      "id": "log_b96bf17b9a90be4d",
+      "createdAt": "2026-09-01T21:25:13.776Z"
+    },
+    {
+      "contractorId": "con_admin_seed",
+      "action": "TIMESFM_INFERENCE_TEST",
+      "details": "TimesFM forward demand synthesis executed for roofing across Calgary (12-week horizon).",
+      "id": "log_3f5b969107b68f8a",
+      "createdAt": "2026-09-01T21:25:13.781Z"
+    },
+    {
+      "contractorId": "con_admin_seed",
+      "action": "TIMESFM_INFERENCE_TEST",
+      "details": "TimesFM forward demand synthesis executed for roofing across Calgary (12-week horizon).",
+      "id": "log_c891f89eb41eefc0",
+      "createdAt": "2026-09-01T21:55:07.721Z"
+    },
+    {
+      "contractorId": "con_admin_seed",
+      "action": "TIMESFM_INFERENCE_TEST",
+      "details": "TimesFM forward demand synthesis executed for roofing across Calgary (12-week horizon).",
+      "id": "log_602c71396c6de7e1",
+      "createdAt": "2026-09-01T21:55:08.452Z"
     }
   ],
   "schedulerJobs": [],

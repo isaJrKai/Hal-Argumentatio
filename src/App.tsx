@@ -33,7 +33,8 @@ import {
   Smartphone,
   ArrowUpRight,
   DollarSign,
-  Zap
+  Zap,
+  Wrench
 } from 'lucide-react';
 
 import AuthPage from './components/AuthPage';
@@ -60,6 +61,8 @@ import PublicPortalPage from './components/PublicPortalPage';
 import FinancialsPanel from './components/FinancialsPanel';
 import RevenueIntelligenceView from './components/RevenueIntelligenceView';
 import HalLoopOperationsView from './components/HalLoopOperationsView';
+import HermesLabPanel from './components/HermesLabPanel';
+import { OperatingCommandRibbon } from './components/ui/OperatingCommandRibbon';
 import { ErrorBoundary } from './components/ErrorBoundary';
 
 import { useBusinessContext } from './context/BusinessContext';
@@ -612,6 +615,7 @@ export default function App() {
     {
       group: 'COGNITIVE & REASONING',
       items: [
+        { id: 'hermes-lab', label: 'Hermes Intelligence Lab', icon: Wrench },
         { id: 'skills', label: 'AI Council & Skills', icon: Cpu },
         { id: 'scheduler', label: 'Simulations & Scans', icon: Play },
         { id: 'loop-engine', label: 'Verified Loop Engine', icon: Zap },
@@ -1123,6 +1127,13 @@ export default function App() {
           {/* WORKSPACE AREA */}
           <main className="flex-1 overflow-y-auto flex flex-col relative transition-colors bg-bg-base min-w-0">
             <div className="p-3 sm:p-5 md:p-6 w-full flex-1 max-w-[1300px] mx-auto min-w-0">
+              
+              {/* Operating Command Ribbon with Global Territory & Trade Levers */}
+              <OperatingCommandRibbon 
+                activeTab={activeTab}
+                onRefreshData={fetchAllData}
+              />
+
               <AnimatePresence mode="wait">
                 <motion.div
                   key={activeTab}
@@ -1227,6 +1238,10 @@ export default function App() {
 
                   {activeTab === 'loop-engine' && (
                     <HalLoopOperationsView token={token} />
+                  )}
+
+                  {activeTab === 'hermes-lab' && (
+                    <HermesLabPanel token={token} />
                   )}
 
                   {activeTab === 'credentials' && (

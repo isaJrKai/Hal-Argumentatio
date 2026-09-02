@@ -452,6 +452,47 @@ export const halLoopEvents = pgTable('hal_loop_events', {
   createdAt: timestamp('created_at').defaultNow().notNull(),
 });
 
+export const hermesLabArtifacts = pgTable('hermes_lab_artifacts', {
+  id: text('id').primaryKey(),
+  contractorId: text('contractor_id').notNull(),
+  toolId: text('tool_id').notNull(), // 'landing_page', 'ad_copy', 'seo_schema', 'outreach_sequence', etc.
+  title: text('title').notNull(),
+  category: text('category').notNull(), // 'web', 'ads', 'seo', 'outreach', 'diagnostics'
+  content: jsonb('content').notNull(), // structured payload + rendered HTML/text
+  status: text('status').default('draft').notNull(), // 'draft', 'ready', 'deployed', 'archived'
+  metadata: jsonb('metadata'),
+  createdBy: text('created_by').default('hermes_agent').notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+});
+
+export const hermesDiagnosticIncidents = pgTable('hermes_diagnostic_incidents', {
+  id: text('id').primaryKey(),
+  contractorId: text('contractor_id').notNull(),
+  title: text('title').notNull(),
+  severity: text('severity').notNull(), // 'LOW', 'MEDIUM', 'HIGH', 'CRITICAL'
+  category: text('category').notNull(), // 'WEBHOOK', 'TRACKING_TAG', 'OUTBOX', 'CAMPAIGN_DECAY', 'SSL_AUDIT'
+  rootCause: text('root_cause').notNull(),
+  evidence: jsonb('evidence'),
+  proposedFix: text('proposed_fix').notNull(),
+  fixArtifactId: text('fix_artifact_id'),
+  status: text('status').default('open').notNull(), // 'open', 'resolving', 'resolved', 'dismissed'
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  resolvedAt: timestamp('resolved_at'),
+});
+
+export const hermesLabMessages = pgTable('hermes_lab_messages', {
+  id: text('id').primaryKey(),
+  contractorId: text('contractor_id').notNull(),
+  artifactId: text('artifact_id'), // optional link to a specific artifact being edited
+  role: text('role').notNull(), // 'user' | 'assistant' | 'system'
+  content: text('content').notNull(),
+  attachedArtifact: jsonb('attached_artifact'), // if assistant generated or updated an artifact during chat
+  thoughtProcess: text('thought_process'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+});
+
+
 
 
 
