@@ -1459,11 +1459,24 @@ class Database {
     this.save();
   }
 
+  // Returns DECRYPTED connector credentials. Values are stored AES-256-GCM
+  // encrypted at rest; legacy plaintext entries decrypt() to themselves.
   public getConnectorCredentials(contractorId: string): Record<string, string> {
     if (!this.data.connectorCredentials) {
       this.data.connectorCredentials = {};
     }
-    return this.data.connectorCredentials[contractorId] || {};
+    const stored = this.data.connectorCredentials[contractorId] || {};
+    const result: Record<string, string> = {};
+    for (const [service, val] of Object.entries(stored)) {
+      result[service] = val ? decrypt(val) : '';
+    }
+    return result;
+  }
+
+  // True when a credential is already configured for this service.
+  public hasConnectorCredential(contractorId: string, service: string): boolean {
+    const stored = this.data.connectorCredentials?.[contractorId];
+    return Boolean(stored && stored[service]);
   }
 
   public saveConnectorCredential(contractorId: string, service: string, keyVal: string) {
@@ -1473,7 +1486,8 @@ class Database {
     if (!this.data.connectorCredentials[contractorId]) {
       this.data.connectorCredentials[contractorId] = {};
     }
-    this.data.connectorCredentials[contractorId][service] = keyVal;
+    // Encrypt third-party API keys at rest (never persist plaintext secrets).
+    this.data.connectorCredentials[contractorId][service] = keyVal ? encrypt(keyVal) : '';
     this.save();
   }
 

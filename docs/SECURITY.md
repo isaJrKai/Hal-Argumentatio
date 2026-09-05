@@ -69,6 +69,25 @@ failure it returns the ciphertext (never silently logs its contents).
 
 Per the AGENTS.md constitution, encryption must never be disabled or bypassed.
 
+## Secrets & Data at Rest
+
+- Third-party connector API keys (Stripe, Twilio, SendGrid, etc.) are stored
+  **AES-256-GCM encrypted** in the local store (`saveConnectorCredential`
+  encrypts on write, `getConnectorCredentials` decrypts on read). The
+  `GET /api/connectors/credentials` endpoint never returns raw keys — only a
+  `__MASKED__` sentinel for configured services; the client never echoes it
+  back on save.
+- Project records and client portal tokens (`/api/projects`,
+  `/api/portal/project/:token`) are consistent across PostgreSQL and the local
+  sandbox store (previously projects were written only to the local store but
+  read from Postgres, so they vanished and portal links 404'd). Portal tokens
+  are 24 random bytes; the portal route rejects non-token-shaped paths.
+- Batch ingestion endpoints (`/api/leads/bulk`, `/api/ads/ingest`,
+  `/api/leads/purge-and-replace`) cap payload sizes; harvested leads never
+  fabricate placeholder emails/phones (unknown contacts stay null).
+- Project updates (`PUT /api/projects/:id`) accept only whitelisted fields and
+  verify the record belongs to the caller.
+
 ## Data Integrity
 
 - API routes never return HTML; unknown `/api/*` routes return JSON `404`.

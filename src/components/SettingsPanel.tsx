@@ -284,10 +284,16 @@ export default function SettingsPanel({
     fetchCreds();
   }, []);
 
+  const MASKED_KEY_SENTINEL = '__MASKED__';
+
   const handleSaveConnectorKey = async (service: string, keyVal: string) => {
     const updated = { ...connectorKeys, [service]: keyVal };
     setConnectorKeys(updated);
-    
+
+    // The masked sentinel is the placeholder returned by the server for an
+    // already-stored key; never POST it back (it would clobber the secret).
+    if (!keyVal || keyVal === MASKED_KEY_SENTINEL) return;
+
     try {
       await fetch('/api/connectors/credentials', {
         method: 'POST',
@@ -335,6 +341,15 @@ export default function SettingsPanel({
     setPasswordSuccess(null);
     setPasswordError(null);
 
+    if (!oldPassword || !newPassword) {
+      setPasswordError('Both current password and new password are required.');
+      return;
+    }
+    if (newPassword.length < 8) {
+      setPasswordError('New password must be at least 8 characters.');
+      return;
+    }
+
     try {
       const res = await fetch('/api/auth/reset-password', {
         method: 'POST',
@@ -343,8 +358,8 @@ export default function SettingsPanel({
           'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify({
-          token: 'demo-sandbox-token',
-          password: newPassword
+          currentPassword: oldPassword,
+          newPassword
         })
       });
 

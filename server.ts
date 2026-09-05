@@ -1058,10 +1058,13 @@ app.post('/api/webhooks/crm', async (req, res) => {
 
 app.post('/api/leads/bulk', authenticate, async (req, res) => {
   const contractorId = (req as any).contractorId;
-  const { leads: reqLeads } = req.body;
+  const { leads: reqLeads } = req.body || {};
 
   if (!reqLeads || !Array.isArray(reqLeads)) {
     return res.status(400).json({ error: 'Leads array is required' });
+  }
+  if (reqLeads.length > 500) {
+    return res.status(413).json({ error: 'Too many leads (limit 500 per bulk import)' });
   }
 
   const addedLeads = [];
@@ -1337,10 +1340,13 @@ app.post('/api/leads/harvest', authenticate, async (req, res) => {
 
 app.post('/api/leads/purge-and-replace', authenticate, async (req, res) => {
   const contractorId = (req as any).contractorId;
-  const { leads: harvestedLeads } = req.body;
+  const { leads: harvestedLeads } = req.body || {};
 
   if (!Array.isArray(harvestedLeads) || harvestedLeads.length === 0) {
     return res.status(400).json({ error: 'An array of harvested leads is required' });
+  }
+  if (harvestedLeads.length > 500) {
+    return res.status(413).json({ error: 'Too many leads (limit 500 per purge-and-replace)' });
   }
 
   try {
@@ -1355,9 +1361,11 @@ app.post('/api/leads/purge-and-replace', authenticate, async (req, res) => {
         id,
         contractorId,
         businessName: hl.businessName,
-        ownerName: hl.ownerName || 'Unknown Owner',
-        email: hl.email || `contact@${hl.businessName.toLowerCase().replace(/[^a-z0-9]/g, '')}.com`,
-        phone: hl.phone || '555-0100',
+        ownerName: hl.ownerName || null,
+        // Never fabricate contact data (HAL Constitution: No Fabricated Reality).
+        // Store only real, harvested values; unknown contacts remain null.
+        email: hl.email || null,
+        phone: hl.phone || null,
         city: hl.city,
         niche: hl.serviceType,
         source: 'harvested_intelligence',
@@ -1856,7 +1864,19 @@ app.delete('/api/intelligence/chat/message/:id', authenticate, async (req, res) 
 
 app.post('/api/intelligence/chat', authenticate, async (req, res) => {
   const contractorId = (req as any).contractorId;
-  const { message, enableGrounding, activeAi } = req.body;
+  const { message, enableGrounding, activeAi } = req.body || {};
+
+  if (!message || typeof message !== 'string') {
+    return res.status(400).json({ error: 'A message string is required' });
+  }
+  const trimmed = message.trim();
+  if (!trimmed) {
+    return res.status(400).json({ error: 'Message cannot be empty' });
+  }
+  if (trimmed.length > 8000) {
+    return res.status(400).json({ error: 'Message is too long (limit 8000 characters)' });
+  }
+
   try {
     // 1. Fetch current chat history to supply to askHalBot as context
     const currentHistory = await pgDb.select().from(chatMessages).where(eq(chatMessages.contractorId, contractorId)).orderBy(chatMessages.createdAt);
@@ -1875,14 +1895,14 @@ app.post('/api/intelligence/chat', authenticate, async (req, res) => {
       id: 'msg_' + crypto.randomBytes(8).toString('hex'),
       contractorId,
       role: 'user',
-      text: message,
+      text: trimmed,
       enableGrounding: !!enableGrounding,
       timestamp: timestampDate,
       createdAt: timestampDate,
     }).returning();
 
     // 3. Ask HAL
-    const result = await askHalBot(message, formattedHistory, !!enableGrounding, activeAi);
+    const result = await askHalBot(trimmed, formattedHistory, !!enableGrounding, activeAi);
 
     // 4. Save HAL's reply to the database
     const replyDate = new Date();
@@ -2581,53 +2601,81 @@ app.get('/api/projects', authenticate, async (req, res) => {
     const projects = await pgDb.select().from(clientProjects).where(eq(clientProjects.contractorId, contractorId)).orderBy(desc(clientProjects.createdAt));
     res.json(projects);
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    // Fall back to the local in-memory store when Postgres is unavailable.
+    try {
+      return res.json(db.getClientProjects(contractorId) || []);
+    } catch {
+      res.status(500).json({ error: err.message });
+    }
   }
 });
 
-app.post('/api/projects', authenticate, (req, res) => {
+app.post('/api/projects', authenticate, async (req, res) => {
   const contractorId = (req as any).contractorId;
-  const { leadId, clientName, businessName, city, serviceType, packageTier, monthlyRetainerUsd, initialAuditScore } = req.body;
+  const { leadId, clientName, businessName, city, serviceType, packageTier, monthlyRetainerUsd, initialAuditScore } = req.body || {};
 
-  if (!businessName) {
+  if (!businessName || typeof businessName !== 'string') {
     return res.status(400).json({ error: 'Business name is required to create a project' });
   }
 
-  const project = db.createClientProject(contractorId, {
-    id: 'proj_' + crypto.randomBytes(6).toString('hex'),
+  const retainer = Number(monthlyRetainerUsd) || 2400;
+  const auditScore = Number(initialAuditScore) || 50;
+  const projectId = 'proj_' + crypto.randomBytes(6).toString('hex');
+  const portalToken = crypto.randomBytes(24).toString('hex');
+  const now = new Date();
+
+  const assets = [
+    { id: 'ast_' + crypto.randomBytes(4).toString('hex'), name: 'High-Res Brand Logo', category: 'logo', status: 'pending' },
+    { id: 'ast_' + crypto.randomBytes(4).toString('hex'), name: 'Domain Registrar Credentials', category: 'domain_access', status: 'pending' },
+    { id: 'ast_' + crypto.randomBytes(4).toString('hex'), name: 'Google Business Profile Manager Delegation', category: 'analytics_access', status: 'pending' }
+  ];
+  const milestones = [
+    { id: 'ms_1', title: 'Onboarding & Asset Intake', description: 'Intake and verify client DNS, assets, and service radius.', status: 'in_progress' },
+    { id: 'ms_2', title: 'Technical Speed & SSL Hardening', description: 'Compress images, configure TLS 1.3, optimize Core Web Vitals.', status: 'pending' },
+    { id: 'ms_3', title: 'Geo-SEO Schema & Map Pack Synchronization', description: 'Inject JSON-LD structured data and align 40+ local citations.', status: 'pending' },
+    { id: 'ms_4', title: 'Autonomous Funnel Activation', description: 'Launch lead capture forms and direct SMS dispatch routing.', status: 'pending' },
+    { id: 'ms_5', title: 'Monthly Executive ROI Review', description: 'Deliver progress comparison report and growth metrics breakdown.', status: 'pending' }
+  ];
+
+  const projectPayload = {
+    id: projectId,
+    contractorId,
     leadId: leadId || '',
     clientName: clientName || 'Business Owner',
     businessName,
     city: city || 'Calgary',
     serviceType: serviceType || 'General Trade',
     packageTier: packageTier || 'Dominance',
-    monthlyRetainerUsd: Number(monthlyRetainerUsd) || 2400,
-    startDate: new Date().toISOString().split('T')[0],
+    monthlyRetainerUsd: retainer,
+    startDate: now,
     status: 'onboarding',
-    initialAuditScore: Number(initialAuditScore) || 50,
-    currentScore: Number(initialAuditScore) || 50,
+    initialAuditScore: auditScore,
+    currentScore: auditScore,
     targetScore: 95,
-    portalAccessToken: crypto.randomBytes(12).toString('hex'),
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-    assets: [
-      { id: 'ast_' + crypto.randomBytes(4).toString('hex'), name: 'High-Res Brand Logo', category: 'logo', status: 'pending' },
-      { id: 'ast_' + crypto.randomBytes(4).toString('hex'), name: 'Domain Registrar Credentials', category: 'domain_access', status: 'pending' },
-      { id: 'ast_' + crypto.randomBytes(4).toString('hex'), name: 'Google Business Profile Manager Delegation', category: 'analytics_access', status: 'pending' }
-    ],
-    milestones: [
-      { id: 'ms_1', title: 'Onboarding & Asset Intake', description: 'Intake and verify client DNS, assets, and service radius.', status: 'in_progress' },
-      { id: 'ms_2', title: 'Technical Speed & SSL Hardening', description: 'Compress images, configure TLS 1.3, optimize Core Web Vitals.', status: 'pending' },
-      { id: 'ms_3', title: 'Geo-SEO Schema & Map Pack Synchronization', description: 'Inject JSON-LD structured data and align 40+ local citations.', status: 'pending' },
-      { id: 'ms_4', title: 'Autonomous Funnel Activation', description: 'Launch lead capture forms and direct SMS dispatch routing.', status: 'pending' },
-      { id: 'ms_5', title: 'Monthly Executive ROI Review', description: 'Deliver progress comparison report and growth metrics breakdown.', status: 'pending' }
-    ]
-  });
+    portalAccessToken: portalToken,
+    assets,
+    milestones,
+  };
+
+  let project: any;
+  try {
+    const [inserted] = await pgDb.insert(clientProjects).values(projectPayload).returning();
+    project = inserted;
+  } catch (pgErr: any) {
+    // Postgres unavailable — persist to the local sandbox store.
+    project = db.createClientProject(contractorId, {
+      ...projectPayload,
+      status: 'onboarding',
+      startDate: now.toISOString().split('T')[0],
+      createdAt: now.toISOString(),
+      updatedAt: now.toISOString(),
+    } as any);
+  }
 
   db.addAuditLog({
     contractorId,
     action: 'PROJECT_ONBOARDED',
-    details: `Initiated active delivery project for ${businessName} ($${project.monthlyRetainerUsd}/mo).`
+    details: `Initiated active delivery project for ${businessName} ($${retainer}/mo).`
   });
 
   broadcastNotification(
@@ -2640,19 +2688,67 @@ app.post('/api/projects', authenticate, (req, res) => {
   res.status(201).json(project);
 });
 
-app.put('/api/projects/:id', authenticate, (req, res) => {
+// Fields a client may update on a project.
+const PROJECT_UPDATABLE_FIELDS = [
+  'status', 'currentScore', 'targetScore', 'packageTier', 'monthlyRetainerUsd',
+  'milestones', 'assets', 'notes', 'clientName'
+] as const;
+
+app.put('/api/projects/:id', authenticate, async (req, res) => {
   const contractorId = (req as any).contractorId;
   const { id } = req.params;
-  const updates = req.body;
+  const rawUpdates = req.body || {};
 
+  // Whitelist updatable fields to prevent mass-assignment.
+  const updates: Record<string, any> = {};
+  for (const field of PROJECT_UPDATABLE_FIELDS) {
+    if (rawUpdates[field] !== undefined) updates[field] = rawUpdates[field];
+  }
+  if (Object.keys(updates).length === 0) {
+    return res.status(400).json({ error: 'No valid fields to update' });
+  }
+
+  try {
+    // 1. Try PostgreSQL first.
+    const [existingPg] = await pgDb.select().from(clientProjects)
+      .where(and(eq(clientProjects.id, id), eq(clientProjects.contractorId, contractorId)));
+
+    if (existingPg) {
+      const [updated] = await pgDb.update(clientProjects)
+        .set({ ...updates, updatedAt: new Date() })
+        .where(eq(clientProjects.id, id))
+        .returning();
+
+      if (updates.status === 'completed' && existingPg.status !== 'completed') {
+        db.addAuditLog({
+          contractorId,
+          action: 'REVIEW_REQUEST_QUEUED',
+          details: `Project completed for ${updated.businessName}. Automated SMS/Email review and $100 referral incentive queued within 24-hour window.`
+        });
+        broadcastNotification(
+          contractorId,
+          'success',
+          'Post-Job Referral Engine Triggered',
+          `Review request & referral invite dispatched to ${updated.clientName} (${updated.businessName}) to capture 24-hr referral window.`
+        );
+      }
+      return res.json(updated);
+    }
+  } catch (pgErr: any) {
+    // Postgres unavailable — fall back to local store.
+  }
+
+  // 2. Local sandbox store fallback.
   const existingProject = db.getClientProjects(contractorId).find(p => p.id === id);
+  if (!existingProject) {
+    return res.status(404).json({ error: 'Project not found or unauthorized' });
+  }
   const updated = db.updateClientProject(id, contractorId, updates);
   if (!updated) {
     return res.status(404).json({ error: 'Project not found or unauthorized' });
   }
 
-  // Phase 2: Automated Post-Job Referral & Review Engine Trigger
-  if (updates.status === 'completed' && existingProject && existingProject.status !== 'completed') {
+  if (updates.status === 'completed' && existingProject.status !== 'completed') {
     db.addAuditLog({
       contractorId,
       action: 'REVIEW_REQUEST_QUEUED',
@@ -2671,11 +2767,27 @@ app.put('/api/projects/:id', authenticate, (req, res) => {
 
 // ─── CONNECTORS CREDENTIALS & HEALTH API ──────────────────────────────────────
 
+// Mask a secret for return to the browser: keep the last 4 characters so the
+// user can identify which key is stored, never the full secret.
+function maskSecret(value: string): string {
+  if (!value) return '';
+  if (value.length <= 4) return '••••';
+  return `••••••••${value.slice(-4)}`;
+}
+
+// Sentinel the client sends back when it did not change an already-masked key.
+const MASKED_KEY_SENTINEL = '__MASKED__';
+
 app.get('/api/connectors/credentials', authenticate, (req, res) => {
   const contractorId = (req as any).contractorId;
   try {
     const creds = db.getConnectorCredentials(contractorId);
-    res.json(creds);
+    // Never return raw third-party API keys to the client.
+    const masked: Record<string, string> = {};
+    for (const [service, val] of Object.entries(creds)) {
+      masked[service] = val ? MASKED_KEY_SENTINEL : '';
+    }
+    res.json(masked);
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
@@ -2683,12 +2795,23 @@ app.get('/api/connectors/credentials', authenticate, (req, res) => {
 
 app.post('/api/connectors/credentials', authenticate, (req, res) => {
   const contractorId = (req as any).contractorId;
-  const { service, keyVal } = req.body;
-  if (!service) {
-    return res.status(400).json({ error: 'Service name is required' });
+  const { service, keyVal } = req.body || {};
+  if (!service || typeof service !== 'string' || service.length > 64) {
+    return res.status(400).json({ error: 'A valid service name is required' });
+  }
+  if (typeof keyVal !== 'string' || keyVal.length > 4096) {
+    return res.status(400).json({ error: 'keyVal must be a string' });
   }
   try {
-    db.saveConnectorCredential(contractorId, service, keyVal || '');
+    // The client echoes the masked sentinel for unchanged keys; ignore it so
+    // we never overwrite the stored secret with the placeholder.
+    if (keyVal === MASKED_KEY_SENTINEL) {
+      if (!db.hasConnectorCredential(contractorId, service)) {
+        return res.status(400).json({ error: `No credential stored yet for ${service}` });
+      }
+      return res.json({ success: true, service, unchanged: true });
+    }
+    db.saveConnectorCredential(contractorId, service, keyVal.trim());
     db.addAuditLog({
       contractorId,
       action: 'CONNECTOR_KEY_UPDATED',
@@ -2760,29 +2883,43 @@ app.get('/api/connectors/health', authenticate, (req, res) => {
 // Public Client Portal Endpoint (accessible by clients with portalAccessToken)
 app.get('/api/portal/project/:token', async (req, res) => {
   const { token } = req.params;
-  try {
-    const [project] = await pgDb.select().from(clientProjects).where(eq(clientProjects.portalAccessToken, token));
-    if (!project) {
-      return res.status(404).json({ error: 'Client portal session not found or invalid token' });
-    }
-    res.json({
-      businessName: project.businessName,
-      clientName: project.clientName,
-      city: project.city,
-      serviceType: project.serviceType,
-      packageTier: project.packageTier,
-      startDate: project.startDate,
-      status: project.status,
-      initialAuditScore: project.initialAuditScore,
-      currentScore: project.currentScore,
-      targetScore: project.targetScore,
-      milestones: project.milestones,
-      assets: project.assets,
-      updatedAt: project.updatedAt
-    });
-  } catch (err: any) {
-    res.status(500).json({ error: err.message });
+  // Tokens are 48 hex chars; reject anything else to prevent scanning.
+  if (!token || !/^[a-f0-9]{24,128}$/.test(token)) {
+    return res.status(404).json({ error: 'Client portal session not found or invalid token' });
   }
+
+  const projectView = (project: any) => ({
+    businessName: project.businessName,
+    clientName: project.clientName,
+    city: project.city,
+    serviceType: project.serviceType,
+    packageTier: project.packageTier,
+    startDate: project.startDate,
+    status: project.status,
+    initialAuditScore: project.initialAuditScore,
+    currentScore: project.currentScore,
+    targetScore: project.targetScore,
+    milestones: project.milestones,
+    assets: project.assets,
+    updatedAt: project.updatedAt
+  });
+
+  try {
+    const [pgProject] = await pgDb.select().from(clientProjects).where(eq(clientProjects.portalAccessToken, token));
+    if (pgProject) {
+      return res.json(projectView(pgProject));
+    }
+  } catch (err: any) {
+    // Postgres unavailable — fall through to the local store.
+  }
+
+  // Local sandbox store fallback.
+  const localProject = db.getProjectByPortalToken(token);
+  if (localProject) {
+    return res.json(projectView(localProject));
+  }
+
+  return res.status(404).json({ error: 'Client portal session not found or invalid token' });
 });
 
 // ─── PHASE 5: FINANCIAL INTELLIGENCE & RETAINER METRICS API ─────────────────
@@ -4091,10 +4228,16 @@ app.get('/api/revenue/intelligence', authenticate, async (req, res) => {
 
 app.post('/api/ads/ingest', authenticate, async (req, res) => {
   const contractorId = (req as any).contractorId;
-  const { items } = req.body;
+  const { items } = req.body || {};
   try {
     if (!Array.isArray(items)) {
       return res.status(400).json({ error: 'Items array required for batch ad performance ingestion' });
+    }
+    if (items.length === 0) {
+      return res.status(400).json({ error: 'Items array cannot be empty' });
+    }
+    if (items.length > 1000) {
+      return res.status(413).json({ error: 'Too many items (limit 1000 per ingestion)' });
     }
 
     const inserted = [];
