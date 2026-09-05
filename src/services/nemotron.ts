@@ -1,4 +1,5 @@
 import { GoogleGenAI } from "@google/genai";
+import { fetchWithTimeout } from "../lib/net";
 
 let aiClient: GoogleGenAI | null = null;
 
@@ -72,14 +73,15 @@ export async function callNemotron(
         payload.response_format = { type: "json_object" };
       }
 
-      const response = await fetch("https://integrate.api.nvidia.com/v1/chat/completions", {
+      const response = await fetchWithTimeout("https://integrate.api.nvidia.com/v1/chat/completions", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           "Authorization": `Bearer ${apiKey}`,
         },
         body: JSON.stringify(payload),
-      });
+        timeoutMs: 45000,
+      } as RequestInit);
 
       if (response.ok) {
         const data = await response.json();

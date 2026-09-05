@@ -35,17 +35,19 @@ interface AuditData {
   businessName: string;
   city: string;
   serviceType: string;
-  websiteUrl?: string;
-  seoScore: number;
-  performanceScore: number;
-  sslStatus: 'secured' | 'missing';
-  googleRating: number;
-  reviewCount: number;
-  sentimentScore: number;
+  websiteUrl?: string | null;
+  // Metric fields may be null when no verified harvest data exists; the UI
+  // renders a neutral placeholder instead of fabricated numbers.
+  seoScore: number | null;
+  performanceScore: number | null;
+  sslStatus: 'secured' | 'missing' | null;
+  googleRating: number | null;
+  reviewCount: number | null;
+  sentimentScore: number | null;
   notes: string;
   outreachStrategy: string;
-  urgencyScore: number;
-  predictedLtvUsd: number;
+  urgencyScore: number | null;
+  predictedLtvUsd: number | null;
   createdAt: string;
 }
 
@@ -232,16 +234,18 @@ export default function PublicAuditPage({ auditId, onNavigateToLogin }: PublicAu
           <div className="bg-[#0f131d] border border-slate-800 rounded-xl p-5 space-y-3 relative overflow-hidden">
             <div className="flex justify-between items-start">
               <span className="text-[10px] font-mono uppercase tracking-wider text-slate-400 font-bold">Mobile Speed</span>
-              <Zap className={`w-4 h-4 ${data.performanceScore >= 70 ? 'text-emerald-400' : data.performanceScore >= 50 ? 'text-amber-400' : 'text-rose-400'}`} />
+              <Zap className={`w-4 h-4 ${data.performanceScore == null ? 'text-slate-600' : data.performanceScore >= 70 ? 'text-emerald-400' : data.performanceScore >= 50 ? 'text-amber-400' : 'text-rose-400'}`} />
             </div>
             <div className="flex items-baseline gap-2">
-              <span className={`text-3xl font-extrabold font-mono ${data.performanceScore >= 70 ? 'text-emerald-400' : data.performanceScore >= 50 ? 'text-amber-400' : 'text-rose-400'}`}>
-                {data.performanceScore}
+              <span className={`text-3xl font-extrabold font-mono ${data.performanceScore == null ? 'text-slate-500' : data.performanceScore >= 70 ? 'text-emerald-400' : data.performanceScore >= 50 ? 'text-amber-400' : 'text-rose-400'}`}>
+                {data.performanceScore ?? '—'}
               </span>
-              <span className="text-xs text-slate-500 font-mono">/ 100</span>
+              {data.performanceScore != null && <span className="text-xs text-slate-500 font-mono">/ 100</span>}
             </div>
             <p className="text-[11px] text-slate-400 leading-snug">
-              {data.performanceScore < 60 ? 'High mobile bounce risk. Heavy friction on smartphones.' : 'Acceptable mobile load speed benchmark.'}
+              {data.performanceScore == null
+                ? 'Awaiting mobile performance crawl.'
+                : data.performanceScore < 60 ? 'High mobile bounce risk. Heavy friction on smartphones.' : 'Acceptable mobile load speed benchmark.'}
             </p>
           </div>
 
@@ -249,13 +253,13 @@ export default function PublicAuditPage({ auditId, onNavigateToLogin }: PublicAu
           <div className="bg-[#0f131d] border border-slate-800 rounded-xl p-5 space-y-3 relative overflow-hidden">
             <div className="flex justify-between items-start">
               <span className="text-[10px] font-mono uppercase tracking-wider text-slate-400 font-bold">Search Visibility</span>
-              <Globe className={`w-4 h-4 ${data.seoScore >= 70 ? 'text-emerald-400' : 'text-amber-400'}`} />
+              <Globe className={`w-4 h-4 ${data.seoScore == null ? 'text-slate-600' : data.seoScore >= 70 ? 'text-emerald-400' : 'text-amber-400'}`} />
             </div>
             <div className="flex items-baseline gap-2">
-              <span className={`text-3xl font-extrabold font-mono ${data.seoScore >= 70 ? 'text-emerald-400' : 'text-amber-400'}`}>
-                {data.seoScore}
+              <span className={`text-3xl font-extrabold font-mono ${data.seoScore == null ? 'text-slate-500' : data.seoScore >= 70 ? 'text-emerald-400' : 'text-amber-400'}`}>
+                {data.seoScore ?? '—'}
               </span>
-              <span className="text-xs text-slate-500 font-mono">/ 100</span>
+              {data.seoScore != null && <span className="text-xs text-slate-500 font-mono">/ 100</span>}
             </div>
             <p className="text-[11px] text-slate-400 leading-snug">
               Local indexing and search keyword ranking strength in {data.city}.
@@ -266,15 +270,19 @@ export default function PublicAuditPage({ auditId, onNavigateToLogin }: PublicAu
           <div className="bg-[#0f131d] border border-slate-800 rounded-xl p-5 space-y-3 relative overflow-hidden">
             <div className="flex justify-between items-start">
               <span className="text-[10px] font-mono uppercase tracking-wider text-slate-400 font-bold">Security Lock</span>
-              {data.sslStatus === 'secured' ? <ShieldCheck className="w-4 h-4 text-emerald-400" /> : <AlertTriangle className="w-4 h-4 text-rose-400" />}
+              {data.sslStatus == null
+                ? <Lock className="w-4 h-4 text-slate-600" />
+                : data.sslStatus === 'secured' ? <ShieldCheck className="w-4 h-4 text-emerald-400" /> : <AlertTriangle className="w-4 h-4 text-rose-400" />}
             </div>
             <div className="flex items-baseline gap-2">
-              <span className={`text-xl font-bold font-mono uppercase ${data.sslStatus === 'secured' ? 'text-emerald-400' : 'text-rose-400'}`}>
-                {data.sslStatus}
+              <span className={`text-xl font-bold font-mono uppercase ${data.sslStatus == null ? 'text-slate-500' : data.sslStatus === 'secured' ? 'text-emerald-400' : 'text-rose-400'}`}>
+                {data.sslStatus ?? 'unknown'}
               </span>
             </div>
             <p className="text-[11px] text-slate-400 leading-snug">
-              {data.sslStatus === 'secured' ? 'Verified HTTPS SSL encryption lock active.' : 'Browser security warning flag active.'}
+              {data.sslStatus == null
+                ? 'SSL scan pending.'
+                : data.sslStatus === 'secured' ? 'Verified HTTPS SSL encryption lock active.' : 'Browser security warning flag active.'}
             </p>
           </div>
 
@@ -286,9 +294,9 @@ export default function PublicAuditPage({ auditId, onNavigateToLogin }: PublicAu
             </div>
             <div className="flex items-baseline gap-2">
               <span className="text-3xl font-extrabold font-mono text-white">
-                {data.googleRating}
+                {data.googleRating ?? '—'}
               </span>
-              <span className="text-xs text-slate-400 font-mono">({data.reviewCount} reviews)</span>
+              {data.reviewCount != null && <span className="text-xs text-slate-400 font-mono">({data.reviewCount} reviews)</span>}
             </div>
             <p className="text-[11px] text-slate-400 leading-snug">
               Verified public customer feedback & reputation index.
@@ -370,7 +378,11 @@ export default function PublicAuditPage({ auditId, onNavigateToLogin }: PublicAu
           <div className="bg-[#090b10]/90 border border-slate-800 p-4 rounded-xl flex flex-col sm:flex-row items-center justify-between gap-4 font-mono text-xs">
             <div className="space-y-1 text-center sm:text-left">
               <p className="text-slate-200">
-                At your current performance score ({data.performanceScore}/100), approximately <strong className="text-rose-400">{Math.round(bouncePenaltyPct * 100)}% of mobile visitors</strong> bounce before seeing your contact phone or quote form.
+                {data.performanceScore != null ? (
+                  <>At your current performance score ({data.performanceScore}/100), approximately <strong className="text-rose-400">{Math.round(bouncePenaltyPct * 100)}% of mobile visitors</strong> bounce before seeing your contact phone or quote form.</>
+                ) : (
+                  <>A mobile speed crawl has not completed yet for this property. Slow mobile load speeds typically push <strong className="text-rose-400">20–38% of mobile visitors</strong> to bounce before seeing your contact phone or quote form.</>
+                )}
               </p>
               <p className="text-[11px] text-slate-400">
                 Recovering just <strong className="text-emerald-400">{estimatedLostLeadsPerMonth} missed contracts/month</strong> yields <strong className="text-emerald-400">+${(estimatedLostLeadsPerMonth * avgTicketValue).toLocaleString()}</strong> in gross revenue.

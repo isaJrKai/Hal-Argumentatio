@@ -198,7 +198,12 @@ export class AutonomousLearningEngine {
 
   public async initializeFromDb(): Promise<void> {
     try {
-      const [record] = await getDrizzleDb().select().from(neuralState).where(eq(neuralState.id, 'singleton'));
+      const drizzle = getDrizzleDb();
+      if (!drizzle) {
+        // No database configured — silently run from in-memory defaults.
+        return;
+      }
+      const [record] = await drizzle.select().from(neuralState).where(eq(neuralState.id, 'singleton'));
       if (record) {
         this.state = {
           version: record.version,
@@ -223,7 +228,9 @@ export class AutonomousLearningEngine {
   public async saveState(): Promise<void> {
     this.state.lastUpdated = new Date().toISOString();
     try {
-      await getDrizzleDb().insert(neuralState).values({
+      const drizzle = getDrizzleDb();
+      if (!drizzle) return; // No database configured; state stays in memory.
+      await drizzle.insert(neuralState).values({
         id: 'singleton',
         version: this.state.version,
         calibrationEpoch: this.state.calibrationEpoch,

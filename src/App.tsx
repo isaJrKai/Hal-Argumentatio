@@ -467,7 +467,11 @@ export default function App() {
       clearTimeout(sseTimeoutRef.current);
     }
     
-    const eventSource = new EventSource('/api/events');
+    // EventSource cannot set Authorization headers; pass the JWT as a query
+    // param. Read at connect time so SSE reconnects after re-login use the
+    // fresh token.
+    const sseToken = localStorage.getItem('halbiz_auth_token') || localStorage.getItem('token');
+    const eventSource = new EventSource(sseToken ? `/api/events?token=${encodeURIComponent(sseToken)}` : '/api/events');
 
     eventSource.onopen = () => {
       setSseConnected(true);

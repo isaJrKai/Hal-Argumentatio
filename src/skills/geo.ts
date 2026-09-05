@@ -1,4 +1,5 @@
 import { Skill } from './types';
+import { fetchWithTimeout } from '../lib/net';
 
 export const geoSkill: Skill = {
   id: 'geo_weather',
@@ -24,7 +25,7 @@ export const geoSkill: Skill = {
     try {
       // 1. Geocode the city via Open-Meteo's open service
       const geocodeUrl = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(city)}&count=1&language=en&format=json`;
-      const geoRes = await fetch(geocodeUrl);
+      const geoRes = await fetchWithTimeout(geocodeUrl, { timeoutMs: 12000 });
       if (!geoRes.ok) {
         throw new Error(`Geocoding request failed: ${geoRes.statusText}`);
       }
@@ -39,7 +40,7 @@ export const geoSkill: Skill = {
 
       // 2. Query actual weather data using Open-Meteo
       const weatherUrl = `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current_weather=true&hourly=precipitation,rain,snowfall&timezone=auto`;
-      const weatherRes = await fetch(weatherUrl);
+      const weatherRes = await fetchWithTimeout(weatherUrl, { timeoutMs: 12000 });
       if (!weatherRes.ok) {
         throw new Error(`Weather forecasting query failed: ${weatherRes.statusText}`);
       }

@@ -365,19 +365,19 @@ function getEncryptionKey(): Buffer {
 }
 
 // AES-256-GCM encryption
+// NOTE: On failure this THROWS rather than returning plaintext. Storing
+// unencrypted PII is a constitutional violation ("Never Revert Security or
+// Encryption"); callers must handle the error rather than silently persisting
+// raw PII.
 export function encrypt(text: string): string {
-  try {
-    const key = getEncryptionKey();
-    const iv = crypto.randomBytes(12);
-    const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
-    let encrypted = cipher.update(text, 'utf8', 'hex');
-    encrypted += cipher.final('hex');
-    const authTag = cipher.getAuthTag().toString('hex');
-    return `${iv.toString('hex')}:${encrypted}:${authTag}`;
-  } catch (err) {
-    console.error('Encryption failed:', err);
-    return text; // Fallback
-  }
+  if (text === null || text === undefined) return text as unknown as string;
+  const key = getEncryptionKey();
+  const iv = crypto.randomBytes(12);
+  const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
+  let encrypted = cipher.update(text, 'utf8', 'hex');
+  encrypted += cipher.final('hex');
+  const authTag = cipher.getAuthTag().toString('hex');
+  return `${iv.toString('hex')}:${encrypted}:${authTag}`;
 }
 
 // AES-256-GCM decryption with a specific key
@@ -438,7 +438,7 @@ export function decrypt(encryptedText: string): string {
     if (result !== null) return result;
   } catch (err) {}
 
-  console.error('Decryption failed for ciphertext:', encryptedText);
+  console.error('Decryption failed for ciphertext (length %d)', encryptedText?.length);
   return encryptedText; // Fallback to raw ciphertext if all decryption attempts fail
 }
 
@@ -1152,6 +1152,15 @@ class Database {
     this.data.contractors.push(newCon);
     this.save();
     return newCon;
+  }
+
+  public updateContractorPassword(contractorId: string, newPasswordHash: string): boolean {
+    const idx = this.data.contractors.findIndex(c => c.id === contractorId);
+    if (idx === -1) return false;
+    this.data.contractors[idx].passwordHash = newPasswordHash;
+    this.data.contractors[idx].updatedAt = new Date().toISOString();
+    this.save();
+    return true;
   }
 
   // Sessions
@@ -1883,6 +1892,12 @@ class Database {
 
 export const db = new Database();
 
+// Salted, iterated PBKDF2-SHA512 hash. Format: pbkdf2$<iter>$<salt>$<hash>.
+// See src/lib/security.ts for the compatible verifier that also accepts the
+// legacy unsalted hash so existing accounts keep working.
 export function hashPassword(password: string): string {
-  return crypto.pbkdf2Sync(password, 'salt-for-halbiz', 1000, 64, 'sha512').toString('hex');
+  const salt = crypto.randomBytes(16).toString('hex');
+  const iterations = 120000;
+  const hash = crypto.pbkdf2Sync(password, salt, iterations, 64, 'sha512').toString('hex');
+  return `pbkdf2$${iterations}$${salt}$${hash}`;
 }

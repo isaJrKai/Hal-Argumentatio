@@ -240,16 +240,9 @@ export default function SettingsPanel({
 
   // Key state
   const [keyName, setKeyName] = useState('NVIDIA Analytics Key');
-  const [rawKey, setRawKey] = useState('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');
-  const [createdKeys, setCreatedKeys] = useState<any[]>([
-    {
-      id: 'key_1',
-      name: 'NVIDIA API Channel',
-      prefix: 'nvapi-wd7g',
-      createdAt: new Date().toLocaleDateString(),
-      expiresAt: 'Never'
-    }
-  ]);
+  // API keys are user-provided at runtime; never ship a real key in source.
+  const [rawKey, setRawKey] = useState('');
+  const [createdKeys, setCreatedKeys] = useState<any[]>([]);
   const [keySuccess, setKeySuccess] = useState<string | null>(null);
 
   // Connector API Keys individual configuration state

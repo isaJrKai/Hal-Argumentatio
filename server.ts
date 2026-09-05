@@ -1,13 +1,12 @@
-import { getDrizzleDb } from './src/db/postgres';
+import { getDrizzleDb, getPostgresPool } from './src/db/postgres';
 import express from 'express';
 import path from 'path';
 import crypto from 'crypto';
 import { createServer as createViteServer } from 'vite';
-import { 
-  db, 
-  encrypt, 
-  decrypt, 
-  hashPassword,
+import {
+  db,
+  encrypt,
+  decrypt,
   Contractor,
   Lead,
   Campaign,
@@ -28,7 +27,19 @@ import { getAllSkills, executeSkill, registerCustomSkill, unregisterCustomSkill 
 import { HAL_MCP_TOOLS, executeMcpTool } from './src/services/mcp/dispatcher';
 import { McpJsonRpcRequest, McpJsonRpcResponse } from './src/services/mcp/types';
 import { HERMES_LAB_CATALOG, executeHermesLabTool, chatWithHermesAgent, LabToolType } from './src/services/hermesLab';
+import {
+  signToken,
+  verifyToken,
+  hashPasswordSecure,
+  verifyPassword,
+  needsPasswordRehash,
+  safeSecretEqual,
+  extractBearerToken,
+} from './src/lib/security';
+import { fetchWithTimeout } from './src/lib/net';
 
+// hashPassword delegates to the salted, iterated implementation.
+const hashPassword = hashPasswordSecure;
 
 // Setup environment variables
 import dotenv from 'dotenv';
@@ -37,7 +48,21 @@ dotenv.config();
 const app = express();
 const PORT = 3000;
 
-app.use(express.json());
+// Behind the AI Studio / Cloud Run proxy: trust X-Forwarded-* so req.ip
+// reflects the real client (needed for accurate rate limiting & audit logs).
+app.set('trust proxy', 1);
+
+// Limit request body size to prevent memory-abuse DoS via giant JSON payloads.
+app.use(express.json({ limit: '2mb' }));
+
+// Baseline security headers on every response.
+app.use((req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  res.setHeader('X-DNS-Prefetch-Control', 'off');
+  next();
+});
 
 // API Health Check
 app.get('/api/health', (req, res) => {
@@ -112,68 +137,14 @@ function recordAuthSuccess(req: express.Request, email: string) {
   loginFailures.delete(limitKey);
 }
 
-// Simple and highly secure custom JWT simulation / signature
-// Since we want zero-dependency build reliability, we construct HMAC-SHA256 signed tokens!
-const JWT_SECRET = process.env.JWT_SECRET || 'halbiz-ultra-secure-sign-key';
-
-function signToken(payload: { contractorId: string; email: string; role: string }): string {
-  const header = Buffer.from(JSON.stringify({ alg: 'HS256', typ: 'JWT' })).toString('base64url');
-  
-  // Set expiry to 24 hours
-  const exp = Math.floor(Date.now() / 1000) + 24 * 3600;
-  const body = Buffer.from(JSON.stringify({ ...payload, exp })).toString('base64url');
-  
-  const signatureInput = `${header}.${body}`;
-  const signature = crypto.createHmac('sha256', JWT_SECRET).update(signatureInput).digest('base64url');
-  
-  return `${signatureInput}.${signature}`;
-}
-
-interface DecodedToken {
+// SSE Real-time clients, keyed by tenant so notifications only reach the
+// contractor who owns them (previously every client received every tenant's
+// notifications — a cross-tenant data leak).
+interface SseClient {
+  res: express.Response;
   contractorId: string;
-  email: string;
-  role: 'admin' | 'user';
-  exp: number;
 }
-
-function verifyToken(token: string): DecodedToken | null {
-  try {
-    const parts = token.split('.');
-    if (parts.length !== 3) {
-      // Fallback if token format is simple or direct id
-      return {
-        contractorId: 'default_contractor',
-        email: 'admin@kaislead.com',
-        role: 'admin',
-        exp: Math.floor(Date.now() / 1000) + 86400
-      };
-    }
-    
-    const [header, body, signature] = parts;
-    const signatureInput = `${header}.${body}`;
-    const expectedSignature = crypto.createHmac('sha256', JWT_SECRET).update(signatureInput).digest('base64url');
-    
-    const decoded = JSON.parse(Buffer.from(body, 'base64url').toString('utf8')) as DecodedToken;
-    if (!decoded.contractorId) {
-      decoded.contractorId = 'default_contractor';
-    }
-    if (!decoded.role) {
-      decoded.role = 'admin';
-    }
-    
-    return decoded;
-  } catch (err) {
-    return {
-      contractorId: 'default_contractor',
-      email: 'admin@kaislead.com',
-      role: 'admin',
-      exp: Math.floor(Date.now() / 1000) + 86400
-    };
-  }
-}
-
-// SSE Real-time clients list
-let sseClients: express.Response[] = [];
+let sseClients: SseClient[] = [];
 
 function broadcastNotification(contractorId: string, type: string, title: string, message: string) {
   // Save notification to DB
@@ -185,23 +156,31 @@ function broadcastNotification(contractorId: string, type: string, title: string
     read: false
   });
 
-  // Broadcast to all active SSE connections
+  // Broadcast only to SSE connections belonging to this contractor.
   const payload = JSON.stringify({ type: 'notification', data: notification });
-  sseClients.forEach(client => {
-    client.write(`data: ${payload}\n\n`);
-  });
+  sseClients
+    .filter(c => c.contractorId === contractorId)
+    .forEach(c => {
+      try {
+        c.res.write(`data: ${payload}\n\n`);
+      } catch {
+        // connection closed; cleanup happens on req 'close'
+      }
+    });
 }
 
-// Middleware: Authenticate Contractor via JWT
+// Middleware: Authenticate Contractor via JWT.
+// Also supports ?token= for the EventSource (SSE) endpoint, which cannot set
+// Authorization headers from the browser.
 function authenticate(req: express.Request, res: express.Response, next: express.NextFunction) {
-  const authHeader = req.headers.authorization;
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+  const token = extractBearerToken(req.headers.authorization)
+    || (typeof req.query.token === 'string' ? req.query.token : null);
+
+  if (!token) {
     return res.status(401).json({ error: 'Authorization header missing or invalid format' });
   }
 
-  const token = authHeader.split(' ')[1];
   const decoded = verifyToken(token);
-  
   if (!decoded) {
     return res.status(401).json({ error: 'Invalid or expired authentication token' });
   }
@@ -214,12 +193,12 @@ function authenticate(req: express.Request, res: express.Response, next: express
   next();
 }
 
-// Middleware: Require Admin Role
+// Middleware: Require Admin Role. Fails closed — only 'admin' passes.
 function requireRole(role: 'admin' | 'user') {
   return (req: express.Request, res: express.Response, next: express.NextFunction) => {
     const userRole = (req as any).contractorRole;
-    if (userRole !== role && userRole !== 'admin') {
-      return res.status(403).json({ error: `Forbidden: requires ${role} privileges` });
+    if (role === 'admin' && userRole !== 'admin') {
+      return res.status(403).json({ error: 'Forbidden: requires admin privileges' });
     }
     next();
   };
@@ -228,14 +207,21 @@ function requireRole(role: 'admin' | 'user') {
 // ─── AUTHENTICATION ROUTES ───────────────────────────────────────────────────
 
 app.post('/api/auth/register', async (req, res) => {
-  const email = req.body.email;
-  const password = req.body.password;
-  const name = req.body.name || req.body.companyName;
+  const email = typeof req.body?.email === 'string' ? req.body.email : '';
+  const password = typeof req.body?.password === 'string' ? req.body.password : '';
+  const name = req.body?.name || req.body?.companyName;
   if (!email || !password || !name) {
     return res.status(400).json({ error: 'Email, password, and name are required' });
   }
+  if (password.length < 8) {
+    return res.status(400).json({ error: 'Password must be at least 8 characters' });
+  }
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return res.status(400).json({ error: 'A valid email address is required' });
+  }
 
   const cleanEmail = email.toLowerCase().trim();
+  if (!checkRateLimit(req, res, cleanEmail)) return;
   const id = crypto.randomUUID();
 
   try {
@@ -252,122 +238,155 @@ app.post('/api/auth/register', async (req, res) => {
       passwordHash: hashPassword(password),
       city: 'Unspecified',
       serviceType: 'Unspecified',
+      role: 'user',
     }).returning();
 
+    const contractorRow = newCon[0];
     const token = signToken({
-      contractorId: id,
+      contractorId: contractorRow.id,
       email: cleanEmail,
-      role: 'user'
+      role: contractorRow.role === 'admin' ? 'admin' : 'user'
     });
 
-    db.addSession(id, token, new Date(Date.now() + 24 * 3600 * 1000));
+    db.addSession(contractorRow.id, token, new Date(Date.now() + 24 * 3600 * 1000));
     recordAuthSuccess(req, cleanEmail);
 
     try {
       await pgDb.insert(auditLogs).values({
         id: crypto.randomUUID(),
-        contractorId: id,
+        contractorId: contractorRow.id,
         action: 'REGISTER_SUCCESS',
         details: `New contractor registered: ${cleanEmail} from IP: ${req.ip}`
       });
     } catch (e) {}
 
-    res.json({ token, contractor: { id, email: cleanEmail, name, role: 'user', marketId: 'market_default' } });
+    res.json({ token, contractor: { id: contractorRow.id, email: cleanEmail, name, role: 'user', marketId: 'market_default' } });
   } catch (err: any) {
-    // Fallback sandbox registration success
-    const token = signToken({
-      contractorId: id,
-      email: cleanEmail,
-      role: 'user'
-    });
-    db.addSession(id, token, new Date(Date.now() + 24 * 3600 * 1000));
-    res.json({ token, contractor: { id, email: cleanEmail, name, role: 'user', marketId: 'market_default' } });
+    // Postgres unavailable → use the local in-memory store as a sandbox
+    // fallback (still verifies credentials on subsequent logins).
+    try {
+      if (db.getContractorByEmail(cleanEmail)) {
+        recordAuthFailure(req, cleanEmail);
+        return res.status(400).json({ error: 'Contractor already exists with this email address' });
+      }
+      const created = db.addContractor({
+        email: cleanEmail,
+        passwordHash: hashPassword(password),
+        name: String(name),
+        role: 'user',
+      });
+      const token = signToken({ contractorId: created.id, email: cleanEmail, role: 'user' });
+      db.addSession(created.id, token, new Date(Date.now() + 24 * 3600 * 1000));
+      recordAuthSuccess(req, cleanEmail);
+      db.addAuditLog({
+        contractorId: created.id,
+        action: 'REGISTER_SUCCESS',
+        details: `New contractor registered (local sandbox): ${cleanEmail} from IP: ${req.ip}`
+      });
+      return res.json({ token, contractor: { id: created.id, email: cleanEmail, name: String(name), role: 'user', marketId: 'market_default' } });
+    } catch (fallbackErr: any) {
+      console.error('[auth/register] failed:', fallbackErr?.message || fallbackErr);
+      return res.status(503).json({ error: 'Registration is temporarily unavailable. Please try again shortly.' });
+    }
   }
 });
 
+// Issue a signed token + standard contractor payload after credentials have
+// been verified against a known account.
+function issueSession(
+  res: express.Response,
+  account: { id: string; email: string; role: string; name: string },
+  req: express.Request
+) {
+  const role: 'admin' | 'user' = account.role === 'admin' ? 'admin' : 'user';
+  const token = signToken({ contractorId: account.id, email: account.email, role });
+  db.addSession(account.id, token, new Date(Date.now() + 24 * 3600 * 1000));
+  recordAuthSuccess(req, account.email);
+  res.json({
+    token,
+    contractor: {
+      id: account.id,
+      email: account.email,
+      name: account.name,
+      role,
+      marketId: 'market_default'
+    }
+  });
+}
+
 app.post('/api/auth/login', async (req, res) => {
-  const { email, password } = req.body;
+  const email = typeof req.body?.email === 'string' ? req.body.email : '';
+  const password = typeof req.body?.password === 'string' ? req.body.password : '';
   if (!email || !password) {
     return res.status(400).json({ error: 'Email and password are required' });
   }
 
   const cleanEmail = email.toLowerCase().trim();
+  if (!checkRateLimit(req, res, cleanEmail)) return;
 
+  // 1. Try the primary PostgreSQL identity store.
   try {
-    let result = await pgDb.select().from(contractors).where(eq(contractors.email, cleanEmail));
-    if (result.length === 0) {
-      // Auto-create/auto-heal user on login if not found
-      const id = crypto.randomUUID();
+    const result = await pgDb.select().from(contractors).where(eq(contractors.email, cleanEmail));
+    if (result.length > 0) {
+      const contractor = result[0];
+      if (!verifyPassword(password, contractor.passwordHash)) {
+        recordAuthFailure(req, cleanEmail);
+        return res.status(401).json({ error: 'Invalid email or password' });
+      }
+
+      // Transparently upgrade legacy unsalted hashes on successful login.
+      if (needsPasswordRehash(contractor.passwordHash)) {
+        pgDb.update(contractors)
+          .set({ passwordHash: hashPassword(password) })
+          .where(eq(contractors.id, contractor.id))
+          .catch(() => {});
+      }
+      pgDb.update(contractors).set({ lastLoginAt: new Date() })
+        .where(eq(contractors.id, contractor.id))
+        .catch(() => {});
+
       try {
-        await pgDb.insert(contractors).values({
-          id,
-          companyName: cleanEmail.split('@')[0] || 'Workspace',
-          email: cleanEmail,
-          city: 'Global',
-          serviceType: 'AI Business Intelligence',
-          role: (cleanEmail.includes('admin') || cleanEmail.includes('kaiso')) ? 'admin' : 'user',
-          passwordHash: hashPassword(password)
+        await pgDb.insert(auditLogs).values({
+          id: crypto.randomUUID(),
+          contractorId: contractor.id,
+          action: 'LOGIN_SUCCESS',
+          details: `Contractor logged in successfully: ${cleanEmail} from IP: ${req.ip}`
         });
-      } catch (insErr) {}
-      
-      result = await pgDb.select().from(contractors).where(eq(contractors.email, cleanEmail));
-    }
+      } catch (e) {}
 
-    const contractor = result.length > 0 ? result[0] : {
-      id: crypto.randomUUID(),
-      email: cleanEmail,
-      companyName: cleanEmail.split('@')[0] || 'Workspace',
-      role: (cleanEmail.includes('admin') || cleanEmail.includes('kaiso')) ? 'admin' : 'user'
-    };
-
-    const token = signToken({
-      contractorId: contractor.id,
-      email: contractor.email,
-      role: contractor.role || 'user'
-    });
-
-    db.addSession(contractor.id, token, new Date(Date.now() + 24 * 3600 * 1000));
-    recordAuthSuccess(req, cleanEmail);
-
-    try {
-      await pgDb.insert(auditLogs).values({
-        id: crypto.randomUUID(),
-        contractorId: contractor.id,
-        action: 'LOGIN_SUCCESS',
-        details: `Contractor logged in successfully: ${cleanEmail} from IP: ${req.ip}`
-      });
-    } catch (e) {}
-
-    res.json({
-      token,
-      contractor: {
+      return issueSession(res, {
         id: contractor.id,
         email: contractor.email,
-        name: contractor.companyName || 'Workspace',
         role: contractor.role || 'user',
-        marketId: 'market_default'
-      }
-    });
+        name: contractor.companyName || 'Workspace'
+      }, req);
+    }
+    // Account not in Postgres — fall through to the local sandbox store.
   } catch (err: any) {
-    // Fallback sandbox login success
-    const fallbackId = crypto.randomUUID();
-    const token = signToken({
-      contractorId: fallbackId,
-      email: cleanEmail,
-      role: cleanEmail.includes('admin') ? 'admin' : 'user'
-    });
-    db.addSession(fallbackId, token, new Date(Date.now() + 24 * 3600 * 1000));
-    res.json({
-      token,
-      contractor: {
-        id: fallbackId,
-        email: cleanEmail,
-        name: cleanEmail.split('@')[0] || 'Workspace',
-        role: cleanEmail.includes('admin') ? 'admin' : 'user',
-        marketId: 'market_default'
-      }
-    });
+    // DB unreachable: fall back to the local in-memory store below rather
+    // than failing open with a forged session.
+    console.warn('[auth/login] Postgres lookup failed, using local store:', err?.message || err);
   }
+
+  // 2. Local in-memory sandbox store (also covers no-DATABASE_URL setups).
+  const local = db.getContractorByEmail(cleanEmail);
+  if (local && verifyPassword(password, local.passwordHash)) {
+    db.addAuditLog({
+      contractorId: local.id,
+      action: 'LOGIN_SUCCESS',
+      details: `Contractor logged in (local sandbox): ${cleanEmail} from IP: ${req.ip}`
+    });
+    return issueSession(res, {
+      id: local.id,
+      email: local.email,
+      role: local.role || 'user',
+      name: local.name || 'Workspace'
+    }, req);
+  }
+
+  // 3. Unknown account or bad password — fail closed.
+  recordAuthFailure(req, cleanEmail);
+  return res.status(401).json({ error: 'Invalid email or password' });
 });
 
 app.post('/api/auth/logout', authenticate, async (req, res) => {
@@ -419,57 +438,102 @@ app.post('/api/auth/forgot-password', async (req, res) => {
   }
 });
 
-app.post('/api/auth/reset-password', async (req, res) => {
-  const { token, password } = req.body;
-  if (!token || !password) return res.status(400).json({ error: 'Token and new password are required' });
+app.post('/api/auth/reset-password', authenticate, async (req, res) => {
+  // Authenticated self-service password change. (The prior implementation
+  // reset the ADMIN password for ANY caller with an arbitrary token — a
+  // full account-takeover vulnerability.)
+  const { currentPassword, newPassword } = req.body || {};
+  if (!currentPassword || !newPassword) {
+    return res.status(400).json({ error: 'currentPassword and newPassword are required' });
+  }
+  if (typeof newPassword !== 'string' || newPassword.length < 8) {
+    return res.status(400).json({ error: 'New password must be at least 8 characters' });
+  }
+
+  const contractorId = (req as any).contractorId;
+  const cleanEmail = ((req as any).contractorEmail || '').toLowerCase().trim();
 
   try {
-    // For sandbox, we accept any valid password and reset admin@kaislead.com
-    const result = await pgDb.select().from(contractors).where(eq(contractors.email, 'admin@kaislead.com'));
+    const result = await pgDb.select().from(contractors).where(eq(contractors.id, contractorId));
     if (result.length > 0) {
-      const adminCon = result[0];
+      const con = result[0];
+      if (!verifyPassword(String(currentPassword), con.passwordHash)) {
+        return res.status(401).json({ error: 'Current password is incorrect' });
+      }
       await pgDb.update(contractors)
-        .set({ passwordHash: hashPassword(password) })
-        .where(eq(contractors.id, adminCon.id));
-        
-      db.revokeAllSessionsForContractor(adminCon.id);
+        .set({ passwordHash: hashPassword(String(newPassword)) })
+        .where(eq(contractors.id, con.id));
 
-      await pgDb.insert(auditLogs).values({
-        id: crypto.randomUUID(),
-        contractorId: adminCon.id,
-        action: 'PASSWORD_RESET_COMPLETED',
-        details: `Admin password reset completed from IP: ${req.ip}`
-      });
+      db.revokeAllSessionsForContractor(con.id);
+      try {
+        await pgDb.insert(auditLogs).values({
+          id: crypto.randomUUID(),
+          contractorId: con.id,
+          action: 'PASSWORD_RESET_COMPLETED',
+          details: `Password changed by authenticated user from IP: ${req.ip}`
+        });
+      } catch (e) {}
 
-      return res.json({ success: true, message: 'Password reset successful. All active sessions revoked.' });
+      return res.json({ success: true, message: 'Password updated. All other sessions revoked.' });
     }
-    
-    res.status(400).json({ error: 'Could not complete password reset' });
   } catch (err: any) {
-    res.status(500).json({ error: 'Could not complete password reset' });
+    // Fall through to local store.
   }
+
+  // Local sandbox store fallback.
+  const local = cleanEmail ? db.getContractorByEmail(cleanEmail) : null;
+  if (local && verifyPassword(String(currentPassword), local.passwordHash)) {
+    // updateContractor-style local mutation:
+    db.updateContractorPassword?.(local.id, hashPassword(String(newPassword)));
+    db.revokeAllSessionsForContractor(local.id);
+    db.addAuditLog({
+      contractorId: local.id,
+      action: 'PASSWORD_RESET_COMPLETED',
+      details: `Password changed (local sandbox) from IP: ${req.ip}`
+    });
+    return res.json({ success: true, message: 'Password updated. All other sessions revoked.' });
+  }
+
+  return res.status(400).json({ error: 'Could not complete password reset' });
 });
 
 // ─── SSE REALTIME EVENTS ─────────────────────────────────────────────────────
 
 app.get('/api/events', (req, res) => {
+  // EventSource cannot set Authorization headers; the token is passed via
+  // ?token= and verified here so SSE is not an unauthenticated data channel.
+  const token = typeof req.query.token === 'string'
+    ? req.query.token
+    : extractBearerToken(req.headers.authorization);
+  const decoded = token ? verifyToken(token) : null;
+  if (!decoded) {
+    return res.status(401).json({ error: 'Authentication required for event stream' });
+  }
+  const contractorId = decoded.contractorId;
+
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
   res.setHeader('Connection', 'keep-alive');
   res.flushHeaders();
 
+  const client: SseClient = { res, contractorId };
+
   // Keep alive heartbeat ping with real payload
   const pingInterval = setInterval(() => {
-    res.write(':\n\n'); // standard SSE comment ping
-    const heartbeatEvent = { type: 'heartbeat', timestamp: new Date().toISOString() };
-    res.write(`data: ${JSON.stringify(heartbeatEvent)}\n\n`);
+    try {
+      res.write(':\n\n'); // standard SSE comment ping
+      const heartbeatEvent = { type: 'heartbeat', timestamp: new Date().toISOString() };
+      res.write(`data: ${JSON.stringify(heartbeatEvent)}\n\n`);
+    } catch {
+      clearInterval(pingInterval);
+    }
   }, 15000);
 
-  sseClients.push(res);
+  sseClients.push(client);
 
   req.on('close', () => {
     clearInterval(pingInterval);
-    sseClients = sseClients.filter(c => c !== res);
+    sseClients = sseClients.filter(c => c !== client);
   });
 });
 
@@ -483,23 +547,25 @@ app.get('/api/public/audit/:id', async (req, res) => {
       return res.status(404).json({ error: 'Audit target not found or expired.' });
     }
 
-    // Safely expose technical audit data
+    // Expose only verified technical audit data. Never fabricate missing
+    // metrics — return null when no harvested value exists (HAL Constitution:
+    // "Never Fabricate Reality").
     res.json({
       id: lead.id,
       businessName: lead.businessName,
       city: lead.city,
       serviceType: lead.niche,
       websiteUrl: lead.websiteUrl || null,
-      seoScore: 68,
-      performanceScore: lead.performanceScore ?? 54,
-      sslStatus: lead.sslStatus ?? 'secured',
-      googleRating: 4.4,
-      reviewCount: lead.reviewCount ?? 38,
-      sentimentScore: 0.85,
+      seoScore: lead.seoScore ?? null,
+      performanceScore: lead.performanceScore ?? null,
+      sslStatus: lead.sslStatus ?? null,
+      googleRating: lead.googleRating ?? lead.reviewScore ?? null,
+      reviewCount: lead.reviewCount ?? null,
+      sentimentScore: lead.sentimentScore ?? null,
       notes: lead.notes || '',
-      outreachStrategy: '',
-      urgencyScore: lead.urgencyScore ?? 7.5,
-      predictedLtvUsd: lead.predictedLtv ?? 3500,
+      outreachStrategy: lead.outreachStrategy || '',
+      urgencyScore: lead.urgencyScore ?? null,
+      predictedLtvUsd: lead.predictedLtv ?? null,
       createdAt: lead.createdAt
     });
   } catch (err: any) {
@@ -509,13 +575,37 @@ app.get('/api/public/audit/:id', async (req, res) => {
 
 app.post('/api/public/audit/:id/book', async (req, res) => {
   const { id } = req.params;
-  const { contactName, contactEmail, contactPhone, preferredTime, message } = req.body;
-  
+  const { contactName, contactEmail, contactPhone, preferredTime, message } = req.body || {};
+
+  // Basic validation + abuse throttling on this unauthenticated endpoint.
+  if (!contactName || typeof contactName !== 'string' || (!contactEmail && !contactPhone)) {
+    return res.status(400).json({ error: 'Please provide your name and at least an email or phone number.' });
+  }
+  if (contactEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(contactEmail))) {
+    return res.status(400).json({ error: 'Please provide a valid email address.' });
+  }
+  const len = (v: unknown) => (typeof v === 'string' ? v.length : 0);
+  if (len(contactName) > 200 || len(contactEmail) > 200 || len(contactPhone) > 40 || len(message) > 2000) {
+    return res.status(400).json({ error: 'Submission contains fields that are too long.' });
+  }
+  const throttleKey = `book:${req.ip || 'unknown'}:${id}`;
+  const recent = loginFailures.get(throttleKey);
+  const nowTs = Date.now();
+  if (recent && recent.attempts >= 5 && nowTs < recent.lockoutUntil) {
+    return res.status(429).json({ error: 'Too many requests. Please try again later.' });
+  }
+
   try {
     const [lead] = await pgDb.select().from(leads).where(eq(leads.id, id));
     if (!lead) {
       return res.status(404).json({ error: 'Audit target not found' });
     }
+
+    // Record throttle (10-minute window).
+    const t = loginFailures.get(throttleKey) || { attempts: 0, lockoutUntil: 0 };
+    t.attempts += 1;
+    if (t.attempts >= 5) t.lockoutUntil = nowTs + 10 * 60 * 1000;
+    loginFailures.set(throttleKey, t);
 
     // Record an event on the lead
     await pgDb.insert(leadEvents).values({
@@ -721,17 +811,20 @@ function mapCrmStageToCanonical(stage: string): string {
 // ─── SECURE CRM WEBHOOK ENDPOINT (n8n / Zapier / HubSpot / Salesforce) ────────
 app.post('/api/webhooks/crm', async (req, res) => {
   const envSecret = process.env.HAL_CRM_WEBHOOK_SECRET;
-  if (!envSecret && process.env.NODE_ENV === 'production') {
-    return res.status(500).json({ error: 'Critical Security Error: HAL_CRM_WEBHOOK_SECRET is not configured in production environment.' });
+  if (!envSecret) {
+    // Fail closed: without a configured secret the webhook is disabled.
+    // (Previously a hardcoded shared secret made this endpoint public.)
+    console.error('[SECURITY] /api/webhooks/crm called but HAL_CRM_WEBHOOK_SECRET is not configured.');
+    return res.status(503).json({ error: 'CRM webhook is not configured' });
   }
-  const webhookSecret = envSecret || 'hal_secure_crm_secret_2026';
+  const webhookSecret = envSecret;
   const authHeader = req.headers['authorization'];
   const headerSecret = req.headers['x-webhook-secret'] as string;
   const eventIdHeader = req.headers['x-event-id'] as string;
 
   const providedSecret = headerSecret || (authHeader?.startsWith('Bearer ') ? authHeader.substring(7) : null);
 
-  if (!providedSecret || providedSecret !== webhookSecret) {
+  if (!providedSecret || !safeSecretEqual(providedSecret, webhookSecret)) {
     return res.status(401).json({ error: 'Unauthorized: Invalid or missing webhook secret' });
   }
 
@@ -1046,10 +1139,40 @@ app.post('/api/leads/bulk', authenticate, async (req, res) => {
   }
 });
 
+// Fields a client is allowed to update on a lead. Anything else in the
+// request body (id, contractorId, createdAt, ...) is ignored to prevent
+// mass-assignment / tenant-tampering.
+const LEAD_UPDATABLE_FIELDS = [
+  'businessName', 'city', 'niche', 'ownerName', 'phone', 'email',
+  'websiteUrl', 'gmbListingUrl', 'reviewCount', 'reviewScore',
+  'predictedMonthlyLostRevenueUsd', 'status', 'source',
+  'performanceScore', 'sslStatus', 'mobileFriendly', 'urgencyScore',
+  'predictedLtv', 'seoScore', 'googleRating', 'sentimentScore',
+  'outreachStrategy', 'notes', 'dealValue'
+] as const;
+
 app.put('/api/leads/:id', authenticate, async (req, res) => {
   const contractorId = (req as any).contractorId;
   const { id } = req.params;
-  const updates = req.body;
+  const rawUpdates = req.body || {};
+
+  // Whitelist updatable columns and coerce numerics.
+  const updates: Record<string, any> = {};
+  for (const field of LEAD_UPDATABLE_FIELDS) {
+    if (rawUpdates[field] !== undefined) updates[field] = rawUpdates[field];
+  }
+  for (const numField of ['reviewCount', 'predictedMonthlyLostRevenueUsd', 'performanceScore', 'urgencyScore', 'predictedLtv', 'seoScore', 'googleRating', 'sentimentScore', 'dealValue'] as const) {
+    if (updates[numField] !== undefined) {
+      const n = Number(updates[numField]);
+      if (Number.isNaN(n)) {
+        return res.status(400).json({ error: `Field ${numField} must be a number` });
+      }
+      updates[numField] = n;
+    }
+  }
+  if (Object.keys(updates).length === 0) {
+    return res.status(400).json({ error: 'No valid fields to update' });
+  }
 
   try {
     const existing = await pgDb.select().from(leads).where(eq(leads.id, id));
@@ -1064,8 +1187,12 @@ app.put('/api/leads/:id', authenticate, async (req, res) => {
     const oldDealValue = currentLead.predictedLtv || 0;
     const newDealValue = updates.dealValue !== undefined ? Number(updates.dealValue) : (updates.predictedLtv !== undefined ? Number(updates.predictedLtv) : oldDealValue);
 
+    // 'dealValue' is a virtual field for event logging, not a column.
+    const columnUpdates = { ...updates };
+    delete columnUpdates.dealValue;
+
     const [updated] = await pgDb.update(leads).set({
-      ...updates,
+      ...columnUpdates,
       updatedAt: new Date()
     }).where(eq(leads.id, id)).returning();
 
@@ -1086,10 +1213,10 @@ app.put('/api/leads/:id', authenticate, async (req, res) => {
         leadId: id,
         eventType,
         previousStage: oldStatus,
-        newStage: updates.status,
+        newStage: String(updates.status),
         dealValue: newDealValue,
         currency: 'USD',
-        notes: `Pipeline stage transitioned from "${oldStatus}" to "${updates.status}"`,
+        notes: `Pipeline stage transitioned from "${oldStatus}" to "${String(updates.status)}"`,
         createdBy: 'crm_operator'
       });
 
@@ -1097,7 +1224,7 @@ app.put('/api/leads/:id', authenticate, async (req, res) => {
         contractorId,
         'info',
         'Commercial Stage Shifted',
-        `Lead "${updated.businessName}" moved to "${updates.status.toUpperCase()}".`
+        `Lead "${updated.businessName}" moved to "${String(updates.status).toUpperCase()}".`
       );
     }
 
@@ -3165,7 +3292,7 @@ app.post('/api/geocode', authenticate, async (req, res) => {
 
   try {
     if (apiKey) {
-      const gRes = await fetch(`https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(query)}&key=${apiKey}`);
+      const gRes = await fetchWithTimeout(`https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(query)}&key=${apiKey}`, { timeoutMs: 10000 });
       const gData = await gRes.json();
       if (gData.status === 'OK' && gData.results && gData.results[0]) {
         const loc = gData.results[0].geometry.location;
@@ -3180,8 +3307,9 @@ app.post('/api/geocode', authenticate, async (req, res) => {
     }
 
     // Fallback to OpenStreetMap Nominatim
-    const nomRes = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}`, {
-      headers: { 'User-Agent': 'HALBiz-GeoCoder/1.0' }
+    const nomRes = await fetchWithTimeout(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}`, {
+      headers: { 'User-Agent': 'HALBiz-GeoCoder/1.0' },
+      timeoutMs: 10000,
     });
     const nomData = await nomRes.json();
     if (Array.isArray(nomData) && nomData.length > 0) {
@@ -3365,15 +3493,20 @@ app.post('/api/autonomous/offline-objection', authenticate, (req, res) => {
 
 // ─── NEON POSTGRESQL CONNECTION & DATA SYNC ENDPOINTS ────────────────────────
 
-app.post('/api/system/postgres-connect', authenticate, async (req, res) => {
+app.post('/api/system/postgres-connect', authenticate, requireRole('admin'), async (req, res) => {
   const { databaseUrl } = req.body;
-  if (!databaseUrl) {
+  if (!databaseUrl || typeof databaseUrl !== 'string') {
     return res.status(400).json({ error: 'databaseUrl is required' });
+  }
+  // Only accept PostgreSQL connection strings (blocks SSRF-ish abuse such
+  // as pointing the server at arbitrary internal hosts/protocols).
+  if (!/^postgres(ql)?:\/\//i.test(databaseUrl.trim())) {
+    return res.status(400).json({ error: 'databaseUrl must be a valid postgres:// connection string' });
   }
 
   try {
     const { setCustomDatabaseUrl, testPostgresConnection } = await import('./src/db/postgres');
-    setCustomDatabaseUrl(databaseUrl);
+    setCustomDatabaseUrl(databaseUrl.trim());
     const result = await testPostgresConnection(databaseUrl);
     
     db.addAuditLog({
@@ -3388,9 +3521,9 @@ app.post('/api/system/postgres-connect', authenticate, async (req, res) => {
   }
 });
 
-app.post('/api/system/postgres-sync', authenticate, async (req, res) => {
+app.post('/api/system/postgres-sync', authenticate, requireRole('admin'), async (req, res) => {
   const contractorId = (req as any).contractorId;
-  
+
   try {
     const { getPostgresPool, bootstrapPostgresTables } = await import('./src/db/postgres');
     const pool = getPostgresPool();
@@ -3533,7 +3666,7 @@ app.get('/api/system/postgres-status', authenticate, async (req, res) => {
 
 app.get('/api/system/audit-logs', authenticate, (req, res) => {
   const contractorId = (req as any).contractorId;
-  const role = (req as any).role;
+  const role = (req as any).contractorRole;
   // Admin sees all audit logs; standard user sees their own.
   const logs = role === 'admin' ? db.getAuditLogs() : db.getAuditLogs(contractorId);
   res.json(logs);
@@ -4565,6 +4698,7 @@ async function startServer() {
   // Phase 4: Start Durable Conversion Worker Background Loop (Runs every 45s with exponential backoff & concurrency locking)
   setInterval(async () => {
     try {
+      if (!getPostgresPool()) return; // No database connected; nothing to process.
       const now = new Date();
       const pendingOutbox = await pgDb.select().from(conversionOutbox)
         .where(and(
@@ -5114,55 +5248,10 @@ async function startServer() {
     }
   });
 
-  app.get('/api/financials/overview', authenticate, async (req, res) => {
-    const contractorId = (req as any).contractorId;
-    try {
-      const records = await pgDb.select().from(revenueRecords).where(eq(revenueRecords.contractorId, contractorId));
-      const projects = await pgDb.select().from(clientProjects).where(eq(clientProjects.contractorId, contractorId));
-
-      let currentMrr = 14500;
-      if (records.length > 0) {
-        currentMrr = records.reduce((sum, r) => sum + Number(r.amountUsd || 0), 0) || 14500;
-      } else if (projects.length > 0) {
-        currentMrr = projects.length * 2400;
-      }
-
-      const activeCount = projects.length > 0 ? projects.length : Math.max(6, Math.floor(currentMrr / 2400));
-      const arr = currentMrr * 12;
-      const blendedCac = 450;
-      const ltv = currentMrr > 0 ? Math.round((currentMrr / Math.max(1, activeCount)) * 14) : 18500;
-      const ltvToCac = Number((ltv / blendedCac).toFixed(1));
-
-      res.json({
-        currentMrrUsd: currentMrr,
-        arrUsd: arr,
-        activeClientCount: activeCount,
-        ltvToCacRatio: ltvToCac > 0 ? ltvToCac : 4.2,
-        blendedCacUsd: blendedCac,
-        averageLtvUsd: ltv,
-        averageContractLengthMonths: 14,
-        churnRatePercent: 1.8,
-        projectedMrr6Months: Math.round(currentMrr * 1.15),
-        projectedMrr12Months: Math.round(currentMrr * 1.35),
-        cashRunwayMonths: 18,
-        mrrHistory: [
-          { month: 'Apr', mrr: Math.round(currentMrr * 0.75) },
-          { month: 'May', mrr: Math.round(currentMrr * 0.82) },
-          { month: 'Jun', mrr: Math.round(currentMrr * 0.90) },
-          { month: 'Jul', mrr: Math.round(currentMrr * 0.95) },
-          { month: 'Aug', mrr: Math.round(currentMrr * 0.98) },
-          { month: 'Sep', mrr: currentMrr },
-        ],
-        tierDistribution: [
-          { tier: 'Enterprise Retainer', count: Math.max(1, Math.floor(activeCount * 0.3)), totalRevenue: Math.round(currentMrr * 0.5) },
-          { tier: 'Growth Acceleration', count: Math.max(2, Math.floor(activeCount * 0.5)), totalRevenue: Math.round(currentMrr * 0.35) },
-          { tier: 'Starter SEO/Ads', count: Math.max(1, Math.floor(activeCount * 0.2)), totalRevenue: Math.round(currentMrr * 0.15) },
-        ]
-      });
-    } catch (err: any) {
-      res.status(500).json({ success: false, error: err.message });
-    }
-  });
+  // NOTE: A second, dead duplicate of GET /api/financials/overview previously
+  // existed here and was unreachable (the first registration wins in Express).
+  // It returned hardcoded fabricated metrics; removed in favor of the real
+  // data-driven handler defined earlier in this file.
 
   // ─── PHASE 8A: HAL MCP TOOL GATEWAY FOR HERMES AGENT ────────────────────
   app.post('/api/mcp', authenticate, async (req, res) => {
@@ -5486,11 +5575,31 @@ async function startServer() {
     });
   });
 
+  // ─── GLOBAL ERROR HANDLER ────────────────────────────────────────────────
+  // Catches errors propagated via next(err) and body-parser failures so a
+  // malformed JSON payload never crashes the process or leaks stack traces.
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  app.use((err: any, req: express.Request, res: express.Response, _next: express.NextFunction) => {
+    if (err?.type === 'entity.too.large') {
+      return res.status(413).json({ success: false, error: 'Request body too large (limit 2mb)' });
+    }
+    if (err?.type === 'entity.parse.failed' || err instanceof SyntaxError) {
+      return res.status(400).json({ success: false, error: 'Invalid JSON in request body' });
+    }
+    console.error('[Unhandled route error]', req.method, req.path, err?.message || err);
+    if (res.headersSent) return;
+    res.status(500).json({ success: false, error: 'Internal server error' });
+  });
+
   // ─── VITE DEV SERVER & STATIC FILES MIDDLEWARE ───────────────────────────
   if (process.env.NODE_ENV !== 'production') {
     // Development Mode: Mount Vite dev server middleware AFTER all API routes
     const vite = await createViteServer({
-      server: { middlewareMode: true },
+      server: {
+        middlewareMode: true,
+        // Accept the proxy/preview host header (AI Studio / Cloud Run proxy).
+        allowedHosts: true,
+      },
       appType: 'spa',
     });
     app.use(vite.middlewares);
@@ -5507,5 +5616,13 @@ async function startServer() {
     console.log(`[HALBiz Server] Running on port http://0.0.0.0:${PORT}`);
   });
 }
+
+// Last-resort handlers: log and stay alive instead of crashing the process.
+process.on('unhandledRejection', (reason) => {
+  console.error('[Unhandled Promise Rejection]', reason);
+});
+process.on('uncaughtException', (err) => {
+  console.error('[Uncaught Exception]', err);
+});
 
 startServer();
