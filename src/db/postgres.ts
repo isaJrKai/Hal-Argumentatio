@@ -1,21 +1,54 @@
 import { Pool } from 'pg';
 import { drizzle } from 'drizzle-orm/node-postgres';
-import * as schema from './schema';
+import * as schema from './schema.ts';
 
 let pool: Pool | null = null;
 let pgDb: ReturnType<typeof drizzle> | null = null;
 let activeConnectionString: string | null = null;
 
 export function getPostgresPool(customUrl?: string): Pool | null {
-  const connectionString = customUrl || activeConnectionString || process.env.NEON_DATABASE_URL || process.env.DATABASE_URL;
+  if (customUrl) {
+    if (!pool || customUrl !== activeConnectionString) {
+      if (pool) {
+        pool.end().catch(() => {});
+      }
+      activeConnectionString = customUrl;
+      pool = new Pool({
+        connectionString: customUrl,
+        ssl: customUrl.includes('sslmode=require') || customUrl.includes('neon.tech') || customUrl.includes('supabase')
+          ? { rejectUnauthorized: false }
+          : undefined,
+        max: 10,
+        idleTimeoutMillis: 30000,
+        connectionTimeoutMillis: 5000,
+      });
+      pgDb = drizzle(pool, { schema });
+    }
+    return pool;
+  }
+
+  if (process.env.SQL_HOST) {
+    if (!pool) {
+      pool = new Pool({
+        host: process.env.SQL_HOST,
+        user: process.env.SQL_USER,
+        password: process.env.SQL_PASSWORD,
+        database: process.env.SQL_DB_NAME,
+        max: 10,
+        idleTimeoutMillis: 30000,
+        connectionTimeoutMillis: 15000,
+      });
+      pgDb = drizzle(pool, { schema });
+    }
+    return pool;
+  }
+
+  const connectionString = activeConnectionString || process.env.NEON_DATABASE_URL || process.env.DATABASE_URL;
   if (!connectionString) {
     return null;
   }
   
-  if (!pool || (customUrl && customUrl !== activeConnectionString)) {
-    if (pool) {
-      pool.end().catch(() => {});
-    }
+  if (!pool) {
     activeConnectionString = connectionString;
     pool = new Pool({
       connectionString,
@@ -604,6 +637,21 @@ export async function bootstrapPostgresTables(poolInstance?: Pool): Promise<void
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
       );
     `);
+  } catch (err: any) {
+    // If running in a managed Cloud SQL environment where DDL is provisioned via drizzle-kit / admin runner
+    if (err?.code === '42501' || err?.routine === 'aclcheck_error') {
+      try {
+        const check = await client.query("SELECT count(*) as count FROM information_schema.tables WHERE table_schema = 'public';");
+        const count = parseInt(check.rows[0]?.count || '0', 10);
+        if (count > 0) {
+          console.log(`[HAL PostgreSQL] Managed schema active (${count} public tables verified).`);
+          return;
+        }
+      } catch (_) {
+        // Fall through to rethrow original error
+      }
+    }
+    throw err;
   } finally {
     client.release();
   }

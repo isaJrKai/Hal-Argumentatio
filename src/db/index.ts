@@ -11,23 +11,34 @@ declare global {
 // Function to create or retrieve the connection pool.
 export const createPool = () => {
   if (!global._postgresPool) {
-    const connectionString = process.env.DATABASE_URL || process.env.NEON_DATABASE_URL;
-    if (connectionString) {
+    if (process.env.SQL_HOST) {
       global._postgresPool = new Pool({
-        connectionString,
-        ssl: connectionString.includes('neon.tech') || connectionString.includes('sslmode=require') ? { rejectUnauthorized: false } : undefined,
+        host: process.env.SQL_HOST,
+        user: process.env.SQL_USER,
+        password: process.env.SQL_PASSWORD,
+        database: process.env.SQL_DB_NAME,
         max: 10,
         connectionTimeoutMillis: 15000,
       });
     } else {
-      global._postgresPool = new Pool({
-        host: process.env.SQL_HOST || 'localhost',
-        user: process.env.SQL_USER || 'postgres',
-        password: process.env.SQL_PASSWORD || '',
-        database: process.env.SQL_DB_NAME || 'postgres',
-        max: 10,
-        connectionTimeoutMillis: 15000,
-      });
+      const connectionString = process.env.DATABASE_URL || process.env.NEON_DATABASE_URL;
+      if (connectionString) {
+        global._postgresPool = new Pool({
+          connectionString,
+          ssl: connectionString.includes('neon.tech') || connectionString.includes('sslmode=require') ? { rejectUnauthorized: false } : undefined,
+          max: 10,
+          connectionTimeoutMillis: 15000,
+        });
+      } else {
+        global._postgresPool = new Pool({
+          host: 'localhost',
+          user: 'postgres',
+          password: '',
+          database: 'postgres',
+          max: 10,
+          connectionTimeoutMillis: 15000,
+        });
+      }
     }
 
     // Prevent unhandled pool-level errors from crashing the application

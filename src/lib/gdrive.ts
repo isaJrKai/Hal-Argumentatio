@@ -62,6 +62,20 @@ export const googleSignIn = async (): Promise<{ user: User; accessToken: string 
     } catch (e) {}
     return { user: result.user, accessToken: cachedAccessToken };
   } catch (error: any) {
+    if (
+      error?.code === 'auth/popup-closed-by-user' ||
+      error?.message?.includes('popup-closed-by-user') ||
+      error?.code === 'auth/cancelled-popup-request' ||
+      error?.message?.includes('cancelled-popup-request')
+    ) {
+      console.info('Google Drive sign-in popup was closed by the user.');
+      return null;
+    }
+
+    if (error?.code === 'auth/popup-blocked' || error?.message?.includes('popup-blocked')) {
+      throw new Error('Google Sign-In popup was blocked by your browser. Please allow popups or open the app in a new tab to authenticate.');
+    }
+
     console.error('Google Auth Error:', error);
     throw error;
   } finally {

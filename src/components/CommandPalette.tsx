@@ -24,16 +24,19 @@ import {
   Database,
   Shield,
   Zap,
-  Layers
+  Layers,
+  Layout
 } from 'lucide-react';
-import { Lead } from '../types';
+import { Lead, Campaign } from '../types';
+import { useInspector } from '../context/InspectorContext';
 
 interface CommandPaletteProps {
   isOpen: boolean;
   onClose: () => void;
   leads: Lead[];
+  campaigns?: Campaign[];
   onNavigate: (tabId: string) => void;
-  onRunSkill: (skillId: string) => void;
+  onRunSkill?: (skillId: string) => void;
 }
 
 interface SearchHistoryItem {
@@ -44,14 +47,38 @@ interface SearchHistoryItem {
 export default function CommandPalette({
   isOpen,
   onClose,
-  leads,
+  leads = [],
+  campaigns = [],
   onNavigate,
   onRunSkill
 }: CommandPaletteProps) {
+  const { openInspector } = useInspector();
   const [search, setSearch] = useState('');
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [history, setHistory] = useState<SearchHistoryItem[]>([]);
+  const [hermesArtifacts, setHermesArtifacts] = useState<any[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // Fetch cached or active Hermes artifacts when opened
+  useEffect(() => {
+    if (isOpen) {
+      const fetchArtifacts = async () => {
+        try {
+          const token = localStorage.getItem('halbiz_auth_token') || localStorage.getItem('token') || '';
+          const res = await fetch('/api/hermes/artifacts', {
+            headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+          });
+          if (res.ok) {
+            const data = await res.json();
+            if (Array.isArray(data.artifacts)) {
+              setHermesArtifacts(data.artifacts);
+            }
+          }
+        } catch (_) {}
+      };
+      fetchArtifacts();
+    }
+  }, [isOpen]);
 
   // Load and clean history on mount or when the palette opens
   useEffect(() => {
@@ -116,6 +143,7 @@ export default function CommandPalette({
   // Navigation commands
   const navigationCommands = [
     { id: 'overview', label: 'Go to Mission Control', icon: Sparkles, type: 'nav', keywords: 'dashboard home overview stats kpi mission' },
+    { id: 'blueprint', label: 'Go to Claude Blueprint & Spatial Audit', icon: Layout, type: 'nav', keywords: 'claude blueprint audit spatial dossier architecture overview auto-cad' },
     { id: 'neural', label: 'Go to Synaptic Neural Networks (Mesh & Learning)', icon: Network, type: 'nav', keywords: 'synaptic tool neural networks synaptic mesh deep learning weights nodes dual drive autonomous offline self teaching' },
     { id: 'missions', label: 'Go to Operations (Missions)', icon: Briefcase, type: 'nav', keywords: 'operations tasks missions goals execution' },
     { id: 'forecasts', label: 'Go to Intelligence (Forecasts & Scans)', icon: TrendingUp, type: 'nav', keywords: 'intelligence forecast revenue predictions market analytics' },
@@ -206,7 +234,7 @@ export default function CommandPalette({
       keywords: 'synaptic tool cognitive task offline mode toggle simulated cloud disconnect zero latency local autonomous offline reasoning failover fallback stress test' 
     },
     { 
-      id: 'synaptic_neon_sync', 
+      id: 'credentials', 
       label: 'Synaptic Tool: Sync Neural Weights to Neon Cloud PostgreSQL', 
       description: 'Durable cloud replication of Bayesian weights and learning history to PostgreSQL.',
       icon: Database, 
@@ -309,15 +337,147 @@ export default function CommandPalette({
     { id: 'seo', label: 'Run Technical SEO Assessment', icon: Cpu, type: 'skill', keywords: 'seo assessment technical audit ssl performance score' }
   ];
 
-  // Lead commands
-  const leadCommands = leads.slice(0, 8).map(lead => ({
-    id: lead.id,
-    label: `View Prospect: ${lead.businessName} (${lead.city})`,
-    icon: User,
-    type: 'lead',
-    leadData: lead,
-    keywords: `${lead.businessName} ${lead.city} ${lead.serviceType} ${lead.ownerName || ''} prospect lead contractor`
-  }));
+  // Lead commands - indexes all leads dynamically
+  const leadCommands = leads.map(lead => {
+    const serviceType = lead.serviceType || (lead as any).niche || 'Contracting';
+    const status = lead.status || 'new';
+    return {
+      id: lead.id,
+      label: `${lead.businessName || 'Business'} (${lead.city || 'Territory'})`,
+      description: `${serviceType.toUpperCase()} • Status: ${status.toUpperCase()} • Urgency: ${lead.urgencyScore || 7.5}/10 • Speed: ${lead.performanceScore || 50}/100`,
+      icon: User,
+      type: 'lead',
+      leadData: lead,
+      badge: status.toUpperCase(),
+      keywords: `${lead.businessName || ''} ${lead.city || ''} ${serviceType} ${lead.ownerName || ''} ${lead.phone || ''} ${lead.email || ''} ${status} prospect lead contractor`
+    };
+  });
+
+  // Campaign commands - indexes all campaigns
+  const campaignCommands = campaigns.map(camp => {
+    const status = camp.status || 'draft';
+    const platform = camp.platform || 'General';
+    return {
+      id: camp.id,
+      label: `Campaign: ${camp.name || 'Untitled'}`,
+      description: `Platform: ${platform} • Budget: $${(camp.budget || 0).toLocaleString()} • Status: ${status.toUpperCase()}`,
+      icon: BarChart3,
+      type: 'campaign',
+      campaignData: camp,
+      badge: platform.toUpperCase(),
+      keywords: `${camp.name || ''} ${platform} ${status} campaign ads budget spend marketing`
+    };
+  });
+
+  // Contract and legal template commands
+  const contractCommands = [
+    {
+      id: 'contract_retainer',
+      label: 'Standard Contractor Service Retainer Agreement',
+      description: 'Pre-drafted multi-stage marketing, SEO, and lead acquisition agreement with milestone escrow.',
+      icon: FileText,
+      type: 'contract',
+      badge: 'LEGAL RETAINER',
+      targetTab: 'contracts',
+      keywords: 'contract legal agreement retainer terms client contractor escrow service agreement'
+    },
+    {
+      id: 'contract_nda',
+      label: 'Mutual Non-Disclosure Agreement (NDA)',
+      description: 'Protects proprietary territory data, Hermes generation weights, and lead pipeline intelligence.',
+      icon: FileText,
+      type: 'contract',
+      badge: 'LEGAL NDA',
+      targetTab: 'contracts',
+      keywords: 'nda non disclosure agreement privacy confidentiality proprietary secrets'
+    },
+    {
+      id: 'contract_performance',
+      label: 'Performance Growth Milestone Agreement',
+      description: 'Pay-per-qualified-lead and ROAS revenue split contract for high-volume trade contractors.',
+      icon: FileText,
+      type: 'contract',
+      badge: 'COMMISSION SLA',
+      targetTab: 'contracts',
+      keywords: 'commission performance bonus revenue share growth milestone agreement roas'
+    }
+  ];
+
+  // HAL Bible & Architecture Specifications
+  const documentCommands = [
+    {
+      id: 'doc_01_vision',
+      label: 'HAL Spec 01: Vision & Strategic Mandate',
+      description: 'The grand mandate: coordinating local contractor outreach through evidence-based intelligence.',
+      icon: BookOpen,
+      type: 'document',
+      badge: 'CONSTITUTION',
+      docData: { title: 'HAL Spec 01: Vision', id: '01' },
+      targetTab: 'bible',
+      keywords: 'spec 01 vision constitution mission hal mandate north star'
+    },
+    {
+      id: 'doc_02_philosophy',
+      label: 'HAL Spec 02: Core Philosophy & Intentionality Laws',
+      description: 'The supreme rule of intentionality: Fact vs Hypothesis, No Unsolicited Noise, Zero AI Slop.',
+      icon: BookOpen,
+      type: 'document',
+      badge: 'PHILOSOPHY',
+      docData: { title: 'HAL Spec 02: Philosophy', id: '02' },
+      targetTab: 'bible',
+      keywords: 'spec 02 philosophy intentionality laws rules constitution principles'
+    },
+    {
+      id: 'doc_04_design_system',
+      label: 'HAL Spec 04: Design System & Primitives',
+      description: 'Unified visual primitives, cryptographic UI states, and responsive AutoCAD-grade layouts.',
+      icon: BookOpen,
+      type: 'document',
+      badge: 'DESIGN SYSTEM',
+      docData: { title: 'HAL Spec 04: Design System', id: '04' },
+      targetTab: 'bible',
+      keywords: 'spec 04 design system ui primitives components tokens'
+    },
+    {
+      id: 'doc_17_security',
+      label: 'HAL Spec 17: Security & Cryptographic PII Vault',
+      description: 'AES-GCM-256 field encryption for prospect phone numbers, emails, and contractor credentials.',
+      icon: Shield,
+      type: 'document',
+      badge: 'ENCRYPTION',
+      docData: { title: 'HAL Spec 17: Security', id: '17' },
+      targetTab: 'bible',
+      keywords: 'spec 17 security encryption pii crypto aes gcm vault credentials'
+    },
+    {
+      id: 'doc_24_hermes',
+      label: 'HAL Spec 24: Hermes Engine Architecture',
+      description: 'Nous Research Hermes synthesis: dynamic anti-AI landing pages, diagnostic scripts, and event-bus dispatch.',
+      icon: Sparkles,
+      type: 'document',
+      badge: 'HERMES SPEC',
+      docData: { title: 'HAL Spec 24: Hermes Engine', id: '24' },
+      targetTab: 'bible',
+      keywords: 'spec 24 hermes engine nous research ai synthesis landing page ad copy'
+    }
+  ];
+
+  // Dynamically map any fetched Hermes artifacts
+  const artifactCommands = hermesArtifacts.map(art => {
+    const category = art.category || 'ASSET';
+    const status = art.status || 'DRAFT';
+    return {
+      id: `artifact_${art.id}`,
+      label: `Hermes Artifact: ${art.title || 'Untitled'}`,
+      description: `Category: ${category.toUpperCase()} • Status: ${status.toUpperCase()} • ${art.content?.summary || 'Synthesized asset'}`,
+      icon: Sparkles,
+      type: 'artifact',
+      badge: 'HERMES ASSET',
+      docData: art,
+      targetTab: 'bible',
+      keywords: `${art.title || ''} ${category} ${art.toolId || ''} hermes artifact asset report code`
+    };
+  });
 
   // Combine commands
   const allCommands = [
@@ -325,6 +485,10 @@ export default function CommandPalette({
     ...neuralNodeCommands,
     ...skillCommands,
     ...navigationCommands,
+    ...campaignCommands,
+    ...contractCommands,
+    ...documentCommands,
+    ...artifactCommands,
     ...leadCommands
   ];
 
@@ -337,7 +501,7 @@ export default function CommandPalette({
       ((cmd as any).category && (cmd as any).category.toLowerCase().includes(q)) ||
       (cmd.keywords && cmd.keywords.toLowerCase().includes(q))
     );
-  });
+  }).slice(0, 35); // Keep results responsive and concise
 
   // Reset selected index when search changes
   useEffect(() => {
@@ -412,7 +576,22 @@ export default function CommandPalette({
       onNavigate('skills');
       onRunSkill(cmd.id);
     } else if (cmd.type === 'lead') {
+      if (cmd.leadData) {
+        openInspector('lead', cmd.leadData.businessName, cmd.leadData);
+      }
       onNavigate('leads');
+    } else if (cmd.type === 'campaign') {
+      if (cmd.campaignData) {
+        openInspector('campaign', cmd.campaignData.name, cmd.campaignData);
+      }
+      onNavigate('campaigns');
+    } else if (cmd.type === 'contract') {
+      onNavigate(cmd.targetTab || 'contracts');
+    } else if (cmd.type === 'document' || cmd.type === 'artifact') {
+      if (cmd.docData) {
+        openInspector('artifact', cmd.docData.title || cmd.label, cmd.docData);
+      }
+      onNavigate(cmd.targetTab || 'bible');
     }
     onClose();
   };
@@ -468,7 +647,7 @@ export default function CommandPalette({
             {filteredCommands.length === 0 ? (
               <div className="py-12 text-center font-mono space-y-1">
                 <div className="text-xs text-text-tertiary font-bold">
-                  NO INTELLIGENCE COMMANDS FOUND FOR "{search.toUpperCase()}"
+                  NO INTELLIGENCE COMMANDS FOUND FOR "{(search || '').toUpperCase()}"
                 </div>
                 <div className="text-[10px] text-text-secondary">
                   Try searching "cognitive", "objection", "dual drive", "consensus", "bayesian", "script", or a prospect name.
@@ -705,6 +884,125 @@ export default function CommandPalette({
                       );
                     }
 
+                    if (cmd.type === 'lead') {
+                      return (
+                        <div
+                          key={cmd.id + '-' + cmd.type}
+                          onClick={() => executeCommand(cmd)}
+                          onMouseEnter={() => setSelectedIndex(idx)}
+                          className={`p-2.5 rounded-lg border transition-all cursor-pointer flex items-center justify-between gap-3 ${
+                            isSelected 
+                              ? 'bg-emerald-500/15 border-emerald-400 text-text-primary ring-1 ring-emerald-400/30 shadow-md' 
+                              : 'bg-bg-raised/70 border-border-dim hover:border-emerald-400/40 text-text-secondary'
+                          }`}
+                        >
+                          <div className="flex items-start gap-2.5 min-w-0">
+                            <div className={`p-1.5 rounded bg-bg-base border shrink-0 mt-0.5 ${isSelected ? 'border-emerald-400 text-emerald-400' : 'border-border-dim text-emerald-400'}`}>
+                              <User className="w-4 h-4" />
+                            </div>
+                            <div className="min-w-0 space-y-0.5">
+                              <div className="flex items-center gap-2">
+                                <span className={`text-xs font-mono font-bold truncate ${isSelected ? 'text-emerald-400' : 'text-text-primary'}`}>
+                                  {cmd.label}
+                                </span>
+                                <span className={`text-[8px] font-mono px-1.5 py-0.2 rounded border font-extrabold uppercase shrink-0 ${
+                                  cmd.leadData?.status === 'converted' ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30' :
+                                  cmd.leadData?.status === 'contacted' ? 'bg-cyan-500/20 text-cyan-400 border-cyan-500/30' :
+                                  cmd.leadData?.status === 'dead' ? 'bg-red-500/20 text-red-400 border-red-500/30' :
+                                  'bg-amber-500/20 text-amber-400 border-amber-500/30'
+                                }`}>
+                                  {cmd.badge}
+                                </span>
+                              </div>
+                              <p className="text-[11px] text-text-secondary truncate font-sans">
+                                {cmd.description}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="shrink-0 flex items-center gap-1 text-[10px] font-mono text-emerald-400 font-bold">
+                            <span>Inspect & Act</span>
+                            <ArrowRight className="w-3 h-3" />
+                          </div>
+                        </div>
+                      );
+                    }
+
+                    if (cmd.type === 'campaign') {
+                      return (
+                        <div
+                          key={cmd.id + '-' + cmd.type}
+                          onClick={() => executeCommand(cmd)}
+                          onMouseEnter={() => setSelectedIndex(idx)}
+                          className={`p-2.5 rounded-lg border transition-all cursor-pointer flex items-center justify-between gap-3 ${
+                            isSelected 
+                              ? 'bg-purple-500/15 border-purple-400 text-text-primary ring-1 ring-purple-400/30 shadow-md' 
+                              : 'bg-bg-raised/70 border-border-dim hover:border-purple-400/40 text-text-secondary'
+                          }`}
+                        >
+                          <div className="flex items-start gap-2.5 min-w-0">
+                            <div className={`p-1.5 rounded bg-bg-base border shrink-0 mt-0.5 ${isSelected ? 'border-purple-400 text-purple-400' : 'border-border-dim text-purple-400'}`}>
+                              <BarChart3 className="w-4 h-4" />
+                            </div>
+                            <div className="min-w-0 space-y-0.5">
+                              <div className="flex items-center gap-2">
+                                <span className={`text-xs font-mono font-bold truncate ${isSelected ? 'text-purple-400' : 'text-text-primary'}`}>
+                                  {cmd.label}
+                                </span>
+                                <span className="text-[8px] font-mono px-1.5 py-0.2 rounded bg-purple-500/15 border border-purple-400/30 text-purple-400 font-extrabold uppercase shrink-0">
+                                  {cmd.badge}
+                                </span>
+                              </div>
+                              <p className="text-[11px] text-text-secondary truncate font-sans">
+                                {cmd.description}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="shrink-0 flex items-center gap-1 text-[10px] font-mono text-purple-400 font-bold">
+                            <span>Inspect Campaign</span>
+                            <ArrowRight className="w-3 h-3" />
+                          </div>
+                        </div>
+                      );
+                    }
+
+                    if (cmd.type === 'document' || cmd.type === 'contract' || cmd.type === 'artifact') {
+                      return (
+                        <div
+                          key={cmd.id + '-' + cmd.type}
+                          onClick={() => executeCommand(cmd)}
+                          onMouseEnter={() => setSelectedIndex(idx)}
+                          className={`p-2.5 rounded-lg border transition-all cursor-pointer flex items-center justify-between gap-3 ${
+                            isSelected 
+                              ? 'bg-amber-500/15 border-amber-400 text-text-primary ring-1 ring-amber-400/30 shadow-md' 
+                              : 'bg-bg-raised/70 border-border-dim hover:border-amber-400/40 text-text-secondary'
+                          }`}
+                        >
+                          <div className="flex items-start gap-2.5 min-w-0">
+                            <div className={`p-1.5 rounded bg-bg-base border shrink-0 mt-0.5 ${isSelected ? 'border-amber-400 text-amber-400' : 'border-border-dim text-amber-400'}`}>
+                              <cmd.icon className="w-4 h-4" />
+                            </div>
+                            <div className="min-w-0 space-y-0.5">
+                              <div className="flex items-center gap-2">
+                                <span className={`text-xs font-mono font-bold truncate ${isSelected ? 'text-amber-400' : 'text-text-primary'}`}>
+                                  {cmd.label}
+                                </span>
+                                <span className="text-[8px] font-mono px-1.5 py-0.2 rounded bg-amber-500/15 border border-amber-400/30 text-amber-400 font-extrabold uppercase shrink-0">
+                                  {cmd.badge}
+                                </span>
+                              </div>
+                              <p className="text-[11px] text-text-secondary truncate font-sans">
+                                {cmd.description}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="shrink-0 flex items-center gap-1 text-[10px] font-mono text-amber-400 font-bold">
+                            <span>Open Document</span>
+                            <ArrowRight className="w-3 h-3" />
+                          </div>
+                        </div>
+                      );
+                    }
+
                     return (
                       <div
                         key={cmd.id + '-' + cmd.type}
@@ -720,10 +1018,9 @@ export default function CommandPalette({
                         </div>
                         <span className={`text-[9px] font-mono px-1.5 py-0.5 rounded ${
                           cmd.type === 'skill' ? 'text-amber-400 bg-amber-400/10 border border-amber-400/20' :
-                          cmd.type === 'lead' ? 'text-emerald-400 bg-emerald-400/10 border border-emerald-400/20' :
                           'text-text-tertiary'
                         }`}>
-                          {cmd.type.toUpperCase()}
+                          {(cmd.type || 'ACTION').toUpperCase()}
                         </span>
                       </div>
                     );

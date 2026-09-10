@@ -26,6 +26,8 @@ export const leads = pgTable('leads', {
   ownerName: text('owner_name'),
   phone: text('phone'),
   email: text('email'),
+  phoneEncrypted: text('phone_encrypted'),
+  emailEncrypted: text('email_encrypted'),
   externalCrmId: text('external_crm_id'),
   externalSource: text('external_source'),
   websiteUrl: text('website_url'),
@@ -199,6 +201,7 @@ export const schedulerJobs = pgTable('scheduler_jobs', {
 export const leadEvents = pgTable('lead_events', {
   id: text('id').primaryKey(),
   leadId: text('lead_id').notNull(),
+  type: text('type'),
   externalEventId: text('external_event_id'),
   eventType: text('event_type').notNull(), // LeadCreated, Qualified, SalesAccepted, AppointmentBooked, OpportunityCreated, EstimateSent, ClosedWon, ClosedLost, RevenueUpdated, Reopened
   previousStage: text('previous_stage'),

@@ -34,7 +34,18 @@ import {
   ArrowUpRight,
   DollarSign,
   Zap,
-  Wrench
+  Wrench,
+  Mail,
+  Globe,
+  FileCheck,
+  FileCheck2,
+  Building2,
+  Calculator,
+  Layout,
+  Bot,
+  MessageSquare,
+  LineChart,
+  RefreshCw
 } from 'lucide-react';
 
 import AuthPage from './components/AuthPage';
@@ -62,8 +73,21 @@ import FinancialsPanel from './components/FinancialsPanel';
 import RevenueIntelligenceView from './components/RevenueIntelligenceView';
 import HalLoopOperationsView from './components/HalLoopOperationsView';
 import HermesLabPanel from './components/HermesLabPanel';
-import { OperatingCommandRibbon } from './components/ui/OperatingCommandRibbon';
+import { BlueprintViewerPanel } from './components/BlueprintViewerPanel';
 import { ErrorBoundary } from './components/ErrorBoundary';
+
+// 4-Zone Workstation Shell & Tools
+import { InspectorProvider } from './context/InspectorContext';
+import { TopTelemetryBar } from './components/TopTelemetryBar';
+import { RightInspector } from './components/RightInspector';
+import { EmailDesignerPanel } from './components/EmailDesignerPanel';
+import { LandingPageStudioPanel } from './components/LandingPageStudioPanel';
+import { FormBuilderPanel } from './components/FormBuilderPanel';
+import { ContractsStudioPanel } from './components/ContractsStudioPanel';
+import { WhiteLabelReportsStudioPanel } from './components/WhiteLabelReportsStudioPanel';
+import { DocumentStudioPanel } from './components/DocumentStudioPanel';
+import CalculatorsSection from './components/CalculatorsSection';
+import { ChatBotPanel } from './components/ChatBotPanel';
 
 import { useBusinessContext } from './context/BusinessContext';
 
@@ -254,7 +278,7 @@ export default function App() {
 
       // Auto-inject Authorization header for /api requests if not already provided and not an auth endpoint
       if (urlStr && urlStr.startsWith('/api') && !urlStr.startsWith('/api/auth/')) {
-        const storedToken = localStorage.getItem('halbiz_auth_token');
+        const storedToken = localStorage.getItem('halbiz_auth_token') || localStorage.getItem('token');
         if (storedToken) {
           const headers = new Headers(modifiedInit?.headers || {});
           if (!headers.has('Authorization')) {
@@ -265,6 +289,20 @@ export default function App() {
       }
 
       const response = await originalFetch(input, modifiedInit);
+
+      // Gracefully handle expired or invalid authentication tokens across all /api calls
+      if (response.status === 401 && urlStr && urlStr.startsWith('/api') && !urlStr.startsWith('/api/auth/')) {
+        const hasStoredSession = localStorage.getItem('halbiz_auth_token') || localStorage.getItem('token');
+        if (hasStoredSession) {
+          console.warn('Session token expired or invalid; resetting authentication state.');
+          localStorage.removeItem('halbiz_auth_token');
+          localStorage.removeItem('token');
+          localStorage.removeItem('halbiz_auth_contractor');
+          setToken(null);
+          setContractor(null);
+          window.dispatchEvent(new Event('halbiz_auth_expired'));
+        }
+      }
 
       return response;
     };
@@ -418,37 +456,43 @@ export default function App() {
     try {
       const headers = { 'Authorization': `Bearer ${token}` };
 
-      const [
-        leadsRes, 
-        campaignsRes, 
-        revenuesRes, 
-        forecastsRes, 
-        insightsRes, 
-        recsRes,
-        jobsRes
-      ] = await Promise.all([
-        fetch('/api/leads', { headers }),
-        fetch('/api/campaigns', { headers }),
-        fetch('/api/revenues', { headers }),
-        fetch('/api/forecasts', { headers }),
-        fetch('/api/learning-insights', { headers }),
-        fetch('/api/recommendations', { headers }),
-        fetch('/api/scheduler/jobs', { headers })
+      const safeFetchJson = async (url: string) => {
+        const res = await fetch(url, { headers });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return res.json();
+      };
+
+      const results = await Promise.allSettled([
+        safeFetchJson('/api/leads'),
+        safeFetchJson('/api/campaigns'),
+        safeFetchJson('/api/revenues'),
+        safeFetchJson('/api/forecasts'),
+        safeFetchJson('/api/learning-insights'),
+        safeFetchJson('/api/recommendations'),
+        safeFetchJson('/api/scheduler/jobs')
       ]);
 
-      if (leadsRes.ok) setLeads(await leadsRes.json());
-      if (campaignsRes.ok) setCampaigns(await campaignsRes.json());
-      if (revenuesRes.ok) setRevenues(await revenuesRes.json());
-      if (forecastsRes.ok) setForecasts(await forecastsRes.json());
-      if (insightsRes.ok) setLearningInsights(await insightsRes.json());
-      if (recsRes.ok) setRecommendations(await recsRes.json());
-      if (jobsRes.ok) setSchedulerJobs(await jobsRes.json());
+      const [leadsRes, campaignsRes, revenuesRes, forecastsRes, insightsRes, recsRes, jobsRes] = results;
+
+      if (leadsRes.status === 'fulfilled') setLeads(leadsRes.value);
+      if (campaignsRes.status === 'fulfilled') setCampaigns(campaignsRes.value);
+      if (revenuesRes.status === 'fulfilled') setRevenues(revenuesRes.value);
+      if (forecastsRes.status === 'fulfilled') setForecasts(forecastsRes.value);
+      if (insightsRes.status === 'fulfilled') setLearningInsights(insightsRes.value);
+      if (recsRes.status === 'fulfilled') setRecommendations(recsRes.value);
+      if (jobsRes.status === 'fulfilled') setSchedulerJobs(jobsRes.value);
+
+      // If all failed (e.g. server rebooting or offline), trigger retry
+      const allFailed = results.every(r => r.status === 'rejected');
+      if (allFailed) {
+        throw new Error('All store endpoints rejected');
+      }
 
     } catch (err) {
-      console.error('Failed to fetch full application store:', err);
       if (retryCount < 3) {
-        setTimeout(() => fetchAllData(retryCount + 1), 2000 * (retryCount + 1));
+        setTimeout(() => fetchAllData(retryCount + 1), 1500 * (retryCount + 1));
       } else {
+        console.warn('Failed to fetch full application store after retries:', err);
         setToastAlert({
           id: Date.now().toString(),
           title: "Connection Lost",
@@ -467,7 +511,10 @@ export default function App() {
       clearTimeout(sseTimeoutRef.current);
     }
     
-    const eventSource = new EventSource('/api/events');
+    const token = localStorage.getItem('token');
+    if (!token) return;
+
+    const eventSource = new EventSource(`/api/events?token=${encodeURIComponent(token)}`);
 
     eventSource.onopen = () => {
       setSseConnected(true);
@@ -590,47 +637,52 @@ export default function App() {
     return <AuthPage onAuthSuccess={handleAuthSuccess} />;
   }
 
-  // Structured navigation hierarchy matching human mental operational domains
+  // Structured navigation hierarchy for left panel (tools not represented in the top ribbon)
   const navigationGroups = [
     {
-      group: 'COMMAND & CONTROL',
+      group: 'OPERATING INTELLIGENCE',
       items: [
-        { id: 'overview', label: 'Mission Control', icon: Sparkles },
-        { id: 'forecasts', label: 'Intelligence & Revenue', icon: TrendingUp },
-        { id: 'missions', label: 'Operations Center', icon: Briefcase },
+        { id: 'chat', label: 'HAL Copilot (Chat)', icon: Bot },
+        { id: 'loop-engine', label: 'HAL Operating Loop (10-Stage)', icon: RefreshCw },
+        { id: 'hermes-lab', label: 'Hermes Lab Studio', icon: Sparkles },
+        { id: 'neural', label: 'Neural Decision Graph', icon: Network },
       ]
     },
     {
-      group: 'GROWTH ENGINE',
+      group: 'CLIENT & FIELD OPERATIONS',
       items: [
-        { id: 'revenue-intelligence', label: 'Revenue Intelligence', icon: TrendingUp },
-        { id: 'leads', label: 'Territory Leads', icon: Compass },
-        { id: 'board', label: 'Client Pipeline', icon: Users },
-        { id: 'delivery', label: 'Client Delivery Hub', icon: Briefcase },
-        { id: 'financials', label: 'Financials & Retainers', icon: DollarSign },
-        { id: 'map', label: 'Conquest Map', icon: Map },
-        { id: 'campaigns', label: 'Outreach Campaigns', icon: BarChart3 },
+        { id: 'delivery', label: 'Client Work Orders', icon: Briefcase },
+        { id: 'contracts', label: 'Contracts & Agreements', icon: FileCheck2 },
+        { id: 'whitelabel-reports', label: 'Client Performance Reports', icon: Building2 },
+        { id: 'form-builder', label: 'Lead Capture Forms', icon: FileCheck },
+        { id: 'debrief', label: 'Win/Loss Deal Logger', icon: Check },
       ]
     },
     {
-      group: 'COGNITIVE & REASONING',
+      group: 'MARKETING & DESIGN STUDIO',
       items: [
-        { id: 'hermes-lab', label: 'Hermes Intelligence Lab', icon: Wrench },
-        { id: 'skills', label: 'AI Council & Skills', icon: Cpu },
-        { id: 'scheduler', label: 'Simulations & Scans', icon: Play },
-        { id: 'loop-engine', label: 'Verified Loop Engine', icon: Zap },
-        { id: 'drive', label: 'Knowledge Vault', icon: FileText },
-        { id: 'neural', label: 'Neural Intelligence', icon: Network },
-        { id: 'debrief', label: 'Outcome Logger', icon: Check },
+        { id: 'document-studio', label: 'Document Design Studio', icon: FileText },
+        { id: 'email-designer', label: 'Email Template Designer', icon: Mail },
+        { id: 'landing-studio', label: 'Website Landing Pages', icon: Globe },
+        { id: 'calculators', label: 'Business & ROI Calculators', icon: Calculator },
       ]
     },
     {
-      group: 'SYSTEM & IDENTITY',
+      group: 'COMPANY KNOWLEDGE & TASKS',
       items: [
-        { id: 'connectors', label: 'Connectors Hub', icon: Share2 },
-        { id: 'health', label: 'System Heartbeat', icon: Activity },
-        { id: 'bible', label: 'HAL Constitution', icon: BookOpen },
-        { id: 'credentials', label: 'Settings & Identity', icon: Settings }
+        { id: 'bible', label: 'Company Operating Manual', icon: BookOpen },
+        { id: 'roadmap', label: 'HAL Roadmap & Phase 1', icon: LineChart },
+        { id: 'drive', label: 'Company File Vault', icon: FileText },
+        { id: 'skills', label: 'AI Business Skills', icon: Sparkles },
+        { id: 'scheduler', label: 'Scheduled Tasks & Scans', icon: Play },
+      ]
+    },
+    {
+      group: 'SETTINGS & INTEGRATIONS',
+      items: [
+        { id: 'connectors', label: 'Connected Apps', icon: Share2 },
+        { id: 'credentials', label: 'Company Settings & Keys', icon: Settings },
+        { id: 'health', label: 'System & Server Status', icon: Activity }
       ]
     }
   ];
@@ -646,7 +698,8 @@ export default function App() {
   const innerBg = 'bg-bg-raised border-border-dim';
 
   return (
-    <div className={`h-screen flex flex-col font-sans overflow-hidden select-none selection:bg-accent/30 selection:text-white transition-colors duration-200 ${theme === 'light' ? 'light-theme' : 'dark-theme'} ${baseBg}`}>
+    <InspectorProvider>
+      <div className={`h-screen flex flex-col font-sans overflow-hidden select-none selection:bg-accent/30 selection:text-white transition-colors duration-200 ${theme === 'light' ? 'light-theme' : 'dark-theme'} ${baseBg}`}>
       
       {/* GLOBAL SSE TOAST ALERT SLIDE-IN */}
       <AnimatePresence>
@@ -655,16 +708,14 @@ export default function App() {
             initial={{ opacity: 0, x: 100 }}
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: 100 }}
-            className={`fixed top-12 right-6 z-50 max-w-sm border shadow-lg rounded p-4 flex gap-3 ${
-              isDark ? 'bg-[#090b11] border-accent/30' : 'bg-white border-[#cbd5e1]'
-            }`}
+            className="fixed top-12 right-6 z-50 max-w-sm border border-border-default shadow-lg rounded-lg p-4 flex gap-3 bg-bg-raised text-text-primary"
           >
             <div className="w-6 h-6 rounded bg-accent-dim border border-accent/20 flex items-center justify-center text-accent shrink-0">
               <Check className="w-3.5 h-3.5 stroke-[2.5]" />
             </div>
             <div className="flex-1 space-y-1">
               <div className="flex justify-between items-start">
-                <span className={`text-[10px] font-mono font-bold uppercase tracking-wider ${isDark ? 'text-white' : 'text-[#1a1a1a]'}`}>{toastAlert.title}</span>
+                <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-text-primary">{toastAlert.title}</span>
                 <button onClick={() => setToastAlert(null)} className="text-text-secondary hover:text-text-primary transition-colors">
                   <X className="w-3 h-3" />
                 </button>
@@ -708,35 +759,15 @@ export default function App() {
             className={`fixed top-0 bottom-0 left-0 w-72 max-w-[85vw] z-50 flex flex-col justify-between select-none border-r md:hidden shadow-2xl h-full ${sidebarBg}`}
           >
               <div className="flex flex-col flex-1 overflow-hidden">
-                {/* Logo area */}
-                <div className="p-4 border-b flex items-center justify-between gap-2.5 border-border-dim/40">
-                  <div className="flex items-center gap-2.5">
-                    {companyLogo ? (
-                      <img 
-                        src={companyLogo} 
-                        alt="Company Logo" 
-                        className="w-8 h-8 rounded-lg object-cover border border-accent/20 shadow-md shadow-accent/5 shrink-0"
-                        referrerPolicy="no-referrer"
-                      />
-                    ) : (
-                      <div className="relative w-8 h-8 rounded-lg bg-gradient-to-tr from-indigo-500 to-cyan-400 flex items-center justify-center shadow-lg shadow-indigo-500/20 shrink-0">
-                        <div className="w-4 h-4 rounded-full bg-bg-base flex items-center justify-center">
-                          <div className="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-pulse" />
-                        </div>
-                      </div>
-                    )}
-                    <div className="flex flex-col">
-                      <span className="text-sm font-bold tracking-tight uppercase font-sans text-text-primary">HAL</span>
-                      <span className="text-[7.5px] font-mono tracking-widest uppercase leading-none font-semibold text-text-secondary">AI Business Operating</span>
-                      <span className="text-[6.5px] font-mono tracking-widest uppercase leading-none mt-0.5 text-text-tertiary">Intelligence System</span>
-                    </div>
-                  </div>
+                {/* Mobile Header Bar with Close Button */}
+                <div className="p-3 border-b flex items-center justify-between border-border-dim/40">
+                  <span className="text-xs font-mono font-bold tracking-wider text-text-tertiary uppercase">Navigation</span>
                   <button 
                     onClick={() => setIsMobileMenuOpen(false)}
                     aria-label="Close navigation menu"
-                    className="min-h-[44px] min-w-[44px] flex items-center justify-center p-2 rounded-lg border text-text-secondary hover:text-text-primary transition-colors border-border-dim bg-bg-overlay hover:bg-bg-subtle active:scale-95 cursor-pointer"
+                    className="min-h-[40px] min-w-[40px] flex items-center justify-center p-2 rounded-lg border text-text-secondary hover:text-text-primary transition-colors border-border-dim bg-bg-overlay hover:bg-bg-subtle active:scale-95 cursor-pointer"
                   >
-                    <X className="w-5 h-5" />
+                    <X className="w-4 h-4" />
                   </button>
                 </div>
 
@@ -784,19 +815,19 @@ export default function App() {
                   {/* Theme Toggle Button */}
                   <button 
                     onClick={toggleTheme}
-                    className="min-h-[44px] px-3 py-2 flex items-center gap-2 rounded-lg border transition-colors bg-bg-overlay hover:bg-bg-subtle active:bg-bg-subtle border-border-dim text-text-secondary hover:text-text-primary cursor-pointer"
+                    className="min-h-[44px] px-3 py-2 flex items-center gap-2 rounded-lg border transition-colors bg-bg-subtle hover:bg-bg-raised active:bg-bg-subtle border-border-default text-text-primary cursor-pointer"
                     title="Toggle System Theme"
                     aria-label="Toggle System Theme"
                   >
                     {isDark ? (
                       <>
-                        <Sun className="w-3.5 h-3.5 text-amber-400" />
-                        <span className="text-[9px] font-bold uppercase">LIGHT</span>
+                        <Sun className="w-4 h-4 text-accent" />
+                        <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-accent">PAPER & INK</span>
                       </>
                     ) : (
                       <>
-                        <Moon className="w-3.5 h-3.5 text-indigo-500" />
-                        <span className="text-[9px] font-bold uppercase">DARK</span>
+                        <Moon className="w-4 h-4 text-accent" />
+                        <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-accent">DARK CARBON</span>
                       </>
                     )}
                   </button>
@@ -820,38 +851,36 @@ export default function App() {
         )}
       </AnimatePresence>
 
-      {/* MAIN CONTAINER (SIDEBAR NAV + HEADER + WORKSPACE) */}
+      {/* ZONE 1: TOP NAVIGATION & TELEMETRY RIBBON */}
+      <TopTelemetryBar
+        activeTab={activeTab}
+        setActiveTab={setActiveTab}
+        onOpenCommandPalette={() => setIsCommandPaletteOpen(true)}
+        contractorName={contractor?.name}
+        companyLogo={companyLogo}
+        unreadNotificationsCount={unreadNotificationsCount}
+        notifications={notifications}
+        clearNotifications={clearNotifications}
+        showNotifications={showNotificationDropdown}
+        onToggleNotifications={() => setShowNotificationDropdown(prev => !prev)}
+        onCloseNotifications={() => setShowNotificationDropdown(false)}
+        onToggleTheme={toggleTheme}
+        onOpenMobileMenu={() => setIsMobileMenuOpen(true)}
+        theme={theme}
+        isAppInstalled={isAppInstalled}
+        onInstallClick={handleInstallClick}
+        onLogout={handleLogout}
+      />
+
+      {/* MAIN CONTAINER (SIDEBAR NAV + HEADER + WORKSPACE + RIGHT INSPECTOR) */}
       <div className="flex-1 flex flex-row overflow-hidden w-full h-full min-w-0">
         
         {/* FIXED HIGH-DENSITY SIDEBAR NAV */}
         <aside className={`w-60 shrink-0 border-r flex flex-col justify-between hidden md:flex h-full select-none transition-colors ${sidebarBg}`}>
           
           <div className="flex flex-col flex-1 overflow-hidden">
-            {/* Logo area */}
-            <div className="p-5 border-b flex items-center gap-2.5 border-border-dim/40">
-              {companyLogo ? (
-                <img 
-                  src={companyLogo} 
-                  alt="Company Logo" 
-                  className="w-8 h-8 rounded-lg object-cover border border-accent/20 shadow-md shadow-accent/5 shrink-0"
-                  referrerPolicy="no-referrer"
-                />
-              ) : (
-                <div className="relative w-8 h-8 rounded-lg bg-gradient-to-tr from-indigo-500 to-cyan-400 flex items-center justify-center shadow-lg shadow-indigo-500/20 shrink-0">
-                  <div className="w-4 h-4 rounded-full bg-bg-base flex items-center justify-center">
-                    <div className="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-pulse" />
-                  </div>
-                </div>
-              )}
-              <div className="flex flex-col">
-                <span className="text-sm font-bold tracking-tight uppercase font-sans text-text-primary">HAL</span>
-                <span className="text-[7.5px] font-mono tracking-widest uppercase leading-none font-semibold text-text-secondary">AI Business Operating</span>
-                <span className="text-[6.5px] font-mono tracking-widest uppercase leading-none mt-0.5 text-text-tertiary">Intelligence System</span>
-              </div>
-            </div>
-
             {/* Scrollable category list */}
-            <div className="flex-1 overflow-y-auto py-3.5 px-3 space-y-4">
+            <div className="flex-1 overflow-y-auto py-3 px-3 space-y-4">
               {navigationGroups.map((group) => (
                 <div key={group.group} className="space-y-0.5">
                   <div className="px-2.5 pb-1 text-[7.5px] font-mono font-bold tracking-widest text-text-tertiary uppercase opacity-75">
@@ -891,18 +920,18 @@ export default function App() {
               {/* Theme Toggle Button */}
               <button 
                 onClick={toggleTheme}
-                className="flex items-center gap-1.5 px-2 py-0.5 rounded border transition-colors bg-bg-overlay hover:bg-bg-subtle border-border-dim text-text-secondary hover:text-text-primary"
+                className="flex items-center gap-1.5 px-2 py-1 rounded border transition-colors bg-bg-subtle hover:bg-bg-raised border-border-default text-text-primary cursor-pointer"
                 title="Toggle System Theme"
               >
                 {isDark ? (
                   <>
-                    <Sun className="w-2.5 h-2.5 text-amber-400" />
-                    <span className="text-[8px] font-bold uppercase">LIGHT</span>
+                    <Sun className="w-3 h-3 text-accent" />
+                    <span className="text-[8px] font-mono font-bold uppercase tracking-wider text-accent">PAPER & INK</span>
                   </>
                 ) : (
                   <>
-                    <Moon className="w-2.5 h-2.5 text-indigo-500" />
-                    <span className="text-[8px] font-bold uppercase">DARK</span>
+                    <Moon className="w-3 h-3 text-accent" />
+                    <span className="text-[8px] font-mono font-bold uppercase tracking-wider text-accent">DARK CARBON</span>
                   </>
                 )}
               </button>
@@ -921,218 +950,15 @@ export default function App() {
           </div>
         </aside>
 
-        {/* MAIN BODY AREA (TOP HEADER + WORKSPACE) */}
+        {/* MAIN BODY AREA (WORKSPACE + RIGHT INSPECTOR) */}
         <div className="flex-1 flex flex-col h-full overflow-hidden min-w-0">
           
-          {/* HEADER BAR */}
-          <header className={`h-[70px] shrink-0 border-b px-4 md:px-6 flex items-center justify-between z-30 select-none transition-colors ${headerBg}`}>
-            {/* Left portion: Greetings & System status */}
-            <div className="flex items-center gap-3 md:gap-5">
-              {/* Hamburger Menu Toggle on Mobile */}
-              <button 
-                onClick={() => setIsMobileMenuOpen(true)}
-                className="min-h-[44px] min-w-[44px] flex items-center justify-center p-2.5 rounded-lg border md:hidden transition-colors shrink-0 bg-bg-overlay border-border-dim text-text-secondary hover:text-text-primary hover:bg-bg-subtle active:scale-95 cursor-pointer"
-                title="Open Navigation Menu"
-                aria-label="Open Navigation Menu"
-              >
-                <Menu className="w-5 h-5" />
-              </button>
-
-              <div className="hidden sm:block">
-                <h1 className="text-sm font-bold tracking-tight leading-tight text-text-primary">Good morning, {contractorFirstName}.</h1>
-                <p className="text-[10.5px] mt-0.5 leading-none text-text-secondary">Here's what's happening across your business.</p>
-              </div>
-
-              {/* Ultra compact mobile logo/title in case greeting is hidden on tiny screens */}
-              <div className="sm:hidden flex items-center gap-1.5 shrink-0">
-                <span className="text-xs font-bold tracking-tight uppercase font-sans text-text-primary">HAL OS</span>
-                <span className="w-1 h-1 rounded-full bg-positive animate-pulse" />
-              </div>
-
-              {/* Status capsule */}
-              <button 
-                onClick={() => setActiveTab('health')}
-                className="hidden lg:flex items-center gap-1.5 border border-border-dim hover:border-accent hover:bg-bg-subtle/50 px-2.5 py-1 rounded-full text-[9.5px] font-mono bg-bg-overlay cursor-pointer transition-all"
-                title="View System Diagnostics"
-              >
-                <span className="w-1.5 h-1.5 rounded-full bg-positive animate-pulse" />
-                <span className="font-semibold uppercase text-text-secondary">All Systems Operational</span>
-              </button>
-
-              {/* Install App / Desktop Trigger - Automatically hidden once installed */}
-              {!isAppInstalled && (
-                <button
-                  onClick={handleInstallClick}
-                  className="flex items-center gap-1.5 border border-accent/40 hover:border-accent hover:bg-accent/10 px-2.5 py-1 rounded-full text-[9.5px] font-mono bg-bg-overlay/80 cursor-pointer text-accent transition-all shadow-sm shadow-accent/5"
-                  title={deviceInfo.isMobile ? "Add HALBiz to Home Screen" : "Download or Install to Desktop"}
-                >
-                  {deviceInfo.isMobile ? (
-                    <Smartphone className="w-3 h-3 text-accent" />
-                  ) : (
-                    <Download className="w-3 h-3 text-accent" />
-                  )}
-                  <span className="font-bold uppercase tracking-wider">
-                    {deviceInfo.isMobile ? "INSTALL APP" : "INSTALL DESKTOP"}
-                  </span>
-                </button>
-              )}
-
-              {/* HAL Council Stack */}
-              <button 
-                onClick={() => setActiveTab('skills')}
-                className="hidden xl:flex items-center gap-1.5 border border-border-dim hover:border-accent hover:bg-bg-subtle/50 rounded-full px-2.5 py-1 text-[9.5px] bg-bg-overlay cursor-pointer transition-all"
-                title="View HAL AI Council & Skills"
-              >
-                <span className="font-mono mr-1 text-text-secondary">HAL Council:</span>
-                <div className="flex -space-x-1.5">
-                  <span className="w-4 h-4 rounded-full bg-indigo-600 border border-bg-base flex items-center justify-center text-[7px] font-bold text-white" title="Strategy Agent">SA</span>
-                  <span className="w-4 h-4 rounded-full bg-emerald-600 border border-bg-base flex items-center justify-center text-[7px] font-bold text-white" title="Marketing Agent">MA</span>
-                  <span className="w-4 h-4 rounded-full bg-amber-600 border border-bg-base flex items-center justify-center text-[7px] font-bold text-white" title="Database Agent">DA</span>
-                  <span className="w-4 h-4 rounded-full bg-cyan-600 border border-bg-base flex items-center justify-center text-[7px] font-bold text-white" title="Campaign Agent">CA</span>
-                  <span className="w-4 h-4 rounded-full bg-fuchsia-600 border border-bg-base flex items-center justify-center text-[7px] font-bold text-white" title="Financial Agent">FA</span>
-                  <span className="w-4 h-4 rounded-full border border-bg-base flex items-center justify-center text-[7px] font-bold bg-bg-subtle text-text-secondary">+3</span>
-                </div>
-              </button>
-            </div>
-
-            {/* Right portion: Search, Notifications, Avatar */}
-            <div className="flex items-center gap-2 sm:gap-4">
-              
-              {/* Search button pretending to be an input - collapsed on mobile */}
-              <button
-                onClick={() => setIsCommandPaletteOpen(true)}
-                className="flex items-center justify-center md:justify-between w-8 h-8 md:w-52 md:h-8 px-2 md:px-2.5 border hover:border-accent/40 rounded-md text-[10.5px] transition-all text-left bg-bg-overlay hover:bg-bg-subtle border-border-dim text-text-secondary"
-                title="Search Command Palette"
-              >
-                <div className="flex items-center gap-2">
-                  <Search className="w-3.5 h-3.5" />
-                  <span className="hidden md:inline">Ask HAL anything...</span>
-                </div>
-                <kbd className="hidden md:inline-block px-1 rounded text-[8.5px] border font-mono bg-bg-base border-border-dim">⌘K</kbd>
-              </button>
-
-              {/* Notifications */}
-              <div className="relative">
-                <button
-                  onClick={() => setShowNotificationDropdown(!showNotificationDropdown)}
-                  className="p-1.5 rounded-md border transition-colors relative bg-bg-overlay hover:bg-bg-subtle border-border-dim text-text-secondary hover:text-text-primary"
-                  title="System Notifications & Alerts"
-                >
-                  <Bell className="w-3.5 h-3.5" />
-                  {unreadNotificationsCount > 0 && (
-                    <span className="absolute top-0 right-0 w-2 h-2 rounded-full bg-accent border-2 border-bg-base animate-pulse" />
-                  )}
-                </button>
-
-                {/* Notifications Dropdown */}
-                {showNotificationDropdown && (
-                  <div className="absolute right-0 mt-2 w-84 border rounded-lg shadow-xl p-4 space-y-3 z-50 text-xs bg-bg-raised border-border-dim">
-                    <div className="flex justify-between items-center border-b pb-2 border-border-dim">
-                      <div className="flex items-center gap-1.5">
-                        <span className="font-mono text-[9px] font-bold uppercase tracking-wider text-text-primary">OPERATIONAL ALERTS</span>
-                        {unreadNotificationsCount > 0 && (
-                          <span className="text-[9px] font-mono px-1.5 py-0.2 rounded bg-accent-dim text-accent font-bold">
-                            {unreadNotificationsCount}
-                          </span>
-                        )}
-                      </div>
-                      {unreadNotificationsCount > 0 && (
-                        <button 
-                          onClick={clearNotifications}
-                          className="text-[9px] font-mono text-accent hover:text-accent/80 transition-colors font-bold cursor-pointer"
-                        >
-                          MARK ALL READ
-                        </button>
-                      )}
-                    </div>
-
-                    <div className="space-y-2 max-h-[260px] overflow-y-auto pr-0.5">
-                      {notifications.length === 0 ? (
-                        <div className="py-6 text-center space-y-1">
-                          <p className="text-[11px] font-sans text-text-secondary">All caught up</p>
-                          <p className="text-[9.5px] font-mono text-text-tertiary">No pending system or territory events.</p>
-                        </div>
-                      ) : (
-                        notifications.map(n => {
-                          const target = n.targetTab || (
-                            n.type.includes('lead') ? 'leads' :
-                            n.type.includes('campaign') ? 'campaigns' :
-                            n.type.includes('revenue') || n.type.includes('forecast') ? 'forecasts' :
-                            n.type.includes('mission') ? 'missions' :
-                            n.type.includes('job') || n.type.includes('scheduler') ? 'scheduler' :
-                            'overview'
-                          );
-
-                          return (
-                            <div 
-                              key={n.id} 
-                              onClick={() => {
-                                setActiveTab(target);
-                                setShowNotificationDropdown(false);
-                              }}
-                              className="p-2.5 rounded-lg border leading-relaxed text-[11px] bg-bg-subtle/40 hover:bg-bg-subtle border-border-dim cursor-pointer transition-all hover:border-accent/40 group"
-                            >
-                              <div className="flex justify-between items-center font-mono text-[9px] mb-1">
-                                <span className="text-accent font-bold uppercase truncate max-w-[170px]">{n.title}</span>
-                                <span className="text-text-tertiary">{new Date(n.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                              </div>
-                              <p className="text-text-secondary group-hover:text-text-primary text-[10.5px]">{n.message}</p>
-                              <div className="flex justify-end items-center gap-1 text-[9px] font-mono text-accent font-bold mt-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                                <span>Go to {target.toUpperCase()}</span>
-                                <ArrowUpRight className="w-2.5 h-2.5" />
-                              </div>
-                            </div>
-                          );
-                        })
-                      )}
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* User Avatar Circle / Profile Photo */}
-              {profilePhoto ? (
-                <img 
-                  src={profilePhoto} 
-                  alt="Profile" 
-                  onClick={() => setActiveTab('credentials')}
-                  className="w-8 h-8 rounded-full border border-indigo-500/20 object-cover cursor-pointer hover:border-indigo-500 transition-all shadow-md shrink-0"
-                  referrerPolicy="no-referrer"
-                />
-              ) : (
-                <div 
-                  onClick={() => setActiveTab('credentials')}
-                  className="w-8 h-8 rounded-full border border-indigo-500/20 bg-indigo-500/10 flex items-center justify-center text-xs text-indigo-400 font-bold uppercase cursor-pointer hover:border-indigo-500 transition-all shadow-md shrink-0"
-                  title="Profile & Settings"
-                >
-                  {contractorFirstName.slice(0, 2)}
-                </div>
-              )}
-
-              {/* Logout button */}
-              <button
-                onClick={handleLogout}
-                className="p-1.5 rounded-md border transition-all bg-transparent hover:bg-bg-subtle border-transparent hover:border-border-dim/20 text-text-secondary hover:text-text-primary"
-                title="Logout session"
-              >
-                <LogOut className="w-3.5 h-3.5" />
-              </button>
-
-            </div>
-          </header>
-
           {/* THE HAL INTELLIGENCE SIGNATURE BAR (1px, scan) */}
           <div className="hal-intelligence-bar shrink-0" />
 
           {/* WORKSPACE AREA */}
           <main className="flex-1 overflow-y-auto flex flex-col relative transition-colors bg-bg-base min-w-0">
-            <div className="p-3 sm:p-5 md:p-6 w-full flex-1 max-w-[1300px] mx-auto min-w-0">
-              
-              {/* Operating Command Ribbon with Global Territory & Trade Levers */}
-              <OperatingCommandRibbon 
-                activeTab={activeTab}
-                onRefreshData={fetchAllData}
-              />
+            <div className="p-2 sm:p-4 md:p-5 w-full flex-1 min-w-0">
 
               <AnimatePresence mode="wait">
                 <motion.div
@@ -1152,6 +978,12 @@ export default function App() {
                       forecasts={forecasts}
                       setActiveTab={setActiveTab}
                       theme={theme}
+                    />
+                  )}
+
+                  {activeTab === 'blueprint' && (
+                    <BlueprintViewerPanel 
+                      onBackToDashboard={() => setActiveTab('overview')}
                     />
                   )}
 
@@ -1244,6 +1076,10 @@ export default function App() {
                     <HermesLabPanel token={token} />
                   )}
 
+                  {activeTab === 'chat' && (
+                    <ChatBotPanel token={token} />
+                  )}
+
                   {activeTab === 'credentials' && (
                     <SettingsPanel 
                       token={token}
@@ -1276,8 +1112,41 @@ export default function App() {
                     <HalBiblePanel />
                   )}
 
+                  {activeTab === 'roadmap' && (
+                    <HalBiblePanel initialDocId="20" />
+                  )}
+
                   {activeTab === 'drive' && (
                     <GoogleDrivePanel />
+                  )}
+
+                  {/* ─── NEW PROFESSIONAL TOOLS SUITE ─── */}
+                  {activeTab === 'document-studio' && (
+                    <DocumentStudioPanel token={token} />
+                  )}
+
+                  {activeTab === 'email-designer' && (
+                    <EmailDesignerPanel />
+                  )}
+
+                  {activeTab === 'landing-studio' && (
+                    <LandingPageStudioPanel token={token} />
+                  )}
+
+                  {activeTab === 'form-builder' && (
+                    <FormBuilderPanel />
+                  )}
+
+                  {activeTab === 'contracts' && (
+                    <ContractsStudioPanel token={token} />
+                  )}
+
+                  {activeTab === 'whitelabel-reports' && (
+                    <WhiteLabelReportsStudioPanel token={token} />
+                  )}
+
+                  {activeTab === 'calculators' && (
+                    <CalculatorsSection />
                   )}
                   </ErrorBoundary>
                 </motion.div>
@@ -1286,6 +1155,8 @@ export default function App() {
           </main>
         </div>
 
+        {/* ZONE 4: CONTEXTUAL RIGHT INSPECTOR */}
+        <RightInspector />
       </div>
 
       {/* METICULOUS BOTTOM STATUS BAR */}
@@ -1342,9 +1213,7 @@ export default function App() {
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 15 }}
               transition={{ type: 'spring', damping: 25, stiffness: 220 }}
-              className={`relative max-w-lg w-full rounded-xl border border-border-dim/80 shadow-2xl overflow-hidden p-6 text-center z-50 ${
-                isDark ? 'bg-[#0b0e14] text-text-primary border-accent/20' : 'bg-white text-gray-900 border-gray-200'
-              }`}
+              className="relative max-w-lg w-full rounded-xl border border-border-default shadow-2xl overflow-hidden p-6 text-center z-50 bg-bg-raised text-text-primary"
             >
               <button
                 onClick={() => setShowDesktopInstallModal(false)}
@@ -1504,6 +1373,23 @@ export default function App() {
           </div>
         )}
       </AnimatePresence>
-    </div>
+
+      {/* GLOBAL COMMAND PALETTE (CMD+K / DEEP SEARCH) */}
+      <CommandPalette
+        isOpen={isCommandPaletteOpen}
+        onClose={() => setIsCommandPaletteOpen(false)}
+        onNavigate={(tab) => {
+          setActiveTab(tab);
+          setIsCommandPaletteOpen(false);
+        }}
+        onRunSkill={() => {
+          setActiveTab('skills');
+          setIsCommandPaletteOpen(false);
+        }}
+        leads={leads}
+        campaigns={campaigns}
+      />
+      </div>
+    </InspectorProvider>
   );
 }

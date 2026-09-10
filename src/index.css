@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,300..800;1,300..800&family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;0,6..72,700;1,6..72,400;1,6..72,600&family=IBM+Plex+Mono:ital,wght@0,400;0,500;0,600;1,400&display=swap');
 @import "tailwindcss";
 
 @theme {
@@ -20,15 +20,19 @@
   --color-accent-mid: var(--accent-mid);
   --color-accent-contrast: var(--accent-contrast);
 
-  --color-positive: #10b981;
-  --color-positive-dim: rgba(16, 185, 129, 0.1);
-  --color-warning: #f59e0b;
-  --color-warning-dim: rgba(245, 158, 11, 0.1);
-  --color-negative: #ef4444;
-  --color-negative-dim: rgba(239, 68, 68, 0.1);
-  --color-neutral: #64748b;
+  --color-positive: var(--color-positive);
+  --color-positive-dim: var(--color-positive-dim);
+  --color-warning: var(--color-warning);
+  --color-warning-dim: var(--color-warning-dim);
+  --color-negative: var(--color-negative);
+  --color-negative-dim: var(--color-negative-dim);
+  --color-info: var(--color-info);
+  --color-info-dim: var(--color-info-dim);
+  --color-neutral: var(--color-neutral);
 
   --font-sans: var(--font-sans);
+  --font-serif: var(--font-serif);
+  --font-display: var(--font-display);
   --font-mono: var(--font-mono);
 
   /* Aliases for seamless retrocompatibility across widgets */
@@ -47,64 +51,100 @@
 }
 
 :root, .dark-theme {
-  --bg-base: #05070c;
-  --bg-raised: #090b11;
-  --bg-overlay: #0d1017;
-  --bg-subtle: #121620;
+  --bg-base: #0c0e12;       /* Deep obsidian carbon canvas */
+  --bg-raised: #14171f;     /* Carbon plate sheet */
+  --bg-overlay: #1a1e28;    /* Elevated structural surface */
+  --bg-subtle: #222836;     /* Subtle pressed tile / hover surface */
 
-  --border-dim: #151a24;
-  --border-default: #1b2230;
-  --border-strong: #2a3447;
+  --border-dim: #222938;     /* Fine graphite ruled border */
+  --border-default: #323c52; /* Crisp structural boundary */
+  --border-strong: #4c5b7c;  /* Pronounced outline */
 
-  --text-primary: #f8fafc;
-  --text-secondary: #94a3b8;
-  --text-tertiary: #475569;
+  --text-primary: #f5f4ef;   /* Parchment bone white - crisp contrast, soft glare */
+  --text-secondary: #9da6b8; /* Refined steel-graphite */
+  --text-tertiary: #626c82;  /* Muted charcoal */
 
-  --accent: #c8f542;
-  --accent-dim: rgba(200, 245, 66, 0.08);
-  --accent-mid: rgba(200, 245, 66, 0.15);
-  --accent-contrast: #05070c;
+  --accent: #e5a43b;         /* Antique gold leaf & brass seal - dignified, authoritative */
+  --accent-dim: rgba(229, 164, 59, 0.10);
+  --accent-mid: rgba(229, 164, 59, 0.20);
+  --accent-contrast: #0c0e12;
 
-  --font-sans: "Plus Jakarta Sans", "Inter", ui-sans-serif, system-ui, -apple-system, sans-serif;
-  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+  --color-positive: #10b981;
+  --color-positive-dim: rgba(16, 185, 129, 0.12);
+  --color-warning: #f59e0b;
+  --color-warning-dim: rgba(245, 158, 11, 0.12);
+  --color-negative: #f87171;
+  --color-negative-dim: rgba(248, 113, 113, 0.12);
+  --color-info: #38bdf8;
+  --color-info-dim: rgba(56, 189, 248, 0.12);
+  --color-neutral: #64748b;
+
+  --font-sans: "DM Sans", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-serif: "Newsreader", Garamond, Georgia, serif;
+  --font-display: "Newsreader", Garamond, Georgia, serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, monospace;
 }
 
 .light-theme {
-  --bg-base: #f1f5f9;       /* Slate 100 - clean, distinct neutral canvas */
-  --bg-raised: #ffffff;     /* Pure white cards with strong contrast */
-  --bg-overlay: #ffffff;    /* Pure white overlays and headers */
-  --bg-subtle: #e2e8f0;     /* Slate 200 - clear hover and active background */
+  --bg-base: #f7f5f0;       /* Natural warm archival paper parchment */
+  --bg-raised: #ffffff;     /* Crisp archival deckled paper */
+  --bg-overlay: #ffffff;    /* Pure paper sheet */
+  --bg-subtle: #ece7dc;     /* Soft pressed paper / hover state */
 
-  --border-dim: #cbd5e1;     /* Slate 300 - clear, visible borders */
-  --border-default: #94a3b8; /* Slate 400 - distinct boundaries */
-  --border-strong: #475569;  /* Pronounced outlines */
+  --border-dim: #e4decfa0;   /* Delicate ruled pencil line */
+  --border-default: #d3ccbd; /* Crisp paper boundary */
+  --border-strong: #8c826e;  /* Deep structural ink rule */
 
-  --text-primary: #0f172a;   /* Rich slate 900 */
-  --text-secondary: #334155; /* Slate 700 */
-  --text-tertiary: #64748b;  /* Slate 500 */
+  --text-primary: #181714;   /* Deep soot & iron gall black ink - ultra-crisp */
+  --text-secondary: #48453d; /* Sepia-toned charcoal ink */
+  --text-tertiary: #7d786d;  /* Muted wash ink */
 
-  --accent: #4f46e5;         /* Premium Indigo accent */
-  --accent-dim: rgba(79, 70, 229, 0.08);
-  --accent-mid: rgba(79, 70, 229, 0.16);
+  --accent: #b83a28;         /* Editorial vermilion / sealing wax terracotta */
+  --accent-dim: rgba(184, 58, 40, 0.08);
+  --accent-mid: rgba(184, 58, 40, 0.16);
   --accent-contrast: #ffffff;
 
-  --font-sans: "Plus Jakarta Sans", "Inter", ui-sans-serif, system-ui, -apple-system, sans-serif;
-  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+  --color-positive: #166534; /* Rich forest bookcloth green - deep readability */
+  --color-positive-dim: rgba(22, 101, 52, 0.09);
+  --color-warning: #b45309;  /* Burnt ochre / amber seal */
+  --color-warning-dim: rgba(180, 83, 9, 0.09);
+  --color-negative: #b91c1c; /* Crimson vermilion ink */
+  --color-negative-dim: rgba(185, 28, 28, 0.09);
+  --color-info: #0369a1;     /* Deep sapphire ink */
+  --color-info-dim: rgba(3, 105, 161, 0.09);
+  --color-neutral: #6b665c;
+
+  --font-sans: "DM Sans", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-serif: "Newsreader", Garamond, Georgia, serif;
+  --font-display: "Newsreader", Garamond, Georgia, serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, monospace;
 }
 
 body {
   background-color: var(--bg-base);
   color: var(--text-primary);
   font-family: var(--font-sans);
-  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  font-feature-settings: "cv02", "cv03", "cv04", "cv11", "ss01";
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 /* Custom Typography Utility classes */
+.font-display {
+  font-family: var(--font-display);
+}
+
+.font-serif {
+  font-family: var(--font-serif);
+}
+
 .metric-value {
   font-family: var(--font-mono);
   font-size: 26px;
   font-weight: 500;
-  letter-spacing: -0.04em;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
   color: var(--text-primary);
   line-height: 1;
 }
@@ -113,7 +153,7 @@ body {
   font-family: var(--font-sans);
   font-size: 10px;
   font-weight: 600;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--text-secondary);
 }
@@ -122,6 +162,7 @@ body {
   font-family: var(--font-mono);
   font-size: 13px;
   font-weight: 400;
+  font-variant-numeric: tabular-nums;
   color: var(--text-primary);
 }
 
@@ -129,7 +170,7 @@ body {
   font-family: var(--font-sans);
   font-size: 10px;
   font-weight: 600;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--text-secondary);
 }

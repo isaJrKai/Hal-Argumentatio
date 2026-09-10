@@ -18,6 +18,9 @@ Help users make better business decisions through memory, reasoning, planning, e
 * **Modularity**: Build components as isolated, single-responsibility services.
 * **Evidence-based recommendations**: Do not fabricate insights. Gather active website, reputation, and geo data.
 * **Continuous learning**: Calibrate system weights automatically after every completed campaign.
+* **Constrain the tools, not the behavior**: Never hardcode rigid, brittle workflows. Hand the agent the instruments a junior hire at that desk would actually use (Document Studio, phone, calendar, audit tools, customer notes). Let workflows emerge naturally through collaboration with the operator.
+* **The Apprenticeship Loop**: The operator teaches the agent through natural corrections in plain language, exactly like sitting next to a new employee. Corrections are permanently committed to memory as business heuristics.
+* **Break the Integration Wall**: Provide pre-wired, zero-code connection bridges to WhatsApp, Email, Calendars, and Documents so non-technical operators experience immediate execution.
 
 ### North Star
 HAL is a Business Operating Intelligence Platform, not just a chatbot or CRM.

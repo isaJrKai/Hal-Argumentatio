@@ -124,8 +124,8 @@ export default function SettingsPanel({
 
   const handleCampaignReset = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (resetConfirm.trim().toUpperCase() !== resetCity.trim().toUpperCase()) {
-      setResetError(`Verification code mismatch. Please type "${resetCity.toUpperCase()}" exactly in ALL CAPS to confirm reset.`);
+    if ((resetConfirm || '').trim().toUpperCase() !== (resetCity || '').trim().toUpperCase()) {
+      setResetError(`Verification code mismatch. Please type "${(resetCity || '').toUpperCase()}" exactly in ALL CAPS to confirm reset.`);
       return;
     }
 
@@ -304,10 +304,10 @@ export default function SettingsPanel({
         },
         body: JSON.stringify({ service, keyVal })
       });
-      setConnectorKeySuccess(`Successfully saved API credentials for ${service.toUpperCase()} to backend database.`);
+      setConnectorKeySuccess(`Successfully saved API credentials for ${(service || '').toUpperCase()} to backend database.`);
     } catch (err) {
       console.error('Failed to save connector key to backend', err);
-      setConnectorKeySuccess(`Updated ${service.toUpperCase()} locally (backend sync failed).`);
+      setConnectorKeySuccess(`Updated ${(service || '').toUpperCase()} locally (backend sync failed).`);
     }
     setTimeout(() => setConnectorKeySuccess(null), 4000);
   };
@@ -430,7 +430,7 @@ export default function SettingsPanel({
               >
                 {supportedNiches.map((n) => (
                   <option key={n} value={n}>
-                    {n.toUpperCase()}
+                    {(n || '').toUpperCase()}
                   </option>
                 ))}
               </select>
@@ -461,7 +461,7 @@ export default function SettingsPanel({
                 TARGET CITY / TERRITORY
               </label>
               <span className="text-[10px] text-text-dim flex items-center gap-1">
-                <Globe className="w-3 h-3" /> ACTIVE: {activeCity.toUpperCase()}
+                <Globe className="w-3 h-3" /> ACTIVE: {(activeCity || '').toUpperCase()}
               </span>
             </div>
 
@@ -476,7 +476,7 @@ export default function SettingsPanel({
               >
                 {supportedCities.map((c) => (
                   <option key={c} value={c}>
-                    {c.toUpperCase()}
+                    {(c || '').toUpperCase()}
                   </option>
                 ))}
               </select>
@@ -1402,14 +1402,14 @@ export default function SettingsPanel({
 
             <div className="space-y-1 pt-1">
               <label className="block text-[9px] font-mono uppercase tracking-wider font-bold opacity-80 text-inherit">
-                To confirm reset, type the target city name in ALL CAPS (<strong className="text-red-400">"{resetCity.toUpperCase()}"</strong>):
+                To confirm reset, type the target city name in ALL CAPS (<strong className="text-red-400">"{(resetCity || '').toUpperCase()}"</strong>):
               </label>
               <input
                 type="text"
                 required
                 value={resetConfirm}
                 onChange={(e) => setResetConfirm(e.target.value)}
-                placeholder={`Type "${resetCity.toUpperCase()}"`}
+                placeholder={`Type "${(resetCity || '').toUpperCase()}"`}
                 className={`w-full border rounded p-2 focus:outline-none focus:border-red-500 text-inherit font-mono uppercase tracking-wider ${innerBg} border-red-500/30`}
               />
             </div>

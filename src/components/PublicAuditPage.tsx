@@ -134,26 +134,26 @@ export default function PublicAuditPage({ auditId, onNavigateToLogin }: PublicAu
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#090b10] text-slate-200 flex flex-col items-center justify-center p-6 font-sans">
+      <div className="min-h-screen bg-bg-base text-text-primary flex flex-col items-center justify-center p-6 font-sans">
         <div className="w-12 h-12 rounded-full border-2 border-indigo-500/30 border-t-indigo-500 animate-spin mb-4" />
-        <p className="text-sm font-mono text-slate-400 uppercase tracking-widest">Loading Technical Performance Audit...</p>
+        <p className="text-sm font-mono text-text-secondary uppercase tracking-widest">Loading Technical Performance Audit...</p>
       </div>
     );
   }
 
   if (error || !data) {
     return (
-      <div className="min-h-screen bg-[#090b10] text-slate-200 flex flex-col items-center justify-center p-6 font-sans">
-        <div className="max-w-md w-full bg-[#11141d] border border-slate-800 rounded-xl p-8 text-center space-y-4 shadow-2xl">
+      <div className="min-h-screen bg-bg-base text-text-primary flex flex-col items-center justify-center p-6 font-sans">
+        <div className="max-w-md w-full bg-bg-raised border border-border-dim rounded-xl p-8 text-center space-y-4 shadow-2xl">
           <div className="w-12 h-12 rounded-full bg-red-500/10 border border-red-500/20 text-red-400 mx-auto flex items-center justify-center">
             <AlertTriangle className="w-6 h-6" />
           </div>
-          <h2 className="text-lg font-bold text-white">Audit Link Expired or Unavailable</h2>
-          <p className="text-xs text-slate-400 leading-relaxed">{error || 'This report may have been archived.'}</p>
+          <h2 className="text-lg font-bold text-text-primary">Audit Link Expired or Unavailable</h2>
+          <p className="text-xs text-text-secondary leading-relaxed">{error || 'This report may have been archived.'}</p>
           {onNavigateToLogin && (
             <button
               onClick={onNavigateToLogin}
-              className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-xs font-mono text-slate-300 rounded-md transition-colors"
+              className="px-4 py-2 bg-bg-subtle hover:bg-bg-raised text-xs font-mono text-text-secondary hover:text-text-primary border border-border-dim rounded-md transition-colors"
             >
               Go to Workspace Login
             </button>
@@ -164,20 +164,20 @@ export default function PublicAuditPage({ auditId, onNavigateToLogin }: PublicAu
   }
 
   return (
-    <div className="min-h-screen bg-[#07090e] text-slate-100 font-sans selection:bg-indigo-500/30 selection:text-white pb-20">
+    <div className="min-h-screen bg-bg-base text-text-primary font-sans selection:bg-indigo-500/30 selection:text-white pb-20">
       
       {/* TOP AGENCY BRAND HEADER */}
-      <header className="border-b border-slate-800/80 bg-[#0c0f17]/90 backdrop-blur-md sticky top-0 z-40 px-4 sm:px-8 py-3.5 flex items-center justify-between">
+      <header className="border-b border-border-dim bg-bg-raised/90 backdrop-blur-md sticky top-0 z-40 px-4 sm:px-8 py-3.5 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div 
             className="w-3.5 h-3.5 rounded-sm shrink-0" 
             style={{ backgroundColor: brandColor }}
           />
           <div>
-            <span className="text-xs font-mono font-bold tracking-tight text-white uppercase block">
+            <span className="text-xs font-mono font-bold tracking-tight text-text-primary uppercase block">
               {workspaceConfig.agencyName}
             </span>
-            <span className="text-[10px] font-mono text-slate-400 hidden sm:block">
+            <span className="text-[10px] font-mono text-text-secondary hidden sm:block">
               {workspaceConfig.tagline}
             </span>
           </div>
@@ -187,7 +187,7 @@ export default function PublicAuditPage({ auditId, onNavigateToLogin }: PublicAu
           {workspaceConfig.contactPhone && (
             <a 
               href={`tel:${workspaceConfig.contactPhone.replace(/[^0-9]/g, '')}`}
-              className="text-xs font-mono text-slate-300 hover:text-white flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-slate-800/60 border border-slate-700/60 transition-colors"
+              className="text-xs font-mono text-text-secondary hover:text-text-primary flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-bg-subtle border border-border-dim transition-colors"
             >
               <Phone className="w-3.5 h-3.5 text-indigo-400" />
               <span className="hidden md:inline">{workspaceConfig.contactPhone}</span>
@@ -216,11 +216,11 @@ export default function PublicAuditPage({ auditId, onNavigateToLogin }: PublicAu
             <Sparkles className="w-3.5 h-3.5" />
             <span>Executive Digital & Speed Assessment</span>
           </div>
-          <h1 className="text-2xl sm:text-4xl font-extrabold tracking-tight text-white uppercase font-mono">
+          <h1 className="text-2xl sm:text-4xl font-extrabold tracking-tight text-text-primary uppercase font-mono">
             {data.businessName}
           </h1>
-          <p className="text-xs sm:text-sm text-slate-400 max-w-xl mx-auto font-mono">
-            Prepared exclusively for <strong className="text-slate-200">{data.businessName}</strong> in <strong className="text-slate-200">{data.city}</strong>.
+          <p className="text-xs sm:text-sm text-text-secondary max-w-xl mx-auto font-mono">
+            Prepared exclusively for <strong className="text-text-primary">{data.businessName}</strong> in <strong className="text-text-primary">{data.city}</strong>.
             {data.websiteUrl && ` Evaluated on site URL: ${data.websiteUrl}`}
           </p>
         </div>
@@ -229,43 +229,43 @@ export default function PublicAuditPage({ auditId, onNavigateToLogin }: PublicAu
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           
           {/* Mobile Speed Score */}
-          <div className="bg-[#0f131d] border border-slate-800 rounded-xl p-5 space-y-3 relative overflow-hidden">
+          <div className="bg-bg-raised border border-border-dim rounded-xl p-5 space-y-3 relative overflow-hidden">
             <div className="flex justify-between items-start">
-              <span className="text-[10px] font-mono uppercase tracking-wider text-slate-400 font-bold">Mobile Speed</span>
+              <span className="text-[10px] font-mono uppercase tracking-wider text-text-secondary font-bold">Mobile Speed</span>
               <Zap className={`w-4 h-4 ${data.performanceScore >= 70 ? 'text-emerald-400' : data.performanceScore >= 50 ? 'text-amber-400' : 'text-rose-400'}`} />
             </div>
             <div className="flex items-baseline gap-2">
               <span className={`text-3xl font-extrabold font-mono ${data.performanceScore >= 70 ? 'text-emerald-400' : data.performanceScore >= 50 ? 'text-amber-400' : 'text-rose-400'}`}>
                 {data.performanceScore}
               </span>
-              <span className="text-xs text-slate-500 font-mono">/ 100</span>
+              <span className="text-xs text-text-tertiary font-mono">/ 100</span>
             </div>
-            <p className="text-[11px] text-slate-400 leading-snug">
+            <p className="text-[11px] text-text-secondary leading-snug">
               {data.performanceScore < 60 ? 'High mobile bounce risk. Heavy friction on smartphones.' : 'Acceptable mobile load speed benchmark.'}
             </p>
           </div>
 
           {/* Technical SEO Score */}
-          <div className="bg-[#0f131d] border border-slate-800 rounded-xl p-5 space-y-3 relative overflow-hidden">
+          <div className="bg-bg-raised border border-border-dim rounded-xl p-5 space-y-3 relative overflow-hidden">
             <div className="flex justify-between items-start">
-              <span className="text-[10px] font-mono uppercase tracking-wider text-slate-400 font-bold">Search Visibility</span>
+              <span className="text-[10px] font-mono uppercase tracking-wider text-text-secondary font-bold">Search Visibility</span>
               <Globe className={`w-4 h-4 ${data.seoScore >= 70 ? 'text-emerald-400' : 'text-amber-400'}`} />
             </div>
             <div className="flex items-baseline gap-2">
               <span className={`text-3xl font-extrabold font-mono ${data.seoScore >= 70 ? 'text-emerald-400' : 'text-amber-400'}`}>
                 {data.seoScore}
               </span>
-              <span className="text-xs text-slate-500 font-mono">/ 100</span>
+              <span className="text-xs text-text-tertiary font-mono">/ 100</span>
             </div>
-            <p className="text-[11px] text-slate-400 leading-snug">
+            <p className="text-[11px] text-text-secondary leading-snug">
               Local indexing and search keyword ranking strength in {data.city}.
             </p>
           </div>
 
           {/* SSL Trust */}
-          <div className="bg-[#0f131d] border border-slate-800 rounded-xl p-5 space-y-3 relative overflow-hidden">
+          <div className="bg-bg-raised border border-border-dim rounded-xl p-5 space-y-3 relative overflow-hidden">
             <div className="flex justify-between items-start">
-              <span className="text-[10px] font-mono uppercase tracking-wider text-slate-400 font-bold">Security Lock</span>
+              <span className="text-[10px] font-mono uppercase tracking-wider text-text-secondary font-bold">Security Lock</span>
               {data.sslStatus === 'secured' ? <ShieldCheck className="w-4 h-4 text-emerald-400" /> : <AlertTriangle className="w-4 h-4 text-rose-400" />}
             </div>
             <div className="flex items-baseline gap-2">
@@ -273,24 +273,24 @@ export default function PublicAuditPage({ auditId, onNavigateToLogin }: PublicAu
                 {data.sslStatus}
               </span>
             </div>
-            <p className="text-[11px] text-slate-400 leading-snug">
+            <p className="text-[11px] text-text-secondary leading-snug">
               {data.sslStatus === 'secured' ? 'Verified HTTPS SSL encryption lock active.' : 'Browser security warning flag active.'}
             </p>
           </div>
 
           {/* Reputation & Google Reviews */}
-          <div className="bg-[#0f131d] border border-slate-800 rounded-xl p-5 space-y-3 relative overflow-hidden">
+          <div className="bg-bg-raised border border-border-dim rounded-xl p-5 space-y-3 relative overflow-hidden">
             <div className="flex justify-between items-start">
-              <span className="text-[10px] font-mono uppercase tracking-wider text-slate-400 font-bold">Google Rating</span>
+              <span className="text-[10px] font-mono uppercase tracking-wider text-text-secondary font-bold">Google Rating</span>
               <Star className="w-4 h-4 text-amber-400 fill-amber-400" />
             </div>
             <div className="flex items-baseline gap-2">
-              <span className="text-3xl font-extrabold font-mono text-white">
+              <span className="text-3xl font-extrabold font-mono text-text-primary">
                 {data.googleRating}
               </span>
-              <span className="text-xs text-slate-400 font-mono">({data.reviewCount} reviews)</span>
+              <span className="text-xs text-text-tertiary font-mono">({data.reviewCount} reviews)</span>
             </div>
-            <p className="text-[11px] text-slate-400 leading-snug">
+            <p className="text-[11px] text-text-secondary leading-snug">
               Verified public customer feedback & reputation index.
             </p>
           </div>
@@ -298,20 +298,20 @@ export default function PublicAuditPage({ auditId, onNavigateToLogin }: PublicAu
         </div>
 
         {/* INTERACTIVE LOST REVENUE OPPORTUNITY CALCULATOR */}
-        <div className="bg-gradient-to-b from-[#111522] to-[#0c0f17] border border-indigo-500/30 rounded-2xl p-6 sm:p-8 space-y-6 shadow-xl">
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 border-b border-slate-800 pb-5">
+        <div className="bg-bg-raised border border-indigo-500/30 rounded-2xl p-6 sm:p-8 space-y-6 shadow-xl">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 border-b border-border-dim pb-5">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-lg bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 flex items-center justify-center shrink-0">
                 <Calculator className="w-5 h-5" />
               </div>
               <div>
-                <h2 className="text-lg font-mono font-bold text-white uppercase">Interactive Revenue Leakage Calculator</h2>
-                <p className="text-xs text-slate-400 font-mono">Adjust values below to simulate estimated lost clients due to website latency</p>
+                <h2 className="text-lg font-mono font-bold text-text-primary uppercase">Interactive Revenue Leakage Calculator</h2>
+                <p className="text-xs text-text-secondary font-mono">Adjust values below to simulate estimated lost clients due to website latency</p>
               </div>
             </div>
 
             <div className="text-left sm:text-right font-mono">
-              <span className="text-[10px] text-slate-400 uppercase block">Estimated Leaking Revenue</span>
+              <span className="text-[10px] text-text-secondary uppercase block">Estimated Leaking Revenue</span>
               <span className="text-2xl font-black text-rose-400 tracking-tight">
                 -${estimatedAnnualLostRevenue.toLocaleString()} / year
               </span>
@@ -321,9 +321,9 @@ export default function PublicAuditPage({ auditId, onNavigateToLogin }: PublicAu
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             
             {/* Input 1: Monthly Website Traffic */}
-            <div className="space-y-3 bg-[#090b10] border border-slate-800/80 p-4 rounded-xl">
+            <div className="space-y-3 bg-bg-base border border-border-dim p-4 rounded-xl">
               <div className="flex justify-between items-center text-xs font-mono">
-                <span className="text-slate-300 font-semibold">Estimated Monthly Site Visitors:</span>
+                <span className="text-text-primary font-semibold">Estimated Monthly Site Visitors:</span>
                 <span className="text-indigo-400 font-bold">{monthlyVisitors.toLocaleString()} visits</span>
               </div>
               <input 
@@ -335,7 +335,7 @@ export default function PublicAuditPage({ auditId, onNavigateToLogin }: PublicAu
                 onChange={(e) => setMonthlyVisitors(Number(e.target.value))}
                 className="w-full accent-indigo-500 cursor-pointer"
               />
-              <div className="flex justify-between text-[10px] font-mono text-slate-500">
+              <div className="flex justify-between text-[10px] font-mono text-text-tertiary">
                 <span>200</span>
                 <span>5,000</span>
                 <span>10,000+</span>
@@ -343,9 +343,9 @@ export default function PublicAuditPage({ auditId, onNavigateToLogin }: PublicAu
             </div>
 
             {/* Input 2: Average Project / Contract Value */}
-            <div className="space-y-3 bg-[#090b10] border border-slate-800/80 p-4 rounded-xl">
+            <div className="space-y-3 bg-bg-base border border-border-dim p-4 rounded-xl">
               <div className="flex justify-between items-center text-xs font-mono">
-                <span className="text-slate-300 font-semibold">Average Job / Project Ticket Size:</span>
+                <span className="text-text-primary font-semibold">Average Job / Project Ticket Size:</span>
                 <span className="text-emerald-400 font-bold">${avgTicketValue.toLocaleString()}</span>
               </div>
               <input 
@@ -357,7 +357,7 @@ export default function PublicAuditPage({ auditId, onNavigateToLogin }: PublicAu
                 onChange={(e) => setAvgTicketValue(Number(e.target.value))}
                 className="w-full accent-emerald-500 cursor-pointer"
               />
-              <div className="flex justify-between text-[10px] font-mono text-slate-500">
+              <div className="flex justify-between text-[10px] font-mono text-text-tertiary">
                 <span>$500</span>
                 <span>$10,000</span>
                 <span>$25,000+</span>
@@ -367,12 +367,12 @@ export default function PublicAuditPage({ auditId, onNavigateToLogin }: PublicAu
           </div>
 
           {/* Outcome highlight banner */}
-          <div className="bg-[#090b10]/90 border border-slate-800 p-4 rounded-xl flex flex-col sm:flex-row items-center justify-between gap-4 font-mono text-xs">
+          <div className="bg-bg-base border border-border-dim p-4 rounded-xl flex flex-col sm:flex-row items-center justify-between gap-4 font-mono text-xs">
             <div className="space-y-1 text-center sm:text-left">
-              <p className="text-slate-200">
+              <p className="text-text-primary">
                 At your current performance score ({data.performanceScore}/100), approximately <strong className="text-rose-400">{Math.round(bouncePenaltyPct * 100)}% of mobile visitors</strong> bounce before seeing your contact phone or quote form.
               </p>
-              <p className="text-[11px] text-slate-400">
+              <p className="text-[11px] text-text-secondary">
                 Recovering just <strong className="text-emerald-400">{estimatedLostLeadsPerMonth} missed contracts/month</strong> yields <strong className="text-emerald-400">+${(estimatedLostLeadsPerMonth * avgTicketValue).toLocaleString()}</strong> in gross revenue.
               </p>
             </div>
@@ -388,51 +388,51 @@ export default function PublicAuditPage({ auditId, onNavigateToLogin }: PublicAu
         </div>
 
         {/* STRATEGIC VALUE & RECOMMENDATION */}
-        <div className="bg-[#0f131d] border border-slate-800 rounded-2xl p-6 sm:p-8 space-y-6">
-          <div className="flex items-center gap-2 border-b border-slate-800 pb-4">
+        <div className="bg-bg-raised border border-border-dim rounded-2xl p-6 sm:p-8 space-y-6">
+          <div className="flex items-center gap-2 border-b border-border-dim pb-4">
             <Award className="w-5 h-5 text-indigo-400" />
-            <h3 className="text-base font-mono font-bold text-white uppercase tracking-tight">
+            <h3 className="text-base font-mono font-bold text-text-primary uppercase tracking-tight">
               Recommended Optimization Strategy for {data.city}
             </h3>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 font-mono text-xs">
-            <div className="p-4 bg-[#090b10] border border-slate-800/80 rounded-xl space-y-2">
+            <div className="p-4 bg-bg-base border border-border-dim rounded-xl space-y-2">
               <div className="flex items-center gap-2 text-emerald-400 font-bold">
                 <CheckCircle2 className="w-4 h-4 shrink-0" />
                 <span>1. Core Web Vitals & Mobile Speed Fix</span>
               </div>
-              <p className="text-[11px] text-slate-400 leading-relaxed">
+              <p className="text-[11px] text-text-secondary leading-relaxed">
                 Compress hero imagery, defer blocking scripts, and load page styles within 1.2 seconds to satisfy Google's mobile ranking algorithm.
               </p>
             </div>
 
-            <div className="p-4 bg-[#090b10] border border-slate-800/80 rounded-xl space-y-2">
+            <div className="p-4 bg-bg-base border border-border-dim rounded-xl space-y-2">
               <div className="flex items-center gap-2 text-emerald-400 font-bold">
                 <CheckCircle2 className="w-4 h-4 shrink-0" />
                 <span>2. Instant Click-to-Call & Quote Friction</span>
               </div>
-              <p className="text-[11px] text-slate-400 leading-relaxed">
+              <p className="text-[11px] text-text-secondary leading-relaxed">
                 Add persistent 1-tap emergency calling and high-converting 2-step estimate forms for local homeowners searching on mobile.
               </p>
             </div>
 
-            <div className="p-4 bg-[#090b10] border border-slate-800/80 rounded-xl space-y-2">
+            <div className="p-4 bg-bg-base border border-border-dim rounded-xl space-y-2">
               <div className="flex items-center gap-2 text-emerald-400 font-bold">
                 <CheckCircle2 className="w-4 h-4 shrink-0" />
                 <span>3. Local Map Pack & Reputation Sync</span>
               </div>
-              <p className="text-[11px] text-slate-400 leading-relaxed">
+              <p className="text-[11px] text-text-secondary leading-relaxed">
                 Optimize Google My Business category tags, local schema markup, and showcase recent 5-star customer reviews directly in search previews.
               </p>
             </div>
 
-            <div className="p-4 bg-[#090b10] border border-slate-800/80 rounded-xl space-y-2">
+            <div className="p-4 bg-bg-base border border-border-dim rounded-xl space-y-2">
               <div className="flex items-center gap-2 text-emerald-400 font-bold">
                 <CheckCircle2 className="w-4 h-4 shrink-0" />
                 <span>4. Automated Lead Notification Router</span>
               </div>
-              <p className="text-[11px] text-slate-400 leading-relaxed">
+              <p className="text-[11px] text-text-secondary leading-relaxed">
                 Send incoming quote inquiries directly to your team's mobile via instant SMS dispatch to close jobs before competitors respond.
               </p>
             </div>
@@ -440,14 +440,14 @@ export default function PublicAuditPage({ auditId, onNavigateToLogin }: PublicAu
         </div>
 
         {/* BOOKING / ACTION CTA BOX */}
-        <div className="bg-gradient-to-r from-indigo-950/40 via-slate-900 to-indigo-950/40 border-2 border-indigo-500/40 rounded-2xl p-8 text-center space-y-5">
+        <div className="bg-bg-raised border-2 border-indigo-500/40 rounded-2xl p-8 text-center space-y-5">
           <span className="text-[10px] font-mono uppercase tracking-widest text-indigo-400 font-bold block">
             Next Action Step
           </span>
-          <h2 className="text-xl sm:text-3xl font-extrabold font-mono text-white uppercase">
+          <h2 className="text-xl sm:text-3xl font-extrabold font-mono text-text-primary uppercase">
             Schedule a 15-Minute Technical Review Call
           </h2>
-          <p className="text-xs sm:text-sm text-slate-300 max-w-lg mx-auto font-mono leading-relaxed">
+          <p className="text-xs sm:text-sm text-text-secondary max-w-lg mx-auto font-mono leading-relaxed">
             We will walk through your live site architecture, show the exact scripts causing mobile lag, and outline a simple fix plan.
           </p>
 
@@ -466,27 +466,27 @@ export default function PublicAuditPage({ auditId, onNavigateToLogin }: PublicAu
 
             <button
               onClick={() => setShowBookingModal(true)}
-              className="w-full sm:w-auto px-6 py-3 rounded-xl font-mono font-bold text-slate-200 hover:text-white bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs transition-colors cursor-pointer flex items-center justify-center gap-2"
+              className="w-full sm:w-auto px-6 py-3 rounded-xl font-mono font-bold text-text-primary bg-bg-subtle hover:bg-bg-base border border-border-dim text-xs transition-colors cursor-pointer flex items-center justify-center gap-2"
             >
               <Mail className="w-4 h-4 text-indigo-400" />
               <span>Request Callback / Written Fix Plan</span>
             </button>
           </div>
 
-          <p className="text-[10px] font-mono text-slate-500">
+          <p className="text-[10px] font-mono text-text-tertiary">
             No long-term contracts. Transparent performance-driven execution.
           </p>
         </div>
 
         {/* FOOTER */}
-        <footer className="pt-8 border-t border-slate-800/80 text-center font-mono text-xs text-slate-500 space-y-2">
+        <footer className="pt-8 border-t border-border-dim text-center font-mono text-xs text-text-tertiary space-y-2">
           <p>© {new Date().getFullYear()} {workspaceConfig.agencyName}. All Rights Reserved.</p>
           <p className="text-[10px]">Confidential Business Performance Audit prepared by {workspaceConfig.operatorName}.</p>
           {onNavigateToLogin && (
             <div className="pt-3">
               <button
                 onClick={onNavigateToLogin}
-                className="text-[10px] text-slate-600 hover:text-slate-400 transition-colors underline"
+                className="text-[10px] text-text-tertiary hover:text-text-secondary transition-colors underline"
               >
                 Operator Workspace Login
               </button>
@@ -499,16 +499,16 @@ export default function PublicAuditPage({ auditId, onNavigateToLogin }: PublicAu
       {/* QUICK PROSPECT REQUEST / BOOKING MODAL */}
       {showBookingModal && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="max-w-md w-full bg-[#0e121b] border border-slate-800 rounded-2xl p-6 space-y-5 shadow-2xl relative">
+          <div className="max-w-md w-full bg-bg-raised border border-border-dim rounded-2xl p-6 space-y-5 shadow-2xl relative text-text-primary">
             
-            <div className="flex justify-between items-center border-b border-slate-800 pb-3">
+            <div className="flex justify-between items-center border-b border-border-dim pb-3">
               <div>
-                <h3 className="text-sm font-mono font-bold text-white uppercase">Request Strategy Session</h3>
-                <p className="text-[10px] font-mono text-slate-400">For {data.businessName}</p>
+                <h3 className="text-sm font-mono font-bold text-text-primary uppercase">Request Strategy Session</h3>
+                <p className="text-[10px] font-mono text-text-secondary">For {data.businessName}</p>
               </div>
               <button 
                 onClick={() => setShowBookingModal(false)}
-                className="text-slate-400 hover:text-white font-mono text-xs"
+                className="text-text-secondary hover:text-text-primary font-mono text-xs"
               >
                 [CLOSE]
               </button>
@@ -519,13 +519,13 @@ export default function PublicAuditPage({ auditId, onNavigateToLogin }: PublicAu
                 <div className="w-12 h-12 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 mx-auto flex items-center justify-center">
                   <Check className="w-6 h-6 stroke-[3]" />
                 </div>
-                <h4 className="text-sm font-bold text-white">Request Received!</h4>
-                <p className="text-xs text-slate-400 leading-relaxed">
+                <h4 className="text-sm font-bold text-text-primary">Request Received!</h4>
+                <p className="text-xs text-text-secondary leading-relaxed">
                   Our technical advisor will reach out to confirm your session and send the complete speed audit brief.
                 </p>
                 <button
                   onClick={() => setShowBookingModal(false)}
-                  className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-xs text-white rounded-lg transition-colors mt-2"
+                  className="px-4 py-2 bg-bg-subtle hover:bg-bg-base text-xs text-text-primary border border-border-dim rounded-lg transition-colors mt-2"
                 >
                   Done
                 </button>
@@ -533,47 +533,47 @@ export default function PublicAuditPage({ auditId, onNavigateToLogin }: PublicAu
             ) : (
               <form onSubmit={handleBookingSubmit} className="space-y-4 font-mono text-xs">
                 <div className="space-y-1">
-                  <label className="text-[10px] text-slate-400 uppercase font-bold">Your Name / Title</label>
+                  <label className="text-[10px] text-text-secondary uppercase font-bold">Your Name / Title</label>
                   <input
                     type="text"
                     required
                     value={bookingName}
                     onChange={(e) => setBookingName(e.target.value)}
                     placeholder="e.g. John Doe, Owner"
-                    className="w-full bg-[#080a0f] border border-slate-800 rounded-lg p-2.5 text-white focus:outline-none focus:border-indigo-500"
+                    className="w-full bg-bg-base border border-border-dim rounded-lg p-2.5 text-text-primary focus:outline-none focus:border-indigo-500"
                   />
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1">
-                    <label className="text-[10px] text-slate-400 uppercase font-bold">Phone Number</label>
+                    <label className="text-[10px] text-text-secondary uppercase font-bold">Phone Number</label>
                     <input
                       type="tel"
                       required
                       value={bookingPhone}
                       onChange={(e) => setBookingPhone(e.target.value)}
                       placeholder="(204) 555-0199"
-                      className="w-full bg-[#080a0f] border border-slate-800 rounded-lg p-2.5 text-white focus:outline-none focus:border-indigo-500"
+                      className="w-full bg-bg-base border border-border-dim rounded-lg p-2.5 text-text-primary focus:outline-none focus:border-indigo-500"
                     />
                   </div>
                   <div className="space-y-1">
-                    <label className="text-[10px] text-slate-400 uppercase font-bold">Work Email</label>
+                    <label className="text-[10px] text-text-secondary uppercase font-bold">Work Email</label>
                     <input
                       type="email"
                       value={bookingEmail}
                       onChange={(e) => setBookingEmail(e.target.value)}
                       placeholder="owner@company.com"
-                      className="w-full bg-[#080a0f] border border-slate-800 rounded-lg p-2.5 text-white focus:outline-none focus:border-indigo-500"
+                      className="w-full bg-bg-base border border-border-dim rounded-lg p-2.5 text-text-primary focus:outline-none focus:border-indigo-500"
                     />
                   </div>
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-[10px] text-slate-400 uppercase font-bold">Preferred Time Window</label>
+                  <label className="text-[10px] text-text-secondary uppercase font-bold">Preferred Time Window</label>
                   <select
                     value={bookingTime}
                     onChange={(e) => setBookingTime(e.target.value)}
-                    className="w-full bg-[#080a0f] border border-slate-800 rounded-lg p-2.5 text-slate-300 focus:outline-none focus:border-indigo-500 font-mono"
+                    className="w-full bg-bg-base border border-border-dim rounded-lg p-2.5 text-text-primary focus:outline-none focus:border-indigo-500 font-mono"
                   >
                     <option value="Tomorrow Morning (9:00 AM - 12:00 PM)">Tomorrow Morning (9:00 AM - 12:00 PM)</option>
                     <option value="Tomorrow Afternoon (1:00 PM - 5:00 PM)">Tomorrow Afternoon (1:00 PM - 5:00 PM)</option>
@@ -583,13 +583,13 @@ export default function PublicAuditPage({ auditId, onNavigateToLogin }: PublicAu
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-[10px] text-slate-400 uppercase font-bold">Specific Website Questions (Optional)</label>
+                  <label className="text-[10px] text-text-secondary uppercase font-bold">Specific Website Questions (Optional)</label>
                   <textarea
                     rows={2}
                     value={bookingMessage}
                     onChange={(e) => setBookingMessage(e.target.value)}
                     placeholder="e.g. Would like to fix mobile load time and get more quotes from homeowners in Winnipeg."
-                    className="w-full bg-[#080a0f] border border-slate-800 rounded-lg p-2.5 text-white focus:outline-none focus:border-indigo-500 text-xs"
+                    className="w-full bg-bg-base border border-border-dim rounded-lg p-2.5 text-text-primary focus:outline-none focus:border-indigo-500 text-xs"
                   />
                 </div>
 

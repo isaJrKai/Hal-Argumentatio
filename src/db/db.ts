@@ -207,6 +207,52 @@ export interface SystemAuditLog {
   createdAt: string;
 }
 
+// ─── HAL Roadmap Phase 1 (Foundation): Cryptographic Structured Ledger ───────
+export interface StructuredLedgerEntry {
+  id: string;
+  contractorId: string;
+  sequenceNumber: number;
+  eventType: 
+    | 'lead_captured' 
+    | 'crm_transition' 
+    | 'recommendation_proposed' 
+    | 'recommendation_approved' 
+    | 'recommendation_executed' 
+    | 'conversion_outbox' 
+    | 'revenue_recognized' 
+    | 'security_event' 
+    | 'pipeline_mutation'
+    | 'evidence_gathered'
+    | 'stage_transition'
+    | 'phase2_verification_audit'
+    | 'competitor_audit_completed'
+    | 'lead_harvested'
+    | 'territory_harvest_completed'
+    | 'phase3_verification_audit'
+    | 'phase3_sequence_triggered'
+    | 'phase3_outbox_processed'
+    | 'phase3_live_dispatch'
+    | 'phase3_scheduler_executed'
+    | 'phase4_verification_audit'
+    | 'phase4_consensus_synthesized'
+    | 'phase4_weights_recalibrated'
+    | 'phase4_arbitrage_executed'
+    | 'phase5_verification_audit'
+    | 'phase5_brain_synced'
+    | 'phase5_regions_federated'
+    | 'phase5_ontology_propagated'
+    | 'genesis_block';
+  entityType: string;
+  entityId: string;
+  actor: string;
+  payloadHash: string;
+  prevHash: string;
+  entryHash: string;
+  details?: string;
+  metadata?: Record<string, any>;
+  createdAt: string;
+}
+
 export interface SchedulerJob {
   id: string;
   job: string;
@@ -342,6 +388,7 @@ interface DBStructure {
   apiKeys: ApiKey[];
   notifications: Notification[];
   systemAuditLogs: SystemAuditLog[];
+  structuredLedger?: StructuredLedgerEntry[];
   schedulerJobs: SchedulerJob[];
   missions: Mission[];
   chatMessages?: ChatMessageDb[];
@@ -364,8 +411,9 @@ function getEncryptionKey(): Buffer {
   return key;
 }
 
-// AES-256-GCM encryption
+// AES-256-GCM encryption - strictly fail-closed
 export function encrypt(text: string): string {
+  if (!text) return '';
   try {
     const key = getEncryptionKey();
     const iv = crypto.randomBytes(12);
@@ -376,7 +424,7 @@ export function encrypt(text: string): string {
     return `${iv.toString('hex')}:${encrypted}:${authTag}`;
   } catch (err) {
     console.error('Encryption failed:', err);
-    return text; // Fallback
+    throw new Error('PII Encryption failure: aborting to prevent plaintext data leakage.');
   }
 }
 
@@ -399,9 +447,10 @@ function decryptWithKey(encryptedText: string, key: Buffer): string | null {
   }
 }
 
-// AES-256-GCM decryption
+// AES-256-GCM decryption - strictly fail-closed
 export function decrypt(encryptedText: string): string {
-  if (!encryptedText || !encryptedText.includes(':')) return encryptedText;
+  if (!encryptedText) return '';
+  if (!encryptedText.includes(':')) return '';
 
   // 1. Try with the active derived encryption key
   try {
@@ -418,7 +467,7 @@ export function decrypt(encryptedText: string): string {
     if (result !== null) return result;
   } catch (err) {}
 
-  // 3. Try with the current env key unhashed if it was 32 bytes (in case it changed)
+  // 3. Try with the current env key unhashed if it was 32 bytes
   try {
     const b64 = process.env.LEAD_ENCRYPTION_KEY_B64;
     if (b64) {
@@ -430,7 +479,7 @@ export function decrypt(encryptedText: string): string {
     }
   } catch (err) {}
 
-  // 4. Try with default key hashed (in case it was hashed in any step)
+  // 4. Try with default key hashed
   try {
     const defaultB64 = 'Z01Xek1XOHpNVGczTnpBek1EUTFORFUxTkRVMU5EVTE=';
     const defaultKeyHashed = crypto.createHash('sha256').update(Buffer.from(defaultB64, 'base64')).digest();
@@ -438,8 +487,8 @@ export function decrypt(encryptedText: string): string {
     if (result !== null) return result;
   } catch (err) {}
 
-  console.error('Decryption failed for ciphertext:', encryptedText);
-  return encryptedText; // Fallback to raw ciphertext if all decryption attempts fail
+  // Fail closed - never return raw ciphertext or corrupted data
+  return '';
 }
 
 class Database {
@@ -461,6 +510,7 @@ class Database {
     apiKeys: [],
     notifications: [],
     systemAuditLogs: [],
+    structuredLedger: [],
     schedulerJobs: [],
     missions: [],
     chatMessages: [],
@@ -489,6 +539,20 @@ class Database {
       }
     } else {
       this.save();
+    }
+
+    // Ensure Phase 1 Genesis Block in Structured Ledger
+    if (!this.data.structuredLedger || this.data.structuredLedger.length === 0) {
+      this.data.structuredLedger = [];
+      this.recordLedgerEntry({
+        contractorId: 'system_genesis',
+        eventType: 'genesis_block',
+        entityType: 'system_architecture',
+        entityId: 'hal_foundation_phase1',
+        actor: 'HAL Constitution Engine',
+        details: 'Genesis Block initialized for HAL Roadmap Phase 1: Foundation (Structured Ledger, Secure Storage, Basic Pipeline)',
+        metadata: { version: '1.0.0', phase: 'Foundation', algorithm: 'SHA-256' }
+      });
     }
 
     if (this.data.contractors.length === 0) {
@@ -1533,6 +1597,123 @@ class Database {
     this.data.systemAuditLogs.push(newLog);
     this.save();
     return newLog;
+  }
+
+  // ─── HAL Roadmap Phase 1: Cryptographic Structured Ledger Methods ───────────
+  public getStructuredLedger(contractorId?: string, limit = 100): StructuredLedgerEntry[] {
+    if (!this.data.structuredLedger) {
+      this.data.structuredLedger = [];
+    }
+    let entries = this.data.structuredLedger;
+    if (contractorId) {
+      entries = entries.filter(e => e.contractorId === contractorId || e.contractorId === 'system_genesis');
+    }
+    return entries.slice(-limit).reverse();
+  }
+
+  public recordLedgerEntry(params: {
+    contractorId: string;
+    eventType: StructuredLedgerEntry['eventType'];
+    entityType: string;
+    entityId: string;
+    actor: string;
+    details?: string;
+    metadata?: Record<string, any>;
+  }): StructuredLedgerEntry {
+    if (!this.data.structuredLedger) {
+      this.data.structuredLedger = [];
+    }
+    
+    const entries = this.data.structuredLedger;
+    const sequenceNumber = entries.length + 1;
+    const prevHash = entries.length > 0 ? entries[entries.length - 1].entryHash : '0'.repeat(64);
+    
+    const payloadStr = JSON.stringify({
+      contractorId: params.contractorId,
+      eventType: params.eventType,
+      entityType: params.entityType,
+      entityId: params.entityId,
+      details: params.details || '',
+      metadata: params.metadata || {}
+    });
+    
+    const payloadHash = crypto.createHash('sha256').update(payloadStr).digest('hex');
+    const now = new Date().toISOString();
+    const id = 'led_' + crypto.randomBytes(8).toString('hex');
+    
+    const entryHash = crypto.createHash('sha256').update(
+      `${sequenceNumber}:${prevHash}:${payloadHash}:${params.actor}:${now}`
+    ).digest('hex');
+    
+    const newEntry: StructuredLedgerEntry = {
+      id,
+      contractorId: params.contractorId,
+      sequenceNumber,
+      eventType: params.eventType,
+      entityType: params.entityType,
+      entityId: params.entityId,
+      actor: params.actor,
+      payloadHash,
+      prevHash,
+      entryHash,
+      details: params.details,
+      metadata: params.metadata,
+      createdAt: now
+    };
+    
+    entries.push(newEntry);
+    this.save();
+    return newEntry;
+  }
+
+  public verifyLedgerIntegrity(contractorId?: string): { 
+    valid: boolean; 
+    totalEntries: number; 
+    latestHash: string;
+    brokenAtSequence?: number;
+    auditMessage: string;
+  } {
+    if (!this.data.structuredLedger || this.data.structuredLedger.length === 0) {
+      return { 
+        valid: true, 
+        totalEntries: 0, 
+        latestHash: '0'.repeat(64), 
+        auditMessage: 'Ledger is initialized and empty' 
+      };
+    }
+    
+    const entries = this.data.structuredLedger;
+    let expectedPrevHash = '0'.repeat(64);
+    
+    for (let i = 0; i < entries.length; i++) {
+      const entry = entries[i];
+      if (entry.sequenceNumber !== i + 1) {
+        return {
+          valid: false,
+          totalEntries: entries.length,
+          latestHash: entries[entries.length - 1].entryHash,
+          brokenAtSequence: i + 1,
+          auditMessage: `Sequence mismatch at index ${i}: expected ${i + 1}, found ${entry.sequenceNumber}`
+        };
+      }
+      if (entry.prevHash !== expectedPrevHash) {
+        return {
+          valid: false,
+          totalEntries: entries.length,
+          latestHash: entries[entries.length - 1].entryHash,
+          brokenAtSequence: i + 1,
+          auditMessage: `Hash chain break at sequence ${entry.sequenceNumber}: prevHash does not match previous entry's hash`
+        };
+      }
+      expectedPrevHash = entry.entryHash;
+    }
+    
+    return {
+      valid: true,
+      totalEntries: entries.length,
+      latestHash: entries[entries.length - 1].entryHash,
+      auditMessage: `Cryptographic SHA-256 hash chain intact across all ${entries.length} sequenced ledger entries.`
+    };
   }
 
   // Scheduler Jobs

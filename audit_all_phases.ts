@@ -148,7 +148,41 @@ async function main() {
     const leadJson = await leadRes.json();
     leadAlphaId = leadJson.id || leadJson.lead?.id;
 
-    // 3.2 Ingest CRM Webhook Event (ClosedWon)
+    // 3.2 Ingest CRM Webhook Events sequentially through CRM pipeline state machine (new -> qualified -> proposal -> closed_won)
+    await fetch(`${BASE_URL}/api/webhooks/crm`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-webhook-secret': process.env.HAL_CRM_WEBHOOK_SECRET || 'hal_secure_crm_secret_2026'
+      },
+      body: JSON.stringify({
+        eventId: `${crmEventId}_step1`,
+        eventType: 'Qualified',
+        contractorId: contractorAlphaId,
+        dealValue: 7500,
+        currency: 'USD',
+        occurredAt: new Date().toISOString(),
+        lead: { id: leadAlphaId, email: testLeadEmail }
+      })
+    });
+
+    await fetch(`${BASE_URL}/api/webhooks/crm`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-webhook-secret': process.env.HAL_CRM_WEBHOOK_SECRET || 'hal_secure_crm_secret_2026'
+      },
+      body: JSON.stringify({
+        eventId: `${crmEventId}_step2`,
+        eventType: 'AppointmentBooked',
+        contractorId: contractorAlphaId,
+        dealValue: 7500,
+        currency: 'USD',
+        occurredAt: new Date().toISOString(),
+        lead: { id: leadAlphaId, email: testLeadEmail }
+      })
+    });
+
     const crmWebhookRes = await fetch(`${BASE_URL}/api/webhooks/crm`, {
       method: 'POST',
       headers: {
@@ -447,7 +481,13 @@ async function main() {
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${tokenAlpha}`
-      }
+      },
+      body: JSON.stringify({
+        evidencePayload: {
+          recordsCount: 25,
+          evidenceVerified: true
+        }
+      })
     });
     const advanceJson = await advanceRes.json();
 
@@ -499,6 +539,183 @@ async function main() {
     auditLog.push({
       phase: 'Phase 7',
       testName: 'Verified Business Operating Loop State Machine Lifecycle',
+      passed: false,
+      details: null,
+      error: err.message
+    });
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // TEST 8: Roadmap Phase 3 - Automation Engine & Webhook Outbox Verification
+  // ─────────────────────────────────────────────────────────────────────────
+  try {
+    // 8.1 Status
+    const p3StatusRes = await fetch(`${BASE_URL}/api/roadmap/phase3/status`, {
+      headers: { 'Authorization': `Bearer ${tokenAlpha}` }
+    });
+    const p3StatusJson = await p3StatusRes.json();
+
+    // 8.2 Verify Invariants
+    const p3VerifyRes = await fetch(`${BASE_URL}/api/roadmap/phase3/verify`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${tokenAlpha}`
+      }
+    });
+    const p3VerifyJson = await p3VerifyRes.json();
+
+    // 8.3 Trigger Cadence Sequence
+    const p3SeqRes = await fetch(`${BASE_URL}/api/roadmap/phase3/trigger-sequence`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${tokenAlpha}`
+      },
+      body: JSON.stringify({
+        sequenceId: 'seq_hvac_commercial',
+        businessName: 'Apex Industrial Heating',
+        ownerName: 'Marcus Vance',
+        city: 'Calgary',
+        niche: 'Commercial HVAC'
+      })
+    });
+    const p3SeqJson = await p3SeqRes.json();
+
+    // 8.4 Process Outbox Queue
+    const p3OutboxRes = await fetch(`${BASE_URL}/api/roadmap/phase3/process-outbox`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${tokenAlpha}`
+      }
+    });
+    const p3OutboxJson = await p3OutboxRes.json();
+
+    // 8.5 Autonomous Scheduler Scan
+    const p3SchedulerRes = await fetch(`${BASE_URL}/api/roadmap/phase3/run-scheduler`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${tokenAlpha}`
+      }
+    });
+    const p3SchedulerJson = await p3SchedulerRes.json();
+
+    const passed = p3StatusJson.success &&
+                   p3StatusJson.phase3Verified &&
+                   p3VerifyJson.success &&
+                   p3VerifyJson.verified &&
+                   p3SeqJson.success &&
+                   p3SeqJson.scheduledSteps?.length >= 3 &&
+                   p3OutboxJson.success &&
+                   p3SchedulerJson.success;
+
+    auditLog.push({
+      phase: 'Roadmap Phase 3',
+      testName: 'Phase 3 Automation Engine, Outbox & Scheduler Invariants',
+      passed,
+      details: {
+        phase3Verified: p3StatusJson.phase3Verified,
+        verifiedBlock: p3VerifyJson.block?.sequenceNumber,
+        scheduledStepsCount: p3SeqJson.scheduledSteps?.length,
+        outboxProcessedCount: p3OutboxJson.processedCount,
+        schedulerJobsRun: p3SchedulerJson.jobsRun
+      }
+    });
+  } catch (err: any) {
+    auditLog.push({
+      phase: 'Roadmap Phase 3',
+      testName: 'Phase 3 Automation Engine, Outbox & Scheduler Invariants',
+      passed: false,
+      details: null,
+      error: err.message
+    });
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // TEST 9: ROADMAP PHASE 4 MULTI-AGENT CONSENSUS, WEIGHTS & ARBITRAGE
+  // ─────────────────────────────────────────────────────────────────────────
+  try {
+    // 9.1 Status Check
+    const p4StatusRes = await fetch(`${BASE_URL}/api/roadmap/phase4/status`, {
+      headers: { 'Authorization': `Bearer ${tokenAlpha}` }
+    });
+    const p4StatusJson = await p4StatusRes.json();
+
+    // 9.2 Cryptographic Invariant Verification
+    const p4VerifyRes = await fetch(`${BASE_URL}/api/roadmap/phase4/verify`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${tokenAlpha}`
+      }
+    });
+    const p4VerifyJson = await p4VerifyRes.json();
+
+    // 9.3 Run Dual-Drive Parallel Consensus
+    const p4ConsensusRes = await fetch(`${BASE_URL}/api/roadmap/phase4/run-consensus`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${tokenAlpha}`
+      },
+      body: JSON.stringify({
+        topic: 'Outreach Angle & Commercial Pricing for Calgary Commercial Roofing'
+      })
+    });
+    const p4ConsensusJson = await p4ConsensusRes.json();
+
+    // 9.4 Recalibrate Bayesian Weights
+    const p4RecalibrateRes = await fetch(`${BASE_URL}/api/roadmap/phase4/recalibrate-weights`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${tokenAlpha}`
+      }
+    });
+    const p4RecalibrateJson = await p4RecalibrateRes.json();
+
+    // 9.5 Execute Closed-Loop Strategy Arbitrage
+    const p4ArbitrageRes = await fetch(`${BASE_URL}/api/roadmap/phase4/execute-arbitrage`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${tokenAlpha}`
+      },
+      body: JSON.stringify({
+        arbitrageId: 'arb_01_google_to_lsa'
+      })
+    });
+    const p4ArbitrageJson = await p4ArbitrageRes.json();
+
+    const passed = p4StatusJson.success &&
+                   p4StatusJson.status === 'verified_complete' &&
+                   p4VerifyJson.success &&
+                   p4VerifyJson.verified &&
+                   p4ConsensusJson.success &&
+                   p4ConsensusJson.consensusResult?.alignmentScore >= 88 &&
+                   p4RecalibrateJson.success &&
+                   p4RecalibrateJson.epoch >= 14 &&
+                   p4ArbitrageJson.success &&
+                   p4ArbitrageJson.executedArbitrage?.status === 'executed';
+
+    auditLog.push({
+      phase: 'Roadmap Phase 4',
+      testName: 'Phase 4 Multi-Agent Consensus, Bayesian Weights & Strategy Arbitrage',
+      passed,
+      details: {
+        phase4Status: p4StatusJson.status,
+        score: p4VerifyJson.score,
+        consensusAlignment: p4ConsensusJson.consensusResult?.alignmentScore,
+        recalibratedEpoch: p4RecalibrateJson.epoch,
+        arbitrageStatus: p4ArbitrageJson.executedArbitrage?.status
+      }
+    });
+  } catch (err: any) {
+    auditLog.push({
+      phase: 'Roadmap Phase 4',
+      testName: 'Phase 4 Multi-Agent Consensus, Bayesian Weights & Strategy Arbitrage',
       passed: false,
       details: null,
       error: err.message

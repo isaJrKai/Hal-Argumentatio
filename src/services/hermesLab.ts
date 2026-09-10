@@ -362,21 +362,24 @@ Generate the complete, unshortened asset now in valid JSON format.`;
     }
   }
 
-  // Priority 3: Gemini 2.5 Flash structured generation
+  // Priority 3: Gemini Flash structured generation with fallback
   const gemini = getGeminiClient();
   if (!parsedResponse && gemini) {
-    try {
-      const resp = await gemini.models.generateContent({
-        model: 'gemini-2.5-flash',
-        contents: userPrompt,
-        config: {
-          systemInstruction,
-          responseMimeType: 'application/json'
-        }
-      });
-      parsedResponse = safeExtractJson(resp.text || '{}');
-    } catch (geminiErr) {
-      console.warn('[Hermes Lab] Gemini generation error, attempting fallback:', geminiErr);
+    for (const model of ['gemini-2.5-flash', 'gemini-3.8-flash']) {
+      try {
+        const resp = await gemini.models.generateContent({
+          model,
+          contents: userPrompt,
+          config: {
+            systemInstruction,
+            responseMimeType: 'application/json'
+          }
+        });
+        parsedResponse = safeExtractJson(resp.text || '{}');
+        if (parsedResponse) break;
+      } catch (geminiErr: any) {
+        console.info(`[Hermes Lab] Model ${model} unavailable (${geminiErr?.status || geminiErr?.message || 'error'}), trying fallback...`);
+      }
     }
   }
 
@@ -882,6 +885,90 @@ function generateDeterministicLabFallback(
   </script>
 </body>
 </html>`
+    };
+  }
+
+  if (toolId === 'outreach_sequences') {
+    const owner = parameters?.ownerName || parameters?.first_name || 'Business Owner';
+    const biz = parameters?.businessName || company || 'Local Service Pro';
+    const loc = parameters?.city || city || 'Local Metro';
+    const niche = parameters?.serviceType || parameters?.niche || 'Emergency Contracting';
+    const perf = parameters?.performanceScore || 54;
+    const seo = parameters?.seoScore || 62;
+
+    const step1Subject = `Quick heads-up about ${biz}'s mobile speed in ${loc}`;
+    const step1Body = `Hi ${owner},
+
+Ran a quick diagnostic on ${loc} contractors offering ${niche} services this morning and noticed your mobile site is currently scoring ${perf}/100 on Core Web Vitals.
+
+In ${loc}, over 78% of emergency service calls happen on mobile. When the page takes more than 2.8 seconds to render, homeowners tap back and call the next contractor on Google Maps.
+
+We built a lightweight 1-tap dispatch landing page specifically for ${biz} that loads in under 600ms and plugs right into your phone dispatch. 
+
+Would you be open to seeing the 60-second video walkthrough showing where your competitors are capturing these calls?
+
+Best regards,
+Kaiso Operating Systems • ${loc} Regional Division`;
+
+    const step2Subject = `Benchmark data: ${loc} ${niche} mobile conversion rates`;
+    const step2Body = `Hi ${owner},
+
+Following up on my note regarding ${biz}'s mobile load speed (${perf}/100). 
+
+We put together an itemized diagnostic comparing your site speed against the top 3 ranking ${niche} contractors in ${loc}. Even shaving 1.4 seconds off your mobile First Contentful Paint typically recovers 6 to 12 lost inquiry calls per month without spending an extra dollar on ads.
+
+Here is the direct preview link to your white-label audit report and speed patch.
+
+Would Thursday at 10:30 AM or 2:00 PM work for a quick 5-minute debrief?
+
+Best,
+Kaiso Operating Systems`;
+
+    const step3Subject = `Permission to close file on ${biz} (${loc})`;
+    const step3Body = `Hi ${owner},
+
+I haven't heard back, so I assume optimizing mobile lead capture and speed for ${biz} isn't a top priority right now. Completely understand—you're busy in the field.
+
+I will archive your ${loc} territory diagnostic file for now. If you ever want to review the speed comparison or deploy the high-speed emergency lander, feel free to reply directly here.
+
+Wishing ${biz} a high-volume season ahead.
+
+Warm regards,
+Kaiso Operating Systems`;
+
+    return {
+      title: `3-Touch High-Converting Outreach Sequence - ${biz}`,
+      summary: `High-intent outreach sequence tailored for ${biz} in ${loc} targeting Core Web Vitals deficiency (${perf}/100) and SEO recovery (${seo}/100).`,
+      structuredData: {
+        framework: 'KAISO Empirical Value Sequence (Speed Audit ➔ Local Map Pack ➔ Permission Breakaway)',
+        businessName: biz,
+        ownerName: owner,
+        city: loc,
+        steps: [
+          {
+            step: 1,
+            day: 1,
+            channel: 'email',
+            subject: step1Subject,
+            body: step1Body
+          },
+          {
+            step: 2,
+            day: 3,
+            channel: 'email',
+            subject: step2Subject,
+            body: step2Body
+          },
+          {
+            step: 3,
+            day: 7,
+            channel: 'email',
+            subject: step3Subject,
+            body: step3Body
+          }
+        ]
+      },
+      renderedOutput: `### STEP 1 (DAY 1) — DIRECT SPEED HOOK\n**Subject:** ${step1Subject}\n\n${step1Body}\n\n---\n\n### STEP 2 (DAY 3) — REGIONAL BENCHMARK\n**Subject:** ${step2Subject}\n\n${step2Body}\n\n---\n\n### STEP 3 (DAY 7) — PERMISSION BREAKAWAY\n**Subject:** ${step3Subject}\n\n${step3Body}`
     };
   }
 

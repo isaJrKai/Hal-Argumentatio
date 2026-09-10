@@ -15,8 +15,21 @@ export interface ToastItem {
   duration?: number;
 }
 
+export interface ShowToastOptions {
+  title?: string;
+  message?: string;
+  description?: string;
+  type?: 'info' | 'success' | 'warning' | 'danger' | 'error' | 'ai';
+  variant?: ToastVariant;
+  whatNext?: string;
+  actionLabel?: string;
+  onAction?: () => void;
+  duration?: number;
+}
+
 interface ToastContextType {
   toast: (options: Omit<ToastItem, 'id'>) => void;
+  showToast: (options: ShowToastOptions | string) => void;
   toasts: ToastItem[];
   removeToast: (id: string) => void;
 }
@@ -44,8 +57,34 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
     }
   }, [removeToast]);
 
+  const showToast = useCallback((options: ShowToastOptions | string) => {
+    if (typeof options === 'string') {
+      toast({
+        variant: 'info',
+        title: options,
+        description: ''
+      });
+      return;
+    }
+
+    const variant: ToastVariant =
+      options.variant ||
+      (options.type === 'error' ? 'danger' : options.type as ToastVariant) ||
+      'info';
+
+    toast({
+      variant,
+      title: options.title || '',
+      description: options.description || options.message || '',
+      whatNext: options.whatNext,
+      actionLabel: options.actionLabel,
+      onAction: options.onAction,
+      duration: options.duration
+    });
+  }, [toast]);
+
   return (
-    <ToastContext.Provider value={{ toast, toasts, removeToast }}>
+    <ToastContext.Provider value={{ toast, showToast, toasts, removeToast }}>
       {children}
       <ToastContainer toasts={toasts} removeToast={removeToast} />
     </ToastContext.Provider>
@@ -114,9 +153,11 @@ function ToastCard({ item, onClose }: { item: ToastItem; onClose: () => void; ke
           <h4 className="font-sans font-medium text-xs text-text-primary tracking-tight">
             {item.title}
           </h4>
-          <p className="font-sans text-[11px] text-text-secondary leading-normal">
-            {item.description}
-          </p>
+          {item.description ? (
+            <p className="font-sans text-[11px] text-text-secondary leading-normal">
+              {item.description}
+            </p>
+          ) : null}
         </div>
 
         {/* Action item info */}

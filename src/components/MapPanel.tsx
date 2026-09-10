@@ -452,7 +452,7 @@ export default function MapPanel({ leads, token }: MapPanelProps) {
             ) : (
               <DownloadCloud className="w-3.5 h-3.5" />
             )}
-            <span>PRE-CACHE {cityFilter === 'all' ? 'TERRITORY' : cityFilter.toUpperCase()}</span>
+            <span>PRE-CACHE {cityFilter === 'all' ? 'TERRITORY' : (cityFilter || 'TERRITORY').toUpperCase()}</span>
           </button>
 
           {/* IndexedDB Cache Badge */}
@@ -673,14 +673,14 @@ export default function MapPanel({ leads, token }: MapPanelProps) {
               onChange={(e) => {
                 setCityFilter(e.target.value);
                 setSelectedLeadId(null);
-                logEvent('MAP_FILTER_CITY', `Scope filtered to City: ${e.target.value.toUpperCase()}`);
+                logEvent('MAP_FILTER_CITY', `Scope filtered to City: ${(e.target.value || 'ALL').toUpperCase()}`);
               }}
               className="w-full bg-bg-subtle border border-border-dim hover:border-text-secondary/30 rounded-sm p-2 text-xs text-text-primary focus:outline-none focus:border-brand transition-colors cursor-pointer"
             >
               <option value="all">ALL TERRITORIES</option>
               {Object.keys(cityCounts).map(city => (
                 <option key={city} value={city.toLowerCase()}>
-                  {city.toUpperCase()} ({cityCounts[city]} leads)
+                  {(city || 'TERRITORY').toUpperCase()} ({cityCounts[city]} leads)
                 </option>
               ))}
             </select>
@@ -694,7 +694,7 @@ export default function MapPanel({ leads, token }: MapPanelProps) {
               onChange={(e) => {
                 setStatusFilter(e.target.value);
                 setSelectedLeadId(null);
-                logEvent('MAP_FILTER_STATUS', `Scope filtered to Status: ${e.target.value.toUpperCase()}`);
+                logEvent('MAP_FILTER_STATUS', `Scope filtered to Status: ${(e.target.value || 'ALL').toUpperCase()}`);
               }}
               className="w-full bg-bg-subtle border border-border-dim hover:border-text-secondary/30 rounded-sm p-2 text-xs text-text-primary focus:outline-none focus:border-brand transition-colors cursor-pointer"
             >

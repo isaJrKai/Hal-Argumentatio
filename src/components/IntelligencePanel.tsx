@@ -159,10 +159,12 @@ export default function IntelligencePanel({
   // Load persistent chat history from database on mount
   useEffect(() => {
     const fetchChatHistory = async () => {
+      const effectiveToken = token || localStorage.getItem('token') || localStorage.getItem('halbiz_auth_token') || '';
+      if (!effectiveToken) return;
       try {
         const res = await fetch('/api/intelligence/chat/history', {
           headers: {
-            'Authorization': `Bearer ${token}`
+            'Authorization': `Bearer ${effectiveToken}`
           }
         });
         if (res.ok) {
@@ -179,8 +181,8 @@ export default function IntelligencePanel({
             ]);
           }
         }
-      } catch (err) {
-        console.error("Failed to load chat history:", err);
+      } catch (err: any) {
+        console.warn("Chat history synchronization deferred:", err?.message || err);
       }
     };
     fetchChatHistory();
@@ -872,7 +874,7 @@ export default function IntelligencePanel({
                       </div>
 
                       <div className="flex justify-between items-center text-[10px] font-mono text-text-tertiary pt-2 border-t border-border-dim/40 font-bold">
-                        <span>ALGORITHM: {f.modelVersion.toUpperCase()}</span>
+                        <span>ALGORITHM: {(f.modelVersion || 'Standard').toUpperCase()}</span>
                         <span>CONFIDENCE SCORE: <strong className="text-text-primary font-bold">{Math.round(f.confidenceScore * 100)}%</strong></span>
                       </div>
                     </div>
@@ -1055,12 +1057,12 @@ export default function IntelligencePanel({
                       <td className="p-3">Actual Revenue ≥ 90% of Expected</td>
                     </tr>
                     <tr>
-                      <td className="p-3 font-bold text-sky-400">partially_successful</td>
+                      <td className="p-3 font-bold text-info">partially_successful</td>
                       <td className="p-3">60% – 84.9%</td>
                       <td className="p-3">Directional alignment with variance</td>
                     </tr>
                     <tr>
-                      <td className="p-3 font-bold text-yellow-400">neutral</td>
+                      <td className="p-3 font-bold text-warning">neutral</td>
                       <td className="p-3">40% – 59.9%</td>
                       <td className="p-3">Moderate divergence</td>
                     </tr>

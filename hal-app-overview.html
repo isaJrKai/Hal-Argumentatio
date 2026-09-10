@@ -1,0 +1,1226 @@
+<!-- 
+HALBiz OS - Complete Application Architecture & Interactive UI Blueprint
+This file can be opened directly in any browser, served via Vite, or uploaded directly to Claude.
+Access live at: http://localhost:3000/hal-app-overview.html
+-->
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HALBiz System Architecture & Interactive UI Blueprint</title>
+  <!-- Tailwind CSS via CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            bg: {
+              base: '#0B0D10',
+              raised: '#111419',
+              dark: '#080A0C',
+              card: '#14181F',
+              subtle: '#1A202A'
+            },
+            border: {
+              dim: '#1F2633',
+              subtle: '#2A3345',
+              bright: '#3D4A63'
+            },
+            brand: {
+              DEFAULT: '#3B82F6',
+              glow: '#60A5FA',
+              dark: '#1D4ED8'
+            },
+            accent: {
+              DEFAULT: '#10B981',
+              warning: '#F59E0B',
+              danger: '#EF4444',
+              purple: '#8B5CF6',
+              cyan: '#06B6D4'
+            },
+            text: {
+              primary: '#F1F5F9',
+              secondary: '#94A3B8',
+              muted: '#64748B'
+            }
+          },
+          fontFamily: {
+            mono: ['JetBrains Mono', 'Menlo', 'Consolas', 'monospace'],
+            sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif']
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    /* Custom scrollbar */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #0B0D10;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #1F2633;
+      border-radius: 3px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #3B82F6;
+    }
+    .grid-pattern {
+      background-size: 24px 24px;
+      background-image: 
+        linear-gradient(to right, rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+    }
+  </style>
+</head>
+<body class="bg-bg-base text-text-primary font-sans antialiased min-h-screen flex flex-col overflow-hidden select-none">
+
+  <!-- ========================================================================= -->
+  <!-- TOP TELEMETRY & APP BAR (Zone 1)                                          -->
+  <!-- ========================================================================= -->
+  <header class="h-12 border-b border-border-dim bg-bg-raised flex items-center justify-between px-4 shrink-0 z-30">
+    <div class="flex items-center gap-4">
+      <!-- HAL System Logo -->
+      <div class="flex items-center gap-2.5">
+        <div class="w-7 h-7 rounded bg-blue-600/20 border border-blue-500/40 flex items-center justify-center text-brand font-mono font-black text-xs shadow-sm">
+          HAL
+        </div>
+        <div class="flex flex-col">
+          <div class="flex items-center gap-1.5">
+            <span class="text-xs font-mono font-extrabold tracking-wider text-text-primary">HALBIZ OS</span>
+            <span class="text-[9px] font-mono px-1 py-0.2 bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 rounded font-bold uppercase">v2.4-PRO</span>
+          </div>
+          <span class="text-[10px] text-text-muted font-mono leading-none">Autonomous Contractor Operating Intelligence</span>
+        </div>
+      </div>
+
+      <!-- Quick Agency/Client Switcher -->
+      <div class="hidden md:flex items-center gap-2 pl-4 border-l border-border-dim">
+        <span class="text-[10px] font-mono uppercase text-text-muted">Operator:</span>
+        <div class="flex items-center gap-1.5 bg-bg-base border border-border-dim px-2 py-0.5 rounded text-xs font-mono">
+          <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+          <span class="text-text-primary font-medium">Apex Trades Growth Corp</span>
+          <i data-lucide="chevron-down" class="w-3 h-3 text-text-muted"></i>
+        </div>
+      </div>
+
+      <!-- Quick Telemetry Badges -->
+      <div class="hidden lg:flex items-center gap-3 pl-3 text-[11px] font-mono">
+        <div class="flex items-center gap-1 px-2 py-0.5 rounded bg-blue-500/10 border border-blue-500/20 text-blue-400">
+          <i data-lucide="activity" class="w-3.5 h-3.5"></i>
+          <span>MRR: $18,400</span>
+        </div>
+        <div class="flex items-center gap-1 px-2 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
+          <i data-lucide="shield-check" class="w-3.5 h-3.5"></i>
+          <span>AES-GCM PII Vault: ACTIVE</span>
+        </div>
+        <div class="flex items-center gap-1 px-2 py-0.5 rounded bg-purple-500/10 border border-purple-500/20 text-purple-400">
+          <i data-lucide="sparkles" class="w-3.5 h-3.5"></i>
+          <span>Hermes v2.4: CONNECTED</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Header Right Actions & Density Controls -->
+    <div class="flex items-center gap-2.5">
+      <!-- Global Search Shortcut -->
+      <button onclick="openModal('commandModal')" class="flex items-center gap-2 px-2.5 py-1 rounded bg-bg-base hover:bg-bg-subtle border border-border-dim text-xs font-mono text-text-muted hover:text-text-primary transition-all">
+        <i data-lucide="search" class="w-3.5 h-3.5"></i>
+        <span class="hidden sm:inline">Deep Search</span>
+        <kbd class="px-1 py-0.2 text-[9px] bg-bg-raised border border-border-subtle rounded text-text-muted">Cmd+K</kbd>
+      </button>
+
+      <!-- Density Toggle (High Density vs Spacious) -->
+      <button onclick="toggleDensity()" id="densityBtn" class="px-2 py-1 bg-bg-base hover:bg-bg-subtle border border-border-dim text-[10px] font-mono text-text-muted rounded flex items-center gap-1" title="Toggle Bloomberg/AutoCAD compact density">
+        <i data-lucide="layout-grid" class="w-3 h-3"></i>
+        <span id="densityLabel">Dense Mode</span>
+      </button>
+
+      <!-- Claude Blueprint Prompt Modal Button -->
+      <button onclick="openModal('claudeModal')" class="px-2.5 py-1 bg-blue-600/20 hover:bg-blue-600/30 border border-blue-500/40 text-blue-400 text-xs font-mono font-bold rounded flex items-center gap-1.5 shadow-sm transition-all">
+        <i data-lucide="bot" class="w-3.5 h-3.5"></i>
+        <span>Claude Review & Export</span>
+      </button>
+
+      <!-- Inspector Toggle -->
+      <button onclick="toggleInspector()" class="p-1.5 bg-bg-base hover:bg-bg-subtle border border-border-dim rounded text-text-muted hover:text-text-primary" title="Toggle Contextual Inspector">
+        <i data-lucide="sidebar" class="w-4 h-4"></i>
+      </button>
+    </div>
+  </header>
+
+  <!-- ========================================================================= -->
+  <!-- MAIN WORKSPACE LAYOUT (Zone 2: Left Nav, Zone 3: Canvas, Zone 4: Inspector) -->
+  <!-- ========================================================================= -->
+  <div class="flex-1 flex overflow-hidden relative">
+
+    <!-- ── LEFT NAVIGATION SIDEBAR (Zone 2) ────────────────────────────────── -->
+    <aside class="w-60 border-r border-border-dim bg-bg-dark flex flex-col shrink-0 overflow-y-auto">
+      <div class="p-3 space-y-6">
+
+        <!-- Section: Core Workspace -->
+        <div>
+          <span class="text-[10px] font-mono font-bold text-text-muted uppercase tracking-wider px-2">Core Operations</span>
+          <nav class="mt-1.5 space-y-0.5">
+            <button onclick="switchTab('overview')" class="nav-item active w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded text-xs font-mono text-text-primary bg-blue-600/15 border border-blue-500/30 font-semibold" data-tab="overview">
+              <i data-lucide="layout-dashboard" class="w-4 h-4 text-blue-400"></i>
+              <span>Mission Control</span>
+            </button>
+            <button onclick="switchTab('leads')" class="nav-item w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded text-xs font-mono text-text-secondary hover:text-text-primary hover:bg-bg-subtle/50 transition-colors" data-tab="leads">
+              <i data-lucide="users" class="w-4 h-4 text-emerald-400"></i>
+              <span>Leads Engine</span>
+              <span class="ml-auto text-[9px] px-1.5 py-0.2 bg-emerald-500/10 text-emerald-400 rounded font-mono">142</span>
+            </button>
+            <button onclick="switchTab('campaigns')" class="nav-item w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded text-xs font-mono text-text-secondary hover:text-text-primary hover:bg-bg-subtle/50 transition-colors" data-tab="campaigns">
+              <i data-lucide="megaphone" class="w-4 h-4 text-purple-400"></i>
+              <span>Outreach & Campaigns</span>
+            </button>
+            <button onclick="switchTab('pipeline')" class="nav-item w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded text-xs font-mono text-text-secondary hover:text-text-primary hover:bg-bg-subtle/50 transition-colors" data-tab="pipeline">
+              <i data-lucide="trello" class="w-4 h-4 text-amber-400"></i>
+              <span>Client Pipeline (Kanban)</span>
+            </button>
+            <button onclick="switchTab('territory')" class="nav-item w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded text-xs font-mono text-text-secondary hover:text-text-primary hover:bg-bg-subtle/50 transition-colors" data-tab="territory">
+              <i data-lucide="map" class="w-4 h-4 text-cyan-400"></i>
+              <span>Territory Conquest Radar</span>
+            </button>
+            <button onclick="switchTab('delivery')" class="nav-item w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded text-xs font-mono text-text-secondary hover:text-text-primary hover:bg-bg-subtle/50 transition-colors" data-tab="delivery">
+              <i data-lucide="truck" class="w-4 h-4 text-indigo-400"></i>
+              <span>Delivery & Projects</span>
+            </button>
+            <button onclick="switchTab('financials')" class="nav-item w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded text-xs font-mono text-text-secondary hover:text-text-primary hover:bg-bg-subtle/50 transition-colors" data-tab="financials">
+              <i data-lucide="dollar-sign" class="w-4 h-4 text-emerald-400"></i>
+              <span>Financials & Retainers</span>
+            </button>
+          </nav>
+        </div>
+
+        <!-- Section: Autonomous AI & Hermes -->
+        <div>
+          <span class="text-[10px] font-mono font-bold text-text-muted uppercase tracking-wider px-2">Autonomous Intelligence</span>
+          <nav class="mt-1.5 space-y-0.5">
+            <button onclick="switchTab('hermes')" class="nav-item w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded text-xs font-mono text-text-secondary hover:text-text-primary hover:bg-bg-subtle/50 transition-colors" data-tab="hermes">
+              <i data-lucide="sparkles" class="w-4 h-4 text-blue-400"></i>
+              <span>Hermes Agent Lab</span>
+              <span class="ml-auto text-[9px] px-1 py-0.2 bg-blue-500/20 text-blue-300 rounded font-mono font-bold">PRO</span>
+            </button>
+            <button onclick="switchTab('synaptic')" class="nav-item w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded text-xs font-mono text-text-secondary hover:text-text-primary hover:bg-bg-subtle/50 transition-colors" data-tab="synaptic">
+              <i data-lucide="git-branch" class="w-4 h-4 text-purple-400"></i>
+              <span>Neural Synaptic Graph</span>
+            </button>
+            <button onclick="switchTab('landing_studio')" class="nav-item w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded text-xs font-mono text-text-secondary hover:text-text-primary hover:bg-bg-subtle/50 transition-colors" data-tab="landing_studio">
+              <i data-lucide="palette" class="w-4 h-4 text-amber-400"></i>
+              <span>Landing Page Studio</span>
+            </button>
+            <button onclick="switchTab('bible')" class="nav-item w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded text-xs font-mono text-text-secondary hover:text-text-primary hover:bg-bg-subtle/50 transition-colors" data-tab="bible">
+              <i data-lucide="book-open" class="w-4 h-4 text-cyan-400"></i>
+              <span>HAL Bible & Specs (01-24)</span>
+            </button>
+          </nav>
+        </div>
+
+        <!-- Section: Space & Feature Design Audit (For Claude) -->
+        <div class="p-2.5 rounded bg-blue-950/30 border border-blue-500/30 space-y-2">
+          <div class="flex items-center gap-1.5 text-blue-400 font-mono text-xs font-bold">
+            <i data-lucide="sparkle" class="w-3.5 h-3.5"></i>
+            <span>Claude Review Dossier</span>
+          </div>
+          <p class="text-[11px] text-text-secondary leading-tight">
+            Review the current spatial density, bento layouts, and feature expansions.
+          </p>
+          <button onclick="switchTab('claude_audit')" class="w-full py-1 bg-blue-600 hover:bg-blue-500 text-white rounded text-[11px] font-mono font-bold transition-all" data-tab="claude_audit">
+            Open Space & UI Audit
+          </button>
+        </div>
+
+      </div>
+
+      <!-- Footer system status -->
+      <div class="mt-auto p-3 border-t border-border-dim bg-bg-base/60 text-[10px] font-mono text-text-muted space-y-1">
+        <div class="flex items-center justify-between">
+          <span>PII Encryption</span>
+          <span class="text-emerald-400 font-bold">AES-GCM-256</span>
+        </div>
+        <div class="flex items-center justify-between">
+          <span>Inbound Radar</span>
+          <span class="text-blue-400">350 Leads/Day</span>
+        </div>
+      </div>
+    </aside>
+
+    <!-- ── CENTER CANVAS & MAIN VIEWS (Zone 3) ────────────────────────────── -->
+    <main class="flex-1 flex flex-col overflow-y-auto bg-bg-base relative" id="mainCanvas">
+
+      <!-- =================================================================== -->
+      <!-- VIEW 1: MISSION CONTROL (OVERVIEW)                                  -->
+      <!-- =================================================================== -->
+      <div id="view-overview" class="view-panel p-5 space-y-5">
+        <!-- Top Stats Row (Bento Grid) -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3.5">
+          <!-- Card 1: Monthly Pipeline Volume -->
+          <div class="p-3.5 rounded bg-bg-raised border border-border-dim space-y-1">
+            <div class="flex items-center justify-between text-text-muted text-[11px] font-mono">
+              <span>ACTIVE CONTRACTOR PIPELINE</span>
+              <i data-lucide="users" class="w-3.5 h-3.5 text-emerald-400"></i>
+            </div>
+            <div class="flex items-baseline gap-2">
+              <span class="text-2xl font-bold font-mono text-text-primary">$284,500</span>
+              <span class="text-xs font-mono text-emerald-400 font-bold">+18.2%</span>
+            </div>
+            <p class="text-[11px] text-text-muted">42 Qualified Trade Leads in High Urgency</p>
+          </div>
+
+          <!-- Card 2: Average Speed Leakage Deficit -->
+          <div class="p-3.5 rounded bg-bg-raised border border-border-dim space-y-1">
+            <div class="flex items-center justify-between text-text-muted text-[11px] font-mono">
+              <span>PROSPECT SPEED DEFICIT</span>
+              <i data-lucide="gauge" class="w-3.5 h-3.5 text-amber-400"></i>
+            </div>
+            <div class="flex items-baseline gap-2">
+              <span class="text-2xl font-bold font-mono text-amber-400">48.2<span class="text-sm text-text-muted">/100</span></span>
+              <span class="text-xs font-mono text-amber-400 font-bold">Leaking Calls</span>
+            </div>
+            <p class="text-[11px] text-text-muted">Avg contractor mobile load latency: 4.8s</p>
+          </div>
+
+          <!-- Card 3: Active Autonomous Loops -->
+          <div class="p-3.5 rounded bg-bg-raised border border-border-dim space-y-1">
+            <div class="flex items-center justify-between text-text-muted text-[11px] font-mono">
+              <span>HAL AUTONOMOUS LOOPS</span>
+              <i data-lucide="refresh-cw" class="w-3.5 h-3.5 text-blue-400"></i>
+            </div>
+            <div class="flex items-baseline gap-2">
+              <span class="text-2xl font-bold font-mono text-blue-400">6 Loops</span>
+              <span class="text-xs font-mono text-blue-400 font-bold">Online</span>
+            </div>
+            <p class="text-[11px] text-text-muted">Pacing calibration & real-time webhook routing</p>
+          </div>
+
+          <!-- Card 4: Retainer Cash Velocity -->
+          <div class="p-3.5 rounded bg-bg-raised border border-border-dim space-y-1">
+            <div class="flex items-center justify-between text-text-muted text-[11px] font-mono">
+              <span>AGENCY RECURRING REVENUE</span>
+              <i data-lucide="trending-up" class="w-3.5 h-3.5 text-purple-400"></i>
+            </div>
+            <div class="flex items-baseline gap-2">
+              <span class="text-2xl font-bold font-mono text-purple-400">$18,400<span class="text-xs text-text-muted font-normal">/mo</span></span>
+              <span class="text-xs font-mono text-purple-400 font-bold">4 Retainers</span>
+            </div>
+            <p class="text-[11px] text-text-muted">Avg $4,600 / contractor partner SLA</p>
+          </div>
+        </div>
+
+        <!-- Middle Row: Interactive Action Feed & Territory Radar Snapshot -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+          <!-- Main Left: Live Prospect Harvest & Opportunity Queue (2 cols) -->
+          <div class="lg:col-span-2 rounded bg-bg-raised border border-border-dim p-4 space-y-3">
+            <div class="flex items-center justify-between border-b border-border-dim pb-2.5">
+              <div class="flex items-center gap-2">
+                <i data-lucide="zap" class="w-4 h-4 text-emerald-400"></i>
+                <h3 class="text-xs font-mono font-bold uppercase text-text-primary">Real-Time Contractor Intelligence Stream</h3>
+              </div>
+              <button onclick="switchTab('leads')" class="text-[11px] font-mono text-blue-400 hover:underline flex items-center gap-1">
+                <span>View All 142 Leads</span>
+                <i data-lucide="arrow-right" class="w-3 h-3"></i>
+              </button>
+            </div>
+
+            <!-- List of high priority prospects -->
+            <div class="space-y-2">
+              <div class="p-2.5 rounded bg-bg-dark border border-border-dim flex items-center justify-between gap-3 hover:border-emerald-500/40 transition-colors">
+                <div class="flex items-center gap-3">
+                  <div class="w-8 h-8 rounded bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400 font-mono text-xs font-bold">
+                    HVAC
+                  </div>
+                  <div>
+                    <div class="flex items-center gap-2">
+                      <span class="text-xs font-bold text-text-primary">Apex Climate Pros</span>
+                      <span class="text-[9px] font-mono px-1 py-0.2 bg-amber-500/20 text-amber-400 rounded">SSL Broken</span>
+                      <span class="text-[9px] font-mono px-1 py-0.2 bg-red-500/20 text-red-400 rounded">Speed 38/100</span>
+                    </div>
+                    <span class="text-[11px] text-text-muted">Austin, TX • Owner: Marcus Vance • Est. Value: $5,200/mo</span>
+                  </div>
+                </div>
+                <div class="flex items-center gap-2">
+                  <button onclick="inspectSampleLead('Apex Climate Pros', 'HVAC', 'Austin, TX', 38, 'broken')" class="px-2.5 py-1 bg-emerald-600/20 hover:bg-emerald-600/30 border border-emerald-500/40 text-emerald-400 rounded text-xs font-mono font-bold">
+                    Inspect & Pitch
+                  </button>
+                </div>
+              </div>
+
+              <div class="p-2.5 rounded bg-bg-dark border border-border-dim flex items-center justify-between gap-3 hover:border-blue-500/40 transition-colors">
+                <div class="flex items-center gap-3">
+                  <div class="w-8 h-8 rounded bg-blue-500/10 border border-blue-500/30 flex items-center justify-center text-blue-400 font-mono text-xs font-bold">
+                    ROOF
+                  </div>
+                  <div>
+                    <div class="flex items-center gap-2">
+                      <span class="text-xs font-bold text-text-primary">Vanguard Roofing Systems</span>
+                      <span class="text-[9px] font-mono px-1 py-0.2 bg-emerald-500/20 text-emerald-400 rounded">SSL Valid</span>
+                      <span class="text-[9px] font-mono px-1 py-0.2 bg-amber-500/20 text-amber-400 rounded">Speed 54/100</span>
+                    </div>
+                    <span class="text-[11px] text-text-muted">Dallas, TX • Owner: Elena Rostova • Est. Value: $7,800/mo</span>
+                  </div>
+                </div>
+                <div class="flex items-center gap-2">
+                  <button onclick="inspectSampleLead('Vanguard Roofing Systems', 'Roofing', 'Dallas, TX', 54, 'valid')" class="px-2.5 py-1 bg-blue-600/20 hover:bg-blue-600/30 border border-blue-500/40 text-blue-400 rounded text-xs font-mono font-bold">
+                    Inspect & Pitch
+                  </button>
+                </div>
+              </div>
+
+              <div class="p-2.5 rounded bg-bg-dark border border-border-dim flex items-center justify-between gap-3 hover:border-purple-500/40 transition-colors">
+                <div class="flex items-center gap-3">
+                  <div class="w-8 h-8 rounded bg-purple-500/10 border border-purple-500/30 flex items-center justify-center text-purple-400 font-mono text-xs font-bold">
+                    PLUM
+                  </div>
+                  <div>
+                    <div class="flex items-center gap-2">
+                      <span class="text-xs font-bold text-text-primary">Lone Star Master Plumbers</span>
+                      <span class="text-[9px] font-mono px-1 py-0.2 bg-red-500/20 text-red-400 rounded">0 Review Velocity</span>
+                      <span class="text-[9px] font-mono px-1 py-0.2 bg-amber-500/20 text-amber-400 rounded">Speed 42/100</span>
+                    </div>
+                    <span class="text-[11px] text-text-muted">Houston, TX • Owner: David Kim • Est. Value: $4,500/mo</span>
+                  </div>
+                </div>
+                <div class="flex items-center gap-2">
+                  <button onclick="inspectSampleLead('Lone Star Master Plumbers', 'Plumbing', 'Houston, TX', 42, 'valid')" class="px-2.5 py-1 bg-purple-600/20 hover:bg-purple-600/30 border border-purple-500/40 text-purple-400 rounded text-xs font-mono font-bold">
+                    Inspect & Pitch
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Main Right: Hermes Agent Quick Synthesis (1 col) -->
+          <div class="rounded bg-bg-raised border border-border-dim p-4 space-y-3 flex flex-col justify-between">
+            <div>
+              <div class="flex items-center justify-between border-b border-border-dim pb-2.5">
+                <div class="flex items-center gap-1.5 text-xs font-mono font-bold text-blue-400 uppercase">
+                  <i data-lucide="sparkles" class="w-4 h-4"></i>
+                  <span>Hermes Fast Action</span>
+                </div>
+                <span class="text-[9px] font-mono px-1.5 py-0.2 bg-blue-500/15 text-blue-300 rounded">AUTONOMOUS</span>
+              </div>
+              <p class="text-xs text-text-secondary mt-2 leading-relaxed">
+                Trigger targeted multi-channel cold synthesis with real technical audit data.
+              </p>
+              <div class="mt-3 space-y-2 text-xs font-mono">
+                <div class="p-2 bg-bg-dark rounded border border-border-dim">
+                  <span class="text-text-muted block text-[10px]">Active Niche Focus:</span>
+                  <span class="font-bold text-text-primary">Commercial & Residential HVAC (Texas)</span>
+                </div>
+                <div class="p-2 bg-bg-dark rounded border border-border-dim">
+                  <span class="text-text-muted block text-[10px]">Angle Framework:</span>
+                  <span class="font-bold text-emerald-400">KAISO (Speed Deficit & Missed Call Bridge)</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="pt-3 border-t border-border-dim space-y-2">
+              <button onclick="triggerHermesFastDraft()" class="w-full py-2 bg-blue-600 hover:bg-blue-500 text-white rounded font-mono text-xs font-bold flex items-center justify-center gap-1.5 transition-all shadow-md">
+                <i data-lucide="sparkles" class="w-3.5 h-3.5"></i>
+                <span>Synthesize 10 Tailored Scripts</span>
+              </button>
+              <button onclick="switchTab('hermes')" class="w-full py-1.5 bg-bg-base hover:bg-bg-subtle border border-border-dim text-text-secondary hover:text-text-primary rounded font-mono text-xs transition-colors">
+                Open Hermes Lab Terminal
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- =================================================================== -->
+      <!-- VIEW 2: LEADS EXPLORER (DATA TABLE)                                 -->
+      <!-- =================================================================== -->
+      <div id="view-leads" class="view-panel hidden p-5 space-y-4">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border-dim pb-3">
+          <div>
+            <h2 class="text-base font-mono font-extrabold text-text-primary">REAL CONTRACTOR LEADS ENGINE</h2>
+            <p class="text-xs text-text-muted">142 verified local contractor entities with live Google Ratings, technical Lighthouse speed audits, and PII vault protection.</p>
+          </div>
+          <div class="flex items-center gap-2">
+            <button class="px-2.5 py-1.5 bg-bg-raised border border-border-dim text-xs font-mono text-text-primary rounded hover:bg-bg-subtle flex items-center gap-1.5">
+              <i data-lucide="filter" class="w-3.5 h-3.5 text-text-muted"></i>
+              <span>Filter: Speed &lt; 50</span>
+            </button>
+            <button class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-mono font-bold rounded flex items-center gap-1.5 shadow-sm">
+              <i data-lucide="download" class="w-3.5 h-3.5"></i>
+              <span>Harvest New Real Leads</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Leads Table Component -->
+        <div class="rounded border border-border-dim bg-bg-raised overflow-hidden">
+          <div class="overflow-x-auto">
+            <table class="w-full text-left border-collapse text-xs font-mono">
+              <thead>
+                <tr class="bg-bg-dark border-b border-border-dim text-text-muted text-[10px] uppercase">
+                  <th class="p-2.5">Business & Contact</th>
+                  <th class="p-2.5">Trade / Niche</th>
+                  <th class="p-2.5">Location</th>
+                  <th class="p-2.5">Speed / SEO Score</th>
+                  <th class="p-2.5">SSL Status</th>
+                  <th class="p-2.5">Pipeline Stage</th>
+                  <th class="p-2.5">Urgency</th>
+                  <th class="p-2.5 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-border-dim" id="leadsTableBody">
+                <!-- Lead Row 1 -->
+                <tr class="hover:bg-bg-subtle/40 transition-colors">
+                  <td class="p-2.5">
+                    <div class="font-bold text-text-primary">Apex Climate Pros</div>
+                    <div class="text-[10px] text-text-muted flex items-center gap-1">
+                      <i data-lucide="lock" class="w-2.5 h-2.5 text-emerald-400"></i>
+                      <span>AES Encrypted (Marcus Vance)</span>
+                    </div>
+                  </td>
+                  <td class="p-2.5"><span class="px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20">HVAC</span></td>
+                  <td class="p-2.5 text-text-secondary">Austin, TX</td>
+                  <td class="p-2.5">
+                    <div class="flex items-center gap-2">
+                      <span class="font-bold text-red-400">38/100</span>
+                      <span class="text-text-muted">| SEO 62</span>
+                    </div>
+                  </td>
+                  <td class="p-2.5"><span class="text-red-400 font-bold">MISSING</span></td>
+                  <td class="p-2.5"><span class="px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-400 border border-amber-500/30">CONTACTED</span></td>
+                  <td class="p-2.5">
+                    <div class="w-16 bg-bg-dark rounded-full h-1.5 overflow-hidden">
+                      <div class="bg-red-500 h-full w-[85%]"></div>
+                    </div>
+                  </td>
+                  <td class="p-2.5 text-right">
+                    <button onclick="inspectSampleLead('Apex Climate Pros', 'HVAC', 'Austin, TX', 38, 'missing')" class="px-2 py-1 bg-blue-600/15 hover:bg-blue-600/30 border border-blue-500/40 text-blue-400 rounded text-[11px]">Inspect</button>
+                  </td>
+                </tr>
+
+                <!-- Lead Row 2 -->
+                <tr class="hover:bg-bg-subtle/40 transition-colors">
+                  <td class="p-2.5">
+                    <div class="font-bold text-text-primary">Vanguard Roofing Systems</div>
+                    <div class="text-[10px] text-text-muted flex items-center gap-1">
+                      <i data-lucide="lock" class="w-2.5 h-2.5 text-emerald-400"></i>
+                      <span>AES Encrypted (Elena Rostova)</span>
+                    </div>
+                  </td>
+                  <td class="p-2.5"><span class="px-1.5 py-0.5 rounded bg-purple-500/10 text-purple-400 border border-purple-500/20">ROOFING</span></td>
+                  <td class="p-2.5 text-text-secondary">Dallas, TX</td>
+                  <td class="p-2.5">
+                    <div class="flex items-center gap-2">
+                      <span class="font-bold text-amber-400">54/100</span>
+                      <span class="text-text-muted">| SEO 78</span>
+                    </div>
+                  </td>
+                  <td class="p-2.5"><span class="text-emerald-400 font-bold">VALID</span></td>
+                  <td class="p-2.5"><span class="px-1.5 py-0.5 rounded bg-blue-500/15 text-blue-400 border border-blue-500/30">IN AUDIT</span></td>
+                  <td class="p-2.5">
+                    <div class="w-16 bg-bg-dark rounded-full h-1.5 overflow-hidden">
+                      <div class="bg-amber-500 h-full w-[65%]"></div>
+                    </div>
+                  </td>
+                  <td class="p-2.5 text-right">
+                    <button onclick="inspectSampleLead('Vanguard Roofing Systems', 'Roofing', 'Dallas, TX', 54, 'valid')" class="px-2 py-1 bg-blue-600/15 hover:bg-blue-600/30 border border-blue-500/40 text-blue-400 rounded text-[11px]">Inspect</button>
+                  </td>
+                </tr>
+
+                <!-- Lead Row 3 -->
+                <tr class="hover:bg-bg-subtle/40 transition-colors">
+                  <td class="p-2.5">
+                    <div class="font-bold text-text-primary">Lone Star Master Plumbers</div>
+                    <div class="text-[10px] text-text-muted flex items-center gap-1">
+                      <i data-lucide="lock" class="w-2.5 h-2.5 text-emerald-400"></i>
+                      <span>AES Encrypted (David Kim)</span>
+                    </div>
+                  </td>
+                  <td class="p-2.5"><span class="px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">PLUMBING</span></td>
+                  <td class="p-2.5 text-text-secondary">Houston, TX</td>
+                  <td class="p-2.5">
+                    <div class="flex items-center gap-2">
+                      <span class="font-bold text-red-400">42/100</span>
+                      <span class="text-text-muted">| SEO 48</span>
+                    </div>
+                  </td>
+                  <td class="p-2.5"><span class="text-emerald-400 font-bold">VALID</span></td>
+                  <td class="p-2.5"><span class="px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">WON / RETAINER</span></td>
+                  <td class="p-2.5">
+                    <div class="w-16 bg-bg-dark rounded-full h-1.5 overflow-hidden">
+                      <div class="bg-emerald-500 h-full w-[95%]"></div>
+                    </div>
+                  </td>
+                  <td class="p-2.5 text-right">
+                    <button onclick="inspectSampleLead('Lone Star Master Plumbers', 'Plumbing', 'Houston, TX', 42, 'valid')" class="px-2 py-1 bg-blue-600/15 hover:bg-blue-600/30 border border-blue-500/40 text-blue-400 rounded text-[11px]">Inspect</button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- =================================================================== -->
+      <!-- VIEW 3: OUTREACH & CAMPAIGNS (HERMES DRAFTER & DIAGNOSTICS)         -->
+      <!-- =================================================================== -->
+      <div id="view-campaigns" class="view-panel hidden p-5 space-y-4">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border-dim pb-3">
+          <div>
+            <h2 class="text-base font-mono font-extrabold text-text-primary">CAMPAIGNS & KAISO OUTREACH ENGINE</h2>
+            <p class="text-xs text-text-muted">Multi-channel contractor acquisition: Google LSA, Meta Lead Ads, Direct Cold Outbox, and Hermes AI sequence synthesizer.</p>
+          </div>
+          <div class="flex items-center gap-2">
+            <button onclick="runHermesDiagnostics()" class="px-3 py-1.5 bg-blue-600/20 hover:bg-blue-600/30 border border-blue-500/40 text-blue-400 text-xs font-mono font-bold rounded flex items-center gap-1.5">
+              <i data-lucide="sparkles" class="w-3.5 h-3.5"></i>
+              <span>Diagnose Portfolio with Hermes</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Hermes Diagnostics Banner (Simulated) -->
+        <div id="diagnosticsBanner" class="p-3.5 rounded bg-blue-950/20 border border-blue-500/30 space-y-2">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-2">
+              <i data-lucide="shield-alert" class="w-4 h-4 text-blue-400"></i>
+              <span class="text-xs font-mono font-bold text-text-primary">HERMES PORTFOLIO DIAGNOSTIC SCAN: HEALTH 89/100</span>
+            </div>
+            <span class="text-[10px] font-mono px-2 py-0.5 bg-blue-500/20 text-blue-300 rounded font-bold">1 OPTIMIZATION VECTOR</span>
+          </div>
+          <p class="text-xs text-text-secondary leading-relaxed">
+            Inbound call latency during peak 5PM-8PM contractor closing windows leaks ~18% of inquiries. Calibrating SMS auto-responder bridge recaptures estimated +$4,200/mo pipeline.
+          </p>
+        </div>
+
+        <!-- 3 Channel Summary Cards -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+          <div class="p-3.5 rounded bg-bg-raised border border-border-dim space-y-1">
+            <span class="text-[10px] font-mono text-text-muted uppercase">Google Local Services Ads (LSA)</span>
+            <div class="text-xl font-bold font-mono text-text-primary">$4,200 <span class="text-xs text-text-muted font-normal">/mo</span></div>
+            <span class="text-xs font-mono text-emerald-400 font-bold">CPL: $42.50 (High Intent)</span>
+          </div>
+          <div class="p-3.5 rounded bg-bg-raised border border-border-dim space-y-1">
+            <span class="text-[10px] font-mono text-text-muted uppercase">Meta Contractor Hyper-Local Ads</span>
+            <div class="text-xl font-bold font-mono text-text-primary">$2,800 <span class="text-xs text-text-muted font-normal">/mo</span></div>
+            <span class="text-xs font-mono text-blue-400 font-bold">CPL: $28.00 (Volume)</span>
+          </div>
+          <div class="p-3.5 rounded bg-bg-raised border border-border-dim space-y-1">
+            <span class="text-[10px] font-mono text-text-muted uppercase">Direct Technical Speed Outbox</span>
+            <div class="text-xl font-bold font-mono text-text-primary">142 Leads <span class="text-xs text-text-muted font-normal">Queued</span></div>
+            <span class="text-xs font-mono text-purple-400 font-bold">KAISO Speed Pitches</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- =================================================================== -->
+      <!-- VIEW 4: CLIENT PIPELINE (KANBAN BOARD)                              -->
+      <!-- =================================================================== -->
+      <div id="view-pipeline" class="view-panel hidden p-5 space-y-4">
+        <div class="flex items-center justify-between border-b border-border-dim pb-3">
+          <div>
+            <h2 class="text-base font-mono font-extrabold text-text-primary">DEAL STAGE PIPELINE (KANBAN)</h2>
+            <p class="text-xs text-text-muted">Manage contractor deal lifecycle: Untouched ➔ Contacted ➔ Technical Audit ➔ Retainer Pitch ➔ Closed Won.</p>
+          </div>
+          <div class="text-xs font-mono text-emerald-400 font-bold">
+            Total Pipeline Velocity: $284,500
+          </div>
+        </div>
+
+        <!-- 5 Kanban Columns -->
+        <div class="grid grid-cols-1 md:grid-cols-5 gap-3 h-[600px] overflow-x-auto pb-4">
+          <!-- Col 1: Untouched -->
+          <div class="bg-bg-raised border border-border-dim rounded p-3 flex flex-col gap-2">
+            <div class="flex items-center justify-between pb-2 border-b border-border-dim text-[11px] font-mono font-bold text-text-muted">
+              <span>UNTOUCHED</span>
+              <span class="px-1.5 py-0.2 bg-bg-dark rounded text-text-secondary">38</span>
+            </div>
+            <div class="space-y-2 overflow-y-auto flex-1">
+              <div class="p-2.5 rounded bg-bg-dark border border-border-dim space-y-1">
+                <div class="text-xs font-bold text-text-primary">Precision Air TX</div>
+                <div class="text-[10px] text-text-muted">HVAC • Austin • $4.5k</div>
+                <span class="text-[9px] font-mono px-1 py-0.2 bg-red-500/20 text-red-400 rounded">Speed 29/100</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Col 2: Contacted -->
+          <div class="bg-bg-raised border border-border-dim rounded p-3 flex flex-col gap-2">
+            <div class="flex items-center justify-between pb-2 border-b border-border-dim text-[11px] font-mono font-bold text-text-muted">
+              <span>CONTACTED</span>
+              <span class="px-1.5 py-0.2 bg-bg-dark rounded text-text-secondary">24</span>
+            </div>
+            <div class="space-y-2 overflow-y-auto flex-1">
+              <div class="p-2.5 rounded bg-bg-dark border border-border-dim space-y-1">
+                <div class="text-xs font-bold text-text-primary">Apex Climate Pros</div>
+                <div class="text-[10px] text-text-muted">HVAC • Austin • $5.2k</div>
+                <span class="text-[9px] font-mono px-1 py-0.2 bg-amber-500/20 text-amber-400 rounded">KAISO Email Sent</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Col 3: In Audit -->
+          <div class="bg-bg-raised border border-border-dim rounded p-3 flex flex-col gap-2">
+            <div class="flex items-center justify-between pb-2 border-b border-border-dim text-[11px] font-mono font-bold text-text-muted">
+              <span>IN AUDIT</span>
+              <span class="px-1.5 py-0.2 bg-bg-dark rounded text-text-secondary">12</span>
+            </div>
+            <div class="space-y-2 overflow-y-auto flex-1">
+              <div class="p-2.5 rounded bg-bg-dark border border-border-dim space-y-1">
+                <div class="text-xs font-bold text-text-primary">Vanguard Roofing</div>
+                <div class="text-[10px] text-text-muted">Roofing • Dallas • $7.8k</div>
+                <span class="text-[9px] font-mono px-1 py-0.2 bg-blue-500/20 text-blue-400 rounded">Lighthouse Video Sent</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Col 4: Retainer Pitch -->
+          <div class="bg-bg-raised border border-border-dim rounded p-3 flex flex-col gap-2">
+            <div class="flex items-center justify-between pb-2 border-b border-border-dim text-[11px] font-mono font-bold text-text-muted">
+              <span>RETAINER PITCH</span>
+              <span class="px-1.5 py-0.2 bg-bg-dark rounded text-text-secondary">6</span>
+            </div>
+            <div class="space-y-2 overflow-y-auto flex-1">
+              <div class="p-2.5 rounded bg-bg-dark border border-border-dim space-y-1">
+                <div class="text-xs font-bold text-text-primary">Alamo Foundation Pros</div>
+                <div class="text-[10px] text-text-muted">Concrete • San Antonio • $6.5k</div>
+                <span class="text-[9px] font-mono px-1 py-0.2 bg-purple-500/20 text-purple-400 rounded">Contract Out</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Col 5: Closed Won -->
+          <div class="bg-bg-raised border border-border-dim rounded p-3 flex flex-col gap-2 border-emerald-500/30">
+            <div class="flex items-center justify-between pb-2 border-b border-border-dim text-[11px] font-mono font-bold text-emerald-400">
+              <span>CLOSED WON</span>
+              <span class="px-1.5 py-0.2 bg-emerald-500/20 rounded text-emerald-300">4</span>
+            </div>
+            <div class="space-y-2 overflow-y-auto flex-1">
+              <div class="p-2.5 rounded bg-bg-dark border border-emerald-500/40 space-y-1">
+                <div class="text-xs font-bold text-text-primary">Lone Star Plumbers</div>
+                <div class="text-[10px] text-text-muted">Plumbing • Houston • $4.5k/mo</div>
+                <span class="text-[9px] font-mono px-1 py-0.2 bg-emerald-500/20 text-emerald-400 rounded font-bold">ACTIVE RETAINER</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- =================================================================== -->
+      <!-- VIEW 5: TERRITORY CONQUEST RADAR (WEATHER & STORM SURGE)            -->
+      <!-- =================================================================== -->
+      <div id="view-territory" class="view-panel hidden p-5 space-y-4">
+        <div class="flex items-center justify-between border-b border-border-dim pb-3">
+          <div>
+            <h2 class="text-base font-mono font-extrabold text-text-primary">TERRITORY CONQUEST & WEATHER RADAR</h2>
+            <p class="text-xs text-text-muted">Correlate severe weather alerts (Hail, Freeze, Storms) with contractor demand surges for emergency pipe and roof repair.</p>
+          </div>
+          <span class="text-xs font-mono px-2 py-1 rounded bg-amber-500/10 border border-amber-500/30 text-amber-400">
+            ALERT: Hail Event Reported in North DFW Area
+          </span>
+        </div>
+
+        <!-- Radar Canvas Mockup -->
+        <div class="h-96 rounded bg-bg-raised border border-border-dim p-4 flex flex-col items-center justify-center relative overflow-hidden grid-pattern">
+          <div class="w-64 h-64 rounded-full border border-blue-500/20 flex items-center justify-center relative animate-pulse">
+            <div class="w-48 h-48 rounded-full border border-blue-500/30 flex items-center justify-center">
+              <div class="w-32 h-32 rounded-full border border-blue-500/40 flex items-center justify-center">
+                <div class="w-3 h-3 rounded-full bg-blue-500"></div>
+              </div>
+            </div>
+            <!-- Radar Pins -->
+            <div class="absolute top-12 left-16 px-2 py-1 rounded bg-red-600/80 text-white font-mono text-[10px] font-bold shadow-lg">
+              Hail Spike: Dallas (Roof Surge +340%)
+            </div>
+            <div class="absolute bottom-16 right-12 px-2 py-1 rounded bg-blue-600/80 text-white font-mono text-[10px] font-bold shadow-lg">
+              Freeze Warning: Austin (HVAC Surge +120%)
+            </div>
+          </div>
+          <div class="absolute bottom-3 left-4 text-xs font-mono text-text-muted">
+            Live Geo Feed • Coordinates: 30.2672° N, 97.7431° W (Austin Base)
+          </div>
+        </div>
+      </div>
+
+      <!-- =================================================================== -->
+      <!-- VIEW 6: HERMES AGENT LAB                                            -->
+      <!-- =================================================================== -->
+      <div id="view-hermes" class="view-panel hidden p-5 space-y-4">
+        <div class="flex items-center justify-between border-b border-border-dim pb-3">
+          <div>
+            <h2 class="text-base font-mono font-extrabold text-text-primary">HERMES AUTONOMOUS AGENT LAB</h2>
+            <p class="text-xs text-text-muted">Nous Research Hermes reasoning engine: autonomous ad copy synthesis, landing page generator, and diagnostic audit tool.</p>
+          </div>
+          <span class="text-xs font-mono px-2.5 py-1 rounded bg-blue-600/20 text-blue-400 border border-blue-500/40 font-bold">
+            HERMES-3-REASONING-ACTIVE
+          </span>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <!-- Terminal / Prompt Studio -->
+          <div class="p-4 rounded bg-bg-raised border border-border-dim space-y-3 font-mono">
+            <div class="flex items-center justify-between text-xs text-text-muted border-b border-border-dim pb-2">
+              <span>HERMES PROMPT DISPATCHER</span>
+              <span class="text-emerald-400">READY</span>
+            </div>
+            <div class="space-y-1.5">
+              <label class="text-[10px] text-text-muted uppercase">Target Tool ID</label>
+              <select class="w-full bg-bg-dark border border-border-dim p-2 rounded text-xs text-text-primary">
+                <option>outreach_sequences (Cold KAISO Framework Pitch)</option>
+                <option>landing_page_builder (Anti-AI High Conversion Trade Page)</option>
+                <option>portfolio_diagnostics (Budget & Leakage Anomaly Audit)</option>
+              </select>
+            </div>
+            <div class="space-y-1.5">
+              <label class="text-[10px] text-text-muted uppercase">Prompt Override / Context Injection</label>
+              <textarea rows="5" class="w-full bg-bg-dark border border-border-dim p-2 rounded text-xs text-text-primary font-mono leading-relaxed" placeholder="Draft a high-conversion cold outreach script targeting HVAC contractors in Austin with PageSpeed under 50/100..."></textarea>
+            </div>
+            <button class="w-full py-2 bg-blue-600 hover:bg-blue-500 text-white rounded font-bold text-xs flex items-center justify-center gap-2">
+              <i data-lucide="play" class="w-3.5 h-3.5"></i>
+              <span>Execute Hermes Synthesis</span>
+            </button>
+          </div>
+
+          <!-- Real-Time Artifact Output Viewer -->
+          <div class="p-4 rounded bg-bg-raised border border-border-dim space-y-3 font-mono">
+            <div class="flex items-center justify-between text-xs text-text-muted border-b border-border-dim pb-2">
+              <span>SYNTHESIZED ARTIFACT OUTPUT</span>
+              <span class="text-blue-400">JSON / HTML READY</span>
+            </div>
+            <div class="bg-bg-dark p-3 rounded border border-border-dim text-[11px] text-text-secondary leading-relaxed h-[260px] overflow-y-auto space-y-2">
+              <div class="text-emerald-400 font-bold">// Subject: Actionable Speed & Revenue Leakage Audit for Apex Climate Pros</div>
+              <p>Hi Marcus,</p>
+              <p>We ran a routine Lighthouse performance sweep across Austin-area HVAC operators this morning.</p>
+              <p>Apex Climate Pros flagged an overall mobile speed rating of <strong>38/100</strong> with an unsecured SSL certificate state. In practical terms, local homeowners searching on mobile experience a 4.8s load delay before your call button renders—diverting an estimated 18-22 qualified emergency calls directly to your competitors each month.</p>
+              <p>We built a clean 1-click remedy that restores PageSpeed to 94+ without touching your hosting. Are you open to a 4-minute screen recording walking through the fix?</p>
+              <p>Best,<br>Apex Trades Growth Corp</p>
+            </div>
+            <div class="flex items-center gap-2 pt-2">
+              <button class="flex-1 py-1.5 bg-bg-base hover:bg-bg-subtle border border-border-dim rounded text-xs font-mono text-text-primary">Copy Output</button>
+              <button class="flex-1 py-1.5 bg-emerald-600/20 hover:bg-emerald-600/30 border border-emerald-500/40 text-emerald-400 rounded text-xs font-mono font-bold">Push to Outbox</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- =================================================================== -->
+      <!-- VIEW 7: CLAUDE REVIEW & SPACE OPTIMIZATION DOSSIER (SPECIAL VIEW)   -->
+      <!-- =================================================================== -->
+      <div id="view-claude_audit" class="view-panel hidden p-5 space-y-5">
+        <div class="p-4 rounded bg-blue-950/20 border border-blue-500/40 space-y-2">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-2">
+              <i data-lucide="bot" class="w-5 h-5 text-blue-400"></i>
+              <h2 class="text-sm font-mono font-extrabold text-blue-400 uppercase tracking-wider">
+                Claude 3.7 / 3.5 Sonnet Optimization Dossier
+              </h2>
+            </div>
+            <button onclick="copyClaudePrompt()" class="px-3 py-1 bg-blue-600 hover:bg-blue-500 text-white rounded font-mono text-xs font-bold flex items-center gap-1.5 shadow-sm">
+              <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+              <span>Copy Full Prompt to Clipboard</span>
+            </button>
+          </div>
+          <p class="text-xs text-text-secondary leading-relaxed">
+            This document outlines the entire HALBiz codebase architecture, current spatial layout, and target enhancements. Show this directly to Claude to guide code improvements and spatial density optimization!
+          </p>
+        </div>
+
+        <!-- Space Utilization Audit Cards -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 font-mono">
+          <!-- Card 1: Spatial Audit -->
+          <div class="p-4 rounded bg-bg-raised border border-border-dim space-y-3">
+            <h3 class="text-xs font-bold text-amber-400 uppercase flex items-center gap-2">
+              <i data-lucide="layout" class="w-4 h-4"></i>
+              <span>1. Current Space Utilization Audit</span>
+            </h3>
+            <ul class="text-xs text-text-secondary space-y-2 list-disc pl-4 leading-relaxed">
+              <li><strong>Center Canvas Density:</strong> Large displays (1920x1080 and ultrawide) have excess horizontal negative space in standard card layouts. Needs flexible multi-column Bloomberg/AutoCAD split docking.</li>
+              <li><strong>Simultaneous Workflows:</strong> Users currently must flip between "Leads" and "Outreach Queue". Adding a side-by-side Split View allows inspecting a lead on the left while live-drafting Hermes pitch scripts on the right.</li>
+              <li><strong>Inspector Utility:</strong> The right inspector panel is currently toggleable, but can be elevated to include quick telephonic dialer controls, CRM activity logs, and instant contract dispatch.</li>
+            </ul>
+          </div>
+
+          <!-- Card 2: Feature Expansion Roadmap -->
+          <div class="p-4 rounded bg-bg-raised border border-border-dim space-y-3">
+            <h3 class="text-xs font-bold text-emerald-400 uppercase flex items-center gap-2">
+              <i data-lucide="plus-circle" class="w-4 h-4"></i>
+              <span>2. High-Value Feature Expansions</span>
+            </h3>
+            <ul class="text-xs text-text-secondary space-y-2 list-disc pl-4 leading-relaxed">
+              <li><strong>Unified Omni-Inbox:</strong> Centralize inbound SMS, two-way email threads, and missed call voicemails into an integrated dispatch center.</li>
+              <li><strong>Contractor Webhook Automations:</strong> Visual node-based pipeline connector (like Zapier/Make) connecting Twilio, Meta Lead Ads, and Stripe payouts directly.</li>
+              <li><strong>Client White-Label Portal:</strong> Allow agency contractors to log in with client-restricted access to view their own leads, speed scores, and ad spend.</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- Complete Architecture Checklist -->
+        <div class="p-4 rounded bg-bg-raised border border-border-dim space-y-3 font-mono">
+          <h3 class="text-xs font-bold text-text-primary uppercase flex items-center gap-2">
+            <i data-lucide="layers" class="w-4 h-4 text-blue-400"></i>
+            <span>3. Current Complete Module Inventory (24 Core Systems)</span>
+          </h3>
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 text-[11px] text-text-secondary">
+            <div class="p-2 bg-bg-dark rounded border border-border-dim">01. Mission Control Dashboard</div>
+            <div class="p-2 bg-bg-dark rounded border border-border-dim">02. Sourced Real Business Harvest Engine</div>
+            <div class="p-2 bg-bg-dark rounded border border-border-dim">03. AES-GCM PII Cryptographic Vault</div>
+            <div class="p-2 bg-bg-dark rounded border border-border-dim">04. Multi-Channel Ad Campaigns (LSA/Meta)</div>
+            <div class="p-2 bg-bg-dark rounded border border-border-dim">05. KAISO Cold Outreach Personalizer</div>
+            <div class="p-2 bg-bg-dark rounded border border-border-dim">06. Kanban Client Pipeline Stage Board</div>
+            <div class="p-2 bg-bg-dark rounded border border-border-dim">07. Territory Radar & Storm Surge Maps</div>
+            <div class="p-2 bg-bg-dark rounded border border-border-dim">08. Hermes Autonomous Reasoning Lab</div>
+            <div class="p-2 bg-bg-dark rounded border border-border-dim">09. Anti-AI Landing Page Builder Studio</div>
+            <div class="p-2 bg-bg-dark rounded border border-border-dim">10. Delivery Projects & Milestone Gantt</div>
+            <div class="p-2 bg-bg-dark rounded border border-border-dim">11. Retainer & Commission Agreement Hub</div>
+            <div class="p-2 bg-bg-dark rounded border border-border-dim">12. HAL Bible Specifications (01 - 24)</div>
+            <div class="p-2 bg-bg-dark rounded border border-border-dim">13. Neural Synaptic Vector Graph</div>
+            <div class="p-2 bg-bg-dark rounded border border-border-dim">14. HAL Loop Engine (Continuous Learn)</div>
+            <div class="p-2 bg-bg-dark rounded border border-border-dim">15. Inbound Telephony Webhook (/api/leads)</div>
+            <div class="p-2 bg-bg-dark rounded border border-border-dim">16. Global Command Palette (Cmd+K)</div>
+            <div class="p-2 bg-bg-dark rounded border border-border-dim">17. Contextual Flyout Inspector (Zone 4)</div>
+            <div class="p-2 bg-bg-dark rounded border border-border-dim">18. PostgreSQL Drizzle Cloud Sync</div>
+          </div>
+        </div>
+      </div>
+
+    </main>
+
+    <!-- ── RIGHT CONTEXTUAL INSPECTOR (Zone 4) ────────────────────────────── -->
+    <aside id="inspectorPanel" class="w-80 border-l border-border-dim bg-bg-dark flex flex-col shrink-0 overflow-y-auto transition-all">
+      <div class="p-4 border-b border-border-dim flex items-center justify-between">
+        <div class="flex items-center gap-2">
+          <i data-lucide="info" class="w-4 h-4 text-blue-400"></i>
+          <span class="text-xs font-mono font-bold text-text-primary uppercase">Contextual Inspector</span>
+        </div>
+        <button onclick="toggleInspector()" class="p-1 hover:bg-bg-subtle rounded text-text-muted hover:text-text-primary">
+          <i data-lucide="x" class="w-4 h-4"></i>
+        </button>
+      </div>
+
+      <!-- Selected Entity Inspector Content -->
+      <div class="p-4 space-y-4 font-mono text-xs">
+        <div>
+          <span class="text-[10px] text-text-muted uppercase block">Selected Entity</span>
+          <h3 class="text-sm font-bold text-text-primary mt-0.5" id="inspectorEntityName">Apex Climate Pros</h3>
+          <span class="text-[10px] px-1.5 py-0.2 bg-emerald-500/20 text-emerald-400 rounded font-bold uppercase mt-1 inline-block" id="inspectorEntityBadge">HVAC CONTRACTOR</span>
+        </div>
+
+        <div class="space-y-2 pt-2 border-t border-border-dim">
+          <span class="text-[10px] text-text-muted uppercase block">Technical Audit Findings</span>
+          <div class="p-2 bg-bg-raised rounded border border-border-dim space-y-1">
+            <div class="flex justify-between">
+              <span class="text-text-muted">Mobile Speed:</span>
+              <span class="font-bold text-red-400" id="inspectorSpeed">38 / 100</span>
+            </div>
+            <div class="flex justify-between">
+              <span class="text-text-muted">SSL Security:</span>
+              <span class="font-bold text-red-400" id="inspectorSsl">MISSING</span>
+            </div>
+            <div class="flex justify-between">
+              <span class="text-text-muted">Google Rating:</span>
+              <span class="font-bold text-amber-400">4.3 ★ (22 reviews)</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="space-y-2 pt-2 border-t border-border-dim">
+          <span class="text-[10px] text-text-muted uppercase block">Encrypted PII Credentials</span>
+          <div class="p-2 bg-bg-raised rounded border border-border-dim space-y-1 text-[11px]">
+            <div class="text-text-muted">Owner: <span class="text-text-primary">Marcus Vance</span></div>
+            <div class="text-text-muted">Phone: <span class="text-emerald-400 font-mono">+1 (512) 840-**** [AES]</span></div>
+            <div class="text-text-muted">City: <span class="text-text-primary">Austin, Texas</span></div>
+          </div>
+        </div>
+
+        <div class="space-y-2 pt-2 border-t border-border-dim">
+          <span class="text-[10px] text-text-muted uppercase block">Hermes KAISO Pitch Script</span>
+          <div class="p-2.5 bg-bg-raised rounded border border-border-dim text-[11px] text-text-secondary leading-relaxed" id="inspectorScript">
+            "Your website's 4.8s mobile load latency causes an estimated 18+ high-intent AC emergency calls to drop every month. We deployed a localized speed remedy that recovers these calls instantly."
+          </div>
+        </div>
+
+        <div class="pt-2 border-t border-border-dim space-y-2">
+          <button onclick="triggerHermesFastDraft()" class="w-full py-2 bg-blue-600 hover:bg-blue-500 text-white rounded font-bold text-xs flex items-center justify-center gap-1.5 shadow-sm">
+            <i data-lucide="send" class="w-3.5 h-3.5"></i>
+            <span>Dispatch KAISO Sequence</span>
+          </button>
+          <button onclick="switchTab('pipeline')" class="w-full py-1.5 bg-bg-base hover:bg-bg-subtle border border-border-dim text-text-secondary hover:text-text-primary rounded text-xs">
+            Advance Deal Stage
+          </button>
+        </div>
+      </div>
+    </aside>
+
+  </div>
+
+  <!-- ========================================================================= -->
+  <!-- BOTTOM STATUS BAR (Zone 5)                                                -->
+  <!-- ========================================================================= -->
+  <footer class="h-7 border-t border-border-dim bg-bg-dark flex items-center justify-between px-3 text-[10px] font-mono text-text-muted shrink-0 z-30">
+    <div class="flex items-center gap-4">
+      <div class="flex items-center gap-1.5">
+        <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+        <span class="text-text-secondary">HAL CORE: ONLINE</span>
+      </div>
+      <span>PORT: 3000 (0.0.0.0)</span>
+      <span class="hidden sm:inline">CIPHER: AES-GCM-256</span>
+      <span class="hidden md:inline">AI MODEL: GEMINI 3.8 FLASH + HERMES 3</span>
+    </div>
+    <div class="flex items-center gap-3">
+      <span>HOTKEYS: [Cmd+K] Search • [Cmd+B] Sidebar • [Esc] Close</span>
+      <span class="text-text-primary font-bold">HALBiz Systems</span>
+    </div>
+  </footer>
+
+  <!-- ========================================================================= -->
+  <!-- MODAL: CLAUDE REVIEW & PROMPT EXPORTER                                    -->
+  <!-- ========================================================================= -->
+  <div id="claudeModal" class="fixed inset-0 bg-black/75 backdrop-blur-sm z-50 flex items-center justify-center hidden p-4">
+    <div class="bg-bg-raised border border-border-dim rounded-lg w-full max-w-2xl shadow-2xl flex flex-col max-h-[85vh] font-mono">
+      <div class="p-4 border-b border-border-dim flex items-center justify-between">
+        <div class="flex items-center gap-2">
+          <i data-lucide="bot" class="w-5 h-5 text-blue-400"></i>
+          <h3 class="text-xs font-bold text-text-primary uppercase tracking-wider">Claude Review & Enhancement Dossier</h3>
+        </div>
+        <button onclick="closeModal('claudeModal')" class="text-text-muted hover:text-text-primary p-1">
+          <i data-lucide="x" class="w-4 h-4"></i>
+        </button>
+      </div>
+      <div class="p-4 overflow-y-auto space-y-4 text-xs text-text-secondary">
+        <p class="leading-relaxed">
+          Copy this structured prompt and paste it into Claude along with this HTML file to receive spatial layout upgrades, AutoCAD-grade information density improvements, and feature expansion code:
+        </p>
+        <div class="relative">
+          <textarea id="claudePromptText" readonly rows="12" class="w-full bg-bg-dark border border-border-dim p-3 rounded text-[11px] text-text-primary font-mono leading-relaxed select-all">
+Hello Claude,
+
+I am developing HALBiz, an AI-powered Business Operating Intelligence System built for local trade contractors and growth agencies.
+
+Please analyze the attached HTML blueprint (`hal-app-overview.html`) representing our full application architecture.
+
+Our Goals:
+1. SPATIAL UTILIZATION & DENSITY:
+   - Provide concrete suggestions on how to utilize screen real estate on desktop (1920x1080 and ultrawide) more effectively.
+   - Refactor key views (Leads Engine, Outreach Queue, Client Pipeline) into high-density, low-clutter, AutoCAD/Bloomberg Terminal-grade bento layouts.
+   - Introduce docked split-screen views (e.g. Lead Table + Hermes Outreach Drafter side-by-side).
+
+2. NEW HIGH-VALUE FEATURES:
+   - What additional high-utility features should we build into this platform?
+   - Examples: In-app VoIP dialer, Omni-Inbox (SMS/Email/Missed Calls), client white-label portals, or visual webhook automation builders.
+
+3. VISUAL CRAFTSMANSHIP:
+   - Provide recommendations for typographic contrast, micro-interactions, subtle borders, and color tokens to make this feel like an executive, institutional-grade OS.
+
+Please give me an architectural breakdown, spatial audit, and specific UI component recommendations!
+          </textarea>
+        </div>
+      </div>
+      <div class="p-4 border-t border-border-dim flex items-center justify-between gap-3 bg-bg-dark rounded-b-lg">
+        <span class="text-[11px] text-text-muted">Prompt includes complete system architecture context</span>
+        <button onclick="copyClaudePrompt()" class="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded text-xs font-bold flex items-center gap-1.5 shadow-md">
+          <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+          <span id="copyBtnText">Copy Prompt & Close</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================================================= -->
+  <!-- MODAL: GLOBAL COMMAND PALETTE (CMD+K)                                     -->
+  <!-- ========================================================================= -->
+  <div id="commandModal" class="fixed inset-0 bg-black/75 backdrop-blur-sm z-50 flex items-start justify-center pt-24 hidden p-4">
+    <div class="bg-bg-raised border border-border-dim rounded-lg w-full max-w-xl shadow-2xl flex flex-col font-mono">
+      <div class="p-3 border-b border-border-dim flex items-center gap-2">
+        <i data-lucide="search" class="w-4 h-4 text-text-muted"></i>
+        <input id="commandInput" type="text" placeholder="Search leads, campaigns, Hermes tools, or specs..." class="bg-transparent border-none outline-none text-xs text-text-primary w-full" oninput="filterCommands(this.value)">
+        <kbd class="text-[9px] bg-bg-dark px-1.5 py-0.5 border border-border-subtle rounded text-text-muted">ESC</kbd>
+      </div>
+      <div class="p-2 max-h-72 overflow-y-auto space-y-1" id="commandList">
+        <div onclick="switchTab('overview'); closeModal('commandModal')" class="p-2 rounded hover:bg-blue-600/20 hover:border-blue-500/40 border border-transparent flex items-center justify-between cursor-pointer">
+          <div class="flex items-center gap-2 text-xs text-text-primary">
+            <i data-lucide="layout-dashboard" class="w-3.5 h-3.5 text-blue-400"></i>
+            <span>Mission Control Overview</span>
+          </div>
+          <span class="text-[10px] text-text-muted">PAGE</span>
+        </div>
+        <div onclick="switchTab('leads'); closeModal('commandModal')" class="p-2 rounded hover:bg-blue-600/20 hover:border-blue-500/40 border border-transparent flex items-center justify-between cursor-pointer">
+          <div class="flex items-center gap-2 text-xs text-text-primary">
+            <i data-lucide="users" class="w-3.5 h-3.5 text-emerald-400"></i>
+            <span>Leads Engine (142 Active Records)</span>
+          </div>
+          <span class="text-[10px] text-text-muted">DATA</span>
+        </div>
+        <div onclick="switchTab('hermes'); closeModal('commandModal')" class="p-2 rounded hover:bg-blue-600/20 hover:border-blue-500/40 border border-transparent flex items-center justify-between cursor-pointer">
+          <div class="flex items-center gap-2 text-xs text-text-primary">
+            <i data-lucide="sparkles" class="w-3.5 h-3.5 text-purple-400"></i>
+            <span>Hermes Agent Lab</span>
+          </div>
+          <span class="text-[10px] text-text-muted">AI AGENT</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification Container -->
+  <div id="toast" class="fixed bottom-10 right-10 bg-bg-raised border border-blue-500/40 text-text-primary px-4 py-2.5 rounded shadow-2xl text-xs font-mono z-50 flex items-center gap-2 transition-all transform translate-y-16 opacity-0 pointer-events-none">
+    <i data-lucide="check-circle" class="w-4 h-4 text-emerald-400"></i>
+    <span id="toastMessage">Action completed</span>
+  </div>
+
+  <!-- ========================================================================= -->
+  <!-- JAVASCRIPT CONTROLLER (INTERACTION & TAB NAVIGATION)                      -->
+  <!-- ========================================================================= -->
+  <script>
+    // Initialize Lucide icons
+    lucide.createIcons();
+
+    // Tab Navigation Controller
+    function switchTab(tabId) {
+      document.querySelectorAll('.view-panel').forEach(el => el.classList.add('hidden'));
+      const activeView = document.getElementById('view-' + tabId);
+      if (activeView) {
+        activeView.classList.remove('hidden');
+      }
+
+      document.querySelectorAll('.nav-item').forEach(el => {
+        el.classList.remove('active', 'bg-blue-600/15', 'border-blue-500/30', 'font-semibold', 'text-text-primary');
+        el.classList.add('text-text-secondary');
+        if (el.dataset.tab === tabId) {
+          el.classList.add('active', 'bg-blue-600/15', 'border-blue-500/30', 'font-semibold', 'text-text-primary');
+          el.classList.remove('text-text-secondary');
+        }
+      });
+    }
+
+    // Toggle Inspector Panel
+    let inspectorOpen = true;
+    function toggleInspector() {
+      const panel = document.getElementById('inspectorPanel');
+      inspectorOpen = !inspectorOpen;
+      if (inspectorOpen) {
+        panel.classList.remove('hidden');
+      } else {
+        panel.classList.add('hidden');
+      }
+    }
+
+    // Toggle High Density Mode
+    let isDense = true;
+    function toggleDensity() {
+      isDense = !isDense;
+      const main = document.getElementById('mainCanvas');
+      const label = document.getElementById('densityLabel');
+      if (isDense) {
+        main.classList.remove('p-8');
+        label.innerText = 'Dense Mode';
+        showToast('Switched to AutoCAD Compact Density');
+      } else {
+        main.classList.add('p-8');
+        label.innerText = 'Spacious Mode';
+        showToast('Switched to Spacious SaaS Mode');
+      }
+    }
+
+    // Inspect Sample Lead in Inspector
+    function inspectSampleLead(name, niche, city, speed, ssl) {
+      document.getElementById('inspectorEntityName').innerText = name;
+      document.getElementById('inspectorEntityBadge').innerText = `${niche} CONTRACTOR`;
+      document.getElementById('inspectorSpeed').innerText = `${speed} / 100`;
+      document.getElementById('inspectorSsl').innerText = ssl === 'valid' ? 'VALID' : 'MISSING';
+      document.getElementById('inspectorSsl').className = ssl === 'valid' ? 'font-bold text-emerald-400' : 'font-bold text-red-400';
+      document.getElementById('inspectorScript').innerText = 
+        `"We audited ${name} in ${city}. The mobile page scores ${speed}/100 with ${ssl === 'valid' ? 'standard encryption' : 'an unencrypted SSL warning'}, causing roughly 18+ high-intent emergency calls to abandon before reaching your phone. Our rapid fix brings this to 90+ speed."`;
+      
+      // Ensure inspector is open
+      if (!inspectorOpen) toggleInspector();
+      showToast(`Inspecting: ${name}`);
+    }
+
+    // Hermes Fast Draft Simulator
+    function triggerHermesFastDraft() {
+      showToast('Hermes synthesized 10 localized KAISO outreach sequences!');
+    }
+
+    // Hermes Diagnostics Simulator
+    function runHermesDiagnostics() {
+      const banner = document.getElementById('diagnosticsBanner');
+      banner.classList.add('animate-pulse');
+      setTimeout(() => {
+        banner.classList.remove('animate-pulse');
+        showToast('Hermes scan completed: 1 critical latency vector identified');
+      }, 600);
+    }
+
+    // Modal Handlers
+    function openModal(modalId) {
+      document.getElementById(modalId).classList.remove('hidden');
+      if (modalId === 'commandModal') {
+        setTimeout(() => document.getElementById('commandInput').focus(), 50);
+      }
+    }
+
+    function closeModal(modalId) {
+      document.getElementById(modalId).classList.add('hidden');
+    }
+
+    // Copy Claude Prompt
+    function copyClaudePrompt() {
+      const text = document.getElementById('claudePromptText').value;
+      navigator.clipboard.writeText(text).then(() => {
+        showToast('Claude optimization prompt copied to clipboard!');
+        const btn = document.getElementById('copyBtnText');
+        if (btn) btn.innerText = 'Copied!';
+        setTimeout(() => {
+          closeModal('claudeModal');
+          if (btn) btn.innerText = 'Copy Prompt & Close';
+        }, 1200);
+      });
+    }
+
+    // Toast Utility
+    function showToast(msg) {
+      const toast = document.getElementById('toast');
+      const toastMsg = document.getElementById('toastMessage');
+      toastMsg.innerText = msg;
+      toast.classList.remove('translate-y-16', 'opacity-0', 'pointer-events-none');
+      setTimeout(() => {
+        toast.classList.add('translate-y-16', 'opacity-0', 'pointer-events-none');
+      }, 3000);
+    }
+
+    // Hotkey bindings
+    document.addEventListener('keydown', (e) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault();
+        openModal('commandModal');
+      }
+      if ((e.metaKey || e.ctrlKey) && e.key === 'b') {
+        e.preventDefault();
+        toggleInspector();
+      }
+      if (e.key === 'Escape') {
+        closeModal('commandModal');
+        closeModal('claudeModal');
+      }
+    });
+
+    // Command input filter
+    function filterCommands(query) {
+      const q = query.toLowerCase();
+      const list = document.getElementById('commandList').children;
+      for (let item of list) {
+        if (item.innerText.toLowerCase().includes(q)) {
+          item.style.display = 'flex';
+        } else {
+          item.style.display = 'none';
+        }
+      }
+    }
+  </script>
+</body>
+</html>

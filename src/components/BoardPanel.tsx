@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { Lead } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
 import { useBusinessContext } from '../context/BusinessContext';
+import { useInspector } from '../context/InspectorContext';
+import { useToast } from '../context/ToastContext';
 import { 
   ArrowLeft, 
   ArrowRight, 
@@ -36,6 +38,7 @@ interface BoardPanelProps {
 }
 
 export default function BoardPanel({ leads, token, onRefresh }: BoardPanelProps) {
+  const { toast } = useToast();
   // State for customized sales stages
   const [stageNames, setStageNames] = useState<Record<Lead['status'], string>>(() => {
     const saved = localStorage.getItem('hal_custom_stage_names');
@@ -57,6 +60,54 @@ export default function BoardPanel({ leads, token, onRefresh }: BoardPanelProps)
   // Selected lead for detail inspection modal
   const [selectedBoardLead, setSelectedBoardLead] = useState<Lead | null>(null);
   const [copiedPitch, setCopiedPitch] = useState(false);
+  const { openInspector } = useInspector();
+  const { showToast } = useToast();
+  const [isDraftingWithHermes, setIsDraftingWithHermes] = useState(false);
+
+  const handleDraftSelectedLeadWithHermes = async (lead: Lead) => {
+    setIsDraftingWithHermes(true);
+    try {
+      const res = await fetch('/api/hermes/execute', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          toolId: 'outreach_sequences',
+          parameters: {
+            businessName: lead.businessName,
+            city: lead.city,
+            serviceType: lead.serviceType,
+            ownerName: lead.ownerName || 'Business Owner',
+            websiteUrl: lead.websiteUrl || '',
+            performanceScore: lead.performanceScore || 50,
+            seoScore: lead.seoScore || 65,
+            sslStatus: lead.sslStatus || 'valid',
+            framework: 'KAISO'
+          },
+          promptOverride: `Draft a high-conversion cold pitch for ${lead.businessName} in ${lead.city} referencing their digital footprint.`
+        })
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        const pitchText = data.content?.renderedOutput || data.content?.summary || data.content?.structuredData?.steps?.[0]?.body;
+        if (pitchText) {
+          setSelectedBoardLead(prev => prev ? { ...prev, outreachStrategy: pitchText } : null);
+          showToast(`Hermes drafted custom script for ${lead.businessName}`, 'success');
+        }
+        onRefresh();
+      } else {
+        showToast('Hermes synthesis failed', 'error');
+      }
+    } catch (e) {
+      console.error(e);
+      showToast('Hermes connection timeout', 'error');
+    } finally {
+      setIsDraftingWithHermes(false);
+    }
+  };
 
   // Inline editing column state
   const [editingStage, setEditingStage] = useState<Lead['status'] | null>(null);
@@ -68,21 +119,34 @@ export default function BoardPanel({ leads, token, onRefresh }: BoardPanelProps)
 
   // Core movement endpoint handler
   const moveLeadToStatus = async (leadId: string, nextStatus: Lead['status']) => {
+    const effectiveToken = token || localStorage.getItem('token') || localStorage.getItem('halbiz_auth_token') || '';
     try {
       const res = await fetch(`/api/leads/${leadId}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
+          ...(effectiveToken ? { 'Authorization': `Bearer ${effectiveToken}` } : {})
         },
         body: JSON.stringify({ status: nextStatus })
       });
 
       if (res.ok) {
         onRefresh();
+      } else {
+        const errorData = await res.json().catch(() => ({}));
+        toast({
+          variant: 'warning',
+          title: 'Stage Transition Notice',
+          description: errorData.error || 'Could not move lead to requested status.'
+        });
       }
-    } catch (err) {
-      console.error('Failed to move lead to status:', err);
+    } catch (err: any) {
+      console.warn('Network issue moving lead to status:', err?.message || err);
+      toast({
+        variant: 'danger',
+        title: 'Connection Issue',
+        description: 'Unable to reach backend to update lead status. Please check connectivity.'
+      });
     }
   };
 
@@ -527,7 +591,7 @@ export default function BoardPanel({ leads, token, onRefresh }: BoardPanelProps)
 
                     <div className="p-2.5 rounded-lg bg-bg-base border border-border-dim">
                       <span className="block text-[9px] text-text-tertiary uppercase">Reputation</span>
-                      <span className="text-xs font-bold text-amber-400 mt-1 block">
+                      <span className="text-xs font-bold text-warning mt-1 block">
                         {selectedBoardLead.googleRating ? `${selectedBoardLead.googleRating}★` : '4.2★'}
                       </span>
                     </div>
@@ -538,7 +602,7 @@ export default function BoardPanel({ leads, token, onRefresh }: BoardPanelProps)
                 <div className="grid grid-cols-2 gap-2 font-mono text-xs">
                   <div className="p-3 bg-bg-base rounded-lg border border-border-dim space-y-1">
                     <span className="text-[9px] text-text-tertiary uppercase block">Verified Telephone</span>
-                    <span className="font-bold text-emerald-400 flex items-center gap-1.5">
+                    <span className="font-bold text-positive flex items-center gap-1.5">
                       <Phone className="w-3.5 h-3.5" />
                       {selectedBoardLead.phone || '+1 (403) 555-0192'}
                     </span>
@@ -576,6 +640,26 @@ export default function BoardPanel({ leads, token, onRefresh }: BoardPanelProps)
                     {selectedBoardLead.outreachStrategy || 
                       `"We analyzed ${selectedBoardLead.businessName}'s digital conversion surface in ${selectedBoardLead.city}. Their website ${selectedBoardLead.sslStatus === 'missing' ? 'flags an unencrypted SSL error and ' : ''}scores below standard mobile speed, leaking valuable high-intent local customer calls to competitors. Immediate remediation unlocks an estimated +$${(selectedBoardLead.predictedLtvUsd || 4500).toLocaleString()} in pipeline value."`}
                   </p>
+                  <div className="flex items-center gap-2 pt-1 border-t border-accent/20">
+                    <button
+                      onClick={() => handleDraftSelectedLeadWithHermes(selectedBoardLead)}
+                      disabled={isDraftingWithHermes}
+                      className="flex-1 py-1.5 px-2.5 bg-accent/15 hover:bg-accent/25 border border-accent/40 text-accent rounded text-xs font-mono font-bold uppercase flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                    >
+                      <Sparkles className={`w-3.5 h-3.5 ${isDraftingWithHermes ? 'animate-spin' : 'text-accent'}`} />
+                      <span>{isDraftingWithHermes ? 'Hermes Synthesizing...' : 'Draft with Hermes'}</span>
+                    </button>
+                    <button
+                      onClick={() => {
+                        openInspector('lead', selectedBoardLead.businessName, selectedBoardLead);
+                        setSelectedBoardLead(null);
+                      }}
+                      className="py-1.5 px-3 bg-bg-base hover:bg-bg-subtle border border-border-dim text-text-primary rounded text-xs font-mono font-bold uppercase flex items-center gap-1.5 transition-all cursor-pointer"
+                    >
+                      <ExternalLink className="w-3.5 h-3.5 text-accent" />
+                      <span>Open in Inspector</span>
+                    </button>
+                  </div>
                 </div>
 
                 {/* Quick Move Stage Action */}

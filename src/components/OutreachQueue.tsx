@@ -25,6 +25,7 @@ import {
 } from 'lucide-react';
 import { Lead } from '../types';
 import { useBusinessContext } from '../context/BusinessContext';
+import { useToast } from '../context/ToastContext';
 
 interface OutreachQueueProps {
   leads: Lead[];
@@ -50,10 +51,16 @@ export default function OutreachQueue({ leads, token, onRefresh }: OutreachQueue
   const [activeStatusFilter, setActiveStatusFilter] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
   
+  const { showToast } = useToast();
+
   // Batch Execution State
   const [isExecutingBatch, setIsExecutingBatch] = useState(false);
   const [batchSuccessMessage, setBatchSuccessMessage] = useState<string | null>(null);
   const [batchErrorMessage, setBatchErrorMessage] = useState<string | null>(null);
+
+  // Hermes Drafting States
+  const [isDraftingGlobal, setIsDraftingGlobal] = useState(false);
+  const [draftingLeadId, setDraftingLeadId] = useState<string | null>(null);
 
   // Template customizer state
   const [templateSubject, setTemplateSubject] = useState(
@@ -65,11 +72,124 @@ export default function OutreachQueue({ leads, token, onRefresh }: OutreachQueue
   const [targetFollowUpDays, setTargetFollowUpDays] = useState(3);
   const [autoAdvanceStatus, setAutoAdvanceStatus] = useState(true);
 
+  // Draft with Hermes - for global template
+  const handleDraftGlobalWithHermes = async () => {
+    setIsDraftingGlobal(true);
+    try {
+      const token = localStorage.getItem('halbiz_auth_token') || localStorage.getItem('token') || '';
+      const res = await fetch('/api/hermes/execute', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          toolId: 'outreach_sequences',
+          parameters: {
+            businessName: '{{businessName}}',
+            city: activeCity,
+            serviceType: activeNiche,
+            ownerName: '{{ownerName}}',
+            websiteUrl: '{{websiteUrl}}',
+            operatorName: workspaceConfig.operatorName,
+            agencyName: workspaceConfig.agencyName,
+            framework: 'KAISO'
+          },
+          promptOverride: `Draft a high-conversion KAISO cold outreach script for ${activeNiche} contractors in ${activeCity}. Focus on identifying digital leakage, load speed deficits, and positioning ${workspaceConfig.agencyName} as specialized local growth engineers.`
+        })
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        const content = data.content || {};
+        const steps = content.structuredData?.steps || [];
+        const step = steps[0] || {};
+        
+        const newSubject = step.subject || content.subject || `Speed & Revenue Leakage Audit for {{businessName}} (${activeCity})`;
+        const newBody = step.body || content.renderedOutput || content.summary || templateBody;
+
+        setTemplateSubject(newSubject);
+        setTemplateBody(newBody);
+        showToast('Hermes drafted a personalized KAISO cold sequence', 'success');
+        onRefresh();
+      } else {
+        showToast('Failed to synthesize script with Hermes', 'error');
+      }
+    } catch (e: any) {
+      console.error(e);
+      showToast('Hermes connection timeout', 'error');
+    } finally {
+      setIsDraftingGlobal(false);
+    }
+  };
+
+  // Draft with Hermes - tailored for a specific lead
+  const handleDraftLeadWithHermes = async (lead: Lead) => {
+    setDraftingLeadId(lead.id);
+    try {
+      const token = localStorage.getItem('halbiz_auth_token') || localStorage.getItem('token') || '';
+      const res = await fetch('/api/hermes/execute', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          toolId: 'outreach_sequences',
+          parameters: {
+            businessName: lead.businessName,
+            city: lead.city,
+            serviceType: lead.serviceType,
+            ownerName: lead.ownerName || 'Business Owner',
+            websiteUrl: lead.websiteUrl || `https://${lead.businessName.toLowerCase().replace(/[^a-z0-9]/g, '')}.com`,
+            performanceScore: lead.performanceScore || 52,
+            seoScore: lead.seoScore || 64,
+            sslStatus: lead.sslStatus || 'valid',
+            googleRating: lead.googleRating || 4.2,
+            reviewCount: lead.reviewCount || 18,
+            operatorName: workspaceConfig.operatorName,
+            agencyName: workspaceConfig.agencyName,
+            framework: 'KAISO'
+          },
+          promptOverride: `Generate a sharp KAISO framework pitch for ${lead.businessName} (${lead.serviceType} in ${lead.city}). Cite their technical speed score (${lead.performanceScore || 52}/100) and provide a concise, non-pushy message.`
+        })
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        const content = data.content || {};
+        const steps = content.structuredData?.steps || [];
+        const step = steps[0] || {};
+        
+        const newSubject = step.subject || content.subject || `Preliminary Speed & Lead Leakage Audit: ${lead.businessName}`;
+        const newBody = step.body || content.renderedOutput || content.summary || '';
+
+        if (newSubject) setTemplateSubject(newSubject);
+        if (newBody) setTemplateBody(newBody);
+        setPreviewLead(lead);
+
+        if (!selectedLeadIds.includes(lead.id)) {
+          setSelectedLeadIds(prev => [...prev, lead.id]);
+        }
+
+        showToast(`Hermes synthesized custom KAISO pitch for ${lead.businessName}`, 'success');
+        onRefresh();
+      } else {
+        showToast('Hermes failed to synthesize lead pitch', 'error');
+      }
+    } catch (e: any) {
+      console.error(e);
+      showToast('Hermes network failure', 'error');
+    } finally {
+      setDraftingLeadId(null);
+    }
+  };
+
   // Quick preset loader
   const handleLoadRegionalAngle = () => {
-    setTemplateSubject(`Seasonal Growth Audit: Capture High-Intent ${activeNiche.toUpperCase()} Inquiries in ${activeCity}`);
+    setTemplateSubject(`Seasonal Growth Audit: Capture High-Intent ${(activeNiche || 'Contracting').toUpperCase()} Inquiries in ${activeCity || 'Your City'}`);
     setTemplateBody(
-      `Hi {{ownerName}},\n\nOur system detected that {{businessName}} serves the ${activeCity} market. With ${regionalProfile.climateZone.toLowerCase()} seasonal load underway, homeowners are seeking verified ${activeNiche} specialists.\n\nOur audit revealed technical bottlenecks in mobile load times and local search ranking.\n\nMay I share a 1-page breakdown outlining the 3 fastest fixes to increase inbound calls?\n\nRegards,\n${workspaceConfig.operatorName}\n${workspaceConfig.agencyName}`
+      `Hi {{ownerName}},\n\nOur system detected that {{businessName}} serves the ${activeCity || 'local'} market. With ${regionalProfile.climateZone.toLowerCase()} seasonal load underway, homeowners are seeking verified ${activeNiche || 'trade'} specialists.\n\nOur audit revealed technical bottlenecks in mobile load times and local search ranking.\n\nMay I share a 1-page breakdown outlining the 3 fastest fixes to increase inbound calls?\n\nRegards,\n${workspaceConfig.operatorName}\n${workspaceConfig.agencyName}`
     );
   };
 
@@ -127,7 +247,7 @@ export default function OutreachQueue({ leads, token, onRefresh }: OutreachQueue
 
       const data = await res.json();
       if (res.ok) {
-        setBatchSuccessMessage(`Transmitted ${channel.toUpperCase()} outreach to ${data.successfulCount || selectedLeadIds.length} target accounts.`);
+        setBatchSuccessMessage(`Transmitted ${(channel || 'Email').toUpperCase()} outreach to ${data.successfulCount || selectedLeadIds.length} target accounts.`);
         setSelectedLeadIds([]);
         onRefresh();
         setTimeout(() => setBatchSuccessMessage(null), 5000);
@@ -226,7 +346,16 @@ export default function OutreachQueue({ leads, token, onRefresh }: OutreachQueue
                 <Sparkles className="w-3.5 h-3.5 text-brand" />
                 <span>Message Personalizer</span>
               </div>
-              <span className="text-[10px] font-mono text-text-dim">HAL Smart Variables</span>
+              <button
+                type="button"
+                onClick={handleDraftGlobalWithHermes}
+                disabled={isDraftingGlobal}
+                className="px-2 py-0.5 bg-brand/10 hover:bg-brand/20 border border-brand/40 text-[9.5px] font-mono font-bold text-brand rounded uppercase flex items-center gap-1 transition-all cursor-pointer"
+                title="Synthesize KAISO cold pitch with Hermes"
+              >
+                <Sparkles className={`w-3 h-3 ${isDraftingGlobal ? 'animate-spin' : ''}`} />
+                <span>{isDraftingGlobal ? 'Synthesizing...' : 'Draft with Hermes'}</span>
+              </button>
             </div>
 
             <div className="space-y-1">
@@ -412,14 +541,30 @@ export default function OutreachQueue({ leads, token, onRefresh }: OutreachQueue
                             </span>
                           </td>
                           <td className="p-3 text-right">
-                            <button
-                              onClick={() => {
-                                handleToggleSelectLead(lead.id);
-                              }}
-                              className="px-2 py-1 bg-bg-dark hover:bg-bg-subtle border border-border-dim text-[10px] text-text-primary rounded-sm font-bold uppercase transition-colors"
-                            >
-                              {isSelected ? 'QUEUED' : 'QUEUE'}
-                            </button>
+                            <div className="flex items-center justify-end gap-1.5">
+                              <button
+                                type="button"
+                                onClick={() => handleDraftLeadWithHermes(lead)}
+                                disabled={draftingLeadId === lead.id}
+                                className="px-2 py-1 bg-brand/10 hover:bg-brand/20 border border-brand/40 text-[10px] text-brand rounded-sm font-bold uppercase transition-colors flex items-center gap-1 cursor-pointer"
+                                title="Synthesize custom KAISO outreach script with Hermes"
+                              >
+                                <Sparkles className={`w-3 h-3 ${draftingLeadId === lead.id ? 'animate-spin' : ''}`} />
+                                <span>{draftingLeadId === lead.id ? 'Drafting...' : 'Draft'}</span>
+                              </button>
+                              <button
+                                onClick={() => {
+                                  handleToggleSelectLead(lead.id);
+                                }}
+                                className={`px-2 py-1 border text-[10px] rounded-sm font-bold uppercase transition-colors cursor-pointer ${
+                                  isSelected 
+                                    ? 'bg-brand text-black border-brand' 
+                                    : 'bg-bg-dark hover:bg-bg-subtle border-border-dim text-text-primary'
+                                }`}
+                              >
+                                {isSelected ? 'QUEUED' : 'QUEUE'}
+                              </button>
+                            </div>
                           </td>
                         </tr>
                       );

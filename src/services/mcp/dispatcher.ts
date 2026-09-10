@@ -354,7 +354,12 @@ export async function executeMcpTool(
       const events = await pgDb
         .select()
         .from(halLoopEvents)
-        .where(eq(halLoopEvents.loopId, parsed.loopId))
+        .where(
+          and(
+            eq(halLoopEvents.loopId, parsed.loopId),
+            eq(halLoopEvents.contractorId, contractorId)
+          )
+        )
         .orderBy(desc(halLoopEvents.createdAt));
 
       return {
@@ -404,7 +409,12 @@ export async function executeMcpTool(
           contextData: updatedContext,
           updatedAt: new Date()
         })
-        .where(eq(halLoops.id, parsed.loopId));
+        .where(
+          and(
+            eq(halLoops.id, parsed.loopId),
+            eq(halLoops.contractorId, contractorId)
+          )
+        );
 
       await pgDb.insert(halLoopEvents).values({
         id: crypto.randomUUID(),

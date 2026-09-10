@@ -138,6 +138,13 @@ export default function GoogleDrivePanel() {
         });
       }
     } catch (err: any) {
+      if (
+        err?.code === 'auth/popup-closed-by-user' ||
+        err?.message?.includes('popup-closed-by-user') ||
+        err?.code === 'auth/cancelled-popup-request'
+      ) {
+        return;
+      }
       toast({
         variant: 'danger',
         title: 'Authentication Failed',

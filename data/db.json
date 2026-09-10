@@ -245,323 +245,584 @@
       "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb250cmFjdG9ySWQiOiI1MTYxM2M3NS00OGNiLTRmM2ItOTM4ZC02YzZkMjVjODExYjIiLCJlbWFpbCI6Imhlcm1lc190ZW5hbnRfMTc4ODMwMDcxNzg0MkBleGFtcGxlLmNvbSIsInJvbGUiOiJ1c2VyIiwiZXhwIjoxNzg4Mzg3MTE4fQ.FXYElWeEe1-KF01LbK5UN0ta3BSF0wMJCwqWo5V3y6s",
       "expiresAt": "2026-09-02T22:11:58.067Z",
       "createdAt": "2026-09-01T22:11:58.068Z"
+    },
+    {
+      "id": "sess_efacc9b1b27e8d2a",
+      "contractorId": "con_admin_seed",
+      "token": "test_token_1788779446042",
+      "expiresAt": "2026-09-07T12:10:46.042Z",
+      "createdAt": "2026-09-07T11:10:46.043Z"
+    },
+    {
+      "id": "sess_1e46d385906013be",
+      "contractorId": "7aca0d9a-0871-4a98-b7ee-ed8cbd97ae95",
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb250cmFjdG9ySWQiOiI3YWNhMGQ5YS0wODcxLTRhOTgtYjdlZS1lZDhjYmQ5N2FlOTUiLCJlbWFpbCI6ImF1ZGl0X2FscGhhXzE3ODg4NzcxMzY3NjFAZXhhbXBsZS5jb20iLCJyb2xlIjoidXNlciIsImV4cCI6MTc4ODk2MzUzNn0.Uc4Mh1jgi458ueAsHibnzDkIqaQjBpwsxi_ZQbmwbTU",
+      "expiresAt": "2026-09-09T14:18:56.847Z",
+      "createdAt": "2026-09-08T14:18:56.847Z"
+    },
+    {
+      "id": "sess_1c450114bf019348",
+      "contractorId": "28492052-35f1-4ff9-b9f6-42df2371a52e",
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb250cmFjdG9ySWQiOiIyODQ5MjA1Mi0zNWYxLTRmZjktYjlmNi00MmRmMjM3MWE1MmUiLCJlbWFpbCI6ImF1ZGl0X2JldGFfMTc4ODg3NzEzNjc2MUBleGFtcGxlLmNvbSIsInJvbGUiOiJ1c2VyIiwiZXhwIjoxNzg4OTYzNTM2fQ.rEoWh2i7v--SjupaBZnYp7QYJ2oZ5-x4gHsU9oB1ouM",
+      "expiresAt": "2026-09-09T14:18:56.903Z",
+      "createdAt": "2026-09-08T14:18:56.903Z"
+    },
+    {
+      "id": "sess_f2cea37c7fe51d99",
+      "contractorId": "7b7fda95-3e69-45fd-8e5a-74a25174e1b7",
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb250cmFjdG9ySWQiOiI3YjdmZGE5NS0zZTY5LTQ1ZmQtOGU1YS03NGEyNTE3NGUxYjciLCJlbWFpbCI6ImF1ZGl0X2FscGhhXzE3ODg4NzcyMzcxMDdAZXhhbXBsZS5jb20iLCJyb2xlIjoidXNlciIsImV4cCI6MTc4ODk2MzYzN30.L66pH1V-VWc27S264AM8uMLobA2MWYr415Ksane-5fQ",
+      "expiresAt": "2026-09-09T14:20:37.236Z",
+      "createdAt": "2026-09-08T14:20:37.236Z"
+    },
+    {
+      "id": "sess_e56e00e02cea23e2",
+      "contractorId": "e34ef49f-44ad-4c1d-8fc4-78b68721055b",
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb250cmFjdG9ySWQiOiJlMzRlZjQ5Zi00NGFkLTRjMWQtOGZjNC03OGI2ODcyMTA1NWIiLCJlbWFpbCI6ImF1ZGl0X2JldGFfMTc4ODg3NzIzNzEwN0BleGFtcGxlLmNvbSIsInJvbGUiOiJ1c2VyIiwiZXhwIjoxNzg4OTYzNjM3fQ.A_JSxIeIstgFIdOkBsEkaNtyrbCpjy3YE_HXEhaW4JU",
+      "expiresAt": "2026-09-09T14:20:37.290Z",
+      "createdAt": "2026-09-08T14:20:37.290Z"
+    },
+    {
+      "id": "sess_8139ea3fb3fae15a",
+      "contractorId": "9ded9c4f-f42e-4ed2-9c6e-cc6de3439212",
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb250cmFjdG9ySWQiOiI5ZGVkOWM0Zi1mNDJlLTRlZDItOWM2ZS1jYzZkZTM0MzkyMTIiLCJlbWFpbCI6ImF1ZGl0X2FscGhhXzE3ODg4NzczMzIyMDZAZXhhbXBsZS5jb20iLCJyb2xlIjoidXNlciIsImV4cCI6MTc4ODk2MzczMn0.x-T_FPGNP48jQHGCPZs-tlPTxcbpP6rmE7XUvlqH4hI",
+      "expiresAt": "2026-09-09T14:22:12.264Z",
+      "createdAt": "2026-09-08T14:22:12.264Z"
+    },
+    {
+      "id": "sess_4a5c158abaafd7b3",
+      "contractorId": "2d37c895-70be-4b68-966e-1e1961fffcc1",
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb250cmFjdG9ySWQiOiIyZDM3Yzg5NS03MGJlLTRiNjgtOTY2ZS0xZTE5NjFmZmZjYzEiLCJlbWFpbCI6ImF1ZGl0X2JldGFfMTc4ODg3NzMzMjIwNkBleGFtcGxlLmNvbSIsInJvbGUiOiJ1c2VyIiwiZXhwIjoxNzg4OTYzNzMyfQ.uey_zrkl5S37PYEASdbPeGVRk4uW4HnLyxvE4ngstzY",
+      "expiresAt": "2026-09-09T14:22:12.317Z",
+      "createdAt": "2026-09-08T14:22:12.318Z"
+    },
+    {
+      "id": "sess_d0a81b54138993f8",
+      "contractorId": "721ad163-9d39-4ba2-b8ef-d160f0105e09",
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb250cmFjdG9ySWQiOiI3MjFhZDE2My05ZDM5LTRiYTItYjhlZi1kMTYwZjAxMDVlMDkiLCJlbWFpbCI6ImF1ZGl0X2FscGhhXzE3ODg4Nzc2ODQ0NjhAZXhhbXBsZS5jb20iLCJyb2xlIjoidXNlciIsImV4cCI6MTc4ODk2NDA4NH0.P2YVh7ss57PaEnSYPsRjlBZaSuMegjSowqjm9SqE3IE",
+      "expiresAt": "2026-09-09T14:28:04.537Z",
+      "createdAt": "2026-09-08T14:28:04.537Z"
+    },
+    {
+      "id": "sess_636cb34f1f233f88",
+      "contractorId": "1aecc949-76f1-4790-a26b-611386d692a7",
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb250cmFjdG9ySWQiOiIxYWVjYzk0OS03NmYxLTQ3OTAtYTI2Yi02MTEzODZkNjkyYTciLCJlbWFpbCI6ImF1ZGl0X2JldGFfMTc4ODg3NzY4NDQ2OEBleGFtcGxlLmNvbSIsInJvbGUiOiJ1c2VyIiwiZXhwIjoxNzg4OTY0MDg0fQ._vuOYcrlPk9KoKhUwMSvLDIv8qJVQhZDcENMRC8GC-M",
+      "expiresAt": "2026-09-09T14:28:04.614Z",
+      "createdAt": "2026-09-08T14:28:04.614Z"
+    },
+    {
+      "id": "sess_50bb240b1ecf5c40",
+      "contractorId": "con_admin_seed",
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb250cmFjdG9ySWQiOiJjb25fYWRtaW5fc2VlZCIsImVtYWlsIjoiYWRtaW5Aa2Fpc2xlYWQuY29tIiwicm9sZSI6ImFkbWluIiwiZXhwIjoxNzg5MTAwMTgzfQ.u9dHEuKHVgU402kRQGVxIT7-_iVvcbA9kyWdz9J9PO8",
+      "expiresAt": "2026-09-11T04:16:23.941Z",
+      "createdAt": "2026-09-10T04:16:23.942Z"
+    },
+    {
+      "id": "sess_e2d38200a002ab97",
+      "contractorId": "con_admin_seed",
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb250cmFjdG9ySWQiOiJjb25fYWRtaW5fc2VlZCIsImVtYWlsIjoiYWRtaW5Aa2Fpc2xlYWQuY29tIiwicm9sZSI6ImFkbWluIiwiZXhwIjoxNzg5MTA0MDA3fQ.ZZV0UCx_ZU82rMyq0mk5QDrn2WuUQF2F6u-UMtgaUoA",
+      "expiresAt": "2026-09-11T05:20:07.096Z",
+      "createdAt": "2026-09-10T05:20:07.096Z"
+    },
+    {
+      "id": "sess_fc75c339b596d98a",
+      "contractorId": "con_admin_seed",
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb250cmFjdG9ySWQiOiJjb25fYWRtaW5fc2VlZCIsImVtYWlsIjoiYWRtaW5Aa2Fpc2xlYWQuY29tIiwicm9sZSI6ImFkbWluIiwiZXhwIjoxNzg5MTA0MDI3fQ.hYf6-71t66rzbAi2AeaxNsisf-B6qmI1maHPa-lSSuI",
+      "expiresAt": "2026-09-11T05:20:27.060Z",
+      "createdAt": "2026-09-10T05:20:27.061Z"
+    },
+    {
+      "id": "sess_df9c9ef13d6b33d4",
+      "contractorId": "con_admin_seed",
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb250cmFjdG9ySWQiOiJjb25fYWRtaW5fc2VlZCIsImVtYWlsIjoiYWRtaW5Aa2Fpc2xlYWQuY29tIiwicm9sZSI6ImFkbWluIiwiZXhwIjoxNzg5MTA0MDMwfQ.nlp-wHyYrW_MjVvH816IFEKm9nkT-bxyYSqoRJK7p40",
+      "expiresAt": "2026-09-11T05:20:30.263Z",
+      "createdAt": "2026-09-10T05:20:30.263Z"
+    },
+    {
+      "id": "sess_3c3aa0b6640694a9",
+      "contractorId": "con_admin_seed",
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb250cmFjdG9ySWQiOiJjb25fYWRtaW5fc2VlZCIsImVtYWlsIjoiYWRtaW5Aa2Fpc2xlYWQuY29tIiwicm9sZSI6ImFkbWluIiwiZXhwIjoxNzg5MTA0MzM3fQ.xQzYTQDq_IexrQpQtpQHrOc3dhKj0aZ7uouLl62i240",
+      "expiresAt": "2026-09-11T05:25:37.362Z",
+      "createdAt": "2026-09-10T05:25:37.362Z"
+    },
+    {
+      "id": "sess_b6c594c82b111879",
+      "contractorId": "con_admin_seed",
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb250cmFjdG9ySWQiOiJjb25fYWRtaW5fc2VlZCIsImVtYWlsIjoiYWRtaW5Aa2Fpc2xlYWQuY29tIiwicm9sZSI6ImFkbWluIiwiZXhwIjoxNzg5MTA0MzQ2fQ.ce08mANp6QizuNUovDSIsU8yCTkUGshYTQa9HE24KV8",
+      "expiresAt": "2026-09-11T05:25:46.652Z",
+      "createdAt": "2026-09-10T05:25:46.652Z"
+    },
+    {
+      "id": "sess_b0dca021fe364ce8",
+      "contractorId": "con_admin_seed",
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb250cmFjdG9ySWQiOiJjb25fYWRtaW5fc2VlZCIsImVtYWlsIjoiYWRtaW5Aa2Fpc2xlYWQuY29tIiwicm9sZSI6ImFkbWluIiwiZXhwIjoxNzg5MTA0Nzk4fQ.XHMNIpZ9Af2ex_2fPNdPgTQfFLfmbn-Zy4dbIuZEqd8",
+      "expiresAt": "2026-09-11T05:33:18.003Z",
+      "createdAt": "2026-09-10T05:33:18.003Z"
+    },
+    {
+      "id": "sess_44b152e16173169c",
+      "contractorId": "con_admin_seed",
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb250cmFjdG9ySWQiOiJjb25fYWRtaW5fc2VlZCIsImVtYWlsIjoiYWRtaW5Aa2Fpc2xlYWQuY29tIiwicm9sZSI6ImFkbWluIiwiZXhwIjoxNzg5MTA0ODAxfQ.yXsYWr345FoE7_b8k6DTTmsV1eTPPQcqmC_aZuNWU_U",
+      "expiresAt": "2026-09-11T05:33:21.178Z",
+      "createdAt": "2026-09-10T05:33:21.178Z"
+    },
+    {
+      "id": "sess_cfada454fd222e97",
+      "contractorId": "con_admin_seed",
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb250cmFjdG9ySWQiOiJjb25fYWRtaW5fc2VlZCIsImVtYWlsIjoiYWRtaW5Aa2Fpc2xlYWQuY29tIiwicm9sZSI6ImFkbWluIiwiZXhwIjoxNzg5MTA0ODI3fQ.2Dx-vVce7PBC-ITJdc2zJc_ekxLJrvpvmIEH8Uj5dwk",
+      "expiresAt": "2026-09-11T05:33:47.809Z",
+      "createdAt": "2026-09-10T05:33:47.810Z"
+    },
+    {
+      "id": "sess_f294a377c51a6306",
+      "contractorId": "con_admin_seed",
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb250cmFjdG9ySWQiOiJjb25fYWRtaW5fc2VlZCIsImVtYWlsIjoiYWRtaW5Aa2Fpc2xlYWQuY29tIiwicm9sZSI6ImFkbWluIiwiZXhwIjoxNzg5MTA0ODMwfQ.nqZ7D8Lx6YNCX7q8kJ-B57BcKEUwV_dggg0uIRzntaQ",
+      "expiresAt": "2026-09-11T05:33:50.449Z",
+      "createdAt": "2026-09-10T05:33:50.449Z"
+    },
+    {
+      "id": "sess_adf73745ba889d53",
+      "contractorId": "con_admin_seed",
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb250cmFjdG9ySWQiOiJjb25fYWRtaW5fc2VlZCIsImVtYWlsIjoiYWRtaW5Aa2Fpc2xlYWQuY29tIiwicm9sZSI6ImFkbWluIiwiZXhwIjoxNzg5MTA0ODQwfQ.GfLNn6lYSLvbrwHdNmq9AqBT5GUA_bkLT48fca-k05Y",
+      "expiresAt": "2026-09-11T05:34:00.895Z",
+      "createdAt": "2026-09-10T05:34:00.895Z"
+    },
+    {
+      "id": "sess_57f47d5e92fa9d78",
+      "contractorId": "con_isaac_seed",
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb250cmFjdG9ySWQiOiJjb25faXNhYWNfc2VlZCIsImVtYWlsIjoia2Fpc29pc2FhY0BnbWFpbC5jb20iLCJyb2xlIjoiYWRtaW4iLCJleHAiOjE3ODkxMzkzODF9.3wb86LJTh1UCV1zk5AB721A5ZKTzsCyge6g8Ui7JC7k",
+      "expiresAt": "2026-09-11T15:09:41.829Z",
+      "createdAt": "2026-09-10T15:09:41.829Z"
     }
   ],
   "passwordResets": [],
   "leads": [
     {
-      "id": "lead_seed_3",
       "contractorId": "con_admin_seed",
-      "businessName": "Pump-Tech Plumbing",
-      "ownerName": "Matthew",
-      "emailEncrypted": "2cf4bb9de70ac858ada33942:52f366875c3ee3aeaac4ee34d832637bb4b51681089435605d8d8a68:92dc196756573c2bd1a19027301bb1c4",
+      "businessName": "Prairie Commercial Roofing Ltd",
+      "contactName": "Robert Vance",
       "city": "Winnipeg",
-      "serviceType": "sump pump",
-      "source": "cold_outreach",
-      "status": "new",
-      "urgencyScore": 6.1,
-      "predictedLtvUsd": 2034,
-      "notes": "Seeded lead for Pump-Tech Plumbing in Winnipeg. Niche: sump pump.",
-      "createdAt": "2026-06-09T10:42:30.993Z",
-      "updatedAt": "2026-07-06T10:42:30.990Z"
+      "niche": "commercial roofing",
+      "status": "responded",
+      "score": 88,
+      "source": "google_ads_inbound",
+      "id": "lead_f3bba9878e7906c4",
+      "emailEncrypted": "c16f1389ee9f63ced680a72b:ba2684396e260373c1150ecce20fe4665208bdfef5:561e5712d6341547ce24d6f7022a7ab7",
+      "phoneEncrypted": "7ef61bdbb7b803efae0c8a15:a0eb2a1fac66f8af244eaa4cf9f7e5f215:aad23c0fd2c576a43f80a032e6845c7d",
+      "createdAt": "2026-09-07T10:09:23.315Z",
+      "updatedAt": "2026-09-10T13:36:24.001Z",
+      "notes": "[Inbound WhatsApp - 2026-09-10T13:32]:\n[Inbound WhatsApp - 2026-09-10T13:33]:\n[Inbound WhatsApp - 2026-09-10T13:36]:"
     },
     {
-      "id": "lead_seed_5",
       "contractorId": "con_admin_seed",
-      "businessName": "The Pleasant Plumber",
-      "ownerName": "Barrett Ferguson",
-      "emailEncrypted": "c6dbec08aadf64a38384a321:3e7731174485fc8d684bd4a586cdedd33d95eebcc7f172b2f99784aab9:373f0dabe7779089210e306cdb777fb2",
+      "businessName": "Prairie Commercial Roofing Ltd",
+      "contactName": "Robert Vance",
       "city": "Winnipeg",
-      "serviceType": "plumbing",
-      "source": "cold_outreach",
-      "status": "new",
-      "urgencyScore": 7.8,
-      "predictedLtvUsd": 2449,
-      "notes": "Seeded lead for The Pleasant Plumber in Winnipeg. Niche: plumbing.",
-      "createdAt": "2026-06-11T10:42:30.993Z",
-      "updatedAt": "2026-07-06T10:42:30.990Z"
+      "niche": "commercial roofing",
+      "status": "contacted",
+      "score": 88,
+      "source": "google_ads_inbound",
+      "id": "lead_f9ddf92534f052bd",
+      "emailEncrypted": "f2137c13ee8fe0a58e9ea8e4:e48f0e973680e7ce9fb822f967eae337dba8279992:2fbba7f0848e256c80c582d87222a526",
+      "phoneEncrypted": "d01cef1c0da4464a1301caad:1077f2809012613c4d1e4b1bc0f4847dc7:0aab50a774d35174fc881c0f93c5042b",
+      "createdAt": "2026-09-07T10:10:00.520Z",
+      "updatedAt": "2026-09-07T10:10:00.522Z"
     },
     {
-      "id": "lead_seed_8",
       "contractorId": "con_admin_seed",
-      "businessName": "Guardian Plumbing & Heating",
-      "ownerName": "Dylan",
-      "emailEncrypted": "832012090dc3870d05e8c175:76d134f7b0276928b7b38b60980c2800da3b01bb644e713b54bd308d:f2537491f1ad353ac44fb2cb9d3dfad0",
-      "city": "Landmark",
-      "serviceType": "plumbing & heating",
-      "source": "cold_outreach",
-      "status": "new",
-      "urgencyScore": 6.2,
-      "predictedLtvUsd": 3455,
-      "notes": "Seeded lead for Guardian Plumbing & Heating in Landmark. Niche: plumbing & heating.",
-      "createdAt": "2026-06-14T10:42:30.993Z",
-      "updatedAt": "2026-07-06T10:42:30.990Z"
-    },
-    {
-      "id": "lead_seed_9",
-      "contractorId": "con_admin_seed",
-      "businessName": "River Park South Plumbing",
-      "emailEncrypted": "68450758e407a38f03b449ca:1d535ec02c329fe2a69c0d015a0173b3655ee33349e53224ef40a03b8c316341:b1f3de60def34626a7823652dfebcb91",
+      "businessName": "Prairie Commercial Roofing Ltd",
+      "contactName": "Robert Vance",
       "city": "Winnipeg",
-      "serviceType": "plumbing",
-      "source": "cold_outreach",
-      "status": "new",
-      "urgencyScore": 8.4,
-      "predictedLtvUsd": 1503,
-      "notes": "Seeded lead for River Park South Plumbing in Winnipeg. Niche: plumbing.",
-      "createdAt": "2026-06-15T10:42:30.993Z",
-      "updatedAt": "2026-07-06T10:42:30.990Z"
+      "niche": "commercial roofing",
+      "status": "contacted",
+      "score": 88,
+      "source": "google_ads_inbound",
+      "id": "lead_5da4be25f873a928",
+      "emailEncrypted": "a28fdc3a9b1676465b7c56d5:cdc2d9149aac5e2de15bf08328dc2ef7dd9200000f:1de4d7484fe197a5b7613b9e19588ad9",
+      "phoneEncrypted": "bd6e7243216c8098a6fe123e:e54ee37f2b82386dd1e262851b9e1c6dea:9dee4dbca70c68c969999617f274ec2c",
+      "createdAt": "2026-09-07T10:10:04.917Z",
+      "updatedAt": "2026-09-07T10:10:04.919Z"
     },
     {
-      "id": "lead_seed_11",
       "contractorId": "con_admin_seed",
-      "businessName": "Polar Plumbing & Heating",
-      "ownerName": "Gord",
-      "emailEncrypted": "d2e5c7f5964cfcb91e6e43dd:f9521fd89f070fe089ea6ce02934340d574a0c4978:a0ac520382dcb4e48df6701ed7bc7bd6",
-      "city": "Winkler",
-      "serviceType": "plumbing & heating",
-      "source": "cold_outreach",
-      "status": "new",
-      "urgencyScore": 7.3,
-      "predictedLtvUsd": 3488,
-      "notes": "Seeded lead for Polar Plumbing & Heating in Winkler. Niche: plumbing & heating.",
-      "createdAt": "2026-06-17T10:42:30.993Z",
-      "updatedAt": "2026-07-06T10:42:30.990Z"
+      "businessName": "Prairie Commercial Roofing Ltd",
+      "contactName": "Robert Vance",
+      "city": "Winnipeg",
+      "niche": "commercial roofing",
+      "status": "contacted",
+      "score": 88,
+      "source": "google_ads_inbound",
+      "id": "lead_dca21d5e73302e6e",
+      "emailEncrypted": "498fe4da93d36634754f3a4f:dd5099f0530f7a0041209612ddf1c7be4be586d9c7:c46280c67c00b2f2629fc02dfc2ff405",
+      "phoneEncrypted": "a697d17a15bc6fac261214aa:d180ec3475f9148dccd0a38e1ac8a4bb40:c6d852a0e66b18ec7eff7560b89f2aba",
+      "createdAt": "2026-09-07T10:10:56.011Z",
+      "updatedAt": "2026-09-07T10:10:56.013Z"
     },
     {
-      "id": "lead_seed_12",
       "contractorId": "con_admin_seed",
-      "businessName": "Brown's Plumbing & Heating",
-      "ownerName": "Chad",
-      "emailEncrypted": "5c9502096e17e887548e86ed:18266ba28b1969823e6514a30b8ad7a3d44b6259bbc0:2e21d1de6a45c8955ab428c19dd89273",
-      "city": "Morris",
-      "serviceType": "plumbing",
-      "source": "cold_outreach",
-      "status": "new",
-      "urgencyScore": 6,
-      "predictedLtvUsd": 2048,
-      "notes": "Seeded lead for Brown's Plumbing & Heating in Morris. Niche: plumbing.",
-      "createdAt": "2026-06-18T10:42:30.993Z",
-      "updatedAt": "2026-07-06T10:42:30.990Z"
+      "businessName": "Prairie Commercial Roofing Ltd",
+      "contactName": "Robert Vance",
+      "city": "Winnipeg",
+      "niche": "commercial roofing",
+      "status": "contacted",
+      "score": 88,
+      "source": "google_ads_inbound",
+      "id": "lead_a08937fa20523f19",
+      "emailEncrypted": "d64447e967cb68721396864f:8b987cf825339e499e5971444481598f0e94a74619:71f503a0bf9b1df71604ea6a1302325e",
+      "phoneEncrypted": "784d04991cade6d977acffcb:346a0ee84374674ab6b391dbddb0a6cdd9:acc3875364df6afcbefe0f6146a5bc66",
+      "createdAt": "2026-09-07T10:14:57.678Z",
+      "updatedAt": "2026-09-07T10:14:57.680Z"
     },
     {
-      "id": "lead_seed_13",
       "contractorId": "con_admin_seed",
-      "businessName": "Grand Slam Plumbing",
-      "emailEncrypted": "775c0fa4b25542058cc09cff:6b2b352fbe58e418a4ad1f84329c7c6e656e4745fe17aa23a635:3d8fc67d4e1266a433aaf221d5d46b1d",
-      "city": "Brandon",
-      "serviceType": "plumbing",
-      "source": "cold_outreach",
-      "status": "new",
-      "urgencyScore": 6.4,
-      "predictedLtvUsd": 2189,
-      "notes": "Seeded lead for Grand Slam Plumbing in Brandon. Niche: plumbing.",
-      "createdAt": "2026-06-19T10:42:30.993Z",
-      "updatedAt": "2026-07-06T10:42:30.990Z"
+      "businessName": "Prairie Commercial Roofing Ltd",
+      "contactName": "Robert Vance",
+      "city": "Winnipeg",
+      "niche": "commercial roofing",
+      "status": "contacted",
+      "score": 88,
+      "source": "google_ads_inbound",
+      "id": "lead_a87b063087f76d36",
+      "emailEncrypted": "a0db839f1fa616561498635d:678e20fa2fca30b154622eff642b50d8000d5bc3d3:4b56118e6f8621cf319822d18283de4b",
+      "phoneEncrypted": "4799572dfe288b22512ee83a:767d519cb85b7d9bbe2fac45701b86b01d:e7e504e4779e24ad7f04fa103c012fe5",
+      "createdAt": "2026-09-07T11:00:15.489Z",
+      "updatedAt": "2026-09-07T11:00:15.491Z"
     },
     {
-      "id": "lead_seed_17",
-      "contractorId": "con_admin_seed",
-      "businessName": "Adam Arbeau Plumbing",
-      "ownerName": "Adam Arbeau",
-      "emailEncrypted": "58c3decfbb13a9a0ffec0203:b8961d053b265ebb4f24c9d2879a481b568bec:e1e5c5c2eabfe9f9e6ed7d6a20b55364",
-      "city": "Fredericton",
-      "serviceType": "plumbing",
-      "source": "cold_outreach",
+      "contractorId": "test_stage1_contractor_1788779065388",
+      "businessName": "Winnipeg Mechanical Commercial Ltd",
+      "ownerName": "Dan Fraser",
+      "city": "Winnipeg",
+      "serviceType": "Commercial HVAC",
       "status": "new",
-      "urgencyScore": 6.2,
-      "predictedLtvUsd": 3083,
-      "notes": "Tier C. Adam Arbeau Plumbing has no website or online presence. Skip cold email, do not waste time here.",
-      "createdAt": "2026-06-23T10:42:30.994Z",
-      "updatedAt": "2026-07-06T10:42:30.990Z"
+      "urgencyScore": 88,
+      "predictedLtvUsd": 14000,
+      "source": "stage1_evidence_harvest",
+      "id": "lead_4961e78ff1fd7397",
+      "emailEncrypted": "bb066b502d85d16c39fb17cb:10aef92f2586c49e587e0c74d8c3fc960e09c3068c54:f352273317d45cad9592b704922bcac1",
+      "phoneEncrypted": "e79985d8acaa04c28097101e:984418b6dc5840d0872ee07b:77ec16f40951bd5bf6f4e95d7de236aa",
+      "createdAt": "2026-09-07T11:04:25.406Z",
+      "updatedAt": "2026-09-07T11:04:25.406Z"
     },
     {
-      "id": "lead_seed_18",
-      "contractorId": "con_admin_seed",
-      "businessName": "Phil Dixon Plumbing",
-      "ownerName": "Phil Dixon",
-      "emailEncrypted": "d1caf673d799e5b88a39cc58:3e45a0e0d8199a1926c34887ef91e3022501dd4f4a7b:44fcfbb2ed66feac8da6ee5472c1512b",
-      "city": "Fredericton",
-      "serviceType": "plumbing",
-      "source": "cold_outreach",
+      "contractorId": "test_stage1_contractor_1788779080795",
+      "businessName": "Winnipeg Mechanical Commercial Ltd",
+      "ownerName": "Dan Fraser",
+      "city": "Winnipeg",
+      "serviceType": "Commercial HVAC",
       "status": "new",
-      "urgencyScore": 8.8,
-      "predictedLtvUsd": 2072,
-      "notes": "Tier C. Phil Dixon Plumbing has no website or online presence. Skip cold email, do not waste time here.",
-      "createdAt": "2026-06-24T10:42:30.994Z",
-      "updatedAt": "2026-07-06T10:42:30.990Z"
+      "urgencyScore": 88,
+      "predictedLtvUsd": 14000,
+      "source": "stage1_evidence_harvest",
+      "id": "lead_0e6961d13beda2c7",
+      "emailEncrypted": "107d458d0ea0583b9cb4423c:f1b8d15b9f61664d465099a05da4f7c1d333642b8493:46ed6d710a12f162eccd2406030b642d",
+      "phoneEncrypted": "0ae1079c3cb389fadcaf0dc8:252ec664dc2a7e0f7d2656f1:60bea0aa775c0292a4e5b41a1c968f0c",
+      "createdAt": "2026-09-07T11:04:40.810Z",
+      "updatedAt": "2026-09-07T11:04:40.810Z"
     },
     {
-      "id": "lead_seed_19",
       "contractorId": "con_admin_seed",
-      "businessName": "Grant West Plumbing",
-      "ownerName": "Grant West",
-      "emailEncrypted": "f8d5c462cb945f0e4c6bf729:ea156453a4e9ff88a0251c4bf01d2ce5291007085a8b0803567bc5:6aea73e1ece3500a2550cdb508b83358",
-      "city": "Fredericton",
-      "serviceType": "plumbing",
-      "source": "cold_outreach",
-      "status": "new",
-      "urgencyScore": 5.2,
-      "predictedLtvUsd": 2066,
-      "notes": "Tier C. Grant West Plumbing has no website or online presence. Skip cold email, do not waste time here.",
-      "createdAt": "2026-06-25T10:42:30.995Z",
-      "updatedAt": "2026-07-06T10:42:30.990Z"
+      "businessName": "Prairie Commercial Roofing Ltd",
+      "contactName": "Robert Vance",
+      "city": "Winnipeg",
+      "niche": "commercial roofing",
+      "status": "contacted",
+      "score": 88,
+      "source": "google_ads_inbound",
+      "id": "lead_f7af25330fe5d6a7",
+      "emailEncrypted": "c5631a1032f86d37b1775509:2a68740a1956e5144159a20f38fcff14eb64be5ac8:e4861908df1ff0825f4a214a5c4645d2",
+      "phoneEncrypted": "c04666cb98ac4c54c678a179:83644b1c0546a1f0bc255a734c010a66eb:42c3269ed643404f0d8070951fec3f2e",
+      "createdAt": "2026-09-07T11:04:51.420Z",
+      "updatedAt": "2026-09-07T11:04:51.422Z"
     },
     {
-      "id": "lead_seed_22",
-      "contractorId": "con_admin_seed",
-      "businessName": "Wise Cracks Fredericton",
-      "emailEncrypted": "028d40817d9e776450e9052d:01ef6148dc087f7354961c0d79c8c5bf7f9cbf:4061d6085ddb1e1dc9734663e391c363",
-      "city": "Fredericton",
-      "serviceType": "basement waterproofing",
-      "source": "cold_outreach",
+      "contractorId": "test_stage1_contractor_1788779091730",
+      "businessName": "Winnipeg Mechanical Commercial Ltd",
+      "ownerName": "Dan Fraser",
+      "city": "Winnipeg",
+      "serviceType": "Commercial HVAC",
       "status": "new",
-      "urgencyScore": 7.1,
-      "predictedLtvUsd": 2818,
-      "notes": "Tier B. Wise Cracks Fredericton (wisecracks.com). Basement waterproofing franchise. No active local Google search ads.",
-      "createdAt": "2026-06-28T10:42:30.995Z",
-      "updatedAt": "2026-07-06T10:42:30.990Z"
+      "urgencyScore": 88,
+      "predictedLtvUsd": 14000,
+      "source": "stage1_evidence_harvest",
+      "id": "lead_db473c8f0ad7c8c7",
+      "emailEncrypted": "bd1a9e88b1a88745f9e80a09:7b83ad72dfdd3fe7765d1c1a841551249899f21646b8:2f1771e4e4b57f023795bd9ec23734ef",
+      "phoneEncrypted": "2f8f9c3deb0ef63abf9a2f06:fbe2fdcdfdc6419b61606e07:d4b134a0f8d793fec6b76b135854fb0f",
+      "createdAt": "2026-09-07T11:04:51.745Z",
+      "updatedAt": "2026-09-07T11:04:51.745Z"
     },
     {
-      "id": "lead_seed_23",
       "contractorId": "con_admin_seed",
-      "businessName": "WINMAR Fredericton",
-      "emailEncrypted": "3bef25d02e687afa797b4a3b:4cbc77dacbf12e2e335279af3c0c3ef9796e45c38d:ce0e94df1564abcfbb2cea7fe9bec7d4",
-      "city": "Fredericton",
-      "serviceType": "flood restoration",
-      "source": "cold_outreach",
-      "status": "new",
-      "urgencyScore": 7.7,
-      "predictedLtvUsd": 2811,
-      "notes": "Tier A. WINMAR Fredericton (winmarfredericton.com). Restoration giant. Verified website but corporate franchise boundaries. Good backup for high-intent weather trigger campaigns.",
-      "createdAt": "2026-06-29T10:42:30.995Z",
-      "updatedAt": "2026-07-06T10:42:30.990Z"
+      "businessName": "Prairie Commercial Roofing Ltd",
+      "contactName": "Robert Vance",
+      "city": "Winnipeg",
+      "niche": "commercial roofing",
+      "status": "contacted",
+      "score": 88,
+      "source": "google_ads_inbound",
+      "id": "lead_58acc062c39a5af2",
+      "emailEncrypted": "271493710e85467c54b56376:6f32b818fd746a00cfcc941e5df144ca828d3928f7:78fbb4686cc83a9373e7cfe7e89a8231",
+      "phoneEncrypted": "c088592e551a11fa03d645ba:3d475a32bbefab2aaf5157199d2e7bf30a:4d89c99efda3901bbfd3d2803a38215d",
+      "createdAt": "2026-09-07T11:09:58.507Z",
+      "updatedAt": "2026-09-07T11:09:58.510Z"
     },
     {
-      "id": "lead_seed_34",
-      "contractorId": "con_admin_seed",
-      "businessName": "Kingstree Plumbing",
-      "ownerName": "Brett Kingstree",
-      "emailEncrypted": "73e7b2b2cf6d0809af129fe2:1549fb6ee31b7241c7a0b0801d9217c210bb5517cf81126673c7:10dcc03f841348b9cca3f0b7f7ea8fb6",
-      "city": "Sherwood Park",
-      "serviceType": "plumbing",
-      "source": "cold_outreach",
+      "contractorId": "test_stage1_contractor_1788779398772",
+      "businessName": "Winnipeg Mechanical Commercial Ltd",
+      "ownerName": "Dan Fraser",
+      "city": "Winnipeg",
+      "serviceType": "Commercial HVAC",
       "status": "new",
-      "urgencyScore": 5.6,
-      "predictedLtvUsd": 2536,
-      "notes": "Seeded lead for Kingstree Plumbing in Sherwood Park. Niche: plumbing.",
-      "createdAt": "2026-07-10T10:42:30.995Z",
-      "updatedAt": "2026-07-06T10:42:30.990Z"
+      "urgencyScore": 88,
+      "predictedLtvUsd": 14000,
+      "source": "stage1_evidence_harvest",
+      "id": "lead_0c949c45d6ba33e0",
+      "emailEncrypted": "76a72198b1fbdf9d7ee24180:9243ad11cdf4011d09131c95dd115a2048ff15bb211b:b3093d0c9680e194ea871fd58f8bdeaf",
+      "phoneEncrypted": "4b6b0a6ca6e6a661cebc4c93:e81597caff2a104220aece88:0b0e8e90c1d95b508c6819b8c45d7ccb",
+      "createdAt": "2026-09-07T11:09:58.787Z",
+      "updatedAt": "2026-09-07T11:09:58.787Z"
     },
     {
-      "id": "lead_seed_35",
       "contractorId": "con_admin_seed",
-      "businessName": "The Gentlemen Pros Calgary",
-      "ownerName": "Brham Trim",
-      "emailEncrypted": "2dbda3c510ddc3ffcc232811:3f15012773cf6ef946423bd40c7f11:cf742135cea29a03f4addc12519ec0e4",
+      "businessName": "Prairie Commercial Roofing Ltd",
+      "contactName": "Robert Vance",
+      "city": "Winnipeg",
+      "niche": "commercial roofing",
+      "status": "contacted",
+      "score": 88,
+      "source": "google_ads_inbound",
+      "id": "lead_55f2f80f1c326705",
+      "emailEncrypted": "2280f528ae44f5ce1638124f:9cae0ea8f98f7da986b551b1e08fc865cf9c9290c1:1d993347b6f4b3317c891df4bd3a238f",
+      "phoneEncrypted": "a1a38077f911ea32b561ffa4:b8c0eee392bf94f21f935f2c94f554a398:7f21c86f60e2eafb7b7b46be91062168",
+      "createdAt": "2026-09-07T11:12:48.908Z",
+      "updatedAt": "2026-09-07T11:12:48.910Z"
+    },
+    {
+      "contractorId": "test_stage1_contractor_1788779569185",
+      "businessName": "Winnipeg Mechanical Commercial Ltd",
+      "ownerName": "Dan Fraser",
+      "city": "Winnipeg",
+      "serviceType": "Commercial HVAC",
+      "status": "new",
+      "urgencyScore": 88,
+      "predictedLtvUsd": 14000,
+      "source": "stage1_evidence_harvest",
+      "id": "lead_817d5618382d4fe8",
+      "emailEncrypted": "dec691ba3265a86c1b4e436f:0b87109f7298e02776a7249cb9c084f95fb0f7ffe6f0:7cb40662bf9082dc09b5e89d3a46b4ec",
+      "phoneEncrypted": "88c6300bedfcf532488bfbdd:49bb92e5d197fe018e664b1f:91f5c42cd8b2ef8a2ad96375c07d06bb",
+      "createdAt": "2026-09-07T11:12:49.200Z",
+      "updatedAt": "2026-09-07T11:12:49.200Z"
+    },
+    {
+      "contractorId": "con_admin_seed",
+      "businessName": "Prairie Commercial Roofing Ltd",
+      "contactName": "Robert Vance",
+      "city": "Winnipeg",
+      "niche": "commercial roofing",
+      "status": "contacted",
+      "score": 88,
+      "source": "google_ads_inbound",
+      "id": "lead_6ec7e8602719ed31",
+      "emailEncrypted": "5a3869638725c120e6fdc98f:b768fce87274caf2e269ba9cd2039d314d1c0f6241:a32c250e2da9bbf1374b88e31046da32",
+      "phoneEncrypted": "3d7d9f3a355c44de2ad8ddbc:f46e0182660a8516d16e6d1f9e08daa491:3bc1a73e8d5e25fa4e7b6248f9fa8bcb",
+      "createdAt": "2026-09-08T07:59:32.638Z",
+      "updatedAt": "2026-09-08T07:59:32.640Z"
+    },
+    {
+      "contractorId": "con_test_phase2_1788854438824",
+      "businessName": "Dummy Seed Construction",
+      "contactName": "Seed Test",
+      "city": "Winnipeg",
+      "niche": "commercial roofing",
+      "status": "new",
+      "score": 50,
+      "source": "mock_seed",
+      "id": "lead_435e0d5868705f62",
+      "emailEncrypted": "4a5e6504e176884b047d9437:9d6a452c2c643a15a00cb21830:ba24c0eec4648e07e54039421c2b12f1",
+      "phoneEncrypted": "e7374ff6084dd89fec9469b7:21b7603dff9d8ffda57434ff30b82460bb:65c659682ac3e6cbae7e090abb908584",
+      "createdAt": "2026-09-08T08:00:38.833Z",
+      "updatedAt": "2026-09-08T08:00:38.833Z"
+    },
+    {
+      "contractorId": "con_test_phase2_1788854438824",
+      "businessName": "Prairie Apex Commercial Climate Co.",
+      "contactName": "Craig Henderson",
+      "city": "Winnipeg",
+      "serviceType": "commercial hvac",
+      "status": "new",
+      "score": 91,
+      "source": "harvested_intelligence",
+      "id": "lead_4b622a8779570566",
+      "emailEncrypted": "103e667bfdb4670282f12623:66514f9aef487cd4e6cf5ee2ae26ae1da5a90cde:daee03d9a5066c9b08591c2175e706f2",
+      "phoneEncrypted": "b3e318cff1ce77fef536e736:262c19319c9313df4386cb2c04a8b17ecf:beacbbe4f5ca430ad705aa0336155668",
+      "createdAt": "2026-09-08T08:00:38.839Z",
+      "updatedAt": "2026-09-08T08:00:38.839Z"
+    },
+    {
+      "contractorId": "con_admin_seed",
+      "businessName": "Prairie Commercial Roofing Ltd",
+      "contactName": "Robert Vance",
+      "city": "Winnipeg",
+      "niche": "commercial roofing",
+      "status": "contacted",
+      "score": 88,
+      "source": "google_ads_inbound",
+      "id": "lead_a87f0b4c12413d4b",
+      "emailEncrypted": "10527ee30094ef36d0060175:eab4948a85d8c6aaef50c0109901484498cbf0e947:2854f3d4d04eed50a23c313aa0e564a2",
+      "phoneEncrypted": "90d708fd8f5121e6cbdee6d7:e4defd4f78f004a8fa75dab36bb507d7af:49259071d35adbb11722601c588c93f1",
+      "createdAt": "2026-09-08T08:00:42.813Z",
+      "updatedAt": "2026-09-08T08:00:42.819Z"
+    },
+    {
+      "contractorId": "con_test_phase2_1788854443142",
+      "businessName": "Dummy Seed Construction",
+      "contactName": "Seed Test",
+      "city": "Winnipeg",
+      "niche": "commercial roofing",
+      "status": "new",
+      "score": 50,
+      "source": "mock_seed",
+      "id": "lead_5c8479b7af7cb3ea",
+      "emailEncrypted": "fc39ed715627bbfab28dded6:b051483121a391b23b502f1269:9a82bac4861f52050ddfc8c95a043af5",
+      "phoneEncrypted": "6d13743e21247d0834890d93:fd0790e597e14eece0a86434c9422fcb66:e61619319c0d2830494197cc86476c6a",
+      "createdAt": "2026-09-08T08:00:43.150Z",
+      "updatedAt": "2026-09-08T08:00:43.150Z"
+    },
+    {
+      "contractorId": "con_test_phase2_1788854443142",
+      "businessName": "Prairie Apex Commercial Climate Co.",
+      "contactName": "Craig Henderson",
+      "city": "Winnipeg",
+      "serviceType": "commercial hvac",
+      "status": "new",
+      "score": 91,
+      "source": "harvested_intelligence",
+      "id": "lead_8da3045a8d4efbc1",
+      "emailEncrypted": "b2529cd6ef0de1da2c229945:709f226d22cc4e22af2ac588647f8b17adbb9a6b:3f705a6abd69556fd17d2af5c8d08a2a",
+      "phoneEncrypted": "3b955f229b9d4e60ebaf567a:09384696f56d37646e8d738df6ae0df1d1:b1b898f2282999c26a82343dc7610708",
+      "createdAt": "2026-09-08T08:00:43.156Z",
+      "updatedAt": "2026-09-08T08:00:43.156Z"
+    },
+    {
+      "contractorId": "con_test_phase2_1788854773714",
+      "businessName": "Dummy Seed Construction",
+      "contactName": "Seed Test",
+      "city": "Winnipeg",
+      "niche": "commercial roofing",
+      "status": "new",
+      "score": 50,
+      "source": "mock_seed",
+      "id": "lead_ab6123aeb4d4287e",
+      "emailEncrypted": "eef9405549253314641b1e0d:1e23e13fee27d2edb10f3637fa:d03c63f6b605beb28f8115794e646ab5",
+      "phoneEncrypted": "dcc6fa67666c98a1a08ebfb0:99a92022503a1a6ccabcb457fbd26b244b:847c06559f9349ae18112f75b4c6ec41",
+      "createdAt": "2026-09-08T08:06:13.723Z",
+      "updatedAt": "2026-09-08T08:06:13.723Z"
+    },
+    {
+      "contractorId": "con_test_phase2_1788854773714",
+      "businessName": "Prairie Apex Commercial Climate Co.",
+      "contactName": "Craig Henderson",
+      "city": "Winnipeg",
+      "serviceType": "commercial hvac",
+      "status": "new",
+      "score": 91,
+      "source": "harvested_intelligence",
+      "id": "lead_0efc196b1156695b",
+      "emailEncrypted": "f84663c841fa9abffa1485fa:b2fd24d88010eecd2a273e71c3a702f88fc71e7a:6a14391f6012ee5a66911fb37877a64a",
+      "phoneEncrypted": "fc4de6720d90e7134952d79b:e83566f3e97658d7619a7be178588b468c:16888dc28095e6545e03dfb84bcf1a6f",
+      "createdAt": "2026-09-08T08:06:13.729Z",
+      "updatedAt": "2026-09-08T08:06:13.729Z"
+    },
+    {
+      "contractorId": "con_admin_seed",
+      "businessName": "Prairie Commercial Roofing Ltd",
+      "contactName": "Robert Vance",
+      "city": "Winnipeg",
+      "niche": "commercial roofing",
+      "status": "contacted",
+      "score": 88,
+      "source": "google_ads_inbound",
+      "id": "lead_1fe9b911850fb5ce",
+      "emailEncrypted": "3a57038b12d3e4f092b60d5b:a431aee613a504a0d22739a02606fcb1c46936beb8:9ce47fd6968f595179ca517f63683aa4",
+      "phoneEncrypted": "4a601d762e70148b8fca0e0e:6a44839c83da17bb04070a84cb50b99b36:9885ec73d0f49ca13fa3b7b394cc07e6",
+      "createdAt": "2026-09-08T08:06:18.890Z",
+      "updatedAt": "2026-09-08T08:06:18.893Z"
+    },
+    {
+      "contractorId": "con_test_phase2_1788854779180",
+      "businessName": "Dummy Seed Construction",
+      "contactName": "Seed Test",
+      "city": "Winnipeg",
+      "niche": "commercial roofing",
+      "status": "new",
+      "score": 50,
+      "source": "mock_seed",
+      "id": "lead_4a7f01c1ae589ae3",
+      "emailEncrypted": "cff08a0ba69f347fcf9704d9:d562a5354a55bb518e2bb4bc5d:37361950c2b4592a2056d9cd46312c87",
+      "phoneEncrypted": "95de69962cd8026fc41dcfc1:825e6c00110402c2b071309e1975f17e42:3c613f332070b05d18aff369c837c21a",
+      "createdAt": "2026-09-08T08:06:19.188Z",
+      "updatedAt": "2026-09-08T08:06:19.188Z"
+    },
+    {
+      "contractorId": "con_test_phase2_1788854779180",
+      "businessName": "Prairie Apex Commercial Climate Co.",
+      "contactName": "Craig Henderson",
+      "city": "Winnipeg",
+      "serviceType": "commercial hvac",
+      "status": "new",
+      "score": 91,
+      "source": "harvested_intelligence",
+      "id": "lead_06af5d1925586ad1",
+      "emailEncrypted": "6514d60d895b5210e29b1fb9:f53492222838dd55a071d75ed6dc299989a5f0b7:49d3756bc6f2e3f86225941c6e4956f2",
+      "phoneEncrypted": "1ae12ff4826d05af2e9d6822:d38923dde49d031550fdf21b52a0fd236c:ee2082ef6534a5fcddbfce9caca79fc6",
+      "createdAt": "2026-09-08T08:06:19.194Z",
+      "updatedAt": "2026-09-08T08:06:19.194Z"
+    },
+    {
+      "contractorId": "test_stage1_contractor_1788854779737",
+      "businessName": "Winnipeg Mechanical Commercial Ltd",
+      "ownerName": "Dan Fraser",
+      "city": "Winnipeg",
+      "serviceType": "Commercial HVAC",
+      "status": "new",
+      "urgencyScore": 88,
+      "predictedLtvUsd": 14000,
+      "source": "stage1_evidence_harvest",
+      "id": "lead_d2996c2e4eb7d810",
+      "emailEncrypted": "65cdec771a0909f9de91853c:f7cec4001187cdd67ab235fd7bb7fce96c6384d5d157:c8c09a9b2faed7346fa14d5fc125100b",
+      "phoneEncrypted": "d57c169acaa0334b860b4ca1:b6b907cf186e10cb9feec143:ee8263d44d4df054e5e7c409e726cb86",
+      "createdAt": "2026-09-08T08:06:19.752Z",
+      "updatedAt": "2026-09-08T08:06:19.752Z"
+    },
+    {
+      "contractorId": "con_admin_seed",
+      "businessName": "Inbound Prospect",
       "city": "Calgary",
-      "serviceType": "home services",
-      "source": "cold_outreach",
+      "serviceType": "Roofing",
+      "source": "whatsapp_inbound",
+      "status": "responded",
+      "urgencyScore": 9.2,
+      "predictedLtv": 8500,
+      "id": "lead_9c09079522a372d7",
+      "phoneEncrypted": "3afc4b9a7db3e4429c4e206a:72188c96a343a4ee89eb67d4:5886ee97da32f4b443104fe4576fccc1",
+      "createdAt": "2026-09-10T13:32:50.381Z",
+      "updatedAt": "2026-09-10T14:57:20.633Z",
+      "notes": "[Simulated WhatsApp - 2026-09-10T14:57]: Yes, we received your website audit and want to schedule a review for Tuesday."
+    },
+    {
+      "id": "lead_cfeacc0a090a8671",
+      "contractorId": "con_admin_seed",
+      "businessName": "Sarah Connor (Homeowner Inbound)",
+      "ownerName": "Sarah Connor",
+      "phoneEncrypted": "686dfb9b7d3ac7d3c0199def:3653a53a66523579003426:baf0fd477bb8506df33409455b822881",
+      "city": "Calgary",
+      "niche": "Emergency Inbound",
+      "source": "landing_page",
       "status": "new",
-      "urgencyScore": 7.8,
-      "predictedLtvUsd": 3359,
-      "notes": "Seeded lead for The Gentlemen Pros Calgary in Calgary. Niche: home services.",
-      "createdAt": "2026-07-11T10:42:30.995Z",
-      "updatedAt": "2026-07-06T10:42:30.990Z"
-    },
-    {
-      "id": "lead_seed_43",
-      "contractorId": "con_admin_seed",
-      "businessName": "Nordic Plumbing",
-      "ownerName": "Dennis Baldwin",
-      "emailEncrypted": "576d324728e4b61bf5c7259c:d66e88375fec2e9a60e0e5596a0c4abe6b501c9962d04ddb5e57:0b84838a526a795f5c390cdc2ce11c5f",
-      "city": "Winnipeg",
-      "serviceType": "plumbing",
-      "source": "cold_outreach",
-      "status": "new",
-      "urgencyScore": 6,
-      "predictedLtvUsd": 3057,
-      "notes": "Seeded lead for Nordic Plumbing in Winnipeg. Niche: plumbing.",
-      "createdAt": "2026-07-19T10:42:30.995Z",
-      "updatedAt": "2026-07-06T10:42:30.990Z"
-    },
-    {
-      "id": "lead_seed_45",
-      "contractorId": "con_admin_seed",
-      "businessName": "Aloha Plumbing & Drain",
-      "ownerName": "Angel Sanchez",
-      "emailEncrypted": "72258130f0541b4cfdef303b:b22dfbfa5b9428045897e80e8cdc4ca027bea2345dbd016bc3:64e7deed5995fbd38452ad16966c631a",
-      "city": "Winnipeg",
-      "serviceType": "plumbing",
-      "source": "cold_outreach",
-      "status": "new",
-      "urgencyScore": 7.3,
-      "predictedLtvUsd": 2320,
-      "notes": "Seeded lead for Aloha Plumbing & Drain in Winnipeg. Niche: plumbing.",
-      "createdAt": "2026-07-21T10:42:30.995Z",
-      "updatedAt": "2026-07-06T10:42:30.990Z"
-    },
-    {
-      "id": "lead_seed_48",
-      "contractorId": "con_admin_seed",
-      "businessName": "Northern Concrete Repair",
-      "ownerName": "Joel Smith",
-      "emailEncrypted": "57ab6a2ef07199480a0c2eb0:41f73340c0b3ab6a197e6ed79d7c67677b430688d531d87c81f9a138921284766fafed6f:ff9c7daba744f0dc9d930799e6ac7d26",
-      "city": "Fredericton",
-      "serviceType": "waterproofing & concrete",
-      "source": "cold_outreach",
-      "status": "new",
-      "urgencyScore": 8.4,
-      "predictedLtvUsd": 2757,
-      "notes": "Tier B/C. Northern Concrete Repair (northernconstruction.ca). Concrete & foundation repair. Low review profile.",
-      "createdAt": "2026-07-24T10:42:30.995Z",
-      "updatedAt": "2026-07-06T10:42:30.990Z"
-    },
-    {
-      "id": "lead_seed_2",
-      "contractorId": "con_admin_seed",
-      "businessName": "ILV Plumbing Services",
-      "ownerName": "Ilias",
-      "emailEncrypted": "d9f2e190a972deb0a5ae31d7:12d6d531db905fd47bf8cc808f2b94cb894c403443:754d4f3e9851a1d091fccd489980aa40",
-      "city": "Winnipeg",
-      "serviceType": "plumbing",
-      "source": "cold_outreach",
-      "status": "contacted",
-      "urgencyScore": 8.5,
-      "predictedLtvUsd": 1828,
-      "notes": "Seeded lead for ILV Plumbing Services in Winnipeg. Niche: plumbing.",
-      "createdAt": "2026-06-08T10:42:30.996Z",
-      "updatedAt": "2026-07-06T10:42:30.990Z"
-    },
-    {
-      "id": "lead_seed_4",
-      "contractorId": "con_admin_seed",
-      "businessName": "Worthy Pick Plumbing",
-      "emailEncrypted": "f966872d7ae6ca20ed5f1ceb:de2c5cab3064dd90549df26ed36fdc1d3421:8877e091d6f7e67460915e0415c06694",
-      "city": "Winnipeg",
-      "serviceType": "plumbing",
-      "source": "cold_outreach",
-      "status": "contacted",
-      "urgencyScore": 7.3,
-      "predictedLtvUsd": 2354,
-      "notes": "Seeded lead for Worthy Pick Plumbing in Winnipeg. Niche: plumbing.",
-      "createdAt": "2026-06-10T10:42:30.996Z",
-      "updatedAt": "2026-07-06T10:42:30.990Z"
-    },
-    {
-      "id": "lead_seed_6",
-      "contractorId": "con_admin_seed",
-      "businessName": "Next-Gen Plumbing & Heating",
-      "emailEncrypted": "62962950cf6df00962f230ef:e534fe37fcdd88c38734987154e1502034417506eb12a3:48b56acfe63ee2b8cc93e1e777cfd14b",
-      "city": "Winnipeg",
-      "serviceType": "plumbing",
-      "source": "cold_outreach",
-      "status": "converted",
-      "urgencyScore": 7.2,
-      "predictedLtvUsd": 3500,
-      "notes": "Seeded lead for Next-Gen Plumbing & Heating in Winnipeg. Niche: plumbing.",
-      "createdAt": "2026-06-12T10:42:30.996Z",
-      "updatedAt": "2026-07-06T10:42:30.990Z"
+      "urgencyScore": 9.8,
+      "predictedLtv": 450,
+      "notes": "Landing Page: emergency-starter-lp | Details: Emergency basement drain backup, need technician ASAP",
+      "createdAt": "2026-09-10T13:58:24.796Z",
+      "updatedAt": "2026-09-10T13:58:24.796Z"
     }
   ],
   "leadEvents": [],
@@ -749,16 +1010,7 @@
       "createdAt": "2026-07-06T10:42:30.990Z"
     }
   ],
-  "revenues": [
-    {
-      "id": "rev_seed_6",
-      "leadId": "lead_seed_6",
-      "contractorId": "con_admin_seed",
-      "amountUsd": 3500,
-      "source": "manual_entry",
-      "recordedAt": "2026-07-04T10:42:30.996Z"
-    }
-  ],
+  "revenues": [],
   "forecasts": [
     {
       "id": "fc_seed_expired",
@@ -862,6 +1114,114 @@
       "read": false,
       "id": "not_098bbab8e168c1e1",
       "createdAt": "2026-09-01T21:53:33.489Z"
+    },
+    {
+      "contractorId": "7aca0d9a-0871-4a98-b7ee-ed8cbd97ae95",
+      "type": "success",
+      "title": "Lead Captured",
+      "message": "Successfully created lead profile for Apex Commercial Plaza in Austin.",
+      "read": false,
+      "id": "not_566cc9ae9cad2cec",
+      "createdAt": "2026-09-08T14:18:56.985Z"
+    },
+    {
+      "contractorId": "7b7fda95-3e69-45fd-8e5a-74a25174e1b7",
+      "type": "success",
+      "title": "Lead Captured",
+      "message": "Successfully created lead profile for Apex Commercial Plaza in Austin.",
+      "read": false,
+      "id": "not_fd5900f88ae66e57",
+      "createdAt": "2026-09-08T14:20:37.371Z"
+    },
+    {
+      "contractorId": "9ded9c4f-f42e-4ed2-9c6e-cc6de3439212",
+      "type": "success",
+      "title": "Lead Captured",
+      "message": "Successfully created lead profile for Apex Commercial Plaza in Austin.",
+      "read": false,
+      "id": "not_5abfd4da3de41130",
+      "createdAt": "2026-09-08T14:22:12.396Z"
+    },
+    {
+      "contractorId": "721ad163-9d39-4ba2-b8ef-d160f0105e09",
+      "type": "success",
+      "title": "Lead Captured",
+      "message": "Successfully created lead profile for Apex Commercial Plaza in Austin.",
+      "read": false,
+      "id": "not_3bdee872bf867ad1",
+      "createdAt": "2026-09-08T14:28:04.718Z"
+    },
+    {
+      "contractorId": "con_admin_seed",
+      "type": "lead",
+      "title": "💬 Inbound WhatsApp: Prairie Commercial Roofing Ltd",
+      "message": "\"\"",
+      "read": false,
+      "id": "not_50edf34854ef93d6",
+      "createdAt": "2026-09-10T13:33:27.860Z"
+    },
+    {
+      "contractorId": "con_admin_seed",
+      "type": "lead",
+      "title": "💬 Inbound WhatsApp: Prairie Commercial Roofing Ltd",
+      "message": "\"\"",
+      "read": false,
+      "id": "not_c6de4ec52a5b424a",
+      "createdAt": "2026-09-10T13:36:24.004Z"
+    },
+    {
+      "contractorId": "con_admin_seed",
+      "type": "lead_captured",
+      "title": "⚡ New Priority Homeowner Inbound!",
+      "message": "Sarah Connor ((403) 555-8822) requested urgent dispatch: Emergency basement drain backup, need technician ASAP",
+      "read": false,
+      "id": "not_573ded9346b84f76",
+      "createdAt": "2026-09-10T13:58:24.800Z"
+    },
+    {
+      "contractorId": "con_admin_seed",
+      "type": "lead",
+      "title": "💬 Inbound WhatsApp: Inbound Prospect",
+      "message": "\"Yes, we received your website audit and want to schedule a review for Tuesday.\"",
+      "read": false,
+      "id": "not_fcde410a04a3a7d0",
+      "createdAt": "2026-09-10T14:57:20.636Z"
+    },
+    {
+      "contractorId": "con_isaac_seed",
+      "type": "success",
+      "title": "Lead Captured",
+      "message": "Successfully created lead profile for Test Plumbing in London.",
+      "read": false,
+      "id": "not_109acafd20a66bf7",
+      "createdAt": "2026-09-10T15:10:43.481Z"
+    },
+    {
+      "contractorId": "con_isaac_seed",
+      "type": "info",
+      "title": "Commercial Stage Shifted",
+      "message": "Lead \"Test Plumbing\" moved to \"CONTACTED\".",
+      "read": false,
+      "id": "not_dedce248271bb92e",
+      "createdAt": "2026-09-10T15:10:46.755Z"
+    },
+    {
+      "contractorId": "con_isaac_seed",
+      "type": "info",
+      "title": "Commercial Stage Shifted",
+      "message": "Lead \"Test Plumbing\" moved to \"CONVERTED\".",
+      "read": false,
+      "id": "not_0b4ff54195ffa242",
+      "createdAt": "2026-09-10T15:12:11.679Z"
+    },
+    {
+      "contractorId": "con_isaac_seed",
+      "type": "info",
+      "title": "Commercial Stage Shifted",
+      "message": "Lead \"Test Plumbing\" moved to \"DEAD\".",
+      "read": false,
+      "id": "not_da34336554a7a626",
+      "createdAt": "2026-09-10T15:12:16.741Z"
     }
   ],
   "systemAuditLogs": [
@@ -1202,9 +1562,2693 @@
       "details": "TimesFM forward demand synthesis executed for roofing across Calgary (12-week horizon).",
       "id": "log_602c71396c6de7e1",
       "createdAt": "2026-09-01T21:55:08.452Z"
+    },
+    {
+      "contractorId": "abfb20fd-ff95-4cf6-8535-16e6a7cfd286",
+      "action": "TIMESFM_INFERENCE_TEST",
+      "details": "TimesFM forward demand synthesis executed for plumbing across London (12-week horizon).",
+      "id": "log_40778a29e13d9d84",
+      "createdAt": "2026-09-07T09:57:42.995Z"
+    },
+    {
+      "contractorId": "abfb20fd-ff95-4cf6-8535-16e6a7cfd286",
+      "action": "TIMESFM_INFERENCE_TEST",
+      "details": "TimesFM forward demand synthesis executed for plumbing across London (12-week horizon).",
+      "id": "log_d219e8b5e93bfcc5",
+      "createdAt": "2026-09-07T09:57:42.999Z"
+    },
+    {
+      "contractorId": "abfb20fd-ff95-4cf6-8535-16e6a7cfd286",
+      "action": "TIMESFM_INFERENCE_TEST",
+      "details": "TimesFM forward demand synthesis executed for plumbing across London (12-week horizon).",
+      "id": "log_b56243ea94245fac",
+      "createdAt": "2026-09-07T10:57:28.665Z"
+    },
+    {
+      "contractorId": "abfb20fd-ff95-4cf6-8535-16e6a7cfd286",
+      "action": "TIMESFM_INFERENCE_TEST",
+      "details": "TimesFM forward demand synthesis executed for plumbing across London (12-week horizon).",
+      "id": "log_18c43e17095b62ab",
+      "createdAt": "2026-09-07T10:57:28.669Z"
+    },
+    {
+      "contractorId": "abfb20fd-ff95-4cf6-8535-16e6a7cfd286",
+      "action": "TIMESFM_INFERENCE_TEST",
+      "details": "TimesFM forward demand synthesis executed for plumbing across London (12-week horizon).",
+      "id": "log_09abc9f884a62aba",
+      "createdAt": "2026-09-07T11:06:30.411Z"
+    },
+    {
+      "contractorId": "abfb20fd-ff95-4cf6-8535-16e6a7cfd286",
+      "action": "TIMESFM_INFERENCE_TEST",
+      "details": "TimesFM forward demand synthesis executed for plumbing across London (12-week horizon).",
+      "id": "log_7994baa7dbddd85c",
+      "createdAt": "2026-09-07T11:06:30.428Z"
+    },
+    {
+      "contractorId": "abfb20fd-ff95-4cf6-8535-16e6a7cfd286",
+      "action": "TIMESFM_INFERENCE_TEST",
+      "details": "TimesFM forward demand synthesis executed for plumbing across London (12-week horizon).",
+      "id": "log_a4705e77272adda5",
+      "createdAt": "2026-09-07T11:17:45.166Z"
+    },
+    {
+      "contractorId": "abfb20fd-ff95-4cf6-8535-16e6a7cfd286",
+      "action": "TIMESFM_INFERENCE_TEST",
+      "details": "TimesFM forward demand synthesis executed for plumbing across London (12-week horizon).",
+      "id": "log_b5bf675e0b9f40a1",
+      "createdAt": "2026-09-07T11:17:45.272Z"
+    },
+    {
+      "contractorId": "abfb20fd-ff95-4cf6-8535-16e6a7cfd286",
+      "action": "TIMESFM_INFERENCE_TEST",
+      "details": "TimesFM forward demand synthesis executed for plumbing across London (12-week horizon).",
+      "id": "log_7474795a4f4b9792",
+      "createdAt": "2026-09-07T11:17:46.202Z"
+    },
+    {
+      "contractorId": "abfb20fd-ff95-4cf6-8535-16e6a7cfd286",
+      "action": "TIMESFM_INFERENCE_TEST",
+      "details": "TimesFM forward demand synthesis executed for plumbing across London (12-week horizon).",
+      "id": "log_6dc5c090a1946492",
+      "createdAt": "2026-09-07T11:17:46.206Z"
+    },
+    {
+      "contractorId": "abfb20fd-ff95-4cf6-8535-16e6a7cfd286",
+      "action": "LEADS_VIEW_CHANGED",
+      "details": "Switched lead directory workspace view to: LIST",
+      "ipAddress": "127.0.0.1",
+      "id": "log_5c8a8a9677f05726",
+      "createdAt": "2026-09-07T11:17:53.506Z"
+    },
+    {
+      "contractorId": "abfb20fd-ff95-4cf6-8535-16e6a7cfd286",
+      "action": "LEADS_VIEW_CHANGED",
+      "details": "Switched lead directory workspace view to: LIST",
+      "ipAddress": "127.0.0.1",
+      "id": "log_ef3dde17add24a22",
+      "createdAt": "2026-09-07T11:17:53.508Z"
+    },
+    {
+      "contractorId": "abfb20fd-ff95-4cf6-8535-16e6a7cfd286",
+      "action": "TIMESFM_INFERENCE_TEST",
+      "details": "TimesFM forward demand synthesis executed for plumbing across London (12-week horizon).",
+      "id": "log_6c26eb51989c48cc",
+      "createdAt": "2026-09-07T11:17:56.346Z"
+    },
+    {
+      "contractorId": "abfb20fd-ff95-4cf6-8535-16e6a7cfd286",
+      "action": "TIMESFM_INFERENCE_TEST",
+      "details": "TimesFM forward demand synthesis executed for plumbing across London (12-week horizon).",
+      "id": "log_a168a4a4201d5086",
+      "createdAt": "2026-09-07T11:17:58.855Z"
+    },
+    {
+      "contractorId": "con_admin_seed",
+      "action": "TIMESFM_INFERENCE_TEST",
+      "details": "TimesFM forward demand synthesis executed for roofing across Calgary (12-week horizon).",
+      "id": "log_57357a65b1fca7fd",
+      "createdAt": "2026-09-07T11:19:27.394Z"
+    },
+    {
+      "contractorId": "abfb20fd-ff95-4cf6-8535-16e6a7cfd286",
+      "action": "LEADS_VIEW_CHANGED",
+      "details": "Switched lead directory workspace view to: LIST",
+      "ipAddress": "127.0.0.1",
+      "id": "log_aabd327c39ea2b8b",
+      "createdAt": "2026-09-07T11:20:54.781Z"
+    },
+    {
+      "contractorId": "abfb20fd-ff95-4cf6-8535-16e6a7cfd286",
+      "action": "LEADS_VIEW_CHANGED",
+      "details": "Switched lead directory workspace view to: LIST",
+      "ipAddress": "127.0.0.1",
+      "id": "log_fd81aea650e18e55",
+      "createdAt": "2026-09-07T11:20:54.784Z"
+    },
+    {
+      "contractorId": "abfb20fd-ff95-4cf6-8535-16e6a7cfd286",
+      "action": "MAP_DASHBOARD_MOUNTED",
+      "details": "Conquest Map opened via OpenStreetMap Real Tile Engine. Available entries: 0",
+      "ipAddress": "127.0.0.1",
+      "id": "log_28d2574da8e54c1d",
+      "createdAt": "2026-09-07T11:20:56.735Z"
+    },
+    {
+      "contractorId": "abfb20fd-ff95-4cf6-8535-16e6a7cfd286",
+      "action": "MAP_DASHBOARD_MOUNTED",
+      "details": "Conquest Map opened via OpenStreetMap Real Tile Engine. Available entries: 0",
+      "ipAddress": "127.0.0.1",
+      "id": "log_07d46fd824e55678",
+      "createdAt": "2026-09-07T11:20:56.737Z"
+    },
+    {
+      "contractorId": "con_admin_seed",
+      "action": "TIMESFM_INFERENCE_TEST",
+      "details": "TimesFM forward demand synthesis executed for roofing across Calgary (12-week horizon).",
+      "id": "log_8774d538b647c805",
+      "createdAt": "2026-09-07T11:22:26.736Z"
+    },
+    {
+      "contractorId": "con_admin_seed",
+      "action": "TIMESFM_INFERENCE_TEST",
+      "details": "TimesFM forward demand synthesis executed for plumbing across London (12-week horizon).",
+      "id": "log_66627b29563b8bef",
+      "createdAt": "2026-09-08T07:53:46.682Z"
+    },
+    {
+      "contractorId": "con_admin_seed",
+      "action": "TIMESFM_INFERENCE_TEST",
+      "details": "TimesFM forward demand synthesis executed for plumbing across London (12-week horizon).",
+      "id": "log_a7cc3745d222cf11",
+      "createdAt": "2026-09-08T07:53:46.715Z"
+    },
+    {
+      "contractorId": "con_admin_seed",
+      "action": "TIMESFM_INFERENCE_TEST",
+      "details": "TimesFM forward demand synthesis executed for plumbing across London (12-week horizon).",
+      "id": "log_a5fb304c4c1098ca",
+      "createdAt": "2026-09-08T07:55:52.228Z"
+    },
+    {
+      "contractorId": "con_admin_seed",
+      "action": "TIMESFM_INFERENCE_TEST",
+      "details": "TimesFM forward demand synthesis executed for plumbing across London (12-week horizon).",
+      "id": "log_cdb2ac82865876c2",
+      "createdAt": "2026-09-08T07:55:52.231Z"
+    },
+    {
+      "contractorId": "con_admin_seed",
+      "action": "TIMESFM_INFERENCE_TEST",
+      "details": "TimesFM forward demand synthesis executed for plumbing across London (12-week horizon).",
+      "id": "log_0e939810d9c9c781",
+      "createdAt": "2026-09-08T14:02:04.761Z"
+    },
+    {
+      "contractorId": "con_admin_seed",
+      "action": "TIMESFM_INFERENCE_TEST",
+      "details": "TimesFM forward demand synthesis executed for plumbing across London (12-week horizon).",
+      "id": "log_149edc771ea67d84",
+      "createdAt": "2026-09-08T14:02:04.765Z"
+    },
+    {
+      "contractorId": "con_admin_seed",
+      "action": "TIMESFM_INFERENCE_TEST",
+      "details": "TimesFM forward demand synthesis executed for plumbing across London (12-week horizon).",
+      "id": "log_7eaa51db8f1dec0b",
+      "createdAt": "2026-09-08T14:02:42.281Z"
+    },
+    {
+      "contractorId": "con_admin_seed",
+      "action": "TIMESFM_INFERENCE_TEST",
+      "details": "TimesFM forward demand synthesis executed for plumbing across London (12-week horizon).",
+      "id": "log_b4e35b5ef117eda2",
+      "createdAt": "2026-09-08T14:02:42.284Z"
+    },
+    {
+      "contractorId": "con_admin_seed",
+      "action": "TIMESFM_INFERENCE_TEST",
+      "details": "TimesFM forward demand synthesis executed for plumbing across London (12-week horizon).",
+      "id": "log_0b3e901f932133c3",
+      "createdAt": "2026-09-08T14:12:47.213Z"
+    },
+    {
+      "contractorId": "con_admin_seed",
+      "action": "TIMESFM_INFERENCE_TEST",
+      "details": "TimesFM forward demand synthesis executed for plumbing across London (12-week horizon).",
+      "id": "log_8e1ddb3994498f9d",
+      "createdAt": "2026-09-08T14:12:47.241Z"
+    },
+    {
+      "contractorId": "con_admin_seed",
+      "action": "TIMESFM_INFERENCE_TEST",
+      "details": "TimesFM forward demand synthesis executed for plumbing across London (12-week horizon).",
+      "id": "log_18b0ed1f3379bc54",
+      "createdAt": "2026-09-08T14:23:01.617Z"
+    },
+    {
+      "contractorId": "con_admin_seed",
+      "action": "TIMESFM_INFERENCE_TEST",
+      "details": "TimesFM forward demand synthesis executed for plumbing across London (12-week horizon).",
+      "id": "log_e8bfa4e30aeb14c1",
+      "createdAt": "2026-09-08T14:23:01.627Z"
+    },
+    {
+      "contractorId": "con_admin_seed",
+      "action": "LEADS_VIEW_CHANGED",
+      "details": "Switched lead directory workspace view to: LIST",
+      "ipAddress": "127.0.0.1",
+      "id": "log_d4b85aa44a7eb86f",
+      "createdAt": "2026-09-08T14:23:42.466Z"
+    },
+    {
+      "contractorId": "con_admin_seed",
+      "action": "LEADS_VIEW_CHANGED",
+      "details": "Switched lead directory workspace view to: LIST",
+      "ipAddress": "127.0.0.1",
+      "id": "log_e627faa34685c307",
+      "createdAt": "2026-09-08T14:23:42.469Z"
+    },
+    {
+      "contractorId": "con_admin_seed",
+      "action": "TIMESFM_INFERENCE_TEST",
+      "details": "TimesFM forward demand synthesis executed for plumbing across London (12-week horizon).",
+      "id": "log_4251f17b6cdf9fb9",
+      "createdAt": "2026-09-10T04:16:24.446Z"
+    },
+    {
+      "contractorId": "con_admin_seed",
+      "action": "TIMESFM_INFERENCE_TEST",
+      "details": "TimesFM forward demand synthesis executed for plumbing across London (12-week horizon).",
+      "id": "log_626a9d8322672b0c",
+      "createdAt": "2026-09-10T04:16:24.464Z"
+    },
+    {
+      "contractorId": "con_admin_seed",
+      "action": "TIMESFM_INFERENCE_TEST",
+      "details": "TimesFM forward demand synthesis executed for plumbing across London (12-week horizon).",
+      "id": "log_8e8de2b8e41dcb1f",
+      "createdAt": "2026-09-10T04:28:47.697Z"
+    },
+    {
+      "contractorId": "con_admin_seed",
+      "action": "TIMESFM_INFERENCE_TEST",
+      "details": "TimesFM forward demand synthesis executed for plumbing across London (12-week horizon).",
+      "id": "log_e105204ca3c498eb",
+      "createdAt": "2026-09-10T04:28:47.701Z"
+    },
+    {
+      "contractorId": "con_admin_seed",
+      "action": "TIMESFM_INFERENCE_TEST",
+      "details": "TimesFM forward demand synthesis executed for plumbing across London (12-week horizon).",
+      "id": "log_a1e6063024f9b8b8",
+      "createdAt": "2026-09-10T04:54:43.474Z"
+    },
+    {
+      "contractorId": "con_admin_seed",
+      "action": "TIMESFM_INFERENCE_TEST",
+      "details": "TimesFM forward demand synthesis executed for plumbing across London (12-week horizon).",
+      "id": "log_fe5b34c45954e380",
+      "createdAt": "2026-09-10T04:54:43.476Z"
+    },
+    {
+      "contractorId": "con_admin_seed",
+      "action": "TIMESFM_INFERENCE_TEST",
+      "details": "TimesFM forward demand synthesis executed for plumbing across London (12-week horizon).",
+      "id": "log_511c64c19952e878",
+      "createdAt": "2026-09-10T05:00:54.616Z"
+    },
+    {
+      "contractorId": "con_admin_seed",
+      "action": "TIMESFM_INFERENCE_TEST",
+      "details": "TimesFM forward demand synthesis executed for plumbing across London (12-week horizon).",
+      "id": "log_136aefe56407994d",
+      "createdAt": "2026-09-10T05:00:54.621Z"
+    },
+    {
+      "contractorId": "con_admin_seed",
+      "action": "MAP_DASHBOARD_MOUNTED",
+      "details": "Conquest Map opened via OpenStreetMap Real Tile Engine. Available entries: 20",
+      "ipAddress": "127.0.0.1",
+      "id": "log_08e7d7f18b5b01ef",
+      "createdAt": "2026-09-10T05:10:58.546Z"
+    },
+    {
+      "contractorId": "con_admin_seed",
+      "action": "MAP_DASHBOARD_MOUNTED",
+      "details": "Conquest Map opened via OpenStreetMap Real Tile Engine. Available entries: 20",
+      "ipAddress": "127.0.0.1",
+      "id": "log_3b0c2f5b23680098",
+      "createdAt": "2026-09-10T05:10:58.550Z"
+    },
+    {
+      "contractorId": "con_admin_seed",
+      "action": "LEADS_VIEW_CHANGED",
+      "details": "Switched lead directory workspace view to: LIST",
+      "ipAddress": "127.0.0.1",
+      "id": "log_b3d45e4d70b004bc",
+      "createdAt": "2026-09-10T05:11:04.370Z"
+    },
+    {
+      "contractorId": "con_admin_seed",
+      "action": "LEADS_VIEW_CHANGED",
+      "details": "Switched lead directory workspace view to: LIST",
+      "ipAddress": "127.0.0.1",
+      "id": "log_11ca3b32197309dd",
+      "createdAt": "2026-09-10T05:11:04.378Z"
+    },
+    {
+      "contractorId": "con_admin_seed",
+      "action": "TIMESFM_INFERENCE_TEST",
+      "details": "TimesFM forward demand synthesis executed for plumbing across London (12-week horizon).",
+      "id": "log_4b560ae8d68965cb",
+      "createdAt": "2026-09-10T05:11:04.381Z"
+    },
+    {
+      "contractorId": "con_admin_seed",
+      "action": "TIMESFM_INFERENCE_TEST",
+      "details": "TimesFM forward demand synthesis executed for plumbing across London (12-week horizon).",
+      "id": "log_3fc21516d274f043",
+      "createdAt": "2026-09-10T05:11:04.384Z"
+    },
+    {
+      "contractorId": "con_admin_seed",
+      "action": "TIMESFM_INFERENCE_TEST",
+      "details": "TimesFM forward demand synthesis executed for plumbing across London (12-week horizon).",
+      "id": "log_cd28e016f590abe3",
+      "createdAt": "2026-09-10T05:11:22.877Z"
+    },
+    {
+      "contractorId": "con_admin_seed",
+      "action": "TIMESFM_INFERENCE_TEST",
+      "details": "TimesFM forward demand synthesis executed for plumbing across London (12-week horizon).",
+      "id": "log_f5385fa5d5c52be8",
+      "createdAt": "2026-09-10T05:11:22.881Z"
+    },
+    {
+      "contractorId": "con_admin_seed",
+      "action": "LEADS_VIEW_CHANGED",
+      "details": "Switched lead directory workspace view to: LIST",
+      "ipAddress": "127.0.0.1",
+      "id": "log_4025602565fe5215",
+      "createdAt": "2026-09-10T05:23:51.033Z"
+    },
+    {
+      "contractorId": "con_admin_seed",
+      "action": "LEADS_VIEW_CHANGED",
+      "details": "Switched lead directory workspace view to: LIST",
+      "ipAddress": "127.0.0.1",
+      "id": "log_2aa3e66f2c3bd35b",
+      "createdAt": "2026-09-10T05:23:51.137Z"
+    },
+    {
+      "contractorId": "con_admin_seed",
+      "action": "TIMESFM_INFERENCE_TEST",
+      "details": "TimesFM forward demand synthesis executed for plumbing across London (12-week horizon).",
+      "id": "log_4480e7be6e284510",
+      "createdAt": "2026-09-10T05:32:17.425Z"
+    },
+    {
+      "contractorId": "con_admin_seed",
+      "action": "TIMESFM_INFERENCE_TEST",
+      "details": "TimesFM forward demand synthesis executed for plumbing across London (12-week horizon).",
+      "id": "log_17115b70c566f37e",
+      "createdAt": "2026-09-10T05:32:17.432Z"
+    },
+    {
+      "contractorId": "con_admin_seed",
+      "action": "TIMESFM_INFERENCE_TEST",
+      "details": "TimesFM forward demand synthesis executed for plumbing across London (12-week horizon).",
+      "id": "log_c13265f1f37dab24",
+      "createdAt": "2026-09-10T05:32:58.208Z"
+    },
+    {
+      "contractorId": "con_admin_seed",
+      "action": "TIMESFM_INFERENCE_TEST",
+      "details": "TimesFM forward demand synthesis executed for plumbing across London (12-week horizon).",
+      "id": "log_1972478ee0b1b207",
+      "createdAt": "2026-09-10T05:32:58.248Z"
+    },
+    {
+      "contractorId": "con_admin_seed",
+      "action": "TIMESFM_INFERENCE_TEST",
+      "details": "TimesFM forward demand synthesis executed for plumbing across London (12-week horizon).",
+      "id": "log_613828c5ee3423be",
+      "createdAt": "2026-09-10T05:36:27.950Z"
+    },
+    {
+      "contractorId": "con_admin_seed",
+      "action": "TIMESFM_INFERENCE_TEST",
+      "details": "TimesFM forward demand synthesis executed for plumbing across London (12-week horizon).",
+      "id": "log_b6c93cfc5801a225",
+      "createdAt": "2026-09-10T05:36:27.956Z"
+    },
+    {
+      "contractorId": "con_admin_seed",
+      "action": "TIMESFM_INFERENCE_TEST",
+      "details": "TimesFM forward demand synthesis executed for plumbing across London (12-week horizon).",
+      "id": "log_cfcf5842419e4003",
+      "createdAt": "2026-09-10T13:30:49.309Z"
+    },
+    {
+      "contractorId": "con_admin_seed",
+      "action": "TIMESFM_INFERENCE_TEST",
+      "details": "TimesFM forward demand synthesis executed for plumbing across London (12-week horizon).",
+      "id": "log_aaa3664bc2699a2c",
+      "createdAt": "2026-09-10T13:30:49.313Z"
+    },
+    {
+      "contractorId": "con_admin_seed",
+      "action": "TIMESFM_INFERENCE_TEST",
+      "details": "TimesFM forward demand synthesis executed for plumbing across London (12-week horizon).",
+      "id": "log_b96fd3772de69527",
+      "createdAt": "2026-09-10T13:37:09.825Z"
+    },
+    {
+      "contractorId": "con_admin_seed",
+      "action": "TIMESFM_INFERENCE_TEST",
+      "details": "TimesFM forward demand synthesis executed for plumbing across London (12-week horizon).",
+      "id": "log_d5b54a8433f8277d",
+      "createdAt": "2026-09-10T13:37:09.834Z"
+    },
+    {
+      "contractorId": "con_admin_seed",
+      "action": "TIMESFM_INFERENCE_TEST",
+      "details": "TimesFM forward demand synthesis executed for plumbing across London (12-week horizon).",
+      "id": "log_f7f94b868e576b4b",
+      "createdAt": "2026-09-10T13:51:28.908Z"
+    },
+    {
+      "contractorId": "con_admin_seed",
+      "action": "TIMESFM_INFERENCE_TEST",
+      "details": "TimesFM forward demand synthesis executed for plumbing across London (12-week horizon).",
+      "id": "log_c71b639c2b65ea82",
+      "createdAt": "2026-09-10T13:51:30.054Z"
+    },
+    {
+      "contractorId": "con_admin_seed",
+      "action": "TIMESFM_INFERENCE_TEST",
+      "details": "TimesFM forward demand synthesis executed for plumbing across London (12-week horizon).",
+      "id": "log_e329fbe756c4d4bb",
+      "createdAt": "2026-09-10T13:59:55.330Z"
+    },
+    {
+      "contractorId": "con_admin_seed",
+      "action": "TIMESFM_INFERENCE_TEST",
+      "details": "TimesFM forward demand synthesis executed for plumbing across London (12-week horizon).",
+      "id": "log_c4aaf8b49a5b838c",
+      "createdAt": "2026-09-10T13:59:55.338Z"
+    },
+    {
+      "contractorId": "con_admin_seed",
+      "action": "TIMESFM_INFERENCE_TEST",
+      "details": "TimesFM forward demand synthesis executed for plumbing across London (12-week horizon).",
+      "id": "log_2ac31e2f76d7809a",
+      "createdAt": "2026-09-10T13:59:56.195Z"
+    },
+    {
+      "contractorId": "con_admin_seed",
+      "action": "TIMESFM_INFERENCE_TEST",
+      "details": "TimesFM forward demand synthesis executed for plumbing across London (12-week horizon).",
+      "id": "log_5f074254e4d6f613",
+      "createdAt": "2026-09-10T13:59:56.198Z"
+    },
+    {
+      "contractorId": "con_admin_seed",
+      "action": "TIMESFM_INFERENCE_TEST",
+      "details": "TimesFM forward demand synthesis executed for plumbing across London (12-week horizon).",
+      "id": "log_c3c91305a257fa68",
+      "createdAt": "2026-09-10T14:15:36.866Z"
+    },
+    {
+      "contractorId": "con_admin_seed",
+      "action": "TIMESFM_INFERENCE_TEST",
+      "details": "TimesFM forward demand synthesis executed for plumbing across London (12-week horizon).",
+      "id": "log_b82d4b183a25a2e8",
+      "createdAt": "2026-09-10T14:15:36.870Z"
+    },
+    {
+      "contractorId": "con_admin_seed",
+      "action": "TIMESFM_INFERENCE_TEST",
+      "details": "TimesFM forward demand synthesis executed for plumbing across London (12-week horizon).",
+      "id": "log_a4523438b3118b62",
+      "createdAt": "2026-09-10T14:20:37.089Z"
+    },
+    {
+      "contractorId": "con_admin_seed",
+      "action": "TIMESFM_INFERENCE_TEST",
+      "details": "TimesFM forward demand synthesis executed for plumbing across London (12-week horizon).",
+      "id": "log_d24108cfbec6bd2d",
+      "createdAt": "2026-09-10T14:20:37.093Z"
+    },
+    {
+      "contractorId": "con_admin_seed",
+      "action": "TIMESFM_INFERENCE_TEST",
+      "details": "TimesFM forward demand synthesis executed for plumbing across London (12-week horizon).",
+      "id": "log_1bffd9bec381fcda",
+      "createdAt": "2026-09-10T14:21:06.868Z"
+    },
+    {
+      "contractorId": "con_admin_seed",
+      "action": "TIMESFM_INFERENCE_TEST",
+      "details": "TimesFM forward demand synthesis executed for plumbing across London (12-week horizon).",
+      "id": "log_1dcc5c219a55b104",
+      "createdAt": "2026-09-10T14:21:06.882Z"
+    },
+    {
+      "contractorId": "con_admin_seed",
+      "action": "TIMESFM_INFERENCE_TEST",
+      "details": "TimesFM forward demand synthesis executed for plumbing across London (12-week horizon).",
+      "id": "log_13466fe4766ac84e",
+      "createdAt": "2026-09-10T14:22:30.801Z"
+    },
+    {
+      "contractorId": "con_admin_seed",
+      "action": "TIMESFM_INFERENCE_TEST",
+      "details": "TimesFM forward demand synthesis executed for plumbing across London (12-week horizon).",
+      "id": "log_2df641105021da1c",
+      "createdAt": "2026-09-10T14:22:30.805Z"
+    },
+    {
+      "contractorId": "con_admin_seed",
+      "action": "TIMESFM_INFERENCE_TEST",
+      "details": "TimesFM forward demand synthesis executed for plumbing across London (12-week horizon).",
+      "id": "log_223b59d647ba023e",
+      "createdAt": "2026-09-10T14:22:32.194Z"
+    },
+    {
+      "contractorId": "con_admin_seed",
+      "action": "TIMESFM_INFERENCE_TEST",
+      "details": "TimesFM forward demand synthesis executed for plumbing across London (12-week horizon).",
+      "id": "log_6cb246935f9d492f",
+      "createdAt": "2026-09-10T14:22:32.204Z"
+    },
+    {
+      "contractorId": "con_admin_seed",
+      "action": "TIMESFM_INFERENCE_TEST",
+      "details": "TimesFM forward demand synthesis executed for plumbing across London (12-week horizon).",
+      "id": "log_37b4c60b7a9618d7",
+      "createdAt": "2026-09-10T14:22:33.349Z"
+    },
+    {
+      "contractorId": "con_admin_seed",
+      "action": "TIMESFM_INFERENCE_TEST",
+      "details": "TimesFM forward demand synthesis executed for plumbing across London (12-week horizon).",
+      "id": "log_636826e487487a50",
+      "createdAt": "2026-09-10T14:22:33.394Z"
+    },
+    {
+      "contractorId": "con_admin_seed",
+      "action": "TIMESFM_INFERENCE_TEST",
+      "details": "TimesFM forward demand synthesis executed for plumbing across London (12-week horizon).",
+      "id": "log_30f0249e40d2a8c8",
+      "createdAt": "2026-09-10T14:22:34.049Z"
+    },
+    {
+      "contractorId": "con_admin_seed",
+      "action": "TIMESFM_INFERENCE_TEST",
+      "details": "TimesFM forward demand synthesis executed for plumbing across London (12-week horizon).",
+      "id": "log_207de7dd65646e68",
+      "createdAt": "2026-09-10T14:22:34.058Z"
+    },
+    {
+      "contractorId": "con_admin_seed",
+      "action": "TIMESFM_INFERENCE_TEST",
+      "details": "TimesFM forward demand synthesis executed for plumbing across London (12-week horizon).",
+      "id": "log_df4409ba8ca8caeb",
+      "createdAt": "2026-09-10T14:22:41.136Z"
+    },
+    {
+      "contractorId": "con_admin_seed",
+      "action": "TIMESFM_INFERENCE_TEST",
+      "details": "TimesFM forward demand synthesis executed for plumbing across London (12-week horizon).",
+      "id": "log_cd555f0181e49d22",
+      "createdAt": "2026-09-10T14:22:41.155Z"
+    },
+    {
+      "contractorId": "con_admin_seed",
+      "action": "TIMESFM_INFERENCE_TEST",
+      "details": "TimesFM forward demand synthesis executed for plumbing across London (12-week horizon).",
+      "id": "log_22af6c28ebd84a8d",
+      "createdAt": "2026-09-10T14:24:17.161Z"
+    },
+    {
+      "contractorId": "con_admin_seed",
+      "action": "TIMESFM_INFERENCE_TEST",
+      "details": "TimesFM forward demand synthesis executed for plumbing across London (12-week horizon).",
+      "id": "log_25a6468dc115b488",
+      "createdAt": "2026-09-10T14:24:17.166Z"
+    },
+    {
+      "contractorId": "con_admin_seed",
+      "action": "TIMESFM_INFERENCE_TEST",
+      "details": "TimesFM forward demand synthesis executed for plumbing across London (12-week horizon).",
+      "id": "log_468425ca8cc604e9",
+      "createdAt": "2026-09-10T14:24:19.331Z"
+    },
+    {
+      "contractorId": "con_admin_seed",
+      "action": "TIMESFM_INFERENCE_TEST",
+      "details": "TimesFM forward demand synthesis executed for plumbing across London (12-week horizon).",
+      "id": "log_08597a91600ee6b8",
+      "createdAt": "2026-09-10T14:24:19.337Z"
+    },
+    {
+      "contractorId": "con_admin_seed",
+      "action": "TIMESFM_INFERENCE_TEST",
+      "details": "TimesFM forward demand synthesis executed for plumbing across London (12-week horizon).",
+      "id": "log_f65343d4ada0aade",
+      "createdAt": "2026-09-10T14:24:19.941Z"
+    },
+    {
+      "contractorId": "con_admin_seed",
+      "action": "TIMESFM_INFERENCE_TEST",
+      "details": "TimesFM forward demand synthesis executed for plumbing across London (12-week horizon).",
+      "id": "log_3d9dce3b0df2d0b9",
+      "createdAt": "2026-09-10T14:24:19.960Z"
+    },
+    {
+      "contractorId": "con_admin_seed",
+      "action": "TIMESFM_INFERENCE_TEST",
+      "details": "TimesFM forward demand synthesis executed for plumbing across London (12-week horizon).",
+      "id": "log_3b61755ce0458c29",
+      "createdAt": "2026-09-10T14:30:44.436Z"
+    },
+    {
+      "contractorId": "con_admin_seed",
+      "action": "TIMESFM_INFERENCE_TEST",
+      "details": "TimesFM forward demand synthesis executed for plumbing across London (12-week horizon).",
+      "id": "log_3ea5f82e56a414f9",
+      "createdAt": "2026-09-10T14:30:44.441Z"
+    },
+    {
+      "contractorId": "con_admin_seed",
+      "action": "TIMESFM_INFERENCE_TEST",
+      "details": "TimesFM forward demand synthesis executed for plumbing across London (12-week horizon).",
+      "id": "log_2a652d0ee24121bf",
+      "createdAt": "2026-09-10T14:55:30.941Z"
+    },
+    {
+      "contractorId": "con_admin_seed",
+      "action": "TIMESFM_INFERENCE_TEST",
+      "details": "TimesFM forward demand synthesis executed for plumbing across London (12-week horizon).",
+      "id": "log_8de460022179531c",
+      "createdAt": "2026-09-10T14:55:30.948Z"
+    },
+    {
+      "contractorId": "con_admin_seed",
+      "action": "TIMESFM_INFERENCE_TEST",
+      "details": "TimesFM forward demand synthesis executed for plumbing across London (12-week horizon).",
+      "id": "log_236104c4596741f4",
+      "createdAt": "2026-09-10T15:00:04.847Z"
+    },
+    {
+      "contractorId": "con_admin_seed",
+      "action": "TIMESFM_INFERENCE_TEST",
+      "details": "TimesFM forward demand synthesis executed for plumbing across London (12-week horizon).",
+      "id": "log_7518df2193685498",
+      "createdAt": "2026-09-10T15:00:04.851Z"
+    },
+    {
+      "contractorId": "con_admin_seed",
+      "action": "MAP_DASHBOARD_MOUNTED",
+      "details": "Conquest Map opened via OpenStreetMap Real Tile Engine. Available entries: 21",
+      "ipAddress": "127.0.0.1",
+      "id": "log_cef97e02ced4e117",
+      "createdAt": "2026-09-10T15:06:32.015Z"
+    },
+    {
+      "contractorId": "con_admin_seed",
+      "action": "MAP_DASHBOARD_MOUNTED",
+      "details": "Conquest Map opened via OpenStreetMap Real Tile Engine. Available entries: 21",
+      "ipAddress": "127.0.0.1",
+      "id": "log_6c25c32c849c2e8a",
+      "createdAt": "2026-09-10T15:06:32.019Z"
+    },
+    {
+      "contractorId": "con_admin_seed",
+      "action": "LEADS_VIEW_CHANGED",
+      "details": "Switched lead directory workspace view to: LIST",
+      "ipAddress": "127.0.0.1",
+      "id": "log_eb3040bfb6f22aad",
+      "createdAt": "2026-09-10T15:06:36.392Z"
+    },
+    {
+      "contractorId": "con_admin_seed",
+      "action": "LEADS_VIEW_CHANGED",
+      "details": "Switched lead directory workspace view to: LIST",
+      "ipAddress": "127.0.0.1",
+      "id": "log_1c209621f00a3579",
+      "createdAt": "2026-09-10T15:06:36.396Z"
+    },
+    {
+      "contractorId": "con_admin_seed",
+      "action": "TIMESFM_INFERENCE_TEST",
+      "details": "TimesFM forward demand synthesis executed for plumbing across London (12-week horizon).",
+      "id": "log_084fdfe82e08cb6d",
+      "createdAt": "2026-09-10T15:06:38.520Z"
+    },
+    {
+      "contractorId": "con_admin_seed",
+      "action": "TIMESFM_INFERENCE_TEST",
+      "details": "TimesFM forward demand synthesis executed for plumbing across London (12-week horizon).",
+      "id": "log_f2fbf7a2c5f4b424",
+      "createdAt": "2026-09-10T15:06:38.525Z"
+    },
+    {
+      "contractorId": "con_admin_seed",
+      "action": "TIMESFM_INFERENCE_TEST",
+      "details": "TimesFM forward demand synthesis executed for plumbing across London (12-week horizon).",
+      "id": "log_c5009729a931d6fe",
+      "createdAt": "2026-09-10T15:07:16.731Z"
+    },
+    {
+      "contractorId": "con_admin_seed",
+      "action": "TIMESFM_INFERENCE_TEST",
+      "details": "TimesFM forward demand synthesis executed for plumbing across London (12-week horizon).",
+      "id": "log_a6c210a6ddc9fbe7",
+      "createdAt": "2026-09-10T15:07:16.735Z"
+    },
+    {
+      "contractorId": "con_admin_seed",
+      "action": "LEADS_VIEW_CHANGED",
+      "details": "Switched lead directory workspace view to: LIST",
+      "ipAddress": "127.0.0.1",
+      "id": "log_ec05001ec2707934",
+      "createdAt": "2026-09-10T15:07:25.588Z"
+    },
+    {
+      "contractorId": "con_admin_seed",
+      "action": "LEADS_VIEW_CHANGED",
+      "details": "Switched lead directory workspace view to: LIST",
+      "ipAddress": "127.0.0.1",
+      "id": "log_dd0c7b03c39f7357",
+      "createdAt": "2026-09-10T15:07:25.592Z"
+    },
+    {
+      "contractorId": "con_isaac_seed",
+      "action": "LEADS_VIEW_CHANGED",
+      "details": "Switched lead directory workspace view to: BOARD",
+      "ipAddress": "127.0.0.1",
+      "id": "log_be8ac1f24b8a8328",
+      "createdAt": "2026-09-10T15:25:53.598Z"
     }
   ],
-  "schedulerJobs": [],
+  "structuredLedger": [
+    {
+      "id": "led_90583d2c32b7cc97",
+      "contractorId": "system_genesis",
+      "sequenceNumber": 1,
+      "eventType": "genesis_block",
+      "entityType": "system_architecture",
+      "entityId": "hal_foundation_phase1",
+      "actor": "HAL Constitution Engine",
+      "payloadHash": "312a1e94cdc042cac50d06d1a26d70583b01a450d98651a37c17bd057b251cf2",
+      "prevHash": "0000000000000000000000000000000000000000000000000000000000000000",
+      "entryHash": "5bdb99c340178c3ee6fe84a08c6ff17f842d5f3bfe5e57e58e98bf9a7e951267",
+      "details": "Genesis Block initialized for HAL Roadmap Phase 1: Foundation (Structured Ledger, Secure Storage, Basic Pipeline)",
+      "metadata": {
+        "version": "1.0.0",
+        "phase": "Foundation",
+        "algorithm": "SHA-256"
+      },
+      "createdAt": "2026-09-07T10:08:54.104Z"
+    },
+    {
+      "id": "led_7ebda94f38410ae5",
+      "contractorId": "con_test_phase1_1788775763297",
+      "sequenceNumber": 2,
+      "eventType": "lead_captured",
+      "entityType": "lead",
+      "entityId": "lead_p1_001",
+      "actor": "Attribution Ingestion Engine",
+      "payloadHash": "ddcb2185b5d46162cb07097779e4c32ab664361392f6b9e462d763e5418b5d7e",
+      "prevHash": "5bdb99c340178c3ee6fe84a08c6ff17f842d5f3bfe5e57e58e98bf9a7e951267",
+      "entryHash": "e1c51c7dfb1578d550c6e1d2ff35e82c77b111f148d3510e57d74ed85cf2507f",
+      "details": "Captured prospective HVAC client via Winnipeg search campaign",
+      "metadata": {
+        "source": "google_ads",
+        "gclid": "gclid_p1_test"
+      },
+      "createdAt": "2026-09-07T10:09:23.298Z"
+    },
+    {
+      "id": "led_da4cf3ebbf703cde",
+      "contractorId": "con_test_phase1_1788775763297",
+      "sequenceNumber": 3,
+      "eventType": "crm_transition",
+      "entityType": "lead",
+      "entityId": "lead_p1_001",
+      "actor": "Operator Dispatcher",
+      "payloadHash": "2c0bbaa52ac6e998b774d4e49bb4c44d83258096d242123afcc7fda6f6772c91",
+      "prevHash": "e1c51c7dfb1578d550c6e1d2ff35e82c77b111f148d3510e57d74ed85cf2507f",
+      "entryHash": "408e76dfe3f0cc4cd85f69e0290352e95dd73bdae09d9d181c7b19f621eed091",
+      "details": "Lead status transitioned from new to contacted",
+      "metadata": {
+        "fromStatus": "new",
+        "toStatus": "contacted"
+      },
+      "createdAt": "2026-09-07T10:09:23.299Z"
+    },
+    {
+      "id": "led_71f1f016b428637b",
+      "contractorId": "con_admin_seed",
+      "sequenceNumber": 4,
+      "eventType": "lead_captured",
+      "entityType": "lead",
+      "entityId": "lead_f3bba9878e7906c4",
+      "actor": "HAL Ingestion Gateway",
+      "payloadHash": "744b4ea3e4b7af2a2ca410dee860c3d5fcb4870146811a47edb5ce3b11517ce0",
+      "prevHash": "408e76dfe3f0cc4cd85f69e0290352e95dd73bdae09d9d181c7b19f621eed091",
+      "entryHash": "89f716b61b14f049ffb760212eeaa68cc089649e3aa89497e7527879d6953da3",
+      "details": "Captured high-intent commercial roofing lead (Prairie Commercial Roofing Ltd)",
+      "metadata": {
+        "score": 88,
+        "city": "Winnipeg"
+      },
+      "createdAt": "2026-09-07T10:09:23.316Z"
+    },
+    {
+      "id": "led_02ff275f8a44bec2",
+      "contractorId": "con_test_phase1_1788775800510",
+      "sequenceNumber": 5,
+      "eventType": "lead_captured",
+      "entityType": "lead",
+      "entityId": "lead_p1_001",
+      "actor": "Attribution Ingestion Engine",
+      "payloadHash": "bc7cacbc30e9d41633b4a075bd881f817ec581a8d8a7678776a5deb351e30542",
+      "prevHash": "89f716b61b14f049ffb760212eeaa68cc089649e3aa89497e7527879d6953da3",
+      "entryHash": "9c7c648a535a7508fd2511c0ac017ceaf7ce9fcadb1fea4272ae51ebc7cfdea2",
+      "details": "Captured prospective HVAC client via Winnipeg search campaign",
+      "metadata": {
+        "source": "google_ads",
+        "gclid": "gclid_p1_test"
+      },
+      "createdAt": "2026-09-07T10:10:00.511Z"
+    },
+    {
+      "id": "led_8c03fafb4345e800",
+      "contractorId": "con_test_phase1_1788775800510",
+      "sequenceNumber": 6,
+      "eventType": "crm_transition",
+      "entityType": "lead",
+      "entityId": "lead_p1_001",
+      "actor": "Operator Dispatcher",
+      "payloadHash": "b51e2df5407ed16446551cb8b323286740a309d29e006d295544f5f7a5db9fdf",
+      "prevHash": "9c7c648a535a7508fd2511c0ac017ceaf7ce9fcadb1fea4272ae51ebc7cfdea2",
+      "entryHash": "1e374545aa07741cb08ef3857b5860578be5fe766625147b4b1380e3e1c35e6a",
+      "details": "Lead status transitioned from new to contacted",
+      "metadata": {
+        "fromStatus": "new",
+        "toStatus": "contacted"
+      },
+      "createdAt": "2026-09-07T10:10:00.513Z"
+    },
+    {
+      "id": "led_4b552ec4a28f0bd9",
+      "contractorId": "con_admin_seed",
+      "sequenceNumber": 7,
+      "eventType": "lead_captured",
+      "entityType": "lead",
+      "entityId": "lead_f9ddf92534f052bd",
+      "actor": "HAL Ingestion Gateway",
+      "payloadHash": "e11cc8f2c4f5a8056de3d546d10cdb5d2600abb91219dc0a5f1bc43097495e46",
+      "prevHash": "1e374545aa07741cb08ef3857b5860578be5fe766625147b4b1380e3e1c35e6a",
+      "entryHash": "9bea0d2e35f8dc4df700cb60a4e22fb73b99553234e9c3eb4adf4ff94ced49fc",
+      "details": "Captured high-intent commercial roofing lead (Prairie Commercial Roofing Ltd)",
+      "metadata": {
+        "score": 88,
+        "city": "Winnipeg"
+      },
+      "createdAt": "2026-09-07T10:10:00.521Z"
+    },
+    {
+      "id": "led_40d4afc125aaafd2",
+      "contractorId": "con_admin_seed",
+      "sequenceNumber": 8,
+      "eventType": "crm_transition",
+      "entityType": "lead",
+      "entityId": "lead_f9ddf92534f052bd",
+      "actor": "Operator Dispatcher",
+      "payloadHash": "ddc4e83dc49d344394745aacc4f1c1ee2f82d6c535c1726f45f49c554b123cb2",
+      "prevHash": "9bea0d2e35f8dc4df700cb60a4e22fb73b99553234e9c3eb4adf4ff94ced49fc",
+      "entryHash": "5b170c9b0eb34c2b871828ec98c4e0d698210cb8124fb190665c6f2bf4972923",
+      "details": "Moved Prairie Commercial Roofing Ltd to contacted status",
+      "metadata": {
+        "previousStatus": "new",
+        "newStatus": "contacted"
+      },
+      "createdAt": "2026-09-07T10:10:00.523Z"
+    },
+    {
+      "id": "led_d4ec332a1dd4f95e",
+      "contractorId": "con_test_phase1_1788775804909",
+      "sequenceNumber": 9,
+      "eventType": "lead_captured",
+      "entityType": "lead",
+      "entityId": "lead_p1_001",
+      "actor": "Attribution Ingestion Engine",
+      "payloadHash": "53ff15ca9922024647765462b0ee90d408d7930cfc495c7bd8c815bd9804148e",
+      "prevHash": "5b170c9b0eb34c2b871828ec98c4e0d698210cb8124fb190665c6f2bf4972923",
+      "entryHash": "1cc59cc6607c39ae4be3a8d77a6d789005d7cd314ab7b117a8fb0672d7338a4b",
+      "details": "Captured prospective HVAC client via Winnipeg search campaign",
+      "metadata": {
+        "source": "google_ads",
+        "gclid": "gclid_p1_test"
+      },
+      "createdAt": "2026-09-07T10:10:04.910Z"
+    },
+    {
+      "id": "led_ff7b2f03f1be3738",
+      "contractorId": "con_test_phase1_1788775804909",
+      "sequenceNumber": 10,
+      "eventType": "crm_transition",
+      "entityType": "lead",
+      "entityId": "lead_p1_001",
+      "actor": "Operator Dispatcher",
+      "payloadHash": "226e1286e22cc02213175212d32e8d991cfae9b4edc8ecca38b7851172e44a8a",
+      "prevHash": "1cc59cc6607c39ae4be3a8d77a6d789005d7cd314ab7b117a8fb0672d7338a4b",
+      "entryHash": "0aabc0827f9be524e21e6e6f37d05c59d3d94809cc08c8b12cc0a5a838748a8c",
+      "details": "Lead status transitioned from new to contacted",
+      "metadata": {
+        "fromStatus": "new",
+        "toStatus": "contacted"
+      },
+      "createdAt": "2026-09-07T10:10:04.911Z"
+    },
+    {
+      "id": "led_5cd90b6162ea35b9",
+      "contractorId": "con_admin_seed",
+      "sequenceNumber": 11,
+      "eventType": "lead_captured",
+      "entityType": "lead",
+      "entityId": "lead_5da4be25f873a928",
+      "actor": "HAL Ingestion Gateway",
+      "payloadHash": "bf2d4f4d074b6368ce400e0b1b19c63ace5589670616b1ad1b35e943dcd575b8",
+      "prevHash": "0aabc0827f9be524e21e6e6f37d05c59d3d94809cc08c8b12cc0a5a838748a8c",
+      "entryHash": "0c338227d083bb99763163e377fe3299ded5188af5a033dab8e5782f54942193",
+      "details": "Captured high-intent commercial roofing lead (Prairie Commercial Roofing Ltd)",
+      "metadata": {
+        "score": 88,
+        "city": "Winnipeg"
+      },
+      "createdAt": "2026-09-07T10:10:04.918Z"
+    },
+    {
+      "id": "led_6b8f422187faa2cd",
+      "contractorId": "con_admin_seed",
+      "sequenceNumber": 12,
+      "eventType": "crm_transition",
+      "entityType": "lead",
+      "entityId": "lead_5da4be25f873a928",
+      "actor": "Operator Dispatcher",
+      "payloadHash": "c9819e1cf925837e463e62e29e76a7625a91dfd394463ce2c6d178df33dccbe6",
+      "prevHash": "0c338227d083bb99763163e377fe3299ded5188af5a033dab8e5782f54942193",
+      "entryHash": "fd2d7661104f19c41e848681bb8ef7643117088bdee979b1804cf61fa4d66236",
+      "details": "Moved Prairie Commercial Roofing Ltd to contacted status",
+      "metadata": {
+        "previousStatus": "new",
+        "newStatus": "contacted"
+      },
+      "createdAt": "2026-09-07T10:10:04.920Z"
+    },
+    {
+      "id": "led_cbe395f405b5e811",
+      "contractorId": "con_test_phase1_1788775856003",
+      "sequenceNumber": 13,
+      "eventType": "lead_captured",
+      "entityType": "lead",
+      "entityId": "lead_p1_001",
+      "actor": "Attribution Ingestion Engine",
+      "payloadHash": "a629add1cc8b036387ba33dc71379bea9f18e5b8aaadec90aba4a1d82df97a40",
+      "prevHash": "fd2d7661104f19c41e848681bb8ef7643117088bdee979b1804cf61fa4d66236",
+      "entryHash": "bfcfa0d23a940acecdae2f1d3330f2c137d8f4a664801242279786edecac4f99",
+      "details": "Captured prospective HVAC client via Winnipeg search campaign",
+      "metadata": {
+        "source": "google_ads",
+        "gclid": "gclid_p1_test"
+      },
+      "createdAt": "2026-09-07T10:10:56.004Z"
+    },
+    {
+      "id": "led_6eebc92084bca2fa",
+      "contractorId": "con_test_phase1_1788775856003",
+      "sequenceNumber": 14,
+      "eventType": "crm_transition",
+      "entityType": "lead",
+      "entityId": "lead_p1_001",
+      "actor": "Operator Dispatcher",
+      "payloadHash": "530ba66be265de2879279a44b76ac57bdcce07a1a9966e0153a2e1bd87b58b5c",
+      "prevHash": "bfcfa0d23a940acecdae2f1d3330f2c137d8f4a664801242279786edecac4f99",
+      "entryHash": "da7b7b60d70cb20e90cfc25c691912be25e23ba24b060625290744a9cfe39837",
+      "details": "Lead status transitioned from new to contacted",
+      "metadata": {
+        "fromStatus": "new",
+        "toStatus": "contacted"
+      },
+      "createdAt": "2026-09-07T10:10:56.005Z"
+    },
+    {
+      "id": "led_7148dd1cc0dfaab0",
+      "contractorId": "con_admin_seed",
+      "sequenceNumber": 15,
+      "eventType": "lead_captured",
+      "entityType": "lead",
+      "entityId": "lead_dca21d5e73302e6e",
+      "actor": "HAL Ingestion Gateway",
+      "payloadHash": "2b8cce442f8f0fe532b74aaf9888b2d27db65413062e5bce59f9e83daba9fcd4",
+      "prevHash": "da7b7b60d70cb20e90cfc25c691912be25e23ba24b060625290744a9cfe39837",
+      "entryHash": "36a5e6dacac6f1b4d0660694458a34a872c684d8004db069f560e8adf8fc6484",
+      "details": "Captured high-intent commercial roofing lead (Prairie Commercial Roofing Ltd)",
+      "metadata": {
+        "score": 88,
+        "city": "Winnipeg"
+      },
+      "createdAt": "2026-09-07T10:10:56.012Z"
+    },
+    {
+      "id": "led_aa522f0936769d23",
+      "contractorId": "con_admin_seed",
+      "sequenceNumber": 16,
+      "eventType": "crm_transition",
+      "entityType": "lead",
+      "entityId": "lead_dca21d5e73302e6e",
+      "actor": "Operator Dispatcher",
+      "payloadHash": "0b464b2cdac39b55e9a4f7d5e0e4bd4e9b3f78d945729381462e20629b9d8d19",
+      "prevHash": "36a5e6dacac6f1b4d0660694458a34a872c684d8004db069f560e8adf8fc6484",
+      "entryHash": "7c77ca3116c6a368037008b4905a411f748a96c1633df98e8c67acd7f532f205",
+      "details": "Moved Prairie Commercial Roofing Ltd to contacted status",
+      "metadata": {
+        "previousStatus": "new",
+        "newStatus": "contacted"
+      },
+      "createdAt": "2026-09-07T10:10:56.014Z"
+    },
+    {
+      "id": "led_0affe2ae1ac2feec",
+      "contractorId": "con_test_phase1_1788776097670",
+      "sequenceNumber": 17,
+      "eventType": "lead_captured",
+      "entityType": "lead",
+      "entityId": "lead_p1_001",
+      "actor": "Attribution Ingestion Engine",
+      "payloadHash": "7a3f4d69fafa036e4ee730dbc6f0683c4e7dba02f399d8fd5c59f99d7e59c3d9",
+      "prevHash": "7c77ca3116c6a368037008b4905a411f748a96c1633df98e8c67acd7f532f205",
+      "entryHash": "e5b9a2d03019c1ecd2451e3dd9d280d009632225a2980c88266270123b274834",
+      "details": "Captured prospective HVAC client via Winnipeg search campaign",
+      "metadata": {
+        "source": "google_ads",
+        "gclid": "gclid_p1_test"
+      },
+      "createdAt": "2026-09-07T10:14:57.671Z"
+    },
+    {
+      "id": "led_d1faf612a94fc411",
+      "contractorId": "con_test_phase1_1788776097670",
+      "sequenceNumber": 18,
+      "eventType": "crm_transition",
+      "entityType": "lead",
+      "entityId": "lead_p1_001",
+      "actor": "Operator Dispatcher",
+      "payloadHash": "41981a85170297ce4ceaff9a8d7c516b4463662d8c09fa74ec8ca2f869a846b2",
+      "prevHash": "e5b9a2d03019c1ecd2451e3dd9d280d009632225a2980c88266270123b274834",
+      "entryHash": "a09ba5e9f2faa92bdd5118dedcc0556f6c542cc3b0edb286b33879a32739fb46",
+      "details": "Lead status transitioned from new to contacted",
+      "metadata": {
+        "fromStatus": "new",
+        "toStatus": "contacted"
+      },
+      "createdAt": "2026-09-07T10:14:57.672Z"
+    },
+    {
+      "id": "led_7417933340a2a6d0",
+      "contractorId": "con_admin_seed",
+      "sequenceNumber": 19,
+      "eventType": "lead_captured",
+      "entityType": "lead",
+      "entityId": "lead_a08937fa20523f19",
+      "actor": "HAL Ingestion Gateway",
+      "payloadHash": "b4d5004ff35d9811f3672559037907d28276316014dd8cb896d9c8f1e3525247",
+      "prevHash": "a09ba5e9f2faa92bdd5118dedcc0556f6c542cc3b0edb286b33879a32739fb46",
+      "entryHash": "5ac89a5d6e292edc181f96927e4ba6b6d13b9b93b9245d45c20237e3277b7815",
+      "details": "Captured high-intent commercial roofing lead (Prairie Commercial Roofing Ltd)",
+      "metadata": {
+        "score": 88,
+        "city": "Winnipeg"
+      },
+      "createdAt": "2026-09-07T10:14:57.679Z"
+    },
+    {
+      "id": "led_f85a91144f5bf300",
+      "contractorId": "con_admin_seed",
+      "sequenceNumber": 20,
+      "eventType": "crm_transition",
+      "entityType": "lead",
+      "entityId": "lead_a08937fa20523f19",
+      "actor": "Operator Dispatcher",
+      "payloadHash": "69ce5eebdab938bcff1df72ee45810eac377021602e13961fa723b8b6974a4e2",
+      "prevHash": "5ac89a5d6e292edc181f96927e4ba6b6d13b9b93b9245d45c20237e3277b7815",
+      "entryHash": "1a5eb56fcf8cc04c56e0371a839f5037218975ba805f555d33c4a47bd38a17d5",
+      "details": "Moved Prairie Commercial Roofing Ltd to contacted status",
+      "metadata": {
+        "previousStatus": "new",
+        "newStatus": "contacted"
+      },
+      "createdAt": "2026-09-07T10:14:57.681Z"
+    },
+    {
+      "id": "led_b833426ff9b6101b",
+      "contractorId": "con_test_phase1_1788778815481",
+      "sequenceNumber": 21,
+      "eventType": "lead_captured",
+      "entityType": "lead",
+      "entityId": "lead_p1_001",
+      "actor": "Attribution Ingestion Engine",
+      "payloadHash": "3a6417173d06315beb108710fb0437517894afc69e4454448ab3574b4f44fc03",
+      "prevHash": "1a5eb56fcf8cc04c56e0371a839f5037218975ba805f555d33c4a47bd38a17d5",
+      "entryHash": "f834d4e4e206de4d3ef484a3aa33aa4af7d182b13882eafe8bc5e66a7b599264",
+      "details": "Captured prospective HVAC client via Winnipeg search campaign",
+      "metadata": {
+        "source": "google_ads",
+        "gclid": "gclid_p1_test"
+      },
+      "createdAt": "2026-09-07T11:00:15.482Z"
+    },
+    {
+      "id": "led_7123fe739d119d1d",
+      "contractorId": "con_test_phase1_1788778815481",
+      "sequenceNumber": 22,
+      "eventType": "crm_transition",
+      "entityType": "lead",
+      "entityId": "lead_p1_001",
+      "actor": "Operator Dispatcher",
+      "payloadHash": "f5860b2d83be5c7e53d0e336099ec07671d8b9d60b7327be56b5d9af04ac988d",
+      "prevHash": "f834d4e4e206de4d3ef484a3aa33aa4af7d182b13882eafe8bc5e66a7b599264",
+      "entryHash": "bec050fc008dbee8372e3adf3c88df7b11c9f93e1a4f60687ca637aae6237d62",
+      "details": "Lead status transitioned from new to contacted",
+      "metadata": {
+        "fromStatus": "new",
+        "toStatus": "contacted"
+      },
+      "createdAt": "2026-09-07T11:00:15.483Z"
+    },
+    {
+      "id": "led_60e15d2bf3ac19ff",
+      "contractorId": "con_admin_seed",
+      "sequenceNumber": 23,
+      "eventType": "lead_captured",
+      "entityType": "lead",
+      "entityId": "lead_a87b063087f76d36",
+      "actor": "HAL Ingestion Gateway",
+      "payloadHash": "fe8bbedd68b4ccf626d7002778bc0cc2ed4e66a875150916b4da68dba6f5a8d0",
+      "prevHash": "bec050fc008dbee8372e3adf3c88df7b11c9f93e1a4f60687ca637aae6237d62",
+      "entryHash": "7c69582fac2ca01eb5e12fc4e80c9ee9fc8181733fe366584bd1d9050aacc1b9",
+      "details": "Captured high-intent commercial roofing lead (Prairie Commercial Roofing Ltd)",
+      "metadata": {
+        "score": 88,
+        "city": "Winnipeg"
+      },
+      "createdAt": "2026-09-07T11:00:15.490Z"
+    },
+    {
+      "id": "led_91f1291cea6371ff",
+      "contractorId": "con_admin_seed",
+      "sequenceNumber": 24,
+      "eventType": "crm_transition",
+      "entityType": "lead",
+      "entityId": "lead_a87b063087f76d36",
+      "actor": "Operator Dispatcher",
+      "payloadHash": "348d059f674fdebdbfdbf7ef4524a7e8fc0b3d250bd7b893bdb8c2a416106864",
+      "prevHash": "7c69582fac2ca01eb5e12fc4e80c9ee9fc8181733fe366584bd1d9050aacc1b9",
+      "entryHash": "4e06ab32e92a48ccfa3e2ac0e609fef45c241bcdb0c8246c045236b434528c59",
+      "details": "Moved Prairie Commercial Roofing Ltd to contacted status",
+      "metadata": {
+        "previousStatus": "new",
+        "newStatus": "contacted"
+      },
+      "createdAt": "2026-09-07T11:00:15.492Z"
+    },
+    {
+      "id": "led_3b56ebd12b441855",
+      "contractorId": "test_stage1_contractor_1788779065388",
+      "sequenceNumber": 25,
+      "eventType": "evidence_gathered",
+      "entityType": "hal_loop",
+      "entityId": "loop_test_1788779065409",
+      "actor": "HAL Stage 1 Harvest Engine",
+      "payloadHash": "acad2a73c56075b1e0591f384e3827622a1b3c4c56cd1526c4eba808f33c90b2",
+      "prevHash": "4e06ab32e92a48ccfa3e2ac0e609fef45c241bcdb0c8246c045236b434528c59",
+      "entryHash": "6df773b0f3dc2d20ededd65dbf1f25c4e7e552bc4ae5043e798724ad833bf17c",
+      "details": "Harvested 4 verified territory companies in Winnipeg (Commercial HVAC)",
+      "metadata": {
+        "territory": "Winnipeg",
+        "niche": "Commercial HVAC",
+        "recordsCount": 4,
+        "completenessScore": 95
+      },
+      "createdAt": "2026-09-07T11:04:25.409Z"
+    },
+    {
+      "id": "led_bd44e6614d5b582d",
+      "contractorId": "test_stage1_contractor_1788779065388",
+      "sequenceNumber": 26,
+      "eventType": "stage_transition",
+      "entityType": "hal_loop",
+      "entityId": "loop_test_1788779065409",
+      "actor": "HAL Operator",
+      "payloadHash": "82a6908b01dc73c03bfac97d0cdc5dc154c9de0f966809531012c850ab01837c",
+      "prevHash": "6df773b0f3dc2d20ededd65dbf1f25c4e7e552bc4ae5043e798724ad833bf17c",
+      "entryHash": "ca58815d6a6e245145efc6ac73afd4f74d9ce61971e90e7c0f3cb68eaba3ff25",
+      "details": "Operating Loop advanced from gathering to analyzing",
+      "metadata": {
+        "previousStage": "gathering",
+        "newStage": "analyzing"
+      },
+      "createdAt": "2026-09-07T11:04:25.411Z"
+    },
+    {
+      "id": "led_e1b5cea428f7fb36",
+      "contractorId": "test_stage1_contractor_1788779080795",
+      "sequenceNumber": 27,
+      "eventType": "evidence_gathered",
+      "entityType": "hal_loop",
+      "entityId": "loop_test_1788779080812",
+      "actor": "HAL Stage 1 Harvest Engine",
+      "payloadHash": "96c713d4e6bb3a3bfc170739ee4555215bf58b2baf362f9e9840a08c2b0fcd0f",
+      "prevHash": "ca58815d6a6e245145efc6ac73afd4f74d9ce61971e90e7c0f3cb68eaba3ff25",
+      "entryHash": "edde7e20d963fd695e11f5007b1a6df8216ff9e0b7fb7e5482697e98249c1f32",
+      "details": "Harvested 4 verified territory companies in Winnipeg (Commercial HVAC)",
+      "metadata": {
+        "territory": "Winnipeg",
+        "niche": "Commercial HVAC",
+        "recordsCount": 4,
+        "completenessScore": 95
+      },
+      "createdAt": "2026-09-07T11:04:40.813Z"
+    },
+    {
+      "id": "led_3fcd12e47528a9db",
+      "contractorId": "test_stage1_contractor_1788779080795",
+      "sequenceNumber": 28,
+      "eventType": "stage_transition",
+      "entityType": "hal_loop",
+      "entityId": "loop_test_1788779080812",
+      "actor": "HAL Operator",
+      "payloadHash": "b57a532cfc9161cac9346dd7e114be181bf8394d86ff95ec6ffcf7b71fb9efb1",
+      "prevHash": "edde7e20d963fd695e11f5007b1a6df8216ff9e0b7fb7e5482697e98249c1f32",
+      "entryHash": "79a563b4971894808ead50fb595464bd45bc137c2465227d357100b8cfe77c85",
+      "details": "Operating Loop advanced from gathering to analyzing",
+      "metadata": {
+        "previousStage": "gathering",
+        "newStage": "analyzing"
+      },
+      "createdAt": "2026-09-07T11:04:40.814Z"
+    },
+    {
+      "id": "led_bbd1c1180943270a",
+      "contractorId": "con_test_phase1_1788779091411",
+      "sequenceNumber": 29,
+      "eventType": "lead_captured",
+      "entityType": "lead",
+      "entityId": "lead_p1_001",
+      "actor": "Attribution Ingestion Engine",
+      "payloadHash": "7561dd46e73d34a490edcb39556400d2a1bcd604acb6e343f390640da32a79a1",
+      "prevHash": "79a563b4971894808ead50fb595464bd45bc137c2465227d357100b8cfe77c85",
+      "entryHash": "2a46229dd5277a8fc01075e82f4f386dfbc71a494d5d42282cc1716d52c0f78d",
+      "details": "Captured prospective HVAC client via Winnipeg search campaign",
+      "metadata": {
+        "source": "google_ads",
+        "gclid": "gclid_p1_test"
+      },
+      "createdAt": "2026-09-07T11:04:51.412Z"
+    },
+    {
+      "id": "led_8cd13c52b0e130b2",
+      "contractorId": "con_test_phase1_1788779091411",
+      "sequenceNumber": 30,
+      "eventType": "crm_transition",
+      "entityType": "lead",
+      "entityId": "lead_p1_001",
+      "actor": "Operator Dispatcher",
+      "payloadHash": "86bbe2f9710ab38a18075a7a34b60d08cab85e1713b3041fd0a2bd6841bc0ce5",
+      "prevHash": "2a46229dd5277a8fc01075e82f4f386dfbc71a494d5d42282cc1716d52c0f78d",
+      "entryHash": "82e19b8420c3c79db363338422ee1c5d68b67dd848c8aa977941fab4c6195ef4",
+      "details": "Lead status transitioned from new to contacted",
+      "metadata": {
+        "fromStatus": "new",
+        "toStatus": "contacted"
+      },
+      "createdAt": "2026-09-07T11:04:51.413Z"
+    },
+    {
+      "id": "led_1ecd3e8fa4f89433",
+      "contractorId": "con_admin_seed",
+      "sequenceNumber": 31,
+      "eventType": "lead_captured",
+      "entityType": "lead",
+      "entityId": "lead_f7af25330fe5d6a7",
+      "actor": "HAL Ingestion Gateway",
+      "payloadHash": "3cad05ceb637c949ab783ba6dc1175e0b25a1bc4474b6abf5deb0cf318135316",
+      "prevHash": "82e19b8420c3c79db363338422ee1c5d68b67dd848c8aa977941fab4c6195ef4",
+      "entryHash": "9bef8786ba1344a9c6de6107f230ff3e5cec5bfb77dffdb423cede378b087903",
+      "details": "Captured high-intent commercial roofing lead (Prairie Commercial Roofing Ltd)",
+      "metadata": {
+        "score": 88,
+        "city": "Winnipeg"
+      },
+      "createdAt": "2026-09-07T11:04:51.421Z"
+    },
+    {
+      "id": "led_a4e3b9d685bb4707",
+      "contractorId": "con_admin_seed",
+      "sequenceNumber": 32,
+      "eventType": "crm_transition",
+      "entityType": "lead",
+      "entityId": "lead_f7af25330fe5d6a7",
+      "actor": "Operator Dispatcher",
+      "payloadHash": "9fbb35be9e0fcc44716035e3a8f881bbedb513e03e289b6e4beebc342b97c895",
+      "prevHash": "9bef8786ba1344a9c6de6107f230ff3e5cec5bfb77dffdb423cede378b087903",
+      "entryHash": "66622b91c62ccaa2ee402415a30389f02a9a2d2120342a8205932330ca638e77",
+      "details": "Moved Prairie Commercial Roofing Ltd to contacted status",
+      "metadata": {
+        "previousStatus": "new",
+        "newStatus": "contacted"
+      },
+      "createdAt": "2026-09-07T11:04:51.423Z"
+    },
+    {
+      "id": "led_2a237e5dcc42bb27",
+      "contractorId": "test_stage1_contractor_1788779091730",
+      "sequenceNumber": 33,
+      "eventType": "evidence_gathered",
+      "entityType": "hal_loop",
+      "entityId": "loop_test_1788779091747",
+      "actor": "HAL Stage 1 Harvest Engine",
+      "payloadHash": "c02016aee2f584592f5db4ce1fe478f99723cf0597ecfa643934b6ca1467d050",
+      "prevHash": "66622b91c62ccaa2ee402415a30389f02a9a2d2120342a8205932330ca638e77",
+      "entryHash": "f8fdab83030f4d9114b09fc8ae6a3a366bd23fbdfcbadb87f122d9ef4c918b7d",
+      "details": "Harvested 4 verified territory companies in Winnipeg (Commercial HVAC)",
+      "metadata": {
+        "territory": "Winnipeg",
+        "niche": "Commercial HVAC",
+        "recordsCount": 4,
+        "completenessScore": 95
+      },
+      "createdAt": "2026-09-07T11:04:51.747Z"
+    },
+    {
+      "id": "led_5f67049fd7aa543a",
+      "contractorId": "test_stage1_contractor_1788779091730",
+      "sequenceNumber": 34,
+      "eventType": "stage_transition",
+      "entityType": "hal_loop",
+      "entityId": "loop_test_1788779091747",
+      "actor": "HAL Operator",
+      "payloadHash": "a01f214aa6e4c8edf64eb33de188d1d15c49567d53980a018373c929ccb440fa",
+      "prevHash": "f8fdab83030f4d9114b09fc8ae6a3a366bd23fbdfcbadb87f122d9ef4c918b7d",
+      "entryHash": "a534a4d781d98bcc21fa9d1f4e5288683b6b396ebd52be16eab75b9bd26845da",
+      "details": "Operating Loop advanced from gathering to analyzing",
+      "metadata": {
+        "previousStage": "gathering",
+        "newStage": "analyzing"
+      },
+      "createdAt": "2026-09-07T11:04:51.750Z"
+    },
+    {
+      "id": "led_7d6dfe807f3a4069",
+      "contractorId": "con_test_phase1_1788779398500",
+      "sequenceNumber": 35,
+      "eventType": "lead_captured",
+      "entityType": "lead",
+      "entityId": "lead_p1_001",
+      "actor": "Attribution Ingestion Engine",
+      "payloadHash": "ecd6dc9c1d6e9ab78d9f0d7fd421bd93f8c50d51cd69d11bb6d9bf9fd56490ec",
+      "prevHash": "a534a4d781d98bcc21fa9d1f4e5288683b6b396ebd52be16eab75b9bd26845da",
+      "entryHash": "b1567bfeb896d7928cf934ea115b2f8e65e55277eb28c7730417b361b57ee430",
+      "details": "Captured prospective HVAC client via Winnipeg search campaign",
+      "metadata": {
+        "source": "google_ads",
+        "gclid": "gclid_p1_test"
+      },
+      "createdAt": "2026-09-07T11:09:58.500Z"
+    },
+    {
+      "id": "led_d1691aa3f5b72a10",
+      "contractorId": "con_test_phase1_1788779398500",
+      "sequenceNumber": 36,
+      "eventType": "crm_transition",
+      "entityType": "lead",
+      "entityId": "lead_p1_001",
+      "actor": "Operator Dispatcher",
+      "payloadHash": "5d5ea8b48e11a39d971d0f328f8c5ab748c5d59baf4788f9a20b641c0dc9aec4",
+      "prevHash": "b1567bfeb896d7928cf934ea115b2f8e65e55277eb28c7730417b361b57ee430",
+      "entryHash": "7e4bbae3ef9f64e9319194adc65f73199cb11acaae62bcf07505a75a37f8cf05",
+      "details": "Lead status transitioned from new to contacted",
+      "metadata": {
+        "fromStatus": "new",
+        "toStatus": "contacted"
+      },
+      "createdAt": "2026-09-07T11:09:58.502Z"
+    },
+    {
+      "id": "led_2c4e1613faea80f7",
+      "contractorId": "con_admin_seed",
+      "sequenceNumber": 37,
+      "eventType": "lead_captured",
+      "entityType": "lead",
+      "entityId": "lead_58acc062c39a5af2",
+      "actor": "HAL Ingestion Gateway",
+      "payloadHash": "c638927f81eac6902b904f09df277dfc85ec43880c5db93b9b1b2052d71b00d3",
+      "prevHash": "7e4bbae3ef9f64e9319194adc65f73199cb11acaae62bcf07505a75a37f8cf05",
+      "entryHash": "de16736772fdcdb5d2f43d5c08912ae65763d530e2f75eb17ece9d337267d510",
+      "details": "Captured high-intent commercial roofing lead (Prairie Commercial Roofing Ltd)",
+      "metadata": {
+        "score": 88,
+        "city": "Winnipeg"
+      },
+      "createdAt": "2026-09-07T11:09:58.508Z"
+    },
+    {
+      "id": "led_d7f1b1b2b09f60ab",
+      "contractorId": "con_admin_seed",
+      "sequenceNumber": 38,
+      "eventType": "crm_transition",
+      "entityType": "lead",
+      "entityId": "lead_58acc062c39a5af2",
+      "actor": "Operator Dispatcher",
+      "payloadHash": "248f90037bd72565757049e1d3f1890ae77808a9c2a1df67e73c067b93687826",
+      "prevHash": "de16736772fdcdb5d2f43d5c08912ae65763d530e2f75eb17ece9d337267d510",
+      "entryHash": "2554a25aee42675036565e6dddde9435a478850f0cc8651ae7bb7a306bd6b9bb",
+      "details": "Moved Prairie Commercial Roofing Ltd to contacted status",
+      "metadata": {
+        "previousStatus": "new",
+        "newStatus": "contacted"
+      },
+      "createdAt": "2026-09-07T11:09:58.511Z"
+    },
+    {
+      "id": "led_4389f61bd9a5c4e7",
+      "contractorId": "test_stage1_contractor_1788779398772",
+      "sequenceNumber": 39,
+      "eventType": "evidence_gathered",
+      "entityType": "hal_loop",
+      "entityId": "loop_test_1788779398789",
+      "actor": "HAL Stage 1 Harvest Engine",
+      "payloadHash": "386bc2bcd43dae4ee620087799d5d8eda7fe7b159ee17dc9ace188fe58850307",
+      "prevHash": "2554a25aee42675036565e6dddde9435a478850f0cc8651ae7bb7a306bd6b9bb",
+      "entryHash": "4004c36172265997425996ee8910bbad9158f7ccb8dd2bc4fd872d2fd4e54942",
+      "details": "Harvested 4 verified territory companies in Winnipeg (Commercial HVAC)",
+      "metadata": {
+        "territory": "Winnipeg",
+        "niche": "Commercial HVAC",
+        "recordsCount": 4,
+        "completenessScore": 95
+      },
+      "createdAt": "2026-09-07T11:09:58.789Z"
+    },
+    {
+      "id": "led_1b451f1aa39ca9c3",
+      "contractorId": "test_stage1_contractor_1788779398772",
+      "sequenceNumber": 40,
+      "eventType": "stage_transition",
+      "entityType": "hal_loop",
+      "entityId": "loop_test_1788779398789",
+      "actor": "HAL Operator",
+      "payloadHash": "9f6b7172851ef4b6bcc6a3ba6d5ee4e3e24e10c9f2905ad6f2bc9568c45c9b39",
+      "prevHash": "4004c36172265997425996ee8910bbad9158f7ccb8dd2bc4fd872d2fd4e54942",
+      "entryHash": "b36faf37ec173a91ba69cfdcc5dc92f1b7dcdc950d3b62cfa09f4edbf939d383",
+      "details": "Operating Loop advanced from gathering to analyzing",
+      "metadata": {
+        "previousStage": "gathering",
+        "newStage": "analyzing"
+      },
+      "createdAt": "2026-09-07T11:09:58.791Z"
+    },
+    {
+      "id": "led_3230fe8bc59a4ab4",
+      "contractorId": "con_test_phase1_1788779568899",
+      "sequenceNumber": 41,
+      "eventType": "lead_captured",
+      "entityType": "lead",
+      "entityId": "lead_p1_001",
+      "actor": "Attribution Ingestion Engine",
+      "payloadHash": "580d51a0d5a028f91830216b67bd893d4a59347bc2db1fe4eb3ec1ce2bb00170",
+      "prevHash": "b36faf37ec173a91ba69cfdcc5dc92f1b7dcdc950d3b62cfa09f4edbf939d383",
+      "entryHash": "cf2d4cd8c97963f4b670baccb0c81bdbc5fa1261b6b0bb2cf2d6b64d04156979",
+      "details": "Captured prospective HVAC client via Winnipeg search campaign",
+      "metadata": {
+        "source": "google_ads",
+        "gclid": "gclid_p1_test"
+      },
+      "createdAt": "2026-09-07T11:12:48.900Z"
+    },
+    {
+      "id": "led_92fef29af038e529",
+      "contractorId": "con_test_phase1_1788779568899",
+      "sequenceNumber": 42,
+      "eventType": "crm_transition",
+      "entityType": "lead",
+      "entityId": "lead_p1_001",
+      "actor": "Operator Dispatcher",
+      "payloadHash": "e763781266d56b2db6a6614167994e1b2e2120b4682438179f6432ca2183e6ce",
+      "prevHash": "cf2d4cd8c97963f4b670baccb0c81bdbc5fa1261b6b0bb2cf2d6b64d04156979",
+      "entryHash": "9383002834f586337db64d9e86711706161dc0f3bfa30bd59b9ab7c8d7555a99",
+      "details": "Lead status transitioned from new to contacted",
+      "metadata": {
+        "fromStatus": "new",
+        "toStatus": "contacted"
+      },
+      "createdAt": "2026-09-07T11:12:48.901Z"
+    },
+    {
+      "id": "led_e8dde3c9f28c69ad",
+      "contractorId": "con_admin_seed",
+      "sequenceNumber": 43,
+      "eventType": "lead_captured",
+      "entityType": "lead",
+      "entityId": "lead_55f2f80f1c326705",
+      "actor": "HAL Ingestion Gateway",
+      "payloadHash": "87292b076a9c660723fb61d967fd500d0b3e3aadd8cbc7a8f3b0c07ea87e3173",
+      "prevHash": "9383002834f586337db64d9e86711706161dc0f3bfa30bd59b9ab7c8d7555a99",
+      "entryHash": "98ae6a45caf69cd7f7291871784491a1f06056b62ad7761b99580847ff04c39e",
+      "details": "Captured high-intent commercial roofing lead (Prairie Commercial Roofing Ltd)",
+      "metadata": {
+        "score": 88,
+        "city": "Winnipeg"
+      },
+      "createdAt": "2026-09-07T11:12:48.909Z"
+    },
+    {
+      "id": "led_c172977932066029",
+      "contractorId": "con_admin_seed",
+      "sequenceNumber": 44,
+      "eventType": "crm_transition",
+      "entityType": "lead",
+      "entityId": "lead_55f2f80f1c326705",
+      "actor": "Operator Dispatcher",
+      "payloadHash": "2f115ace7552afb6065f36b9f99146fe4e94cf9ba36657c62972d608496bb4d5",
+      "prevHash": "98ae6a45caf69cd7f7291871784491a1f06056b62ad7761b99580847ff04c39e",
+      "entryHash": "82c94b46304efd41ca4c11f525e2c6dca655235148add00e90152bef75b05c8e",
+      "details": "Moved Prairie Commercial Roofing Ltd to contacted status",
+      "metadata": {
+        "previousStatus": "new",
+        "newStatus": "contacted"
+      },
+      "createdAt": "2026-09-07T11:12:48.911Z"
+    },
+    {
+      "id": "led_782e09ee537e0c37",
+      "contractorId": "test_stage1_contractor_1788779569185",
+      "sequenceNumber": 45,
+      "eventType": "evidence_gathered",
+      "entityType": "hal_loop",
+      "entityId": "loop_test_1788779569202",
+      "actor": "HAL Stage 1 Harvest Engine",
+      "payloadHash": "5f8cf88f705f7d7eba1467b293e42c1d4460a060ca6b818f5f0fc67eb4bd5a82",
+      "prevHash": "82c94b46304efd41ca4c11f525e2c6dca655235148add00e90152bef75b05c8e",
+      "entryHash": "11764f44433e32e33a8d606717cbb6f831e23862e4537fcfb09647a381a040c5",
+      "details": "Harvested 4 verified territory companies in Winnipeg (Commercial HVAC)",
+      "metadata": {
+        "territory": "Winnipeg",
+        "niche": "Commercial HVAC",
+        "recordsCount": 4,
+        "completenessScore": 95
+      },
+      "createdAt": "2026-09-07T11:12:49.202Z"
+    },
+    {
+      "id": "led_90f84cea945f437d",
+      "contractorId": "test_stage1_contractor_1788779569185",
+      "sequenceNumber": 46,
+      "eventType": "stage_transition",
+      "entityType": "hal_loop",
+      "entityId": "loop_test_1788779569202",
+      "actor": "HAL Operator",
+      "payloadHash": "5517279ebe77d1fa5e12a16566f8497779186f349892924eeb7ab681d4a71ca5",
+      "prevHash": "11764f44433e32e33a8d606717cbb6f831e23862e4537fcfb09647a381a040c5",
+      "entryHash": "697d3173ff1405dbeb97a36e7c632ac72e089d1b083d2d8ebd5720ba60bd6eda",
+      "details": "Operating Loop advanced from gathering to analyzing",
+      "metadata": {
+        "previousStage": "gathering",
+        "newStage": "analyzing"
+      },
+      "createdAt": "2026-09-07T11:12:49.204Z"
+    },
+    {
+      "id": "led_2d024f7258fe3c48",
+      "contractorId": "con_test_phase1_1788854372629",
+      "sequenceNumber": 47,
+      "eventType": "lead_captured",
+      "entityType": "lead",
+      "entityId": "lead_p1_001",
+      "actor": "Attribution Ingestion Engine",
+      "payloadHash": "fb840ff255612cc8b204a0674b9e47f49b0e32988c3b05bfd75a4477a8773978",
+      "prevHash": "697d3173ff1405dbeb97a36e7c632ac72e089d1b083d2d8ebd5720ba60bd6eda",
+      "entryHash": "076a7fd8c8d6a0a2a11f47fbee8fa814446cb033271c695815159da5c93a8228",
+      "details": "Captured prospective HVAC client via Winnipeg search campaign",
+      "metadata": {
+        "source": "google_ads",
+        "gclid": "gclid_p1_test"
+      },
+      "createdAt": "2026-09-08T07:59:32.629Z"
+    },
+    {
+      "id": "led_93e58163a186d723",
+      "contractorId": "con_test_phase1_1788854372629",
+      "sequenceNumber": 48,
+      "eventType": "crm_transition",
+      "entityType": "lead",
+      "entityId": "lead_p1_001",
+      "actor": "Operator Dispatcher",
+      "payloadHash": "67d73ab120229e3aae9c58fde78aa5361f97c30205cee804cbe9050f7127c273",
+      "prevHash": "076a7fd8c8d6a0a2a11f47fbee8fa814446cb033271c695815159da5c93a8228",
+      "entryHash": "183189415181ec161975d9c82248d9b8e01b7fc0603880922e724aa78c662f0f",
+      "details": "Lead status transitioned from new to contacted",
+      "metadata": {
+        "fromStatus": "new",
+        "toStatus": "contacted"
+      },
+      "createdAt": "2026-09-08T07:59:32.632Z"
+    },
+    {
+      "id": "led_298a060a0a45ed0e",
+      "contractorId": "con_admin_seed",
+      "sequenceNumber": 49,
+      "eventType": "lead_captured",
+      "entityType": "lead",
+      "entityId": "lead_6ec7e8602719ed31",
+      "actor": "HAL Ingestion Gateway",
+      "payloadHash": "2c8a39cf38ecb2bcdc958575d7471a618e322d2cd0a5bf896f5821c6d4ea65a5",
+      "prevHash": "183189415181ec161975d9c82248d9b8e01b7fc0603880922e724aa78c662f0f",
+      "entryHash": "933c1d5164b19f944e26a91b3826ec251a27226f8a3ecb3e569e9d154229021c",
+      "details": "Captured high-intent commercial roofing lead (Prairie Commercial Roofing Ltd)",
+      "metadata": {
+        "score": 88,
+        "city": "Winnipeg"
+      },
+      "createdAt": "2026-09-08T07:59:32.639Z"
+    },
+    {
+      "id": "led_f80e90a18f3c5310",
+      "contractorId": "con_admin_seed",
+      "sequenceNumber": 50,
+      "eventType": "crm_transition",
+      "entityType": "lead",
+      "entityId": "lead_6ec7e8602719ed31",
+      "actor": "Operator Dispatcher",
+      "payloadHash": "e3530b45e5caa36f47b947d27c5462fa7645de21e74e129403d8b331ea2ea87e",
+      "prevHash": "933c1d5164b19f944e26a91b3826ec251a27226f8a3ecb3e569e9d154229021c",
+      "entryHash": "e454c1fbe74fa0219869e363f6d0d159ac028cd88cfdabfbe97f771a1cce4906",
+      "details": "Moved Prairie Commercial Roofing Ltd to contacted status",
+      "metadata": {
+        "previousStatus": "new",
+        "newStatus": "contacted"
+      },
+      "createdAt": "2026-09-08T07:59:32.642Z"
+    },
+    {
+      "id": "led_98c9c700ef156a4b",
+      "contractorId": "con_test_phase2_1788854438824",
+      "sequenceNumber": 51,
+      "eventType": "lead_harvested",
+      "entityType": "lead",
+      "entityId": "lead_4b622a8779570566",
+      "actor": "HAL Territory Intelligence Harvester",
+      "payloadHash": "583e61901fe93dd82bc43a7ec8c622d8f7888acdf379168eb68740be6bcebf5f",
+      "prevHash": "e454c1fbe74fa0219869e363f6d0d159ac028cd88cfdabfbe97f771a1cce4906",
+      "entryHash": "a4f953ba2740bcbf516edbedf1bd77fcdd1b56146ea02768ff6061fc8dc818ff",
+      "details": "Harvested live business profile: Prairie Apex Commercial Climate Co.",
+      "metadata": {
+        "city": "Winnipeg",
+        "source": "harvested_intelligence"
+      },
+      "createdAt": "2026-09-08T08:00:38.840Z"
+    },
+    {
+      "id": "led_51a5e3f469b2bece",
+      "contractorId": "con_test_phase2_1788854438824",
+      "sequenceNumber": 52,
+      "eventType": "competitor_audit_completed",
+      "entityType": "competitor_intel",
+      "entityId": "audit_7506bedc",
+      "actor": "HAL Market Intelligence Engine",
+      "payloadHash": "d5945edfe122f7714483aaed6d371ed13ee3f6a0f92235c5f7e0bd4625f4ed72",
+      "prevHash": "a4f953ba2740bcbf516edbedf1bd77fcdd1b56146ea02768ff6061fc8dc818ff",
+      "entryHash": "ba8e1e6d9d59aa22b88fe1a401d788d5fa8f2bb2e1b098a3a9225ef3e09a7542",
+      "details": "Completed competitor digital footprint audit for Edmonton (HVAC) across 4 local entities",
+      "metadata": {
+        "territory": "Edmonton",
+        "niche": "Hvac",
+        "competitorsAnalyzed": 4,
+        "avgMobileSpeed": 53,
+        "saturationLevel": "MEDIUM-HIGH"
+      },
+      "createdAt": "2026-09-08T08:00:38.848Z"
+    },
+    {
+      "id": "led_2d5753f4a999498c",
+      "contractorId": "con_test_phase1_1788854442801",
+      "sequenceNumber": 53,
+      "eventType": "lead_captured",
+      "entityType": "lead",
+      "entityId": "lead_p1_001",
+      "actor": "Attribution Ingestion Engine",
+      "payloadHash": "994db8a36f2756a129b9dd0613889b7c6baeec184cc6898631d466db41ddf6f8",
+      "prevHash": "ba8e1e6d9d59aa22b88fe1a401d788d5fa8f2bb2e1b098a3a9225ef3e09a7542",
+      "entryHash": "bb79c4273e610a51c578fa57452952723b5c237dd42163fb03df921ae57ecccb",
+      "details": "Captured prospective HVAC client via Winnipeg search campaign",
+      "metadata": {
+        "source": "google_ads",
+        "gclid": "gclid_p1_test"
+      },
+      "createdAt": "2026-09-08T08:00:42.801Z"
+    },
+    {
+      "id": "led_11a77cdb3af86319",
+      "contractorId": "con_test_phase1_1788854442801",
+      "sequenceNumber": 54,
+      "eventType": "crm_transition",
+      "entityType": "lead",
+      "entityId": "lead_p1_001",
+      "actor": "Operator Dispatcher",
+      "payloadHash": "5b367699f7336cd2be78cc9778a0ed87a6393efc9886322bd7cf36e3b39786a3",
+      "prevHash": "bb79c4273e610a51c578fa57452952723b5c237dd42163fb03df921ae57ecccb",
+      "entryHash": "2ded9862dda434081924a2763c2d946dd53bf0a9b286d5a70135d659b3d7b6af",
+      "details": "Lead status transitioned from new to contacted",
+      "metadata": {
+        "fromStatus": "new",
+        "toStatus": "contacted"
+      },
+      "createdAt": "2026-09-08T08:00:42.805Z"
+    },
+    {
+      "id": "led_7cf40595f44f7b13",
+      "contractorId": "con_admin_seed",
+      "sequenceNumber": 55,
+      "eventType": "lead_captured",
+      "entityType": "lead",
+      "entityId": "lead_a87f0b4c12413d4b",
+      "actor": "HAL Ingestion Gateway",
+      "payloadHash": "eb383e40e9a4a0d3bfcbd078343e81384e3bc58901b6d88760fcfcedf79e7891",
+      "prevHash": "2ded9862dda434081924a2763c2d946dd53bf0a9b286d5a70135d659b3d7b6af",
+      "entryHash": "78d6a7d8e613f3600f3ef0f7495271f04dab88dd8212ace48189c4c60f323bbc",
+      "details": "Captured high-intent commercial roofing lead (Prairie Commercial Roofing Ltd)",
+      "metadata": {
+        "score": 88,
+        "city": "Winnipeg"
+      },
+      "createdAt": "2026-09-08T08:00:42.817Z"
+    },
+    {
+      "id": "led_00910032db20257c",
+      "contractorId": "con_admin_seed",
+      "sequenceNumber": 56,
+      "eventType": "crm_transition",
+      "entityType": "lead",
+      "entityId": "lead_a87f0b4c12413d4b",
+      "actor": "Operator Dispatcher",
+      "payloadHash": "fcabb021c9dec98e0369dc69bd0cc9e932e80d885bc3f6a0e14dc4bd37c7aebc",
+      "prevHash": "78d6a7d8e613f3600f3ef0f7495271f04dab88dd8212ace48189c4c60f323bbc",
+      "entryHash": "6cef46056cb6a15ee58a38ab9a9782858714e91be7675787d13afc38d596e161",
+      "details": "Moved Prairie Commercial Roofing Ltd to contacted status",
+      "metadata": {
+        "previousStatus": "new",
+        "newStatus": "contacted"
+      },
+      "createdAt": "2026-09-08T08:00:42.821Z"
+    },
+    {
+      "id": "led_ffe9615029e2de4a",
+      "contractorId": "con_test_phase2_1788854443142",
+      "sequenceNumber": 57,
+      "eventType": "lead_harvested",
+      "entityType": "lead",
+      "entityId": "lead_8da3045a8d4efbc1",
+      "actor": "HAL Territory Intelligence Harvester",
+      "payloadHash": "e92e3fc111a5b086b0811477fd95a29bf5caa0d39e591af6eead4e4560df30f4",
+      "prevHash": "6cef46056cb6a15ee58a38ab9a9782858714e91be7675787d13afc38d596e161",
+      "entryHash": "6997e7e37e6de42abe8c27a52e1c567a19e4a79e194ce67387d069f090a4ddd5",
+      "details": "Harvested live business profile: Prairie Apex Commercial Climate Co.",
+      "metadata": {
+        "city": "Winnipeg",
+        "source": "harvested_intelligence"
+      },
+      "createdAt": "2026-09-08T08:00:43.158Z"
+    },
+    {
+      "id": "led_12c680a171f46a7f",
+      "contractorId": "con_test_phase2_1788854443142",
+      "sequenceNumber": 58,
+      "eventType": "competitor_audit_completed",
+      "entityType": "competitor_intel",
+      "entityId": "audit_9360419e",
+      "actor": "HAL Market Intelligence Engine",
+      "payloadHash": "e27f1915d96637b56d4730d10559aeaae2a2898408c0bd6cbd041e4b2733a869",
+      "prevHash": "6997e7e37e6de42abe8c27a52e1c567a19e4a79e194ce67387d069f090a4ddd5",
+      "entryHash": "6edb4214c8fe3e7d3c41e50e334dd4c7ff7e60f878214a2a9fc9899bd95e24ff",
+      "details": "Completed competitor digital footprint audit for Edmonton (HVAC) across 4 local entities",
+      "metadata": {
+        "territory": "Edmonton",
+        "niche": "Hvac",
+        "competitorsAnalyzed": 4,
+        "avgMobileSpeed": 53,
+        "saturationLevel": "MEDIUM-HIGH"
+      },
+      "createdAt": "2026-09-08T08:00:43.166Z"
+    },
+    {
+      "id": "led_f2709b5a2885228e",
+      "contractorId": "con_test_phase2_1788854773714",
+      "sequenceNumber": 59,
+      "eventType": "lead_harvested",
+      "entityType": "lead",
+      "entityId": "lead_0efc196b1156695b",
+      "actor": "HAL Territory Intelligence Harvester",
+      "payloadHash": "e68100469abeb44d67771b0db0edee2e25007ac41655458216f1a8bbb44b4089",
+      "prevHash": "6edb4214c8fe3e7d3c41e50e334dd4c7ff7e60f878214a2a9fc9899bd95e24ff",
+      "entryHash": "133c8d0d03a5c502b2aa48c0a4700088aeecde28c8961e942acc98fe62e57317",
+      "details": "Harvested live business profile: Prairie Apex Commercial Climate Co.",
+      "metadata": {
+        "city": "Winnipeg",
+        "source": "harvested_intelligence"
+      },
+      "createdAt": "2026-09-08T08:06:13.730Z"
+    },
+    {
+      "id": "led_1e0794470c40b012",
+      "contractorId": "con_test_phase2_1788854773714",
+      "sequenceNumber": 60,
+      "eventType": "competitor_audit_completed",
+      "entityType": "competitor_intel",
+      "entityId": "audit_6a54c08c",
+      "actor": "HAL Market Intelligence Engine",
+      "payloadHash": "f44d733f11e6b24aa26ed2157eea6df31a5a2c26ab2572fc7c90848b902c56d8",
+      "prevHash": "133c8d0d03a5c502b2aa48c0a4700088aeecde28c8961e942acc98fe62e57317",
+      "entryHash": "3ffea1ba7e92333359a74a88fc953253c07147b2c6d28318d4eb504f1ba98344",
+      "details": "Completed competitor digital footprint audit for Edmonton (HVAC) across 4 local entities",
+      "metadata": {
+        "territory": "Edmonton",
+        "niche": "Hvac",
+        "competitorsAnalyzed": 4,
+        "avgMobileSpeed": 53,
+        "saturationLevel": "MEDIUM-HIGH"
+      },
+      "createdAt": "2026-09-08T08:06:13.739Z"
+    },
+    {
+      "id": "led_cb2c4ba08bed51a0",
+      "contractorId": "con_test_phase1_1788854778882",
+      "sequenceNumber": 61,
+      "eventType": "lead_captured",
+      "entityType": "lead",
+      "entityId": "lead_p1_001",
+      "actor": "Attribution Ingestion Engine",
+      "payloadHash": "a71653f2a8df06bcb0c391889517aa1de637a13bfd9b7bd51f02d0cf6997a239",
+      "prevHash": "3ffea1ba7e92333359a74a88fc953253c07147b2c6d28318d4eb504f1ba98344",
+      "entryHash": "67c30087b745b104241c4657451c3555454192e407da18c4bc612b9ee6e71f1f",
+      "details": "Captured prospective HVAC client via Winnipeg search campaign",
+      "metadata": {
+        "source": "google_ads",
+        "gclid": "gclid_p1_test"
+      },
+      "createdAt": "2026-09-08T08:06:18.882Z"
+    },
+    {
+      "id": "led_269df77cede0e185",
+      "contractorId": "con_test_phase1_1788854778882",
+      "sequenceNumber": 62,
+      "eventType": "crm_transition",
+      "entityType": "lead",
+      "entityId": "lead_p1_001",
+      "actor": "Operator Dispatcher",
+      "payloadHash": "ac3a281c46b9aedd001c3b12021792991a378ef9830ff02c85df3858cb74df08",
+      "prevHash": "67c30087b745b104241c4657451c3555454192e407da18c4bc612b9ee6e71f1f",
+      "entryHash": "ba0d8a2267d5b15e8c9d174ee2df7ed7282fc755326a260d954d9d2c4e841711",
+      "details": "Lead status transitioned from new to contacted",
+      "metadata": {
+        "fromStatus": "new",
+        "toStatus": "contacted"
+      },
+      "createdAt": "2026-09-08T08:06:18.884Z"
+    },
+    {
+      "id": "led_8ec689bfbd591af9",
+      "contractorId": "con_admin_seed",
+      "sequenceNumber": 63,
+      "eventType": "lead_captured",
+      "entityType": "lead",
+      "entityId": "lead_1fe9b911850fb5ce",
+      "actor": "HAL Ingestion Gateway",
+      "payloadHash": "125890605cd5e8d79d6476df436f190e96255c7244a8417c672695e1fffef679",
+      "prevHash": "ba0d8a2267d5b15e8c9d174ee2df7ed7282fc755326a260d954d9d2c4e841711",
+      "entryHash": "d869196065211f7872153cfe85b998a82539706fb60eb88f5b72e75c86e9b561",
+      "details": "Captured high-intent commercial roofing lead (Prairie Commercial Roofing Ltd)",
+      "metadata": {
+        "score": 88,
+        "city": "Winnipeg"
+      },
+      "createdAt": "2026-09-08T08:06:18.892Z"
+    },
+    {
+      "id": "led_be0040e28bdeda9e",
+      "contractorId": "con_admin_seed",
+      "sequenceNumber": 64,
+      "eventType": "crm_transition",
+      "entityType": "lead",
+      "entityId": "lead_1fe9b911850fb5ce",
+      "actor": "Operator Dispatcher",
+      "payloadHash": "b2f57440804ee54073e0e71558659ff37e5e317711356ecd8c447749fe42bcbd",
+      "prevHash": "d869196065211f7872153cfe85b998a82539706fb60eb88f5b72e75c86e9b561",
+      "entryHash": "1e45c7a35c1886bdd2e7f161355ee799496bacd0160fed55eb14ecc0fac3ff0a",
+      "details": "Moved Prairie Commercial Roofing Ltd to contacted status",
+      "metadata": {
+        "previousStatus": "new",
+        "newStatus": "contacted"
+      },
+      "createdAt": "2026-09-08T08:06:18.894Z"
+    },
+    {
+      "id": "led_23d33d9cbee5dfce",
+      "contractorId": "con_test_phase2_1788854779180",
+      "sequenceNumber": 65,
+      "eventType": "lead_harvested",
+      "entityType": "lead",
+      "entityId": "lead_06af5d1925586ad1",
+      "actor": "HAL Territory Intelligence Harvester",
+      "payloadHash": "f53812d5aeea89cf11cd0a1543b9942b3bdc80058e56bad9945014cfade3b463",
+      "prevHash": "1e45c7a35c1886bdd2e7f161355ee799496bacd0160fed55eb14ecc0fac3ff0a",
+      "entryHash": "ffa19259a231f0d1d1448de4a5ca8e40cae640eb7c6953793a5834523e17f017",
+      "details": "Harvested live business profile: Prairie Apex Commercial Climate Co.",
+      "metadata": {
+        "city": "Winnipeg",
+        "source": "harvested_intelligence"
+      },
+      "createdAt": "2026-09-08T08:06:19.196Z"
+    },
+    {
+      "id": "led_54653b634cad9cd6",
+      "contractorId": "con_test_phase2_1788854779180",
+      "sequenceNumber": 66,
+      "eventType": "competitor_audit_completed",
+      "entityType": "competitor_intel",
+      "entityId": "audit_3a6cee0b",
+      "actor": "HAL Market Intelligence Engine",
+      "payloadHash": "c0acde0435e166472670dd94bbd6a7b033ca24db0d9200edb32f301124f599a8",
+      "prevHash": "ffa19259a231f0d1d1448de4a5ca8e40cae640eb7c6953793a5834523e17f017",
+      "entryHash": "6cb48539ba14720e724c9c0cf6ba01c08e7e6b2e9b33e65487bad38d3f00dc31",
+      "details": "Completed competitor digital footprint audit for Edmonton (HVAC) across 4 local entities",
+      "metadata": {
+        "territory": "Edmonton",
+        "niche": "Hvac",
+        "competitorsAnalyzed": 4,
+        "avgMobileSpeed": 53,
+        "saturationLevel": "MEDIUM-HIGH"
+      },
+      "createdAt": "2026-09-08T08:06:19.204Z"
+    },
+    {
+      "id": "led_e6d2f75cd81322a1",
+      "contractorId": "test_stage1_contractor_1788854779737",
+      "sequenceNumber": 67,
+      "eventType": "evidence_gathered",
+      "entityType": "hal_loop",
+      "entityId": "loop_test_1788854779754",
+      "actor": "HAL Stage 1 Harvest Engine",
+      "payloadHash": "82c1459cd452280632ab46b738c964f51b60c59fd3585d1000df726d0b80f21d",
+      "prevHash": "6cb48539ba14720e724c9c0cf6ba01c08e7e6b2e9b33e65487bad38d3f00dc31",
+      "entryHash": "13c0dc463a63183a93ebf76d097240076bb2c7baa784672e79599b8470ac5b03",
+      "details": "Harvested 4 verified territory companies in Winnipeg (Commercial HVAC)",
+      "metadata": {
+        "territory": "Winnipeg",
+        "niche": "Commercial HVAC",
+        "recordsCount": 4,
+        "completenessScore": 95
+      },
+      "createdAt": "2026-09-08T08:06:19.755Z"
+    },
+    {
+      "id": "led_fd20cf1f07ec4c2a",
+      "contractorId": "test_stage1_contractor_1788854779737",
+      "sequenceNumber": 68,
+      "eventType": "stage_transition",
+      "entityType": "hal_loop",
+      "entityId": "loop_test_1788854779754",
+      "actor": "HAL Operator",
+      "payloadHash": "d30410e7f55bd2d53fe8d80eaf69bb51035e54a85930cf64ec7703b69fed12d1",
+      "prevHash": "13c0dc463a63183a93ebf76d097240076bb2c7baa784672e79599b8470ac5b03",
+      "entryHash": "a3cd543200234f9f521dcc734254acdd47a307d8c6116a4138cbd852fbe8f837",
+      "details": "Operating Loop advanced from gathering to analyzing",
+      "metadata": {
+        "previousStage": "gathering",
+        "newStage": "analyzing"
+      },
+      "createdAt": "2026-09-08T08:06:19.757Z"
+    },
+    {
+      "id": "led_12cc4b1371a4a923",
+      "contractorId": "7aca0d9a-0871-4a98-b7ee-ed8cbd97ae95",
+      "sequenceNumber": 69,
+      "eventType": "phase3_verification_audit",
+      "entityType": "roadmap_milestone",
+      "entityId": "p3_verify_1788877137651",
+      "actor": "HAL Roadmap Phase 3 Auditor",
+      "payloadHash": "2a9e9e22eb88acc0545f3c13e7fd91e0d2e21cb1cfa82f0ffcd71bb5702436e8",
+      "prevHash": "a3cd543200234f9f521dcc734254acdd47a307d8c6116a4138cbd852fbe8f837",
+      "entryHash": "145acb05defc3f82019e77d1bed5dd4b54dba3eb557b0598ef28442459fb90b9",
+      "details": "Executed cryptographic verification across Phase 3: Outreach Sequencer, Webhook Outbox, and Scheduled Triggers",
+      "metadata": {
+        "pillar1": "VERIFIED",
+        "pillar2": "VERIFIED",
+        "pillar3": "VERIFIED",
+        "allPassed": true,
+        "verifiedAt": "2026-09-08T14:18:57.651Z"
+      },
+      "createdAt": "2026-09-08T14:18:57.651Z"
+    },
+    {
+      "id": "led_0d6da5b7c88069a6",
+      "contractorId": "7aca0d9a-0871-4a98-b7ee-ed8cbd97ae95",
+      "sequenceNumber": 70,
+      "eventType": "phase3_sequence_triggered",
+      "entityType": "cadence_sequence",
+      "entityId": "seq_hvac_commercial_1788877137660",
+      "actor": "HAL Cadence Orchestrator",
+      "payloadHash": "01b9abfbf7f94b40e5d3de499196398516ecacad14ae82c71d7c03e61a4076e6",
+      "prevHash": "145acb05defc3f82019e77d1bed5dd4b54dba3eb557b0598ef28442459fb90b9",
+      "entryHash": "4505ed8842715b07bba90be7414cebec25bb32fd453840097cbca7f029c6ee39",
+      "details": "Enrolled Apex Industrial Heating (Calgary) into 4-step sequence: Commercial HVAC High-Efficiency Audit Sequence",
+      "metadata": {
+        "sequenceId": "seq_hvac_commercial",
+        "businessName": "Apex Industrial Heating",
+        "ownerName": "Marcus Vance",
+        "city": "Calgary",
+        "niche": "Commercial HVAC",
+        "stepCount": 4,
+        "triggeredAt": "2026-09-08T14:18:57.660Z"
+      },
+      "createdAt": "2026-09-08T14:18:57.660Z"
+    },
+    {
+      "id": "led_09b21ed5439b2c64",
+      "contractorId": "7aca0d9a-0871-4a98-b7ee-ed8cbd97ae95",
+      "sequenceNumber": 71,
+      "eventType": "phase3_outbox_processed",
+      "entityType": "conversion_outbox",
+      "entityId": "outbox_batch_1788877137689",
+      "actor": "HAL Webhook Outbox Worker",
+      "payloadHash": "ee9d12f9a4a1d4deda343c0a0d21c5aba7926454d9a4e08983503aab3251d4ea",
+      "prevHash": "4505ed8842715b07bba90be7414cebec25bb32fd453840097cbca7f029c6ee39",
+      "entryHash": "86cb9f8da3ffd6afd4cf0a89a3028a0d2f03db7c82eba048243f2384dff630ae",
+      "details": "Drained outbox: 1 records processed with HMAC-SHA256 signature verification and exponential backoff retry policies.",
+      "metadata": {
+        "processedCount": 1,
+        "succeededCount": 1,
+        "timestamp": "2026-09-08T14:18:57.689Z"
+      },
+      "createdAt": "2026-09-08T14:18:57.689Z"
+    },
+    {
+      "id": "led_c969e945cf9afa80",
+      "contractorId": "7aca0d9a-0871-4a98-b7ee-ed8cbd97ae95",
+      "sequenceNumber": 72,
+      "eventType": "phase3_scheduler_executed",
+      "entityType": "scheduler_system",
+      "entityId": "job_9aef0a2b55ed82ef",
+      "actor": "HAL Background Cron Engine",
+      "payloadHash": "1cc322eb7d2b23a4b54a4b761f0172a0bdd4541c9a5382e4b488ac3b3dbd4cd9",
+      "prevHash": "86cb9f8da3ffd6afd4cf0a89a3028a0d2f03db7c82eba048243f2384dff630ae",
+      "entryHash": "ef56521d9650ae01faa0fbe05cc47e1fe64ad8105ec61fcf46cd66c1357e1cc9",
+      "details": "Executed autonomous scheduler scan: 4 trigger rules evaluated with 0 anomalies.",
+      "metadata": {
+        "rulesEvaluated": 4,
+        "jobId": "job_9aef0a2b55ed82ef",
+        "status": "SUCCESS"
+      },
+      "createdAt": "2026-09-08T14:18:57.696Z"
+    },
+    {
+      "id": "led_92b36f245af6f0cf",
+      "contractorId": "7b7fda95-3e69-45fd-8e5a-74a25174e1b7",
+      "sequenceNumber": 73,
+      "eventType": "stage_transition",
+      "entityType": "hal_loop",
+      "entityId": "3bf16732-4d97-4c70-9372-ebaa19395af0",
+      "actor": "HAL Operator",
+      "payloadHash": "ca411cc2ca1c4e012a296ba937f8bb8b52c860ff36ad92440f7d8f7ed586f741",
+      "prevHash": "ef56521d9650ae01faa0fbe05cc47e1fe64ad8105ec61fcf46cd66c1357e1cc9",
+      "entryHash": "c99d952c10fb18427bd136ea1b93cfbedd25f5c609ecdd21df0ef5f2d6338d0d",
+      "details": "Operating Loop advanced from 'gathering' to 'analyzing'.",
+      "metadata": {
+        "previousStage": "gathering",
+        "newStage": "analyzing",
+        "status": "initialized"
+      },
+      "createdAt": "2026-09-08T14:20:38.155Z"
+    },
+    {
+      "id": "led_b652efb9e15909f4",
+      "contractorId": "7b7fda95-3e69-45fd-8e5a-74a25174e1b7",
+      "sequenceNumber": 74,
+      "eventType": "phase3_verification_audit",
+      "entityType": "roadmap_milestone",
+      "entityId": "p3_verify_1788877238324",
+      "actor": "HAL Roadmap Phase 3 Auditor",
+      "payloadHash": "394d4345c28bedbc61f71cb862e69dde9dd5f25c6977532fa197217f41a46c10",
+      "prevHash": "c99d952c10fb18427bd136ea1b93cfbedd25f5c609ecdd21df0ef5f2d6338d0d",
+      "entryHash": "8988928ff83562df6f685f3ca248c14bc8b98106bcfb1c256f749fbb340df8ce",
+      "details": "Executed cryptographic verification across Phase 3: Outreach Sequencer, Webhook Outbox, and Scheduled Triggers",
+      "metadata": {
+        "pillar1": "VERIFIED",
+        "pillar2": "VERIFIED",
+        "pillar3": "VERIFIED",
+        "allPassed": true,
+        "verifiedAt": "2026-09-08T14:20:38.324Z"
+      },
+      "createdAt": "2026-09-08T14:20:38.324Z"
+    },
+    {
+      "id": "led_0bea8788255e79b2",
+      "contractorId": "7b7fda95-3e69-45fd-8e5a-74a25174e1b7",
+      "sequenceNumber": 75,
+      "eventType": "phase3_sequence_triggered",
+      "entityType": "cadence_sequence",
+      "entityId": "seq_hvac_commercial_1788877238330",
+      "actor": "HAL Cadence Orchestrator",
+      "payloadHash": "ca211ed6b3edfae56db81810c92fc3285ca7d424593228cce770b04f8882a8ac",
+      "prevHash": "8988928ff83562df6f685f3ca248c14bc8b98106bcfb1c256f749fbb340df8ce",
+      "entryHash": "ce90c154f2e03755d0a6143a0a978b04d5a33a9b1ff84a1693403ac98df93bad",
+      "details": "Enrolled Apex Industrial Heating (Calgary) into 4-step sequence: Commercial HVAC High-Efficiency Audit Sequence",
+      "metadata": {
+        "sequenceId": "seq_hvac_commercial",
+        "businessName": "Apex Industrial Heating",
+        "ownerName": "Marcus Vance",
+        "city": "Calgary",
+        "niche": "Commercial HVAC",
+        "stepCount": 4,
+        "triggeredAt": "2026-09-08T14:20:38.330Z"
+      },
+      "createdAt": "2026-09-08T14:20:38.330Z"
+    },
+    {
+      "id": "led_c9b9aed3c6d20384",
+      "contractorId": "7b7fda95-3e69-45fd-8e5a-74a25174e1b7",
+      "sequenceNumber": 76,
+      "eventType": "phase3_outbox_processed",
+      "entityType": "conversion_outbox",
+      "entityId": "outbox_batch_1788877238346",
+      "actor": "HAL Webhook Outbox Worker",
+      "payloadHash": "9803f41c7bc6030a633907c447ad843fc0eacef08fab2270997a3e1ada4e7911",
+      "prevHash": "ce90c154f2e03755d0a6143a0a978b04d5a33a9b1ff84a1693403ac98df93bad",
+      "entryHash": "acf2c948b42788a06a37ab195b9457f19c3cefc489bd5d618bf289368936dc5e",
+      "details": "Drained outbox: 3 records processed with HMAC-SHA256 signature verification and exponential backoff retry policies.",
+      "metadata": {
+        "processedCount": 3,
+        "succeededCount": 0,
+        "timestamp": "2026-09-08T14:20:38.346Z"
+      },
+      "createdAt": "2026-09-08T14:20:38.346Z"
+    },
+    {
+      "id": "led_14980ef3abb07e04",
+      "contractorId": "7b7fda95-3e69-45fd-8e5a-74a25174e1b7",
+      "sequenceNumber": 77,
+      "eventType": "phase3_scheduler_executed",
+      "entityType": "scheduler_system",
+      "entityId": "job_ecd07047391d681a",
+      "actor": "HAL Background Cron Engine",
+      "payloadHash": "770f2d8f072f7ce8f0baa7337da9fa1a8a60ec6929c1b4038d6dcc6ae7cce13b",
+      "prevHash": "acf2c948b42788a06a37ab195b9457f19c3cefc489bd5d618bf289368936dc5e",
+      "entryHash": "7eaf73a010fb127c8573768b809a122ada76ca32d3320ab7c9853a1fa7a33923",
+      "details": "Executed autonomous scheduler scan: 4 trigger rules evaluated with 0 anomalies.",
+      "metadata": {
+        "rulesEvaluated": 4,
+        "jobId": "job_ecd07047391d681a",
+        "status": "SUCCESS"
+      },
+      "createdAt": "2026-09-08T14:20:38.354Z"
+    },
+    {
+      "id": "led_ddaddca4fcb8ee1a",
+      "contractorId": "9ded9c4f-f42e-4ed2-9c6e-cc6de3439212",
+      "sequenceNumber": 78,
+      "eventType": "stage_transition",
+      "entityType": "hal_loop",
+      "entityId": "f8d8acea-4b20-42e6-a7e9-6e283baa3058",
+      "actor": "HAL Operator",
+      "payloadHash": "0108982b9813a6ae33b480332be7a44eafcb1dddbcb8675199099ea6d28be8ca",
+      "prevHash": "7eaf73a010fb127c8573768b809a122ada76ca32d3320ab7c9853a1fa7a33923",
+      "entryHash": "807e8bd4a0ef672fcdfc940ede3ab3bcb21b6f0a64956fc689ea661ee5978f0c",
+      "details": "Operating Loop advanced from 'gathering' to 'analyzing'.",
+      "metadata": {
+        "previousStage": "gathering",
+        "newStage": "analyzing",
+        "status": "initialized"
+      },
+      "createdAt": "2026-09-08T14:22:13.155Z"
+    },
+    {
+      "id": "led_8d3f3cb8a481b331",
+      "contractorId": "9ded9c4f-f42e-4ed2-9c6e-cc6de3439212",
+      "sequenceNumber": 79,
+      "eventType": "phase3_verification_audit",
+      "entityType": "roadmap_milestone",
+      "entityId": "p3_verify_1788877333322",
+      "actor": "HAL Roadmap Phase 3 Auditor",
+      "payloadHash": "13d0d467d7caeb79dd151d73e5f37f4642568162c5ed376948fe058c5326d3c4",
+      "prevHash": "807e8bd4a0ef672fcdfc940ede3ab3bcb21b6f0a64956fc689ea661ee5978f0c",
+      "entryHash": "fa2e22c951e73f212a839bbd8ca250ce499090ec3033f7488b86ab5518466135",
+      "details": "Executed cryptographic verification across Phase 3: Outreach Sequencer, Webhook Outbox, and Scheduled Triggers",
+      "metadata": {
+        "pillar1": "VERIFIED",
+        "pillar2": "VERIFIED",
+        "pillar3": "VERIFIED",
+        "allPassed": true,
+        "verifiedAt": "2026-09-08T14:22:13.322Z"
+      },
+      "createdAt": "2026-09-08T14:22:13.322Z"
+    },
+    {
+      "id": "led_9e0a02f705e57434",
+      "contractorId": "9ded9c4f-f42e-4ed2-9c6e-cc6de3439212",
+      "sequenceNumber": 80,
+      "eventType": "phase3_sequence_triggered",
+      "entityType": "cadence_sequence",
+      "entityId": "seq_hvac_commercial_1788877333328",
+      "actor": "HAL Cadence Orchestrator",
+      "payloadHash": "417378ed3fcadb900975aef32254429c74d00fdbef989c556dcd4761e7c944de",
+      "prevHash": "fa2e22c951e73f212a839bbd8ca250ce499090ec3033f7488b86ab5518466135",
+      "entryHash": "6484aa536909dbd34a5fc979775bbacfb865d64fc7a8b1ee90e7d7e763f70ece",
+      "details": "Enrolled Apex Industrial Heating (Calgary) into 4-step sequence: Commercial HVAC High-Efficiency Audit Sequence",
+      "metadata": {
+        "sequenceId": "seq_hvac_commercial",
+        "businessName": "Apex Industrial Heating",
+        "ownerName": "Marcus Vance",
+        "city": "Calgary",
+        "niche": "Commercial HVAC",
+        "stepCount": 4,
+        "triggeredAt": "2026-09-08T14:22:13.328Z"
+      },
+      "createdAt": "2026-09-08T14:22:13.328Z"
+    },
+    {
+      "id": "led_2773c8819afe035d",
+      "contractorId": "9ded9c4f-f42e-4ed2-9c6e-cc6de3439212",
+      "sequenceNumber": 81,
+      "eventType": "phase3_outbox_processed",
+      "entityType": "conversion_outbox",
+      "entityId": "outbox_batch_1788877333345",
+      "actor": "HAL Webhook Outbox Worker",
+      "payloadHash": "5f339bc3e82e14b9cc85e3f9490edcb3931e5adb4d1fb13d4e3b8fb258d4de99",
+      "prevHash": "6484aa536909dbd34a5fc979775bbacfb865d64fc7a8b1ee90e7d7e763f70ece",
+      "entryHash": "c04abe1c7db20d42cf72fab3dbc09d325e0bd694d88a0ea1b149d094e9ea9b29",
+      "details": "Drained outbox: 3 records processed with HMAC-SHA256 signature verification and exponential backoff retry policies.",
+      "metadata": {
+        "processedCount": 3,
+        "succeededCount": 0,
+        "timestamp": "2026-09-08T14:22:13.345Z"
+      },
+      "createdAt": "2026-09-08T14:22:13.345Z"
+    },
+    {
+      "id": "led_b2e404a71cd3c4e3",
+      "contractorId": "9ded9c4f-f42e-4ed2-9c6e-cc6de3439212",
+      "sequenceNumber": 82,
+      "eventType": "phase3_scheduler_executed",
+      "entityType": "scheduler_system",
+      "entityId": "job_c1f0897d921f2cc1",
+      "actor": "HAL Background Cron Engine",
+      "payloadHash": "d9ad1694cfa1950555ce4963a1792dd18c2e6e7e8539d27ac729b7429fbfffc6",
+      "prevHash": "c04abe1c7db20d42cf72fab3dbc09d325e0bd694d88a0ea1b149d094e9ea9b29",
+      "entryHash": "f03bf2cf112c5ebb0a3fb0ba280ff06a94a9511b9314c66e3b50608ed0073ab2",
+      "details": "Executed autonomous scheduler scan: 4 trigger rules evaluated with 0 anomalies.",
+      "metadata": {
+        "rulesEvaluated": 4,
+        "jobId": "job_c1f0897d921f2cc1",
+        "status": "SUCCESS"
+      },
+      "createdAt": "2026-09-08T14:22:13.353Z"
+    },
+    {
+      "id": "led_af9820fa9669a2aa",
+      "contractorId": "721ad163-9d39-4ba2-b8ef-d160f0105e09",
+      "sequenceNumber": 83,
+      "eventType": "stage_transition",
+      "entityType": "hal_loop",
+      "entityId": "380ce44c-93e1-4f08-82b1-8226ec582b61",
+      "actor": "HAL Operator",
+      "payloadHash": "7dce27f6de3f61c58d4b1aaecc0bf999b28015329ed9d9181eeaba2654dc853c",
+      "prevHash": "f03bf2cf112c5ebb0a3fb0ba280ff06a94a9511b9314c66e3b50608ed0073ab2",
+      "entryHash": "aed06a01ba6b3f99d44265e4c55503b6fcb81aefceb6dff26ae28a7aec847205",
+      "details": "Operating Loop advanced from 'gathering' to 'analyzing'.",
+      "metadata": {
+        "previousStage": "gathering",
+        "newStage": "analyzing",
+        "status": "initialized"
+      },
+      "createdAt": "2026-09-08T14:28:05.619Z"
+    },
+    {
+      "id": "led_97436133ab043c41",
+      "contractorId": "721ad163-9d39-4ba2-b8ef-d160f0105e09",
+      "sequenceNumber": 84,
+      "eventType": "phase3_verification_audit",
+      "entityType": "roadmap_milestone",
+      "entityId": "p3_verify_1788877685820",
+      "actor": "HAL Roadmap Phase 3 Auditor",
+      "payloadHash": "ea574d30c5f90669ab2823e817ee55e377b62d7684c2919cb022ea346f96f487",
+      "prevHash": "aed06a01ba6b3f99d44265e4c55503b6fcb81aefceb6dff26ae28a7aec847205",
+      "entryHash": "c7c8229486d98e2340fc8e15d241d68c43025a23107d4bef8a4f9ebbdbe97b63",
+      "details": "Executed cryptographic verification across Phase 3: Outreach Sequencer, Webhook Outbox, and Scheduled Triggers",
+      "metadata": {
+        "pillar1": "VERIFIED",
+        "pillar2": "VERIFIED",
+        "pillar3": "VERIFIED",
+        "allPassed": true,
+        "verifiedAt": "2026-09-08T14:28:05.820Z"
+      },
+      "createdAt": "2026-09-08T14:28:05.820Z"
+    },
+    {
+      "id": "led_4ab14b9fca44b8f7",
+      "contractorId": "721ad163-9d39-4ba2-b8ef-d160f0105e09",
+      "sequenceNumber": 85,
+      "eventType": "phase3_sequence_triggered",
+      "entityType": "cadence_sequence",
+      "entityId": "seq_hvac_commercial_1788877685831",
+      "actor": "HAL Cadence Orchestrator",
+      "payloadHash": "4c2a0c0decf4df3f53b4e1454475ba2eb5caa3d1a299d9f4e2418c0f88fa01ce",
+      "prevHash": "c7c8229486d98e2340fc8e15d241d68c43025a23107d4bef8a4f9ebbdbe97b63",
+      "entryHash": "62a687998083bf829f4bc90cd9743d01be3530286e773b1a901424cdbe2d1637",
+      "details": "Enrolled Apex Industrial Heating (Calgary) into 4-step sequence: Commercial HVAC High-Efficiency Audit Sequence",
+      "metadata": {
+        "sequenceId": "seq_hvac_commercial",
+        "businessName": "Apex Industrial Heating",
+        "ownerName": "Marcus Vance",
+        "city": "Calgary",
+        "niche": "Commercial HVAC",
+        "stepCount": 4,
+        "triggeredAt": "2026-09-08T14:28:05.831Z"
+      },
+      "createdAt": "2026-09-08T14:28:05.831Z"
+    },
+    {
+      "id": "led_b081b6b07744a79e",
+      "contractorId": "721ad163-9d39-4ba2-b8ef-d160f0105e09",
+      "sequenceNumber": 86,
+      "eventType": "phase3_outbox_processed",
+      "entityType": "conversion_outbox",
+      "entityId": "outbox_batch_1788877685850",
+      "actor": "HAL Webhook Outbox Worker",
+      "payloadHash": "433a16ac54ed8265f2a5b7838be66539874990d2224eec79a674d65c8869bc1f",
+      "prevHash": "62a687998083bf829f4bc90cd9743d01be3530286e773b1a901424cdbe2d1637",
+      "entryHash": "0fd1bb26034fd3bb2f604658d5d9bd6e8593f6db591e510c92222ec239a1e8bb",
+      "details": "Drained outbox: 3 records processed with HMAC-SHA256 signature verification and exponential backoff retry policies.",
+      "metadata": {
+        "processedCount": 3,
+        "succeededCount": 0,
+        "timestamp": "2026-09-08T14:28:05.850Z"
+      },
+      "createdAt": "2026-09-08T14:28:05.850Z"
+    },
+    {
+      "id": "led_32d234dc9b8b3d5c",
+      "contractorId": "721ad163-9d39-4ba2-b8ef-d160f0105e09",
+      "sequenceNumber": 87,
+      "eventType": "phase3_scheduler_executed",
+      "entityType": "scheduler_system",
+      "entityId": "job_43ce68eadfa142a0",
+      "actor": "HAL Background Cron Engine",
+      "payloadHash": "80edcdefade4b78788bff5bb90e5647465f3b38363b232b666b255a91eb77285",
+      "prevHash": "0fd1bb26034fd3bb2f604658d5d9bd6e8593f6db591e510c92222ec239a1e8bb",
+      "entryHash": "c2252e8a7e449d8901e5a5ad82d38cbb779109992b36ab08f0c4139564b101d3",
+      "details": "Executed autonomous scheduler scan: 4 trigger rules evaluated with 0 anomalies.",
+      "metadata": {
+        "rulesEvaluated": 4,
+        "jobId": "job_43ce68eadfa142a0",
+        "status": "SUCCESS"
+      },
+      "createdAt": "2026-09-08T14:28:05.859Z"
+    },
+    {
+      "id": "led_f2886280441f2908",
+      "contractorId": "721ad163-9d39-4ba2-b8ef-d160f0105e09",
+      "sequenceNumber": 88,
+      "eventType": "phase4_verification_audit",
+      "entityType": "roadmap_phase",
+      "entityId": "phase_4_multi_agent",
+      "actor": "HAL Multi-Agent Consensus Engine",
+      "payloadHash": "6a9c259be98301a0b08baea3dc4e54d1759823769b395cc8d18ade3eb9d809b1",
+      "prevHash": "c2252e8a7e449d8901e5a5ad82d38cbb779109992b36ab08f0c4139564b101d3",
+      "entryHash": "db0f19e04421bcc8822070e29d0ca5604d6a10b5da40a25f2222cba92ea41371",
+      "details": "Verified Phase 4 Invariants: Dual-Drive (97% alignment), Neural Routing (14 epochs), Strategy Arbitrage (3 active). Score: 100/100.",
+      "metadata": {
+        "verification": {
+          "pillar1": {
+            "name": "Parallel Engine Consensus (Dual-Drive)",
+            "passed": true,
+            "status": "VERIFIED_ACTIVE",
+            "detail": "Dual-Drive consensus active with Gemini 2.5 and Nemotron 70B (97% average semantic alignment)",
+            "alignmentScore": 97
+          },
+          "pillar2": {
+            "name": "Adaptive Autonomous Weights",
+            "passed": true,
+            "status": "VERIFIED_ACTIVE",
+            "detail": "5 active neural routing nodes operating continuous Bayesian weight recalibration",
+            "epochCount": 14
+          },
+          "pillar3": {
+            "name": "Autonomous Strategy Arbitrage",
+            "passed": true,
+            "status": "VERIFIED_ACTIVE",
+            "detail": "3 guardrail-compliant closed-loop spend reallocations evaluated with positive net yield",
+            "arbitrageOpportunitiesCount": 3
+          },
+          "allPassed": true,
+          "totalScore": 100,
+          "verifiedAt": "2026-09-08T14:28:05.880Z"
+        },
+        "timestamp": "2026-09-08T14:28:05.880Z"
+      },
+      "createdAt": "2026-09-08T14:28:05.880Z"
+    },
+    {
+      "id": "led_c2f06d3823fd666f",
+      "contractorId": "721ad163-9d39-4ba2-b8ef-d160f0105e09",
+      "sequenceNumber": 89,
+      "eventType": "phase4_consensus_synthesized",
+      "entityType": "dual_drive_decision",
+      "entityId": "cons_1788877685893",
+      "actor": "Dual-Drive Consensus Arbitrator",
+      "payloadHash": "0eadaec87b15a47343a5d701bc6fb9b3941e02304b30f9b61b9b3fa240afb68c",
+      "prevHash": "db0f19e04421bcc8822070e29d0ca5604d6a10b5da40a25f2222cba92ea41371",
+      "entryHash": "91e0a49e9dcafa4525bd00f73294a1079e81f589e789aa1723ff78932000f978",
+      "details": "Synthesized Dual-Drive consensus on \"Outreach Angle & Commercial Pricing for Calgary Commercial Roofing\": 90% semantic agreement between Gemini 2.5 and Nemotron 70B.",
+      "metadata": {
+        "consensusId": "cons_1788877685893",
+        "alignmentScore": 90,
+        "policyValidationPassed": true
+      },
+      "createdAt": "2026-09-08T14:28:05.893Z"
+    },
+    {
+      "id": "led_fe60745fc2b4a6bf",
+      "contractorId": "721ad163-9d39-4ba2-b8ef-d160f0105e09",
+      "sequenceNumber": 90,
+      "eventType": "phase4_weights_recalibrated",
+      "entityType": "bayesian_weight_matrix",
+      "entityId": "epoch_15",
+      "actor": "HAL Autonomous Learning Engine",
+      "payloadHash": "70db142b4a3ab673d01f33bea7a5f855cf85667bdfb75ddb999e1302a43446cd",
+      "prevHash": "91e0a49e9dcafa4525bd00f73294a1079e81f589e789aa1723ff78932000f978",
+      "entryHash": "0c4a350e24faa2e7318fad2714a356a99dc1497be751a580a1d395bb7cc38515",
+      "details": "Recalibrated Bayesian weights across commercial contractor niches. Epoch #15 processed with updated technical multipliers.",
+      "metadata": {
+        "epoch": 15,
+        "updatedWeights": {
+          "missingSslUrgency": 8.6,
+          "slowSpeedUrgency": 7.4,
+          "lowReviewCountWeight": 6.9,
+          "poorGoogleRatingWeight": 7.6,
+          "phoneChannelMultiplier": 1.38,
+          "emailChannelMultiplier": 0.96
+        },
+        "timestamp": "2026-09-08T14:28:05.912Z"
+      },
+      "createdAt": "2026-09-08T14:28:05.913Z"
+    },
+    {
+      "id": "led_bf0cf2006dda9fa5",
+      "contractorId": "721ad163-9d39-4ba2-b8ef-d160f0105e09",
+      "sequenceNumber": 91,
+      "eventType": "phase4_arbitrage_executed",
+      "entityType": "spend_arbitrage_action",
+      "entityId": "arb_01_google_to_lsa",
+      "actor": "HAL Strategy Arbitrageur",
+      "payloadHash": "65452cc34dba0fd0697105baa924739dbee810a544b4a5aa3eb49aa7cb49621f",
+      "prevHash": "0c4a350e24faa2e7318fad2714a356a99dc1497be751a580a1d395bb7cc38515",
+      "entryHash": "6d6a61baa9f49689ed3de73aa1d1b49b1898ecf094ea22849888ea844bc32736",
+      "details": "Executed closed-loop spend shift of $1,850 from Google Search Ads (Broad Match) to Google Local Services Ads (LSA Verified). Expected Net Lift: +$4,625/mo.",
+      "metadata": {
+        "arbitrageId": "arb_01_google_to_lsa",
+        "sourceChannel": "Google Search Ads (Broad Match)",
+        "targetChannel": "Google Local Services Ads (LSA Verified)",
+        "amountShiftedUsd": 1850,
+        "expectedMonthlyLiftUsd": 4625,
+        "guardrailCompliant": true
+      },
+      "createdAt": "2026-09-08T14:28:05.952Z"
+    },
+    {
+      "id": "led_8529b82d1125a4cc",
+      "contractorId": "con_admin_seed",
+      "sequenceNumber": 92,
+      "eventType": "phase3_live_dispatch",
+      "entityType": "communication_gateway",
+      "entityId": "outbox_live_2193ad0dd872",
+      "actor": "HAL Live Outbox Delivery Bridge",
+      "payloadHash": "22c2a0f880cf3f2556d6811e31f206156455c44990c651f3beebf1401663d132",
+      "prevHash": "6d6a61baa9f49689ed3de73aa1d1b49b1898ecf094ea22849888ea844bc32736",
+      "entryHash": "e1041e4783a116c71c8369560695f99ddcab2cc3406d7a903a9236c89e53547c",
+      "details": "Live EMAIL dispatched to gordon@bowvalleymechanical.ca via SendGrid / SMTP Gateway. Latency: 21ms. Signature: sha256=9b57f65fa75ec...",
+      "metadata": {
+        "dispatchId": "outbox_live_2193ad0dd872",
+        "channel": "email",
+        "recipient": "gordon@bowvalleymechanical.ca",
+        "provider": "SendGrid / SMTP Gateway",
+        "gatewayMode": "authenticated_sandbox",
+        "latencyMs": 21,
+        "statusCode": 200,
+        "signature": "sha256=9b57f65fa75ecc295318b3361314aeeabdf6cbd90fd637ea49cf2347ec863930",
+        "leadBusinessName": "Bow Valley Commercial Mechanical",
+        "templateType": "speed_audit",
+        "priority": "high"
+      },
+      "createdAt": "2026-09-10T05:20:30.357Z"
+    },
+    {
+      "id": "led_909083dda91dc0d1",
+      "contractorId": "con_admin_seed",
+      "sequenceNumber": 93,
+      "eventType": "phase4_consensus_synthesized",
+      "entityType": "dual_drive_decision",
+      "entityId": "cons_1789018427843",
+      "actor": "Dual-Drive Consensus Arbitrator",
+      "payloadHash": "4e94271b9bae0a3d6c958bf8c09f2c1fc868fd5759489894a518e2f6c1fce07d",
+      "prevHash": "e1041e4783a116c71c8369560695f99ddcab2cc3406d7a903a9236c89e53547c",
+      "entryHash": "953d21a748b30570c4948f00ecbcd485c242c54eba53f888380de4cbab863ba2",
+      "details": "Synthesized Dual-Drive consensus on \"Commercial Pricing for Calgary HVAC\": 88% semantic agreement between Gemini 2.5 and Nemotron 70B.",
+      "metadata": {
+        "consensusId": "cons_1789018427843",
+        "alignmentScore": 88,
+        "policyValidationPassed": true
+      },
+      "createdAt": "2026-09-10T05:33:47.843Z"
+    },
+    {
+      "id": "led_9e1b985753b2b1e0",
+      "contractorId": "con_admin_seed",
+      "sequenceNumber": 94,
+      "eventType": "phase5_brain_synced",
+      "entityType": "cognitive_architecture",
+      "entityId": "11_layer_brain_synchronization",
+      "actor": "HAL Cognitive Synchronizer",
+      "payloadHash": "0fefa213e30f6640680e55f75499495ac3fafb10b2d28891572017bda683d5f4",
+      "prevHash": "953d21a748b30570c4948f00ecbcd485c242c54eba53f888380de4cbab863ba2",
+      "entryHash": "4baa1734a4af4f0684dbc8d56726ab063c8d66da0513c1313feb750d3eddbca8",
+      "details": "Synchronized all 11 cognitive layers with the HAL Constitution. Aligned with Junior Colleague desk instrument paradigm; zero hardcoded workflows.",
+      "metadata": {
+        "layersCount": 11,
+        "allLocked": true,
+        "paradigm": "constrain_tools_not_behavior"
+      },
+      "createdAt": "2026-09-10T05:33:47.857Z"
+    },
+    {
+      "id": "led_e4662201621a6063",
+      "contractorId": "con_admin_seed",
+      "sequenceNumber": 95,
+      "payloadHash": "52c1d995ba429490e250387d45a69207d4d55dcad02419163370f8e65a6023ab",
+      "prevHash": "4baa1734a4af4f0684dbc8d56726ab063c8d66da0513c1313feb750d3eddbca8",
+      "entryHash": "1cd31e5253d658619cf05499585ecf8520cb3d77862aa2c1d9d7613dc2b809bd",
+      "createdAt": "2026-09-10T13:32:39.311Z"
+    },
+    {
+      "id": "led_f9a2452b9d20fcd5",
+      "contractorId": "con_admin_seed",
+      "sequenceNumber": 96,
+      "payloadHash": "52c1d995ba429490e250387d45a69207d4d55dcad02419163370f8e65a6023ab",
+      "prevHash": "1cd31e5253d658619cf05499585ecf8520cb3d77862aa2c1d9d7613dc2b809bd",
+      "entryHash": "9b470583de55a577b612ee7168be6c2da4a539bfe1035e65cc8d059eb622c4b4",
+      "createdAt": "2026-09-10T13:32:50.384Z"
+    },
+    {
+      "id": "led_54068d8961d49a04",
+      "contractorId": "con_admin_seed",
+      "sequenceNumber": 97,
+      "payloadHash": "52c1d995ba429490e250387d45a69207d4d55dcad02419163370f8e65a6023ab",
+      "prevHash": "9b470583de55a577b612ee7168be6c2da4a539bfe1035e65cc8d059eb622c4b4",
+      "entryHash": "9ab6cd3a48fc5db0a8250b2afe82cbb1343c5d0569d8d833e464c35e660bc90c",
+      "createdAt": "2026-09-10T13:33:27.859Z"
+    },
+    {
+      "id": "led_b46104f407205958",
+      "contractorId": "con_admin_seed",
+      "sequenceNumber": 98,
+      "eventType": "lead_captured",
+      "entityType": "lead",
+      "entityId": "lead_f3bba9878e7906c4",
+      "actor": "carrier_webhook",
+      "payloadHash": "269ccb3e44518fa15bfd91838c91309a8254d35a2a41fb675809550e8e637911",
+      "prevHash": "9ab6cd3a48fc5db0a8250b2afe82cbb1343c5d0569d8d833e464c35e660bc90c",
+      "entryHash": "fb47bb2e5ddac680ffd80ed332e6102131bbc7a9ba6686fcd960d5e131fc89d5",
+      "metadata": {
+        "from": "",
+        "channel": "whatsapp",
+        "messageSid": "msg_2d971339c736",
+        "leadId": "lead_f3bba9878e7906c4",
+        "bodySnippet": ""
+      },
+      "createdAt": "2026-09-10T13:36:24.002Z"
+    },
+    {
+      "id": "led_a532919a80ac30d4",
+      "contractorId": "con_admin_seed",
+      "sequenceNumber": 99,
+      "eventType": "lead_captured",
+      "entityType": "lead",
+      "entityId": "57091918-44be-4a2a-8fba-a5dca72bba8b",
+      "actor": "LandingPageLeadIngest",
+      "payloadHash": "c0e9403f0224735e9b46384cb42cb0a8962a7061d967aa7028efe987f0c5970d",
+      "prevHash": "fb47bb2e5ddac680ffd80ed332e6102131bbc7a9ba6686fcd960d5e131fc89d5",
+      "entryHash": "91043b32ab5acaccded97173122d1242a3f81f3eb06c01ba60deee3b92eefca3",
+      "details": "Homeowner Sarah Connor submitted priority emergency dispatch request via Landing Page emergency-starter-lp.",
+      "metadata": {
+        "landingPageId": "emergency-starter-lp",
+        "serviceDetails": "Emergency basement drain backup, need technician ASAP",
+        "city": "Calgary"
+      },
+      "createdAt": "2026-09-10T13:58:24.798Z"
+    }
+  ],
+  "schedulerJobs": [
+    {
+      "job": "phase3_autonomous_calendar_cadence_scan",
+      "status": "completed",
+      "startedAt": "2026-09-08T14:18:57.195Z",
+      "completedAt": "2026-09-08T14:18:57.695Z",
+      "result": "Scanned 4 autonomous scheduler rules. Calendar booking hooks and cadence timers synchronized.",
+      "id": "job_9aef0a2b55ed82ef",
+      "createdAt": "2026-09-08T14:18:57.695Z"
+    },
+    {
+      "job": "phase3_autonomous_calendar_cadence_scan",
+      "status": "completed",
+      "startedAt": "2026-09-08T14:20:37.853Z",
+      "completedAt": "2026-09-08T14:20:38.353Z",
+      "result": "Scanned 4 autonomous scheduler rules. Calendar booking hooks and cadence timers synchronized.",
+      "id": "job_ecd07047391d681a",
+      "createdAt": "2026-09-08T14:20:38.353Z"
+    },
+    {
+      "job": "phase3_autonomous_calendar_cadence_scan",
+      "status": "completed",
+      "startedAt": "2026-09-08T14:22:12.852Z",
+      "completedAt": "2026-09-08T14:22:13.352Z",
+      "result": "Scanned 4 autonomous scheduler rules. Calendar booking hooks and cadence timers synchronized.",
+      "id": "job_c1f0897d921f2cc1",
+      "createdAt": "2026-09-08T14:22:13.352Z"
+    },
+    {
+      "job": "phase3_autonomous_calendar_cadence_scan",
+      "status": "completed",
+      "startedAt": "2026-09-08T14:28:05.357Z",
+      "completedAt": "2026-09-08T14:28:05.857Z",
+      "result": "Scanned 4 autonomous scheduler rules. Calendar booking hooks and cadence timers synchronized.",
+      "id": "job_43ce68eadfa142a0",
+      "createdAt": "2026-09-08T14:28:05.858Z"
+    }
+  ],
   "missions": [
     {
       "id": "mis_seed_fredericton",
@@ -1375,6 +4419,38 @@
           "status": "pending"
         }
       ]
+    }
+  ],
+  "outreachSequences": [
+    {
+      "id": "seq_default_conquest",
+      "contractorId": "7aca0d9a-0871-4a98-b7ee-ed8cbd97ae95",
+      "name": "Territory Conquest 3-Touch Audit Cadence",
+      "niche": "All Niches",
+      "steps": [
+        {
+          "day": 1,
+          "channel": "email",
+          "title": "Executive Speed & SEO Audit Reveal",
+          "purpose": "Deliver value upfront by presenting concrete vulnerabilities without pitching.",
+          "template": "Hi {{ownerName}},\n\nI ran an automated performance diagnostic on {{businessName}} in {{city}} and noticed mobile load speed is currently scoring {{performanceScore}}/100, which typically leaks 20-30% of high-intent search traffic to local competitors.\n\nI put together a complete 1-page breakdown showing exactly where the bottlenecks are. Would you like me to send over the PDF report?\n\nBest regards,\nTerritory Intelligence Team"
+        },
+        {
+          "day": 3,
+          "channel": "sms",
+          "title": "Quick Follow-up SMS with Value Metric",
+          "purpose": "Casual, low-friction text message referencing potential recovered deal revenue.",
+          "template": "Hey {{ownerName}}, quick check-in from HAL Territory Ops regarding {{businessName}}. We calculated that resolving your SSL and mobile speed flags could recover an est. ${{predictedLtv}} in new job bookings this quarter. Let me know if you want the checklist!"
+        },
+        {
+          "day": 7,
+          "channel": "call",
+          "title": "Objection-Proof Closing Call Script",
+          "purpose": "Direct phone conversation positioning yourself as the territory authority.",
+          "template": "Script: \"Hi {{ownerName}}, this is calling regarding the digital footprint audit we ran for {{businessName}} in {{city}}. I wanted to see if you had 3 minutes to review the 2 high-priority fixes before we publish our quarterly {{serviceType}} industry benchmark report.\""
+        }
+      ],
+      "createdAt": "2026-09-08T14:18:57.601Z"
     }
   ]
 }

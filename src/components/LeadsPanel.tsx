@@ -227,17 +227,20 @@ export default function LeadsPanel({ leads, token, onRefresh }: LeadsPanelProps)
   }, [selectedLead]);
 
   useEffect(() => {
+    const effectiveToken = token || (typeof window !== 'undefined' ? (localStorage.getItem('token') || localStorage.getItem('halbiz_auth_token')) : '');
+    if (!effectiveToken) return;
+
     fetch('/api/system/audit-logs', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`
+        'Authorization': `Bearer ${effectiveToken}`
       },
       body: JSON.stringify({
         action: 'LEADS_VIEW_CHANGED',
         details: `Switched lead directory workspace view to: ${viewMode.toUpperCase()}`
       })
-    }).catch(err => console.error('Failed to log leads view change:', err));
+    }).catch(err => console.warn('Deferred leads view audit log:', err?.message || err));
   }, [viewMode, token]);
 
   const fetchLeadEvents = async (leadId: string) => {

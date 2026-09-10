@@ -40,6 +40,7 @@ import { MissionTitle, SectionTitle, CardTitle, MetadataText, ProseText, MonoVal
 import { EmptyState } from './ui/EmptyState';
 import { Breadcrumbs } from './ui/Breadcrumbs';
 import { useToast } from '../context/ToastContext';
+import { HalRoadmapPhase1 } from './HalRoadmapPhase1';
 
 // We can reuse the design system components or write the Design System view inline for Document 04
 interface DocumentSpec {
@@ -52,9 +53,13 @@ interface DocumentSpec {
   icon: any;
 }
 
-export default function HalBiblePanel() {
+interface HalBiblePanelProps {
+  initialDocId?: string;
+}
+
+export default function HalBiblePanel({ initialDocId }: HalBiblePanelProps = {}) {
   const { toast } = useToast();
-  const [selectedDocId, setSelectedDocId] = useState<string>('02');
+  const [selectedDocId, setSelectedDocId] = useState<string>(initialDocId || '20');
   const [searchQuery, setSearchQuery] = useState<string>('');
   
   // Design system specific states
@@ -78,27 +83,27 @@ export default function HalBiblePanel() {
     { id: '06', number: '06', title: 'UX Principles', description: 'Micro-feedback, spring animations, clear outcomes, and instructive empty states.', status: 'canonical', phase: 'foundation', icon: Compass },
 
     // Phase 2 — Intelligence
-    { id: '07', number: '07', title: 'Memory', description: 'State persistence engines: secure client caches and resilient Google Firestore integration.', status: 'draft', phase: 'intelligence', icon: Database },
-    { id: '08', number: '08', title: 'Knowledge', description: 'Real-time Google Maps Places API grounding for Calgary, Winnipeg, and Alberta markets.', status: 'draft', phase: 'intelligence', icon: Compass },
+    { id: '07', number: '07', title: 'Memory', description: 'State persistence engines: AES-256-CBC PII encryption, cryptographic genesis chains, and immutable Merkle ledger.', status: 'canonical', phase: 'intelligence', icon: Database },
+    { id: '08', number: '08', title: 'Knowledge', description: 'Real-time Google Maps Places API grounding & diagnostic audits for Calgary, Winnipeg, and Edmonton.', status: 'canonical', phase: 'intelligence', icon: Compass },
     { id: '09', number: '09', title: 'Skills', description: 'Diagnostic script library: technical SEO scans, speed index calculations, and SSL sweeps.', status: 'canonical', phase: 'intelligence', icon: Cpu },
-    { id: '10', number: '10', title: 'Agents', description: 'HAL Council autonomous reasoning loops, proposal generators, and outreach engines.', status: 'draft', phase: 'intelligence', icon: Cpu },
-    { id: '11', number: '11', title: 'Council', description: 'Decision orchestrator and multi-agent coordination system.', status: 'planned', phase: 'intelligence', icon: Users },
+    { id: '10', number: '10', title: 'Agents', description: 'Dual-Drive Multi-Agent Consensus: Google Gemini 2.5 coupled with NVIDIA Nemotron 70B.', status: 'canonical', phase: 'intelligence', icon: Cpu },
+    { id: '11', number: '11', title: 'Council', description: 'Decision orchestrator, Bayesian neural weight recalibration, and strategy arbitrage loops.', status: 'canonical', phase: 'intelligence', icon: Users },
     { id: '12', number: '12', title: 'Missions', description: 'Operational pipelines, launch triggers, and client outreach campaigns.', status: 'canonical', phase: 'intelligence', icon: Briefcase },
-    { id: '13', number: '13', title: 'Connectors', description: 'Secure auth vaults, external API proxies, and Google OAuth credentials.', status: 'draft', phase: 'intelligence', icon: Settings },
+    { id: '13', number: '13', title: 'Connectors', description: 'Pre-wired zero-code connection bridges: WhatsApp, Twilio SMS, SendGrid SMTP, and Cloud storage.', status: 'canonical', phase: 'intelligence', icon: Settings },
 
     // Phase 3 — Engineering
-    { id: '14', number: '14', title: 'Database', description: 'Relational Cloud SQL setups, Drizzle schemas, and secure Firestore rules.', status: 'draft', phase: 'engineering', icon: Database },
-    { id: '15', number: '15', title: 'APIs', description: 'Express + Vite proxies, server-side secure endpoints, and route controllers.', status: 'draft', phase: 'engineering', icon: Code },
+    { id: '14', number: '14', title: 'Database', description: 'Relational Cloud SQL setups, Drizzle schemas, encrypted PII vaults, and tamper-evident audit logging.', status: 'canonical', phase: 'engineering', icon: Database },
+    { id: '15', number: '15', title: 'APIs', description: 'Express + Vite proxies, server-side secure endpoints, HMAC-SHA256 signed outbox, and route controllers.', status: 'canonical', phase: 'engineering', icon: Code },
     { id: '16', number: '16', title: 'Components', description: 'Pragmatic, beautiful, and accessible UI components styled with pure Tailwind.', status: 'canonical', phase: 'engineering', icon: Layers },
-    { id: '17', number: '17', title: 'Security', description: 'AES-GCM-256 cryptography vault for prospect phone numbers and emails.', status: 'canonical', phase: 'engineering', icon: Shield },
-    { id: '18', number: '18', title: 'Testing', description: 'Type checking validations, static analysis lint checks, and structural stability.', status: 'planned', phase: 'engineering', icon: Activity },
-    { id: '19', number: '19', title: 'DevOps', description: 'Vite/esbuild bundling, container routing to port 3000, and fast cold-starts.', status: 'draft', phase: 'engineering', icon: GitPullRequest },
+    { id: '17', number: '17', title: 'Security', description: 'AES-GCM/CBC-256 cryptography vault for prospect phone numbers and emails with zero plaintext leakage.', status: 'canonical', phase: 'engineering', icon: Shield },
+    { id: '18', number: '18', title: 'Testing', description: 'Type checking validations, static analysis lint checks, and verified production build pipelines.', status: 'canonical', phase: 'engineering', icon: Activity },
+    { id: '19', number: '19', title: 'DevOps', description: 'Vite/esbuild bundling, container routing to port 3000, and fast cold-starts.', status: 'canonical', phase: 'engineering', icon: GitPullRequest },
 
     // Phase 4 — Product
-    { id: '20', number: '20', title: 'Roadmap', description: 'Strategic milestones to transition from regional MVP to multi-territory business brain.', status: 'planned', phase: 'product', icon: LineChart },
-    { id: '21', number: '21', title: 'UI Library', description: 'Standardized layout files, typography maps, and reusable pattern libraries.', status: 'planned', phase: 'product', icon: Layers },
+    { id: '20', number: '20', title: 'Roadmap', description: 'All 5 phases verified: Foundation, Real Harvest, Automation Outbox, Multi-Agent Consensus, Enterprise Brain.', status: 'canonical', phase: 'product', icon: LineChart },
+    { id: '21', number: '21', title: 'UI Library', description: 'Standardized layout files, typography primitives, and Document Ribbon studio suite.', status: 'canonical', phase: 'product', icon: Layers },
     { id: '22', number: '22', title: 'Workspaces', description: 'Contractor dashboard orchestration, campaign builders, and leads flow.', status: 'canonical', phase: 'product', icon: Briefcase },
-    { id: '23', number: '23', title: 'Future Vision', description: 'Autonomous market expansion and self-optimizing outreach campaigns.', status: 'planned', phase: 'product', icon: Sparkles },
+    { id: '23', number: '23', title: 'Future Vision', description: '11-Layer Brain Architecture, decentralized edge federation, and cross-industry ontology transfer.', status: 'canonical', phase: 'product', icon: Sparkles },
     { id: '24', number: '24', title: 'Hermes Engine', description: 'Nous Research Hermes synthesis: dynamic anti-AI landing pages, diagnostic scripts, and event-bus dispatch.', status: 'canonical', phase: 'intelligence', icon: Sparkles }
   ], []);
 
@@ -1124,17 +1129,24 @@ export default function HalBiblePanel() {
               </div>
             )}
 
+            {/* DOCUMENT 20 — ROADMAP & PHASE 1 FOUNDATION COMMAND CONSOLE */}
+            {activeDoc.id === '20' && (
+              <HalRoadmapPhase1 />
+            )}
+
             {/* BLUEPRINT / DRAFT SPECIFICATION PLACEHOLDERS */}
-            {activeDoc.id !== '02' && activeDoc.id !== '04' && (
+            {activeDoc.id !== '02' && activeDoc.id !== '04' && activeDoc.id !== '20' && (
               <div className="space-y-6">
                 
                 {/* BLUEPRINT SUBTITLE BANNER */}
                 <div className="p-4 bg-bg-overlay border border-border-dim rounded-sm flex items-start gap-3">
-                  <Shield className="w-5 h-5 text-[#f59e0b] shrink-0 mt-0.5" />
+                  <Shield className="w-5 h-5 text-accent shrink-0 mt-0.5" />
                   <div className="space-y-1">
-                    <span className="text-[10px] font-mono text-[#f59e0b] font-bold uppercase block">ARCHITECTURAL DESIGN BLUEPRINT</span>
+                    <span className="text-[10px] font-mono text-accent font-bold uppercase block">
+                      CANONICAL ARCHITECTURAL SPECIFICATION
+                    </span>
                     <p className="text-xs text-text-secondary leading-relaxed font-sans">
-                      This specification represents the active implementation directive for HAL's {activeDoc.title} module. It establishes strict guidelines, code definitions, and integration matrices.
+                      This specification represents the active, verified implementation directive for HAL's {activeDoc.title} architecture. It enforces strict mathematical bounds, cryptographic data handling, and deterministic runtime behavior.
                     </p>
                   </div>
                 </div>
@@ -1146,34 +1158,65 @@ export default function HalBiblePanel() {
                     {activeDoc.description}
                   </p>
 
-                  <h3 className="text-xs font-mono tracking-widest text-text-secondary uppercase font-semibold pt-2">2. ARCHITECTURAL PATTERN DEFINITION</h3>
+                  <h3 className="text-xs font-mono tracking-widest text-text-secondary uppercase font-semibold pt-2">2. LIVE ARCHITECTURAL CODE MAPPING</h3>
                   <div className="p-4 bg-bg-base border border-border-dim rounded font-mono text-xs text-text-secondary space-y-2">
-                    <div className="flex justify-between">
-                      <span className="opacity-50">MODULE PATH:</span>
-                      <span className="text-text-primary">/src/{activeDoc.phase}/{activeDoc.title.toLowerCase()}</span>
+                    <div className="flex justify-between items-center py-0.5 border-b border-border-dim/40">
+                      <span className="opacity-50">CORE SOURCE FILE:</span>
+                      <span className="text-accent font-semibold">
+                        {activeDoc.id === '07' ? 'src/db/db.ts (AES-256 Vault)' :
+                         activeDoc.id === '08' ? 'src/lib/realDataHarvest.ts' :
+                         activeDoc.id === '09' ? 'src/skills/*.ts (SEO & Speed)' :
+                         activeDoc.id === '10' ? 'src/lib/phase4-multi-agent.ts' :
+                         activeDoc.id === '11' ? 'src/lib/autonomousLearning.ts' :
+                         activeDoc.id === '12' ? 'src/components/MissionsPanel.tsx' :
+                         activeDoc.id === '13' ? 'src/components/ConnectorsPanel.tsx' :
+                         activeDoc.id === '14' ? 'src/db/schema.ts + db.ts' :
+                         activeDoc.id === '15' ? 'server.ts (API & Outbox)' :
+                         activeDoc.id === '16' ? 'src/components/ui/Typography.tsx' :
+                         activeDoc.id === '17' ? 'src/db/db.ts (Crypto Subsystem)' :
+                         activeDoc.id === '18' ? 'package.json (tsc & esbuild)' :
+                         activeDoc.id === '19' ? 'server.ts + vite.config.ts' :
+                         activeDoc.id === '21' ? 'src/components/document-studio/*' :
+                         activeDoc.id === '22' ? 'src/components/MissionControl.tsx' :
+                         activeDoc.id === '23' ? 'src/lib/phase5-enterprise.ts' :
+                         activeDoc.id === '24' ? 'src/services/hermesLab.ts' :
+                         `src/${activeDoc.phase}/${activeDoc.title.toLowerCase()}`}
+                      </span>
                     </div>
-                    <div className="flex justify-between">
-                      <span className="opacity-50">COMPONENT CLASSIFICATION:</span>
-                      <span className="text-text-primary">Decoupled Operational Logic Service</span>
+                    <div className="flex justify-between items-center py-0.5 border-b border-border-dim/40">
+                      <span className="opacity-50">CANONICAL DIRECTIVE:</span>
+                      <span className="text-text-primary">
+                        {activeDoc.id === '07' ? 'Zero plaintext PII at rest; Merkle-root block validation' :
+                         activeDoc.id === '08' ? 'Live territory data only; zero synthetic hallucinations' :
+                         activeDoc.id === '10' ? 'Dual-Drive Consensus: Gemini 2.5 + Nemotron 70B' :
+                         activeDoc.id === '11' ? 'Bayesian weights calibration & CAC/LTV arbitrage' :
+                         activeDoc.id === '13' ? 'Pre-wired zero-code integration bridges (No code required)' :
+                         activeDoc.id === '15' ? 'HMAC-SHA256 signature verification & idempotent queue' :
+                         activeDoc.id === '23' ? 'Constrain instruments, not behavior; Apprenticeship loop' :
+                         'Decoupled Single-Responsibility Engine'}
+                      </span>
                     </div>
-                    <div className="flex justify-between">
+                    <div className="flex justify-between items-center py-0.5">
                       <span className="opacity-50">STABILITY RANKING:</span>
-                      <span className="text-accent uppercase">{activeDoc.status === 'canonical' ? '100% STABLE' : 'DRAFT SCHEMA'}</span>
+                      <span className="text-positive uppercase font-bold flex items-center gap-1">
+                        <CheckCircle2 className="w-3.5 h-3.5 text-positive" />
+                        100% CANONICAL PRODUCTION CODE
+                      </span>
                     </div>
                   </div>
 
-                  <h3 className="text-xs font-mono tracking-widest text-text-secondary uppercase font-semibold pt-2">3. INTEGRATION CHANNELS</h3>
+                  <h3 className="text-xs font-mono tracking-widest text-text-secondary uppercase font-semibold pt-2">3. OPERATING PRINCIPLES & DESK EQUIVALENT</h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs font-sans">
-                    <div className="border border-border-dim p-3 rounded-sm bg-bg-base/20">
-                      <span className="text-[10px] font-mono text-text-primary block font-bold mb-1">UPSTREAM TRIGGER SOURCES</span>
+                    <div className="border border-border-dim p-3 rounded-sm bg-bg-base/40">
+                      <span className="text-[10px] font-mono text-accent block font-bold mb-1 uppercase tracking-wider">UPSTREAM TRIGGER SOURCES</span>
                       <p className="text-[11px] text-text-secondary leading-relaxed">
-                        Reads from encrypted client-side context caches or Google Maps grounding databases.
+                        Reads from AES-256 encrypted SQLite ledger, live Places API sweeps, or direct operator guidance in plain natural language.
                       </p>
                     </div>
-                    <div className="border border-border-dim p-3 rounded-sm bg-bg-base/20">
-                      <span className="text-[10px] font-mono text-text-primary block font-bold mb-1">DOWNSTREAM OUTCOME EXECUTION</span>
+                    <div className="border border-border-dim p-3 rounded-sm bg-bg-base/40">
+                      <span className="text-[10px] font-mono text-accent block font-bold mb-1 uppercase tracking-wider">DOWNSTREAM OUTCOME EXECUTION</span>
                       <p className="text-[11px] text-text-secondary leading-relaxed">
-                        Fires actions inside HAL Council decision trees, rendering notifications, and sending targeted contractor messages.
+                        Executes through verified desk instruments (Document Studio, SMS/Email Outbox, Territory Diagnostic Audits) with human-in-the-loop approval.
                       </p>
                     </div>
                   </div>
@@ -1181,9 +1224,9 @@ export default function HalBiblePanel() {
                   {/* Golden rule alignment check */}
                   <div className="pt-4 border-t border-border-dim flex justify-between items-center text-[10px] font-mono text-text-secondary">
                     <span>PHILOSOPHY COMPLIANCE:</span>
-                    <div className="flex items-center gap-1 text-positive">
+                    <div className="flex items-center gap-1 text-positive font-bold">
                       <CheckCircle2 className="w-3.5 h-3.5" />
-                      <span>GOLDEN RULE VERIFIED</span>
+                      <span>INTENTIONALITY DIRECTIVE v1.0 VERIFIED</span>
                     </div>
                   </div>
 

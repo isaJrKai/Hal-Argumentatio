@@ -54,7 +54,7 @@ Also return a confidence score between 0.0 and 1.0 based on how clear the causal
     if (ai) {
       try {
         const response = await ai.models.generateContent({
-          model: "gemini-3.5-flash",
+          model: "gemini-3.8-flash",
           contents: prompt,
           config: {
             systemInstruction: "You are HAL, a Swiss-style, highly professional AI Business Operating Intelligence system. You produce objective, analytical, short learning insights without marketing fluff.",
@@ -114,7 +114,7 @@ Also return a confidence score between 0.0 and 1.0 based on how clear the causal
     if (ai) {
       try {
         const response = await ai.models.generateContent({
-          model: "gemini-3.5-flash",
+          model: "gemini-3.8-flash",
           contents: prompt,
           config: {
             systemInstruction: "You are HAL, a Swiss-style, highly professional AI Business Operating Intelligence system. You produce objective, analytical, short learning insights without marketing fluff.",
@@ -177,7 +177,7 @@ Return your response in a raw JSON object format (no markdown blocks, no code bl
     if (ai) {
       try {
         const response = await ai.models.generateContent({
-          model: "gemini-3.5-flash",
+          model: "gemini-3.8-flash",
           contents: prompt,
           config: {
             responseMimeType: "application/json",
@@ -238,7 +238,7 @@ Return your response in a raw JSON object format (no markdown blocks, no code bl
     if (ai) {
       try {
         const response = await ai.models.generateContent({
-          model: "gemini-3.5-flash",
+          model: "gemini-3.8-flash",
           contents: prompt,
           config: {
             responseMimeType: "application/json",
@@ -527,7 +527,7 @@ Return your response in a raw JSON array matching this structure:
     if (ai) {
       try {
         const response = await ai.models.generateContent({
-          model: "gemini-3.5-flash",
+          model: "gemini-3.8-flash",
           contents: prompt,
           config: {
             responseMimeType: "application/json",
@@ -574,7 +574,7 @@ Return your response in a raw JSON array matching this structure:
     if (ai) {
       try {
         const response = await ai.models.generateContent({
-          model: "gemini-3.5-flash",
+          model: "gemini-3.8-flash",
           contents: prompt,
           config: {
             responseMimeType: "application/json",
@@ -621,6 +621,8 @@ Key Knowledge Pillars:
    - Modularity: Build isolated, single-responsibility services.
    - Evidence-based recommendations: Rely on real harvested territory data, technical SEO audits, page speeds, SSL status, and Google Ratings.
    - Continuous learning: Calibrate weights after completed campaigns.
+   - Constrain the tools, not the behavior: Never hardcode rigid workflows. Hand the user the instruments a junior employee at their desk would use (Document Studio, phone, calendar, audit tools, customer notes). Let workflows emerge naturally through collaboration with the operator.
+   - The Apprenticeship Loop: Treat the operator like the business owner sitting next to you for a week. When they correct you ("No, we don't say that to regulars", "Use shaded style for contracts"), absorb the correction permanently into business memory.
    - Epistemic discipline: Clearly distinguish FACT, OBSERVATION, INFERENCE, HYPOTHESIS, and ACTION.
 3. ARCHITECTURAL BOUNDARIES:
    - Connectors: Dedicated strictly to connecting HAL to external services (GA4, Google Search Console, Google Tag Manager, GBP, Maps, SMTP, Outlook, WhatsApp, Google Drive, OneDrive, Gemini, OpenAI, Claude, Microsoft 365, Google Workspace, Stripe, HubSpot, Slack). No user profiles or themes belong here!
@@ -668,7 +670,7 @@ Respond to any questions from the executive clearly and authoritatively. Be tech
         let response;
         try {
           response = await ai.models.generateContent({
-            model: "gemini-3.5-flash",
+            model: "gemini-3.8-flash",
             contents,
             config
           });
@@ -678,7 +680,7 @@ Respond to any questions from the executive clearly and authoritatively. Be tech
             usedGrounding = false;
             delete config.tools;
             response = await ai.models.generateContent({
-              model: "gemini-3.5-flash",
+              model: "gemini-3.8-flash",
               contents,
               config
             });
@@ -779,7 +781,7 @@ Respond to any questions from the executive clearly and authoritatively. Be tech
         let response;
         try {
           response = await ai.models.generateContent({
-            model: "gemini-3.5-flash",
+            model: "gemini-3.8-flash",
             contents,
             config
           });
@@ -789,7 +791,7 @@ Respond to any questions from the executive clearly and authoritatively. Be tech
             usedGrounding = false;
             delete config.tools;
             response = await ai.models.generateContent({
-              model: "gemini-3.5-flash",
+              model: "gemini-3.8-flash",
               contents,
               config
             });

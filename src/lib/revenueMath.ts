@@ -84,3 +84,95 @@ export function classifyOutcome(
   }
   return 'insufficient_data';
 }
+
+/**
+ * Funnel stage counts for rate calculation
+ */
+export interface FunnelCounts {
+  impressions?: number;
+  clicks?: number;
+  leads: number;
+  qualified: number;
+  sal: number;
+  appointments: number;
+  opportunities?: number;
+  customers: number;
+}
+
+/**
+ * Calculates Cost Per Lead (CPL) with zero-denominator protection.
+ */
+export function calculateCpl(spend: number, leads: number): number {
+  if (!leads || leads <= 0 || !spend || spend <= 0) return 0;
+  return Number((spend / leads).toFixed(2));
+}
+
+/**
+ * Calculates Cost Per Qualified Lead (CPQ) with zero-denominator protection.
+ */
+export function calculateCpq(spend: number, qualified: number): number {
+  if (!qualified || qualified <= 0 || !spend || spend <= 0) return 0;
+  return Number((spend / qualified).toFixed(2));
+}
+
+/**
+ * Calculates Cost Per Sales Accepted Lead (CP-SAL) with zero-denominator protection.
+ */
+export function calculateCostPerSal(spend: number, sal: number): number {
+  if (!sal || sal <= 0 || !spend || spend <= 0) return 0;
+  return Number((spend / sal).toFixed(2));
+}
+
+/**
+ * Calculates Cost Per Appointment with zero-denominator protection.
+ */
+export function calculateCostPerAppointment(spend: number, appointments: number): number {
+  if (!appointments || appointments <= 0 || !spend || spend <= 0) return 0;
+  return Number((spend / appointments).toFixed(2));
+}
+
+/**
+ * Calculates Customer Acquisition Cost (CAC) with zero-denominator protection.
+ */
+export function calculateCac(spend: number, customers: number): number {
+  if (!customers || customers <= 0 || !spend || spend <= 0) return 0;
+  return Number((spend / customers).toFixed(2));
+}
+
+/**
+ * Calculates Return on Ad Spend (ROAS) with zero-denominator protection.
+ */
+export function calculateRoas(revenue: number, spend: number): number {
+  if (!spend || spend <= 0 || !revenue || revenue <= 0) return 0;
+  return Number((revenue / spend).toFixed(2));
+}
+
+/**
+ * Calculates Net / Gross Margin Percentage.
+ */
+export function calculateMarginPct(revenue: number, costs: number): number {
+  if (!revenue || revenue <= 0) return 0;
+  return Number((((revenue - costs) / revenue) * 100).toFixed(2));
+}
+
+/**
+ * Calculates stage-to-stage conversion rates across the 7-stage revenue funnel.
+ */
+export function calculateFunnelConversions(counts: FunnelCounts) {
+  const clickToLead = counts.clicks && counts.clicks > 0 ? Number(((counts.leads / counts.clicks) * 100).toFixed(2)) : 0;
+  const leadToQualified = counts.leads > 0 ? Number(((counts.qualified / counts.leads) * 100).toFixed(2)) : 0;
+  const qualifiedToSal = counts.qualified > 0 ? Number(((counts.sal / counts.qualified) * 100).toFixed(2)) : 0;
+  const salToAppointment = counts.sal > 0 ? Number(((counts.appointments / counts.sal) * 100).toFixed(2)) : 0;
+  const appointmentToCustomer = counts.appointments > 0 ? Number(((counts.customers / counts.appointments) * 100).toFixed(2)) : 0;
+  const overallLeadToCustomer = counts.leads > 0 ? Number(((counts.customers / counts.leads) * 100).toFixed(2)) : 0;
+
+  return {
+    clickToLead,
+    leadToQualified,
+    qualifiedToSal,
+    salToAppointment,
+    appointmentToCustomer,
+    overallLeadToCustomer
+  };
+}
+

@@ -15,6 +15,7 @@ import {
   Terminal,
   Zap
 } from 'lucide-react';
+import HalStage1GatheringConsole from './HalStage1GatheringConsole';
 
 interface Loop {
   id: string;
@@ -143,7 +144,14 @@ export default function HalLoopOperationsView({ token }: { token?: string | null
     try {
       const res = await fetch(`/api/hal/loops/${loopId}/advance`, {
         method: 'POST',
-        headers: { Authorization: `Bearer ${activeToken}` }
+        headers: { 
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${activeToken}` 
+        },
+        body: JSON.stringify({
+          operatorApproved: selectedLoop?.status === 'awaiting_approval',
+          evidencePayload: selectedLoop?.stateSnapshot || {}
+        })
       });
       const data = await res.json();
       if (data.success) {
@@ -412,6 +420,21 @@ export default function HalLoopOperationsView({ token }: { token?: string | null
                   </div>
                 </div>
               </div>
+
+              {/* Stage 1 Specialized Gathering Console */}
+              {selectedLoop.currentStage === 'gathering' && (
+                <HalStage1GatheringConsole
+                  loopId={selectedLoop.id}
+                  token={token}
+                  stateSnapshot={selectedLoop.stateSnapshot}
+                  onEvidenceGathered={() => {
+                    fetchLoops();
+                    fetchLoopDetail(selectedLoop.id);
+                  }}
+                  onAdvanceStage={() => handleAdvanceLoop(selectedLoop.id)}
+                  actionLoading={actionLoading}
+                />
+              )}
 
               {/* Timeline Audit Events */}
               <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-xs space-y-4">

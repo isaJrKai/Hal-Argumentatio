@@ -2,6 +2,26 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { INDUSTRY_TAXONOMY, IndustryProfile, getIndustryProfile } from '../config/industryTaxonomy';
 import { GLOBAL_REGIONS, RegionalProfile, resolveRegionalProfile } from '../config/worldModel';
 
+export interface CustomEmailTemplate {
+  id: string;
+  name: string;
+  tag: string;
+  subject: string;
+  headline: string;
+  subtext: string;
+  ctaText: string;
+  ctaColor: string;
+  createdAt?: string;
+}
+
+export interface HermesDirectives {
+  rules: string;
+  primaryGuarantee: string;
+  forbiddenKeywords: string;
+  urgencyLevel: 'calm' | 'direct' | 'high_emergency';
+  includePhoneSticky: boolean;
+}
+
 export interface WorkspaceConfig {
   agencyName: string;
   operatorName: string;
@@ -13,6 +33,8 @@ export interface WorkspaceConfig {
   contactEmail?: string;
   customCities: string[];
   customNiches: string[];
+  customEmailTemplates?: CustomEmailTemplate[];
+  hermesDirectives?: HermesDirectives;
   ltvMultiplier: number; // Formula tuning multiplier (e.g. 1.0)
   targetCAC: number; // Configurable operational target CAC
   budgetMultiplier: number; // Budget scaling factor
@@ -91,13 +113,21 @@ export const BusinessProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     return {
       agencyName: 'HAL Intelligence',
       operatorName: 'Workspace Operator',
-      brandColor: '#2563eb',
+      brandColor: 'system',
       tagline: 'AI Business Operating Intelligence Platform',
       bookingUrl: 'https://cal.com/hal-strategy',
       contactPhone: '(214) 555-0199',
       contactEmail: 'advisory@hal-operating.com',
       customCities: [],
       customNiches: [],
+      customEmailTemplates: [],
+      hermesDirectives: {
+        rules: 'Always focus on speed-to-lead, guaranteed arrival window, upfront transparent pricing, and master-certified journeymen technicians.',
+        primaryGuarantee: '30-Minute Dispatch Callback Guaranteed',
+        forbiddenKeywords: 'cheap, bargain, discount, low quality, slow',
+        urgencyLevel: 'high_emergency',
+        includePhoneSticky: true
+      },
       ltvMultiplier: 1.0,
       targetCAC: 145,
       budgetMultiplier: 1.0,
@@ -182,26 +212,33 @@ export const BusinessProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
   // Dynamically synchronize the workspace brand accent color with CSS variables
   useEffect(() => {
-    if (typeof document !== 'undefined' && workspaceConfig.brandColor) {
+    if (typeof document !== 'undefined') {
       const hex = workspaceConfig.brandColor;
       const root = document.documentElement;
       
-      let r = 37, g = 99, b = 235;
-      if (/^#[0-9A-Fa-f]{6}$/.test(hex)) {
-        r = parseInt(hex.slice(1, 3), 16);
-        g = parseInt(hex.slice(3, 5), 16);
-        b = parseInt(hex.slice(5, 7), 16);
-      }
-      
-      const yiq = (r * 299 + g * 587 + b * 114) / 1000;
-      const contrastText = yiq >= 150 ? '#05070c' : '#ffffff';
+      // If user has chosen an active custom hex color (not system or old hardcoded default)
+      if (hex && hex !== 'system' && hex !== '#2563eb' && /^#[0-9A-Fa-f]{6}$/.test(hex)) {
+        const r = parseInt(hex.slice(1, 3), 16);
+        const g = parseInt(hex.slice(3, 5), 16);
+        const b = parseInt(hex.slice(5, 7), 16);
+        const yiq = (r * 299 + g * 587 + b * 114) / 1000;
+        const contrastText = yiq >= 150 ? '#0c0e12' : '#ffffff';
 
-      root.style.setProperty('--accent', hex);
-      root.style.setProperty('--color-accent', hex);
-      root.style.setProperty('--color-brand', hex);
-      root.style.setProperty('--accent-dim', `rgba(${r}, ${g}, ${b}, 0.1)`);
-      root.style.setProperty('--accent-mid', `rgba(${r}, ${g}, ${b}, 0.2)`);
-      root.style.setProperty('--accent-contrast', contrastText);
+        root.style.setProperty('--accent', hex);
+        root.style.setProperty('--color-accent', hex);
+        root.style.setProperty('--color-brand', hex);
+        root.style.setProperty('--accent-dim', `rgba(${r}, ${g}, ${b}, 0.12)`);
+        root.style.setProperty('--accent-mid', `rgba(${r}, ${g}, ${b}, 0.22)`);
+        root.style.setProperty('--accent-contrast', contrastText);
+      } else {
+        // Clear manual overrides so .dark-theme and .light-theme CSS variables control the palette
+        root.style.removeProperty('--accent');
+        root.style.removeProperty('--color-accent');
+        root.style.removeProperty('--color-brand');
+        root.style.removeProperty('--accent-dim');
+        root.style.removeProperty('--accent-mid');
+        root.style.removeProperty('--accent-contrast');
+      }
     }
   }, [workspaceConfig.brandColor]);
 

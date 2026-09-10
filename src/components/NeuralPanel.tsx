@@ -35,7 +35,17 @@ export default function NeuralPanel() {
   const fetchNetwork = async () => {
     setIsSyncing(true);
     try {
-      const res = await fetch('/api/neural/network');
+      const authToken = localStorage.getItem('halbiz_auth_token') || localStorage.getItem('token') || '';
+      const res = await fetch('/api/neural/network', {
+        headers: authToken ? { 'Authorization': `Bearer ${authToken}` } : {}
+      });
+      if (!res.ok) {
+        if (res.status === 401) {
+          console.warn('Neural network sync deferred: authentication token invalid or expired.');
+          return;
+        }
+        throw new Error(`Failed to fetch network (${res.status})`);
+      }
       const data = await res.json();
       
       if (data.error) throw new Error(data.error);
@@ -58,7 +68,7 @@ export default function NeuralPanel() {
         initSimulation(data.nodes, data.links);
       }
     } catch (e) {
-      console.error('Failed to fetch network', e);
+      console.warn('Network visualization sync paused:', e);
     } finally {
       setIsSyncing(false);
     }
@@ -455,7 +465,7 @@ export default function NeuralPanel() {
         
         ctx.fillStyle = color;
         ctx.font = `${4.5 / transform.k}px monospace`;
-        ctx.fillText(`${node.type.toUpperCase()} HUB`, node.x, node.y + (5/transform.k));
+        ctx.fillText(`${(node.type || 'NODE').toUpperCase()} HUB`, node.x, node.y + (5/transform.k));
       } else {
         // Standard zoomed-out view (dot)
         ctx.arc(node.x, node.y, r, 0, Math.PI * 2);
@@ -677,7 +687,7 @@ export default function NeuralPanel() {
                <div className="space-y-1 mt-2 pt-2 border-t border-border-dim">
                   <div className="flex justify-between">
                     <span className="text-[9px] text-text-tertiary">TYPE</span>
-                    <span className="text-[9px] text-text-primary font-mono">{hoveredNode.type.toUpperCase()}</span>
+                    <span className="text-[9px] text-text-primary font-mono">{(hoveredNode.type || 'NODE').toUpperCase()}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-[9px] text-text-tertiary">WEIGHT / STRENGTH</span>

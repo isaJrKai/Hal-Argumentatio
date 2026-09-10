@@ -35,7 +35,8 @@ import {
   SendHorizontal,
   ChevronRight,
   Sliders,
-  Database
+  Database,
+  Share2
 } from 'lucide-react';
 import { useToast } from '../context/ToastContext';
 
@@ -181,8 +182,8 @@ export default function HermesLabPanel({ token }: { token: string | null }) {
           setPromptOverride(first.defaultPrompt || '');
         }
       }
-    } catch (err) {
-      console.error('Failed to fetch catalog', err);
+    } catch (err: any) {
+      console.warn('Hermes catalog fetch deferred:', err?.message || err);
     }
   };
 
@@ -199,8 +200,8 @@ export default function HermesLabPanel({ token }: { token: string | null }) {
           setActiveArtifact(arts[0]);
         }
       }
-    } catch (err) {
-      console.error('Failed to fetch artifacts', err);
+    } catch (err: any) {
+      console.warn('Hermes artifacts fetch deferred:', err?.message || err);
     }
   };
 
@@ -213,8 +214,8 @@ export default function HermesLabPanel({ token }: { token: string | null }) {
         const data = await res.json();
         setIncidents(Array.isArray(data.incidents) ? data.incidents : []);
       }
-    } catch (err) {
-      console.error('Failed to fetch diagnostics', err);
+    } catch (err: any) {
+      console.warn('Hermes diagnostics fetch deferred:', err?.message || err);
     }
   };
 
@@ -227,8 +228,8 @@ export default function HermesLabPanel({ token }: { token: string | null }) {
         const data = await res.json();
         setMessages(Array.isArray(data.messages) ? data.messages : []);
       }
-    } catch (err) {
-      console.error('Failed to fetch chat messages', err);
+    } catch (err: any) {
+      console.warn('Hermes chat messages fetch deferred:', err?.message || err);
     }
   };
 
@@ -453,6 +454,10 @@ export default function HermesLabPanel({ token }: { token: string | null }) {
   const handleOpenInNewTab = () => {
     if (!activeArtifact?.content?.renderedOutput) return;
     try {
+      if (activeArtifact.toolId === 'landing_page' && activeArtifact.id) {
+        window.open(`/landing/${activeArtifact.id}`, '_blank');
+        return;
+      }
       const blob = new Blob([activeArtifact.content.renderedOutput], { type: 'text/html' });
       const url = URL.createObjectURL(blob);
       const newWin = window.open(url, '_blank');
@@ -465,6 +470,19 @@ export default function HermesLabPanel({ token }: { token: string | null }) {
       }
     } catch (err: any) {
       console.warn('Could not open preview in new window:', err);
+    }
+  };
+
+  const handleCopyLiveLink = () => {
+    if (!activeArtifact?.id) return;
+    const liveUrl = `${window.location.origin}/landing/${activeArtifact.id}`;
+    if (navigator.clipboard?.writeText) {
+      navigator.clipboard.writeText(liveUrl);
+      toast({
+        title: 'Public Live Link Copied',
+        message: `Shareable URL ready: ${liveUrl}`,
+        type: 'success'
+      });
     }
   };
 
@@ -1052,13 +1070,22 @@ export default function HermesLabPanel({ token }: { token: string | null }) {
                       )}
 
                       {activeArtifact.toolId === 'landing_page' && (
-                        <button
-                          onClick={handleOpenInNewTab}
-                          className="p-1.5 bg-bg-base border border-border-dim hover:border-cyan-500 rounded-lg text-text-secondary hover:text-text-primary text-xs flex items-center gap-1 cursor-pointer"
-                          title="Open Live Preview in New Window"
-                        >
-                          <ExternalLink className="w-3.5 h-3.5" />
-                        </button>
+                        <>
+                          <button
+                            onClick={handleOpenInNewTab}
+                            className="p-1.5 bg-bg-base border border-border-dim hover:border-cyan-500 rounded-lg text-text-secondary hover:text-text-primary text-xs flex items-center gap-1 cursor-pointer"
+                            title="Open Live Public URL in New Window"
+                          >
+                            <ExternalLink className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            onClick={handleCopyLiveLink}
+                            className="p-1.5 bg-bg-base border border-border-dim hover:border-cyan-500 rounded-lg text-text-secondary hover:text-cyan-400 text-xs flex items-center gap-1 cursor-pointer"
+                            title="Copy Public Shareable Landing Page Link"
+                          >
+                            <Share2 className="w-3.5 h-3.5" />
+                          </button>
+                        </>
                       )}
 
                       <button

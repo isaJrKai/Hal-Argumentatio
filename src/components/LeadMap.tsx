@@ -570,7 +570,7 @@ function OpenStreetMapContainer({
         polygon.bindPopup(`
           <div style="padding: 6px; font-family: monospace; font-size: 11px; color: white; background: #111827; border-radius: 4px;">
             <div style="font-weight: bold; color: ${zone.color}; text-transform: uppercase;">${zone.name}</div>
-            <div style="font-size: 9px; color: #9ca3af; margin-top: 2px;">CITY: ${zone.city.toUpperCase()}</div>
+            <div style="font-size: 9px; color: #9ca3af; margin-top: 2px;">CITY: ${(zone.city || 'TERRITORY').toUpperCase()}</div>
           </div>
         `);
       }
@@ -824,7 +824,7 @@ function OpenStreetMapContainer({
           <div style="font-size: 13px; font-weight: bold; margin-bottom: 6px; color: white;">${lead.businessName}</div>
           
           <div style="font-size: 10px; color: #9ca3af; margin-bottom: 4px; line-height: 1.4;">
-            <div>CITY: <b style="color:#e5e7eb;">${lead.city.toUpperCase()}</b></div>
+            <div>CITY: <b style="color:#e5e7eb;">${(lead.city || 'TERRITORY').toUpperCase()}</b></div>
             ${lead.ownerName ? `<div>OWNER: <b style="color:#e5e7eb;">${lead.ownerName}</b></div>` : ''}
             ${lead.phone ? `<div>PHONE: <b style="color:#e5e7eb;">${lead.phone}</b></div>` : ''}
           </div>
