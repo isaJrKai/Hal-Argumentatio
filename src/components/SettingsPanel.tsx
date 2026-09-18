@@ -24,19 +24,24 @@ import {
   Plus,
   Paintbrush,
   Sparkles,
-  Globe
+  Globe,
+  BookOpen,
+  Sliders
 } from 'lucide-react';
 import { useBusinessContext } from '../context/BusinessContext';
 import { IndustryProfile } from '../config/industryTaxonomy';
+import HalBiblePanel from './HalBiblePanel';
 
 interface SettingsPanelProps {
-  token: string;
+  token: string | null;
   theme: 'dark' | 'light';
   profilePhoto: string | null;
   companyLogo: string | null;
   onProfilePhotoUpdate: (photo: string | null) => void;
   onCompanyLogoUpdate: (logo: string | null) => void;
   onRefresh?: () => void;
+  initialSubTab?: 'settings' | 'about';
+  initialDocId?: string;
 }
 
 export default function SettingsPanel({ 
@@ -46,8 +51,17 @@ export default function SettingsPanel({
   companyLogo,
   onProfilePhotoUpdate,
   onCompanyLogoUpdate,
-  onRefresh
+  onRefresh,
+  initialSubTab = 'settings',
+  initialDocId
 }: SettingsPanelProps) {
+  const [activeSubTab, setActiveSubTab] = useState<'settings' | 'about'>(initialSubTab);
+
+  useEffect(() => {
+    if (initialSubTab) {
+      setActiveSubTab(initialSubTab);
+    }
+  }, [initialSubTab]);
   const { 
     activeIndustry, 
     activeCity, 
@@ -84,6 +98,49 @@ export default function SettingsPanel({
   const [resetLoading, setResetLoading] = useState(false);
   const [resetError, setResetError] = useState<string | null>(null);
   const [resetSuccess, setResetSuccess] = useState<string | null>(null);
+
+  // Public Link & Reddit Testing Shield State
+  const [publicLinkMode, setPublicLinkMode] = useState<'safe_sandbox' | 'disabled' | 'open'>('safe_sandbox');
+  const [publicLinkLoading, setPublicLinkLoading] = useState(false);
+  const [copiedLink, setCopiedLink] = useState(false);
+  const sharedUrl = 'https://ais-pre-yhe6kkyk2vea7llaamk5bi-536406481799.europe-west1.run.app';
+
+  useEffect(() => {
+    fetch('/api/public-link/status')
+      .then(res => res.json())
+      .then(data => {
+        if (data && data.mode) {
+          setPublicLinkMode(data.mode);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  const handleUpdatePublicLinkMode = async (newMode: 'safe_sandbox' | 'disabled' | 'open') => {
+    setPublicLinkLoading(true);
+    try {
+      const res = await fetch('/api/public-link/mode', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mode: newMode })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setPublicLinkMode(newMode);
+      }
+    } catch (e) {
+    } finally {
+      setPublicLinkLoading(false);
+    }
+  };
+
+  const copyToClipboard = (text: string) => {
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(text);
+      setCopiedLink(true);
+      setTimeout(() => setCopiedLink(false), 2000);
+    }
+  };
 
   const cardBg = theme === 'dark' ? 'bg-panel-dark border-border-dark text-text-primary' : 'bg-white border-gray-200 text-gray-900 shadow-sm';
   const innerBg = theme === 'dark' ? 'bg-bg-dark' : 'bg-gray-50';
@@ -273,19 +330,26 @@ export default function SettingsPanel({
   const [connectorKeySuccess, setConnectorKeySuccess] = useState<string | null>(null);
 
   useEffect(() => {
-    const fetchCreds = async () => {
+    const fetchCreds = async (retry = 1) => {
       try {
+        const token = localStorage.getItem('halbiz_auth_token') || localStorage.getItem('token') || '';
         const res = await fetch('/api/connectors/credentials', {
-          headers: {
-            'Authorization': `Bearer ${localStorage.getItem('halbiz_auth_token') || localStorage.getItem('token')}`
-          }
+          headers: token ? { 'Authorization': `Bearer ${token}` } : {}
         });
-        const data = await res.json();
-        if (data && typeof data === 'object') {
-          setConnectorKeys(prev => ({ ...prev, ...data }));
+        if (res.ok) {
+          const data = await res.json();
+          if (data && typeof data === 'object' && !data.error) {
+            setConnectorKeys(prev => ({ ...prev, ...data }));
+          }
+        } else if (retry > 0) {
+          setTimeout(() => fetchCreds(retry - 1), 600);
         }
       } catch (err) {
-        console.error('Failed to load connector credentials from backend', err);
+        if (retry > 0) {
+          setTimeout(() => fetchCreds(retry - 1), 600);
+        } else {
+          console.warn('Connector credentials sync pending:', err);
+        }
       }
     };
     fetchCreds();
@@ -396,7 +460,45 @@ export default function SettingsPanel({
 
   return (
     <div className="space-y-6">
-      
+      {/* Tab Switcher: Settings & Keys vs About & Operating Manual */}
+      <div className="flex items-center justify-between border-b pb-3 border-inherit">
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setActiveSubTab('settings')}
+            className={`px-3.5 py-1.5 rounded-lg text-xs font-mono font-bold uppercase tracking-wider transition-all flex items-center gap-2 cursor-pointer ${
+              activeSubTab === 'settings'
+                ? 'bg-brand text-white shadow-xs'
+                : 'text-text-secondary hover:text-text-primary hover:bg-bg-subtle'
+            }`}
+          >
+            <Sliders className="w-3.5 h-3.5" />
+            <span>Settings & API Keys</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveSubTab('about')}
+            className={`px-3.5 py-1.5 rounded-lg text-xs font-mono font-bold uppercase tracking-wider transition-all flex items-center gap-2 cursor-pointer ${
+              activeSubTab === 'about'
+                ? 'bg-brand text-white shadow-xs'
+                : 'text-text-secondary hover:text-text-primary hover:bg-bg-subtle'
+            }`}
+          >
+            <BookOpen className="w-3.5 h-3.5" />
+            <span>About & Operating Manual</span>
+          </button>
+        </div>
+        <div className="text-[10px] font-mono text-text-tertiary hidden sm:block">
+          {activeSubTab === 'about' ? 'HAL CONSTITUTION & ROADMAP' : 'ENTERPRISE SYSTEM CONFIGURATION'}
+        </div>
+      </div>
+
+      {activeSubTab === 'about' ? (
+        <div className="pt-2">
+          <HalBiblePanel initialDocId={initialDocId} />
+        </div>
+      ) : (
+        <>
       {/* MULTI-INDUSTRY & WHITE-LABEL WORKSPACE MANAGER */}
       <div className={`border rounded-lg p-6 space-y-6 ${cardBg}`}>
         <div className="flex items-center gap-2 border-b pb-3 border-inherit">
@@ -1326,6 +1428,135 @@ export default function SettingsPanel({
         </div>
       </div>
 
+      {/* PUBLIC SHARE & REDDIT TESTING SHIELD */}
+      <div className={`border rounded-lg p-5 mt-6 space-y-5 ${cardBg}`}>
+        <div className="flex items-center justify-between border-b pb-3 border-inherit">
+          <div className="flex items-center gap-2">
+            <Globe className="w-4 h-4 text-brand" />
+            <span className="text-xs font-mono uppercase tracking-wider font-bold">Public Share & Reddit Testing Shield</span>
+          </div>
+          <span className={`text-[10px] font-mono px-2 py-0.5 rounded border uppercase font-bold ${
+            publicLinkMode === 'safe_sandbox' 
+              ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
+              : publicLinkMode === 'disabled'
+              ? 'bg-red-500/10 text-red-400 border-red-500/30'
+              : 'bg-amber-500/10 text-amber-400 border-amber-500/30'
+          }`}>
+            {publicLinkMode === 'safe_sandbox' && '🟢 Safe Sandbox Active'}
+            {publicLinkMode === 'disabled' && '🔴 Link Deactivated'}
+            {publicLinkMode === 'open' && '🟡 Unrestricted Access'}
+          </span>
+        </div>
+
+        <p className="text-xs text-inherit opacity-85 leading-relaxed font-sans">
+          Use this secure link to share HAL with testers on Reddit or social channels. 
+          When <strong>Safe Sandbox</strong> is active, visitors receive automated 1-click test access with IP rate limits (60 req/min) and Gemini AI burst protection to prevent quota exhaustion while keeping your real business settings intact.
+        </p>
+
+        {/* Share Link Bar */}
+        <div className={`border rounded p-3 flex items-center justify-between gap-3 ${innerBg} ${borderCol}`}>
+          <div className="min-w-0 flex-1">
+            <div className="text-[10px] font-mono opacity-70 uppercase tracking-wider font-bold mb-1">
+              Public Safe Link for Reddit / Beta Testers
+            </div>
+            <div className="text-xs font-mono text-brand truncate font-bold">
+              {sharedUrl}
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => copyToClipboard(sharedUrl)}
+            className="px-3 py-1.5 rounded bg-brand/15 hover:bg-brand/25 border border-brand/40 text-brand text-xs font-mono font-bold transition-colors shrink-0 flex items-center gap-1.5 cursor-pointer"
+            title="Copy Public Testing Link"
+          >
+            {copiedLink ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+            <span>{copiedLink ? 'COPIED' : 'COPY LINK'}</span>
+          </button>
+        </div>
+
+        {/* Mode Selector Buttons */}
+        <div className="space-y-2">
+          <label className="block text-[10px] font-mono opacity-80 uppercase tracking-wider font-bold">
+            Public Traffic Control Mode
+          </label>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+            <button
+              type="button"
+              disabled={publicLinkLoading}
+              onClick={() => handleUpdatePublicLinkMode('safe_sandbox')}
+              className={`p-3 rounded border text-left transition-all cursor-pointer ${
+                publicLinkMode === 'safe_sandbox'
+                  ? 'border-emerald-500 bg-emerald-500/10 text-emerald-300 shadow-sm'
+                  : 'border-inherit hover:border-emerald-500/50 opacity-70 hover:opacity-100'
+              }`}
+            >
+              <div className="text-xs font-mono font-bold flex items-center gap-1.5">
+                <span>🛡️ Safe Sandbox</span>
+              </div>
+              <p className="text-[10px] opacity-75 mt-1 font-sans leading-normal">
+                Recommended for Reddit. Rate-limited, AI quota shield active, isolated data.
+              </p>
+            </button>
+
+            <button
+              type="button"
+              disabled={publicLinkLoading}
+              onClick={() => handleUpdatePublicLinkMode('disabled')}
+              className={`p-3 rounded border text-left transition-all cursor-pointer ${
+                publicLinkMode === 'disabled'
+                  ? 'border-red-500 bg-red-500/10 text-red-300 shadow-sm'
+                  : 'border-inherit hover:border-red-500/50 opacity-70 hover:opacity-100'
+              }`}
+            >
+              <div className="text-xs font-mono font-bold flex items-center gap-1.5">
+                <span>🔒 Killswitch (Disabled)</span>
+              </div>
+              <p className="text-[10px] opacity-75 mt-1 font-sans leading-normal">
+                Blocks all public shared traffic with an HTTP 403 Deactivated page.
+              </p>
+            </button>
+
+            <button
+              type="button"
+              disabled={publicLinkLoading}
+              onClick={() => handleUpdatePublicLinkMode('open')}
+              className={`p-3 rounded border text-left transition-all cursor-pointer ${
+                publicLinkMode === 'open'
+                  ? 'border-amber-500 bg-amber-500/10 text-amber-300 shadow-sm'
+                  : 'border-inherit hover:border-amber-500/50 opacity-70 hover:opacity-100'
+              }`}
+            >
+              <div className="text-xs font-mono font-bold flex items-center gap-1.5">
+                <span>🌐 Open Unrestricted</span>
+              </div>
+              <p className="text-[10px] opacity-75 mt-1 font-sans leading-normal">
+                Normal production routing without special public visitor rate limiters.
+              </p>
+            </button>
+          </div>
+        </div>
+
+        {/* Security Summary Pills */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-2 border-t border-inherit text-[10px] font-mono opacity-80">
+          <div className="flex items-center gap-1.5">
+            <Check className="w-3 h-3 text-emerald-400" />
+            <span>IP Rate Limiting (60/m)</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <Check className="w-3 h-3 text-emerald-400" />
+            <span>AI Burst Quota Shield</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <Check className="w-3 h-3 text-emerald-400" />
+            <span>AES-256 PII Encrypted</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <Check className="w-3 h-3 text-emerald-400" />
+            <span>1-Click Reddit Demo Access</span>
+          </div>
+        </div>
+      </div>
+
       {/* Campaign Reset & Territory Pivot */}
       <div className={`border rounded-lg p-5 mt-6 space-y-6 ${cardBg}`}>
         <div className="flex items-center gap-2 border-b pb-3 border-inherit">
@@ -1436,6 +1667,8 @@ export default function SettingsPanel({
           </button>
         </form>
       </div>
+      </>
+      )}
     </div>
   );
 }

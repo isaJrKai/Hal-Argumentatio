@@ -429,6 +429,8 @@ export function generateLandingPageHtml(config: LandingPageConfig): string {
     }
   }
 
+  const isPaper = branding.colorPreset === 'paper_ink';
+
   return `<!DOCTYPE html>
 <html lang="en" class="scroll-smooth">
 <head>
@@ -439,7 +441,23 @@ export function generateLandingPageHtml(config: LandingPageConfig): string {
   <meta property="og:title" content="${seo.metaTitle || businessName}" />
   <meta property="og:description" content="${seo.metaDescription || `Serving ${city}. 24/7 priority emergency dispatch.`}" />
   <meta property="og:type" content="website" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;0,6..72,700;1,6..72,400&family=IBM+Plex+Mono:ital,wght@0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
   <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['DM Sans', 'system-ui', 'sans-serif'],
+            serif: ['Newsreader', 'Georgia', 'serif'],
+            mono: ['IBM Plex Mono', 'monospace']
+          }
+        }
+      }
+    }
+  </script>
   <style>
     /* Emil Kowalski Motion Bar: purposeful transforms, zero layout thrashing */
     * {
@@ -460,12 +478,177 @@ export function generateLandingPageHtml(config: LandingPageConfig): string {
         scroll-behavior: auto !important;
       }
     }
+
+    /* ─── ARCHIVAL PAPER & INK EDITORIAL THEME ─── */
+    body.theme-paper-ink {
+      background-color: #f7f5f0 !important;
+      color: #18181b !important;
+      font-family: 'DM Sans', system-ui, sans-serif !important;
+    }
+    .theme-paper-ink h1,
+    .theme-paper-ink h2,
+    .theme-paper-ink h3,
+    .theme-paper-ink h4,
+    .theme-paper-ink h5 {
+      font-family: 'Newsreader', Georgia, serif !important;
+      color: #18181b !important;
+      letter-spacing: -0.015em !important;
+    }
+    .theme-paper-ink header {
+      background-color: rgba(247, 245, 240, 0.96) !important;
+      border-bottom: 1px solid #dcd5c7 !important;
+      box-shadow: 0 1px 4px rgba(24, 24, 27, 0.03) !important;
+    }
+    .theme-paper-ink header span.text-white,
+    .theme-paper-ink header .text-white {
+      color: #18181b !important;
+    }
+    .theme-paper-ink header .text-slate-400 {
+      color: #71717a !important;
+    }
+    .theme-paper-ink .text-white {
+      color: #18181b !important;
+    }
+    .theme-paper-ink .text-slate-200,
+    .theme-paper-ink .text-slate-300 {
+      color: #3f3f46 !important;
+    }
+    .theme-paper-ink .text-slate-400,
+    .theme-paper-ink .text-slate-500 {
+      color: #71717a !important;
+    }
+    .theme-paper-ink .text-slate-600 {
+      color: #a1a1aa !important;
+    }
+    .theme-paper-ink .text-amber-400,
+    .theme-paper-ink .text-amber-500,
+    .theme-paper-ink .text-sky-400,
+    .theme-paper-ink .text-sky-300 {
+      color: #9a3412 !important;
+    }
+
+    /* Cards & Containers */
+    .theme-paper-ink [class*="bg-slate-900"],
+    .theme-paper-ink [class*="bg-slate-950"] {
+      background-color: #ffffff !important;
+      border-color: #dcd5c7 !important;
+      color: #18181b !important;
+      box-shadow: 0 1px 3px rgba(24, 24, 27, 0.04) !important;
+    }
+    .theme-paper-ink [class*="bg-slate-800"] {
+      background-color: #f2ece1 !important;
+      border-color: #dcd5c7 !important;
+      color: #18181b !important;
+    }
+    .theme-paper-ink [class*="border-slate-"],
+    .theme-paper-ink [class*="border-sky-"],
+    .theme-paper-ink [class*="border-amber-"] {
+      border-color: #dcd5c7 !important;
+    }
+
+    /* Gradients: flatten to crisp paper cards */
+    .theme-paper-ink [class*="bg-gradient-"] {
+      background-image: none !important;
+      background-color: #ffffff !important;
+      border-color: #dcd5c7 !important;
+    }
+
+    /* Primary CTAs & Buttons: Deep Carbon Ink */
+    .theme-paper-ink .bg-amber-500,
+    .theme-paper-ink .bg-amber-400,
+    .theme-paper-ink button[type="submit"],
+    .theme-paper-ink a[href^="tel:"].bg-amber-500 {
+      background-color: #18181b !important;
+      color: #f7f5f0 !important;
+      border: 1px solid #18181b !important;
+      box-shadow: 0 2px 5px rgba(24, 24, 27, 0.12) !important;
+    }
+    .theme-paper-ink .bg-amber-500:hover,
+    .theme-paper-ink .bg-amber-400:hover,
+    .theme-paper-ink button[type="submit"]:hover {
+      background-color: #27272a !important;
+      color: #ffffff !important;
+    }
+    .theme-paper-ink .text-slate-950 {
+      color: #f7f5f0 !important;
+    }
+
+    /* Secondary Badges & Pills */
+    .theme-paper-ink [class*="bg-amber-500/"],
+    .theme-paper-ink [class*="bg-sky-500/"],
+    .theme-paper-ink [class*="bg-emerald-500/"] {
+      background-color: #faebe5 !important;
+      color: #9a3412 !important;
+      border-color: #f0c5b5 !important;
+    }
+
+    /* Form Fields */
+    .theme-paper-ink input,
+    .theme-paper-ink textarea {
+      background-color: #ffffff !important;
+      border: 1px solid #dcd5c7 !important;
+      color: #18181b !important;
+      box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.03) !important;
+    }
+    .theme-paper-ink input:focus,
+    .theme-paper-ink textarea:focus {
+      border-color: #18181b !important;
+      outline: 2px solid rgba(24, 24, 27, 0.08) !important;
+    }
+    .theme-paper-ink input::placeholder,
+    .theme-paper-ink textarea::placeholder {
+      color: #a1a1aa !important;
+    }
+
+    /* Announcement Bar */
+    .theme-paper-ink div.bg-amber-500 {
+      background-color: #18181b !important;
+      color: #f7f5f0 !important;
+      border-bottom: 1px solid #27272a !important;
+    }
+    .theme-paper-ink div.bg-amber-500 span.bg-slate-950 {
+      background-color: #9a3412 !important;
+      color: #ffffff !important;
+    }
+
+    /* Accordion Details */
+    .theme-paper-ink details {
+      background-color: #ffffff !important;
+      border: 1px solid #dcd5c7 !important;
+      color: #18181b !important;
+    }
+    .theme-paper-ink details summary span {
+      color: #18181b !important;
+    }
+    .theme-paper-ink details p {
+      color: #52525b !important;
+      border-top-color: #dcd5c7 !important;
+    }
+
+    /* Footer */
+    .theme-paper-ink footer {
+      background-color: #eee9df !important;
+      border-top: 1px solid #dcd5c7 !important;
+      color: #71717a !important;
+    }
+    .theme-paper-ink footer p {
+      color: #71717a !important;
+    }
+
+    /* Sticky Mobile Call Bar */
+    .theme-paper-ink .fixed.bottom-0 {
+      background-color: rgba(247, 245, 240, 0.98) !important;
+      border-top: 1px solid #dcd5c7 !important;
+    }
+    .theme-paper-ink .fixed.bottom-0 span.text-amber-400 {
+      color: #9a3412 !important;
+    }
   </style>
   <script type="application/ld+json">
     ${JSON.stringify(schemaJson, null, 2)}
   </script>
 </head>
-<body class="bg-slate-950 text-slate-100 font-sans antialiased min-h-screen pb-16 sm:pb-0">
+<body class="${isPaper ? 'theme-paper-ink bg-[#f7f5f0] text-[#18181b]' : 'bg-slate-950 text-slate-100'} font-sans antialiased min-h-screen pb-16 sm:pb-0">
 
   ${renderedSections}
 

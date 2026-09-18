@@ -41,6 +41,7 @@ import { EmptyState } from './ui/EmptyState';
 import { Breadcrumbs } from './ui/Breadcrumbs';
 import { useToast } from '../context/ToastContext';
 import { HalRoadmapPhase1 } from './HalRoadmapPhase1';
+import { HalRoadmapPhase5View } from './HalRoadmapPhase5View';
 
 // We can reuse the design system components or write the Design System view inline for Document 04
 interface DocumentSpec {
@@ -1129,13 +1130,18 @@ export default function HalBiblePanel({ initialDocId }: HalBiblePanelProps = {})
               </div>
             )}
 
-            {/* DOCUMENT 20 — ROADMAP & PHASE 1 FOUNDATION COMMAND CONSOLE */}
+            {/* DOCUMENT 20 — ROADMAP & FOUNDATION COMMAND CONSOLE */}
             {activeDoc.id === '20' && (
               <HalRoadmapPhase1 />
             )}
 
+            {/* DOCUMENT 23 — FUTURE VISION & 11-LAYER ENTERPRISE BRAIN */}
+            {activeDoc.id === '23' && (
+              <HalRoadmapPhase5View />
+            )}
+
             {/* BLUEPRINT / DRAFT SPECIFICATION PLACEHOLDERS */}
-            {activeDoc.id !== '02' && activeDoc.id !== '04' && activeDoc.id !== '20' && (
+            {activeDoc.id !== '02' && activeDoc.id !== '04' && activeDoc.id !== '20' && activeDoc.id !== '23' && (
               <div className="space-y-6">
                 
                 {/* BLUEPRINT SUBTITLE BANNER */}

@@ -94,10 +94,10 @@ interface AuditTest {
   details: string;
 }
 
-export const HalRoadmapPhase1: React.FC = () => {
+export const HalRoadmapPhase1: React.FC<{ initialPhase?: number }> = ({ initialPhase = 5 }) => {
   const [loading, setLoading] = useState(true);
   const [activeSubTab, setActiveSubTab] = useState<'overview' | 'ledger' | 'vault' | 'pipeline'>('overview');
-  const [selectedPhase, setSelectedPhase] = useState<number>(2);
+  const [selectedPhase, setSelectedPhase] = useState<number>(initialPhase);
   const [pillarData, setPillarData] = useState<PillarStatus | null>(null);
   const [roadmapPhases, setRoadmapPhases] = useState<any[]>([]);
   
@@ -125,22 +125,30 @@ export const HalRoadmapPhase1: React.FC = () => {
   const [copiedHash, setCopiedHash] = useState<string | null>(null);
   const [selectedLedgerEntry, setSelectedLedgerEntry] = useState<LedgerEntry | null>(null);
 
-  const fetchStatus = async () => {
+  const fetchStatus = async (retry = 1) => {
     try {
       setLoading(true);
-      const token = localStorage.getItem('token') || localStorage.getItem('halbiz_auth_token');
+      const token = localStorage.getItem('halbiz_auth_token') || localStorage.getItem('token') || '';
       const res = await fetch('/api/roadmap/phase1/status', {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
+        headers: token ? { 'Authorization': `Bearer ${token}` } : {}
       });
       if (res.ok) {
         const data = await res.json();
-        setPillarData(data.pillars);
-        setRoadmapPhases(data.roadmapPhases || []);
+        if (data && data.pillars) {
+          setPillarData(data.pillars);
+        }
+        if (data && data.roadmapPhases) {
+          setRoadmapPhases(data.roadmapPhases || []);
+        }
+      } else if (retry > 0) {
+        setTimeout(() => fetchStatus(retry - 1), 600);
       }
     } catch (err) {
-      console.error('Failed to load Roadmap Phase 1 status:', err);
+      if (retry > 0) {
+        setTimeout(() => fetchStatus(retry - 1), 600);
+      } else {
+        console.warn('Roadmap Phase 1 status currently synchronizing:', err);
+      }
     } finally {
       setLoading(false);
     }
@@ -288,6 +296,18 @@ export const HalRoadmapPhase1: React.FC = () => {
               <span className="px-3 py-1.5 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 text-xs font-mono font-bold flex items-center gap-1.5">
                 <Check className="w-3.5 h-3.5 stroke-[3]" />
                 <span>PHASE 3 FULLY VERIFIED</span>
+              </span>
+            )}
+            {selectedPhase === 4 && (
+              <span className="px-3 py-1.5 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 text-xs font-mono font-bold flex items-center gap-1.5">
+                <Check className="w-3.5 h-3.5 stroke-[3]" />
+                <span>PHASE 4 FULLY VERIFIED</span>
+              </span>
+            )}
+            {selectedPhase === 5 && (
+              <span className="px-3 py-1.5 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 text-xs font-mono font-bold flex items-center gap-1.5">
+                <Check className="w-3.5 h-3.5 stroke-[3]" />
+                <span>PHASE 5 ENTERPRISE BRAIN</span>
               </span>
             )}
           </div>

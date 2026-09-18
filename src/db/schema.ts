@@ -24,10 +24,14 @@ export const leads = pgTable('leads', {
   city: text('city').notNull(),
   niche: text('niche').notNull(),
   ownerName: text('owner_name'),
-  phone: text('phone'),
-  email: text('email'),
+  phone: text('phone'), // DEPRECATED: Plaintext storage disallowed. All active writes must use phoneEncrypted.
+  email: text('email'), // DEPRECATED: Plaintext storage disallowed. All active writes must use emailEncrypted.
   phoneEncrypted: text('phone_encrypted'),
   emailEncrypted: text('email_encrypted'),
+  isSynthetic: boolean('is_synthetic').default(false).notNull(), // Data transparency: false = live harvested; true = synthetic fallback
+  sourceType: text('source_type').default('live_harvest').notNull(), // 'live_harvest' | 'synthetic_fallback' | 'manual' | 'google_ads'
+  verificationStatus: text('verification_status').default('UNVERIFIED_STAGING').notNull(), // 'VERIFIED' | 'UNVERIFIED_STAGING' | 'FABRICATED_REJECTED'
+  dnsVerified: boolean('dns_verified').default(false).notNull(),
   externalCrmId: text('external_crm_id'),
   externalSource: text('external_source'),
   websiteUrl: text('website_url'),
@@ -172,8 +176,12 @@ export const outreachSequences = pgTable('outreach_sequences', {
 export const apiKeys = pgTable('api_keys', {
   id: text('id').primaryKey(),
   contractorId: text('contractor_id').notNull(),
-  key: text('key').notNull(),
+  keyHash: text('key_hash').notNull(), // One-way cryptographic SHA-256 or bcrypt hash
+  prefix: text('prefix').notNull(), // Safe display prefix (e.g. hlbz_1a2b...)
+  key: text('key'), // DEPRECATED: Plaintext key column; optional for legacy backward compatibility
   label: text('label').notNull(),
+  lastUsedAt: timestamp('last_used_at'),
+  expiresAt: timestamp('expires_at'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
 });
 

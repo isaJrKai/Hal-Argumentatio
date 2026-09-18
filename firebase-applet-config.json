@@ -3,7 +3,10 @@
   "appId": "1:945073139445:web:07c4173c47f69f5a889fbc",
   "apiKey": "AIzaSyDP8oR78-7TfnTojRp6phmp5d788a8ftiM",
   "authDomain": "plexiform-goal-cp497.firebaseapp.com",
+  "firestoreDatabaseId": "ai-studio-halbiz-61cd25f8-d463-44e4-866d-fbeb51a7174d",
   "storageBucket": "plexiform-goal-cp497.firebasestorage.app",
   "messagingSenderId": "945073139445",
-  "measurementId": ""
+  "measurementId": "",
+  "oAuthClientId": "945073139445-5f3ht87b9pk47r4mrgo7p1v6rlh4jdqn.apps.googleusercontent.com",
+  "recaptchaSiteKey": ""
 }

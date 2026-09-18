@@ -11,8 +11,10 @@ import {
   Trash2,
   Sparkles,
   Shield,
-  Layers
+  Layers,
+  Sliders
 } from 'lucide-react';
+import { useInspector } from '../../context/InspectorContext';
 
 interface SectionEditorProps {
   config: LandingPageConfig;
@@ -38,6 +40,7 @@ const SECTION_LABELS: Record<string, { label: string; iconName: string }> = {
 
 export const SectionEditor: React.FC<SectionEditorProps> = ({ config, onChange }) => {
   const [expandedSection, setExpandedSection] = useState<string | null>('hero');
+  const { openInspector } = useInspector();
 
   const moveSection = (index: number, direction: 'up' | 'down') => {
     const newOrder = [...config.sectionOrder];
@@ -150,6 +153,16 @@ export const SectionEditor: React.FC<SectionEditorProps> = ({ config, onChange }
                     }`}
                   >
                     {isActive ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
+                  </button>
+
+                  {/* Inspector Sidebar Toggle */}
+                  <button
+                    type="button"
+                    title="Inspect in Workspace Sidebar"
+                    onClick={() => openInspector('landing_section', meta.label, { sectionKey: secKey, sectionData: secData })}
+                    className="p-1 rounded text-slate-400 hover:text-amber-400 transition"
+                  >
+                    <Sliders className="w-3.5 h-3.5" />
                   </button>
                 </div>
               </div>

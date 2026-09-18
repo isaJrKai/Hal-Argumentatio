@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useRef, useCallback, useMemo, ReactNode } from 'react';
 
-export type InspectorEntityType = 'email_block' | 'lead' | 'campaign' | 'artifact' | 'metric' | null;
+export type InspectorEntityType = 'email_block' | 'lead' | 'campaign' | 'artifact' | 'metric' | 'landing_section' | 'landing_config' | null;
 
 export interface InspectorState {
   type: InspectorEntityType;
@@ -25,7 +25,7 @@ const defaultState: InspectorState = {
   title: 'Workspace Inspector',
   data: null,
   activeTab: 'content',
-  isOpen: true
+  isOpen: false
 };
 
 const InspectorContext = createContext<InspectorContextType | undefined>(undefined);

@@ -29,7 +29,13 @@ import {
   Save,
   CheckCircle2,
   HelpCircle,
-  FileText
+  FileText,
+  PanelLeftClose,
+  PanelLeftOpen,
+  Maximize2,
+  Minimize2,
+  Columns,
+  Layout
 } from 'lucide-react';
 import { useBusinessContext } from '../context/BusinessContext';
 import { useToast } from '../context/ToastContext';
@@ -41,10 +47,12 @@ import { BrandingControls } from './landing/BrandingControls';
 import { SeoSchemaPanel } from './landing/SeoSchemaPanel';
 import { AiGeneratorModal } from './landing/AiGeneratorModal';
 import { QualityGatePanel } from './landing/QualityGatePanel';
+import { useInspector } from '../context/InspectorContext';
 
 export const LandingPageStudioPanel: React.FC<{ token: string | null }> = ({ token }) => {
   const { regionalProfile, activeNiche, workspaceConfig } = useBusinessContext();
   const { showToast } = useToast();
+  const { openInspector, registerDataChangeCallback } = useInspector();
 
   // Active configuration state
   const [config, setConfig] = useState<LandingPageConfig>(() => {
@@ -60,6 +68,11 @@ export const LandingPageStudioPanel: React.FC<{ token: string | null }> = ({ tok
   const [selectedArtifactId, setSelectedArtifactId] = useState<string>('');
   const [activeTab, setActiveTab] = useState<'builder' | 'templates' | 'branding' | 'seo' | 'quality_gates' | 'code'>('builder');
   const [viewport, setViewport] = useState<'desktop' | 'tablet' | 'mobile'>('desktop');
+  const [workspaceMode, setWorkspaceMode] = useState<'split' | 'canvas' | 'editor'>('split');
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [zoomLevel, setZoomLevel] = useState<'100' | '85' | '75'>('100');
+  const [showFullscreenModal, setShowFullscreenModal] = useState(false);
+  const [mobileActiveView, setMobileActiveView] = useState<'editor' | 'preview'>('editor');
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
@@ -69,6 +82,32 @@ export const LandingPageStudioPanel: React.FC<{ token: string | null }> = ({ tok
 
   // Computed rendered HTML from current configuration
   const renderedHtml = generateLandingPageHtml(config);
+
+  // Listen to live updates from Inspector
+  useEffect(() => {
+    registerDataChangeCallback((newData: any) => {
+      if (newData && newData.sectionKey && newData.sectionData) {
+        setConfig(prev => {
+          const next = { ...prev };
+          if (next.sections) {
+            next.sections = {
+              ...next.sections,
+              [newData.sectionKey]: {
+                ...next.sections[newData.sectionKey],
+                ...newData.sectionData
+              }
+            };
+          }
+          return next;
+        });
+      } else if (newData && newData.branding) {
+        setConfig(prev => ({
+          ...prev,
+          ...newData
+        }));
+      }
+    });
+  }, [registerDataChangeCallback]);
 
   // Live URL for current page
   const liveUrl = typeof window !== 'undefined' ? `${window.location.origin}/landing/${config.id}` : '';
@@ -290,13 +329,13 @@ export const LandingPageStudioPanel: React.FC<{ token: string | null }> = ({ tok
           </div>
         </div>
 
-        {/* Center: Viewport Controls & Tab Navigation */}
-        <div className="flex items-center gap-2">
+        {/* Center: Workspace Layout, Viewport Controls & Tab Navigation */}
+        <div className="flex items-center gap-2 flex-wrap">
           {/* Studio Tabs */}
           <div className="flex p-0.5 bg-slate-950 border border-slate-800 rounded-xl text-xs">
             <button
               type="button"
-              onClick={() => setActiveTab('builder')}
+              onClick={() => { setActiveTab('builder'); if (workspaceMode === 'canvas') setWorkspaceMode('split'); setSidebarCollapsed(false); }}
               className={`px-3 py-1.5 rounded-lg font-medium transition flex items-center gap-1.5 ${
                 activeTab === 'builder' ? 'bg-amber-500 text-slate-950 font-bold shadow' : 'text-slate-400 hover:text-white'
               }`}
@@ -306,7 +345,7 @@ export const LandingPageStudioPanel: React.FC<{ token: string | null }> = ({ tok
             </button>
             <button
               type="button"
-              onClick={() => setActiveTab('templates')}
+              onClick={() => { setActiveTab('templates'); if (workspaceMode === 'canvas') setWorkspaceMode('split'); setSidebarCollapsed(false); }}
               className={`px-3 py-1.5 rounded-lg font-medium transition flex items-center gap-1.5 ${
                 activeTab === 'templates' ? 'bg-amber-500 text-slate-950 font-bold shadow' : 'text-slate-400 hover:text-white'
               }`}
@@ -316,7 +355,7 @@ export const LandingPageStudioPanel: React.FC<{ token: string | null }> = ({ tok
             </button>
             <button
               type="button"
-              onClick={() => setActiveTab('branding')}
+              onClick={() => { setActiveTab('branding'); if (workspaceMode === 'canvas') setWorkspaceMode('split'); setSidebarCollapsed(false); }}
               className={`px-3 py-1.5 rounded-lg font-medium transition flex items-center gap-1.5 ${
                 activeTab === 'branding' ? 'bg-amber-500 text-slate-950 font-bold shadow' : 'text-slate-400 hover:text-white'
               }`}
@@ -326,7 +365,7 @@ export const LandingPageStudioPanel: React.FC<{ token: string | null }> = ({ tok
             </button>
             <button
               type="button"
-              onClick={() => setActiveTab('seo')}
+              onClick={() => { setActiveTab('seo'); if (workspaceMode === 'canvas') setWorkspaceMode('split'); setSidebarCollapsed(false); }}
               className={`px-3 py-1.5 rounded-lg font-medium transition flex items-center gap-1.5 ${
                 activeTab === 'seo' ? 'bg-amber-500 text-slate-950 font-bold shadow' : 'text-slate-400 hover:text-white'
               }`}
@@ -336,7 +375,7 @@ export const LandingPageStudioPanel: React.FC<{ token: string | null }> = ({ tok
             </button>
             <button
               type="button"
-              onClick={() => setActiveTab('quality_gates')}
+              onClick={() => { setActiveTab('quality_gates'); if (workspaceMode === 'canvas') setWorkspaceMode('split'); setSidebarCollapsed(false); }}
               className={`px-3 py-1.5 rounded-lg font-medium transition flex items-center gap-1.5 ${
                 activeTab === 'quality_gates' ? 'bg-amber-500 text-slate-950 font-bold shadow' : 'text-slate-400 hover:text-white'
               }`}
@@ -346,13 +385,50 @@ export const LandingPageStudioPanel: React.FC<{ token: string | null }> = ({ tok
             </button>
             <button
               type="button"
-              onClick={() => setActiveTab('code')}
+              onClick={() => { setActiveTab('code'); if (workspaceMode === 'canvas') setWorkspaceMode('split'); setSidebarCollapsed(false); }}
               className={`px-3 py-1.5 rounded-lg font-medium transition flex items-center gap-1.5 ${
                 activeTab === 'code' ? 'bg-amber-500 text-slate-950 font-bold shadow' : 'text-slate-400 hover:text-white'
               }`}
             >
               <Code className="w-3.5 h-3.5" />
               <span className="hidden sm:inline">HTML</span>
+            </button>
+          </div>
+
+          {/* Workspace Layout Mode (Split vs Canvas Focus vs Full Editor) */}
+          <div className="hidden lg:flex p-0.5 bg-slate-950 border border-slate-800 rounded-xl text-xs" title="Workspace Layout Mode">
+            <button
+              type="button"
+              onClick={() => { setWorkspaceMode('split'); setSidebarCollapsed(false); }}
+              className={`px-2.5 py-1.5 rounded-lg flex items-center gap-1.5 transition ${
+                workspaceMode === 'split' ? 'bg-slate-800 text-amber-400 font-bold' : 'text-slate-400 hover:text-white'
+              }`}
+              title="Split View (Editor + Live Canvas)"
+            >
+              <Columns className="w-3.5 h-3.5" />
+              <span className="hidden xl:inline">Split</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => { setWorkspaceMode('canvas'); setSidebarCollapsed(true); }}
+              className={`px-2.5 py-1.5 rounded-lg flex items-center gap-1.5 transition ${
+                workspaceMode === 'canvas' ? 'bg-slate-800 text-amber-400 font-bold' : 'text-slate-400 hover:text-white'
+              }`}
+              title="Maximize Live Preview Canvas (More Working Space)"
+            >
+              <Eye className="w-3.5 h-3.5" />
+              <span className="hidden xl:inline">Canvas</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => { setWorkspaceMode('editor'); setSidebarCollapsed(false); }}
+              className={`px-2.5 py-1.5 rounded-lg flex items-center gap-1.5 transition ${
+                workspaceMode === 'editor' ? 'bg-slate-800 text-amber-400 font-bold' : 'text-slate-400 hover:text-white'
+              }`}
+              title="Maximize Editor (Full-width Copywriting & Settings)"
+            >
+              <Layout className="w-3.5 h-3.5" />
+              <span className="hidden xl:inline">Editor</span>
             </button>
           </div>
 
@@ -389,10 +465,98 @@ export const LandingPageStudioPanel: React.FC<{ token: string | null }> = ({ tok
               <Smartphone className="w-3.5 h-3.5" />
             </button>
           </div>
+
+          {/* Zoom Scale Controls */}
+          <div className="hidden xl:flex p-0.5 bg-slate-950 border border-slate-800 rounded-xl text-[11px] font-mono">
+            {(['100', '85', '75'] as const).map(z => (
+              <button
+                key={z}
+                type="button"
+                onClick={() => setZoomLevel(z)}
+                className={`px-1.5 py-1 rounded-lg transition ${
+                  zoomLevel === z ? 'bg-slate-800 text-amber-400 font-bold' : 'text-slate-400 hover:text-white'
+                }`}
+                title={`Scale Live Canvas ${z}%`}
+              >
+                {z}%
+              </button>
+            ))}
+          </div>
+
+          {/* Fullscreen Preview Trigger */}
+          <button
+            type="button"
+            onClick={() => setShowFullscreenModal(true)}
+            title="Distraction-Free Fullscreen Preview"
+            className="hidden md:flex p-1.5 rounded-xl border border-slate-800 bg-slate-950 hover:bg-slate-800 text-slate-300 hover:text-amber-400 transition"
+          >
+            <Maximize2 className="w-3.5 h-3.5" />
+          </button>
         </div>
 
         {/* Right: AI Synthesis, History, Save, Share & Live Actions */}
         <div className="flex items-center gap-2">
+          {/* Paper & Ink Toggle */}
+          <button
+            type="button"
+            onClick={() => {
+              const isCurrent = config.branding.colorPreset === 'paper_ink';
+              if (isCurrent) {
+                setConfig(prev => ({
+                  ...prev,
+                  branding: {
+                    ...prev.branding,
+                    colorPreset: 'emergency_amber',
+                    primaryColor: '#0284c7',
+                    secondaryColor: '#0f172a',
+                    accentColor: '#f59e0b'
+                  }
+                }));
+                showToast({
+                  title: 'Theme Updated',
+                  message: 'Switched to Emergency Amber theme',
+                  type: 'info'
+                });
+              } else {
+                setConfig(prev => ({
+                  ...prev,
+                  branding: {
+                    ...prev.branding,
+                    colorPreset: 'paper_ink',
+                    primaryColor: '#18181b',
+                    secondaryColor: '#f7f5f0',
+                    accentColor: '#9a3412'
+                  }
+                }));
+                showToast({
+                  title: 'Paper & Ink Applied',
+                  message: 'Switched to Archival Paper & Ink theme',
+                  type: 'info'
+                });
+              }
+            }}
+            title="Toggle Paper & Ink Archival Theme"
+            className={`px-2.5 py-1.5 rounded-xl border text-xs font-mono font-bold transition flex items-center gap-1.5 cursor-pointer ${
+              config.branding.colorPreset === 'paper_ink'
+                ? 'bg-amber-500/20 text-amber-400 border-amber-500/40'
+                : 'border-slate-800 bg-slate-900 text-slate-300 hover:text-white'
+            }`}
+          >
+            <span>📜 Paper & Ink</span>
+          </button>
+
+          {/* Inspector Button */}
+          <button
+            type="button"
+            onClick={() => {
+              openInspector('landing_config', `${config.businessName} (Lander Settings)`, config);
+            }}
+            title="Inspect in Workspace Sidebar"
+            className="p-1.5 rounded-xl border border-slate-800 bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-amber-400 transition cursor-pointer"
+          >
+            <Sliders className="w-4 h-4" />
+          </button>
+
           {/* AI Generator Button */}
           <button
             type="button"
@@ -455,178 +619,360 @@ export const LandingPageStudioPanel: React.FC<{ token: string | null }> = ({ tok
             <span className="hidden sm:inline">Live</span>
           </a>
         </div>
+
+        {/* Mobile View Toggle (Editor vs Preview) */}
+        <div className="flex md:hidden p-0.5 bg-slate-950 border border-slate-800 rounded-xl text-xs w-full">
+          <button
+            type="button"
+            onClick={() => setMobileActiveView('editor')}
+            className={`flex-1 py-1.5 rounded-lg font-bold transition flex items-center justify-center gap-1.5 ${
+              mobileActiveView === 'editor' ? 'bg-amber-500 text-slate-950 shadow' : 'text-slate-400'
+            }`}
+          >
+            <Layout className="w-3.5 h-3.5" />
+            <span>Editor</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setMobileActiveView('preview')}
+            className={`flex-1 py-1.5 rounded-lg font-bold transition flex items-center justify-center gap-1.5 ${
+              mobileActiveView === 'preview' ? 'bg-amber-500 text-slate-950 shadow' : 'text-slate-400'
+            }`}
+          >
+            <Eye className="w-3.5 h-3.5" />
+            <span>Preview</span>
+          </button>
+        </div>
       </header>
 
       {/* ─── MAIN STUDIO WORKSPACE: SIDEBAR + PREVIEW CANVAS ─── */}
-      <div className="flex-1 flex overflow-hidden min-h-0">
+      <div className="flex-1 flex flex-col md:flex-row overflow-hidden min-h-0 relative">
         
         {/* Left Interactive Control Panel (Builder / Templates / Branding / SEO / Code) */}
-        <aside className="w-full md:w-96 shrink-0 border-r border-slate-800 bg-slate-900/60 p-4 overflow-y-auto space-y-4">
-          
-          {/* TAB 1: SECTION BUILDER */}
-          {activeTab === 'builder' && (
-            <SectionEditor config={config} onChange={setConfig} />
-          )}
-
-          {/* TAB 2: TRADE TEMPLATES */}
-          {activeTab === 'templates' && (
-            <div className="space-y-4">
-              <div className="flex items-center justify-between pb-2 border-b border-slate-800">
-                <div className="flex items-center gap-2">
-                  <Sliders className="w-4 h-4 text-amber-400" />
-                  <h4 className="text-xs font-bold uppercase tracking-wider text-slate-200">
-                    Trade-Specific Template Library
-                  </h4>
-                </div>
-              </div>
-              <p className="text-xs text-slate-400 leading-relaxed">
-                One-click mobile-first templates engineered specifically for local home service trades with proven high-converting conversion blocks.
-              </p>
-
-              <div className="grid grid-cols-1 gap-3">
-                {Object.entries(TRADE_TEMPLATES).map(([key, t]) => (
-                  <div
-                    key={key}
-                    className="p-4 rounded-xl bg-slate-950 border border-slate-800 hover:border-amber-400/80 transition space-y-2 flex flex-col justify-between"
-                  >
-                    <div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-bold text-white uppercase">{t.trade}</span>
-                        <span className="px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400 text-[10px] font-semibold">
-                          30-Min SLA
-                        </span>
-                      </div>
-                      <h5 className="text-sm font-bold text-slate-200 mt-1">{t.title}</h5>
-                      <p className="text-[11px] text-slate-400 mt-1 line-clamp-2">
-                        {t.sections.hero.headline}
-                      </p>
-                    </div>
-
-                    <div className="pt-2 border-t border-slate-900 flex items-center justify-between">
-                      <span className="text-[10px] text-slate-500 font-mono">
-                        {t.sectionOrder.length} Modules Included
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => handleApplyTemplate(key)}
-                        className="px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs transition"
-                      >
-                        Apply Template
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* TAB 3: BRANDING & CONTACT */}
-          {activeTab === 'branding' && (
-            <BrandingControls config={config} onChange={setConfig} />
-          )}
-
-          {/* TAB 4: SEO & SCHEMA */}
-          {activeTab === 'seo' && (
-            <SeoSchemaPanel config={config} onChange={setConfig} />
-          )}
-
-          {/* TAB 5: QUALITY GATES & ANTI-SLOP AUDIT */}
-          {activeTab === 'quality_gates' && (
-            <QualityGatePanel 
-              config={config} 
-              onChange={setConfig} 
-              onNavigateToTab={(tab) => {
-                if (tab === 'editor') setActiveTab('builder');
-                else if (tab === 'seo') setActiveTab('seo');
-                else if (tab === 'branding') setActiveTab('branding');
-              }}
-            />
-          )}
-
-          {/* TAB 6: HTML CODE INSPECTOR */}
-          {activeTab === 'code' && (
-            <div className="space-y-3">
-              <div className="flex items-center justify-between pb-2 border-b border-slate-800">
-                <div className="flex items-center gap-2">
-                  <Code className="w-4 h-4 text-sky-400" />
-                  <h4 className="text-xs font-bold uppercase tracking-wider text-slate-200">
-                    Exportable HTML Source
-                  </h4>
-                </div>
-                <button
-                  type="button"
-                  onClick={handleDownloadHtml}
-                  className="text-xs text-sky-400 hover:text-sky-300 font-bold flex items-center gap-1"
-                >
-                  <Download className="w-3.5 h-3.5" /> Download
-                </button>
-              </div>
-              <textarea
-                readOnly
-                value={renderedHtml}
-                rows={22}
-                className="w-full p-3 rounded-xl bg-slate-950 border border-slate-800 font-mono text-[10.5px] text-slate-300 leading-relaxed focus:outline-none"
-              />
-            </div>
-          )}
-        </aside>
-
-        {/* Right Canvas: Live Iframe Preview With Responsive Bezel */}
-        <main className="flex-1 bg-slate-950/90 flex flex-col items-center justify-start p-4 sm:p-6 overflow-y-auto">
-          
-          {/* Top Canvas Indicator */}
-          <div className="w-full max-w-5xl flex items-center justify-between pb-3 text-xs text-slate-400">
-            <div className="flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-              <span className="font-mono text-[11px]">
-                Live Preview: {viewport.toUpperCase()} ({viewport === 'desktop' ? '1200px' : viewport === 'tablet' ? '768px' : '375px'})
-              </span>
-            </div>
-            <div className="text-[11px] text-slate-500 font-mono hidden sm:block">
-              Interactive Form Submissions Direct-Route to HAL CRM
-            </div>
-          </div>
-
-          {/* Viewport Frame */}
-          <div
-            className={`transition-all duration-300 ease-in-out bg-slate-900 rounded-2xl shadow-2xl border border-slate-800 overflow-hidden flex flex-col ${
-              viewport === 'desktop'
-                ? 'w-full max-w-5xl h-[820px]'
-                : viewport === 'tablet'
-                ? 'w-[768px] h-[820px]'
-                : 'w-[375px] h-[720px] ring-8 ring-slate-800/80 rounded-[36px]'
+        {workspaceMode !== 'canvas' && (
+          <aside
+            className={`transition-all duration-300 ease-in-out border-r border-slate-800 bg-slate-900/70 p-4 overflow-y-auto space-y-4 shrink-0 ${
+              mobileActiveView === 'editor' ? 'flex flex-col' : 'hidden md:flex md:flex-col'
+            } ${
+              workspaceMode === 'editor'
+                ? 'w-full max-w-4xl mx-auto border-r-0 border-x border-slate-800 my-2 rounded-2xl shadow-xl'
+                : sidebarCollapsed
+                ? 'w-14 p-2 items-center space-y-3'
+                : 'w-full md:w-[420px] lg:w-[440px]'
             }`}
           >
-            {/* Browser Bezel for Desktop & Tablet */}
-            {viewport !== 'mobile' && (
-              <div className="px-4 py-2 bg-slate-950 border-b border-slate-800 flex items-center gap-2 shrink-0">
-                <div className="flex items-center gap-1.5">
-                  <span className="w-2.5 h-2.5 rounded-full bg-red-500/80" />
-                  <span className="w-2.5 h-2.5 rounded-full bg-amber-500/80" />
-                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-500/80" />
+            {/* If Collapsed in Split Mode: Show Slim Rail */}
+            {workspaceMode === 'split' && sidebarCollapsed ? (
+              <div className="flex flex-col items-center space-y-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setSidebarCollapsed(false)}
+                  title="Expand Editor Sidebar"
+                  className="p-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 transition shadow cursor-pointer"
+                >
+                  <PanelLeftOpen className="w-4 h-4" />
+                </button>
+                <div className="w-6 h-px bg-slate-800 my-1" />
+                <button
+                  type="button"
+                  onClick={() => { setActiveTab('builder'); setSidebarCollapsed(false); }}
+                  title="Builder"
+                  className={`p-2 rounded-lg ${activeTab === 'builder' ? 'text-amber-400 bg-slate-800' : 'text-slate-400 hover:text-white'}`}
+                >
+                  <Layers className="w-4 h-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setActiveTab('templates'); setSidebarCollapsed(false); }}
+                  title="Trades"
+                  className={`p-2 rounded-lg ${activeTab === 'templates' ? 'text-amber-400 bg-slate-800' : 'text-slate-400 hover:text-white'}`}
+                >
+                  <Sliders className="w-4 h-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setActiveTab('branding'); setSidebarCollapsed(false); }}
+                  title="Branding"
+                  className={`p-2 rounded-lg ${activeTab === 'branding' ? 'text-amber-400 bg-slate-800' : 'text-slate-400 hover:text-white'}`}
+                >
+                  <Palette className="w-4 h-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setActiveTab('seo'); setSidebarCollapsed(false); }}
+                  title="SEO"
+                  className={`p-2 rounded-lg ${activeTab === 'seo' ? 'text-amber-400 bg-slate-800' : 'text-slate-400 hover:text-white'}`}
+                >
+                  <ShieldCheck className="w-4 h-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setActiveTab('quality_gates'); setSidebarCollapsed(false); }}
+                  title="Quality Gates"
+                  className={`p-2 rounded-lg ${activeTab === 'quality_gates' ? 'text-amber-400 bg-slate-800' : 'text-slate-400 hover:text-white'}`}
+                >
+                  <CheckCircle2 className="w-4 h-4" />
+                </button>
+              </div>
+            ) : (
+              <>
+                {/* Header with quick collapse and focus buttons */}
+                <div className="flex items-center justify-between pb-2 border-b border-slate-800">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-bold uppercase tracking-wider text-slate-300">
+                      {activeTab === 'builder' ? 'Modular Section Editor' :
+                       activeTab === 'templates' ? 'Trade Template Library' :
+                       activeTab === 'branding' ? 'Brand & Call Settings' :
+                       activeTab === 'seo' ? 'Local SEO & Rich Schema' :
+                       activeTab === 'quality_gates' ? 'Conversion & Quality Gates' : 'HTML Code'}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    {workspaceMode === 'split' && (
+                      <button
+                        type="button"
+                        onClick={() => setSidebarCollapsed(true)}
+                        title="Collapse Sidebar (Maximize Preview Workspace)"
+                        className="p-1.5 rounded-lg text-slate-400 hover:text-amber-400 hover:bg-slate-800 transition cursor-pointer"
+                      >
+                        <PanelLeftClose className="w-4 h-4" />
+                      </button>
+                    )}
+                    {workspaceMode === 'editor' && (
+                      <button
+                        type="button"
+                        onClick={() => setWorkspaceMode('split')}
+                        title="Return to Split View"
+                        className="px-2 py-1 rounded-lg text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 transition"
+                      >
+                        Split View
+                      </button>
+                    )}
+                  </div>
                 </div>
-                <div className="flex-1 mx-4 px-3 py-1 rounded-md bg-slate-900 border border-slate-800 text-[11px] font-mono text-slate-400 truncate text-center">
-                  https://hal.ai/landing/{config.id}
-                </div>
+
+                {/* TAB 1: SECTION BUILDER */}
+                {activeTab === 'builder' && (
+                  <SectionEditor config={config} onChange={setConfig} />
+                )}
+
+                {/* TAB 2: TRADE TEMPLATES */}
+                {activeTab === 'templates' && (
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between pb-2 border-b border-slate-800">
+                      <div className="flex items-center gap-2">
+                        <Sliders className="w-4 h-4 text-amber-400" />
+                        <h4 className="text-xs font-bold uppercase tracking-wider text-slate-200">
+                          Trade-Specific Template Library
+                        </h4>
+                      </div>
+                    </div>
+                    <p className="text-xs text-slate-400 leading-relaxed">
+                      One-click mobile-first templates engineered specifically for local home service trades with proven high-converting conversion blocks.
+                    </p>
+
+                    <div className="grid grid-cols-1 gap-3">
+                      {Object.entries(TRADE_TEMPLATES).map(([key, t]) => (
+                        <div
+                          key={key}
+                          className="p-4 rounded-xl bg-slate-950 border border-slate-800 hover:border-amber-400/80 transition space-y-2 flex flex-col justify-between"
+                        >
+                          <div>
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs font-bold text-white uppercase">{t.trade}</span>
+                              <span className="px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400 text-[10px] font-semibold">
+                                30-Min SLA
+                              </span>
+                            </div>
+                            <h5 className="text-sm font-bold text-slate-200 mt-1">{t.title}</h5>
+                            <p className="text-[11px] text-slate-400 mt-1 line-clamp-2">
+                              {t.sections.hero.headline}
+                            </p>
+                          </div>
+
+                          <div className="pt-2 border-t border-slate-900 flex items-center justify-between">
+                            <span className="text-[10px] text-slate-500 font-mono">
+                              {t.sectionOrder.length} Modules Included
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => handleApplyTemplate(key)}
+                              className="px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs transition cursor-pointer"
+                            >
+                              Apply Template
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* TAB 3: BRANDING & CONTACT */}
+                {activeTab === 'branding' && (
+                  <BrandingControls config={config} onChange={setConfig} />
+                )}
+
+                {/* TAB 4: SEO & SCHEMA */}
+                {activeTab === 'seo' && (
+                  <SeoSchemaPanel config={config} onChange={setConfig} />
+                )}
+
+                {/* TAB 5: QUALITY GATES & ANTI-SLOP AUDIT */}
+                {activeTab === 'quality_gates' && (
+                  <QualityGatePanel 
+                    config={config} 
+                    onChange={setConfig} 
+                    onNavigateToTab={(tab) => {
+                      if (tab === 'editor') setActiveTab('builder');
+                      else if (tab === 'seo') setActiveTab('seo');
+                      else if (tab === 'branding') setActiveTab('branding');
+                    }}
+                  />
+                )}
+
+                {/* TAB 6: HTML CODE INSPECTOR */}
+                {activeTab === 'code' && (
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between pb-2 border-b border-slate-800">
+                      <div className="flex items-center gap-2">
+                        <Code className="w-4 h-4 text-sky-400" />
+                        <h4 className="text-xs font-bold uppercase tracking-wider text-slate-200">
+                          Exportable HTML Source
+                        </h4>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleDownloadHtml}
+                        className="text-xs text-sky-400 hover:text-sky-300 font-bold flex items-center gap-1 cursor-pointer"
+                      >
+                        <Download className="w-3.5 h-3.5" /> Download
+                      </button>
+                    </div>
+                    <textarea
+                      readOnly
+                      value={renderedHtml}
+                      rows={22}
+                      className="w-full p-3 rounded-xl bg-slate-950 border border-slate-800 font-mono text-[10.5px] text-slate-300 leading-relaxed focus:outline-none"
+                    />
+                  </div>
+                )}
+              </>
+            )}
+          </aside>
+        )}
+
+        {/* Right Canvas: Live Iframe Preview With Responsive Bezel */}
+        {workspaceMode !== 'editor' && (
+          <main className={`flex-1 flex-col items-center justify-start p-3 sm:p-6 overflow-y-auto relative transition-colors duration-200 ${
+            mobileActiveView === 'preview' ? 'flex flex-col' : 'hidden md:flex md:flex-col'
+          } ${
+            config.branding.colorPreset === 'paper_ink' ? 'bg-[#ede7db]' : 'bg-slate-950/90'
+          }`}>
+            
+            {/* If sidebar is hidden/collapsed: Floating Reopen Button */}
+            {(workspaceMode === 'canvas' || sidebarCollapsed) && (
+              <div className="absolute top-4 left-4 z-20 flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => { setWorkspaceMode('split'); setSidebarCollapsed(false); }}
+                  className="px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs shadow-lg transition flex items-center gap-1.5 cursor-pointer"
+                  title="Open Editor Sidebar"
+                >
+                  <PanelLeftOpen className="w-4 h-4" />
+                  <span>Open Editor</span>
+                </button>
               </div>
             )}
 
-            {/* Mobile Speaker Notch */}
-            {viewport === 'mobile' && (
-              <div className="pt-2 pb-1 bg-slate-950 flex justify-center shrink-0">
-                <span className="w-16 h-1 rounded-full bg-slate-800" />
+            {/* Top Canvas Indicator */}
+            <div className="w-full max-w-5xl flex items-center justify-between pb-3 text-xs">
+              <div className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                <span className={`font-mono text-[11px] ${config.branding.colorPreset === 'paper_ink' ? 'text-stone-700 font-semibold' : 'text-slate-400'}`}>
+                  Live Preview: {viewport.toUpperCase()} ({viewport === 'desktop' ? '1200px' : viewport === 'tablet' ? '768px' : '375px'}) {zoomLevel !== '100' ? `• Zoom ${zoomLevel}%` : ''}
+                </span>
               </div>
-            )}
+              <div className="flex items-center gap-2">
+                <span className={`text-[11px] font-mono hidden sm:inline ${config.branding.colorPreset === 'paper_ink' ? 'text-stone-500' : 'text-slate-500'}`}>
+                  Instant Lead-Capture to HAL CRM
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setShowFullscreenModal(true)}
+                  className={`text-[11px] font-semibold px-2.5 py-1 rounded-lg transition flex items-center gap-1.5 cursor-pointer ${
+                    config.branding.colorPreset === 'paper_ink'
+                      ? 'bg-stone-200 hover:bg-stone-300 text-stone-800'
+                      : 'bg-slate-800 hover:bg-slate-700 text-slate-300'
+                  }`}
+                  title="Open Distraction-Free Preview"
+                >
+                  <Maximize2 className="w-3 h-3" />
+                  <span>Full View</span>
+                </button>
+              </div>
+            </div>
 
-            {/* Live Rendered Iframe */}
-            <iframe
-              key={`${config.id}-${config.branding.colorPreset}-${config.sectionOrder.join('-')}`}
-              srcDoc={renderedHtml}
-              title="Landing Page Preview"
-              className="w-full flex-1 border-0 bg-slate-950"
-            />
-          </div>
-        </main>
+            {/* Viewport Frame with Zoom Scaling */}
+            <div
+              style={{
+                transform: zoomLevel !== '100' ? `scale(${Number(zoomLevel) / 100})` : undefined,
+                transformOrigin: 'top center',
+                transition: 'transform 200ms ease'
+              }}
+              className={`transition-all duration-300 ease-in-out rounded-2xl shadow-2xl overflow-hidden flex flex-col ${
+                config.branding.colorPreset === 'paper_ink'
+                  ? 'bg-white border border-[#dcd5c7] shadow-stone-300/40'
+                  : 'bg-slate-900 border border-slate-800'
+              } ${
+                viewport === 'desktop'
+                  ? 'w-full max-w-5xl h-[860px]'
+                  : viewport === 'tablet'
+                  ? 'w-[768px] h-[860px]'
+                  : 'w-[375px] h-[740px] ring-8 ring-slate-800/80 rounded-[36px]'
+              }`}
+            >
+              {/* Browser Bezel for Desktop & Tablet */}
+              {viewport !== 'mobile' && (
+                <div className={`px-4 py-2 flex items-center gap-2 shrink-0 ${
+                  config.branding.colorPreset === 'paper_ink'
+                    ? 'bg-[#f7f5f0] border-b border-[#dcd5c7]'
+                    : 'bg-slate-950 border-b border-slate-800'
+                }`}>
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-2.5 h-2.5 rounded-full bg-red-500/80" />
+                    <span className="w-2.5 h-2.5 rounded-full bg-amber-500/80" />
+                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-500/80" />
+                  </div>
+                  <div className={`flex-1 mx-4 px-3 py-1 rounded-md text-[11px] font-mono truncate text-center ${
+                    config.branding.colorPreset === 'paper_ink'
+                      ? 'bg-white border border-[#dcd5c7] text-stone-700'
+                      : 'bg-slate-900 border border-slate-800 text-slate-400'
+                  }`}>
+                    https://hal.ai/landing/{config.id}
+                  </div>
+                </div>
+              )}
+
+              {/* Mobile Speaker Notch */}
+              {viewport === 'mobile' && (
+                <div className="pt-2 pb-1 bg-slate-950 flex justify-center shrink-0">
+                  <span className="w-16 h-1 rounded-full bg-slate-800" />
+                </div>
+              )}
+
+              {/* Live Rendered Iframe */}
+              <iframe
+                key={`${config.id}-${config.branding.colorPreset}-${config.sectionOrder.join('-')}`}
+                srcDoc={renderedHtml}
+                title="Landing Page Preview"
+                className={`w-full flex-1 border-0 ${
+                  config.branding.colorPreset === 'paper_ink' ? 'bg-[#f7f5f0]' : 'bg-slate-950'
+                }`}
+              />
+            </div>
+          </main>
+        )}
       </div>
 
       {/* ─── AI GENERATOR MODAL ─── */}
@@ -687,6 +1033,90 @@ export const LandingPageStudioPanel: React.FC<{ token: string | null }> = ({ tok
                 ))}
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* ─── FULLSCREEN DISTRACTION-FREE PREVIEW MODAL ─── */}
+      {showFullscreenModal && (
+        <div className="fixed inset-0 z-50 flex flex-col bg-slate-950">
+          {/* Header */}
+          <div className="px-6 py-3 border-b border-slate-800 bg-slate-900/90 backdrop-blur flex items-center justify-between shrink-0">
+            <div className="flex items-center gap-3">
+              <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping"></span>
+              <h3 className="text-sm font-bold text-white uppercase tracking-wider">
+                Distraction-Free Live Preview • {config.sections.hero.headline || config.title}
+              </h3>
+            </div>
+            
+            <div className="flex items-center gap-2">
+              <div className="flex p-0.5 bg-slate-950 border border-slate-800 rounded-xl">
+                <button
+                  type="button"
+                  onClick={() => setViewport('desktop')}
+                  className={`p-1.5 rounded-lg transition ${viewport === 'desktop' ? 'bg-slate-800 text-amber-400' : 'text-slate-400 hover:text-white'}`}
+                >
+                  <Monitor className="w-4 h-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setViewport('tablet')}
+                  className={`p-1.5 rounded-lg transition ${viewport === 'tablet' ? 'bg-slate-800 text-amber-400' : 'text-slate-400 hover:text-white'}`}
+                >
+                  <Tablet className="w-4 h-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setViewport('mobile')}
+                  className={`p-1.5 rounded-lg transition ${viewport === 'mobile' ? 'bg-slate-800 text-amber-400' : 'text-slate-400 hover:text-white'}`}
+                >
+                  <Smartphone className="w-4 h-4" />
+                </button>
+              </div>
+
+              <a
+                href={liveUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs transition flex items-center gap-1.5 border border-slate-700"
+              >
+                <ExternalLink className="w-3.5 h-3.5" />
+                <span>New Tab</span>
+              </a>
+
+              <button
+                type="button"
+                onClick={() => setShowFullscreenModal(false)}
+                className="px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs transition flex items-center gap-1.5 cursor-pointer"
+              >
+                <Minimize2 className="w-3.5 h-3.5" />
+                <span>Close Fullscreen</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Canvas Container */}
+          <div className={`flex-1 flex items-center justify-center p-4 overflow-hidden ${
+            config.branding.colorPreset === 'paper_ink' ? 'bg-[#ede7db]' : 'bg-slate-950'
+          }`}>
+            <div className={`h-full transition-all duration-300 rounded-2xl shadow-2xl overflow-hidden border flex flex-col ${
+              config.branding.colorPreset === 'paper_ink' ? 'bg-white border-[#dcd5c7]' : 'bg-slate-900 border-slate-800'
+            } ${
+              viewport === 'desktop'
+                ? 'w-full max-w-6xl'
+                : viewport === 'tablet'
+                ? 'w-[768px]'
+                : 'w-[375px] ring-8 ring-slate-800/80 rounded-[36px]'
+            }`}>
+              <iframe
+                key={`fs-${config.id}-${config.branding.colorPreset}-${config.sectionOrder.join('-')}`}
+                srcDoc={renderedHtml}
+                title="Fullscreen Preview"
+                className={`w-full flex-1 border-0 ${
+                  config.branding.colorPreset === 'paper_ink' ? 'bg-[#f7f5f0]' : 'bg-slate-950'
+                }`}
+              />
+            </div>
           </div>
         </div>
       )}

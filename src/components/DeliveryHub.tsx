@@ -48,20 +48,30 @@ export default function DeliveryHub({ token, leads = [] }: DeliveryHubProps) {
   const [newProjectPackage, setNewProjectPackage] = useState<'Growth' | 'Dominance' | 'Enterprise'>('Dominance');
   const [newProjectRetainer, setNewProjectRetainer] = useState(2400);
 
-  const fetchProjects = async () => {
+  const fetchProjects = async (retry = 1) => {
     try {
+      setLoading(true);
+      const activeToken = token || localStorage.getItem('halbiz_auth_token') || localStorage.getItem('token') || '';
       const res = await fetch('/api/projects', {
-        headers: { 'Authorization': `Bearer ${token}` }
+        headers: activeToken ? { 'Authorization': `Bearer ${activeToken}` } : {}
       });
       if (res.ok) {
         const data = await res.json();
-        setProjects(data);
-        if (data.length > 0 && !selectedProject) {
-          setSelectedProject(data[0]);
+        if (Array.isArray(data)) {
+          setProjects(data);
+          if (data.length > 0 && !selectedProject) {
+            setSelectedProject(data[0]);
+          }
         }
+      } else if (retry > 0) {
+        setTimeout(() => fetchProjects(retry - 1), 600);
       }
     } catch (err) {
-      console.error('Failed to fetch client projects:', err);
+      if (retry > 0) {
+        setTimeout(() => fetchProjects(retry - 1), 600);
+      } else {
+        console.warn('Client projects temporarily unavailable:', err);
+      }
     } finally {
       setLoading(false);
     }

@@ -14,6 +14,7 @@ const PRESETS: Array<{
   secondary: string;
   accent: string;
 }> = [
+  { id: 'paper_ink', name: 'Paper & Ink (Warm Archival)', primary: '#18181b', secondary: '#f7f5f0', accent: '#9a3412' },
   { id: 'emergency_amber', name: 'Emergency Amber', primary: '#0284c7', secondary: '#0f172a', accent: '#f59e0b' },
   { id: 'trust_navy', name: 'Trust Navy & Cyan', primary: '#2563eb', secondary: '#0f172a', accent: '#38bdf8' },
   { id: 'modern_slate', name: 'Modern Slate Blue', primary: '#0f172a', secondary: '#334155', accent: '#3b82f6' },

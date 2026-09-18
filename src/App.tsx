@@ -269,28 +269,55 @@ export default function App() {
     }
   }, [theme]);
 
-  // Global fetch interceptor to attach auth tokens and catch expired sessions
+  // Global fetch interceptor to attach auth tokens, handle transient network hiccups, and catch expired sessions
   useEffect(() => {
     const originalFetch = window.fetch;
     window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
-      let modifiedInit = init;
+      let modifiedInit = init ? { ...init } : {};
       const urlStr = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
 
-      // Auto-inject Authorization header for /api requests if not already provided and not an auth endpoint
+      // Auto-inject or repair Authorization header for /api requests if not an auth endpoint
       if (urlStr && urlStr.startsWith('/api') && !urlStr.startsWith('/api/auth/')) {
         const storedToken = localStorage.getItem('halbiz_auth_token') || localStorage.getItem('token');
         if (storedToken) {
-          const headers = new Headers(modifiedInit?.headers || {});
-          if (!headers.has('Authorization')) {
+          const headers = new Headers(modifiedInit.headers || {});
+          const existingAuth = headers.get('Authorization');
+          const isInvalidAuth = !existingAuth ||
+            existingAuth === 'Bearer' ||
+            existingAuth === 'Bearer ' ||
+            existingAuth === 'Bearer null' ||
+            existingAuth === 'Bearer undefined' ||
+            existingAuth.trim() === 'Bearer';
+
+          if (isInvalidAuth) {
             headers.set('Authorization', `Bearer ${storedToken}`);
-            modifiedInit = { ...modifiedInit, headers };
+            modifiedInit.headers = headers;
           }
         }
       }
 
-      const response = await originalFetch(input, modifiedInit);
+      // Execute request with resilient retry for ephemeral dev-server boot / network stalls
+      let response: Response;
+      try {
+        response = await originalFetch(input, modifiedInit);
+      } catch (networkErr: any) {
+        const method = (modifiedInit.method || 'GET').toUpperCase();
+        if (method === 'GET' && urlStr && urlStr.startsWith('/api')) {
+          // Dev server / Vite middleware warm-up retry: wait 350ms and retry once
+          await new Promise((resolve) => setTimeout(resolve, 350));
+          try {
+            response = await originalFetch(input, modifiedInit);
+          } catch (retryErr) {
+            // One final backoff attempt
+            await new Promise((resolve) => setTimeout(resolve, 700));
+            response = await originalFetch(input, modifiedInit);
+          }
+        } else {
+          throw networkErr;
+        }
+      }
 
-      // Gracefully handle expired or invalid authentication tokens across all /api calls
+      // Gracefully handle genuinely expired authentication tokens across /api calls
       if (response.status === 401 && urlStr && urlStr.startsWith('/api') && !urlStr.startsWith('/api/auth/')) {
         const hasStoredSession = localStorage.getItem('halbiz_auth_token') || localStorage.getItem('token');
         if (hasStoredSession) {
@@ -620,6 +647,13 @@ export default function App() {
     );
   }
 
+  // Public Community Sandbox indicator for shared link (ais-pre) or Reddit visitors
+  const isSharedPreview = typeof window !== 'undefined' && (
+    window.location.hostname.includes('ais-pre-') ||
+    document.referrer.toLowerCase().includes('reddit.com') ||
+    document.referrer.toLowerCase().includes('redd.it')
+  );
+
   if (publicPortalToken) {
     return (
       <PublicPortalPage 
@@ -670,8 +704,6 @@ export default function App() {
     {
       group: 'COMPANY KNOWLEDGE & TASKS',
       items: [
-        { id: 'bible', label: 'Company Operating Manual', icon: BookOpen },
-        { id: 'roadmap', label: 'HAL Roadmap & Phase 1', icon: LineChart },
         { id: 'drive', label: 'Company File Vault', icon: FileText },
         { id: 'skills', label: 'AI Business Skills', icon: Sparkles },
         { id: 'scheduler', label: 'Scheduled Tasks & Scans', icon: Play },
@@ -682,6 +714,7 @@ export default function App() {
       items: [
         { id: 'connectors', label: 'Connected Apps', icon: Share2 },
         { id: 'credentials', label: 'Company Settings & Keys', icon: Settings },
+        { id: 'about', label: 'About & Operating Manual', icon: BookOpen },
         { id: 'health', label: 'System & Server Status', icon: Activity }
       ]
     }
@@ -700,6 +733,18 @@ export default function App() {
   return (
     <InspectorProvider>
       <div className={`h-screen flex flex-col font-sans overflow-hidden select-none selection:bg-accent/30 selection:text-white transition-colors duration-200 ${theme === 'light' ? 'light-theme' : 'dark-theme'} ${baseBg}`}>
+
+      {/* PUBLIC COMMUNITY SANDBOX BANNER (REDDIT / SHARED LINK VISITORS) */}
+      {isSharedPreview && (
+        <div className="bg-brand/10 border-b border-brand/20 px-4 py-1.5 flex items-center justify-between text-[11px] font-mono text-brand z-30 shrink-0">
+          <div className="flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-brand animate-pulse" />
+            <span className="font-bold tracking-wide">PUBLIC COMMUNITY TESTING SANDBOX</span>
+            <span className="text-text-secondary hidden md:inline">— Live Telemetry, Isolated Demo Ledger & Gemini Rate Shield Active</span>
+          </div>
+          <span className="text-[10px] text-text-tertiary font-bold tracking-widest uppercase">Safe Mode</span>
+        </div>
+      )}
       
       {/* GLOBAL SSE TOAST ALERT SLIDE-IN */}
       <AnimatePresence>
@@ -947,6 +992,18 @@ export default function App() {
               </span>
               <span className="text-[9px] px-1.5 py-0.5 bg-indigo-500/10 text-indigo-400 font-bold rounded">LIVE</span>
             </button>
+
+            {!isAppInstalled && (
+              <button
+                id="sidebar-download-app-btn"
+                onClick={handleInstallClick}
+                className="flex items-center justify-center gap-1.5 w-full h-8 px-2.5 rounded text-[10px] font-mono font-bold transition-all bg-accent hover:bg-accent/85 text-black shadow-xs cursor-pointer"
+                title="Download HAL Desktop App (Disappears after download)"
+              >
+                <Download className="w-3.5 h-3.5 text-black" />
+                <span>DOWNLOAD APP</span>
+              </button>
+            )}
           </div>
         </aside>
 
@@ -1089,6 +1146,21 @@ export default function App() {
                       onProfilePhotoUpdate={handleProfilePhotoUpdate}
                       onCompanyLogoUpdate={handleCompanyLogoUpdate}
                       onRefresh={fetchAllData}
+                      initialSubTab="settings"
+                    />
+                  )}
+
+                  {(activeTab === 'about' || activeTab === 'bible' || activeTab === 'roadmap') && (
+                    <SettingsPanel 
+                      token={token}
+                      theme={theme}
+                      profilePhoto={profilePhoto}
+                      companyLogo={companyLogo}
+                      onProfilePhotoUpdate={handleProfilePhotoUpdate}
+                      onCompanyLogoUpdate={handleCompanyLogoUpdate}
+                      onRefresh={fetchAllData}
+                      initialSubTab="about"
+                      initialDocId={activeTab === 'roadmap' ? '20' : undefined}
                     />
                   )}
 
@@ -1106,14 +1178,6 @@ export default function App() {
 
                   {activeTab === 'health' && (
                     <SystemHealthPanel token={token} />
-                  )}
-
-                  {activeTab === 'bible' && (
-                    <HalBiblePanel />
-                  )}
-
-                  {activeTab === 'roadmap' && (
-                    <HalBiblePanel initialDocId="20" />
                   )}
 
                   {activeTab === 'drive' && (
@@ -1343,22 +1407,31 @@ export default function App() {
                     <div className="flex flex-col gap-1.5 pt-1">
                       <button
                         onClick={downloadWindowsShortcut}
-                        className="w-full text-center py-1 bg-accent hover:bg-accent/80 text-black text-[9.5px] font-mono font-bold rounded shadow transition-all cursor-pointer"
+                        className={`w-full text-center py-1.5 ${deviceInfo.isWindows || (!deviceInfo.isMac && !deviceInfo.isLinux) ? 'bg-accent hover:bg-accent/80 text-black font-bold' : 'bg-bg-raised border border-border-dim hover:border-text-tertiary text-text-secondary hover:text-text-primary'} text-[9.5px] font-mono rounded shadow-xs transition-all cursor-pointer flex items-center justify-center gap-1.5`}
                       >
-                        DOWNLOAD WINDOWS (.URL)
+                        <Download className="w-3 h-3" />
+                        <span>DOWNLOAD WINDOWS (.URL)</span>
+                        {deviceInfo.isWindows && <span className="text-[8px] bg-black text-accent px-1 rounded">DETECTED</span>}
                       </button>
                       <button
                         onClick={downloadMacShortcut}
-                        className="w-full text-center py-1 bg-bg-raised border border-border-dim hover:border-text-tertiary text-text-secondary hover:text-text-primary text-[9.5px] font-mono font-bold rounded transition-all cursor-pointer"
+                        className={`w-full text-center py-1.5 ${deviceInfo.isMac ? 'bg-accent hover:bg-accent/80 text-black font-bold' : 'bg-bg-raised border border-border-dim hover:border-text-tertiary text-text-secondary hover:text-text-primary'} text-[9.5px] font-mono rounded transition-all cursor-pointer flex items-center justify-center gap-1.5`}
                       >
-                        DOWNLOAD MACOS (.WEBLOC)
+                        <Download className="w-3 h-3" />
+                        <span>DOWNLOAD MACOS (.WEBLOC)</span>
+                        {deviceInfo.isMac && <span className="text-[8px] bg-black text-accent px-1 rounded">DETECTED</span>}
                       </button>
                       <button
                         onClick={downloadLinuxShortcut}
-                        className="w-full text-center py-1 bg-bg-raised border border-border-dim hover:border-text-tertiary text-text-secondary hover:text-text-primary text-[9.5px] font-mono font-bold rounded transition-all cursor-pointer"
+                        className={`w-full text-center py-1.5 ${deviceInfo.isLinux ? 'bg-accent hover:bg-accent/80 text-black font-bold' : 'bg-bg-raised border border-border-dim hover:border-text-tertiary text-text-secondary hover:text-text-primary'} text-[9.5px] font-mono rounded transition-all cursor-pointer flex items-center justify-center gap-1.5`}
                       >
-                        DOWNLOAD LINUX (.DESKTOP)
+                        <Download className="w-3 h-3" />
+                        <span>DOWNLOAD LINUX (.DESKTOP)</span>
+                        {deviceInfo.isLinux && <span className="text-[8px] bg-black text-accent px-1 rounded">DETECTED</span>}
                       </button>
+                    </div>
+                    <div className="text-[8.5px] text-text-tertiary font-mono text-center pt-1">
+                      ✓ Download button automatically disappears once downloaded
                     </div>
                   </div>
                 </div>

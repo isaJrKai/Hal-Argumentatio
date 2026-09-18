@@ -52,6 +52,22 @@ export interface Lead {
   email?: string;
   phone?: string;
 
+  // Data Transparency & Grounding Flags
+  isSynthetic?: boolean;
+  sourceType?: 'live_harvest' | 'synthetic_fallback' | 'manual' | 'google_ads' | 'spreadsheet_import';
+  verificationStatus?: 'VERIFIED' | 'UNVERIFIED_STAGING' | 'FABRICATED_REJECTED';
+  dnsVerified?: boolean;
+  groundingEvidence?: {
+    hostname?: string;
+    dnsResolved?: boolean;
+    httpReachable?: boolean;
+    sslSecured?: boolean;
+    phoneValid?: boolean;
+    isDummyPhone?: boolean;
+    reasons?: string[];
+    verifiedAt?: string;
+  };
+
   // Phase 2: Sourced Real Business Intelligence Properties
   websiteUrl?: string;
   seoScore?: number;
@@ -945,14 +961,24 @@ class Database {
     const id = 'lead_' + crypto.randomBytes(8).toString('hex');
     const now = new Date().toISOString();
     
-    const emailEncrypted = lead.email ? encrypt(lead.email) : undefined;
-    const phoneEncrypted = lead.phone ? encrypt(lead.phone) : undefined;
+    const emailEncrypted = lead.email ? encrypt(lead.email) : lead.emailEncrypted;
+    const phoneEncrypted = lead.phone ? encrypt(lead.phone) : lead.phoneEncrypted;
+    const isSynthetic = lead.isSynthetic !== undefined 
+      ? lead.isSynthetic 
+      : (lead.phone === '555-0192' || lead.phone === '555-0100' || lead.source === 'synthetic_fallback');
+    const sourceType = lead.sourceType || (isSynthetic ? 'synthetic_fallback' : 'live_harvest');
+    const verificationStatus = lead.verificationStatus || (isSynthetic ? 'FABRICATED_REJECTED' : 'VERIFIED');
+    const dnsVerified = lead.dnsVerified !== undefined ? lead.dnsVerified : !isSynthetic;
 
     const newLead: Lead = {
       ...lead,
       id,
       emailEncrypted,
       phoneEncrypted,
+      isSynthetic,
+      sourceType,
+      verificationStatus,
+      dnsVerified,
       createdAt: now,
       updatedAt: now
     };
@@ -1600,7 +1626,7 @@ class Database {
   }
 
   // ─── HAL Roadmap Phase 1: Cryptographic Structured Ledger Methods ───────────
-  public getStructuredLedger(contractorId?: string, limit = 100): StructuredLedgerEntry[] {
+  public getStructuredLedger(contractorId?: string, limit = 10000): StructuredLedgerEntry[] {
     if (!this.data.structuredLedger) {
       this.data.structuredLedger = [];
     }

@@ -412,18 +412,24 @@ export const HalRoadmapPhase2View: React.FC = () => {
                 Purges static mock seeds and ingests actual operating businesses with verified SSL status, mobile Core Web Vitals, and AES-GCM-256 encrypted PII.
               </p>
             </div>
-            <div className="p-3 rounded-lg bg-bg-base border border-border-dim font-mono text-xs space-y-1.5">
-              <div className="flex justify-between text-text-secondary">
-                <span>Real Operating Leads:</span>
-                <span className="font-bold text-text-primary">{p1?.metrics.realHarvestedCount || 0}</span>
+            <div className="p-3 rounded-lg bg-bg-base border border-border-dim font-mono text-xs space-y-2">
+              <div className="flex items-center justify-between gap-2 text-text-secondary">
+                <span className="shrink-0">Real Operating Leads:</span>
+                <span className="font-bold text-text-primary text-right">{p1?.metrics.realHarvestedCount || 0}</span>
               </div>
-              <div className="flex justify-between text-text-secondary">
-                <span>PII Encrypted Records:</span>
-                <span className="font-bold text-emerald-500">{p1?.metrics.encryptedCount || 0}</span>
+              <div className="flex items-center justify-between gap-2 text-text-secondary">
+                <span className="shrink-0">PII Encrypted Records:</span>
+                <span className="font-bold text-emerald-500 text-right">{p1?.metrics.encryptedCount || 0}</span>
               </div>
-              <div className="flex justify-between text-text-secondary">
-                <span>Plaintext Leak Check:</span>
-                <span className="font-bold text-emerald-500">{p1?.metrics.plaintextLeakCheck || 'PASSED'}</span>
+              <div className="flex items-center justify-between gap-2 text-text-secondary">
+                <span className="shrink-0">Plaintext Leak Check:</span>
+                <span className={`font-bold px-1.5 py-0.5 rounded text-[11px] text-right ${
+                  p1?.metrics.plaintextLeakCheck?.includes('FAIL')
+                    ? 'bg-red-500/10 text-red-500 border border-red-500/20'
+                    : 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20'
+                }`}>
+                  {p1?.metrics.plaintextLeakCheck === 'PASSED_ZERO_LEAKAGE' ? 'PASSED (0 LEAK)' : (p1?.metrics.plaintextLeakCheck || 'PASSED')}
+                </span>
               </div>
             </div>
             <button
@@ -451,18 +457,18 @@ export const HalRoadmapPhase2View: React.FC = () => {
                 Spatial quadrant clustering across North, South, East, West, and Central hubs. Calculates dynamic dispatch latency in minutes and density congestion ratings.
               </p>
             </div>
-            <div className="p-3 rounded-lg bg-bg-base border border-border-dim font-mono text-xs space-y-1.5">
-              <div className="flex justify-between text-text-secondary">
-                <span>Active Quadrants:</span>
-                <span className="font-bold text-text-primary">{statusData?.quadrants.length || 5}</span>
+            <div className="p-3 rounded-lg bg-bg-base border border-border-dim font-mono text-xs space-y-2">
+              <div className="flex items-center justify-between gap-2 text-text-secondary">
+                <span className="shrink-0">Active Quadrants:</span>
+                <span className="font-bold text-text-primary text-right">{statusData?.quadrants.length || 5}</span>
               </div>
-              <div className="flex justify-between text-text-secondary">
-                <span>Avg Dispatch Latency:</span>
-                <span className="font-bold text-accent">{p2?.metrics.avgLatencyMins || 19.8} mins</span>
+              <div className="flex items-center justify-between gap-2 text-text-secondary">
+                <span className="shrink-0">Avg Dispatch Latency:</span>
+                <span className="font-bold text-accent text-right">{p2?.metrics.avgLatencyMins || 19.8} mins</span>
               </div>
-              <div className="flex justify-between text-text-secondary">
-                <span>Territory Radius:</span>
-                <span className="font-bold text-text-primary">15.0 km</span>
+              <div className="flex items-center justify-between gap-2 text-text-secondary">
+                <span className="shrink-0">Territory Radius:</span>
+                <span className="font-bold text-text-primary text-right">15.0 km</span>
               </div>
             </div>
             <button
@@ -490,18 +496,18 @@ export const HalRoadmapPhase2View: React.FC = () => {
                 Audits localized Google Maps 3-Pack competitors, analyzes Core Web Vitals speed deficits, and drafts a 4-step tactical penetration plan.
               </p>
             </div>
-            <div className="p-3 rounded-lg bg-bg-base border border-border-dim font-mono text-xs space-y-1.5">
-              <div className="flex justify-between text-text-secondary">
-                <span>Top Competitors Tracked:</span>
-                <span className="font-bold text-text-primary">{activeAuditReport?.competitors.length || 4}</span>
+            <div className="p-3 rounded-lg bg-bg-base border border-border-dim font-mono text-xs space-y-2">
+              <div className="flex items-center justify-between gap-2 text-text-secondary">
+                <span className="shrink-0">Top Competitors Tracked:</span>
+                <span className="font-bold text-text-primary text-right">{activeAuditReport?.competitors.length || 4}</span>
               </div>
-              <div className="flex justify-between text-text-secondary">
-                <span>Avg Competitor Speed:</span>
-                <span className="font-bold text-amber-500">{activeAuditReport?.marketAverages.avgMobileSpeed || 45}/100</span>
+              <div className="flex items-center justify-between gap-2 text-text-secondary">
+                <span className="shrink-0">Avg Competitor Speed:</span>
+                <span className="font-bold text-amber-500 text-right">{activeAuditReport?.marketAverages.avgMobileSpeed || 45}/100</span>
               </div>
-              <div className="flex justify-between text-text-secondary">
-                <span>Market Saturation:</span>
-                <span className="font-bold text-indigo-400">{activeAuditReport?.saturationLevel || 'MEDIUM-HIGH'}</span>
+              <div className="flex items-center justify-between gap-2 text-text-secondary">
+                <span className="shrink-0">Market Saturation:</span>
+                <span className="font-bold text-indigo-400 text-right">{activeAuditReport?.saturationLevel || 'MEDIUM-HIGH'}</span>
               </div>
             </div>
             <button

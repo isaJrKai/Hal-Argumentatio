@@ -8,6 +8,7 @@ export type TradeType =
   | 'general';
 
 export type ColorPreset = 
+  | 'paper_ink'
   | 'emergency_amber' 
   | 'trust_navy' 
   | 'modern_slate' 

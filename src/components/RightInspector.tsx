@@ -94,39 +94,41 @@ export const RightInspector: React.FC = () => {
         </button>
       </div>
 
-      {/* Tabs */}
-      <div className="flex items-center border-b border-border-dim/60 px-2 shrink-0 bg-bg-base/50">
-        <button
-          onClick={() => setInspectorTab('content')}
-          className={`flex-1 py-2 text-xs font-medium text-center border-b-2 transition-all cursor-pointer ${
-            activeTab === 'content'
-              ? 'border-accent text-accent font-semibold'
-              : 'border-transparent text-text-secondary hover:text-text-primary'
-          }`}
-        >
-          Content
-        </button>
-        <button
-          onClick={() => setInspectorTab('style')}
-          className={`flex-1 py-2 text-xs font-medium text-center border-b-2 transition-all cursor-pointer ${
-            activeTab === 'style'
-              ? 'border-accent text-accent font-semibold'
-              : 'border-transparent text-text-secondary hover:text-text-primary'
-          }`}
-        >
-          Style
-        </button>
-        <button
-          onClick={() => setInspectorTab('settings')}
-          className={`flex-1 py-2 text-xs font-medium text-center border-b-2 transition-all cursor-pointer ${
-            activeTab === 'settings'
-              ? 'border-accent text-accent font-semibold'
-              : 'border-transparent text-text-secondary hover:text-text-primary'
-          }`}
-        >
-          Settings
-        </button>
-      </div>
+      {/* Tabs - only displayed when inspecting rich multi-tab blocks */}
+      {type === 'email_block' && (
+        <div className="flex items-center border-b border-border-dim/60 px-2 shrink-0 bg-bg-base/50">
+          <button
+            onClick={() => setInspectorTab('content')}
+            className={`flex-1 py-2 text-xs font-medium text-center border-b-2 transition-all cursor-pointer ${
+              activeTab === 'content'
+                ? 'border-accent text-accent font-semibold'
+                : 'border-transparent text-text-secondary hover:text-text-primary'
+            }`}
+          >
+            Content
+          </button>
+          <button
+            onClick={() => setInspectorTab('style')}
+            className={`flex-1 py-2 text-xs font-medium text-center border-b-2 transition-all cursor-pointer ${
+              activeTab === 'style'
+                ? 'border-accent text-accent font-semibold'
+                : 'border-transparent text-text-secondary hover:text-text-primary'
+            }`}
+          >
+            Style
+          </button>
+          <button
+            onClick={() => setInspectorTab('settings')}
+            className={`flex-1 py-2 text-xs font-medium text-center border-b-2 transition-all cursor-pointer ${
+              activeTab === 'settings'
+                ? 'border-accent text-accent font-semibold'
+                : 'border-transparent text-text-secondary hover:text-text-primary'
+            }`}
+          >
+            Settings
+          </button>
+        </div>
+      )}
 
       {/* Inspector Body */}
       <div className="flex-1 overflow-y-auto p-4 space-y-5 text-xs">
@@ -431,6 +433,252 @@ export const RightInspector: React.FC = () => {
               {hermesSuccessMessage && (
                 <p className="text-[10px] text-positive font-mono mt-1">{hermesSuccessMessage}</p>
               )}
+            </div>
+          </div>
+        )}
+
+        {/* CASE 3: LANDING PAGE SECTION */}
+        {type === 'landing_section' && (
+          <div className="space-y-4">
+            <div className="p-3 bg-bg-base border border-border-dim rounded-lg space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-mono font-bold uppercase text-accent">
+                  {data?.sectionKey?.replace('_', ' ') || 'Landing Section'}
+                </span>
+                <label className="flex items-center gap-1.5 cursor-pointer text-[11px] font-mono">
+                  <input
+                    type="checkbox"
+                    checked={data?.sectionData?.active ?? true}
+                    onChange={(e) => {
+                      const updated = {
+                        ...data,
+                        sectionData: {
+                          ...data.sectionData,
+                          active: e.target.checked
+                        }
+                      };
+                      updateInspectorData(updated);
+                    }}
+                    className="accent-accent w-3.5 h-3.5 rounded cursor-pointer"
+                  />
+                  <span className={data?.sectionData?.active !== false ? 'text-positive font-bold' : 'text-text-tertiary'}>
+                    {data?.sectionData?.active !== false ? 'Active' : 'Disabled'}
+                  </span>
+                </label>
+              </div>
+              <div className="text-xs text-text-secondary font-mono">
+                Live property inspector connected to Landing Page Studio.
+              </div>
+            </div>
+
+            {/* Headline / Title */}
+            {(data?.sectionData?.headline !== undefined || data?.sectionData?.title !== undefined) && (
+              <div>
+                <label className="block text-[11px] font-mono text-text-secondary mb-1 uppercase font-bold">
+                  {data?.sectionData?.headline !== undefined ? 'Headline' : 'Title'}
+                </label>
+                <input
+                  type="text"
+                  value={data?.sectionData?.headline ?? data?.sectionData?.title ?? ''}
+                  onChange={(e) => {
+                    const field = data?.sectionData?.headline !== undefined ? 'headline' : 'title';
+                    const updated = {
+                      ...data,
+                      sectionData: {
+                        ...data.sectionData,
+                        [field]: e.target.value
+                      }
+                    };
+                    updateInspectorData(updated);
+                  }}
+                  className="w-full px-2.5 py-1.5 rounded bg-bg-base border border-border-dim focus:border-accent text-text-primary text-xs outline-hidden"
+                />
+              </div>
+            )}
+
+            {/* Subheadline / Text */}
+            {(data?.sectionData?.subheadline !== undefined || data?.sectionData?.text !== undefined) && (
+              <div>
+                <label className="block text-[11px] font-mono text-text-secondary mb-1 uppercase font-bold">
+                  {data?.sectionData?.subheadline !== undefined ? 'Subheadline' : 'Content Text'}
+                </label>
+                <textarea
+                  rows={3}
+                  value={data?.sectionData?.subheadline ?? data?.sectionData?.text ?? ''}
+                  onChange={(e) => {
+                    const field = data?.sectionData?.subheadline !== undefined ? 'subheadline' : 'text';
+                    const updated = {
+                      ...data,
+                      sectionData: {
+                        ...data.sectionData,
+                        [field]: e.target.value
+                      }
+                    };
+                    updateInspectorData(updated);
+                  }}
+                  className="w-full px-2.5 py-1.5 rounded bg-bg-base border border-border-dim focus:border-accent text-text-primary text-xs outline-hidden resize-none"
+                />
+              </div>
+            )}
+
+            {/* Description / Subtitle */}
+            {(data?.sectionData?.description !== undefined || data?.sectionData?.subtitle !== undefined) && (
+              <div>
+                <label className="block text-[11px] font-mono text-text-secondary mb-1 uppercase font-bold">
+                  {data?.sectionData?.description !== undefined ? 'Description' : 'Subtitle'}
+                </label>
+                <textarea
+                  rows={2}
+                  value={data?.sectionData?.description ?? data?.sectionData?.subtitle ?? ''}
+                  onChange={(e) => {
+                    const field = data?.sectionData?.description !== undefined ? 'description' : 'subtitle';
+                    const updated = {
+                      ...data,
+                      sectionData: {
+                        ...data.sectionData,
+                        [field]: e.target.value
+                      }
+                    };
+                    updateInspectorData(updated);
+                  }}
+                  className="w-full px-2.5 py-1.5 rounded bg-bg-base border border-border-dim focus:border-accent text-text-primary text-xs outline-hidden resize-none"
+                />
+              </div>
+            )}
+
+            {/* CTA / Button Text */}
+            {(data?.sectionData?.primaryCtaText !== undefined || data?.sectionData?.ctaText !== undefined || data?.sectionData?.buttonText !== undefined) && (
+              <div>
+                <label className="block text-[11px] font-mono text-text-secondary mb-1 uppercase font-bold">
+                  CTA / Button Text
+                </label>
+                <input
+                  type="text"
+                  value={data.sectionData.primaryCtaText ?? data.sectionData.ctaText ?? data.sectionData.buttonText ?? ''}
+                  onChange={(e) => {
+                    const field = data.sectionData.primaryCtaText !== undefined 
+                      ? 'primaryCtaText' 
+                      : data.sectionData.ctaText !== undefined 
+                        ? 'ctaText' 
+                        : 'buttonText';
+                    const updated = {
+                      ...data,
+                      sectionData: {
+                        ...data.sectionData,
+                        [field]: e.target.value
+                      }
+                    };
+                    updateInspectorData(updated);
+                  }}
+                  className="w-full px-2.5 py-1.5 rounded bg-bg-base border border-border-dim focus:border-accent text-text-primary text-xs outline-hidden"
+                />
+              </div>
+            )}
+
+            {/* Badge / Urgency Tag */}
+            {(data?.sectionData?.urgencyBadge !== undefined || data?.sectionData?.badgeText !== undefined || data?.sectionData?.tag !== undefined) && (
+              <div>
+                <label className="block text-[11px] font-mono text-text-secondary mb-1 uppercase font-bold">
+                  Badge / Callout Text
+                </label>
+                <input
+                  type="text"
+                  value={data.sectionData.urgencyBadge ?? data.sectionData.badgeText ?? data.sectionData.tag ?? ''}
+                  onChange={(e) => {
+                    const field = data.sectionData.urgencyBadge !== undefined 
+                      ? 'urgencyBadge' 
+                      : data.sectionData.badgeText !== undefined 
+                        ? 'badgeText' 
+                        : 'tag';
+                    const updated = {
+                      ...data,
+                      sectionData: {
+                        ...data.sectionData,
+                        [field]: e.target.value
+                      }
+                    };
+                    updateInspectorData(updated);
+                  }}
+                  className="w-full px-2.5 py-1.5 rounded bg-bg-base border border-border-dim focus:border-accent text-text-primary text-xs outline-hidden"
+                />
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* CASE 4: LANDING PAGE CONFIG */}
+        {type === 'landing_config' && (
+          <div className="space-y-4">
+            <div className="p-3 bg-bg-base border border-border-dim rounded-lg space-y-1">
+              <span className="text-[10px] font-mono font-bold uppercase text-accent">Global Lander Identity</span>
+              <div className="text-xs text-text-secondary font-mono">
+                Updates branding and metadata across all rendered sections.
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-[11px] font-mono text-text-secondary mb-1 uppercase font-bold">Business / Trade Name</label>
+              <input
+                type="text"
+                value={data?.businessName || ''}
+                onChange={(e) => updateInspectorData({ ...data, businessName: e.target.value })}
+                className="w-full px-2.5 py-1.5 rounded bg-bg-base border border-border-dim focus:border-accent text-text-primary text-xs outline-hidden"
+              />
+            </div>
+
+            <div>
+              <label className="block text-[11px] font-mono text-text-secondary mb-1 uppercase font-bold">Primary City Territory</label>
+              <input
+                type="text"
+                value={data?.city || ''}
+                onChange={(e) => updateInspectorData({ ...data, city: e.target.value })}
+                className="w-full px-2.5 py-1.5 rounded bg-bg-base border border-border-dim focus:border-accent text-text-primary text-xs outline-hidden"
+              />
+            </div>
+
+            <div>
+              <label className="block text-[11px] font-mono text-text-secondary mb-1 uppercase font-bold">Click-to-Call Phone</label>
+              <input
+                type="text"
+                value={data?.phone || ''}
+                onChange={(e) => updateInspectorData({ ...data, phone: e.target.value })}
+                className="w-full px-2.5 py-1.5 rounded bg-bg-base border border-border-dim focus:border-accent text-text-primary text-xs outline-hidden"
+              />
+            </div>
+
+            <div>
+              <label className="block text-[11px] font-mono text-text-secondary mb-1 uppercase font-bold">Theme / Color Preset</label>
+              <select
+                value={data?.branding?.colorPreset || 'paper_ink'}
+                onChange={(e) => {
+                  const preset = e.target.value;
+                  let primary = '#18181b';
+                  let secondary = '#f7f5f0';
+                  let accent = '#9a3412';
+                  if (preset === 'emergency_amber') { primary = '#0284c7'; secondary = '#0f172a'; accent = '#f59e0b'; }
+                  else if (preset === 'trust_navy') { primary = '#2563eb'; secondary = '#0f172a'; accent = '#38bdf8'; }
+                  else if (preset === 'eco_green') { primary = '#059669'; secondary = '#064e3b'; accent = '#10b981'; }
+                  
+                  updateInspectorData({
+                    ...data,
+                    branding: {
+                      ...data.branding,
+                      colorPreset: preset,
+                      primaryColor: primary,
+                      secondaryColor: secondary,
+                      accentColor: accent
+                    }
+                  });
+                }}
+                className="w-full px-2.5 py-1.5 rounded bg-bg-base border border-border-dim focus:border-accent text-text-primary text-xs outline-hidden"
+              >
+                <option value="paper_ink">Paper & Ink (Warm Archival)</option>
+                <option value="emergency_amber">Emergency Amber</option>
+                <option value="trust_navy">Trust Navy & Cyan</option>
+                <option value="modern_slate">Modern Slate</option>
+                <option value="eco_green">Eco Emerald</option>
+                <option value="electric_gold">Electric Gold</option>
+              </select>
             </div>
           </div>
         )}

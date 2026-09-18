@@ -50,12 +50,13 @@ export async function callNemotron(
     throw new Error("NVIDIA_API_KEY is not defined.");
   }
 
-  // Active models available on NVIDIA NIM API catalog
+  // Active models verified on NVIDIA NIM API catalog
   const candidateModels = [
-    "meta/llama-3.3-70b-instruct",            // Active flagship 70B instruct model
-    "meta/llama-3.1-8b-instruct",             // Fast, widely available lightweight instruct
-    "mistralai/mistral-large-2-instruct",     // High reasoning fallback
-    "deepseek-ai/deepseek-r1"                 // Deep reasoning fallback
+    "nvidia/nemotron-3.5-lightning-30b-a3b",         // Active flagship 30B Nemotron structured model
+    "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning",  // Fast reasoning-specialized Nemotron
+    "nvidia/nemotron-3-super-120b-a12b",              // High-capacity Nemotron fallback
+    "openai/gpt-oss-20b",                             // Fast open architecture NIM fallback
+    "meta/llama-3.2-11b-vision-instruct"              // Active Llama 3.2 NIM fallback
   ];
 
   let lastError: any = null;
@@ -83,7 +84,8 @@ export async function callNemotron(
 
       if (response.ok) {
         const data = await response.json();
-        return data.choices?.[0]?.message?.content || "";
+        const choice = data.choices?.[0]?.message;
+        return choice?.content || choice?.reasoning_content || "";
       } else {
         const errText = await response.text();
         console.warn(`NVIDIA API model ${model} failed with status ${response.status}: ${errText}`);

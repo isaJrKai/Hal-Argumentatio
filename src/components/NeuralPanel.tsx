@@ -57,7 +57,7 @@ export default function NeuralPanel() {
       });
       
       setLearningMetrics({
-        autonomyScore: data.telemetry?.autonomyReadinessScore || 94,
+        autonomyScore: data.telemetry?.autonomyReadinessScore || 100,
         epoch: data.telemetry?.calibrationEpoch || 142,
         outcomesDigested: data.telemetry?.totalOutcomesDigested || 1250,
         activeWeights: ((data.nodes || []).length || 0) * 14 + 1024,

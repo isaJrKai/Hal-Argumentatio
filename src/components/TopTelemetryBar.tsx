@@ -64,7 +64,7 @@ export const TopTelemetryBar: React.FC<TopTelemetryBarProps> = ({
   onToggleTheme,
   onOpenMobileMenu,
   theme = 'dark',
-  isAppInstalled = true,
+  isAppInstalled = false,
   onInstallClick,
   onLogout
 }) => {
@@ -74,6 +74,7 @@ export const TopTelemetryBar: React.FC<TopTelemetryBarProps> = ({
     activeCity, 
     regionalProfile, 
     formatCurrency, 
+    setActiveCity,
     setCity 
   } = useBusinessContext();
   
@@ -161,6 +162,20 @@ export const TopTelemetryBar: React.FC<TopTelemetryBarProps> = ({
               <CheckCircle2 className="w-3.5 h-3.5" />
               <span>{quickNotification}</span>
             </div>
+          )}
+
+          {/* Download App Action - Disappears after download */}
+          {!isAppInstalled && onInstallClick && (
+            <button
+              id="download-app-header-btn"
+              onClick={onInstallClick}
+              className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg bg-accent hover:bg-accent/85 text-black text-xs font-mono font-bold transition-all cursor-pointer shadow-sm hover:shadow active:scale-95 group shrink-0"
+              title="Download & Install HAL Desktop or Mobile App (Disappears once downloaded)"
+            >
+              <Download className="w-3.5 h-3.5 text-black group-hover:translate-y-0.5 transition-transform" />
+              <span className="hidden sm:inline">DOWNLOAD APP</span>
+              <span className="sm:hidden">DOWNLOAD</span>
+            </button>
           )}
 
           {/* AI Assistant Quick Status */}
@@ -352,7 +367,7 @@ export const TopTelemetryBar: React.FC<TopTelemetryBarProps> = ({
                   {['Calgary', 'Winnipeg', 'Edmonton'].map((city) => (
                     <button
                       key={city}
-                      onClick={() => setCity(city)}
+                      onClick={() => (setActiveCity ? setActiveCity(city) : setCity?.(city))}
                       className={`px-2 py-0.5 rounded text-[11px] font-sans font-medium transition-colors cursor-pointer border ${
                         activeCity === city
                           ? 'bg-accent text-accent-contrast border-accent font-bold shadow-xs'

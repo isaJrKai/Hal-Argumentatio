@@ -39,20 +39,20 @@ export function canonicalizeStage(stage: string): string {
  * Enforces business progression invariants and prevents arbitrary pipeline jumps.
  */
 export const ALLOWED_CRM_TRANSITIONS: Record<string, string[]> = {
-  new: ['contacted', 'qualified', 'unresponsive', 'closed_lost', 'dead', 'proposal', 'closed_won', 'converted'],
-  contacted: ['qualified', 'unresponsive', 'proposal', 'closed_lost', 'dead', 'closed_won', 'converted', 'new'],
+  new: ['contacted', 'qualified', 'unresponsive', 'closed_lost', 'dead'],
+  contacted: ['qualified', 'unresponsive', 'proposal', 'closed_lost', 'dead'],
   unresponsive: ['contacted', 'closed_lost', 'dead', 'reactivated'],
-  qualified: ['sal', 'proposal', 'closed_lost', 'dead', 'closed_won', 'converted', 'contacted'],
-  sal: ['proposal', 'closed_lost', 'dead', 'closed_won', 'converted', 'contacted'],
+  qualified: ['sal', 'proposal', 'closed_lost', 'dead'],
+  sal: ['proposal', 'closed_lost', 'dead'],
   proposal: ['customer', 'closed_won', 'converted', 'closed_lost', 'dead', 'contacted'],
-  customer: ['retained', 'churned', 'contacted', 'closed_lost', 'dead', 'new'],
-  closed_won: ['retained', 'churned', 'contacted', 'closed_lost', 'dead', 'new', 'proposal'],
-  converted: ['retained', 'churned', 'contacted', 'closed_lost', 'dead', 'new', 'proposal'],
-  closed_lost: ['reactivated', 'new', 'contacted', 'qualified', 'converted', 'closed_won'],
-  dead: ['reactivated', 'new', 'contacted', 'qualified', 'converted', 'closed_won'],
+  customer: ['retained', 'churned', 'contacted', 'closed_lost', 'dead'],
+  closed_won: ['retained', 'churned', 'contacted', 'closed_lost', 'dead'],
+  converted: ['retained', 'churned', 'contacted', 'closed_lost', 'dead'],
+  closed_lost: ['reactivated'],
+  dead: ['reactivated'],
   retained: ['churned', 'contacted'],
-  churned: ['reactivated', 'new', 'contacted'],
-  reactivated: ['contacted', 'qualified', 'closed_lost', 'dead', 'proposal', 'converted']
+  churned: ['reactivated'],
+  reactivated: ['contacted', 'qualified', 'proposal']
 };
 
 export interface TransitionValidationResult {

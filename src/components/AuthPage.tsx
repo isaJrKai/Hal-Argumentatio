@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion } from 'motion/react';
-import { Shield, Eye, EyeOff, KeyRound, Loader2, Sparkles } from 'lucide-react';
+import { Shield, Eye, EyeOff, KeyRound, Loader2, Sparkles, Download } from 'lucide-react';
 
 interface AuthPageProps {
   onAuthSuccess: (token: string, contractor: any) => void;
@@ -18,6 +18,44 @@ export default function AuthPage({ onAuthSuccess }: AuthPageProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+
+  const [isAppInstalled, setIsAppInstalled] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    return localStorage.getItem('hal_app_installed') === 'true' ||
+      window.matchMedia('(display-mode: standalone)').matches ||
+      (window.navigator as any).standalone === true;
+  });
+
+  const handleDownloadApp = () => {
+    const currentUrl = window.location.origin;
+    const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPod|iPad/.test(navigator.userAgent);
+    const isLinux = typeof navigator !== 'undefined' && /Linux/.test(navigator.userAgent) && !/Android/.test(navigator.userAgent);
+    
+    let filename = 'HALBiz.url';
+    let content = `[InternetShortcut]\nURL=${currentUrl}\nIconIndex=0\nIconFile=${currentUrl}/icon.jpg\n`;
+    let type = 'text/plain';
+
+    if (isMac) {
+      filename = 'HALBiz.webloc';
+      content = `<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">\n<plist version="1.0">\n<dict>\n\t<key>URL</key>\n\t<string>${currentUrl}</string>\n</dict>\n</plist>\n`;
+    } else if (isLinux) {
+      filename = 'HALBiz.desktop';
+      content = `[Desktop Entry]\nName=HALBiz\nComment=AI Business Operating Intelligence System\nExec=xdg-open ${currentUrl}\nIcon=utilities-terminal\nTerminal=false\nType=Application\nCategories=Office;Development;\n`;
+    }
+
+    const blob = new Blob([content], { type });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+
+    setIsAppInstalled(true);
+    localStorage.setItem('hal_app_installed', 'true');
+  };
 
   const handleQuickLogin = async (quickEmail: string, quickPass: string) => {
     setEmail(quickEmail);
@@ -137,7 +175,20 @@ export default function AuthPage({ onAuthSuccess }: AuthPageProps) {
   };
 
   return (
-    <div className="min-height-screen min-h-screen bg-bg-dark flex items-center justify-center p-6 font-sans selection:bg-brand selection:text-black">
+    <div className="min-height-screen min-h-screen bg-bg-dark flex items-center justify-center p-6 font-sans selection:bg-brand selection:text-black relative">
+      {/* Download App Button (Disappears after download) */}
+      {!isAppInstalled && (
+        <button
+          id="auth-download-app-btn"
+          onClick={handleDownloadApp}
+          className="absolute top-5 right-5 z-20 flex items-center gap-2 px-3 py-1.5 rounded bg-brand/15 hover:bg-brand/25 border border-brand/40 text-brand text-xs font-mono font-bold transition-all cursor-pointer shadow-lg hover:scale-105 active:scale-95"
+          title="Download HAL Desktop App (Disappears after download)"
+        >
+          <Download className="w-3.5 h-3.5 text-brand" />
+          <span>DOWNLOAD APP</span>
+        </button>
+      )}
+
       {/* Decorative ambient blobs */}
       <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-brand/5 rounded-full blur-[120px] pointer-events-none" />
       <div className="absolute bottom-1/3 right-1/4 w-80 h-80 bg-brand/5 rounded-full blur-[100px] pointer-events-none" />
@@ -351,26 +402,20 @@ export default function AuthPage({ onAuthSuccess }: AuthPageProps) {
           <p className="text-[10px] font-mono text-text-dim leading-normal uppercase tracking-widest flex items-center justify-center gap-1.5">
             <KeyRound className="w-3.5 h-3.5 text-text-dim" /> SECURE SANDBOX ENVIRONMENT
           </p>
-          <div className="flex flex-col sm:flex-row gap-2 justify-center">
+
+          <div className="flex justify-center">
             <button
+              id="quick-login-admin"
               type="button"
               disabled={loading}
               onClick={() => handleQuickLogin('admin@kaislead.com', 'admin123')}
               className="text-[10px] font-mono py-1.5 px-3 rounded bg-brand/10 hover:bg-brand/20 border border-brand/30 text-brand transition-colors cursor-pointer flex items-center justify-center gap-1.5 font-bold"
               title="Click to automatically login as admin@kaislead.com"
             >
-              <span>⚡ Quick Login: admin@kaislead.com</span>
-            </button>
-            <button
-              type="button"
-              disabled={loading}
-              onClick={() => handleQuickLogin('kaisoisaac@gmail.com', 'admin123')}
-              className="text-[10px] font-mono py-1.5 px-3 rounded bg-indigo-500/10 hover:bg-indigo-500/20 border border-indigo-500/30 text-indigo-400 transition-colors cursor-pointer flex items-center justify-center gap-1.5 font-bold"
-              title="Click to automatically login as kaisoisaac@gmail.com"
-            >
-              <span>⚡ Quick Login: kaisoisaac@gmail.com</span>
+              <span>⚡ Quick Login: Admin (admin@kaislead.com)</span>
             </button>
           </div>
+
           <p className="text-[9.5px] font-mono text-text-dim leading-normal">
             Default Password: <strong className="text-text-secondary">admin123</strong>
           </p>

@@ -16,6 +16,8 @@ import {
   Flame, 
   Shield, 
   ShieldCheck, 
+  ShieldAlert,
+  CloudRain,
   Lightbulb,
   CheckCircle2,
   AlertCircle,
@@ -253,6 +255,7 @@ export default function OverviewPanel({
 
   // Forecast chart data
   const [forecastMetricMode, setForecastMetricMode] = useState<'all' | 'revenue' | 'demand'>('all');
+  const [forecastMetadata, setForecastMetadata] = useState<any>(null);
   const [forecastChartData, setForecastChartData] = useState<any[]>([
     { day: 'W1', v: 52000, demand: 64, cpl: 44.5 },
     { day: 'W2', v: 58500, demand: 67, cpl: 43.8 },
@@ -282,18 +285,21 @@ export default function OverviewPanel({
         const res = await fetch('/api/ai/test-timesfm', {
           method: 'POST',
           headers,
-          body: JSON.stringify({ city: activeCity, niche: activeNiche, horizonWeeks: 12 })
+          body: JSON.stringify({ city: activeCity, niche: activeNiche, horizonWeeks: 12, applyGuardrails: true })
         });
         if (!res.ok) {
           throw new Error(`TimesFM endpoint returned HTTP ${res.status}`);
         }
         const data = await res.json();
         if (isMounted && data.success && data.forecastCurve) {
+          setForecastMetadata(data);
           const formatted = data.forecastCurve.map((c: any) => ({
             day: c.week.replace('W+', 'W'),
             v: Math.round(c.projectedCplUsd * c.predictedDemandIndex * (workspaceConfig.budgetMultiplier || 1.0) * (regionalProfile.territoryMetrics.typicalCPC / 4.5) * 14),
             demand: c.predictedDemandIndex,
-            cpl: c.projectedCplUsd
+            cpl: c.projectedCplUsd,
+            isBreach: c.isBreachingCplLimit,
+            weatherSurge: c.weatherSurgeFactor
           }));
           setForecastChartData(formatted);
         }
@@ -564,17 +570,22 @@ export default function OverviewPanel({
           </div>
         </section>
 
-        {/* 12-Week Revenue & Demand Forecast (TimesFM) */}
+        {/* 12-Week Revenue & Demand Forecast (TimesFM + HAL Brain) */}
         <section className={`border rounded-xl p-5 flex flex-col justify-between ${cardBg} lg:col-span-7 md:col-span-2 col-span-1 min-w-0 transition-all`}>
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-2">
             <div>
               <div className="flex items-center gap-2">
                 <span className="text-xs font-sans font-semibold tracking-wide block mb-0.5">12-Week Revenue & Demand Forecast</span>
                 <span className="px-1.5 py-0.2 bg-warning-dim text-warning font-mono text-[9px] font-bold rounded uppercase flex items-center gap-1 border border-warning/30">
-                  <Activity className="w-2.5 h-2.5" /> LIVE
+                  <Activity className="w-2.5 h-2.5" /> BRAIN SYNCED
                 </span>
+                {forecastMetadata?.budgetGuardrails?.breachDetected && (
+                  <span className="px-1.5 py-0.2 bg-danger-dim text-danger font-mono text-[9px] font-bold rounded uppercase flex items-center gap-1 border border-danger/30 animate-pulse">
+                    <ShieldAlert className="w-2.5 h-2.5" /> GUARDRAIL THROTTLE
+                  </span>
+                )}
               </div>
-              <span className="text-[10px] font-mono text-text-tertiary">TimesFM foundation time-series projection calibrated to territory capacity</span>
+              <span className="text-[10px] font-mono text-text-tertiary">TimesFM foundation time-series projection synchronized with HAL 11-Layer Brain</span>
             </div>
 
             {/* Metric Mode Filter */}
@@ -612,6 +623,45 @@ export default function OverviewPanel({
               >
                 Demand Index
               </button>
+            </div>
+          </div>
+
+          {/* Brain Integration Telemetry Pills */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mb-3 pt-1">
+            <div className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-bg-base border border-border-dim text-[10px] font-mono">
+              <Layers className="w-3.5 h-3.5 text-accent shrink-0" />
+              <div className="truncate">
+                <span className="text-text-tertiary block text-[9px] uppercase font-sans">Live Google Ads</span>
+                <span className="text-text-primary font-semibold truncate">
+                  {forecastMetadata?.googleAdsBaseline 
+                    ? `${forecastMetadata.googleAdsBaseline.recordsCount} Logs · $${forecastMetadata.googleAdsBaseline.empiricalCpl} CPL` 
+                    : 'Ingesting Daily Records...'}
+                </span>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-bg-base border border-border-dim text-[10px] font-mono">
+              <CloudRain className={`w-3.5 h-3.5 shrink-0 ${forecastMetadata?.weatherTrigger?.hazardCategory !== 'STABLE_SEASONAL' ? 'text-warning' : 'text-info'}`} />
+              <div className="truncate">
+                <span className="text-text-tertiary block text-[9px] uppercase font-sans">Weather Trigger</span>
+                <span className="text-text-primary font-semibold truncate">
+                  {forecastMetadata?.weatherTrigger 
+                    ? `${forecastMetadata.weatherTrigger.hazardCategory === 'FREEZE_THAW' ? '❄️ Freeze Warning' : forecastMetadata.weatherTrigger.hazardCategory === 'HAIL_HIGH_WIND' ? '🌪️ Hail Advisory' : forecastMetadata.weatherTrigger.hazardCategory === 'HEAVY_PRECIPITATION' ? '🌧️ Rain Surge' : '☀️ Stable'} (${forecastMetadata.weatherTrigger.demandSurgeMultiplier}x)`
+                    : 'Querying Open-Meteo...'}
+                </span>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-bg-base border border-border-dim text-[10px] font-mono">
+              <ShieldCheck className={`w-3.5 h-3.5 shrink-0 ${forecastMetadata?.budgetGuardrails?.breachDetected ? 'text-danger' : 'text-positive'}`} />
+              <div className="truncate">
+                <span className="text-text-tertiary block text-[9px] uppercase font-sans">Budget Guardrail</span>
+                <span className="text-text-primary font-semibold truncate">
+                  {forecastMetadata?.budgetGuardrails?.breachDetected
+                    ? `Throttled 0.75x (CAC Target: $${forecastMetadata.budgetGuardrails.targetCac})`
+                    : `Armed & Enforcing (≤$${forecastMetadata?.budgetGuardrails?.maxAllowableCpl || 77} CPL)`}
+                </span>
+              </div>
             </div>
           </div>
           
@@ -690,7 +740,18 @@ export default function OverviewPanel({
                         {item.cpl !== undefined && (
                           <div className="flex items-center justify-between text-[10px]">
                             <span className="text-text-tertiary">Estimated CPL:</span>
-                            <span className="font-medium text-text-primary">${item.cpl}</span>
+                            <span className={`font-medium ${item.isBreach ? 'text-danger font-bold flex items-center gap-1' : 'text-text-primary'}`}>
+                              ${item.cpl}
+                              {item.isBreach && <span className="text-[8.5px] px-1 py-0.2 rounded bg-danger-dim text-danger">BREACH</span>}
+                            </span>
+                          </div>
+                        )}
+                        {item.weatherSurge && item.weatherSurge > 1.0 && (
+                          <div className="flex items-center justify-between text-[9.5px] pt-1 border-t border-border-dim/50 text-warning">
+                            <span className="flex items-center gap-1">
+                              <CloudRain className="w-2.5 h-2.5" /> Weather Lift:
+                            </span>
+                            <span className="font-bold">+{Math.round((item.weatherSurge - 1) * 100)}% Surge</span>
                           </div>
                         )}
                       </div>
@@ -727,8 +788,8 @@ export default function OverviewPanel({
           </div>
 
           {/* Chart Footnote / Legend */}
-          <div className="flex items-center justify-between pt-2 border-t border-border-dim/50 text-[9.5px] font-mono text-text-tertiary">
-            <div className="flex items-center gap-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 pt-2 border-t border-border-dim/50 text-[9.5px] font-mono text-text-tertiary">
+            <div className="flex items-center gap-3">
               <span className="flex items-center gap-1.5">
                 <span className="w-2.5 h-1 rounded-xs" style={{ backgroundColor: chartPalette.rev }} />
                 Projected Revenue ($)
@@ -738,7 +799,11 @@ export default function OverviewPanel({
                 Demand Index (0-100)
               </span>
             </div>
-            <span>Seasonal Multiplier: {(workspaceConfig.budgetMultiplier || 1.0).toFixed(1)}x</span>
+            <div className="flex items-center gap-2">
+              <span className="text-text-secondary truncate">
+                {forecastMetadata?.weatherTrigger?.strategicDirective || `Seasonal Multiplier: ${(workspaceConfig.budgetMultiplier || 1.0).toFixed(1)}x`}
+              </span>
+            </div>
           </div>
         </section>
 

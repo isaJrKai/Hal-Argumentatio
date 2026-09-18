@@ -29,6 +29,9 @@ export interface DualDriveConsensusResult {
   arbitrationMethod: 'weighted_synthesis' | 'policy_critic_gate' | 'unanimous';
   synthesizedAction: string;
   policyValidationPassed: boolean;
+  verdict?: 'CONTRACT_VERIFIED_UNANIMOUS' | 'BOUNDS_SATISFIED_WITH_CONDITIONS' | 'DIRECTIONAL_CONTRADICTION' | 'INVARIANT_VIOLATION' | 'CRITICAL_INVARIANT_BREACH';
+  invariants?: Array<{ ruleId: string; ruleName: string; passed: boolean; severity: string; proof: string }>;
+  contractVerification?: any;
   timestamp: string;
 }
 
@@ -48,6 +51,8 @@ export interface StrategyArbitrageOpportunity {
   id: string;
   sourceChannel: string;
   targetChannel: string;
+  sourceCampaignId?: string;
+  targetCampaignId?: string;
   proposedReallocationUsd: number;
   currentSourceRoas: number;
   projectedTargetRoas: number;
@@ -165,7 +170,7 @@ export function getDefaultConsensusHistory(): DualDriveConsensusResult[] {
         latencyMs: 320
       },
       nemotronEngine: {
-        model: 'nvidia/llama-3.1-nemotron-70b-instruct',
+        model: 'nvidia/nemotron-3.5-lightning-30b-a3b',
         focus: 'Deterministic Policy & Compliance Verification',
         recommendation: 'Verify technical claim against measured PSI report; validate that pricing satisfies 3.8x ROAS floor under local commercial HVAC density.',
         confidence: 0.97,
@@ -175,6 +180,27 @@ export function getDefaultConsensusHistory(): DualDriveConsensusResult[] {
       arbitrationMethod: 'weighted_synthesis',
       synthesizedAction: 'Deploy Sequence Cadence with primary focus on mobile speed leak, backed by calibrated $2,600/mo pricing and cryptographic audit guarantee.',
       policyValidationPassed: true,
+      verdict: 'CONTRACT_VERIFIED_UNANIMOUS',
+      invariants: [
+        { ruleId: 'INV_01_DIRECTIONAL_CONSISTENCY', ruleName: 'Directional Intervention Agreement', passed: true, severity: 'CRITICAL', proof: 'Gemini (increase) and Nemotron (increase) maintain compatible expansion trajectories.' },
+        { ruleId: 'INV_02_ROAS_FLOOR_SATISFIABILITY', ruleName: 'Minimum Business ROAS Floor', passed: true, severity: 'CRITICAL', proof: 'Joint bound established at 3.80x ROAS (exceeds 3.0x statutory minimum).' },
+        { ruleId: 'INV_03_PII_CRYPTOGRAPHIC_INTEGRITY', ruleName: 'Cryptographic PII Protection', passed: true, severity: 'CRITICAL', proof: 'Deterministic policy gate enforces AES-256-GCM encryption on all downstream lead records.' },
+        { ruleId: 'INV_04_PRICING_BOUND_CONVERGENCE', ruleName: 'Commercial Pricing Delta Bounds', passed: true, severity: 'WARNING', proof: 'Evaluated pricing convergence: $2,600 vs $2,600 (delta: 0.0%).' },
+        { ruleId: 'INV_05_EMPIRICAL_CLAIM_GROUNDING', ruleName: 'Empirical Audit Grounding', passed: true, severity: 'INFO', proof: '100% of claims (2/2) backed by verified web vitals or ROAS floor benchmarks.' },
+        { ruleId: 'INV_06_ANTI_FRAUD_IDEMPOTENCY', ruleName: 'Anti-Fraud & Idempotency Check', passed: true, severity: 'CRITICAL', proof: 'Cryptographic deduplication hash verified.' }
+      ],
+      contractVerification: {
+        alignmentScore: 96,
+        verdict: 'CONTRACT_VERIFIED_UNANIMOUS',
+        passedPolicy: true,
+        directionalAgreement: true,
+        boundsIntersection: {
+          minRoas: 3.8,
+          budgetCeilingUsd: 5000,
+          pricingMonthlyUsd: 2600,
+          overlapRatio: 0.94
+        }
+      },
       timestamp: new Date(Date.now() - 3600000 * 2).toISOString()
     },
     {
@@ -188,7 +214,7 @@ export function getDefaultConsensusHistory(): DualDriveConsensusResult[] {
         latencyMs: 290
       },
       nemotronEngine: {
-        model: 'nvidia/llama-3.1-nemotron-70b-instruct',
+        model: 'nvidia/nemotron-3.5-lightning-30b-a3b',
         focus: 'Idempotency & Fraud Guardrails',
         recommendation: 'Enforce cryptographic hash deduplication on caller phone; verify lead status transition through canonical proposal stage.',
         confidence: 0.99,
@@ -198,6 +224,27 @@ export function getDefaultConsensusHistory(): DualDriveConsensusResult[] {
       arbitrationMethod: 'unanimous',
       synthesizedAction: 'Confirmed ClosedWon attribution with SHA-256 hashed PII in durable outbox. Dispatched webhook with valid HMAC signature.',
       policyValidationPassed: true,
+      verdict: 'CONTRACT_VERIFIED_UNANIMOUS',
+      invariants: [
+        { ruleId: 'INV_01_DIRECTIONAL_CONSISTENCY', ruleName: 'Directional Intervention Agreement', passed: true, severity: 'CRITICAL', proof: 'Gemini (enforce) and Nemotron (enforce) agree on attribution reconciliation.' },
+        { ruleId: 'INV_02_ROAS_FLOOR_SATISFIABILITY', ruleName: 'Minimum Business ROAS Floor', passed: true, severity: 'CRITICAL', proof: 'Attribution yields $7,500 estimate on $420 spend (17.8x ROAS).' },
+        { ruleId: 'INV_03_PII_CRYPTOGRAPHIC_INTEGRITY', ruleName: 'Cryptographic PII Protection', passed: true, severity: 'CRITICAL', proof: 'SHA-256 phone hash + AES-256-GCM record encryption confirmed active.' },
+        { ruleId: 'INV_04_PRICING_BOUND_CONVERGENCE', ruleName: 'Commercial Pricing Delta Bounds', passed: true, severity: 'WARNING', proof: 'Direct match on commercial scope of work ($7,500).' },
+        { ruleId: 'INV_05_EMPIRICAL_CLAIM_GROUNDING', ruleName: 'Empirical Audit Grounding', passed: true, severity: 'INFO', proof: 'Attribution verified against recorded call log ID and GCLID token.' },
+        { ruleId: 'INV_06_ANTI_FRAUD_IDEMPOTENCY', ruleName: 'Anti-Fraud & Idempotency Check', passed: true, severity: 'CRITICAL', proof: 'Cryptographic deduplication hash verified.' }
+      ],
+      contractVerification: {
+        alignmentScore: 98,
+        verdict: 'CONTRACT_VERIFIED_UNANIMOUS',
+        passedPolicy: true,
+        directionalAgreement: true,
+        boundsIntersection: {
+          minRoas: 4.5,
+          budgetCeilingUsd: 7500,
+          pricingMonthlyUsd: 7500,
+          overlapRatio: 0.98
+        }
+      },
       timestamp: new Date(Date.now() - 3600000 * 5).toISOString()
     }
   ];
@@ -253,45 +300,33 @@ export function getDefaultArbitrageOpportunities(): StrategyArbitrageOpportunity
   ];
 }
 
-/**
- * Executes a simulated or real Dual-Drive parallel consensus arbitration
- */
-export function calculateConsensusAlignment(
-  geminiOutput: string,
-  nemotronOutput: string,
-  targetTopic: string
-): {
-  alignmentScore: number;
-  synthesizedText: string;
-  passedPolicy: boolean;
-} {
-  const gWords = new Set(geminiOutput.toLowerCase().split(/\W+/).filter(w => w.length > 3));
-  const nWords = new Set(nemotronOutput.toLowerCase().split(/\W+/).filter(w => w.length > 3));
+export {
+  calculateConsensusAlignment,
+  extractContractFromPerspective,
+  verifyStructuredContracts
+} from './contractVerification';
 
-  let overlap = 0;
-  for (const w of gWords) {
-    if (nWords.has(w)) overlap++;
-  }
-
-  const union = new Set([...gWords, ...nWords]).size;
-  const jaccard = union > 0 ? (overlap / union) : 0.8;
-  
-  // High-dimensional semantic alignment index calibrated between 88% and 98%
-  const alignmentScore = Math.min(99, Math.max(88, Math.round(85 + (jaccard * 25))));
-  const passedPolicy = !nemotronOutput.toLowerCase().includes('violation') && !nemotronOutput.toLowerCase().includes('reject');
-
-  const synthesizedText = `[Dual-Drive Synthesized Directive]: ${geminiOutput.trim()} [Nemotron Safety Assurance]: Verified with ${alignmentScore}% cross-model agreement.`;
-
-  return {
-    alignmentScore,
-    synthesizedText,
-    passedPolicy
-  };
-}
+export {
+  auditArbitrageGuardrails,
+  calculateNetMonthlyLift,
+  aggregateCampaignMetrics,
+  evaluateAutonomousStrategyArbitrage,
+  DEFAULT_ARBITRAGE_GUARDRAILS,
+  type ArbitrageGuardrailConfig,
+  type CampaignPerformanceMetrics,
+  type ArbitrageEvaluationResult,
+  type GuardrailComplianceReport
+} from './strategyArbitrage';
+export type {
+  ExtractedContract,
+  StructuredConsensusResult,
+  InvariantCheckResult,
+  ConsensusVerdict
+} from './contractVerification';
 
 /**
  * Validates Phase 4 Multi-Agent Invariants:
- * 1. Dual-Drive Consensus (Gemini 2.5 + Nemotron 70B parallel arbitration)
+ * 1. Dual-Drive Consensus (Gemini 2.5 + Nemotron 70B parallel arbitration via Structured Contract Verification)
  * 2. Adaptive Bayesian Weights (calibration epochs > 0, calibrated technical weights)
  * 3. Autonomous Strategy Arbitrage (spend reallocations evaluated with guardrails)
  */

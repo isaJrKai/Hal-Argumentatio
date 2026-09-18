@@ -55,6 +55,7 @@ export interface BusinessContextType {
   // State setters
   setActiveIndustry: (industryId: string) => void;
   setActiveCity: (city: string) => void;
+  setCity?: (city: string) => void;
   setActiveNiche: (niche: string) => void;
   
   // Taxonomy lists
@@ -258,6 +259,7 @@ export const BusinessProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       formatCurrency,
       setActiveIndustry,
       setActiveCity,
+      setCity: setActiveCity,
       setActiveNiche,
       supportedIndustries: INDUSTRY_TAXONOMY,
       supportedCities,

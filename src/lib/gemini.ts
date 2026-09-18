@@ -1,5 +1,6 @@
 import { GoogleGenAI } from "@google/genai";
 import { generateResponse, cleanJSONResponse, callNemotron, getActiveAI } from "../services/nemotron";
+import { verifyLeadGrounding } from "./networkVerification";
 
 let aiClient: GoogleGenAI | null = null;
 
@@ -24,6 +25,7 @@ function getAIClient(): GoogleGenAI | null {
 
 /**
  * Analyzes expired forecast outcomes and generates a natural language learning insight
+ * Returns a calibrated confidence score based on empirical deviation and causal evidence.
  */
 export async function generateLearningFromOutcome(
   metric: string,
@@ -32,7 +34,7 @@ export async function generateLearningFromOutcome(
   deviation: number,
   assumptions: string,
   preferredAI?: string
-): Promise<{ insight: string; confidence: number; category: string }> {
+): Promise<{ insight: string; confidence: number; category: string; source?: string }> {
   const category = `${metric}_deviation_learning`;
   
   const prompt = `You are HAL, the core learning engine of HALBiz.
@@ -43,10 +45,26 @@ An expired business metric forecast has been evaluated.
 - Deviation: ${Math.round(deviation * 100)}%
 - Original forecast assumptions: "${assumptions}"
 
-Write a concise, professional, highly actionable learning insight (1-2 sentences maximum) that explains why the deviation occurred or what can be adjusted in the future. Be highly specific. Do not use generic filler words.
-Also return a confidence score between 0.0 and 1.0 based on how clear the causality of this learning is.`;
+Task:
+1. Write a concise, professional, highly actionable learning insight (1-2 sentences maximum) explaining why the deviation occurred or what must be adjusted in future cycles. Be specific. No fluff.
+2. Quantify your causal confidence score as a decimal between 0.10 and 0.95 reflecting how strongly the available data supports this causal attribution (lower for high volatility or unexplained gaps, higher for clear direct attribution).
+
+Return your response strictly as a raw JSON object matching this structure:
+{
+  "insight": "string",
+  "confidence": number
+}`;
 
   const activeAI = getActiveAI(preferredAI);
+
+  // Helper to calibrate confidence: clamp between 0.10 and 0.95 and account for extreme unexplained variance
+  const calibrateConfidence = (rawScore: number): number => {
+    const parsed = typeof rawScore === 'number' && !isNaN(rawScore) ? rawScore : 0.65;
+    // Penalty if deviation is extreme (>60%) indicating high unpredictability
+    const variancePenalty = Math.abs(deviation) > 0.6 ? 0.15 : Math.abs(deviation) > 0.3 ? 0.08 : 0;
+    const bounded = Math.min(0.92, Math.max(0.18, parsed - variancePenalty));
+    return Math.round(bounded * 100) / 100;
+  };
 
   if (activeAI === 'gemini') {
     // 1. Try Gemini first (Strictly 3.5)
@@ -57,16 +75,21 @@ Also return a confidence score between 0.0 and 1.0 based on how clear the causal
           model: "gemini-3.8-flash",
           contents: prompt,
           config: {
-            systemInstruction: "You are HAL, a Swiss-style, highly professional AI Business Operating Intelligence system. You produce objective, analytical, short learning insights without marketing fluff.",
-            temperature: 0.3,
+            systemInstruction: "You are HAL, a Swiss-style, highly professional AI Business Operating Intelligence system. You produce objective, analytical, short learning insights without marketing fluff. Always output valid JSON.",
+            responseMimeType: "application/json",
+            temperature: 0.2,
           }
         });
 
-        const text = response.text || "";
+        const text = response.text || "{}";
+        const parsed = JSON.parse(text.trim());
+        const insight = parsed.insight || text.trim();
+        const confidence = calibrateConfidence(Number(parsed.confidence));
         return {
-          insight: text.trim(),
-          confidence: 0.85,
-          category
+          insight,
+          confidence,
+          category,
+          source: 'gemini-3.8-flash'
         };
       } catch (err) {
         console.error("Gemini learning call failed, trying Nemotron fallback:", err);
@@ -76,15 +99,20 @@ Also return a confidence score between 0.0 and 1.0 based on how clear the causal
     // Fallback to NVIDIA Nemotron
     if (process.env.NVIDIA_API_KEY) {
       try {
-        const systemInstruction = "You are HAL, a Swiss-style, highly professional AI Business Operating Intelligence system. You produce objective, analytical, short learning insights without marketing fluff.";
+        const systemInstruction = "You are HAL, a Swiss-style, highly professional AI Business Operating Intelligence system. Always output valid JSON matching the requested schema.";
         const text = await callNemotron([
           { role: "system", content: systemInstruction },
           { role: "user", content: prompt }
-        ], 0.3);
+        ], 0.2, true);
+        const cleaned = cleanJSONResponse(text);
+        const parsed = JSON.parse(cleaned);
+        const insight = parsed.insight || cleaned;
+        const confidence = calibrateConfidence(Number(parsed.confidence));
         return {
-          insight: text.trim(),
-          confidence: 0.85,
-          category
+          insight,
+          confidence,
+          category,
+          source: 'nvidia-nemotron-70b'
         };
       } catch (err) {
         console.error("NVIDIA Nemotron learning fallback failed:", err);
@@ -94,15 +122,20 @@ Also return a confidence score between 0.0 and 1.0 based on how clear the causal
     // 1. Try NVIDIA Nemotron first (since Gemini is OFF or Nemotron is preferred)
     if (process.env.NVIDIA_API_KEY) {
       try {
-        const systemInstruction = "You are HAL, a Swiss-style, highly professional AI Business Operating Intelligence system. You produce objective, analytical, short learning insights without marketing fluff.";
+        const systemInstruction = "You are HAL, a Swiss-style, highly professional AI Business Operating Intelligence system. Always output valid JSON matching the requested schema.";
         const text = await callNemotron([
           { role: "system", content: systemInstruction },
           { role: "user", content: prompt }
-        ], 0.3);
+        ], 0.2, true);
+        const cleaned = cleanJSONResponse(text);
+        const parsed = JSON.parse(cleaned);
+        const insight = parsed.insight || cleaned;
+        const confidence = calibrateConfidence(Number(parsed.confidence));
         return {
-          insight: text.trim(),
-          confidence: 0.85,
-          category
+          insight,
+          confidence,
+          category,
+          source: 'nvidia-nemotron-70b'
         };
       } catch (err) {
         console.error("NVIDIA Nemotron learning call failed, trying Gemini fallback:", err);
@@ -117,16 +150,21 @@ Also return a confidence score between 0.0 and 1.0 based on how clear the causal
           model: "gemini-3.8-flash",
           contents: prompt,
           config: {
-            systemInstruction: "You are HAL, a Swiss-style, highly professional AI Business Operating Intelligence system. You produce objective, analytical, short learning insights without marketing fluff.",
-            temperature: 0.3,
+            systemInstruction: "You are HAL, a Swiss-style, highly professional AI Business Operating Intelligence system. Always output valid JSON.",
+            responseMimeType: "application/json",
+            temperature: 0.2,
           }
         });
 
-        const text = response.text || "";
+        const text = response.text || "{}";
+        const parsed = JSON.parse(text.trim());
+        const insight = parsed.insight || text.trim();
+        const confidence = calibrateConfidence(Number(parsed.confidence));
         return {
-          insight: text.trim(),
-          confidence: 0.85,
-          category
+          insight,
+          confidence,
+          category,
+          source: 'gemini-3.8-flash'
         };
       } catch (err) {
         console.error("Gemini learning fallback failed:", err);
@@ -134,14 +172,18 @@ Also return a confidence score between 0.0 and 1.0 based on how clear the causal
     }
   }
 
-  // 3. Fallback heuristics if all AI APIs fail
+  // 3. Fallback heuristics if all AI APIs fail - transparently flagged as unverified heuristic
   const direction = actual > predicted ? 'higher' : 'lower';
-  const magnitude = Math.abs(deviation) > 0.2 ? 'significant' : 'minor';
-  const fallbackInsight = `Observed actual ${metric} is ${direction} than predicted by ${Math.round(Math.abs(deviation) * 100)}%. This ${magnitude} deviation suggest revising initial bid premiums during weather-triggered peak event hours.`;
+  const absDev = Math.abs(deviation);
+  const magnitude = absDev > 0.2 ? 'significant' : 'minor';
+  const fallbackInsight = `[Fallback Heuristic - Model Offline]: Observed actual ${metric} is ${direction} than predicted by ${Math.round(absDev * 100)}%. This ${magnitude} deviation suggests manual review of initial bid premiums during event hours.`;
+  // Honest mathematically bounded confidence based on deviation magnitude (lower deviation = higher baseline reliability)
+  const heuristicConfidence = Math.max(0.20, Math.min(0.48, 0.50 - absDev * 0.25));
   return {
     insight: fallbackInsight,
-    confidence: 0.75,
-    category
+    confidence: Math.round(heuristicConfidence * 100) / 100,
+    category,
+    source: 'fallback_heuristic'
   };
 }
 
@@ -152,7 +194,7 @@ export async function generateForecastNarrative(
   metric: string,
   historicalData: any[],
   preferredAI?: string
-): Promise<{ predicted: number; assumptions: string; confidenceScore: number }> {
+): Promise<{ predicted: number; assumptions: string; confidenceScore: number; source?: string }> {
   const dataString = JSON.stringify(historicalData);
   
   const prompt = `Analyze this 90-day historical trend for the metric "${metric}":
@@ -170,6 +212,15 @@ Return your response in a raw JSON object format (no markdown blocks, no code bl
 }`;
 
   const activeAI = getActiveAI(preferredAI);
+
+  const calibrateForecastConfidence = (modelScore?: number): number => {
+    const sampleSize = historicalData?.length || 0;
+    // Sample depth multiplier: with < 7 records, epistemic uncertainty is high
+    const depthWeight = sampleSize >= 60 ? 1.0 : sampleSize >= 14 ? 0.85 : sampleSize >= 7 ? 0.70 : 0.45;
+    const raw = typeof modelScore === 'number' && !isNaN(modelScore) ? modelScore : 0.65;
+    const calibrated = Math.min(0.93, Math.max(0.20, raw * depthWeight));
+    return Math.round(calibrated * 100) / 100;
+  };
 
   if (activeAI === 'gemini') {
     // 1. Try Gemini first (Strictly 3.5)
@@ -190,7 +241,8 @@ Return your response in a raw JSON object format (no markdown blocks, no code bl
         return {
           predicted: Number(result.predicted) || 15.0,
           assumptions: result.assumptions || "Fitted on last 90 days performance trend lines.",
-          confidenceScore: Number(result.confidenceScore) || 0.75
+          confidenceScore: calibrateForecastConfidence(Number(result.confidenceScore)),
+          source: 'gemini-3.8-flash'
         };
       } catch (err) {
         console.error("Gemini forecast generation failed, trying Nemotron fallback:", err);
@@ -208,7 +260,8 @@ Return your response in a raw JSON object format (no markdown blocks, no code bl
         return {
           predicted: Number(result.predicted) || 15.0,
           assumptions: result.assumptions || "Fitted on last 90 days performance trend lines.",
-          confidenceScore: Number(result.confidenceScore) || 0.75
+          confidenceScore: calibrateForecastConfidence(Number(result.confidenceScore)),
+          source: 'nvidia-nemotron-70b'
         };
       } catch (err) {
         console.error("NVIDIA Nemotron forecast fallback failed:", err);
@@ -226,7 +279,8 @@ Return your response in a raw JSON object format (no markdown blocks, no code bl
         return {
           predicted: Number(result.predicted) || 15.0,
           assumptions: result.assumptions || "Fitted on last 90 days performance trend lines.",
-          confidenceScore: Number(result.confidenceScore) || 0.75
+          confidenceScore: calibrateForecastConfidence(Number(result.confidenceScore)),
+          source: 'nvidia-nemotron-70b'
         };
       } catch (err) {
         console.error("NVIDIA Nemotron forecast generation failed, trying Gemini fallback:", err);
@@ -251,7 +305,8 @@ Return your response in a raw JSON object format (no markdown blocks, no code bl
         return {
           predicted: Number(result.predicted) || 15.0,
           assumptions: result.assumptions || "Fitted on last 90 days performance trend lines.",
-          confidenceScore: Number(result.confidenceScore) || 0.75
+          confidenceScore: calibrateForecastConfidence(Number(result.confidenceScore)),
+          source: 'gemini-3.8-flash'
         };
       } catch (err) {
         console.error("Gemini forecast fallback failed:", err);
@@ -261,14 +316,20 @@ Return your response in a raw JSON object format (no markdown blocks, no code bl
 
   // 3. Robust linear projection fallback
   if (historicalData.length === 0) {
-    return { predicted: 20, assumptions: "Heuristic baseline. No historical snapshots found.", confidenceScore: 0.5 };
+    return {
+      source: 'fallback_heuristic',
+      predicted: 20,
+      assumptions: "[Fallback Heuristic - Model Offline] No historical snapshots found; uncalibrated default baseline.",
+      confidenceScore: 0.30 // Honest confidence rating (< 0.5)
+    };
   }
   const values = historicalData.map(h => h.value);
   const avg = values.reduce((sum, v) => sum + v, 0) / values.length;
   return {
-    predicted: Math.round(avg * 1.05 * 10) / 10, // heuristic slight trend growth
-    assumptions: `Seasonal auto-naive regression fitted on historical ${historicalData.length} records, projecting a standard 5% variance multiplier.`,
-    confidenceScore: 0.7
+    source: 'fallback_heuristic',
+    predicted: Math.round(avg * 1.05 * 10) / 10,
+    assumptions: `[Fallback Heuristic - Model Offline] Naive linear +5% trend extrapolation across ${historicalData.length} records.`,
+    confidenceScore: 0.40 // Honest confidence rating (< 0.5)
   };
 }
 
@@ -295,6 +356,11 @@ export async function harvestRealBusinesses(
   sentimentScore: number;
   outreachStrategy: string;
   notes: string;
+  isSynthetic: boolean;
+  sourceType: 'live_harvest' | 'synthetic_fallback';
+  verificationStatus?: 'VERIFIED' | 'UNVERIFIED_STAGING' | 'FABRICATED_REJECTED';
+  dnsVerified?: boolean;
+  groundingEvidence?: any;
 }>> {
   const prompt = `Research or identify actual, real home services operating businesses (or highly realistic active operations if real ones are scarce) in the city of "${city}" for the niche "${niche}".
 Return exactly 4 businesses. For each business, provide:
@@ -337,207 +403,77 @@ Return your response in a raw JSON array matching this structure:
 
   const activeAI = getActiveAI(preferredAI);
 
-  // Helper to generate local fallbacks if AI fails or is unconfigured
-  const getFallbackData = () => {
-    const capCity = city.trim().replace(/\b\w/g, c => c.toUpperCase());
-    const capNiche = niche.trim().replace(/\b\w/g, c => c.toUpperCase());
-    const lowerNiche = niche.toLowerCase();
+  // Fail-Closed Grounding Invariant: HAL Constitution Law #2 strictly prohibits synthetic lead injection.
+  // When live search or AI is unconfigured or unable to identify operating businesses,
+  // the harvester returns an empty list rather than generating synthetic profiles.
+  const getFallbackData = () => [];
 
-    // Industry-tailored template generators
-    let templates: Array<{ name: string; owner: string; domain: string; seo: number; perf: number; ssl: 'secured' | 'missing'; rating: number; reviews: number; notes: string; strategy: string }> = [];
-
-    if (lowerNiche.includes('builder') || lowerNiche.includes('contractor') || lowerNiche.includes('remodel') || lowerNiche.includes('framing')) {
-      templates = [
-        {
-          name: `${capCity} Signature Custom Home Builders`,
-          owner: "Marcus Sterling",
-          domain: `signaturebuilders${city.toLowerCase()}.com`,
-          seo: 74,
-          perf: 48,
-          ssl: 'secured',
-          rating: 4.8,
-          reviews: 42,
-          notes: "High-resolution 3D project gallery loads slowly on mobile devices, dropping 40% of consultation requests.",
-          strategy: "Propose mobile-optimized portfolio viewer and automated 3D estimate request portal."
-        },
-        {
-          name: `Apex ${capCity} General Contracting & Framing`,
-          owner: "David Vance",
-          domain: `apexcontracting${city.toLowerCase()}.ca`,
-          seo: 62,
-          perf: 78,
-          ssl: 'secured',
-          rating: 4.4,
-          reviews: 28,
-          notes: "Missing licensed builder credentials badging and active project warranty guarantees.",
-          strategy: "Audit email detailing trust conversion dropoffs caused by missing license verification seals."
-        },
-        {
-          name: `Heritage Remodeling & Build ${capCity}`,
-          owner: "Julian Thorne",
-          domain: `heritageremodel${city.toLowerCase()}.ca`,
-          seo: 44,
-          perf: 38,
-          ssl: 'missing',
-          rating: 3.9,
-          reviews: 14,
-          notes: "Site lacks SSL security certificate. Homeowners see critical security warning when requesting quotes.",
-          strategy: "Urgent call highlighting browser security block on consultation forms."
-        },
-        {
-          name: `Vanguard Commercial Construction`,
-          owner: "Arthur Pendelton",
-          domain: `vanguardbuild${city.toLowerCase()}.com`,
-          seo: 82,
-          perf: 65,
-          ssl: 'secured',
-          rating: 4.9,
-          reviews: 64,
-          notes: "Strong desktop domain rank but lacks targeted landing pages for regional suburban developments.",
-          strategy: "Pitch geo-targeted ad funnels for upcoming commercial sub-division permits."
-        }
-      ];
-    } else if (lowerNiche.includes('mow') || lowerNiche.includes('lawn') || lowerNiche.includes('landscap') || lowerNiche.includes('tree')) {
-      templates = [
-        {
-          name: `${capCity} TurfPro Mowing & Lawn Maintenance`,
-          owner: "Tyler Dyck",
-          domain: `turfpromowing${city.toLowerCase()}.com`,
-          seo: 71,
-          perf: 84,
-          ssl: 'secured',
-          rating: 4.7,
-          reviews: 95,
-          notes: "Lacks instant online square-footage quote calculator; requires manual callback for recurring plans.",
-          strategy: "Pitch 60-second online instant yard estimator widget to double spring subscription signups."
-        },
-        {
-          name: `GreenBlade Commercial Landscaping`,
-          owner: "Scott Anderson",
-          domain: `greenbladelandscaping${city.toLowerCase()}.ca`,
-          seo: 58,
-          perf: 52,
-          ssl: 'secured',
-          rating: 4.3,
-          reviews: 36,
-          notes: "Slow mobile loading speed during peak spring booking window causes high bounce rate.",
-          strategy: "Mobile performance audit showing route-density campaign loss due to slow site speed."
-        },
-        {
-          name: `Timberland Tree Care & Yard Services`,
-          owner: "Garth Wiebe",
-          domain: `timberlandtree${city.toLowerCase()}.ca`,
-          seo: 42,
-          perf: 40,
-          ssl: 'missing',
-          rating: 3.8,
-          reviews: 19,
-          notes: "Missing SSL security certificate and unvalidated contact form.",
-          strategy: "Call regarding lost storm cleanup leads due to Google Chrome security warnings."
-        },
-        {
-          name: `Prairie Mowers & Estate Care`,
-          owner: "Dave Miller",
-          domain: `prairiemowers${city.toLowerCase()}.com`,
-          seo: 79,
-          perf: 76,
-          ssl: 'secured',
-          rating: 4.8,
-          reviews: 112,
-          notes: "High customer rating but no automated seasonal subscription renewal portal.",
-          strategy: "Pitch recurring subscription billing portal and neighborhood route density ads."
-        }
-      ];
-    } else {
-      // Standard / Specialized Home & Commercial Services
-      templates = [
-        {
-          name: `${capCity} Professional ${capNiche} Ltd`,
-          owner: "Robert Vance",
-          domain: `${city.toLowerCase()}${lowerNiche.replace(/\s+/g, '')}.ca`,
-          seo: 68,
-          perf: 54,
-          ssl: 'secured',
-          rating: 4.2,
-          reviews: 78,
-          notes: "Mobile load speed is below 3 seconds. Missing call-to-action on top-of-fold.",
-          strategy: "Email audit highlighting page-speed weaknesses on mobile causing lead drops."
-        },
-        {
-          name: `Red River ${capNiche} Experts`,
-          owner: "Trevor Dyck",
-          domain: `redriver${lowerNiche.replace(/\s+/g, '')}.com`,
-          seo: 74,
-          perf: 82,
-          ssl: 'secured',
-          rating: 4.7,
-          reviews: 34,
-          notes: "Excellent reviews but low overall visibility. Competitors bidding aggressively on search terms.",
-          strategy: "Pitch automated ad bid adjustments for high-intent search surges."
-        },
-        {
-          name: `Prairie ${capNiche} Specialists`,
-          owner: "Gary Wiebe",
-          domain: `prairie${lowerNiche.replace(/\s+/g, '')}.ca`,
-          seo: 45,
-          perf: 41,
-          ssl: 'missing',
-          rating: 3.8,
-          reviews: 12,
-          notes: "Website lacks SSL. Basic contact form has no validation. Critical security warning active.",
-          strategy: "Call highlighting SSL warning which deters prospective clients from submitting quote requests."
-        },
-        {
-          name: `Apex ${capCity} ${capNiche} Co`,
-          owner: "Dave Landry",
-          domain: `apex${city.toLowerCase()}${lowerNiche.replace(/\s+/g, '')}.ca`,
-          seo: 81,
-          perf: 65,
-          ssl: 'secured',
-          rating: 4.6,
-          reviews: 124,
-          notes: "Good overall technical setup but high local competition. Needs dedicated landing pages.",
-          strategy: "Pitch high-intent local search ads to capture immediate high-value contracts."
-        }
-      ];
-    }
-
-    return templates.map(t => ({
-      businessName: t.name,
-      ownerName: t.owner,
-      email: `service@${t.domain}`,
-      phone: "555-0192",
-      city: capCity,
-      serviceType: lowerNiche,
-      websiteUrl: `https://${t.domain}`,
-      seoScore: t.seo,
-      performanceScore: t.perf,
-      sslStatus: t.ssl,
-      googleRating: t.rating,
-      reviewCount: t.reviews,
-      sentimentScore: Math.round((t.rating / 5) * 100) / 100,
-      outreachStrategy: t.strategy,
-      notes: t.notes
+  const groundHarvestedBusinesses = async (items: any[]) => {
+    return await Promise.all(items.map(async (b) => {
+      try {
+        const grounding = await verifyLeadGrounding({
+          businessName: b.businessName,
+          websiteUrl: b.websiteUrl,
+          phone: b.phone,
+          isSynthetic: b.isSynthetic
+        });
+        const isGroundTruth = grounding.isGroundTruth;
+        return {
+          ...b,
+          isSynthetic: !isGroundTruth || b.isSynthetic,
+          sourceType: (!isGroundTruth || b.isSynthetic) ? 'synthetic_fallback' : (b.sourceType || 'live_harvest'),
+          verificationStatus: grounding.status,
+          dnsVerified: grounding.evidence.dnsResolved,
+          groundingEvidence: grounding.evidence
+        };
+      } catch (e) {
+        return {
+          ...b,
+          isSynthetic: b.isSynthetic ?? false,
+          sourceType: b.sourceType || 'live_harvest',
+          verificationStatus: 'UNVERIFIED_STAGING' as const,
+          dnsVerified: false
+        };
+      }
     }));
   };
 
   if (activeAI === 'gemini') {
-    // Try Gemini 3.5 with Search Grounding tools first
+    // Try Gemini 2.5/3.8 Flash model with native JSON mode first
     const ai = getAIClient();
     if (ai) {
       try {
-        const response = await ai.models.generateContent({
-          model: "gemini-3.8-flash",
-          contents: prompt,
-          config: {
-            responseMimeType: "application/json",
-            temperature: 0.3,
-            tools: [{ googleSearch: {} }],
-          }
-        });
+        let text = "[]";
+        try {
+          const response = await ai.models.generateContent({
+            model: "gemini-2.5-flash",
+            contents: prompt,
+            config: {
+              responseMimeType: "application/json",
+              temperature: 0.2,
+            }
+          });
+          text = response.text || "[]";
+        } catch (jsonErr: any) {
+          // If responseMimeType is incompatible with active configuration, try text format and clean
+          const response = await ai.models.generateContent({
+            model: "gemini-2.5-flash",
+            contents: prompt + "\n\nImportant: Output ONLY the raw JSON array inside markdown code block or as valid JSON.",
+            config: {
+              temperature: 0.2,
+            }
+          });
+          text = cleanJSONResponse(response.text || "[]");
+        }
 
-        const text = response.text || "[]";
-        return JSON.parse(text.trim());
+        const cleaned = cleanJSONResponse(text);
+        const parsed = JSON.parse(cleaned);
+        const mapped = (Array.isArray(parsed) ? parsed : []).map((b: any) => ({
+          ...b,
+          isSynthetic: false,
+          sourceType: 'live_harvest' as const
+        }));
+        return await groundHarvestedBusinesses(mapped);
       } catch (err) {
         console.error("Gemini business harvesting failed, attempting Nemotron fallback:", err);
       }
@@ -550,7 +486,13 @@ Return your response in a raw JSON array matching this structure:
           { role: "user", content: prompt }
         ], 0.3, true);
         const cleaned = cleanJSONResponse(text);
-        return JSON.parse(cleaned);
+        const parsed = JSON.parse(cleaned);
+        const mapped = (Array.isArray(parsed) ? parsed : []).map((b: any) => ({
+          ...b,
+          isSynthetic: false,
+          sourceType: 'live_harvest' as const
+        }));
+        return await groundHarvestedBusinesses(mapped);
       } catch (err) {
         console.error("NVIDIA Nemotron business harvesting fallback failed:", err);
       }
@@ -563,7 +505,13 @@ Return your response in a raw JSON array matching this structure:
           { role: "user", content: prompt }
         ], 0.3, true);
         const cleaned = cleanJSONResponse(text);
-        return JSON.parse(cleaned);
+        const parsed = JSON.parse(cleaned);
+        const mapped = (Array.isArray(parsed) ? parsed : []).map((b: any) => ({
+          ...b,
+          isSynthetic: false,
+          sourceType: 'live_harvest' as const
+        }));
+        return await groundHarvestedBusinesses(mapped);
       } catch (err) {
         console.error("NVIDIA Nemotron business harvesting failed, attempting Gemini fallback:", err);
       }
@@ -584,15 +532,21 @@ Return your response in a raw JSON array matching this structure:
         });
 
         const text = response.text || "[]";
-        return JSON.parse(text.trim());
+        const parsed = JSON.parse(text.trim());
+        const mapped = (Array.isArray(parsed) ? parsed : []).map((b: any) => ({
+          ...b,
+          isSynthetic: false,
+          sourceType: 'live_harvest' as const
+        }));
+        return await groundHarvestedBusinesses(mapped);
       } catch (err) {
         console.error("Gemini business harvesting fallback failed:", err);
       }
     }
   }
 
-  // Ultimate fallback to local hardcoded data
-  return getFallbackData();
+  // Fail-Closed Fallback: Return empty array per HAL Constitution Law #2 (Never Fabricate Reality)
+  return [];
 }
 
 /**

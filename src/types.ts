@@ -12,6 +12,20 @@ export interface Lead {
   urgencyScore: number;
   predictedLtvUsd: number;
   notes?: string;
+  isSynthetic?: boolean;
+  sourceType?: 'live_harvest' | 'synthetic_fallback' | 'manual' | 'google_ads' | 'spreadsheet_import';
+  verificationStatus?: 'VERIFIED' | 'UNVERIFIED_STAGING' | 'FABRICATED_REJECTED';
+  dnsVerified?: boolean;
+  groundingEvidence?: {
+    hostname?: string;
+    dnsResolved?: boolean;
+    httpReachable?: boolean;
+    sslSecured?: boolean;
+    phoneValid?: boolean;
+    isDummyPhone?: boolean;
+    reasons?: string[];
+    verifiedAt?: string;
+  };
   createdAt: string;
   updatedAt: string;
 

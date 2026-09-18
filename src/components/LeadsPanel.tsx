@@ -15,6 +15,7 @@ import {
   DollarSign, 
   CheckCircle, 
   AlertCircle,
+  AlertTriangle,
   MessageSquare,
   Sparkles,
   ChevronRight,
@@ -125,6 +126,66 @@ export default function LeadsPanel({ leads, token, onRefresh }: LeadsPanelProps)
       console.error(err);
     } finally {
       setReplacing(false);
+    }
+  };
+
+  // Fail-Closed & Network Grounding Verification State
+  const [probingGroundingId, setProbingGroundingId] = useState<string | null>(null);
+  const [verifyingAllGrounding, setVerifyingAllGrounding] = useState(false);
+  const [groundingFeedback, setGroundingFeedback] = useState<string | null>(null);
+
+  const handleProbeGrounding = async (leadId: string) => {
+    setProbingGroundingId(leadId);
+    setGroundingFeedback(null);
+    try {
+      const res = await fetch(`/api/leads/${leadId}/verify-grounding`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setGroundingFeedback(`Network probe finished: ${data.verificationStatus}. DNS: ${data.dnsVerified ? 'Resolved' : 'Failed'}`);
+        if (selectedLead && selectedLead.id === leadId) {
+          setSelectedLead({
+            ...selectedLead,
+            verificationStatus: data.verificationStatus,
+            dnsVerified: data.dnsVerified
+          });
+        }
+        onRefresh();
+      } else {
+        setGroundingFeedback(data.error || 'Failed to probe network grounding');
+      }
+    } catch (err: any) {
+      setGroundingFeedback(err.message || 'Error probing network grounding');
+    } finally {
+      setProbingGroundingId(null);
+    }
+  };
+
+  const handleVerifyAllGrounding = async () => {
+    setVerifyingAllGrounding(true);
+    setGroundingFeedback(null);
+    try {
+      const res = await fetch('/api/leads/verify-all', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setGroundingFeedback(`Network verification complete: ${data.verified} verified, ${data.staging} staging, ${data.quarantined} quarantined.`);
+        onRefresh();
+      } else {
+        setGroundingFeedback(data.error || 'Error running verification');
+      }
+    } catch (err: any) {
+      setGroundingFeedback(err.message || 'Verification failed');
+    } finally {
+      setVerifyingAllGrounding(false);
     }
   };
   
@@ -1147,8 +1208,37 @@ Next-Gen Waterproofing	Calgary	Waterproofing	Jane Smith	jane@nextgen.ca	403-555-
             >
               <Plus className="w-3.5 h-3.5 stroke-[2.5]" /> Add Lead
             </button>
+
+            <button
+              onClick={handleVerifyAllGrounding}
+              disabled={verifyingAllGrounding}
+              className="bg-card-inner hover:bg-card-dark text-emerald-400 border border-emerald-500/30 px-3 py-2 rounded-sm font-mono text-xs flex items-center gap-1.5 font-bold shrink-0 uppercase tracking-wider transition-colors disabled:opacity-50"
+              title="Run DNS & Network Grounding Probe on all leads"
+            >
+              {verifyingAllGrounding ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin text-emerald-400" />
+              ) : (
+                <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+              )}
+              {verifyingAllGrounding ? 'PROBING...' : 'VERIFY ALL'}
+            </button>
           </div>
         </div>
+
+        {groundingFeedback && (
+          <div className="p-3 bg-card-dark border border-border-dark text-xs font-mono rounded-sm flex items-center justify-between text-text-secondary">
+            <span className="flex items-center gap-2">
+              <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
+              {groundingFeedback}
+            </span>
+            <button
+              onClick={() => setGroundingFeedback(null)}
+              className="text-text-dim hover:text-text-primary px-2 py-0.5 rounded cursor-pointer"
+            >
+              ✕
+            </button>
+          </div>
+        )}
 
         {viewMode === 'map' ? (
           <div className="bg-card-dark border border-border-dark p-4.5 rounded-sm">
@@ -1172,6 +1262,13 @@ Next-Gen Waterproofing	Calgary	Waterproofing	Jane Smith	jane@nextgen.ca	403-555-
             <div className="divide-y divide-border-dark/60">
               {filteredLeads.map((l) => {
                 const isActive = selectedLead?.id === l.id;
+                const isSyntheticLead = Boolean(
+                  l.isSynthetic || 
+                  l.sourceType === 'synthetic_fallback' || 
+                  l.phone === '555-0192' || 
+                  l.phone === '555-0100' ||
+                  (l.notes && l.notes.includes('[SYNTHETIC FALLBACK]'))
+                );
                 return (
                   <div
                     key={l.id}
@@ -1193,6 +1290,19 @@ Next-Gen Waterproofing	Calgary	Waterproofing	Jane Smith	jane@nextgen.ca	403-555-
                         <span className="text-[9px] font-mono bg-card-dark text-text-secondary px-2 py-0.5 rounded-sm border border-border-dark font-bold uppercase tracking-wider">
                           {l.serviceType}
                         </span>
+                        {l.verificationStatus === 'VERIFIED' ? (
+                          <span className="text-[9px] font-mono bg-emerald-500/15 text-emerald-400 px-2 py-0.5 rounded-sm border border-emerald-500/30 font-bold uppercase tracking-wider flex items-center gap-1">
+                            <ShieldCheck className="w-2.5 h-2.5 text-emerald-400" /> DNS GROUNDED
+                          </span>
+                        ) : isSyntheticLead || l.verificationStatus === 'FABRICATED_REJECTED' ? (
+                          <span className="text-[9px] font-mono bg-rose-500/15 text-rose-400 px-2 py-0.5 rounded-sm border border-rose-500/40 font-bold uppercase tracking-wider flex items-center gap-1">
+                            <AlertTriangle className="w-2.5 h-2.5 text-rose-400" /> FAIL-CLOSED QUARANTINE
+                          </span>
+                        ) : (
+                          <span className="text-[9px] font-mono bg-amber-500/15 text-amber-400 px-2 py-0.5 rounded-sm border border-amber-500/30 font-bold uppercase tracking-wider flex items-center gap-1">
+                            <AlertCircle className="w-2.5 h-2.5 text-amber-400" /> UNVERIFIED STAGING
+                          </span>
+                        )}
                       </div>
                       <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] sm:text-xs text-text-secondary font-mono">
                         <span className="flex items-center gap-1"><MapPin className="w-3 h-3 text-text-dim" /> {l.city}</span>
@@ -1225,34 +1335,139 @@ Next-Gen Waterproofing	Calgary	Waterproofing	Jane Smith	jane@nextgen.ca	403-555-
 
       {/* Details / Activity Panel */}
       <div ref={detailsRef} className="bg-card-dark border border-border-dark rounded-sm p-5 flex flex-col justify-between h-fit min-h-[500px]">
-        {selectedLead ? (
-          <div className="space-y-6">
-            <div className="border-b border-border-dark pb-4">
-              <h3 className="text-base font-bold text-text-primary mb-1 leading-normal font-sans">{selectedLead.businessName}</h3>
-              <p className="text-[10px] text-text-secondary uppercase font-mono tracking-widest font-bold">{selectedLead.serviceType}</p>
-            </div>
+        {selectedLead ? (() => {
+          const isSelectedSynthetic = Boolean(
+            selectedLead.isSynthetic || 
+            selectedLead.sourceType === 'synthetic_fallback' || 
+            selectedLead.phone === '555-0192' || 
+            selectedLead.phone === '555-0100' ||
+            (selectedLead.notes && selectedLead.notes.includes('[SYNTHETIC FALLBACK]'))
+          );
 
-            <div className="space-y-3.5 text-xs text-text-secondary font-sans">
-              <div className="flex items-center gap-3">
-                <User className="w-4 h-4 text-text-dim" />
-                <span>Owner: <strong className="text-text-primary">{selectedLead.ownerName || 'Unknown / Unspecified'}</strong></span>
+          return (
+            <div className="space-y-6">
+              <div className="border-b border-border-dark pb-4">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <h3 className="text-base font-bold text-text-primary mb-1 leading-normal font-sans">{selectedLead.businessName}</h3>
+                    <p className="text-[10px] text-text-secondary uppercase font-mono tracking-widest font-bold">{selectedLead.serviceType}</p>
+                  </div>
+                  {isSelectedSynthetic ? (
+                    <span className="text-[9px] font-mono bg-amber-500/15 text-amber-400 px-2 py-1 rounded-sm border border-amber-500/40 font-bold uppercase tracking-wider flex items-center gap-1">
+                      <AlertTriangle className="w-3 h-3 text-amber-400" /> SYNTHETIC DEMO
+                    </span>
+                  ) : (
+                    <span className="text-[9px] font-mono bg-emerald-500/10 text-emerald-400 px-2 py-1 rounded-sm border border-emerald-500/20 font-bold uppercase tracking-wider">
+                      VERIFIED LIVE
+                    </span>
+                  )}
+                </div>
               </div>
-              <div className="flex items-center gap-3">
-                <Mail className="w-4 h-4 text-text-dim" />
-                <span className="font-mono text-text-primary">{selectedLead.email || 'None provided'}</span>
+
+              {isSelectedSynthetic && (
+                <div className="p-3.5 bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs rounded-sm font-sans flex items-start gap-3">
+                  <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                  <div className="space-y-1">
+                    <div className="font-mono text-[10px] uppercase font-bold tracking-wider text-amber-400">
+                      ⚠️ Data Transparency: Synthetic Fallback Profile
+                    </div>
+                    <div className="text-[11px] leading-relaxed text-amber-200/90 font-sans">
+                      This lead was generated by the fallback heuristic when AI model quota or offline mode triggered. Dummy phone numbers (<strong className="font-mono text-amber-300">555-0192</strong>) are simulated placeholders. <strong>Do not allocate paid ad or SMS outreach budget to this contact.</strong>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <div className="space-y-3.5 text-xs text-text-secondary font-sans">
+                <div className="flex items-center gap-3">
+                  <User className="w-4 h-4 text-text-dim" />
+                  <span>Owner: <strong className="text-text-primary">{selectedLead.ownerName || 'Unknown / Unspecified'}</strong></span>
+                </div>
+                <div className="flex items-center gap-3">
+                  <Mail className="w-4 h-4 text-text-dim" />
+                  <span className="font-mono text-text-primary">{selectedLead.email || 'None provided'}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <Phone className="w-4 h-4 text-text-dim" />
+                    <span className={`font-mono ${isSelectedSynthetic ? 'text-amber-400 font-bold' : 'text-text-primary'}`}>
+                      {selectedLead.phone || 'None provided'}
+                    </span>
+                  </div>
+                  {isSelectedSynthetic && (
+                    <span className="text-[9px] font-mono font-bold uppercase px-2 py-0.5 rounded bg-amber-500/20 text-amber-400 border border-amber-500/30">
+                      Dummy - Do Not Dial
+                    </span>
+                  )}
+                </div>
+                <div className="flex items-center gap-3">
+                  <MapPin className="w-4 h-4 text-text-dim" />
+                  <span className="text-text-primary">Location: {selectedLead.city}</span>
+                </div>
+                <div className="bg-card-inner p-3 rounded-sm border border-border-dark/60 text-text-secondary leading-relaxed font-mono text-[11px] mt-2">
+                  {selectedLead.notes || 'No profile notes captured.'}
+                </div>
               </div>
-              <div className="flex items-center gap-3">
-                <Phone className="w-4 h-4 text-text-dim" />
-                <span className="font-mono text-text-primary">{selectedLead.phone || 'None provided'}</span>
+
+              {/* Fail-Closed Network Grounding & DNS Audit Panel */}
+              <div className="border-t border-border-dark/60 pt-4 space-y-3">
+                <div className="flex justify-between items-center">
+                  <span className="text-[10px] font-mono uppercase tracking-widest text-text-dim block font-bold">
+                    Network Grounding & Fail-Closed Gate
+                  </span>
+                  <button
+                    onClick={() => handleProbeGrounding(selectedLead.id)}
+                    disabled={probingGroundingId === selectedLead.id}
+                    className="text-[10px] font-mono font-bold px-2 py-1 rounded bg-card-inner hover:bg-card-dark text-text-primary border border-border-dark flex items-center gap-1 cursor-pointer disabled:opacity-50 transition-colors"
+                  >
+                    {probingGroundingId === selectedLead.id ? (
+                      <Loader2 className="w-3 h-3 animate-spin text-brand" />
+                    ) : (
+                      <ShieldCheck className="w-3 h-3 text-emerald-400" />
+                    )}
+                    {probingGroundingId === selectedLead.id ? 'Probing...' : 'Probe Live Grounding'}
+                  </button>
+                </div>
+
+                <div className="bg-card-inner p-3 rounded-sm border border-border-dark/60 space-y-2.5 font-mono text-[11px]">
+                  <div className="flex justify-between items-center">
+                    <span className="text-text-secondary">Grounding State:</span>
+                    {selectedLead.verificationStatus === 'VERIFIED' ? (
+                      <span className="text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-sm font-bold text-[9px] uppercase border border-emerald-500/30 flex items-center gap-1">
+                        <ShieldCheck className="w-3 h-3 text-emerald-400" /> VERIFIED GROUND TRUTH
+                      </span>
+                    ) : isSelectedSynthetic || selectedLead.verificationStatus === 'FABRICATED_REJECTED' ? (
+                      <span className="text-rose-400 bg-rose-500/10 px-2 py-0.5 rounded-sm font-bold text-[9px] uppercase border border-rose-500/30 flex items-center gap-1">
+                        <AlertTriangle className="w-3 h-3 text-rose-400" /> FAIL-CLOSED QUARANTINED
+                      </span>
+                    ) : (
+                      <span className="text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-sm font-bold text-[9px] uppercase border border-amber-500/30 flex items-center gap-1">
+                        <AlertCircle className="w-3 h-3 text-amber-400" /> UNVERIFIED STAGING
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="flex justify-between items-center">
+                    <span className="text-text-secondary">DNS A/AAAA Record:</span>
+                    <span className={`font-bold text-[10px] ${selectedLead.dnsVerified ? 'text-emerald-400' : 'text-amber-400'}`}>
+                      {selectedLead.dnsVerified ? 'RESOLVED (Network Verified)' : 'UNRESOLVED / PENDING PROBE'}
+                    </span>
+                  </div>
+
+                  <div className="flex justify-between items-center">
+                    <span className="text-text-secondary">Fail-Closed Outreach Gate:</span>
+                    {selectedLead.verificationStatus === 'VERIFIED' ? (
+                      <span className="text-emerald-400 font-bold text-[10px]">
+                        AUTHORIZED FOR AUTONOMOUS DISPATCH
+                      </span>
+                    ) : (
+                      <span className="text-rose-400 font-bold text-[10px]">
+                        BLOCKED (Requires Verified Ground Truth)
+                      </span>
+                    )}
+                  </div>
+                </div>
               </div>
-              <div className="flex items-center gap-3">
-                <MapPin className="w-4 h-4 text-text-dim" />
-                <span className="text-text-primary">Location: {selectedLead.city}</span>
-              </div>
-              <div className="bg-card-inner p-3 rounded-sm border border-border-dark/60 text-text-secondary leading-relaxed font-mono text-[11px] mt-2">
-                {selectedLead.notes || 'No profile notes captured.'}
-              </div>
-            </div>
 
             {/* Phase 2: Sourced Intelligence Audit Metrics */}
             {selectedLead.websiteUrl && (
@@ -1464,7 +1679,8 @@ Next-Gen Waterproofing	Calgary	Waterproofing	Jane Smith	jane@nextgen.ca	403-555-
               </form>
             </div>
           </div>
-        ) : (
+        );
+      })() : (
           <div className="flex-1 flex flex-col items-center justify-center text-center py-16 text-text-dim space-y-3">
             <MessageSquare className="w-8 h-8 text-border-dark" />
             <p className="font-mono text-[10px] uppercase tracking-wider max-w-[240px] leading-relaxed">Select a prospect from the left column to view operational metrics and audit logs.</p>

@@ -115,6 +115,14 @@ export async function bootstrapPostgresTables(poolInstance?: Pool): Promise<void
         owner_name TEXT,
         phone TEXT,
         email TEXT,
+        phone_encrypted TEXT,
+        email_encrypted TEXT,
+        is_synthetic BOOLEAN DEFAULT false NOT NULL,
+        source_type TEXT DEFAULT 'live_harvest' NOT NULL,
+        verification_status TEXT DEFAULT 'UNVERIFIED_STAGING' NOT NULL,
+        dns_verified BOOLEAN DEFAULT false NOT NULL,
+        external_crm_id TEXT,
+        external_source TEXT,
         website_url TEXT,
         gmb_listing_url TEXT,
         review_count INTEGER DEFAULT 0,
@@ -585,6 +593,8 @@ export async function bootstrapPostgresTables(poolInstance?: Pool): Promise<void
       ALTER TABLE leads ADD COLUMN IF NOT EXISTS sentiment_score DOUBLE PRECISION DEFAULT 0;
       ALTER TABLE leads ADD COLUMN IF NOT EXISTS outreach_strategy TEXT;
       ALTER TABLE leads ADD COLUMN IF NOT EXISTS notes TEXT;
+      ALTER TABLE leads ADD COLUMN IF NOT EXISTS verification_status TEXT DEFAULT 'UNVERIFIED_STAGING';
+      ALTER TABLE leads ADD COLUMN IF NOT EXISTS dns_verified BOOLEAN DEFAULT false;
 
       ALTER TABLE lead_events ADD COLUMN IF NOT EXISTS external_event_id TEXT;
       ALTER TABLE lead_events ADD COLUMN IF NOT EXISTS event_type TEXT;
@@ -636,6 +646,14 @@ export async function bootstrapPostgresTables(poolInstance?: Pool): Promise<void
         thought_process TEXT,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
       );
+
+      -- Safe idempotent column upgrades for leads table
+      ALTER TABLE leads ADD COLUMN IF NOT EXISTS is_synthetic BOOLEAN DEFAULT false NOT NULL;
+      ALTER TABLE leads ADD COLUMN IF NOT EXISTS source_type TEXT DEFAULT 'live_harvest' NOT NULL;
+      ALTER TABLE leads ADD COLUMN IF NOT EXISTS phone_encrypted TEXT;
+      ALTER TABLE leads ADD COLUMN IF NOT EXISTS email_encrypted TEXT;
+      ALTER TABLE leads ADD COLUMN IF NOT EXISTS external_crm_id TEXT;
+      ALTER TABLE leads ADD COLUMN IF NOT EXISTS external_source TEXT;
     `);
   } catch (err: any) {
     // If running in a managed Cloud SQL environment where DDL is provisioned via drizzle-kit / admin runner
