@@ -14,6 +14,10 @@ export type ColorPreset =
   | 'modern_slate' 
   | 'eco_green' 
   | 'electric_gold' 
+  | 'executive_carbon'
+  | 'modern_swiss'
+  | 'nordic_obsidian'
+  | 'artisan_warmth'
   | 'custom';
 
 export interface TrustBadgeItem {
@@ -57,6 +61,27 @@ export interface FaqItem {
   id: string;
   question: string;
   answer: string;
+}
+
+export interface BentoItem {
+  id: string;
+  title: string;
+  subtitle: string;
+  value?: string;
+  tag?: string;
+  icon?: string;
+  colSpan?: '1' | '2' | '3';
+}
+
+export interface PricingTierItem {
+  id: string;
+  name: string;
+  price: string;
+  period?: string;
+  popular?: boolean;
+  tagline: string;
+  features: string[];
+  ctaText: string;
 }
 
 export interface LandingPageConfig {
@@ -166,6 +191,20 @@ export interface LandingPageConfig {
       active: boolean;
       title: string;
       items: FaqItem[];
+    };
+    bento_features?: {
+      active: boolean;
+      badge: string;
+      title: string;
+      subtitle: string;
+      items: BentoItem[];
+    };
+    pricing_packages?: {
+      active: boolean;
+      badge: string;
+      title: string;
+      subtitle: string;
+      items: PricingTierItem[];
     };
     sticky_mobile_call: {
       active: boolean;

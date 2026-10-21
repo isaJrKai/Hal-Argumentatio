@@ -15,6 +15,10 @@ const PRESETS: Array<{
   accent: string;
 }> = [
   { id: 'paper_ink', name: 'Paper & Ink (Warm Archival)', primary: '#18181b', secondary: '#f7f5f0', accent: '#9a3412' },
+  { id: 'executive_carbon', name: 'Executive Carbon (Matte Dark)', primary: '#09090b', secondary: '#18181b', accent: '#e4e4e7' },
+  { id: 'modern_swiss', name: 'Modern Swiss (Clean Minimal)', primary: '#ffffff', secondary: '#0f172a', accent: '#e11d48' },
+  { id: 'nordic_obsidian', name: 'Nordic Obsidian (Ice Blue)', primary: '#030712', secondary: '#0b1329', accent: '#38bdf8' },
+  { id: 'artisan_warmth', name: 'Artisan Warmth (Craft Cedar)', primary: '#292524', secondary: '#f5f5f4', accent: '#d97706' },
   { id: 'emergency_amber', name: 'Emergency Amber', primary: '#0284c7', secondary: '#0f172a', accent: '#f59e0b' },
   { id: 'trust_navy', name: 'Trust Navy & Cyan', primary: '#2563eb', secondary: '#0f172a', accent: '#38bdf8' },
   { id: 'modern_slate', name: 'Modern Slate Blue', primary: '#0f172a', secondary: '#334155', accent: '#3b82f6' },

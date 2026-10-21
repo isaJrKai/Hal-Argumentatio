@@ -196,27 +196,29 @@ export default function OverviewPanel({
   const totalRevenueVal = revenues.reduce((sum, r) => sum + r.amountUsd, 0);
   const activeCampaignsCount = campaigns.filter(c => c.status === 'active').length;
 
-  // Compute realistic fallback values if system is fresh
-  const displayRevenueVal = totalRevenueVal > 0 ? totalRevenueVal : 28540;
-  const displayNewLeadsVal = untouchedLeads > 0 ? untouchedLeads : 32;
+  // Display authentic verified metrics without mock inflation
+  const displayRevenueVal = totalRevenueVal;
+  const displayNewLeadsVal = untouchedLeads;
   const displayAvgDealVal = convertedLeads.length > 0 
     ? Math.round(totalRevenueVal / convertedLeads.length) 
-    : 1250;
-  const displayActiveClientsVal = convertedLeads.length > 0 ? convertedLeads.length : 18;
-  const displayOpportunitiesVal = totalLeads > 0 ? totalLeads : 64;
+    : 0;
+  const displayActiveClientsVal = convertedLeads.length;
+  const displayOpportunitiesVal = totalLeads;
 
   // Donut chart data (Opportunities distribution)
   const highValLeads = leads.filter(l => (l.urgencyScore || 0) > 7).length;
   const medValLeads = leads.filter(l => (l.urgencyScore || 0) >= 4 && (l.urgencyScore || 0) <= 7).length;
   const lowValLeads = leads.filter(l => (l.urgencyScore || 0) < 4).length;
 
-  const donutData = [
-    { name: 'High Value', value: highValLeads > 0 ? highValLeads : 18, color: chartPalette.highVal },
-    { name: 'Medium Value', value: medValLeads > 0 ? medValLeads : 24, color: chartPalette.medVal },
-    { name: 'Low Value', value: lowValLeads > 0 ? lowValLeads : 22, color: chartPalette.lowVal },
+  const donutData = totalLeads > 0 ? [
+    { name: 'High Value', value: highValLeads, color: chartPalette.highVal },
+    { name: 'Medium Value', value: medValLeads, color: chartPalette.medVal },
+    { name: 'Low Value', value: lowValLeads, color: chartPalette.lowVal },
+  ] : [
+    { name: 'Pipeline Ready', value: 1, color: chartPalette.medVal }
   ];
 
-  const totalOpportunities = donutData.reduce((sum, d) => sum + d.value, 0);
+  const totalOpportunities = totalLeads;
 
   // Sparkline data for cards
   const sparkData1 = [12, 15, 13, 18, 16, 22, 20, 25, 22, 28, 26, 31];

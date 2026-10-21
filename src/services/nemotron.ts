@@ -25,15 +25,32 @@ function getAIClient(): GoogleGenAI | null {
  * Clean dynamic markdown codeblock wraps from responses
  */
 export function cleanJSONResponse(text: string): string {
+  if (!text || typeof text !== 'string') return '{}';
   let cleaned = text.trim();
-  if (cleaned.startsWith("```json")) {
-    cleaned = cleaned.substring(7);
-  } else if (cleaned.startsWith("```")) {
-    cleaned = cleaned.substring(3);
+
+  // 1. Try markdown code block extraction
+  const jsonBlockRegex = /```(?:json)?\s*([\s\S]*?)\s*```/i;
+  const match = cleaned.match(jsonBlockRegex);
+  if (match && match[1]) {
+    cleaned = match[1].trim();
   }
-  if (cleaned.endsWith("```")) {
-    cleaned = cleaned.substring(0, cleaned.length - 3);
+
+  // 2. If it's not starting with { or [, locate the first { or [ and matching last } or ]
+  const firstBracket = cleaned.indexOf('[');
+  const firstBrace = cleaned.indexOf('{');
+  
+  if (firstBracket !== -1 && (firstBrace === -1 || firstBracket < firstBrace)) {
+    const lastBracket = cleaned.lastIndexOf(']');
+    if (lastBracket > firstBracket) {
+      cleaned = cleaned.substring(firstBracket, lastBracket + 1);
+    }
+  } else if (firstBrace !== -1) {
+    const lastBrace = cleaned.lastIndexOf('}');
+    if (lastBrace > firstBrace) {
+      cleaned = cleaned.substring(firstBrace, lastBrace + 1);
+    }
   }
+
   return cleaned.trim();
 }
 
@@ -150,7 +167,7 @@ export async function callGemini(
   }
 
   let lastErr: any = null;
-  for (const model of ["gemini-2.5-flash", "gemini-3.8-flash"]) {
+  for (const model of ["gemini-3.8-flash", "gemini-flash-latest", "gemini-3.1-flash-lite"]) {
     try {
       const response = await ai.models.generateContent({
         model,

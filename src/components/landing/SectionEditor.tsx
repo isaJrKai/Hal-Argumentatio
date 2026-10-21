@@ -28,6 +28,8 @@ const SECTION_LABELS: Record<string, { label: string; iconName: string }> = {
   trust_bar: { label: 'Authority Trust Badges (4x)', iconName: 'Shield' },
   seasonal_alert: { label: 'Seasonal Emergency / Weather Module', iconName: 'CloudRain' },
   services: { label: 'Core Trade Services Grid', iconName: 'Wrench' },
+  bento_features: { label: 'Bento Grid Capabilities & Metrics', iconName: 'Grid' },
+  pricing_packages: { label: 'Transparent Pricing Packages', iconName: 'Tag' },
   before_after: { label: 'Before & After Project Showcase', iconName: 'Image' },
   reviews: { label: 'Verified Google 5-Star Reviews', iconName: 'CheckCircle' },
   service_areas: { label: 'Neighborhood Service Areas (Local SEO)', iconName: 'MapPin' },
@@ -40,7 +42,50 @@ const SECTION_LABELS: Record<string, { label: string; iconName: string }> = {
 
 export const SectionEditor: React.FC<SectionEditorProps> = ({ config, onChange }) => {
   const [expandedSection, setExpandedSection] = useState<string | null>('hero');
+  const [polishingSection, setPolishingSection] = useState<string | null>(null);
+  const [quickPromptSection, setQuickPromptSection] = useState<string | null>(null);
+  const [customPrompt, setCustomPrompt] = useState<string>('');
   const { openInspector } = useInspector();
+
+  const handleRegenerateSection = async (secKey: string) => {
+    setPolishingSection(secKey);
+    try {
+      const res = await fetch('/api/landing-pages/regenerate-section', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sectionKey: secKey,
+          trade: config.trade || 'plumbing',
+          businessName: config.businessName,
+          city: config.city,
+          currentSectionData: (config.sections as any)[secKey],
+          customPrompt: customPrompt.trim() || undefined
+        })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const updatedSection = data?.updatedData || data?.sectionData;
+        if (data && updatedSection) {
+          onChange({
+            ...config,
+            sections: {
+              ...config.sections,
+              [secKey]: {
+                ...(config.sections as any)[secKey],
+                ...updatedSection
+              }
+            }
+          });
+          setQuickPromptSection(null);
+          setCustomPrompt('');
+        }
+      }
+    } catch (err) {
+      console.error('Failed to regenerate section:', err);
+    } finally {
+      setPolishingSection(null);
+    }
+  };
 
   const moveSection = (index: number, direction: 'up' | 'down') => {
     const newOrder = [...config.sectionOrder];
@@ -143,6 +188,32 @@ export const SectionEditor: React.FC<SectionEditorProps> = ({ config, onChange }
                     <ArrowDown className="w-3.5 h-3.5" />
                   </button>
 
+                  {/* AI Polish Button */}
+                  <button
+                    type="button"
+                    title="AI Polish Section with Gemini"
+                    disabled={polishingSection === secKey}
+                    onClick={() => {
+                      if (quickPromptSection === secKey) {
+                        setQuickPromptSection(null);
+                      } else {
+                        setQuickPromptSection(secKey);
+                      }
+                    }}
+                    className={`p-1 px-1.5 rounded text-xs transition flex items-center gap-1 ${
+                      polishingSection === secKey
+                        ? 'text-amber-400 bg-amber-400/20 animate-pulse'
+                        : quickPromptSection === secKey
+                        ? 'bg-amber-400/20 text-amber-300'
+                        : 'text-amber-400/80 hover:text-amber-300 hover:bg-amber-400/10'
+                    }`}
+                  >
+                    <Sparkles className="w-3.5 h-3.5" />
+                    <span className="text-[10px] hidden sm:inline font-semibold">
+                      {polishingSection === secKey ? 'Polishing...' : 'AI Polish'}
+                    </span>
+                  </button>
+
                   {/* Active Toggle */}
                   <button
                     type="button"
@@ -166,6 +237,38 @@ export const SectionEditor: React.FC<SectionEditorProps> = ({ config, onChange }
                   </button>
                 </div>
               </div>
+
+              {/* Quick AI Polish Input Bar */}
+              {quickPromptSection === secKey && (
+                <div className="px-3 py-2 border-t border-slate-800 bg-amber-500/10 flex items-center gap-2">
+                  <input
+                    type="text"
+                    placeholder="Instructions (e.g., 'Make punchier for frozen pipe emergencies') or leave blank for auto-polish..."
+                    value={customPrompt}
+                    onChange={(e) => setCustomPrompt(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') handleRegenerateSection(secKey);
+                    }}
+                    className="flex-1 px-2.5 py-1 text-xs rounded bg-slate-950 border border-slate-700 text-white placeholder-slate-500 focus:outline-none focus:border-amber-400"
+                  />
+                  <button
+                    type="button"
+                    disabled={polishingSection === secKey}
+                    onClick={() => handleRegenerateSection(secKey)}
+                    className="px-2.5 py-1 text-xs rounded bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold transition flex items-center gap-1 cursor-pointer shrink-0"
+                  >
+                    <Sparkles className="w-3 h-3" />
+                    <span>{polishingSection === secKey ? 'Polishing...' : 'Polish'}</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setQuickPromptSection(null)}
+                    className="text-slate-400 hover:text-white text-xs px-1"
+                  >
+                    ✕
+                  </button>
+                </div>
+              )}
 
               {/* Expandable Form for Specific Section Fields */}
               {isExpanded && isActive && (
@@ -482,6 +585,451 @@ export const SectionEditor: React.FC<SectionEditorProps> = ({ config, onChange }
                         }
                         className="w-full px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-white text-xs focus:outline-none focus:border-amber-400"
                       />
+                    </div>
+                  )}
+
+                  {secKey === 'bento_features' && config.sections.bento_features && (
+                    <div className="space-y-3">
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <label className="block text-[11px] text-slate-400 font-semibold mb-1">Badge</label>
+                          <input
+                            type="text"
+                            value={config.sections.bento_features.badge || ''}
+                            onChange={(e) =>
+                              onChange({
+                                ...config,
+                                sections: {
+                                  ...config.sections,
+                                  bento_features: { ...config.sections.bento_features!, badge: e.target.value }
+                                }
+                              })
+                            }
+                            className="w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-white text-xs focus:outline-none focus:border-amber-400"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[11px] text-slate-400 font-semibold mb-1">Headline</label>
+                          <input
+                            type="text"
+                            value={config.sections.bento_features.title || ''}
+                            onChange={(e) =>
+                              onChange({
+                                ...config,
+                                sections: {
+                                  ...config.sections,
+                                  bento_features: { ...config.sections.bento_features!, title: e.target.value }
+                                }
+                              })
+                            }
+                            className="w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-white text-xs focus:outline-none focus:border-amber-400"
+                          />
+                        </div>
+                      </div>
+                      <div>
+                        <label className="block text-[11px] text-slate-400 font-semibold mb-1">Subheadline</label>
+                        <input
+                          type="text"
+                          value={config.sections.bento_features.subtitle || ''}
+                          onChange={(e) =>
+                            onChange({
+                              ...config,
+                              sections: {
+                                ...config.sections,
+                                bento_features: { ...config.sections.bento_features!, subtitle: e.target.value }
+                              }
+                            })
+                          }
+                          className="w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-white text-xs focus:outline-none focus:border-amber-400"
+                        />
+                      </div>
+
+                      <div className="pt-2 border-t border-slate-800">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-[11px] text-slate-400 font-semibold">Bento Cards</span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const newItems = [
+                                ...(config.sections.bento_features?.items || []),
+                                {
+                                  id: 'bento_' + Date.now(),
+                                  title: 'New Capability',
+                                  subtitle: 'Verified dispatch performance metric.',
+                                  value: '100%',
+                                  tag: 'Reliability',
+                                  icon: '⚡',
+                                  colSpan: '1' as const
+                                }
+                              ];
+                              onChange({
+                                ...config,
+                                sections: {
+                                  ...config.sections,
+                                  bento_features: { ...config.sections.bento_features!, items: newItems }
+                                }
+                              });
+                            }}
+                            className="text-[10px] text-amber-400 hover:text-amber-300 font-bold flex items-center gap-1 cursor-pointer"
+                          >
+                            <Plus className="w-3 h-3" /> Add Bento Card
+                          </button>
+                        </div>
+                        <div className="space-y-2">
+                          {(config.sections.bento_features.items || []).map((item, bIdx) => (
+                            <div key={item.id} className="p-2.5 rounded-lg bg-slate-900 border border-slate-800 space-y-2">
+                              <div className="flex items-center justify-between gap-2">
+                                <input
+                                  type="text"
+                                  value={item.title}
+                                  placeholder="Title"
+                                  onChange={(e) => {
+                                    const updated = [...config.sections.bento_features!.items];
+                                    updated[bIdx].title = e.target.value;
+                                    onChange({
+                                      ...config,
+                                      sections: {
+                                        ...config.sections,
+                                        bento_features: { ...config.sections.bento_features!, items: updated }
+                                      }
+                                    });
+                                  }}
+                                  className="font-bold text-white bg-transparent border-b border-slate-700 text-xs flex-1 focus:outline-none focus:border-amber-400"
+                                />
+                                <select
+                                  value={item.colSpan || '1'}
+                                  onChange={(e) => {
+                                    const updated = [...config.sections.bento_features!.items];
+                                    updated[bIdx].colSpan = e.target.value as any;
+                                    onChange({
+                                      ...config,
+                                      sections: {
+                                        ...config.sections,
+                                        bento_features: { ...config.sections.bento_features!, items: updated }
+                                      }
+                                    });
+                                  }}
+                                  className="bg-slate-950 border border-slate-700 text-[10px] rounded px-1.5 py-0.5 text-slate-300"
+                                >
+                                  <option value="1">Span 1</option>
+                                  <option value="2">Span 2 (Wide)</option>
+                                  <option value="3">Span 3 (Full)</option>
+                                </select>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const updated = config.sections.bento_features!.items.filter((_, i) => i !== bIdx);
+                                    onChange({
+                                      ...config,
+                                      sections: {
+                                        ...config.sections,
+                                        bento_features: { ...config.sections.bento_features!, items: updated }
+                                      }
+                                    });
+                                  }}
+                                  className="text-red-400 hover:text-red-300 p-1"
+                                >
+                                  <Trash2 className="w-3 h-3" />
+                                </button>
+                              </div>
+                              <input
+                                type="text"
+                                value={item.subtitle}
+                                placeholder="Subtitle / explanation"
+                                onChange={(e) => {
+                                  const updated = [...config.sections.bento_features!.items];
+                                  updated[bIdx].subtitle = e.target.value;
+                                  onChange({
+                                    ...config,
+                                    sections: {
+                                      ...config.sections,
+                                      bento_features: { ...config.sections.bento_features!, items: updated }
+                                    }
+                                  });
+                                }}
+                                className="w-full px-2 py-1 rounded bg-slate-950 border border-slate-800 text-[11px] text-slate-300"
+                              />
+                              <div className="grid grid-cols-3 gap-1.5">
+                                <input
+                                  type="text"
+                                  value={item.value || ''}
+                                  placeholder="Metric / Value"
+                                  onChange={(e) => {
+                                    const updated = [...config.sections.bento_features!.items];
+                                    updated[bIdx].value = e.target.value;
+                                    onChange({
+                                      ...config,
+                                      sections: {
+                                        ...config.sections,
+                                        bento_features: { ...config.sections.bento_features!, items: updated }
+                                      }
+                                    });
+                                  }}
+                                  className="px-2 py-1 rounded bg-slate-950 border border-slate-800 text-[10px] text-amber-400 font-bold"
+                                />
+                                <input
+                                  type="text"
+                                  value={item.tag || ''}
+                                  placeholder="Tag / Category"
+                                  onChange={(e) => {
+                                    const updated = [...config.sections.bento_features!.items];
+                                    updated[bIdx].tag = e.target.value;
+                                    onChange({
+                                      ...config,
+                                      sections: {
+                                        ...config.sections,
+                                        bento_features: { ...config.sections.bento_features!, items: updated }
+                                      }
+                                    });
+                                  }}
+                                  className="px-2 py-1 rounded bg-slate-950 border border-slate-800 text-[10px] text-slate-300"
+                                />
+                                <input
+                                  type="text"
+                                  value={item.icon || ''}
+                                  placeholder="Icon (e.g. ⚡)"
+                                  onChange={(e) => {
+                                    const updated = [...config.sections.bento_features!.items];
+                                    updated[bIdx].icon = e.target.value;
+                                    onChange({
+                                      ...config,
+                                      sections: {
+                                        ...config.sections,
+                                        bento_features: { ...config.sections.bento_features!, items: updated }
+                                      }
+                                    });
+                                  }}
+                                  className="px-2 py-1 rounded bg-slate-950 border border-slate-800 text-[10px] text-slate-300"
+                                />
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {secKey === 'pricing_packages' && config.sections.pricing_packages && (
+                    <div className="space-y-3">
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <label className="block text-[11px] text-slate-400 font-semibold mb-1">Badge</label>
+                          <input
+                            type="text"
+                            value={config.sections.pricing_packages.badge || ''}
+                            onChange={(e) =>
+                              onChange({
+                                ...config,
+                                sections: {
+                                  ...config.sections,
+                                  pricing_packages: { ...config.sections.pricing_packages!, badge: e.target.value }
+                                }
+                              })
+                            }
+                            className="w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-white text-xs focus:outline-none focus:border-amber-400"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[11px] text-slate-400 font-semibold mb-1">Headline</label>
+                          <input
+                            type="text"
+                            value={config.sections.pricing_packages.title || ''}
+                            onChange={(e) =>
+                              onChange({
+                                ...config,
+                                sections: {
+                                  ...config.sections,
+                                  pricing_packages: { ...config.sections.pricing_packages!, title: e.target.value }
+                                }
+                              })
+                            }
+                            className="w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-white text-xs focus:outline-none focus:border-amber-400"
+                          />
+                        </div>
+                      </div>
+                      <div>
+                        <label className="block text-[11px] text-slate-400 font-semibold mb-1">Subheadline</label>
+                        <input
+                          type="text"
+                          value={config.sections.pricing_packages.subtitle || ''}
+                          onChange={(e) =>
+                            onChange({
+                              ...config,
+                              sections: {
+                                ...config.sections,
+                                pricing_packages: { ...config.sections.pricing_packages!, subtitle: e.target.value }
+                              }
+                            })
+                          }
+                          className="w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-white text-xs focus:outline-none focus:border-amber-400"
+                        />
+                      </div>
+
+                      <div className="pt-2 border-t border-slate-800">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-[11px] text-slate-400 font-semibold">Pricing Packages</span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const newItems = [
+                                ...(config.sections.pricing_packages?.items || []),
+                                {
+                                  id: 'pkg_' + Date.now(),
+                                  name: 'Standard Package',
+                                  price: '$199',
+                                  period: 'flat rate',
+                                  popular: false,
+                                  tagline: 'Standard diagnostic and repair',
+                                  features: ['Full diagnostic inspection', 'Written upfront quote', '1-year warranty'],
+                                  ctaText: 'Select Package'
+                                }
+                              ];
+                              onChange({
+                                ...config,
+                                sections: {
+                                  ...config.sections,
+                                  pricing_packages: { ...config.sections.pricing_packages!, items: newItems }
+                                }
+                              });
+                            }}
+                            className="text-[10px] text-amber-400 hover:text-amber-300 font-bold flex items-center gap-1 cursor-pointer"
+                          >
+                            <Plus className="w-3 h-3" /> Add Package
+                          </button>
+                        </div>
+                        <div className="space-y-3">
+                          {(config.sections.pricing_packages.items || []).map((tier, pIdx) => (
+                            <div key={tier.id} className="p-2.5 rounded-lg bg-slate-900 border border-slate-800 space-y-2">
+                              <div className="flex items-center justify-between gap-2">
+                                <input
+                                  type="text"
+                                  value={tier.name}
+                                  placeholder="Package Name"
+                                  onChange={(e) => {
+                                    const updated = [...config.sections.pricing_packages!.items];
+                                    updated[pIdx].name = e.target.value;
+                                    onChange({
+                                      ...config,
+                                      sections: {
+                                        ...config.sections,
+                                        pricing_packages: { ...config.sections.pricing_packages!, items: updated }
+                                      }
+                                    });
+                                  }}
+                                  className="font-bold text-white bg-transparent border-b border-slate-700 text-xs flex-1 focus:outline-none focus:border-amber-400"
+                                />
+                                <label className="flex items-center gap-1 text-[10px] text-amber-400 font-medium cursor-pointer">
+                                  <input
+                                    type="checkbox"
+                                    checked={tier.popular || false}
+                                    onChange={(e) => {
+                                      const updated = [...config.sections.pricing_packages!.items];
+                                      updated[pIdx].popular = e.target.checked;
+                                      onChange({
+                                        ...config,
+                                        sections: {
+                                          ...config.sections,
+                                          pricing_packages: { ...config.sections.pricing_packages!, items: updated }
+                                        }
+                                      });
+                                    }}
+                                    className="rounded border-slate-700"
+                                  />
+                                  <span>Popular</span>
+                                </label>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const updated = config.sections.pricing_packages!.items.filter((_, i) => i !== pIdx);
+                                    onChange({
+                                      ...config,
+                                      sections: {
+                                        ...config.sections,
+                                        pricing_packages: { ...config.sections.pricing_packages!, items: updated }
+                                      }
+                                    });
+                                  }}
+                                  className="text-red-400 hover:text-red-300 p-1"
+                                >
+                                  <Trash2 className="w-3 h-3" />
+                                </button>
+                              </div>
+                              <div className="grid grid-cols-2 gap-2">
+                                <input
+                                  type="text"
+                                  value={tier.price}
+                                  placeholder="Price (e.g. $149)"
+                                  onChange={(e) => {
+                                    const updated = [...config.sections.pricing_packages!.items];
+                                    updated[pIdx].price = e.target.value;
+                                    onChange({
+                                      ...config,
+                                      sections: {
+                                        ...config.sections,
+                                        pricing_packages: { ...config.sections.pricing_packages!, items: updated }
+                                      }
+                                    });
+                                  }}
+                                  className="px-2 py-1 rounded bg-slate-950 border border-slate-800 text-[11px] text-amber-400 font-bold"
+                                />
+                                <input
+                                  type="text"
+                                  value={tier.period || ''}
+                                  placeholder="Period (e.g. flat rate)"
+                                  onChange={(e) => {
+                                    const updated = [...config.sections.pricing_packages!.items];
+                                    updated[pIdx].period = e.target.value;
+                                    onChange({
+                                      ...config,
+                                      sections: {
+                                        ...config.sections,
+                                        pricing_packages: { ...config.sections.pricing_packages!, items: updated }
+                                      }
+                                    });
+                                  }}
+                                  className="px-2 py-1 rounded bg-slate-950 border border-slate-800 text-[11px] text-slate-300"
+                                />
+                              </div>
+                              <input
+                                type="text"
+                                value={tier.tagline}
+                                placeholder="Tagline"
+                                onChange={(e) => {
+                                  const updated = [...config.sections.pricing_packages!.items];
+                                  updated[pIdx].tagline = e.target.value;
+                                  onChange({
+                                    ...config,
+                                    sections: {
+                                      ...config.sections,
+                                      pricing_packages: { ...config.sections.pricing_packages!, items: updated }
+                                    }
+                                  });
+                                }}
+                                className="w-full px-2 py-1 rounded bg-slate-950 border border-slate-800 text-[11px] text-slate-300"
+                              />
+                              <div>
+                                <label className="block text-[10px] text-slate-400 mb-1">Features (one per line)</label>
+                                <textarea
+                                  rows={2}
+                                  value={(tier.features || []).join('\n')}
+                                  onChange={(e) => {
+                                    const updated = [...config.sections.pricing_packages!.items];
+                                    updated[pIdx].features = e.target.value.split('\n').filter(Boolean);
+                                    onChange({
+                                      ...config,
+                                      sections: {
+                                        ...config.sections,
+                                        pricing_packages: { ...config.sections.pricing_packages!, items: updated }
+                                      }
+                                    });
+                                  }}
+                                  className="w-full px-2 py-1 rounded bg-slate-950 border border-slate-800 text-[11px] text-slate-300"
+                                />
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
                     </div>
                   )}
                 </div>

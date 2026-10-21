@@ -25,7 +25,8 @@ import {
   Globe,
   Sun,
   Moon,
-  Bot
+  Bot,
+  GitBranch
 } from 'lucide-react';
 import { useBusinessContext } from '../context/BusinessContext';
 
@@ -33,6 +34,7 @@ interface TopTelemetryBarProps {
   activeTab: string;
   setActiveTab: (tab: string) => void;
   onOpenCommandPalette: () => void;
+  onOpenGitHubDeploy?: () => void;
   contractorName?: string;
   companyLogo?: string | null;
   unreadNotificationsCount?: number;
@@ -53,6 +55,7 @@ export const TopTelemetryBar: React.FC<TopTelemetryBarProps> = ({
   activeTab,
   setActiveTab,
   onOpenCommandPalette,
+  onOpenGitHubDeploy,
   contractorName = 'Acme Services',
   companyLogo,
   unreadNotificationsCount = 0,
@@ -257,6 +260,19 @@ export const TopTelemetryBar: React.FC<TopTelemetryBarProps> = ({
               </div>
             )}
           </div>
+
+          {/* Push to GitHub Button */}
+          {onOpenGitHubDeploy && (
+            <button
+              type="button"
+              onClick={onOpenGitHubDeploy}
+              className="px-2.5 py-1 rounded-lg border border-border-dim bg-bg-surface hover:bg-bg-subtle text-text-primary text-xs font-semibold transition flex items-center gap-1.5 cursor-pointer shadow-xs"
+              title="Deploy and push workspace to GitHub repository"
+            >
+              <GitBranch className="w-3.5 h-3.5 text-accent" />
+              <span className="hidden sm:inline">Push to GitHub</span>
+            </button>
+          )}
 
           {/* Account Profile */}
           <div className="flex items-center gap-2 pl-2 border-l border-border-dim text-xs">

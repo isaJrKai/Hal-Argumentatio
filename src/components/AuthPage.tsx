@@ -10,8 +10,11 @@ export default function AuthPage({ onAuthSuccess }: AuthPageProps) {
   const [isLogin, setIsLogin] = useState(true);
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [email, setEmail] = useState(() => {
+    if (typeof window === 'undefined') return 'kaisoisaac@gmail.com';
+    return localStorage.getItem('halbiz_last_email') || 'kaisoisaac@gmail.com';
+  });
+  const [password, setPassword] = useState('admin123');
   const [name, setName] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   
@@ -78,6 +81,7 @@ export default function AuthPage({ onAuthSuccess }: AuthPageProps) {
         throw new Error(data.error || 'Authentication failed');
       }
 
+      localStorage.setItem('halbiz_last_email', quickEmail);
       onAuthSuccess(data.token, data.contractor);
     } catch (err: any) {
       setError(err.message || 'An error occurred. Please try again.');
@@ -108,6 +112,7 @@ export default function AuthPage({ onAuthSuccess }: AuthPageProps) {
         throw new Error(data.error || 'Authentication failed');
       }
 
+      localStorage.setItem('halbiz_last_email', email);
       onAuthSuccess(data.token, data.contractor);
     } catch (err: any) {
       setError(err.message || 'An error occurred. Please try again.');
@@ -403,21 +408,31 @@ export default function AuthPage({ onAuthSuccess }: AuthPageProps) {
             <KeyRound className="w-3.5 h-3.5 text-text-dim" /> SECURE SANDBOX ENVIRONMENT
           </p>
 
-          <div className="flex justify-center">
+          <div className="flex flex-col gap-2 justify-center">
+            <button
+              id="quick-login-isaac"
+              type="button"
+              disabled={loading}
+              onClick={() => handleQuickLogin('kaisoisaac@gmail.com', 'admin123')}
+              className="text-[10px] font-mono py-2 px-3 rounded bg-brand/15 hover:bg-brand/25 border border-brand/40 text-brand transition-all cursor-pointer flex items-center justify-center gap-1.5 font-bold shadow-xs hover:scale-[1.01] active:scale-[0.99]"
+              title="Click to automatically login as Isaac (kaisoisaac@gmail.com)"
+            >
+              <span>⚡ Fast Login: Isaac (kaisoisaac@gmail.com)</span>
+            </button>
             <button
               id="quick-login-admin"
               type="button"
               disabled={loading}
               onClick={() => handleQuickLogin('admin@kaislead.com', 'admin123')}
-              className="text-[10px] font-mono py-1.5 px-3 rounded bg-brand/10 hover:bg-brand/20 border border-brand/30 text-brand transition-colors cursor-pointer flex items-center justify-center gap-1.5 font-bold"
+              className="text-[10px] font-mono py-1.5 px-3 rounded bg-white/5 hover:bg-white/10 border border-border-dark text-text-secondary hover:text-white transition-all cursor-pointer flex items-center justify-center gap-1.5 font-bold shadow-xs hover:scale-[1.01] active:scale-[0.99]"
               title="Click to automatically login as admin@kaislead.com"
             >
-              <span>⚡ Quick Login: Admin (admin@kaislead.com)</span>
+              <span>⚡ Fast Login: Admin (admin@kaislead.com)</span>
             </button>
           </div>
 
           <p className="text-[9.5px] font-mono text-text-dim leading-normal">
-            Default Password: <strong className="text-text-secondary">admin123</strong>
+            Default Master Password: <strong className="text-text-secondary font-mono">admin123</strong>
           </p>
         </div>
       </motion.div>

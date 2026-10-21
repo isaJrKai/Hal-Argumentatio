@@ -106,13 +106,14 @@ export const ChatBotPanel: React.FC<ChatBotPanelProps> = ({ token }) => {
 
       if (res.ok) {
         const data = await res.json();
+        const modelText = data.modelMessage?.text || data.reply || data.text || 'Response received from HAL Core.';
         setMessages(prev => [
           ...prev.filter(m => m.id !== tempUserMsg.id),
           data.userMessage || tempUserMsg,
           data.modelMessage || {
             id: 'mod_' + Date.now(),
             role: 'model',
-            text: data.text || 'Response received from HAL Core.',
+            text: modelText,
             sources: data.sources,
             createdAt: new Date().toISOString()
           }
@@ -122,11 +123,28 @@ export const ChatBotPanel: React.FC<ChatBotPanelProps> = ({ token }) => {
       }
     } catch (err: any) {
       console.error(err);
-      // Resilient local synthesis fallback
+      // Contextual local synthesis fallback
+      const qLower = query.toLowerCase();
+      let fallbackText = `I am here to guide your operations in ${regionalProfile.city} (${activeNiche}).`;
+      
+      if (qLower.includes('step by step') || qLower.includes('what to do') || qLower.includes('dont know') || qLower.includes("don't know") || qLower.includes('start')) {
+        fallbackText = `Here is your exact step-by-step operating roadmap to win contractor clients:
+
+1. **Select Territory & Niche**: Navigate to **Territory Radar** or **Mission Control** to set your focus (e.g. Sump Pump / Waterproofing or Custom Home Builders in ${regionalProfile.city}).
+2. **Harvest Real Leads**: Open the **Leads** tab and run a harvest. HAL checks website load speeds, SSL, and Google reviews.
+3. **Filter High-Deficit Prospects**: Look for businesses with speed scores under 40 or missing mobile click-to-call buttons. They're burning ad spend on bouncing visitors.
+4. **Deploy Speed Deficit Pitch**: In **Outreach Studio** or **Document Studio**, create a personalized deficit report showing how many calls they are losing.
+5. **Close on an Emergency Intake Pipeline**: Offer your sub-second intake landing page and instant SMS dispatch system for a setup fee + monthly retainer.
+
+What niche or city would you like to inspect first?`;
+      } else {
+        fallbackText = `HAL Intelligence: For "${query}", your active workspace is configured for ${regionalProfile.city} (${activeNiche}). You can audit contractor websites, package verified lead lists, or launch outreach campaigns from the navigation menu.`;
+      }
+
       const fallbackReply: ChatMessage = {
         id: 'fallback_' + Date.now(),
         role: 'model',
-        text: `HAL Intelligence Engine: Analysis confirmed for "${query}" in ${regionalProfile.city}.\n\nBased on your active ${activeNiche} territory configuration and current Core Web Vitals benchmarks, prioritized execution should focus on reducing mobile First Contentful Paint (<1.2s) and establishing 1-tap phone dispatch routing.`,
+        text: fallbackText,
         createdAt: new Date().toISOString()
       };
       setMessages(prev => [...prev, fallbackReply]);

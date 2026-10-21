@@ -5,8 +5,10 @@ export const DEFAULT_SECTION_ORDER = [
   'header',
   'hero',
   'trust_bar',
-  'seasonal_alert',
+  'bento_features',
   'services',
+  'pricing_packages',
+  'seasonal_alert',
   'before_after',
   'reviews',
   'service_areas',
@@ -68,6 +70,99 @@ export const TRADE_TEMPLATES: Record<string, LandingPageConfig> = {
           { id: 'b2', icon: 'Clock', title: '30-Min Arrival', subtitle: 'Priority Emergency Response' },
           { id: 'b3', icon: 'DollarSign', title: 'Upfront Fixed Rate', subtitle: 'No Hidden Surprise Fees' },
           { id: 'b4', icon: 'Award', title: '1-Year Warranty', subtitle: '100% Labor & Parts Backed' }
+        ]
+      },
+      bento_features: {
+        active: true,
+        badge: 'ENGINEERED FOR SPEED',
+        title: 'Built For Rapid Emergency Intervention',
+        subtitle: 'Why 12,000+ local property owners rely on our mobile dispatch units.',
+        items: [
+          {
+            id: 'bf1',
+            title: '30-Minute Live On-Duty Dispatch',
+            subtitle: 'GPS-tracked service vans pre-stocked with 400+ OEM replacement fittings and industrial pipe clamps.',
+            value: '< 30 Min',
+            tag: 'LIVE STATUS: ACTIVE',
+            colSpan: '2'
+          },
+          {
+            id: 'bf2',
+            title: '100% Upfront Written Quote',
+            subtitle: 'Zero diagnostic charge when repair is authorized on the spot. No hourly run-up.',
+            value: '$0 Trip Fee',
+            tag: 'NO SURCHARGES',
+            colSpan: '1'
+          },
+          {
+            id: 'bf3',
+            title: 'Licensed Red Seal Master Craftsmen',
+            subtitle: 'All technicians carry active municipal licenses, bonded liability, and background clearances.',
+            value: 'Lic #MP-88402',
+            tag: 'VERIFIED',
+            colSpan: '1'
+          },
+          {
+            id: 'bf4',
+            title: 'High-Definition Sewer Camera Diagnostic',
+            subtitle: 'Self-leveling color fiber optic camera with digital footage provided directly to your phone for insurance.',
+            value: '4K Footage',
+            tag: 'FREE WITH JETTING',
+            colSpan: '2'
+          }
+        ]
+      },
+      pricing_packages: {
+        active: true,
+        badge: 'TRANSPARENT PRICING',
+        title: 'Clear Upfront Fixed-Rate Packages',
+        subtitle: 'Every estimate is provided in writing before any tool touches your home.',
+        items: [
+          {
+            id: 'p1',
+            name: 'Emergency Diagnostic & Camera Scan',
+            price: '$49',
+            period: 'Waived with repair',
+            popular: false,
+            tagline: 'Ideal for unexplained leaks, odors, or sudden drop in line pressure.',
+            features: [
+              'Complete acoustic line locator check',
+              'Digital color camera inspection',
+              'Written insurance-ready fault report',
+              'Fee waived 100% if repair is completed'
+            ],
+            ctaText: 'Book Diagnostic ($49)'
+          },
+          {
+            id: 'p2',
+            name: 'Rapid Hydro-Jet & Rooter Service',
+            price: '$249',
+            period: 'Flat Rate',
+            popular: true,
+            tagline: 'Our most requested emergency service for clearing stubborn blockages.',
+            features: [
+              '4,000 PSI high-pressure hydro-jetting',
+              'Root cutting mechanical auger pass',
+              'Before & after video verification',
+              '90-day no-clog written guarantee'
+            ],
+            ctaText: 'Dispatch Hydro-Jet Crew'
+          },
+          {
+            id: 'p3',
+            name: 'Water Heater Replacement Package',
+            price: '$890',
+            period: 'All-inclusive',
+            popular: false,
+            tagline: 'Same-day replacement for burst or rusted leaking water tanks.',
+            features: [
+              'Brand new 40/50 gallon high-efficiency tank',
+              'Complete removal & disposal of old unit',
+              'New brass shutoff valve & gas flex line',
+              '10-year manufacturer tank warranty'
+            ],
+            ctaText: 'Request Tank Replacement'
+          }
         ]
       },
       seasonal_alert: {

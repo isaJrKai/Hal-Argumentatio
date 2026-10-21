@@ -48,7 +48,7 @@ interface LeadsPanelProps {
 }
 
 export default function LeadsPanel({ leads, token, onRefresh }: LeadsPanelProps) {
-  const { activeCity, activeNiche, activeIndustry, supportedNiches } = useBusinessContext();
+  const { activeCity, activeNiche, activeIndustry, supportedNiches, supportedCities, addCustomCity } = useBusinessContext();
 
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
   const [events, setEvents] = useState<LeadEvent[]>([]);
@@ -65,6 +65,7 @@ export default function LeadsPanel({ leads, token, onRefresh }: LeadsPanelProps)
   // Phase 2: Sourced Real Business Intelligence State
   const [harvestCity, setHarvestCity] = useState(activeCity);
   const [harvestNiche, setHarvestNiche] = useState(activeNiche);
+  const [customCityInput, setCustomCityInput] = useState('');
 
   // Update harvest parameters when active context shifts
   useEffect(() => {
@@ -72,13 +73,25 @@ export default function LeadsPanel({ leads, token, onRefresh }: LeadsPanelProps)
     setHarvestNiche(activeNiche);
   }, [activeCity, activeNiche]);
   const [harvesting, setHarvesting] = useState(false);
+  const [harvestError, setHarvestError] = useState<string | null>(null);
+  const [harvestLimit, setHarvestLimit] = useState(10);
+  const [customCityMode, setCustomCityMode] = useState(false);
   const [harvestedLeads, setHarvestedLeads] = useState<any[]>([]);
+  const [selectedIndices, setSelectedIndices] = useState<Set<number>>(new Set());
+  const [ingesting, setIngesting] = useState(false);
   const [replacing, setReplacing] = useState(false);
   const [showHarvester, setShowHarvester] = useState(false);
 
   const handleHarvest = async () => {
+    const targetCity = customCityMode && customCityInput.trim() ? customCityInput.trim() : harvestCity;
+    if (customCityMode && customCityInput.trim() && addCustomCity) {
+      addCustomCity(customCityInput.trim());
+    }
+
     setHarvesting(true);
+    setHarvestError(null);
     setHarvestedLeads([]);
+    setSelectedIndices(new Set());
     try {
       const res = await fetch('/api/leads/harvest', {
         method: 'POST',
@@ -87,19 +100,57 @@ export default function LeadsPanel({ leads, token, onRefresh }: LeadsPanelProps)
           'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify({ 
-          city: harvestCity, 
+          city: targetCity, 
           niche: harvestNiche,
+          limit: harvestLimit,
           activeAi: localStorage.getItem('hal_active_ai') || 'gemini'
         })
       });
       const data = await res.json();
-      if (res.ok) {
-        setHarvestedLeads(data);
+      if (res.ok && Array.isArray(data)) {
+        if (data.length === 0) {
+          setHarvestError(`No operating businesses could be confirmed for "${harvestNiche}" in "${targetCity}". Try another nearby city or broadening the trade term.`);
+        } else {
+          setHarvestedLeads(data);
+          // Default select all discovered leads
+          setSelectedIndices(new Set(data.map((_, i) => i)));
+        }
+      } else {
+        const errorMsg = data.error || (Array.isArray(data) ? null : 'Failed to harvest business records');
+        setHarvestError(errorMsg || `Discovery service returned code ${res.status}. Please try again.`);
+      }
+    } catch (err: any) {
+      console.error(err);
+      setHarvestError(err?.message || 'Network error communicating with live harvest engine.');
+    } finally {
+      setHarvesting(false);
+    }
+  };
+
+  const handleIngestSelected = async () => {
+    const leadsToIngest = harvestedLeads.filter((_, i) => selectedIndices.has(i));
+    if (leadsToIngest.length === 0) return;
+    setIngesting(true);
+    try {
+      const res = await fetch('/api/leads/ingest', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ leads: leadsToIngest })
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setHarvestedLeads([]);
+        setSelectedIndices(new Set());
+        setShowHarvester(false);
+        onRefresh();
       }
     } catch (err) {
       console.error(err);
     } finally {
-      setHarvesting(false);
+      setIngesting(false);
     }
   };
 
@@ -118,6 +169,7 @@ export default function LeadsPanel({ leads, token, onRefresh }: LeadsPanelProps)
       const data = await res.json();
       if (res.ok) {
         setHarvestedLeads([]);
+        setSelectedIndices(new Set());
         setShowHarvester(false);
         setSelectedLead(null);
         onRefresh();
@@ -790,23 +842,44 @@ export default function LeadsPanel({ leads, token, onRefresh }: LeadsPanelProps)
                 Configure a territory and industry vertical below to crawl real-world operating entities, conduct automated technical SEO audits, SSL security checks, and public reviews sentiment gathering.
               </p>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                <div>
-                  <label className="block text-[9px] font-mono text-text-dim uppercase tracking-wider mb-1 font-bold">Target City</label>
-                  <select
-                    value={harvestCity}
-                    onChange={(e) => setHarvestCity(e.target.value)}
-                    className="w-full bg-card-inner border border-border-dark rounded-sm p-2 text-xs text-text-secondary focus:outline-none focus:border-brand font-mono font-bold"
-                  >
-                    <option value="Winnipeg">Winnipeg</option>
-                    <option value="Calgary">Calgary</option>
-                    <option value="Fredericton">Fredericton</option>
-                    <option value="Sherwood Park">Sherwood Park</option>
-                  </select>
+              {/* Target Controls Grid */}
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                <div className="md:col-span-2">
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-[9px] font-mono text-text-dim uppercase tracking-wider font-bold">
+                      {customCityMode ? 'Custom Territory / City' : 'Target City'}
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => setCustomCityMode(!customCityMode)}
+                      className="text-[9px] font-mono text-brand hover:underline"
+                    >
+                      {customCityMode ? 'Switch to Preset List' : '+ Enter Any City'}
+                    </button>
+                  </div>
+                  {customCityMode ? (
+                    <input
+                      type="text"
+                      placeholder="e.g. Dallas, TX or London, UK"
+                      value={customCityInput}
+                      onChange={(e) => setCustomCityInput(e.target.value)}
+                      className="w-full bg-card-inner border border-border-dark rounded-sm p-2 text-xs text-text-primary focus:outline-none focus:border-brand font-mono"
+                    />
+                  ) : (
+                    <select
+                      value={harvestCity}
+                      onChange={(e) => setHarvestCity(e.target.value)}
+                      className="w-full bg-card-inner border border-border-dark rounded-sm p-2 text-xs text-text-secondary focus:outline-none focus:border-brand font-mono font-bold"
+                    >
+                      {(supportedCities || ['Dallas', 'Calgary', 'Winnipeg', 'Toronto', 'Columbus', 'Dubai']).map((c) => (
+                        <option key={c} value={c}>{c}</option>
+                      ))}
+                    </select>
+                  )}
                 </div>
 
                 <div>
-                  <label className="block text-[9px] font-mono text-text-dim uppercase tracking-wider mb-1 font-bold">Industry Vertical / Niche</label>
+                  <label className="block text-[9px] font-mono text-text-dim uppercase tracking-wider mb-1 font-bold">Trade Niche</label>
                   <select
                     value={harvestNiche}
                     onChange={(e) => setHarvestNiche(e.target.value)}
@@ -820,17 +893,50 @@ export default function LeadsPanel({ leads, token, onRefresh }: LeadsPanelProps)
                   </select>
                 </div>
 
-                <div className="flex items-end">
+                <div className="flex flex-col justify-end">
+                  <div className="flex items-center gap-2 mb-1">
+                    <label className="text-[9px] font-mono text-text-dim uppercase tracking-wider font-bold">Limit:</label>
+                    <select
+                      value={harvestLimit}
+                      onChange={(e) => setHarvestLimit(Number(e.target.value))}
+                      className="bg-card-inner border border-border-dark text-[10px] font-mono text-text-primary px-1.5 py-0.5 rounded-sm"
+                    >
+                      <option value={5}>5 Leads</option>
+                      <option value={10}>10 Leads</option>
+                      <option value={15}>15 Leads</option>
+                      <option value={20}>20 Leads</option>
+                    </select>
+                  </div>
                   <button
                     onClick={handleHarvest}
                     disabled={harvesting}
-                    className="w-full bg-brand text-black hover:bg-brand-dim disabled:opacity-40 py-2 rounded-sm font-mono text-xs font-bold uppercase tracking-wider transition-colors flex items-center justify-center gap-1.5"
+                    className="w-full bg-brand text-black hover:bg-brand-dim disabled:opacity-40 py-2 rounded-sm font-mono text-xs font-bold uppercase tracking-wider transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
                   >
                     <Compass className="w-3.5 h-3.5 stroke-[2.5]" />
-                    {harvesting ? 'Conducting Deep Scrapes...' : 'EXECUTE SCAN'}
+                    {harvesting ? 'Scanning Web & Maps...' : 'EXECUTE SCAN'}
                   </button>
                 </div>
               </div>
+
+              {/* Error Alert Box */}
+              {harvestError && (
+                <div className="bg-negative/10 border border-negative/30 rounded-sm p-3 flex items-start gap-2.5 text-xs text-text-primary">
+                  <AlertCircle className="w-4 h-4 text-negative shrink-0 mt-0.5" />
+                  <div className="flex-1 space-y-1">
+                    <p className="font-mono font-bold text-negative text-[11px] uppercase tracking-wider">
+                      Discovery Exception Encountered
+                    </p>
+                    <p className="text-[11px] text-text-secondary">{harvestError}</p>
+                  </div>
+                  <button
+                    onClick={handleHarvest}
+                    disabled={harvesting}
+                    className="shrink-0 text-[10px] font-mono px-2 py-1 bg-negative/20 hover:bg-negative/30 text-negative border border-negative/40 rounded-sm font-bold uppercase cursor-pointer"
+                  >
+                    Retry
+                  </button>
+                </div>
+              )}
 
               {harvesting && (
                 <div className="bg-card-inner border border-border-dark/60 p-4 rounded-sm flex items-center gap-3">
@@ -844,19 +950,55 @@ export default function LeadsPanel({ leads, token, onRefresh }: LeadsPanelProps)
 
               {harvestedLeads.length > 0 && (
                 <div className="space-y-3 pt-2">
-                  <span className="text-[10px] font-mono uppercase tracking-widest text-text-dim block font-bold">
-                    Discovered Active Operating Entities ({harvestedLeads.length})
-                  </span>
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-mono uppercase tracking-widest text-text-dim block font-bold">
+                      Discovered Entities ({selectedIndices.size} of {harvestedLeads.length} Selected)
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (selectedIndices.size === harvestedLeads.length) {
+                          setSelectedIndices(new Set());
+                        } else {
+                          setSelectedIndices(new Set(harvestedLeads.map((_, i) => i)));
+                        }
+                      }}
+                      className="text-[10px] font-mono text-brand hover:underline cursor-pointer"
+                    >
+                      {selectedIndices.size === harvestedLeads.length ? 'Deselect All' : 'Select All'}
+                    </button>
+                  </div>
 
                   <div className="border border-border-dark/80 rounded-sm divide-y divide-border-dark overflow-hidden bg-card-inner">
-                    {harvestedLeads.map((hl, index) => (
-                      <div key={index} className="p-3 grid grid-cols-1 md:grid-cols-3 gap-3 text-xs leading-normal">
-                        <div>
+                    {harvestedLeads.map((hl, index) => {
+                      const isSelected = selectedIndices.has(index);
+                      return (
+                        <div
+                          key={index}
+                          onClick={() => {
+                            const next = new Set(selectedIndices);
+                            if (next.has(index)) next.delete(index);
+                            else next.add(index);
+                            setSelectedIndices(next);
+                          }}
+                          className={`p-3 grid grid-cols-1 md:grid-cols-12 gap-3 text-xs leading-normal cursor-pointer transition-colors ${
+                            isSelected ? 'bg-brand/5 border-l-2 border-l-brand' : 'opacity-70 hover:opacity-100'
+                          }`}
+                        >
+                          <div className="md:col-span-1 flex items-center justify-center">
+                            <input
+                              type="checkbox"
+                              checked={isSelected}
+                              onChange={() => {}}
+                              className="accent-brand rounded cursor-pointer w-4 h-4"
+                            />
+                          </div>
+                          <div className="md:col-span-4">
                           <p className="font-bold text-text-primary text-[13px]">{hl.businessName}</p>
                           <p className="text-[10px] font-mono text-text-dim uppercase tracking-wider">{hl.serviceType} • {hl.city}</p>
                           <p className="text-[11px] font-mono text-text-secondary mt-1">{hl.phone} | {hl.email}</p>
                         </div>
-                        <div className="space-y-1 font-mono text-[11px] text-text-secondary">
+                        <div className="md:col-span-4 space-y-1 font-mono text-[11px] text-text-secondary">
                           <p className="flex items-center gap-1.5">
                             <Globe className="w-3.5 h-3.5 text-text-dim" />
                             <span className="truncate max-w-[150px]">{hl.websiteUrl}</span>
@@ -871,7 +1013,7 @@ export default function LeadsPanel({ leads, token, onRefresh }: LeadsPanelProps)
                             <span>Perf Score: <strong className="text-text-primary font-bold">{hl.performanceScore}</strong></span>
                           </p>
                         </div>
-                        <div className="space-y-1 font-mono text-[11px] text-text-secondary">
+                        <div className="md:col-span-3 space-y-1 font-mono text-[11px] text-text-secondary">
                           <p className="flex items-center gap-1.5">
                             <Star className="w-3 h-3 text-yellow-400 fill-yellow-400" />
                             <span>{hl.googleRating} ({hl.reviewCount} reviews)</span>
@@ -882,21 +1024,33 @@ export default function LeadsPanel({ leads, token, onRefresh }: LeadsPanelProps)
                           </p>
                         </div>
                       </div>
-                    ))}
+                    ); })}
                   </div>
 
-                  <div className="bg-brand/10 border border-brand/25 p-3 rounded-sm space-y-2">
+                  {/* Dual Ingestion Actions */}
+                  <div className="bg-brand/10 border border-brand/25 p-3 rounded-sm space-y-2.5">
                     <p className="text-[11px] font-sans text-text-secondary leading-relaxed">
-                      ⚠️ <strong>MANDATORY DIRECTIVE</strong>: Committing this harvested data will permanently purge all default mock templates starting with <code>lead_seed_</code> and write these authentic business audits directly to your secured ledger.
+                      Choose how to commit these discovered operating entities: ingest selected entities additively into your active pipeline, or purge legacy mock seeds completely.
                     </p>
-                    <button
-                      onClick={handlePurgeAndReplace}
-                      disabled={replacing}
-                      className="w-full bg-brand text-black hover:bg-brand-dim disabled:opacity-40 py-2 rounded-sm font-mono text-xs font-bold uppercase tracking-wider transition-colors flex items-center justify-center gap-2"
-                    >
-                      <Layers className="w-3.5 h-3.5 stroke-[2.5]" />
-                      {replacing ? 'COMMITTING LEDGER CHANGES...' : 'COMMIT REAL INTELLIGENCE: PURGE MOCK DATA & INGEST ACTUAL LEADS'}
-                    </button>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      <button
+                        onClick={handleIngestSelected}
+                        disabled={ingesting || selectedIndices.size === 0}
+                        className="w-full bg-card-dark border border-brand/40 text-brand hover:bg-brand/10 disabled:opacity-40 py-2.5 rounded-sm font-mono text-xs font-bold uppercase tracking-wider transition-colors flex items-center justify-center gap-2 cursor-pointer"
+                      >
+                        <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
+                        {ingesting ? 'Adding Leads...' : `Ingest Selected (${selectedIndices.size}) Additively`}
+                      </button>
+
+                      <button
+                        onClick={handlePurgeAndReplace}
+                        disabled={replacing || harvestedLeads.length === 0}
+                        className="w-full bg-brand text-black hover:bg-brand-dim disabled:opacity-40 py-2.5 rounded-sm font-mono text-xs font-bold uppercase tracking-wider transition-colors flex items-center justify-center gap-2 cursor-pointer"
+                      >
+                        <Layers className="w-3.5 h-3.5 stroke-[2.5]" />
+                        {replacing ? 'Purging & Replacing...' : 'Purge Mock Seeds & Commit Real Data'}
+                      </button>
+                    </div>
                   </div>
                 </div>
               )}

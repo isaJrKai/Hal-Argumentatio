@@ -120,6 +120,29 @@ export default function App() {
     return saved ? JSON.parse(saved) : null;
   });
 
+  // Session rehydration and token validation on mount
+  useEffect(() => {
+    const existingToken = localStorage.getItem('halbiz_auth_token') || localStorage.getItem('token');
+    if (existingToken) {
+      fetch('/api/auth/me', {
+        headers: { 'Authorization': `Bearer ${existingToken}` }
+      })
+        .then(res => {
+          if (!res.ok) throw new Error('Session invalid');
+          return res.json();
+        })
+        .then(data => {
+          if (data.contractor) {
+            setContractor(data.contractor);
+            localStorage.setItem('halbiz_auth_contractor', JSON.stringify(data.contractor));
+          }
+        })
+        .catch(() => {
+          console.warn('Session verification failed, requesting re-authentication.');
+        });
+    }
+  }, []);
+
   // Public Interactive Audit Mode Detection (Direct client view without login)
   const [publicAuditId, setPublicAuditId] = useState<string | null>(() => {
     if (typeof window === 'undefined') return null;

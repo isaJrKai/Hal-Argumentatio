@@ -172,21 +172,33 @@ export function extractHostname(rawUrl: string): string {
 /**
  * Performs asynchronous DNS lookup with a strict safety timeout.
  */
-async function resolveDnsWithTimeout(hostname: string, timeoutMs = 2500): Promise<{ resolved: boolean; ips?: string[]; error?: string }> {
-  const lookupPromise = dns.promises.lookup(hostname, { all: true });
-  const timeoutPromise = new Promise<{ resolved: boolean; error: string }>((_, reject) =>
-    setTimeout(() => reject(new Error(`DNS resolution timed out after ${timeoutMs}ms`)), timeoutMs)
-  );
+async function resolveDnsWithTimeout(hostname: string, timeoutMs = 4000): Promise<{ resolved: boolean; ips?: string[]; error?: string }> {
+  const tryLookup = async (host: string) => {
+    const lookupPromise = dns.promises.lookup(host, { all: true });
+    const timeoutPromise = new Promise<{ resolved: boolean; error: string }>((_, reject) =>
+      setTimeout(() => reject(new Error(`DNS resolution timed out after ${timeoutMs}ms`)), timeoutMs)
+    );
+    return await Promise.race([lookupPromise, timeoutPromise]) as dns.LookupAddress[];
+  };
 
   try {
-    const results = await Promise.race([lookupPromise, timeoutPromise]) as dns.LookupAddress[];
+    const results = await tryLookup(hostname);
     if (Array.isArray(results) && results.length > 0) {
       return { resolved: true, ips: results.map(r => r.address) };
     }
-    return { resolved: false, error: 'No IP records returned' };
   } catch (err: any) {
+    // If apex domain failed, try with www. prefix
+    if (!hostname.startsWith('www.')) {
+      try {
+        const wwwResults = await tryLookup('www.' + hostname);
+        if (Array.isArray(wwwResults) && wwwResults.length > 0) {
+          return { resolved: true, ips: wwwResults.map(r => r.address) };
+        }
+      } catch {}
+    }
     return { resolved: false, error: err.message || 'DNS lookup failed' };
   }
+  return { resolved: false, error: 'No IP records returned' };
 }
 
 /**
@@ -194,7 +206,7 @@ async function resolveDnsWithTimeout(hostname: string, timeoutMs = 2500): Promis
  */
 export async function validateDomainAndDns(
   websiteUrl: string,
-  options: { probeHttp?: boolean; timeoutMs?: number } = { probeHttp: true, timeoutMs: 2500 }
+  options: { probeHttp?: boolean; timeoutMs?: number } = { probeHttp: true, timeoutMs: 4000 }
 ): Promise<DomainValidationResult> {
   const hostname = extractHostname(websiteUrl);
 
@@ -208,7 +220,7 @@ export async function validateDomainAndDns(
     };
   }
 
-  // 1. Perform DNS lookup
+  // 1. Perform DNS lookup with www fallback
   const dnsResult = await resolveDnsWithTimeout(hostname, options.timeoutMs);
 
   if (!dnsResult.resolved) {
@@ -332,9 +344,14 @@ export async function verifyLeadGrounding(lead: {
  * Enforces that no synthetic, unverified, or dummy lead can ever be dispatched to external channels.
  */
 export class FailClosedOutreachError extends Error {
-  constructor(message: string, public readonly leadId?: string, public readonly violations?: string[]) {
+  public readonly leadId?: string;
+  public readonly violations?: string[];
+
+  constructor(message: string, leadId?: string, violations?: string[]) {
     super(`[FAIL-CLOSED GATE BLOCKED]: ${message}`);
     this.name = 'FailClosedOutreachError';
+    this.leadId = leadId;
+    this.violations = violations;
   }
 }
 

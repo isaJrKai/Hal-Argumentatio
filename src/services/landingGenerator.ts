@@ -118,7 +118,7 @@ Return ONLY a JSON object matching this schema:
 }`;
 
     let responseText: string | null = null;
-    const candidateModels = ['gemini-2.5-flash', 'gemini-3.8-flash'];
+    const candidateModels = ['gemini-3.8-flash', 'gemini-flash-latest', 'gemini-3.1-flash-lite'];
 
     for (const model of candidateModels) {
       try {
@@ -198,4 +198,63 @@ Return ONLY a JSON object matching this schema:
 
   const html = generateLandingPageHtml(cleanedConfig);
   return { config: cleanedConfig, html };
+}
+
+export interface SectionRegenerateParams {
+  sectionKey: string;
+  currentData: any;
+  prompt: string;
+  trade?: string;
+  city?: string;
+  businessName?: string;
+}
+
+export async function regenerateLandingSection(params: SectionRegenerateParams): Promise<{ updatedData: any }> {
+  const { sectionKey, currentData, prompt, trade, city, businessName } = params;
+  const apiKey = process.env.GEMINI_API_KEY;
+
+  if (!apiKey) {
+    return { updatedData: currentData };
+  }
+
+  const ai = new GoogleGenAI({ apiKey });
+  const systemPrompt = `You are HAL's master landing page copywriter.
+Task: Regenerate and polish the JSON data for section "${sectionKey}" of a high-converting contractor landing page.
+Business: ${businessName || 'Local Contractor'}
+Trade: ${trade || 'Home Services'}
+City: ${city || 'Local Metro'}
+Operator Directive: "${prompt}"
+
+STRICT RULES:
+1. Anti-Slop Enforced: No fluff, no clichés ("delve", "pivotal", "seamless", "elevate", "cutting-edge").
+2. State numbers, specific guarantees, transparent prices, or local neighborhoods where appropriate.
+3. Return ONLY a valid JSON object matching the exact structure of this section. Do NOT wrap in conversational text.
+
+Current Section Data:
+${JSON.stringify(currentData, null, 2)}`;
+
+  const candidateModels = ['gemini-3.8-flash', 'gemini-flash-latest', 'gemini-3.1-flash-lite'];
+  for (const model of candidateModels) {
+    try {
+      const response = await ai.models.generateContent({
+        model,
+        contents: `Polish this section based on: "${prompt}"`,
+        config: {
+          systemInstruction: systemPrompt,
+          temperature: 0.3,
+          responseMimeType: 'application/json'
+        }
+      });
+      if (response && response.text) {
+        const parsed = safeExtractJson(response.text);
+        if (parsed && typeof parsed === 'object') {
+          return { updatedData: { ...currentData, ...parsed } };
+        }
+      }
+    } catch (err: any) {
+      console.info(`[Section AI Polish] Model ${model} retry fallback:`, err?.message || err);
+    }
+  }
+
+  return { updatedData: currentData };
 }

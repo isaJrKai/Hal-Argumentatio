@@ -42,6 +42,7 @@ import { useToast } from '../context/ToastContext';
 import { LandingPageConfig, PageVersionSnapshot, TradeType } from './landing/types';
 import { TRADE_TEMPLATES } from './landing/templates';
 import { generateLandingPageHtml } from './landing/htmlGenerator';
+import { generateLandingPageTsx } from './landing/tsxGenerator';
 import { SectionEditor } from './landing/SectionEditor';
 import { BrandingControls } from './landing/BrandingControls';
 import { SeoSchemaPanel } from './landing/SeoSchemaPanel';
@@ -80,8 +81,11 @@ export const LandingPageStudioPanel: React.FC<{ token: string | null }> = ({ tok
   const [showHistoryModal, setShowHistoryModal] = useState(false);
   const [versionHistory, setVersionHistory] = useState<PageVersionSnapshot[]>([]);
 
-  // Computed rendered HTML from current configuration
+  // Computed rendered code from current configuration
   const renderedHtml = generateLandingPageHtml(config);
+  const renderedTsx = generateLandingPageTsx(config);
+  const [codeFormat, setCodeFormat] = useState<'html' | 'tsx'>('html');
+  const [isSimulatingLead, setIsSimulatingLead] = useState(false);
 
   // Listen to live updates from Inspector
   useEffect(() => {
@@ -255,6 +259,60 @@ export const LandingPageStudioPanel: React.FC<{ token: string | null }> = ({ tok
       message: 'Standalone production file with Tailwind & schema downloaded.',
       type: 'success'
     });
+  };
+
+  // Download React / Next.js TSX
+  const handleDownloadTsx = () => {
+    const blob = new Blob([renderedTsx], { type: 'text/typescript' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${config.businessName.replace(/[^a-zA-Z0-9]/g, '') || 'LandingPage'}.tsx`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    showToast({
+      title: 'TSX Component Exported',
+      message: 'Next.js / React component downloaded successfully.',
+      type: 'success'
+    });
+  };
+
+  // Simulate an inbound lead capture
+  const handleSimulateLead = async () => {
+    setIsSimulatingLead(true);
+    try {
+      const res = await fetch('/api/public/landing-leads', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contractorId: config.contractorId || '',
+          landingPageId: config.id,
+          name: 'Sarah M. (Live Simulator)',
+          phone: '(403) 555-0199',
+          serviceDetails: `Emergency priority inspection requested via ${config.title} test trigger`,
+          city: config.city
+        })
+      });
+      if (res.ok) {
+        showToast({
+          title: 'Lead Captured & Encrypted',
+          message: 'Test lead logged to database and contractor SSE notification fired.',
+          type: 'success'
+        });
+      } else {
+        throw new Error('Simulation endpoint failed');
+      }
+    } catch (err) {
+      showToast({
+        title: 'Lead Simulation Error',
+        message: 'Could not submit test lead to endpoint.',
+        type: 'error'
+      });
+    } finally {
+      setIsSimulatingLead(false);
+    }
   };
 
   // Apply a trade template
@@ -496,53 +554,67 @@ export const LandingPageStudioPanel: React.FC<{ token: string | null }> = ({ tok
 
         {/* Right: AI Synthesis, History, Save, Share & Live Actions */}
         <div className="flex items-center gap-2">
-          {/* Paper & Ink Toggle */}
+          {/* Quick Theme Selector Dropdown */}
+          <div className="flex items-center gap-1 bg-slate-900 border border-slate-800 rounded-xl px-2 py-1">
+            <Palette className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+            <select
+              value={config.branding.colorPreset || 'emergency_amber'}
+              onChange={(e) => {
+                const preset = e.target.value as any;
+                let primary = '#0284c7';
+                let secondary = '#0f172a';
+                let accent = '#f59e0b';
+                if (preset === 'paper_ink') {
+                  primary = '#18181b'; secondary = '#f7f5f0'; accent = '#9a3412';
+                } else if (preset === 'executive_carbon') {
+                  primary = '#09090b'; secondary = '#18181b'; accent = '#e4e4e7';
+                } else if (preset === 'modern_swiss') {
+                  primary = '#ffffff'; secondary = '#0f172a'; accent = '#e11d48';
+                } else if (preset === 'nordic_obsidian') {
+                  primary = '#030712'; secondary = '#0b1329'; accent = '#38bdf8';
+                } else if (preset === 'artisan_warmth') {
+                  primary = '#292524'; secondary = '#f5f5f4'; accent = '#d97706';
+                } else if (preset === 'trust_navy') {
+                  primary = '#2563eb'; secondary = '#0f172a'; accent = '#38bdf8';
+                }
+                setConfig(prev => ({
+                  ...prev,
+                  branding: {
+                    ...prev.branding,
+                    colorPreset: preset,
+                    primaryColor: primary,
+                    secondaryColor: secondary,
+                    accentColor: accent
+                  }
+                }));
+                showToast({
+                  title: 'Theme Applied',
+                  message: `Switched preset to ${preset.replace(/_/g, ' ')}`,
+                  type: 'info'
+                });
+              }}
+              className="bg-transparent text-xs font-semibold text-slate-200 focus:outline-none cursor-pointer py-0.5"
+            >
+              <option value="paper_ink" className="bg-slate-900">📜 Paper & Ink</option>
+              <option value="executive_carbon" className="bg-slate-900">⬛ Executive Carbon</option>
+              <option value="modern_swiss" className="bg-slate-900">⚪ Modern Swiss</option>
+              <option value="nordic_obsidian" className="bg-slate-900">🌌 Nordic Obsidian</option>
+              <option value="artisan_warmth" className="bg-slate-900">🪵 Artisan Warmth</option>
+              <option value="emergency_amber" className="bg-slate-900">⚡ Emergency Amber</option>
+              <option value="trust_navy" className="bg-slate-900">🛡️ Trust Navy</option>
+            </select>
+          </div>
+
+          {/* Simulate Inbound Lead Capture */}
           <button
             type="button"
-            onClick={() => {
-              const isCurrent = config.branding.colorPreset === 'paper_ink';
-              if (isCurrent) {
-                setConfig(prev => ({
-                  ...prev,
-                  branding: {
-                    ...prev.branding,
-                    colorPreset: 'emergency_amber',
-                    primaryColor: '#0284c7',
-                    secondaryColor: '#0f172a',
-                    accentColor: '#f59e0b'
-                  }
-                }));
-                showToast({
-                  title: 'Theme Updated',
-                  message: 'Switched to Emergency Amber theme',
-                  type: 'info'
-                });
-              } else {
-                setConfig(prev => ({
-                  ...prev,
-                  branding: {
-                    ...prev.branding,
-                    colorPreset: 'paper_ink',
-                    primaryColor: '#18181b',
-                    secondaryColor: '#f7f5f0',
-                    accentColor: '#9a3412'
-                  }
-                }));
-                showToast({
-                  title: 'Paper & Ink Applied',
-                  message: 'Switched to Archival Paper & Ink theme',
-                  type: 'info'
-                });
-              }
-            }}
-            title="Toggle Paper & Ink Archival Theme"
-            className={`px-2.5 py-1.5 rounded-xl border text-xs font-mono font-bold transition flex items-center gap-1.5 cursor-pointer ${
-              config.branding.colorPreset === 'paper_ink'
-                ? 'bg-amber-500/20 text-amber-400 border-amber-500/40'
-                : 'border-slate-800 bg-slate-900 text-slate-300 hover:text-white'
-            }`}
+            disabled={isSimulatingLead}
+            onClick={handleSimulateLead}
+            title="Simulate inbound homeowner dispatch request (validates encryption, database persistence, and SSE alert)"
+            className="px-2.5 py-1.5 rounded-xl border border-emerald-500/40 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 text-xs font-bold transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
           >
-            <span>📜 Paper & Ink</span>
+            <Zap className={`w-3.5 h-3.5 ${isSimulatingLead ? 'animate-bounce' : ''}`} />
+            <span className="hidden xl:inline">{isSimulatingLead ? 'Routing Lead...' : 'Test Lead'}</span>
           </button>
 
           {/* Inspector Button */}
@@ -831,29 +903,73 @@ export const LandingPageStudioPanel: React.FC<{ token: string | null }> = ({ tok
                   />
                 )}
 
-                {/* TAB 6: HTML CODE INSPECTOR */}
+                {/* TAB 6: CODE EXPORT & SOURCE */}
                 {activeTab === 'code' && (
                   <div className="space-y-3">
                     <div className="flex items-center justify-between pb-2 border-b border-slate-800">
                       <div className="flex items-center gap-2">
                         <Code className="w-4 h-4 text-sky-400" />
                         <h4 className="text-xs font-bold uppercase tracking-wider text-slate-200">
-                          Exportable HTML Source
+                          Export Production Source
                         </h4>
                       </div>
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const codeToCopy = codeFormat === 'html' ? renderedHtml : renderedTsx;
+                            navigator.clipboard.writeText(codeToCopy);
+                            showToast({
+                              title: 'Code Copied',
+                              message: `Copied ${codeFormat.toUpperCase()} to clipboard`,
+                              type: 'success'
+                            });
+                          }}
+                          className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs text-slate-200 font-bold flex items-center gap-1 cursor-pointer transition"
+                        >
+                          <Copy className="w-3.5 h-3.5" />
+                          <span>Copy</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={codeFormat === 'html' ? handleDownloadHtml : handleDownloadTsx}
+                          className="px-2.5 py-1 rounded-lg bg-sky-600 hover:bg-sky-500 text-xs text-white font-bold flex items-center gap-1 cursor-pointer transition"
+                        >
+                          <Download className="w-3.5 h-3.5" />
+                          <span>Download .{codeFormat}</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Format Toggle Bar */}
+                    <div className="flex p-0.5 bg-slate-950 border border-slate-800 rounded-lg text-xs">
                       <button
                         type="button"
-                        onClick={handleDownloadHtml}
-                        className="text-xs text-sky-400 hover:text-sky-300 font-bold flex items-center gap-1 cursor-pointer"
+                        onClick={() => setCodeFormat('html')}
+                        className={`flex-1 py-1 px-2 rounded-md font-bold transition flex items-center justify-center gap-1.5 cursor-pointer ${
+                          codeFormat === 'html' ? 'bg-amber-500 text-slate-950 shadow' : 'text-slate-400 hover:text-white'
+                        }`}
                       >
-                        <Download className="w-3.5 h-3.5" /> Download
+                        <span>Single-File HTML</span>
+                        <span className="text-[10px] opacity-75 font-normal">Static / CDN</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setCodeFormat('tsx')}
+                        className={`flex-1 py-1 px-2 rounded-md font-bold transition flex items-center justify-center gap-1.5 cursor-pointer ${
+                          codeFormat === 'tsx' ? 'bg-sky-500 text-white shadow' : 'text-slate-400 hover:text-white'
+                        }`}
+                      >
+                        <span>React / Next.js TSX</span>
+                        <span className="text-[10px] opacity-75 font-normal">App Router</span>
                       </button>
                     </div>
+
                     <textarea
                       readOnly
-                      value={renderedHtml}
-                      rows={22}
-                      className="w-full p-3 rounded-xl bg-slate-950 border border-slate-800 font-mono text-[10.5px] text-slate-300 leading-relaxed focus:outline-none"
+                      value={codeFormat === 'html' ? renderedHtml : renderedTsx}
+                      rows={21}
+                      className="w-full p-3 rounded-xl bg-slate-950 border border-slate-800 font-mono text-[10.5px] text-slate-300 leading-relaxed focus:outline-none focus:border-amber-400"
                     />
                   </div>
                 )}

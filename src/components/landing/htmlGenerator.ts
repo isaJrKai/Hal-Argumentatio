@@ -411,6 +411,88 @@ export function generateLandingPageHtml(config: LandingPageConfig): string {
         }
         break;
 
+      case 'bento_features':
+        if (sections.bento_features?.active && sections.bento_features.items?.length > 0) {
+          renderedSections += `
+  <!-- Bento Capabilities Grid -->
+  <section class="max-w-6xl mx-auto px-4 sm:px-6 py-12">
+    <div class="text-center max-w-2xl mx-auto mb-10 space-y-2">
+      ${sections.bento_features.badge ? `<span class="inline-block px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-400 text-[11px] font-bold tracking-wider uppercase">${sections.bento_features.badge}</span>` : ''}
+      <h2 class="text-2xl sm:text-4xl font-black text-white tracking-tight">${sections.bento_features.title}</h2>
+      <p class="text-xs sm:text-sm text-slate-400">${sections.bento_features.subtitle}</p>
+    </div>
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+      ${sections.bento_features.items.map(item => {
+        const colClass = item.colSpan === '2' ? 'md:col-span-2' : item.colSpan === '3' ? 'md:col-span-3' : 'md:col-span-1';
+        return `
+        <div class="${colClass} p-6 rounded-2xl bg-slate-900/70 border border-slate-800 hover:border-slate-700 transition flex flex-col justify-between space-y-4">
+          <div class="space-y-2">
+            <div class="flex items-center justify-between">
+              ${item.tag ? `<span class="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20">${item.tag}</span>` : '<span></span>'}
+              ${item.icon ? `<span class="text-xl">${item.icon}</span>` : ''}
+            </div>
+            <h3 class="text-lg font-bold text-white tracking-tight">${item.title}</h3>
+            <p class="text-xs text-slate-400 leading-relaxed">${item.subtitle}</p>
+          </div>
+          ${item.value ? `
+          <div class="pt-3 border-t border-slate-800/80 flex items-baseline gap-2">
+            <span class="text-2xl font-black text-white">${item.value}</span>
+            <span class="text-[11px] text-slate-500">Verified Metric</span>
+          </div>` : ''}
+        </div>`;
+      }).join('')}
+    </div>
+  </section>\n`;
+        }
+        break;
+
+      case 'pricing_packages':
+        if (sections.pricing_packages?.active && sections.pricing_packages.items?.length > 0) {
+          renderedSections += `
+  <!-- Upfront Transparent Pricing Packages -->
+  <section class="max-w-6xl mx-auto px-4 sm:px-6 py-12">
+    <div class="text-center max-w-2xl mx-auto mb-10 space-y-2">
+      ${sections.pricing_packages.badge ? `<span class="inline-block px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-[11px] font-bold tracking-wider uppercase">${sections.pricing_packages.badge}</span>` : ''}
+      <h2 class="text-2xl sm:text-4xl font-black text-white tracking-tight">${sections.pricing_packages.title}</h2>
+      <p class="text-xs sm:text-sm text-slate-400">${sections.pricing_packages.subtitle}</p>
+    </div>
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+      ${sections.pricing_packages.items.map(tier => `
+        <div class="p-6 sm:p-7 rounded-2xl flex flex-col justify-between transition relative ${tier.popular ? 'bg-gradient-to-b from-slate-900 to-slate-950 border-2 border-amber-500 shadow-xl shadow-amber-500/10' : 'bg-slate-900/60 border border-slate-800'}">
+          ${tier.popular ? `
+          <div class="absolute -top-3 left-1/2 -translate-x-1/2 bg-amber-500 text-slate-950 font-black text-[10px] uppercase tracking-wider px-3 py-0.5 rounded-full shadow-md">
+            Most Popular
+          </div>` : ''}
+          <div>
+            <div class="flex items-center justify-between">
+              <h3 class="text-lg font-black text-white">${tier.name}</h3>
+            </div>
+            <p class="text-xs text-slate-400 mt-1 mb-4">${tier.tagline}</p>
+            <div class="flex items-baseline gap-1 my-3">
+              <span class="text-3xl font-black text-white tracking-tight">${tier.price}</span>
+              ${tier.period ? `<span class="text-xs text-slate-400 font-medium">${tier.period}</span>` : ''}
+            </div>
+            <div class="space-y-2.5 pt-3 border-t border-slate-800/80 my-4 text-xs">
+              ${(tier.features || []).map(f => `
+                <div class="flex items-start gap-2 text-slate-300">
+                  <span class="text-amber-400 font-bold shrink-0">✓</span>
+                  <span>${f}</span>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+          <div class="pt-2">
+            <a href="#lead-form" class="w-full py-3 px-4 rounded-xl text-center font-bold text-xs transition block ${tier.popular ? 'bg-amber-500 hover:bg-amber-400 text-slate-950 shadow-md shadow-amber-500/20' : 'bg-slate-800 hover:bg-slate-700 text-white border border-slate-700'}">
+              ${tier.ctaText || 'Select Package'}
+            </a>
+          </div>
+        </div>
+      `).join('')}
+    </div>
+  </section>\n`;
+        }
+        break;
+
       case 'sticky_mobile_call':
         if (sections.sticky_mobile_call?.active) {
           renderedSections += `
@@ -643,12 +725,128 @@ export function generateLandingPageHtml(config: LandingPageConfig): string {
     .theme-paper-ink .fixed.bottom-0 span.text-amber-400 {
       color: #9a3412 !important;
     }
+
+    /* ─── EXECUTIVE CARBON THEME ─── */
+    body.theme-executive-carbon {
+      background-color: #09090b !important;
+      color: #f4f4f5 !important;
+    }
+    .theme-executive-carbon header {
+      background-color: rgba(9, 9, 11, 0.95) !important;
+      border-bottom: 1px solid #27272a !important;
+    }
+    .theme-executive-carbon [class*="bg-slate-900"],
+    .theme-executive-carbon [class*="bg-slate-950"] {
+      background-color: #121215 !important;
+      border-color: #27272a !important;
+    }
+    .theme-executive-carbon [class*="border-slate-"] {
+      border-color: #27272a !important;
+    }
+    .theme-executive-carbon .bg-amber-500,
+    .theme-executive-carbon .bg-amber-400 {
+      background-color: #f4f4f5 !important;
+      color: #09090b !important;
+    }
+    .theme-executive-carbon .text-amber-400 {
+      color: #e4e4e7 !important;
+    }
+
+    /* ─── MODERN SWISS THEME ─── */
+    body.theme-modern-swiss {
+      background-color: #ffffff !important;
+      color: #0f172a !important;
+    }
+    .theme-modern-swiss header {
+      background-color: rgba(255, 255, 255, 0.96) !important;
+      border-bottom: 1px solid #e2e8f0 !important;
+    }
+    .theme-modern-swiss header .text-white { color: #0f172a !important; }
+    .theme-modern-swiss .text-white { color: #0f172a !important; }
+    .theme-modern-swiss .text-slate-300,
+    .theme-modern-swiss .text-slate-400 { color: #475569 !important; }
+    .theme-modern-swiss [class*="bg-slate-900"],
+    .theme-modern-swiss [class*="bg-slate-950"] {
+      background-color: #f8fafc !important;
+      border-color: #e2e8f0 !important;
+      color: #0f172a !important;
+    }
+    .theme-modern-swiss [class*="border-slate-"] {
+      border-color: #e2e8f0 !important;
+    }
+    .theme-modern-swiss .bg-amber-500,
+    .theme-modern-swiss .bg-amber-400 {
+      background-color: #e11d48 !important;
+      color: #ffffff !important;
+    }
+    .theme-modern-swiss .text-amber-400 {
+      color: #e11d48 !important;
+    }
+
+    /* ─── NORDIC OBSIDIAN THEME ─── */
+    body.theme-nordic-obsidian {
+      background-color: #030712 !important;
+      color: #f8fafc !important;
+    }
+    .theme-nordic-obsidian header {
+      background-color: rgba(3, 7, 18, 0.95) !important;
+      border-bottom: 1px solid #1e293b !important;
+    }
+    .theme-nordic-obsidian [class*="bg-slate-900"],
+    .theme-nordic-obsidian [class*="bg-slate-950"] {
+      background-color: #0b1329 !important;
+      border-color: #1e293b !important;
+    }
+    .theme-nordic-obsidian [class*="border-slate-"] {
+      border-color: #1e293b !important;
+    }
+    .theme-nordic-obsidian .bg-amber-500,
+    .theme-nordic-obsidian .bg-amber-400 {
+      background-color: #38bdf8 !important;
+      color: #030712 !important;
+    }
+    .theme-nordic-obsidian .text-amber-400 {
+      color: #38bdf8 !important;
+    }
+
+    /* ─── ARTISAN WARMTH THEME ─── */
+    body.theme-artisan-warmth {
+      background-color: #292524 !important;
+      color: #fafaf9 !important;
+    }
+    .theme-artisan-warmth header {
+      background-color: rgba(41, 37, 36, 0.95) !important;
+      border-bottom: 1px solid #44403c !important;
+    }
+    .theme-artisan-warmth [class*="bg-slate-900"],
+    .theme-artisan-warmth [class*="bg-slate-950"] {
+      background-color: #1c1917 !important;
+      border-color: #44403c !important;
+    }
+    .theme-artisan-warmth [class*="border-slate-"] {
+      border-color: #44403c !important;
+    }
+    .theme-artisan-warmth .bg-amber-500,
+    .theme-artisan-warmth .bg-amber-400 {
+      background-color: #d97706 !important;
+      color: #fafaf9 !important;
+    }
+    .theme-artisan-warmth .text-amber-400 {
+      color: #f59e0b !important;
+    }
   </style>
   <script type="application/ld+json">
     ${JSON.stringify(schemaJson, null, 2)}
   </script>
 </head>
-<body class="${isPaper ? 'theme-paper-ink bg-[#f7f5f0] text-[#18181b]' : 'bg-slate-950 text-slate-100'} font-sans antialiased min-h-screen pb-16 sm:pb-0">
+<body class="${
+  branding.colorPreset === 'paper_ink' ? 'theme-paper-ink bg-[#f7f5f0] text-[#18181b]' :
+  branding.colorPreset === 'executive_carbon' ? 'theme-executive-carbon bg-[#09090b] text-[#f4f4f5]' :
+  branding.colorPreset === 'modern_swiss' ? 'theme-modern-swiss bg-[#ffffff] text-[#0f172a]' :
+  branding.colorPreset === 'nordic_obsidian' ? 'theme-nordic-obsidian bg-[#030712] text-[#f8fafc]' :
+  branding.colorPreset === 'artisan_warmth' ? 'theme-artisan-warmth bg-[#292524] text-[#fafaf9]' :
+  'bg-slate-950 text-slate-100'
+} font-sans antialiased min-h-screen pb-16 sm:pb-0">
 
   ${renderedSections}
 

@@ -593,327 +593,81 @@ class Database {
   }
 
   private seed() {
-    console.log('Seeding database with default HALBiz data...');
+    console.log('Initializing pristine database for new app...');
     const now = new Date().toISOString();
     
-    // 1. Create admin contractor
+    // 1. Create admin contractor if missing
     const adminId = 'con_admin_seed';
-    const admin: Contractor = {
-      id: adminId,
-      email: 'admin@kaislead.com',
-      passwordHash: hashPassword('admin123'),
-      name: 'Isaac (Admin)',
-      role: 'admin',
-      marketId: 'market_winnipeg_calgary',
-      createdAt: now,
-      updatedAt: now
-    };
-    this.data.contractors.push(admin);
-
-    // 2. Create Prospects / Leads list
-    const defaultCity = "Winnipeg";
-    const defaultNiche = "trade services";
-
-    const seedProspects = [
-      { num: 3, name: "Apex Premier Contracting", city: "Winnipeg", email: "contact@apexpremier.com", owner: "Matthew Miller", niche: "custom building", status: "new" },
-      { num: 5, name: "Horizon Trade Services", city: "Winnipeg", email: "contact@horizontrades.ca", owner: "Sarah Jenkins", niche: "general contracting", status: "new" },
-      { num: 8, name: "Guardian Mechanical & Power", city: "Landmark", email: "info@guardianpower.com", owner: "Dylan Foster", niche: "electrical & solar", status: "new" },
-      { num: 9, name: "River Park Construction", city: "Winnipeg", email: "info@riverparkbuild.com", owner: "Owner", niche: "custom building", status: "new" },
-      { num: 11, name: "Polar Climate & Mechanical", city: "Winkler", email: "gord@polarclimate.ca", owner: "Gord", niche: "hvac & mechanical", status: "new" },
-      { num: 12, name: "Prairie Mowing & Turf Co.", city: "Morris", email: "chad@prairiemow.ca", owner: "Chad", niche: "lawn care", status: "new" },
-      { num: 13, name: "Grand Slam Builders", city: "Brandon", email: "info@grandslambuilders.com", owner: "Owner", niche: "custom building", status: "new" },
-      { num: 17, name: "Arbeau Contracting Solutions", city: "Fredericton", email: "alparbeau@gmail.com", owner: "Adam Arbeau", niche: "trade services", status: "new" },
-      { num: 18, name: "Phil Dixon Exterior Pro", city: "Fredericton", email: "phil.j.dixon@gmail.com", owner: "Phil Dixon", niche: "roofing & siding", status: "new" },
-      { num: 19, name: "Grant West Mechanical", city: "Fredericton", email: "grantwest@gmail.com", owner: "Grant West", niche: "hvac & mechanical", status: "new" },
-      { num: 22, name: "Wise Cracks Construction", city: "Fredericton", email: "info@wisecracks.com", owner: "Owner", niche: "foundation repair", status: "new" },
-      { num: 23, name: "WINMAR Territory Services", city: "Fredericton", email: "fredericton@winmar.ca", owner: "Owner", niche: "restoration", status: "new" },
-      { num: 34, name: "Kingstree Builders", city: "Sherwood Park", email: "brett@kingstreebuilders.ca", owner: "Brett Kingstree", niche: "custom building", status: "new" },
-      { num: 35, name: "The Gentlemen Pros Calgary", city: "Calgary", email: "brham@tgpros.ca", owner: "Brham Trim", niche: "home services", status: "new" },
-      { num: 43, name: "Nordic Auto Logistics", city: "Winnipeg", email: "dennisbaldwinson@gmail.com", owner: "Dennis Baldwin", niche: "auto detailing", status: "new" },
-      { num: 45, name: "Aloha Turf & Landscape", city: "Winnipeg", email: "JDejesus@alohaturf.ca", owner: "Angel Sanchez", niche: "lawn care", status: "new" },
-      { num: 48, name: "Northern Concrete Repair", city: "Fredericton", email: "joel.smith@NorthernConcreteRepair.ca", owner: "Joel Smith", niche: "concrete & masonry", status: "new" },
-      { num: 2, name: "ILV Contracting Group", city: "Winnipeg", email: "ilias@ilvcontracting.com", owner: "Ilias", niche: "general contracting", status: "contacted" },
-      { num: 4, name: "Worthy Pick Builders", city: "Winnipeg", email: "info@worthypick.ca", owner: "Owner", niche: "custom building", status: "contacted" },
-      { num: 6, name: "Next-Gen Power & Solar", city: "Winnipeg", email: "info@nextgenpower.ca", owner: "Owner", niche: "electrical & solar", status: "converted" },
-    ];
-
-    for (const p of seedProspects) {
-      const emailEncrypted = encrypt(p.email);
-      const leadId = `lead_seed_${p.num}`;
-      
-      const l: Lead = {
-        id: leadId,
-        contractorId: adminId,
-        businessName: p.name,
-        ownerName: p.owner === "Owner" ? undefined : p.owner,
-        emailEncrypted,
-        city: p.city,
-        serviceType: p.niche,
-        source: 'cold_outreach',
-        status: p.status as 'new' | 'contacted' | 'converted' | 'dead',
-        urgencyScore: Math.round((Math.random() * 4 + 5) * 10) / 10, // 5.0 to 9.0
-        predictedLtvUsd: p.status === 'converted' ? 18500 : Math.round((Math.random() * 8000 + 4500)),
-        notes: `Seeded lead for ${p.name} in ${p.city}. Niche: ${p.niche}.`,
-        createdAt: new Date(Date.now() - (30 - p.num) * 24 * 3600000).toISOString(), // staggered dates
+    if (!this.data.contractors.some(c => c.id === adminId || c.email === 'admin@kaislead.com')) {
+      const admin: Contractor = {
+        id: adminId,
+        email: 'admin@kaislead.com',
+        passwordHash: hashPassword('admin123'),
+        name: 'Isaac (Admin)',
+        role: 'admin',
+        marketId: 'market_default',
+        createdAt: now,
         updatedAt: now
       };
-      this.data.leads.push(l);
-
-      // Create a converted revenue for the converted lead
-      if (p.status === 'converted') {
-        const rev: Revenue = {
-          id: `rev_seed_${p.num}`,
-          leadId,
-          contractorId: adminId,
-          amountUsd: 18500,
-          source: 'manual_entry',
-          recordedAt: new Date(Date.now() - 2 * 24 * 3600000).toISOString()
-        };
-        this.data.revenues.push(rev);
-      }
+      this.data.contractors.push(admin);
     }
 
-    // 3. Create Campaigns
-    const WinnipegCampaignId = 'camp_seed_winnipeg';
-    const CalgaryCampaignId = 'camp_seed_calgary';
-
-    const campWinnipeg: Campaign = {
-      id: WinnipegCampaignId,
-      contractorId: adminId,
-      marketId: 'market_winnipeg',
-      name: 'Winnipeg Territory Acquisition Launch',
-      platform: 'google_ads',
-      budget: 1800,
-      spent: 1250,
-      status: 'active',
-      startDate: new Date(Date.now() - 30 * 24 * 3600000).toISOString(),
-      createdAt: new Date(Date.now() - 30 * 24 * 3600000).toISOString(),
-      updatedAt: now
-    };
-
-    const campCalgary: Campaign = {
-      id: CalgaryCampaignId,
-      contractorId: adminId,
-      marketId: 'market_calgary',
-      name: 'Calgary High-LTV Growth Campaign',
-      platform: 'google_ads',
-      budget: 2200,
-      spent: 1400,
-      status: 'active',
-      startDate: new Date(Date.now() - 15 * 24 * 3600000).toISOString(),
-      createdAt: new Date(Date.now() - 15 * 24 * 3600000).toISOString(),
-      updatedAt: now
-    };
-
-    this.data.campaigns.push(campWinnipeg);
-    this.data.campaigns.push(campCalgary);
-
-    // 4. Create Performance Snapshots for last 7 days
-    for (let i = 7; i >= 1; i--) {
-      const snapDate = new Date(Date.now() - i * 24 * 3600000).toISOString().split('T')[0];
-      
-      // Winnipeg snaps
-      this.data.performanceSnapshots.push({
-        id: `snap_w_${i}`,
-        campaignId: WinnipegCampaignId,
-        date: snapDate,
-        leads: Math.floor(Math.random() * 4) + 2, // 2-5 leads
-        spend: 40 + Math.random() * 10,
-        cpl: 0, // calculate later
-        clicks: Math.floor(Math.random() * 20) + 15,
-        impressions: Math.floor(Math.random() * 300) + 200,
-        createdAt: now
-      });
-
-      // Calgary snaps
-      this.data.performanceSnapshots.push({
-        id: `snap_c_${i}`,
-        campaignId: CalgaryCampaignId,
-        date: snapDate,
-        leads: Math.floor(Math.random() * 3) + 1, // 1-4 leads
-        spend: 55 + Math.random() * 15,
-        cpl: 0, // calculate later
-        clicks: Math.floor(Math.random() * 25) + 12,
-        impressions: Math.floor(Math.random() * 400) + 250,
-        createdAt: now
+    // 2. Create Isaac contractor if missing
+    const isaacId = 'con_isaac_seed';
+    if (!this.data.contractors.some(c => c.id === isaacId || c.email === 'kaisoisaac@gmail.com')) {
+      this.data.contractors.push({
+        id: isaacId,
+        email: 'kaisoisaac@gmail.com',
+        passwordHash: hashPassword('admin123'),
+        name: 'Isaac',
+        role: 'admin',
+        marketId: 'market_default',
+        createdAt: now,
+        updatedAt: now
       });
     }
 
-    // Fix CPL in performance snapshots
-    this.data.performanceSnapshots.forEach(s => {
-      s.cpl = s.leads > 0 ? Math.round((s.spend / s.leads) * 100) / 100 : s.spend;
-    });
-
-    // 5. Create some Forecasts (e.g. Lead volume target)
-    const targetDate1 = new Date(Date.now() - 1 * 24 * 3600000).toISOString(); // Yesterday (expired!)
-    const targetDate2 = new Date(Date.now() + 5 * 24 * 3600000).toISOString(); // Future
-
-    const fcExpired: Forecast = {
-      id: 'fc_seed_expired',
-      contractorId: adminId,
-      metric: 'lead_volume',
-      predicted: 25,
-      confidenceScore: 0.82,
-      targetDate: targetDate1,
-      modelVersion: 'v1_manual',
-      evaluated: false,
-      assumptions: 'Assumed high demand driven by market growth and regional digital audit gap analysis.',
-      createdAt: new Date(Date.now() - 8 * 24 * 3600000).toISOString()
-    };
-
-    const fcFuture: Forecast = {
-      id: 'fc_seed_future',
-      contractorId: adminId,
-      metric: 'cpl',
-      predicted: 18.5,
-      confidenceScore: 0.74,
-      targetDate: targetDate2,
-      modelVersion: 'v1_auto',
-      evaluated: false,
-      assumptions: 'Predicted based on seasonal optimization adjustments and lowered bidding competition.',
-      createdAt: new Date(Date.now() - 2 * 24 * 3600000).toISOString()
-    };
-
-    this.data.forecasts.push(fcExpired);
-    this.data.forecasts.push(fcFuture);
-
-    // 6. Create some Recommendations
-    this.data.recommendations.push({
-      id: 'rec_seed_1',
-      contractorId: adminId,
-      category: 'budget_allocation',
-      action: 'Shift $400 from Calgary High-LTV to Winnipeg Territory Launch Campaign',
-      rationale: 'Winnipeg campaign shows a Cost-Per-Lead (CPL) of $12.50 vs Calgary\'s $22.40. Reallocating budget maximizes total generated leads within the same aggregate budget constraint.',
-      confidence: 0.91,
-      evidence: 'Cost efficiency difference is statistically significant (p < 0.01) based on performance over the last 14 days.',
-      status: 'pending',
-      createdAt: now,
-      updatedAt: now
-    });
-
-    this.data.recommendations.push({
-      id: 'rec_seed_2',
-      contractorId: adminId,
-      category: 'bidding_strategy',
-      action: 'Enable Enhanced CPC for high-intent emergency service keywords',
-      rationale: 'Search queries peak during night hours due to current weather conditions in target territories. Automated bid multipliers will capture high-intent emergency traffic.',
-      confidence: 0.85,
-      evidence: 'Conversion rate of night-time queries is 3.5x higher than daytime counterparts during weather advisory periods.',
-      status: 'pending',
-      createdAt: now,
-      updatedAt: now
-    });
-
-    // 7. Seed Learning Insights
-    this.data.learningInsights.push({
-      id: 'insight_seed_1',
-      category: 'weather_elasticity',
-      insight: 'High-intent service lead volume is highly elastic to local seasonal weather shifts (elasticity factor: 2.8x volume increase within 12 hours).',
-      confidence: 0.94,
-      observedCount: 4,
-      createdAt: now,
-      updatedAt: now
-    });
-
-    this.data.learningInsights.push({
-      id: 'insight_seed_2',
-      category: 'competition_decay',
-      insight: 'Weekend Cost-Per-Click (CPC) drops by 24% across Winnipeg home services because competitors pause budgets, but conversion rates remain within 5% of weekday levels.',
-      confidence: 0.88,
-      observedCount: 8,
-      createdAt: now,
-      updatedAt: now
-    });
-
-    // 8. Seed default automated Missions
-    const mis1Id = 'mis_seed_fredericton';
-    const mis2Id = 'mis_seed_winnipeg';
-
-    this.data.missions = [
-      {
-        id: mis1Id,
-        contractorId: adminId,
-        title: 'Territory Penetration Mission: Fredericton Regional Trades',
-        description: 'Automated multi-agent sequence to harvest active businesses, evaluate digital speed/SEO gaps, and compile custom outreach copy.',
-        status: 'completed',
-        city: 'Fredericton',
-        niche: 'trade services',
-        createdAt: now,
-        updatedAt: now,
-        steps: [
-          {
-            id: 'mstep_fred_1',
-            missionId: mis1Id,
-            title: 'Territory Intelligence Harvest',
-            description: 'Scans the regional business registry to extract email, phone, and owner listings.',
-            status: 'completed',
-            result: 'Successfully identified 5 premium local business profiles with contact records.',
-            updatedAt: now
-          },
-          {
-            id: 'mstep_fred_2',
-            missionId: mis1Id,
-            title: 'Technical Web Speed Audits',
-            description: 'Analyzes render latency, mobile responsiveness, and SSL security indicators.',
-            status: 'completed',
-            result: 'Completed 5 automated audits. Identified 2 critical sites lacking mobile CTAs.',
-            updatedAt: now
-          },
-          {
-            id: 'mstep_fred_3',
-            missionId: mis1Id,
-            title: 'Personalized Value Outreach Drafting',
-            description: 'Drafts cold outreach angles detailing exact performance scores and conversion gains.',
-            status: 'completed',
-            result: 'Outbound pitch documents constructed using custom speed parameters.',
-            updatedAt: now
-          }
-        ]
-      },
-      {
-        id: mis2Id,
-        contractorId: adminId,
-        title: 'Demand-Triggered Territory Conquest Campaign',
-        description: 'Real-time weather warning trigger to bid aggressively on high-intent terms during high demand periods.',
-        status: 'running',
-        city: 'Winnipeg',
-        niche: 'trade services',
-        createdAt: now,
-        updatedAt: now,
-        steps: [
-          {
-            id: 'mstep_wpg_1',
-            missionId: mis2Id,
-            title: 'Open-Meteo Environmental Threshold Check',
-            description: 'Queries live weather data to verify if regional demand indicators trigger campaign scaling.',
-            status: 'completed',
-            result: 'Environmental threshold met: Active demand signal recorded in Winnipeg.',
-            updatedAt: now
-          },
-          {
-            id: 'mstep_wpg_2',
-            missionId: mis2Id,
-            title: 'Sourced Leads Intelligence Query',
-            description: 'Retrieves high-priority regional service leads with active digital gaps.',
-            status: 'completed',
-            result: 'Loaded 4 sourced leads with active digital weaknesses.',
-            updatedAt: now
-          },
-          {
-            id: 'mstep_wpg_3',
-            missionId: mis2Id,
-            title: 'Demand-Triggered Ad Bid Increase',
-            description: 'Injects CPC bid multiplier (1.4x) on high-intent regional service terms.',
-            status: 'pending',
-            result: 'Waiting for manual review or automatic API trigger.',
-            updatedAt: now
-          }
-        ]
-      }
-    ];
+    // Clean slate: 0 mock leads, 0 mock campaigns, 0 mock revenues, 0 mock forecasts, 0 mock recommendations, 0 mock missions
+    this.data.leads = [];
+    this.data.leadEvents = [];
+    this.data.campaigns = [];
+    this.data.revenues = [];
+    this.data.performanceSnapshots = [];
+    this.data.forecasts = [];
+    this.data.predictionOutcomes = [];
+    this.data.recommendations = [];
+    this.data.missions = [];
+    this.data.learningInsights = [];
+    this.data.chatMessages = [];
 
     this.save();
-    console.log('Database seeding complete!');
+    console.log('Pristine database ready: 0 mock items.');
+  }
+
+  public purgeAllMockData() {
+    console.log('Purging all mock items across the system...');
+    // Keep only true authorized contractors
+    this.data.contractors = this.data.contractors.filter(c => 
+      c.email === 'kaisoisaac@gmail.com' || c.email === 'admin@kaislead.com' || c.id === 'con_isaac_seed' || c.id === 'con_admin_seed'
+    );
+    // Purge mock leads
+    this.data.leads = this.data.leads.filter(l => !l.id.startsWith('lead_seed_'));
+    // Purge mock campaigns
+    this.data.campaigns = this.data.campaigns.filter(c => !c.id.startsWith('camp_seed_') && !c.id.startsWith('camp_isaac_'));
+    // Purge mock revenues
+    this.data.revenues = this.data.revenues.filter(r => !r.id.startsWith('rev_seed_') && !r.id.startsWith('rev_isaac_'));
+    // Purge mock forecasts
+    this.data.forecasts = this.data.forecasts.filter(f => !f.id.startsWith('fc_seed_') && !f.id.startsWith('fc_isaac_'));
+    // Purge mock recommendations
+    this.data.recommendations = this.data.recommendations.filter(re => !re.id.startsWith('rec_seed_') && !re.id.startsWith('rec_isaac_'));
+    // Purge mock missions
+    this.data.missions = this.data.missions.filter(m => !m.id.startsWith('mis_seed_'));
+    // Purge mock learning insights
+    this.data.learningInsights = this.data.learningInsights.filter(i => !i.id.startsWith('insight_seed_'));
+    // Purge mock performance snapshots
+    this.data.performanceSnapshots = this.data.performanceSnapshots.filter(s => !s.id.startsWith('snap_'));
+    
+    this.save();
   }
 
   public save() {
@@ -946,7 +700,11 @@ class Database {
   public getLeads(contractorId?: string): Lead[] {
     let rawLeads = this.data.leads;
     if (contractorId) {
-      rawLeads = rawLeads.filter(l => l.contractorId === contractorId);
+      if (contractorId === 'con_isaac_seed' || contractorId === 'con_admin_seed') {
+        rawLeads = rawLeads.filter(l => l.contractorId === 'con_admin_seed' || l.contractorId === 'con_isaac_seed');
+      } else {
+        rawLeads = rawLeads.filter(l => l.contractorId === contractorId);
+      }
     }
     return rawLeads.map(lead => {
       return {
@@ -957,8 +715,8 @@ class Database {
     });
   }
 
-  public addLead(lead: Omit<Lead, 'id' | 'createdAt' | 'updatedAt'>): Lead {
-    const id = 'lead_' + crypto.randomBytes(8).toString('hex');
+  public addLead(lead: Omit<Lead, 'id' | 'createdAt' | 'updatedAt'> & { id?: string }): Lead {
+    const id = lead.id || ('lead_' + crypto.randomBytes(8).toString('hex'));
     const now = new Date().toISOString();
     
     const emailEncrypted = lead.email ? encrypt(lead.email) : lead.emailEncrypted;
@@ -1282,6 +1040,9 @@ class Database {
   // Campaigns
   public getCampaigns(contractorId?: string): Campaign[] {
     if (contractorId) {
+      if (contractorId === 'con_isaac_seed' || contractorId === 'con_admin_seed') {
+        return this.data.campaigns.filter(c => c.contractorId === 'con_admin_seed' || c.contractorId === 'con_isaac_seed');
+      }
       return this.data.campaigns.filter(c => c.contractorId === contractorId);
     }
     return this.data.campaigns;
@@ -1339,6 +1100,9 @@ class Database {
   // Revenues
   public getRevenues(contractorId?: string): Revenue[] {
     if (contractorId) {
+      if (contractorId === 'con_isaac_seed' || contractorId === 'con_admin_seed') {
+        return this.data.revenues.filter(r => r.contractorId === 'con_admin_seed' || r.contractorId === 'con_isaac_seed');
+      }
       return this.data.revenues.filter(r => r.contractorId === contractorId);
     }
     return this.data.revenues;
@@ -1367,6 +1131,9 @@ class Database {
   // Forecasts & Outcomes
   public getForecasts(contractorId?: string): Forecast[] {
     if (contractorId) {
+      if (contractorId === 'con_isaac_seed' || contractorId === 'con_admin_seed') {
+        return this.data.forecasts.filter(f => f.contractorId === 'con_admin_seed' || f.contractorId === 'con_isaac_seed');
+      }
       return this.data.forecasts.filter(f => f.contractorId === contractorId);
     }
     return this.data.forecasts;
@@ -1438,6 +1205,9 @@ class Database {
   // Recommendations
   public getRecommendations(contractorId?: string): Recommendation[] {
     if (contractorId) {
+      if (contractorId === 'con_isaac_seed' || contractorId === 'con_admin_seed') {
+        return this.data.recommendations.filter(r => r.contractorId === 'con_admin_seed' || r.contractorId === 'con_isaac_seed');
+      }
       return this.data.recommendations.filter(r => r.contractorId === contractorId);
     }
     return this.data.recommendations;
