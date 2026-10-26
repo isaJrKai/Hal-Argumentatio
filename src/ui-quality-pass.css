@@ -1,0 +1,167 @@
+/*
+ * HAL UI quality pass
+ * Purpose: improve legibility and reduce visual noise without changing product behavior.
+ * Keep motion functional, short, and optional; color communicates state rather than decoration.
+ */
+
+:root {
+  font-size: 16px;
+  --ui-motion-fast: 140ms;
+  --ui-motion-standard: 190ms;
+  --ui-ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ui-ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+}
+
+/* The existing interface overuses micro-labels. Preserve their hierarchy but make them readable. */
+body {
+  font-size: 15px;
+  line-height: 1.55;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+button {
+  min-height: 36px;
+}
+
+input,
+select,
+textarea {
+  min-height: 40px;
+  font-size: 15px;
+}
+
+label,
+.label,
+.metric-label {
+  font-size: 12px;
+  letter-spacing: 0.045em;
+}
+
+.body {
+  font-size: 15px;
+  line-height: 1.65;
+}
+
+.data-cell {
+  font-size: 14px;
+}
+
+.btn-primary,
+.btn-ghost,
+.btn-danger {
+  min-height: 38px;
+  font-family: var(--font-sans);
+  font-size: 13px;
+  letter-spacing: 0.025em;
+  text-transform: none;
+}
+
+.badge {
+  font-family: var(--font-sans);
+  font-size: 12px;
+  letter-spacing: 0.01em;
+  padding: 3px 8px;
+}
+
+/* Catch overly tiny Tailwind text utilities used throughout legacy panels. */
+[class*="text-[8px]"],
+[class*="text-[8.5px]"],
+[class*="text-[9px]"],
+[class*="text-[9.5px]"],
+[class*="text-[10px]"],
+[class*="text-[10.5px]"] {
+  font-size: 12px !important;
+  line-height: 1.45;
+}
+
+[class*="text-[11px]"] {
+  font-size: 13px !important;
+  line-height: 1.5;
+}
+
+/* One restrained product accent; semantic colors remain reserved for status and risk. */
+.badge-active {
+  color: var(--color-positive);
+  background: var(--color-positive-dim);
+  border-color: color-mix(in srgb, var(--color-positive) 24%, transparent);
+}
+
+.badge-warning {
+  color: var(--color-warning);
+  background: var(--color-warning-dim);
+  border-color: color-mix(in srgb, var(--color-warning) 24%, transparent);
+}
+
+.badge-danger {
+  color: var(--color-negative);
+  background: var(--color-negative-dim);
+  border-color: color-mix(in srgb, var(--color-negative) 24%, transparent);
+}
+
+/* Consistent, visible keyboard focus. Do not rely on color alone. */
+:where(a, button, input, select, textarea, [tabindex]):focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
+/* No perpetual decorative scanning, pulsing, or shimmer. Loading states should be intentional. */
+.hal-intelligence-bar::after,
+.live-dot,
+.skeleton {
+  animation: none !important;
+}
+
+.skeleton {
+  background: var(--bg-subtle);
+}
+
+.panel {
+  animation: none;
+}
+
+button,
+a,
+input,
+select,
+textarea {
+  transition-duration: var(--ui-motion-fast);
+  transition-timing-function: var(--ui-ease-out);
+}
+
+@media (max-width: 640px) {
+  body {
+    font-size: 16px;
+  }
+
+  button {
+    min-height: 42px;
+  }
+
+  input,
+  select,
+  textarea {
+    min-height: 44px;
+    font-size: 16px;
+  }
+
+  .metric-value {
+    font-size: 24px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
+}
