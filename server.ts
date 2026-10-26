@@ -3,6 +3,7 @@ import express from 'express';
 import path from 'path';
 import fs from 'fs';
 import crypto from 'crypto';
+import { isIP } from 'node:net';
 import { execSync } from 'child_process';
 import { createServer as createViteServer } from 'vite';
 import { 
@@ -88,17 +89,36 @@ dotenv.config();
 const app = express();
 const PORT = 3000;
 
-app.use(express.json());
+app.use(express.json({
+  verify: (req, _res, buffer) => {
+    (req as any).rawBody = Buffer.from(buffer);
+  }
+}));
 
-// Enable Cross-Origin Resource Sharing (CORS) & Handle Preflights
+// Allow browser origins explicitly; same-origin requests do not require CORS.
+const corsAllowedOrigins = new Set(
+  (process.env.CORS_ALLOWED_ORIGINS || process.env.APP_URL || '')
+    .split(',')
+    .map(value => {
+      try { return new URL(value.trim()).origin; } catch { return ''; }
+    })
+    .filter(Boolean)
+);
+
 app.use((req, res, next) => {
-  res.header('Access-Control-Allow-Origin', '*');
+  const origin = req.headers.origin;
+  res.header('Vary', 'Origin');
   res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS');
   res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, X-Active-AI, Cache-Control');
   res.header('Access-Control-Max-Age', '86400');
-  if (req.method === 'OPTIONS') {
-    return res.sendStatus(204);
+
+  if (origin && corsAllowedOrigins.has(origin)) {
+    res.header('Access-Control-Allow-Origin', origin);
+  } else if (origin && req.method === 'OPTIONS') {
+    return res.sendStatus(403);
   }
+
+  if (req.method === 'OPTIONS') return res.sendStatus(204);
   next();
 });
 
@@ -3433,8 +3453,25 @@ app.post('/api/dispatch/webhook', authenticate, async (req, res) => {
   const contractorId = (req as any).contractorId;
   const { targetUrl, eventType, payload } = req.body;
 
-  if (!targetUrl) {
+  if (typeof targetUrl !== 'string' || !targetUrl.trim()) {
     return res.status(400).json({ error: 'Target URL is required' });
+  }
+
+  let parsedTarget: URL;
+  try {
+    parsedTarget = new URL(targetUrl);
+  } catch {
+    return res.status(400).json({ error: 'Target URL must be a valid HTTPS URL.' });
+  }
+  if (parsedTarget.protocol !== 'https:' || parsedTarget.username || parsedTarget.password || isIP(parsedTarget.hostname)) {
+    return res.status(400).json({ error: 'Webhook targets must use HTTPS and a hostname, not embedded credentials or an IP literal.' });
+  }
+  const allowedHosts = (process.env.HAL_WEBHOOK_ALLOWED_HOSTS || '')
+    .split(',')
+    .map(host => host.trim().toLowerCase())
+    .filter(Boolean);
+  if (!allowedHosts.includes(parsedTarget.hostname.toLowerCase())) {
+    return res.status(403).json({ error: 'Webhook target host is not allowlisted.' });
   }
 
   const payloadString = JSON.stringify({
@@ -3458,7 +3495,8 @@ app.post('/api/dispatch/webhook', authenticate, async (req, res) => {
   let responseBody = '';
 
   try {
-    const hookRes = await fetch(targetUrl, {
+    const hookRes = await fetch(parsedTarget.toString(), {
+      redirect: 'manual',
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -3921,17 +3959,36 @@ app.get('/api/outreach/whatsapp/webhook', (req, res) => {
   const mode = req.query['hub.mode'];
   const token = req.query['hub.verify_token'];
   const challenge = req.query['hub.challenge'];
+  const expectedToken = process.env.WHATSAPP_VERIFY_TOKEN;
 
-  const expectedToken = process.env.WHATSAPP_VERIFY_TOKEN || 'hal_whatsapp_verify_token';
-  if (mode === 'subscribe' && token === expectedToken) {
-    res.status(200).send(challenge);
-  } else {
-    res.status(403).json({ error: 'Verification failed' });
+  if (!expectedToken) {
+    return res.status(503).json({ error: 'WhatsApp webhook verification is not configured.' });
   }
+  if (mode === 'subscribe' && typeof token === 'string' && token === expectedToken && typeof challenge === 'string') {
+    return res.status(200).send(challenge);
+  }
+  return res.status(403).json({ error: 'Verification failed' });
 });
 
 // WhatsApp Inbound Message Listener
 app.post('/api/outreach/whatsapp/webhook', (req, res) => {
+  const appSecret = process.env.WHATSAPP_APP_SECRET;
+  const signature = req.header('x-hub-signature-256');
+  const rawBody = (req as any).rawBody as Buffer | undefined;
+
+  if (!appSecret) {
+    return res.status(503).json({ error: 'WhatsApp inbound signature verification is not configured.' });
+  }
+  if (!signature || !rawBody || !signature.startsWith('sha256=')) {
+    return res.status(401).json({ error: 'Missing or invalid webhook signature.' });
+  }
+
+  const expected = Buffer.from('sha256=' + crypto.createHmac('sha256', appSecret).update(rawBody).digest('hex'));
+  const received = Buffer.from(signature);
+  if (expected.length !== received.length || !crypto.timingSafeEqual(expected, received)) {
+    return res.status(401).json({ error: 'Invalid webhook signature.' });
+  }
+
   const body = req.body;
   try {
     if (body.object === 'whatsapp_business_account') {
