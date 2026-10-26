@@ -299,9 +299,9 @@ export default function ConnectorsPanel() {
         <div>
           <div className="flex items-center gap-2">
             <h1 className="text-2xl font-bold tracking-tight text-zinc-900 dark:text-zinc-100">
-              Living Integration Conduits
+              Integrations & Verification
             </h1>
-            <Badge variant="active">
+            <Badge variant="neutral">
               Verification required
             </Badge>
           </div>
@@ -546,7 +546,7 @@ export default function ConnectorsPanel() {
               </div>
               <div>
                 <h3 className="text-base font-semibold text-zinc-900 dark:text-zinc-100">
-                  Two-Way Twilio WhatsApp & SMS Webhook Conduit
+                  Inbound Messaging Webhooks
                 </h3>
                 <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
                   Inbound webhook support is present in the code; provider signatures, event processing, and live alerts require end-to-end verification.
@@ -558,7 +558,7 @@ export default function ConnectorsPanel() {
               {/* Webhook URLs */}
               <div className="space-y-3">
                 <label className="text-xs font-semibold text-zinc-700 dark:text-zinc-300">
-                  Carrier Ingestion Webhook URLs (Point Twilio Here)
+                  Inbound webhook endpoints (provider signature validation required)
                 </label>
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -789,7 +789,7 @@ export default function ConnectorsPanel() {
                   </div>
                   <div>
                     <h4 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
-                      Cloud SQL PostgreSQL Relational Storage
+                      PostgreSQL Database
                     </h4>
                     <p className="text-xs text-zinc-500 mt-0.5">
                       Database version, schema inventory, and connection status have not been checked here.
