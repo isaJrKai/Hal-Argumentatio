@@ -84,11 +84,13 @@ export const TopTelemetryBar: React.FC<TopTelemetryBarProps> = ({
   const [showRibbon, setShowRibbon] = useState(true);
   const [quickNotification, setQuickNotification] = useState<string | null>(null);
 
-  // Trigger brief user-friendly feedback on quick ribbon actions
-  const triggerRibbonAction = (actionName: string, tabRedirect?: string) => {
-    setQuickNotification(actionName);
+  // Ribbon items are shortcuts, not evidence that a background operation ran.
+  const triggerRibbonAction = (_actionName: string, tabRedirect?: string) => {
     if (tabRedirect) {
       setActiveTab(tabRedirect);
+      setQuickNotification('Workspace opened. No scan, verification, export, or message was run.');
+    } else {
+      setQuickNotification('This shortcut is not connected to a live operation yet.');
     }
     setTimeout(() => {
       setQuickNotification(null);
@@ -185,11 +187,11 @@ export const TopTelemetryBar: React.FC<TopTelemetryBarProps> = ({
           <button
             onClick={() => setActiveTab('hermes-lab')}
             className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-accent-dim border border-accent/30 text-accent hover:bg-accent-mid text-xs font-sans font-medium transition-all cursor-pointer shadow-xs"
-            title="AI Business Assistant: Online and ready"
+            title="Open the AI Assistant workspace"
           >
             <Sparkles className="w-3.5 h-3.5 text-accent" />
             <span className="hidden sm:inline">AI Assistant</span>
-            <span className="w-1.5 h-1.5 rounded-full bg-positive animate-pulse" />
+            <span className="w-1.5 h-1.5 rounded-full bg-text-tertiary" />
           </button>
 
           {/* Dedicated Theme Toggle: Paper & Ink / Dark Carbon */}
