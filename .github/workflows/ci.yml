@@ -24,3 +24,16 @@ jobs:
         run: npm ci
       - name: Type-check and run automated tests
         run: npm run test:ci
+      - name: Audit dependency advisories
+        run: |
+          npm audit --json > /tmp/hal-npm-audit.json || true
+          node - <<'NODE'
+          const report = require('/tmp/hal-npm-audit.json');
+          const issues = Object.values(report.vulnerabilities || {});
+          for (const issue of issues) {
+            console.log(`${String(issue.severity).toUpperCase()} ${issue.name} | direct=${issue.isDirect} | range=${issue.range} | fix=${JSON.stringify(issue.fixAvailable)}`);
+          }
+          const high = issues.filter(issue => issue.severity === 'high' || issue.severity === 'critical');
+          console.log(`Audit summary: ${issues.length} vulnerable packages; ${high.length} high/critical.`);
+          if (high.length) process.exit(1);
+          NODE
