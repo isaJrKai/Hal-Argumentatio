@@ -12,7 +12,7 @@ This document separates observed repository facts from work that still needs evi
 - A root README and sale-readiness handover document have now been added on the preparation branch.
 - GitHub Actions CI is active on the preparation pull request; the build and test results are tracked in the pull request checks.
 
-**Important:** Remote GitHub Actions evidence shows that `npm ci` and `npm run test:ci` have passed on the latest code revision. A production build and live end-to-end run still need verification. The dependency audit currently fails due to high-severity advisories; dependency remediation is in progress. Database restore, tenant isolation, and production deployment have not been demonstrated.
+**Important:** The latest GitHub Actions run passed `npm ci`, `npm run test:ci`, the production build, and the production dependency audit. The production dependency audit reported **0 vulnerable packages**. The full audit still reports four high-severity Firebase-related packages from orphaned legacy lockfile entries; the app now imports only `@firebase/app` and `@firebase/auth`, and `firebase`/`firebase-admin` are no longer root dependencies, but a clean regenerated lockfile is still needed to eliminate those stale entries. Live end-to-end verification, database restore, full tenant-isolation review, and production deployment have not been demonstrated.
 
 The unified outreach UI previously displayed fabricated provider connection states and sample performance figures. The current branch removes fabricated pipeline, conversion, outreach, lead-assessment, and activity figures and labels the unified dispatch route as simulation-only; no provider delivery is claimed. Provider adapters, callback/event tracking, webhook SSRF protection, durable encrypted per-account credential storage, and end-to-end tests remain release work.
 
@@ -26,7 +26,7 @@ Record evidence for each item before calling HAL production-ready.
 |---|---|---|
 | Clean install | Fresh environment; npm ci completes from lockfile | Passed in GitHub Actions on latest tested revision |
 | Static checks | npm run lint completes successfully | Passed as part of `npm run test:ci` on latest tested revision |
-| Build | npm run build completes successfully | CI gate added; waiting for result |
+| Build | npm run build completes successfully | Passed in GitHub Actions on the latest tested revision |
 | Automated tests | Unit, integration, API, security, and full CI scripts run; failures triaged | `npm run test:ci` passed in GitHub Actions on latest tested revision |
 | Database | Fresh test database, schema bootstrap/migrations, persistence, backup and restore tested | Not yet verified |
 | Authentication | Login/session paths tested; weak/default secrets rejected; no auth fail-open behaviour | Requires review and testing |
@@ -34,8 +34,8 @@ Record evidence for each item before calling HAL production-ready.
 | Secrets | Current files and Git history reviewed; any real exposed keys revoked/rotated | Requires review |
 | CORS / rate limiting | Allowed origins and abuse limits match the deployment threat model | Requires review and testing |
 | AI providers | Missing keys, quota errors, timeouts, and provider failures handled predictably | Requires testing |
-| Deployment | Fresh deployment from documented steps; health check and critical journeys verified | Not yet verified |
-| Dependencies/licences | Advisory report and third-party licence inventory reviewed | Audit currently reports high-severity advisories; remediation in progress |
+| Deployment | Fresh deployment from documented steps; health check and critical journeys verified | Not yet verified; current host could not be controlled or verified from this session |
+| Dependencies/licences | Advisory report and third-party licence inventory reviewed | Production audit: 0 vulnerabilities. Full audit: 4 high-severity findings from orphaned legacy Firebase lock entries; clean lock regeneration remains open. Third-party licence inventory still needs review |
 | Data handling | Tracked data files checked; customer/PII transfer scope documented | Requires review |
 | Domain/hosting | Current host, account ownership, URL transfer limits, and migration plan confirmed | Requires confirmation |
 
