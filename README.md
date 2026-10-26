@@ -86,7 +86,7 @@ The tracked .env.example lists the current configuration surface, including:
 
 Password reset is intentionally disabled until persistent single-use tokens and a verified delivery provider are implemented. New accounts require passwords of at least 12 characters. Exact requirements depend on the route and feature being used. Generate unique secrets for each environment. The JWT secret must be high-entropy and private. The lead-encryption key must be managed carefully: changing it can make existing encrypted records unreadable unless the data is migrated correctly. HAL_LEGACY_ENCRYPTION_KEY_B64 exists only for a controlled migration; leave it empty in normal operation. Never copy example values into production.
 
-## Available commands
+Legacy JSON-to-PostgreSQL migration scripts read a private export path from HAL_SOURCE_JSON. Runtime data is intentionally excluded from source control; do not commit a live export. Review each migration script and take a database backup before running it.\n\n## Available commands
 
 | Command | Purpose |
 |---|---|
