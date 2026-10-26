@@ -27,6 +27,7 @@ import {
 } from 'lucide-react';
 import OutreachQueue from './OutreachQueue';
 import { useToast } from '../context/ToastContext';
+import { UnifiedCommunicationsHub } from './UnifiedCommunicationsHub';
 
 interface CampaignsPanelProps {
   campaigns: Campaign[];
@@ -36,7 +37,7 @@ interface CampaignsPanelProps {
 }
 
 export default function CampaignsPanel({ campaigns, leads = [], token, onRefresh }: CampaignsPanelProps) {
-  const [activeSubTab, setActiveSubTab] = useState<'queue' | 'performance' | 'dispatcher'>('queue');
+  const [activeSubTab, setActiveSubTab] = useState<'hub' | 'queue' | 'performance' | 'dispatcher'>('hub');
   const [selectedCampaign, setSelectedCampaign] = useState<Campaign | null>(null);
   const [snapshots, setSnapshots] = useState<PerformanceSnapshot[]>([]);
   
@@ -465,6 +466,18 @@ export default function CampaignsPanel({ campaigns, leads = [], token, onRefresh
       {/* SUB-NAVIGATION TABS */}
       <div className="flex items-center gap-2 border-b border-border-dim/60 pb-2">
         <button
+          onClick={() => setActiveSubTab('hub')}
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-sm text-xs font-mono font-bold uppercase transition-colors cursor-pointer ${
+            activeSubTab === 'hub'
+              ? 'bg-brand text-black'
+              : 'bg-bg-raised text-text-secondary hover:text-text-primary border border-border-dim'
+          }`}
+        >
+          <Send className="w-3.5 h-3.5" />
+          <span>Outreach Hub (WhatsApp / Email / SMS)</span>
+        </button>
+
+        <button
           onClick={() => setActiveSubTab('queue')}
           className={`flex items-center gap-1.5 px-3 py-1.5 rounded-sm text-xs font-mono font-bold uppercase transition-colors cursor-pointer ${
             activeSubTab === 'queue'
@@ -554,6 +567,14 @@ export default function CampaignsPanel({ campaigns, leads = [], token, onRefresh
             </button>
           </div>
         </div>
+      )}
+
+      {activeSubTab === 'hub' && (
+        <UnifiedCommunicationsHub
+          leads={leads}
+          token={token}
+          onRefresh={onRefresh}
+        />
       )}
 
       {activeSubTab === 'queue' && (

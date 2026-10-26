@@ -3,10 +3,8 @@
   "configVersion": 0,
   "workspaces": {
     "": {
-      "name": "hal-human-argumentation-layer",
+      "name": "react-example",
       "dependencies": {
-        "@firebase/app": "^0.16.2",
-        "@firebase/auth": "^1.13.6",
         "@fontsource/inter": "^5.2.8",
         "@fontsource/jetbrains-mono": "^5.2.8",
         "@google/genai": "^2.4.0",
@@ -19,8 +17,11 @@
         "bcryptjs": "^3.0.3",
         "d3": "^7.9.0",
         "dotenv": "^17.2.3",
+        "drizzle-kit": "^0.31.10",
         "drizzle-orm": "^0.45.2",
         "express": "^4.21.2",
+        "firebase": "^12.15.0",
+        "firebase-admin": "^14.2.0",
         "leaflet": "^1.9.4",
         "lucide-react": "^0.546.0",
         "motion": "^12.23.24",
@@ -39,7 +40,6 @@
         "@types/pg": "^8.21.0",
         "@types/supertest": "^7.2.1",
         "autoprefixer": "^10.4.21",
-        "drizzle-kit": "^0.31.10",
         "esbuild": "^0.25.0",
         "supertest": "^7.2.2",
         "tailwindcss": "^4.1.14",
