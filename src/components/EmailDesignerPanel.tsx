@@ -103,8 +103,8 @@ export const EmailDesignerPanel: React.FC = () => {
   };
 
   // Business profile personalization
-  const companyName = workspaceConfig.agencyName || workspaceConfig.operatorName || 'Rapid Response Pros';
-  const companyPhone = workspaceConfig.contactPhone || '(204) 555-0199';
+  const companyName = workspaceConfig.agencyName || workspaceConfig.operatorName || '';
+  const companyPhone = workspaceConfig.contactPhone || '';
   const companyLogo = workspaceConfig.agencyLogoUrl || '';
   const brandColor = workspaceConfig.brandColor || '#2563EB';
 
@@ -115,16 +115,16 @@ export const EmailDesignerPanel: React.FC = () => {
     businessName: companyName,
     phone: companyPhone,
     logoUrl: companyLogo,
-    headline: `Special Service Priority for ${regionalProfile.city} Homeowners`,
-    subtext: `Get 15% OFF your next certified ${activeNiche || 'priority'} inspection in ${regionalProfile.city}. Use code LOCAL15.`,
-    ctaText: 'Claim Your Priority Slot',
-    ctaLink: workspaceConfig.bookingUrl || 'https://cal.com/hal-strategy',
+    headline: `A note from your service team in ${regionalProfile.city}`,
+    subtext: `Add an approved offer or a factual service update before sending. Do not include discounts, credentials, or guarantees unless the business has confirmed them.`,
+    ctaText: 'Contact Our Team',
+    ctaLink: workspaceConfig.bookingUrl || '',
     ctaBgColor: brandColor,
     ctaTextColor: '#FFFFFF',
     font: 'Inter',
     textColor: '#18181b',
     techImageUrl: 'https://images.unsplash.com/photo-1621905251189-08b45d6a269e?auto=format&fit=crop&w=600&q=80',
-    address: `123 Main St, ${regionalProfile.city}, ${regionalProfile.countryCode}`
+    address: ''
   });
 
   // Pre-configured Personalized Templates
@@ -766,23 +766,23 @@ export const EmailDesignerPanel: React.FC = () => {
               <div className="flex flex-col items-center">
                 <Clock className="w-4 h-4 text-blue-600 mb-1" />
                 <span className="text-[11px] font-bold">Fast & Reliable</span>
-                <span className="text-[9.5px] text-slate-500">24/7 Service</span>
+                <span className="text-[9.5px] text-slate-500">Configure service hours</span>
               </div>
               <div className="flex flex-col items-center">
                 <ShieldCheck className="w-4 h-4 text-blue-600 mb-1" />
-                <span className="text-[11px] font-bold">Licensed & Insured</span>
-                <span className="text-[9.5px] text-slate-500">Peace of mind</span>
+                <span className="text-[11px] font-bold">Licensing & Insurance</span>
+                <span className="text-[9.5px] text-slate-500">Confirm before publishing</span>
               </div>
               <div className="flex flex-col items-center">
                 <Award className="w-4 h-4 text-blue-600 mb-1" />
-                <span className="text-[11px] font-bold">Satisfaction Guaranteed</span>
-                <span className="text-[9.5px] text-slate-500">100% Quality</span>
+                <span className="text-[11px] font-bold">Service Guarantee</span>
+                <span className="text-[9.5px] text-slate-500">Add approved terms</span>
               </div>
             </div>
 
             {/* FOOTER */}
             <div className="p-6 text-center text-slate-400 text-[10.5px] space-y-2 bg-white">
-              <p>You received this email because you are a valued customer of {emailData.businessName}.</p>
+              <p>You are receiving this message because the sender believes it is relevant to your relationship with their business. Confirm lawful consent and unsubscribe handling before sending.</p>
               <div className="flex justify-center gap-3 text-blue-600 font-medium">
                 <span className="hover:underline cursor-pointer">Unsubscribe</span>
                 <span>•</span>
