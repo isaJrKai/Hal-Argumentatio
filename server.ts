@@ -4898,22 +4898,10 @@ app.post('/api/ai/simulate-outreach', authenticate, async (req, res) => {
     
     res.json({ success: true, result: parsedResult });
   } catch (err: any) {
-    console.error("Simulation warning, serving empirical fallback:", err);
-    const targetNiche = niche || 'home_services';
-    const targetChannel = channel || 'multichannel';
-    const isHighIntent = /emergency|leak|repair|freeze|storm/i.test(offer || '');
-    const predictedCpl = isHighIntent ? 32.5 : 46.0;
-    const volume = isHighIntent ? 26 : 19;
-    const confidence = isHighIntent ? 86 : 78;
-
-    res.json({
-      success: true,
-      result: {
-        confidence,
-        predictedCpl,
-        volume,
-        rationale: `HAL Empirical Simulation Engine: Validated for ${targetNiche} across ${targetChannel}. Projected ${volume} conversions at $${predictedCpl} CPL based on historical conversion velocity.`
-      }
+    console.error("Simulation request failed; no synthetic metrics were generated:", err);
+    res.status(503).json({
+      success: false,
+      error: 'Simulation unavailable: the model request failed and no verified fallback metrics exist.'
     });
   }
 });
@@ -4942,7 +4930,8 @@ app.post('/api/ai/test-timesfm', authenticate, async (req, res) => {
     res.json(result);
   } catch (err: any) {
     console.error('TimesFM Brain execution error:', err);
-    res.status(500).json({ error: err.message });
+    const unavailable = String(err?.message || '').includes('Forecast unavailable');
+    res.status(unavailable ? 409 : 500).json({ error: err.message });
   }
 });
 
