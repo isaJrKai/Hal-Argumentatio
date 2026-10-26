@@ -213,8 +213,8 @@ export default function ConnectorsPanel() {
   const [metaToken, setMetaToken] = useState(() => localStorage.getItem('hal_meta_token') || '');
   const [metaAdAccountId, setMetaAdAccountId] = useState(() => localStorage.getItem('hal_meta_ad_account_id') || '');
   const [isTestingMeta, setIsTestingMeta] = useState(false);
-  const [metaStatus, setMetaStatus] = useState<'idle' | 'connected' | 'error'>(() => {
-    return localStorage.getItem('hal_meta_token') ? 'connected' : 'idle';
+  const [metaStatus, setMetaStatus] = useState<'idle' | 'configured' | 'connected' | 'error'>(() => {
+    return localStorage.getItem('hal_meta_token') ? 'configured' : 'idle';
   });
 
   const handleSaveMetaCredentials = async () => {
@@ -758,7 +758,7 @@ export default function ConnectorsPanel() {
               <div className="flex items-center justify-between pt-2">
                 <div className="flex items-center gap-2">
                   <Badge variant={metaStatus === 'connected' ? 'active' : metaStatus === 'error' ? 'danger' : 'neutral'}>
-                    {metaStatus === 'connected' ? 'Authenticated' : metaStatus === 'error' ? 'Invalid Credentials' : 'Not Configured'}
+                    {metaStatus === 'connected' ? 'API validated' : metaStatus === 'configured' ? 'Saved · unverified' : metaStatus === 'error' ? 'Validation failed' : 'Not configured'}
                   </Badge>
                 </div>
 
@@ -841,20 +841,20 @@ export default function ConnectorsPanel() {
                   </div>
                   <div>
                     <h4 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
-                      Google Gemini 2.5 Multi-Modal AI
+                      Google Gemini integration
                     </h4>
                     <p className="text-xs text-zinc-500 mt-0.5">
-                      Primary cognitive engine powering territory audits and market reasoning.
+                      AI provider status depends on configured credentials and a successful live request.
                     </p>
                   </div>
                 </div>
-                <Badge variant="active">
-                  Connected
+                <Badge variant="neutral">
+                  Status not checked
                 </Badge>
               </div>
               <div className="mt-4 pt-3 border-t border-zinc-100 dark:border-zinc-800/60 flex items-center justify-between text-xs text-zinc-500">
-                <span>Model: gemini-2.5-flash</span>
-                <span>Grounded: Google Search API</span>
+                <span>Model: configured at runtime</span>
+                <span>Search grounding: not verified</span>
               </div>
             </Card>
 
@@ -875,12 +875,12 @@ export default function ConnectorsPanel() {
                   </div>
                 </div>
                 <Badge variant="active">
-                  26 Authentic Leads
+                  Lead verification not run
                 </Badge>
               </div>
               <div className="mt-4 pt-3 border-t border-zinc-100 dark:border-zinc-800/60 flex items-center justify-between text-xs text-zinc-500">
-                <span>Mock Seeds: 0 (Purged)</span>
-                <span>Coverage: Calgary & Edmonton</span>
+                <span>Seed status: not checked</span>
+                <span>Coverage: depends on search scope</span>
               </div>
             </Card>
           </div>
