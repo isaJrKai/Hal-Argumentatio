@@ -3651,10 +3651,10 @@ app.post('/api/dispatch/campaign-batch', authenticate, async (req, res) => {
     entityType: 'campaign_dispatch',
     entityId: 'batch_' + Date.now(),
     actor: 'HAL Outreach Dispatcher',
-    details: `Dispatched ${successful} personalized outreach messages via ${channel.toUpperCase()}. CRM state machine transitioned leads to 'contacted'.`,
+    details: `Recorded ${simulated} simulated outreach attempts via ${channel.toUpperCase()}. No external messages were sent and lead statuses were not changed.`,
     metadata: {
       channel,
-      successful,
+      simulated,
       failed,
       totalTargeted: targetLeads.length,
       timestamp: new Date().toISOString()
