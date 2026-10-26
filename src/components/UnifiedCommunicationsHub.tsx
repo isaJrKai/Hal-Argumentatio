@@ -123,7 +123,7 @@ export const UnifiedCommunicationsHub: React.FC<UnifiedCommunicationsHubProps> =
       setSubject('');
       setMessage(`Hi ${owner}, I'm reaching out to ask whether ${biz} is open to discussing ways to improve online visibility and lead follow-up in ${city}. If useful, I can share a brief assessment based on publicly available information. Would you be interested?`);
     } else if (activeChannel === 'email') {
-      setSubject(`Performance diagnostic & emergency call capture for ${biz} (${city})`);
+      setSubject(`Introductory conversation about online visibility — ${biz}`);
       setMessage(`Hi ${owner},\n\nI'm contacting ${biz} about potential ways to improve online visibility and lead follow-up in ${city}. I have not completed a verified technical audit, so I don't want to assume there is a specific problem.\n\nIf you're interested, I can review publicly available information and share evidence-based findings before recommending any changes.\n\nWould you be open to a brief conversation?\n\nRegards,\n${workspaceConfig.operatorName || 'HAL Team'}`);
     } else if (activeChannel === 'sms') {
       setSubject('');
@@ -489,7 +489,7 @@ export const UnifiedCommunicationsHub: React.FC<UnifiedCommunicationsHubProps> =
               <div className="text-right">
                 <span className="text-[10px] text-slate-500 uppercase tracking-wider block font-semibold">Destination</span>
                 <span className="font-mono text-amber-400 font-bold">
-                  {activeChannel === 'email' ? (selectedLead.email || 'Email on file') : (selectedLead.phone || 'Phone on file')}
+                  {activeChannel === 'email' ? (selectedLead.email || 'Not provided') : (selectedLead.phone || 'Not provided')}
                 </span>
               </div>
             </div>
@@ -548,7 +548,7 @@ export const UnifiedCommunicationsHub: React.FC<UnifiedCommunicationsHubProps> =
               ) : (
                 <>
                   <Send className="w-4 h-4" />
-                  <span>Transmit via {activeChannel.toUpperCase()}</span>
+                  <span>Record simulated dispatch</span>
                 </>
               )}
             </button>
@@ -589,9 +589,9 @@ export const UnifiedCommunicationsHub: React.FC<UnifiedCommunicationsHubProps> =
                   </div>
                 </div>
                 <div className="flex items-center gap-4 text-[11px]">
-                  <span className="text-slate-400 font-mono hidden sm:inline">{item.providerId}</span>
-                  <span className="text-emerald-400 font-semibold flex items-center gap-1">
-                    <CheckCircle2 className="w-3.5 h-3.5" /> Delivered
+                  <span className="text-slate-400 font-mono hidden sm:inline">{item.providerId || 'Simulation only'}</span>
+                  <span className="text-slate-400 font-semibold flex items-center gap-1">
+                    <CheckCircle2 className="w-3.5 h-3.5" /> {item.status === "delivered" ? "Delivered" : "Simulation recorded"}
                   </span>
                   <span className="text-slate-500 font-mono text-[10px]">
                     {new Date(item.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
