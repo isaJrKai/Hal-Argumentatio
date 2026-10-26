@@ -7987,7 +7987,7 @@ async function startServer() {
       
       const verification = verifyPhase2Pillars(allLeads as any);
       const quadrants = calculateSpatialQuadrants(allLeads as any);
-      const defaultAudit = auditCompetitorFootprint('Calgary', 'commercial roofing');
+      const competitorAuditStatus = {\n        status: 'UNAVAILABLE_NO_VERIFIED_SOURCE',\n        message: 'Competitor rankings, ratings, reviews, performance, and spend are unavailable until a verified data source is configured.'\n      };
 
       const ledgerEntries = db.getStructuredLedger(contractorId, 20);
       const recentAudits = ledgerEntries.filter(e => e.eventType === 'competitor_audit_completed' || e.eventType === 'lead_harvested');
@@ -7999,7 +7999,7 @@ async function startServer() {
         phase2Verified: verification.allPassed,
         verification,
         quadrants,
-        competitorAuditSample: defaultAudit,
+        competitorAuditSample: null,\n        competitorAuditStatus,
         recentIntelligenceEvents: recentAudits,
         integrity
       });
@@ -8024,7 +8024,7 @@ async function startServer() {
         entityType: 'roadmap_milestone',
         entityId: 'p2_verify_' + Date.now(),
         actor: 'HAL Roadmap Phase 2 Auditor',
-        details: 'Executed cryptographic verification across Phase 2: Local Harvesting, Spatial Geo Scoring, and Competitor Footprints',
+        details: 'Ran Phase 2 evidence checks. Capabilities without verified source data remain pending.',
         metadata: {
           pillar1: verification.pillar1.status,
           pillar2: verification.pillar2.status,
