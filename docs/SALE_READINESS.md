@@ -62,6 +62,8 @@ The current preview uses an ai.studio subdomain. Treat it as platform-managed un
 
 Third-party dependencies and provider accounts may require the buyer to create their own accounts and API keys. Do not promise transfer of an account or subscription that is not explicitly owned and transferable.
 
+The legacy JSON-to-PostgreSQL sync scripts now require an explicit private export path through HAL_SOURCE_JSON (or the legacy default path if a local file exists). Review their idempotency and transaction behaviour before running them; a database backup is mandatory.
+
 ## Buyer handover pack
 
 Provide these only after checking they contain no secrets or private data:
