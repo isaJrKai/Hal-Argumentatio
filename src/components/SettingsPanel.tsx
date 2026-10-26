@@ -1359,7 +1359,7 @@ export default function SettingsPanel({
         <div className="flex items-center justify-between border-b pb-3 border-inherit">
           <div className="flex items-center gap-2">
             <Globe className="w-4 h-4 text-brand" />
-            <span className="text-xs font-mono uppercase tracking-wider font-bold">Public Share & Reddit Testing Shield</span>
+            <span className="text-xs font-mono uppercase tracking-wider font-bold">Public Link Controls</span>
           </div>
           <span className={`text-[10px] font-mono px-2 py-0.5 rounded border uppercase font-bold ${
             publicLinkMode === 'safe_sandbox' 
@@ -1378,14 +1378,11 @@ export default function SettingsPanel({
           Public-link controls are best-effort and must not be treated as an authentication boundary. A verified deployment URL is shown only when APP_URL is configured. Public demo access is disabled by default; do not share a link until deployment and access controls have been tested.
         </p>
         {publicLinkError && <div role="alert" className="p-3 text-xs rounded border border-red-500/30 text-red-400">{publicLinkError}</div>}
-        <p className="hidden">
-        </p>
-
         {/* Share Link Bar */}
         <div className={`border rounded p-3 flex items-center justify-between gap-3 ${innerBg} ${borderCol}`}>
           <div className="min-w-0 flex-1">
             <div className="text-[10px] font-mono opacity-70 uppercase tracking-wider font-bold mb-1">
-              Public Safe Link for Reddit / Beta Testers
+              Configured deployment URL
             </div>
             <div className="text-xs font-mono text-brand truncate font-bold">
               {sharedUrl || 'No verified public URL configured'}
