@@ -1,6 +1,25 @@
 import React, { useState } from 'react';
 import { motion } from 'motion/react';
-import { Shield, Eye, EyeOff, Loader2, Sparkles, Download } from 'lucide-react';
+import { Shield, Eye, EyeOff, Loader2 } from 'lucide-react';
+
+async function parseApiResponse(res: Response): Promise<any> {
+  const contentType = res.headers.get('content-type') || '';
+  const body = await res.text();
+
+  if (!contentType.toLowerCase().includes('application/json')) {
+    throw new Error(
+      res.ok
+        ? 'The server returned an unexpected response. Please refresh and try again.'
+        : `The server could not complete the request (HTTP ${res.status}). Please try again later.`
+    );
+  }
+
+  try {
+    return JSON.parse(body);
+  } catch {
+    throw new Error('The server returned an invalid response. Please try again later.');
+  }
+}
 
 interface AuthPageProps {
   onAuthSuccess: (token: string, contractor: any) => void;
@@ -22,43 +41,6 @@ export default function AuthPage({ onAuthSuccess }: AuthPageProps) {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
-  const [isAppInstalled, setIsAppInstalled] = useState<boolean>(() => {
-    if (typeof window === 'undefined') return false;
-    return localStorage.getItem('hal_app_installed') === 'true' ||
-      window.matchMedia('(display-mode: standalone)').matches ||
-      (window.navigator as any).standalone === true;
-  });
-
-  const handleDownloadApp = () => {
-    const currentUrl = window.location.origin;
-    const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPod|iPad/.test(navigator.userAgent);
-    const isLinux = typeof navigator !== 'undefined' && /Linux/.test(navigator.userAgent) && !/Android/.test(navigator.userAgent);
-    
-    let filename = 'HALBiz.url';
-    let content = `[InternetShortcut]\nURL=${currentUrl}\nIconIndex=0\nIconFile=${currentUrl}/icon.jpg\n`;
-    let type = 'text/plain';
-
-    if (isMac) {
-      filename = 'HALBiz.webloc';
-      content = `<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">\n<plist version="1.0">\n<dict>\n\t<key>URL</key>\n\t<string>${currentUrl}</string>\n</dict>\n</plist>\n`;
-    } else if (isLinux) {
-      filename = 'HALBiz.desktop';
-      content = `[Desktop Entry]\nName=HALBiz\nComment=AI Business Operating Intelligence System\nExec=xdg-open ${currentUrl}\nIcon=utilities-terminal\nTerminal=false\nType=Application\nCategories=Office;Development;\n`;
-    }
-
-    const blob = new Blob([content], { type });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = filename;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-
-    setIsAppInstalled(true);
-    localStorage.setItem('hal_app_installed', 'true');
-  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -76,7 +58,7 @@ export default function AuthPage({ onAuthSuccess }: AuthPageProps) {
         body: JSON.stringify(payload)
       });
 
-      const data = await res.json();
+      const data = await parseApiResponse(res);
       
       if (!res.ok) {
         throw new Error(data.error || 'Authentication failed');
@@ -104,13 +86,13 @@ export default function AuthPage({ onAuthSuccess }: AuthPageProps) {
         body: JSON.stringify({ email })
       });
 
-      const data = await res.json();
+      const data = await parseApiResponse(res);
 
       if (!res.ok) {
         throw new Error(data.error || 'Failed to request reset token');
       }
 
-      setSuccess(data.message + (data.debugToken ? ` (Development Debug Token: ${data.debugToken})` : ''));
+      setSuccess(data.message || 'If the account exists, password-reset instructions will be provided.');
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -118,51 +100,10 @@ export default function AuthPage({ onAuthSuccess }: AuthPageProps) {
     }
   };
 
-  const handleResetPassword = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    setError(null);
-    setSuccess(null);
 
-    try {
-      const res = await fetch('/api/auth/reset-password', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token: email, password }) // email holds reset token in this sandbox form
-      });
-
-      const data = await res.json();
-
-      if (!res.ok) {
-        throw new Error(data.error || 'Password reset failed');
-      }
-
-      setSuccess('Password updated successfully. You can now login with your new credentials.');
-      setShowForgotPassword(false);
-      setIsLogin(true);
-      setEmail('');
-      setPassword('');
-    } catch (err: any) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   return (
     <div className="min-height-screen min-h-screen bg-bg-dark flex items-center justify-center p-6 font-sans selection:bg-brand selection:text-black relative">
-      {/* Download App Button (Disappears after download) */}
-      {!isAppInstalled && (
-        <button
-          id="auth-download-app-btn"
-          onClick={handleDownloadApp}
-          className="absolute top-5 right-5 z-20 flex items-center gap-2 px-3 py-1.5 rounded bg-brand/15 hover:bg-brand/25 border border-brand/40 text-brand text-xs font-mono font-bold transition-all cursor-pointer shadow-lg hover:scale-105 active:scale-95"
-          title="Download HAL Desktop App (Disappears after download)"
-        >
-          <Download className="w-3.5 h-3.5 text-brand" />
-          <span>DOWNLOAD APP</span>
-        </button>
-      )}
 
       {/* Decorative ambient blobs */}
       <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-brand/5 rounded-full blur-[120px] pointer-events-none" />
@@ -182,10 +123,10 @@ export default function AuthPage({ onAuthSuccess }: AuthPageProps) {
 
         <div className="text-center mb-8">
           <h1 className="text-2xl font-bold tracking-tight text-white flex items-center justify-center gap-2">
-            HALBIZ <span className="text-[10px] font-mono bg-brand-glow text-brand border border-brand/30 px-2 py-0.5 rounded-sm font-bold">V1.2</span>
+            HALBIZ
           </h1>
           <p className="text-xs font-mono uppercase tracking-widest text-text-secondary mt-2">
-            AI Business Operating Intelligence System
+            Business workspace
           </p>
         </div>
 
@@ -210,36 +151,22 @@ export default function AuthPage({ onAuthSuccess }: AuthPageProps) {
         )}
 
         {showForgotPassword ? (
-          <form onSubmit={email.length > 20 ? handleResetPassword : handleForgotPassword} className="space-y-4">
+          <form onSubmit={handleForgotPassword} className="space-y-4">
             <div>
               <label className="block text-[10px] font-mono uppercase tracking-wider text-text-secondary mb-1.5">
-                {email.length > 20 ? "Reset Token" : "Email Address"}
+                Email Address
               </label>
               <input
-                type="text"
+                type="email"
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder={email.length > 20 ? "Paste token here..." : "you@company.com"}
+                placeholder="you@company.com"
                 className="w-full bg-card-inner border border-border-dark rounded-sm py-2 px-3 text-sm text-text-primary placeholder-text-dim focus:outline-none focus:border-brand transition-colors font-sans"
               />
             </div>
 
-            {email.length > 20 && (
-              <div>
-                <label className="block text-[10px] font-mono uppercase tracking-wider text-text-secondary mb-1.5">
-                  New Password
-                </label>
-                <input
-                  type="password"
-                  required
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••"
-                  className="w-full bg-card-inner border border-border-dark rounded-sm py-2 px-3 text-sm text-text-primary placeholder-text-dim focus:outline-none focus:border-brand transition-colors"
-                />
-              </div>
-            )}
+
 
             <button
               type="submit"
@@ -248,10 +175,8 @@ export default function AuthPage({ onAuthSuccess }: AuthPageProps) {
             >
               {loading ? (
                 <Loader2 className="w-4 h-4 animate-spin" />
-              ) : email.length > 20 ? (
-                'Reset Password'
               ) : (
-                'Dispatch Reset Link'
+                'Send password reset instructions'
               )}
             </button>
 
@@ -281,7 +206,7 @@ export default function AuthPage({ onAuthSuccess }: AuthPageProps) {
                   required
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  placeholder="e.g., Isaac"
+                  placeholder="Your full name"
                   className="w-full bg-card-inner border border-border-dark rounded-sm py-2 px-3 text-sm text-text-primary placeholder-text-dim focus:outline-none focus:border-brand transition-colors"
                 />
               </div>
@@ -374,7 +299,7 @@ export default function AuthPage({ onAuthSuccess }: AuthPageProps) {
         )}
 
         <p className="mt-6 border-t border-border-dark pt-4 text-center text-xs text-text-dim">
-          Use your own account credentials. Default demo credentials are not provided.
+          Sign in with your registered account. Password recovery and external sign-in are available only when configured by the administrator.
         </p>
       </motion.div>
     </div>

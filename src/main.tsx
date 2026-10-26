@@ -9,6 +9,7 @@ import '@fontsource/jetbrains-mono/400.css';
 import '@fontsource/jetbrains-mono/500.css';
 import App from './App.tsx';
 import './index.css';
+import './ui-quality-pass.css';
 import { BusinessProvider } from './context/BusinessContext.tsx';
 import { ToastProvider } from './context/ToastContext.tsx';
 import { APIProvider } from '@vis.gl/react-google-maps';
