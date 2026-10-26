@@ -312,7 +312,7 @@ export default function PublicAuditPage({ auditId, onNavigateToLogin }: PublicAu
             </div>
 
             <div className="text-left sm:text-right font-mono">
-              <span className="text-[10px] text-text-secondary uppercase block">Estimated Leaking Revenue</span>
+              <span className="text-[10px] text-text-secondary uppercase block">Scenario Estimate — Not a Forecast</span>
               <span className="text-2xl font-black text-rose-400 tracking-tight">
                 {estimatedAnnualLostRevenue == null ? 'Not available' : `-${estimatedAnnualLostRevenue.toLocaleString()} / year`}
               </span>
