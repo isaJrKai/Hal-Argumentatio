@@ -97,6 +97,16 @@ label,
   line-height: 1.55;
 }
 
+/* Keep panel children shrinkable so long content respects its layout. */
+:where(.flex > *, .inline-flex > *, .grid > *) {
+  min-width: 0;
+}
+
+/* Improve rhythm without forcing the original typographic scale to change. */
+:where(p, li, dd, dt) {
+  line-height: 1.55;
+}
+
 /* One restrained product accent; semantic colors remain reserved for status and risk. */
 .badge-active {
   color: var(--color-positive);
