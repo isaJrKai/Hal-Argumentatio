@@ -297,7 +297,7 @@ export const HalRoadmapPhase3View: React.FC = () => {
     dealValue: 0,
     timestamp: new Date().toISOString()
   };
-  const sampleSignature = signWebhookPayload(testWebhookSecret, samplePayload);
+  const sampleSignature = testWebhookSecret ? signWebhookPayload(testWebhookSecret, samplePayload) : '';
 
   const p1 = statusData?.verification?.pillar1;
   const p2 = statusData?.verification?.pillar2;
@@ -392,10 +392,10 @@ export const HalRoadmapPhase3View: React.FC = () => {
               <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" />
             </div>
             <div className="text-sm font-bold text-text-primary truncate">
-              {statusData?.integrity?.totalEntries || 12} Blocks Sequenced
+              {statusData?.integrity?.totalEntries ?? 0} Recorded Blocks
             </div>
             <div className="text-[10px] font-mono text-emerald-500 font-semibold">
-              HASH CHAIN INTACT
+              {statusData?.integrity?.valid ? 'HASH CHAIN VERIFIED' : 'HASH CHAIN NOT VERIFIED'}
             </div>
           </div>
         </div>
@@ -405,10 +405,10 @@ export const HalRoadmapPhase3View: React.FC = () => {
           <div className="mt-4 p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-between text-xs">
             <div className="flex items-center gap-2 text-emerald-600 dark:text-emerald-400 font-medium">
               <CheckCircle2 className="w-4 h-4 shrink-0" />
-              <span>Phase 3 Automation Verification Complete: All 3 Pillars Passed Invariant Audit</span>
+              <span>{verificationResult.allPassed ? 'Phase 3 verification passed all required checks.' : 'Phase 3 verification is incomplete; one or more checks failed.'}</span>
             </div>
             <span className="font-mono text-[10px] text-emerald-500">
-              BLOCK #{verificationResult.block?.sequenceNumber || 'VERIFIED'}
+              BLOCK #{verificationResult.block?.sequenceNumber ?? 'NO BLOCK'}
             </span>
           </div>
         )}
