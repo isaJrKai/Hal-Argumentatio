@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion } from 'motion/react';
-import { Shield, Eye, EyeOff, Loader2, Sparkles } from 'lucide-react';
+import { Shield, Eye, EyeOff, Loader2 } from 'lucide-react';
 
 async function parseApiResponse(res: Response): Promise<any> {
   const contentType = res.headers.get('content-type') || '';
@@ -100,36 +100,7 @@ export default function AuthPage({ onAuthSuccess }: AuthPageProps) {
     }
   };
 
-  const handleResetPassword = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    setError(null);
-    setSuccess(null);
 
-    try {
-      const res = await fetch('/api/auth/reset-password', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token: email, password }) // email holds reset token in this sandbox form
-      });
-
-      const data = await parseApiResponse(res);
-
-      if (!res.ok) {
-        throw new Error(data.error || 'Password reset failed');
-      }
-
-      setSuccess('Password updated successfully. You can now login with your new credentials.');
-      setShowForgotPassword(false);
-      setIsLogin(true);
-      setEmail('');
-      setPassword('');
-    } catch (err: any) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   return (
     <div className="min-height-screen min-h-screen bg-bg-dark flex items-center justify-center p-6 font-sans selection:bg-brand selection:text-black relative">
@@ -152,10 +123,10 @@ export default function AuthPage({ onAuthSuccess }: AuthPageProps) {
 
         <div className="text-center mb-8">
           <h1 className="text-2xl font-bold tracking-tight text-white flex items-center justify-center gap-2">
-            HALBIZ <span className="text-[10px] font-mono bg-brand-glow text-brand border border-brand/30 px-2 py-0.5 rounded-sm font-bold">V1.2</span>
+            HALBIZ
           </h1>
           <p className="text-xs font-mono uppercase tracking-widest text-text-secondary mt-2">
-            AI Business Operating Intelligence System
+            Business workspace
           </p>
         </div>
 
@@ -180,36 +151,22 @@ export default function AuthPage({ onAuthSuccess }: AuthPageProps) {
         )}
 
         {showForgotPassword ? (
-          <form onSubmit={email.length > 20 ? handleResetPassword : handleForgotPassword} className="space-y-4">
+          <form onSubmit={handleForgotPassword} className="space-y-4">
             <div>
               <label className="block text-[10px] font-mono uppercase tracking-wider text-text-secondary mb-1.5">
-                {email.length > 20 ? "Reset Token" : "Email Address"}
+                Email Address
               </label>
               <input
-                type="text"
+                type="email"
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder={email.length > 20 ? "Paste token here..." : "you@company.com"}
+                placeholder="you@company.com"
                 className="w-full bg-card-inner border border-border-dark rounded-sm py-2 px-3 text-sm text-text-primary placeholder-text-dim focus:outline-none focus:border-brand transition-colors font-sans"
               />
             </div>
 
-            {email.length > 20 && (
-              <div>
-                <label className="block text-[10px] font-mono uppercase tracking-wider text-text-secondary mb-1.5">
-                  New Password
-                </label>
-                <input
-                  type="password"
-                  required
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••"
-                  className="w-full bg-card-inner border border-border-dark rounded-sm py-2 px-3 text-sm text-text-primary placeholder-text-dim focus:outline-none focus:border-brand transition-colors"
-                />
-              </div>
-            )}
+
 
             <button
               type="submit"
@@ -218,10 +175,8 @@ export default function AuthPage({ onAuthSuccess }: AuthPageProps) {
             >
               {loading ? (
                 <Loader2 className="w-4 h-4 animate-spin" />
-              ) : email.length > 20 ? (
-                'Reset Password'
               ) : (
-                'Dispatch Reset Link'
+                'Send password reset instructions'
               )}
             </button>
 
@@ -251,7 +206,7 @@ export default function AuthPage({ onAuthSuccess }: AuthPageProps) {
                   required
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  placeholder="e.g., Isaac"
+                  placeholder="Your full name"
                   className="w-full bg-card-inner border border-border-dark rounded-sm py-2 px-3 text-sm text-text-primary placeholder-text-dim focus:outline-none focus:border-brand transition-colors"
                 />
               </div>
@@ -344,7 +299,7 @@ export default function AuthPage({ onAuthSuccess }: AuthPageProps) {
         )}
 
         <p className="mt-6 border-t border-border-dark pt-4 text-center text-xs text-text-dim">
-          Use your own account credentials. Default demo credentials are not provided.
+          Sign in with your registered account. Password recovery and external sign-in are available only when configured by the administrator.
         </p>
       </motion.div>
     </div>
