@@ -9,12 +9,12 @@ This document separates observed repository facts from work that still needs evi
 - Stack visible in the repository: React, TypeScript, Vite, Node.js/Express, PostgreSQL, Drizzle ORM, Vitest
 - Source includes AI provider integrations, MCP-related code, skill modules, database schemas, documentation, and tests.
 - Package scripts exist for build, TypeScript checking, and multiple test groups.
-- A root README and sale-readiness handover document have now been added on the preparation branch.
-- GitHub Actions CI is active on the preparation pull request; the build and test results are tracked in the pull request checks.
+- A root README and sale-readiness handover document are now merged into `main`.
+- GitHub Actions CI runs on pushes to `main`; the latest merge commit has a passing CI run.
 
 **Important:** The latest GitHub Actions run passed `npm ci`, `npm run test:ci`, the production build, and the production dependency audit. The production dependency audit reported **0 vulnerable packages**. The full audit still reports four high-severity Firebase-related packages from orphaned legacy lockfile entries; the app now imports only `@firebase/app` and `@firebase/auth`, and `firebase`/`firebase-admin` are no longer root dependencies, but a clean regenerated lockfile is still needed to eliminate those stale entries. Live end-to-end verification, database restore, full tenant-isolation review, and production deployment have not been demonstrated.
 
-The unified outreach UI previously displayed fabricated provider connection states and sample performance figures. The current branch removes fabricated pipeline, conversion, outreach, lead-assessment, and activity figures and labels the unified dispatch route as simulation-only; no provider delivery is claimed. Provider adapters, callback/event tracking, webhook SSRF protection, durable encrypted per-account credential storage, and end-to-end tests remain release work.
+The unified outreach UI previously displayed fabricated provider connection states and sample performance figures. The merged `main` revision removes or relabels fabricated pipeline, conversion, outreach, lead-assessment, and activity figures and labels the unified dispatch route as simulation-only; no provider delivery is claimed. Provider adapters, callback/event tracking, webhook SSRF protection, durable encrypted per-account credential storage, and end-to-end tests remain release work.
 
 CORS and webhook safeguards were tightened on this branch: browser origins are allowlisted, outbound webhook targets require a dedicated signing secret and explicit HTTPS host allowlist, redirects are not followed, and inbound WhatsApp callbacks require HMAC verification. These changes still require end-to-end testing with a real provider account.
 
