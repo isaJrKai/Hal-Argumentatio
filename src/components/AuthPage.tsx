@@ -220,7 +220,7 @@ export default function AuthPage({ onAuthSuccess }: AuthPageProps) {
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder={email.length > 20 ? "Paste token here..." : "e.g., admin@kaislead.com"}
+                placeholder={email.length > 20 ? "Paste token here..." : "you@company.com"}
                 className="w-full bg-card-inner border border-border-dark rounded-sm py-2 px-3 text-sm text-text-primary placeholder-text-dim focus:outline-none focus:border-brand transition-colors font-sans"
               />
             </div>
@@ -296,7 +296,7 @@ export default function AuthPage({ onAuthSuccess }: AuthPageProps) {
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="e.g., admin@kaislead.com"
+                placeholder="you@company.com"
                 className="w-full bg-card-inner border border-border-dark rounded-sm py-2 px-3 text-sm text-text-primary placeholder-text-dim focus:outline-none focus:border-brand transition-colors"
               />
             </div>
