@@ -7987,7 +7987,10 @@ async function startServer() {
       
       const verification = verifyPhase2Pillars(allLeads as any);
       const quadrants = calculateSpatialQuadrants(allLeads as any);
-      const competitorAuditStatus = {\n        status: 'UNAVAILABLE_NO_VERIFIED_SOURCE',\n        message: 'Competitor rankings, ratings, reviews, performance, and spend are unavailable until a verified data source is configured.'\n      };
+      const competitorAuditStatus = {
+        status: 'UNAVAILABLE_NO_VERIFIED_SOURCE',
+        message: 'Competitor rankings, ratings, reviews, performance, and spend are unavailable until a verified data source is configured.'
+      };
 
       const ledgerEntries = db.getStructuredLedger(contractorId, 20);
       const recentAudits = ledgerEntries.filter(e => e.eventType === 'competitor_audit_completed' || e.eventType === 'lead_harvested');
