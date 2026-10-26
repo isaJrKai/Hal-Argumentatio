@@ -2,6 +2,8 @@ import { describe, it, expect } from 'vitest';
 import crypto from 'crypto';
 import { verifyToken, signToken, getJwtSecret } from '../../src/lib/auth';
 
+process.env.JWT_SECRET ||= 'hal-test-only-jwt-secret-do-not-use-outside-tests';
+
 describe('Security: Authentication & Fail-Open Regression Tests', () => {
   describe('JWT Secret Audit', () => {
     it('verifies that a non-empty JWT secret is configured', () => {
