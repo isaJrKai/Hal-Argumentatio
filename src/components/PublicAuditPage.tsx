@@ -94,13 +94,11 @@ export default function PublicAuditPage({ auditId, onNavigateToLogin }: PublicAu
     }
   }, [auditId]);
 
-  // Derived calculations:
-  // Google benchmarks show mobile bounce increases by 32% as page load goes from 1s to 3s, and 90% if >5s.
-  const perfScore = data?.performanceScore ?? null;
-  const bouncePenaltyPct = perfScore == null ? null : perfScore < 50 ? 0.38 : perfScore < 75 ? 0.22 : 0.08;
-  const currentConversionRate = 0.025; // illustrative assumption, not a measured site conversion rate
-  const estimatedLostLeadsPerMonth = bouncePenaltyPct == null ? null : Math.round(monthlyVisitors * bouncePenaltyPct * currentConversionRate);
-  const estimatedAnnualLostRevenue = estimatedLostLeadsPerMonth == null ? null : Math.round(estimatedLostLeadsPerMonth * avgTicketValue * 12);
+  // Scenario calculations only: these assumptions are not measured business results.
+  const assumedBounceRate = 0.22;
+  const currentConversionRate = 0.025;
+  const estimatedLostLeadsPerMonth = Math.round(monthlyVisitors * assumedBounceRate * currentConversionRate);
+  const estimatedAnnualLostRevenue = Math.round(estimatedLostLeadsPerMonth * avgTicketValue * 12);
 
   const handleBookingSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -395,7 +393,7 @@ export default function PublicAuditPage({ auditId, onNavigateToLogin }: PublicAu
           <div className="flex items-center gap-2 border-b border-border-dim pb-4">
             <Award className="w-5 h-5 text-indigo-400" />
             <h3 className="text-base font-mono font-bold text-text-primary uppercase tracking-tight">
-              Recommended Optimization Strategy for {data.city}
+              Suggested Review Areas for {data.city}
             </h3>
           </div>
 
@@ -406,7 +404,7 @@ export default function PublicAuditPage({ auditId, onNavigateToLogin }: PublicAu
                 <span>1. Core Web Vitals & Mobile Speed Fix</span>
               </div>
               <p className="text-[11px] text-text-secondary leading-relaxed">
-                Compress hero imagery, defer blocking scripts, and load page styles within 1.2 seconds to satisfy Google's mobile ranking algorithm.
+                Potential checks include image weight, render-blocking resources, and measured Core Web Vitals. No issue is asserted until the site is tested.
               </p>
             </div>
 
@@ -416,7 +414,7 @@ export default function PublicAuditPage({ auditId, onNavigateToLogin }: PublicAu
                 <span>2. Instant Click-to-Call & Quote Friction</span>
               </div>
               <p className="text-[11px] text-text-secondary leading-relaxed">
-                Add persistent 1-tap emergency calling and high-converting 2-step estimate forms for local homeowners searching on mobile.
+                Review whether contact actions are visible, accessible, and easy to complete on mobile.
               </p>
             </div>
 
@@ -426,7 +424,7 @@ export default function PublicAuditPage({ auditId, onNavigateToLogin }: PublicAu
                 <span>3. Local Map Pack & Reputation Sync</span>
               </div>
               <p className="text-[11px] text-text-secondary leading-relaxed">
-                Optimize Google My Business category tags, local schema markup, and showcase recent 5-star customer reviews directly in search previews.
+                Review local business details, structured data, and current public reviews where these data sources are available.
               </p>
             </div>
 
@@ -436,7 +434,7 @@ export default function PublicAuditPage({ auditId, onNavigateToLogin }: PublicAu
                 <span>4. Automated Lead Notification Router</span>
               </div>
               <p className="text-[11px] text-text-secondary leading-relaxed">
-                Send incoming quote inquiries directly to your team's mobile via instant SMS dispatch to close jobs before competitors respond.
+                Review lead-notification options after a messaging provider has been configured and delivery has been tested.
               </p>
             </div>
           </div>
@@ -451,7 +449,7 @@ export default function PublicAuditPage({ auditId, onNavigateToLogin }: PublicAu
             Schedule a 15-Minute Technical Review Call
           </h2>
           <p className="text-xs sm:text-sm text-text-secondary max-w-lg mx-auto font-mono leading-relaxed">
-            We will walk through your live site architecture, show the exact scripts causing mobile lag, and outline a simple fix plan.
+            Request a technical review. Findings will be based on an actual assessment; this report does not claim unmeasured site issues.
           </p>
 
           <div className="flex flex-col sm:flex-row justify-center items-center gap-3 pt-2">
@@ -488,7 +486,7 @@ export default function PublicAuditPage({ auditId, onNavigateToLogin }: PublicAu
         {/* FOOTER */}
         <footer className="pt-8 border-t border-border-dim text-center font-mono text-xs text-text-tertiary space-y-2">
           <p>© {new Date().getFullYear()} {workspaceConfig.agencyName}. All Rights Reserved.</p>
-          <p className="text-[10px]">Confidential Business Performance Audit prepared by {workspaceConfig.operatorName}.</p>
+          <p className="text-[10px]">Technical assessment report prepared by {workspaceConfig.operatorName}.</p>
           {onNavigateToLogin && (
             <div className="pt-3">
               <button
