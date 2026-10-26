@@ -1367,10 +1367,10 @@ export default function OverviewPanel({
                       <td className="py-2.5 text-[10px] font-mono text-text-tertiary">{act.time}</td>
                       <td className="py-2.5 text-right">
                         <span className={`inline-block text-[9px] font-mono px-2 py-0.5 rounded border font-semibold ${
-                          act.status === 'New' ? 'bg-accent-dim text-accent border-accent/20' :
-                          act.status === 'Completed' ? 'bg-positive-dim text-positive border-positive/20' :
-                          act.status === 'Sent' ? 'bg-info-dim text-info border-info/20' :
-                          act.status === 'Positive' ? 'bg-positive-dim text-positive border-positive/20' :
+                          act.status === 'new' ? 'bg-accent-dim text-accent border-accent/20' :
+                          act.status === 'converted' ? 'bg-positive-dim text-positive border-positive/20' :
+                          act.status === 'contacted' ? 'bg-info-dim text-info border-info/20' :
+                          act.status === 'dead' ? 'bg-negative-dim text-negative border-negative/20' :
                           'bg-warning-dim text-warning border-warning/20'
                         }`}>
                           {act.status}
