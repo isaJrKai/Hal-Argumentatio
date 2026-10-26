@@ -8416,7 +8416,7 @@ async function startServer() {
 
   // 6. Phase 3 Live Outbox Delivery Bridge - Status & Queue
   app.get('/api/roadmap/phase3/outbox-queue', authenticate, async (req, res) => {
-    const contractorId = (req as any).contractorId || (req as any).user?.id || 'demo_contractor';
+    const contractorId = (req as any).contractorId;
 
     try {
       const records = await pgDb.select().from(conversionOutbox).where(eq(conversionOutbox.contractorId, contractorId)).limit(50);
@@ -8484,7 +8484,7 @@ async function startServer() {
 
   // 7. Phase 3 Live Outbox Delivery Bridge - Immediate Dispatch
   app.post('/api/roadmap/phase3/live-dispatch', authenticate, async (req, res) => {
-    const contractorId = (req as any).contractorId || (req as any).user?.id || 'demo_contractor';
+    const contractorId = (req as any).contractorId;
     const {
       channel = 'email',
       recipient,
@@ -8999,7 +8999,7 @@ async function startServer() {
   // GET /api/roadmap/phase5/status
   app.get('/api/roadmap/phase5/status', authenticate, async (req, res) => {
     try {
-      const contractorId = (req as any).contractorId || (req as any).user?.id || 'demo_contractor';
+      const contractorId = (req as any).contractorId;
       const allLeads = await pgDb.select().from(leads).where(eq(leads.contractorId, contractorId));
       const totalLeadsCount = allLeads.length;
       const syntheticLeadsCount = allLeads.filter(l => l.isSynthetic).length;
@@ -9041,7 +9041,7 @@ async function startServer() {
   // POST /api/roadmap/phase5/verify
   app.post('/api/roadmap/phase5/verify', authenticate, async (req, res) => {
     try {
-      const contractorId = (req as any).contractorId || (req as any).user?.id || 'demo_contractor';
+      const contractorId = (req as any).contractorId;
       const allLeads = await pgDb.select().from(leads).where(eq(leads.contractorId, contractorId));
       const totalLeadsCount = allLeads.length;
       const syntheticLeadsCount = allLeads.filter(l => l.isSynthetic).length;
@@ -9095,7 +9095,7 @@ async function startServer() {
   // POST /api/roadmap/phase5/sync-brain
   app.post('/api/roadmap/phase5/sync-brain', authenticate, async (req, res) => {
     try {
-      const contractorId = (req as any).contractorId || (req as any).user?.id || 'demo_contractor';
+      const contractorId = (req as any).contractorId;
       const brainLayers = evaluateBrainSynchronization();
 
       const auditBlock = db.recordLedgerEntry({
@@ -9127,7 +9127,7 @@ async function startServer() {
   // POST /api/roadmap/phase5/federate-regions
   app.post('/api/roadmap/phase5/federate-regions', authenticate, async (req, res) => {
     try {
-      const contractorId = (req as any).contractorId || (req as any).user?.id || 'demo_contractor';
+      const contractorId = (req as any).contractorId;
       const edgeRegions = getDefaultEdgeRegions();
 
       const auditBlock = db.recordLedgerEntry({
@@ -9158,7 +9158,7 @@ async function startServer() {
   // POST /api/roadmap/phase5/propagate-ontology
   app.post('/api/roadmap/phase5/propagate-ontology', authenticate, async (req, res) => {
     try {
-      const contractorId = (req as any).contractorId || (req as any).user?.id || 'demo_contractor';
+      const contractorId = (req as any).contractorId;
       const ontologies = getDefaultBusinessOntologies();
 
       const auditBlock = db.recordLedgerEntry({
