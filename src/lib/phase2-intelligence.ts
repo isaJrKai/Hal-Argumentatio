@@ -115,7 +115,9 @@ export function verifyPhase2Pillars(
     }
   }
 
-  const piiCheckPassed = totalLeads > 0 && !hasPlaintextLeak;\n  // The current input does not include verifiable source provenance.\n  const pillar1Verified = false;
+  const piiCheckPassed = totalLeads > 0 && !hasPlaintextLeak;
+  // The current input does not include verifiable source provenance.
+  const pillar1Verified = false;
 
   // Pillar 2: Live Geo Ranking & Latency Scoring
   const quadrants = calculateSpatialQuadrants(leadsList);
