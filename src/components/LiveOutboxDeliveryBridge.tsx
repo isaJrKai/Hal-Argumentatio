@@ -77,9 +77,7 @@ export const LiveOutboxDeliveryBridge: React.FC = () => {
   // Dispatch Inputs
   const [recipient, setRecipient] = useState('');
   const [subject, setSubject] = useState('');
-  const [body, setBody] = useState(
-    'Hi Gordon,\n\nOur system detected Bow Valley Commercial Mechanical serves the Calgary, AB sector. Our technical audit noted a 3.4s mobile load deficit vs. top 3-pack competitors.\n\nMay I share our 1-page territory audit highlighting the 3 highest ROI fixes?\n\nRegards,\nHAL Operations Desk'
-  );
+  const [body, setBody] = useState('');
   const [priority, setPriority] = useState<'high' | 'normal'>('normal');
 
   // Execution & Telemetry
