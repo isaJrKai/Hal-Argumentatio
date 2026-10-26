@@ -455,17 +455,21 @@ export default function PublicAuditPage({ auditId, onNavigateToLogin }: PublicAu
           </p>
 
           <div className="flex flex-col sm:flex-row justify-center items-center gap-3 pt-2">
-            <a
-              href={bookingUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="w-full sm:w-auto px-6 py-3 rounded-xl font-mono font-bold text-white text-xs shadow-xl transition-transform hover:scale-105 flex items-center justify-center gap-2"
-              style={{ backgroundColor: brandColor }}
-            >
-              <Calendar className="w-4 h-4" />
-              <span>Choose Time on Calendar</span>
-              <ExternalLink className="w-3.5 h-3.5 opacity-80" />
-            </a>
+            {bookingUrl ? (
+              <a
+                href={bookingUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-full sm:w-auto px-6 py-3 rounded-xl font-mono font-bold text-white text-xs shadow-xl transition-transform hover:scale-105 flex items-center justify-center gap-2"
+                style={{ backgroundColor: brandColor }}
+              >
+                <Calendar className="w-4 h-4" />
+                <span>Choose Time on Calendar</span>
+                <ExternalLink className="w-3.5 h-3.5 opacity-80" />
+              </a>
+            ) : (
+              <span className="text-xs text-text-tertiary">Calendar booking link not configured</span>
+            )}
 
             <button
               onClick={() => setShowBookingModal(true)}
