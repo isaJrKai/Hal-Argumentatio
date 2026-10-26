@@ -215,7 +215,6 @@ export default function OverviewPanel({
   // Historical trend series are not yet stored, so no synthetic sparkline is rendered.
 
   // Forecast chart data
-  const [forecastMetricMode, setForecastMetricMode] = useState<'demand'>('demand');
   const [forecastMetadata, setForecastMetadata] = useState<any>(null);
   const [forecastChartData, setForecastChartData] = useState<any[]>([]);
 
@@ -514,42 +513,7 @@ export default function OverviewPanel({
             </div>
 
             <div className="text-[9.5px] font-mono text-text-tertiary px-2 py-1 rounded border border-border-dim">DEMAND INDEX SCENARIO</div>
-            {false && <div className="flex items-center gap-1 bg-bg-base p-1 rounded-lg border border-border-dim text-[9.5px] font-mono shrink-0">
-              <button
-                type="button"
-                onClick={() => setForecastMetricMode('all')}
-                className={`px-2 py-1 rounded transition-all cursor-pointer ${
-                  forecastMetricMode === 'all'
-                    ? 'bg-accent text-black font-bold shadow-xs'
-                    : 'text-text-tertiary hover:text-text-primary'
-                }`}
-              >
-                Combined
-              </button>
-              <button
-                type="button"
-                onClick={() => setForecastMetricMode('revenue')}
-                className={`px-2 py-1 rounded transition-all cursor-pointer ${
-                  forecastMetricMode === 'revenue'
-                    ? 'bg-info text-black font-bold shadow-xs'
-                    : 'text-text-tertiary hover:text-text-primary'
-                }`}
-              >
-                Revenue ($)
-              </button>
-              <button
-                type="button"
-                onClick={() => setForecastMetricMode('demand')}
-                className={`px-2 py-1 rounded transition-all cursor-pointer ${
-                  forecastMetricMode === 'demand'
-                    ? 'bg-positive text-black font-bold shadow-xs'
-                    : 'text-text-tertiary hover:text-text-primary'
-                }`}
-              >
-                Demand Index
-              </button>
-            </div>}
-          </div>
+                      </div>
 
           {/* Brain Integration Telemetry Pills */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mb-3 pt-1">
@@ -683,8 +647,7 @@ export default function OverviewPanel({
                     name="Demand Index" 
                     stroke={chartPalette.demand} 
                     strokeWidth={2} 
-                    strokeDasharray={forecastMetricMode === 'all' ? '4 3' : undefined} 
-                    fillOpacity={forecastMetricMode === 'demand' ? 1 : 0} 
+                    fillOpacity={1} 
                     fill="url(#colorDemand)" 
                   />
                 )}
