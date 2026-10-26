@@ -24,9 +24,6 @@ import {
   NeuralGraphNode,
   StrategyArbitrageOpportunity,
   Phase4VerificationResult,
-  getDefaultNeuralGraphNodes,
-  getDefaultConsensusHistory,
-  getDefaultArbitrageOpportunities,
   verifyPhase4Pillars
 } from '../lib/phase4-multi-agent';
 
@@ -499,6 +496,7 @@ export const HalRoadmapPhase4View: React.FC = () => {
 
           {/* Consensus Records */}
           <div className="space-y-4">
+            {consensusList.length === 0 && <div className="p-5 rounded-xl border border-border-dim text-sm text-text-secondary">No verified consensus records are stored yet. Generate a consensus to create a real record.</div>}
             {consensusList.map((cons) => (
               <div key={cons.id} className="p-5 rounded-xl bg-bg-raised border border-border-dim space-y-4 shadow-xs">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-border-dim pb-3">
@@ -639,6 +637,7 @@ export const HalRoadmapPhase4View: React.FC = () => {
               Specialized Autonomous Agent Nodes
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {neuralNodes.length === 0 && <div className="p-5 rounded-xl border border-border-dim text-sm text-text-secondary md:col-span-3">Runtime node telemetry is not configured. No latency, confidence, or task counts are being reported.</div>}
               {neuralNodes.map((node) => (
                 <div key={node.id} className="p-4 rounded-xl bg-bg-raised border border-border-dim space-y-3">
                   <div className="flex items-center justify-between">
@@ -779,6 +778,7 @@ export const HalRoadmapPhase4View: React.FC = () => {
 
           {/* Arbitrage Opportunities Table */}
           <div className="space-y-4">
+            {arbitrageList.length === 0 && <div className="p-5 rounded-xl border border-border-dim text-sm text-text-secondary">No verified arbitrage opportunities are available. Connect measured campaign performance before evaluating budget shifts.</div>}
             {arbitrageList.map((item) => (
               <div key={item.id} className="p-5 rounded-xl bg-bg-raised border border-border-dim space-y-3">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
