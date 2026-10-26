@@ -85,7 +85,7 @@ export default function HalBiblePanel({ initialDocId }: HalBiblePanelProps = {})
 
     // Phase 2 — Intelligence
     { id: '07', number: '07', title: 'Memory', description: 'State persistence engines: AES-256-CBC PII encryption, cryptographic genesis chains, and immutable Merkle ledger.', status: 'canonical', phase: 'intelligence', icon: Database },
-    { id: '08', number: '08', title: 'Knowledge', description: 'Real-time Google Maps Places API grounding & diagnostic audits for Calgary, Winnipeg, and Edmonton.', status: 'canonical', phase: 'intelligence', icon: Compass },
+    { id: '08', number: '08', title: 'Knowledge', description: 'Designed for map grounding and diagnostic audits; live provider access and measured results must be verified.', status: 'canonical', phase: 'intelligence', icon: Compass },
     { id: '09', number: '09', title: 'Skills', description: 'Diagnostic script library: technical SEO scans, speed index calculations, and SSL sweeps.', status: 'canonical', phase: 'intelligence', icon: Cpu },
     { id: '10', number: '10', title: 'Agents', description: 'Dual-Drive Multi-Agent Consensus: Google Gemini 2.5 coupled with NVIDIA Nemotron 70B.', status: 'canonical', phase: 'intelligence', icon: Cpu },
     { id: '11', number: '11', title: 'Council', description: 'Decision orchestrator, Bayesian neural weight recalibration, and strategy arbitrage loops.', status: 'canonical', phase: 'intelligence', icon: Users },
@@ -101,7 +101,7 @@ export default function HalBiblePanel({ initialDocId }: HalBiblePanelProps = {})
     { id: '19', number: '19', title: 'DevOps', description: 'Vite/esbuild bundling, container routing to port 3000, and fast cold-starts.', status: 'canonical', phase: 'engineering', icon: GitPullRequest },
 
     // Phase 4 — Product
-    { id: '20', number: '20', title: 'Roadmap', description: 'All 5 phases verified: Foundation, Real Harvest, Automation Outbox, Multi-Agent Consensus, Enterprise Brain.', status: 'canonical', phase: 'product', icon: LineChart },
+    { id: '20', number: '20', title: 'Roadmap', description: 'Roadmap phases are tracked separately; each remains unverified until its runtime behavior has supporting evidence.', status: 'canonical', phase: 'product', icon: LineChart },
     { id: '21', number: '21', title: 'UI Library', description: 'Standardized layout files, typography primitives, and Document Ribbon studio suite.', status: 'canonical', phase: 'product', icon: Layers },
     { id: '22', number: '22', title: 'Workspaces', description: 'Contractor dashboard orchestration, campaign builders, and leads flow.', status: 'canonical', phase: 'product', icon: Briefcase },
     { id: '23', number: '23', title: 'Future Vision', description: '11-Layer Brain Architecture, decentralized edge federation, and cross-industry ontology transfer.', status: 'canonical', phase: 'product', icon: Sparkles },
@@ -190,7 +190,7 @@ export default function HalBiblePanel({ initialDocId }: HalBiblePanelProps = {})
     });
   };
 
-  // Run Philosophy System Alignment check
+  // Play a visual preview only; this does not audit the running system.
   const startSystemVerification = () => {
     setIsVerifying(true);
     setVerificationProgress(10);
@@ -212,8 +212,8 @@ export default function HalBiblePanel({ initialDocId }: HalBiblePanelProps = {})
           setVerificationPassed(true);
           toast({
             variant: 'success',
-            title: 'HAL Core Alignment Passed',
-            description: 'Your codebase remains 100% compliant with the HAL Master Philosophy.',
+            title: 'Verification Preview Finished',
+            description: 'The animation completed; no system, codebase, security, or compliance checks were performed.',
             whatNext: 'Proceed with building high-fidelity client features.'
           });
         }
@@ -667,7 +667,7 @@ export default function HalBiblePanel({ initialDocId }: HalBiblePanelProps = {})
                           {verificationProgress >= 25 && verificationProgress < 50 && 'Scanning codebase for PII cryptology functions...'}
                           {verificationProgress >= 50 && verificationProgress < 75 && 'Evaluating UI visual weights and gradients...'}
                           {verificationProgress >= 75 && verificationProgress < 100 && 'Checking for unrequested layout bloat...'}
-                          {verificationProgress === 100 && 'Verification successfully finalized!'}
+                          {verificationProgress === 100 && 'Preview finished; no verification checks ran.'}
                         </span>
                       </div>
                     </div>
@@ -994,11 +994,11 @@ export default function HalBiblePanel({ initialDocId }: HalBiblePanelProps = {})
                       <div className="space-y-2">
                         <span className="text-[10px] font-mono tracking-widest text-text-secondary uppercase font-semibold font-bold">PEDAGOGICAL EMPTY STATES</span>
                         <EmptyState 
-                          title="Google Maps Location Cache Cleared"
-                          whyEmpty="The local client cache database is fully optimized and purged of outdated territory entries to comply with PII policies."
-                          whatNext="Click 'Run Harvest Scanner' in your Knowledge workspace to initialize maps grounding."
-                          expectedOutcome="HAL Council will instantly parse 45 new potential roofing candidates inside Alberta."
-                          actionLabel="RUN HARVEST SCANNER"
+                          title="Location Cache Empty-State Preview"
+                          whyEmpty="No location records are loaded in this UI preview. No database purge or cache operation has been performed."
+                          whatNext="Configure and verify a map provider, then load actual harvest results."
+                          expectedOutcome="No result count is promised. Display only records returned by the configured live source."
+                          actionLabel="CONFIGURE DATA SOURCE"
                           onActionClick={() => alert('Harvesting Map grounding!')}
                         />
                       </div>
@@ -1011,7 +1011,7 @@ export default function HalBiblePanel({ initialDocId }: HalBiblePanelProps = {})
                               <TableEmptyState 
                                 colSpan={4}
                                 title="No Connected Google Ads Accounts"
-                                description="Since Calgary Roof Pros hasn't authorized OAuth channels, HAL cannot fetch real-time ad performance metrics."
+                                description="Live ad performance is unavailable until a verified ad-platform connection and authorization are configured."
                                 action={
                                   <Button variant="outline" size="sm">
                                     PROPOSE ENTERPRISE CONNECT
@@ -1153,7 +1153,7 @@ export default function HalBiblePanel({ initialDocId }: HalBiblePanelProps = {})
                       CANONICAL ARCHITECTURAL SPECIFICATION
                     </span>
                     <p className="text-xs text-text-secondary leading-relaxed font-sans">
-                      This specification represents the active, verified implementation directive for HAL's {activeDoc.title} architecture. It enforces strict mathematical bounds, cryptographic data handling, and deterministic runtime behavior.
+                      This page displays the selected specification document. It does not verify runtime behavior or prove that every listed feature is implemented.
                     </p>
                   </div>
                 </div>
@@ -1223,7 +1223,7 @@ export default function HalBiblePanel({ initialDocId }: HalBiblePanelProps = {})
                     <div className="border border-border-dim p-3 rounded-sm bg-bg-base/40">
                       <span className="text-[10px] font-mono text-accent block font-bold mb-1 uppercase tracking-wider">DOWNSTREAM OUTCOME EXECUTION</span>
                       <p className="text-[11px] text-text-secondary leading-relaxed">
-                        Executes through verified desk instruments (Document Studio, SMS/Email Outbox, Territory Diagnostic Audits) with human-in-the-loop approval.
+                        Designed to integrate with Document Studio, the SMS/Email Outbox, and territory audits; each integration must be verified in the deployed environment.
                       </p>
                     </div>
                   </div>
