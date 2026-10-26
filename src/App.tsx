@@ -244,8 +244,7 @@ export default function App() {
       window.matchMedia('(display-mode: standalone)').matches ||
       (window.navigator as any).standalone === true ||
       document.referrer.includes('android-app://');
-    const wasMarkedInstalled = localStorage.getItem('hal_app_installed') === 'true';
-    return isStandaloneMode || wasMarkedInstalled;
+    return isStandaloneMode;
   });
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [showDesktopInstallModal, setShowDesktopInstallModal] = useState(false);
@@ -942,7 +941,7 @@ export default function App() {
         onToggleTheme={toggleTheme}
         onOpenMobileMenu={() => setIsMobileMenuOpen(true)}
         theme={theme}
-        isAppInstalled={isAppInstalled}
+        isAppInstalled={isAppInstalled || !deferredPrompt}
         onInstallClick={handleInstallClick}
         onLogout={handleLogout}
       />
