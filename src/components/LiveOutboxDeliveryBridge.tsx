@@ -20,7 +20,6 @@ import {
   Activity,
   AlertCircle
 } from 'lucide-react';
-import { signWebhookPayload } from '../lib/phase3-automation';
 
 interface GatewayStatus {
   id: string;
@@ -59,60 +58,29 @@ interface QuickLeadOption {
   urgencyScore: number;
 }
 
-const SAMPLE_TERRITORY_LEADS: QuickLeadOption[] = [
-  {
-    id: 'lead_calgary_01',
-    businessName: 'Bow Valley Commercial Mechanical',
-    ownerName: 'Gordon MacIntyre',
-    city: 'Calgary, AB',
-    niche: 'Commercial HVAC',
-    email: 'gordon@bowvalleymechanical.ca',
-    phone: '+1 (403) 555-0184',
-    urgencyScore: 9.4
-  },
-  {
-    id: 'lead_winnipeg_02',
-    businessName: 'Red River Industrial Roofing Ltd',
-    ownerName: 'David Wiebe',
-    city: 'Winnipeg, MB',
-    niche: 'Commercial Roofing',
-    email: 'david@redriverroofing.ca',
-    phone: '+1 (204) 555-0199',
-    urgencyScore: 8.8
-  },
-  {
-    id: 'lead_edmonton_03',
-    businessName: 'Gateway Power & Industrial Systems',
-    ownerName: 'Sarah Chen',
-    city: 'Edmonton, AB',
-    niche: 'Commercial Electrical',
-    email: 'sarah@gatewaypower.ca',
-    phone: '+1 (780) 555-0142',
-    urgencyScore: 9.1
-  },
-  {
-    id: 'lead_austin_04',
-    businessName: 'Lone Star Mechanical Facilities',
-    ownerName: 'Marcus Vance',
-    city: 'Austin, TX',
-    niche: 'Commercial HVAC',
-    email: 'marcus@lonestarfacilities.com',
-    phone: '+1 (512) 555-0138',
-    urgencyScore: 8.5
-  }
-];
+const VERIFIED_TERRITORY_LEADS: QuickLeadOption[] = [];
+const EMPTY_LEAD: QuickLeadOption = {
+  id: '',
+  businessName: '',
+  ownerName: '',
+  city: '',
+  niche: '',
+  email: '',
+  phone: '',
+  urgencyScore: 0
+};
 
 export const LiveOutboxDeliveryBridge: React.FC = () => {
   const [selectedChannel, setSelectedChannel] = useState<'email' | 'sms' | 'whatsapp' | 'webhook'>('email');
-  const [selectedLead, setSelectedLead] = useState<QuickLeadOption>(SAMPLE_TERRITORY_LEADS[0]);
+  const [selectedLead, setSelectedLead] = useState<QuickLeadOption>(EMPTY_LEAD);
   
   // Dispatch Inputs
-  const [recipient, setRecipient] = useState(SAMPLE_TERRITORY_LEADS[0].email);
-  const [subject, setSubject] = useState('Urgent: Commercial HVAC Mobile Speed & Inbound Lead Deficit');
+  const [recipient, setRecipient] = useState('');
+  const [subject, setSubject] = useState('');
   const [body, setBody] = useState(
     'Hi Gordon,\n\nOur system detected Bow Valley Commercial Mechanical serves the Calgary, AB sector. Our technical audit noted a 3.4s mobile load deficit vs. top 3-pack competitors.\n\nMay I share our 1-page territory audit highlighting the 3 highest ROI fixes?\n\nRegards,\nHAL Operations Desk'
   );
-  const [priority, setPriority] = useState<'high' | 'normal'>('high');
+  const [priority, setPriority] = useState<'high' | 'normal'>('normal');
 
   // Execution & Telemetry
   const [isDispatching, setIsDispatching] = useState(false);
@@ -128,57 +96,18 @@ export const LiveOutboxDeliveryBridge: React.FC = () => {
   // Dynamic token substitution
   const handleSelectLead = (lead: QuickLeadOption) => {
     setSelectedLead(lead);
-    if (selectedChannel === 'email') {
-      setRecipient(lead.email);
-      setSubject(`Performance Briefing for ${lead.businessName} (${lead.city})`);
-      setBody(
-        `Hi ${lead.ownerName},\n\nOur system audited ${lead.businessName} in ${lead.city} and noted critical ranking opportunities in the local commercial ${lead.niche} territory.\n\nWould you like the diagnostic sheet?\n\nRegards,\nHAL Operations Desk`
-      );
-    } else if (selectedChannel === 'sms') {
-      setRecipient(lead.phone);
-      setBody(`Hi ${lead.ownerName}, sent the ${lead.city} ${lead.niche} speed audit for ${lead.businessName}. Can I text the PDF link? - HAL`);
-    } else if (selectedChannel === 'whatsapp') {
-      setRecipient(lead.phone);
-      setBody(`*HAL Commercial Audit*\nHi ${lead.ownerName}, we finalized the territory report for *${lead.businessName}* in ${lead.city}. Urgent score: ${lead.urgencyScore}/10.`);
-    } else {
-      setRecipient('https://webhook.site/#!/view/sample-hal-outbox-endpoint');
-      setBody(JSON.stringify({
-        event: 'lead.harvested',
-        leadId: lead.id,
-        businessName: lead.businessName,
-        owner: lead.ownerName,
-        city: lead.city,
-        niche: lead.niche,
-        urgency: lead.urgencyScore
-      }, null, 2));
-    }
+    setRecipient(selectedChannel === 'email' ? lead.email : selectedChannel === 'webhook' ? '' : lead.phone);
+    setSubject(`Question about ${lead.businessName || 'your business'}`);
+    setBody(`Hello ${lead.ownerName || 'there'},\\n\\nI have not completed a verified technical assessment of ${lead.businessName || 'your business'}, and I do not want to claim an issue or lost revenue without evidence. Would you be open to a brief review based on measured findings?\\n\\nRegards,\\nHAL`);
   };
 
   const handleChannelChange = (channel: 'email' | 'sms' | 'whatsapp' | 'webhook') => {
     setSelectedChannel(channel);
-    if (channel === 'email') {
-      setRecipient(selectedLead.email);
-      setSubject(`Performance Briefing for ${selectedLead.businessName} (${selectedLead.city})`);
-      setBody(
-        `Hi ${selectedLead.ownerName},\n\nOur system audited ${selectedLead.businessName} in ${selectedLead.city} and noted critical ranking opportunities in the commercial ${selectedLead.niche} sector.\n\nMay I share the 1-page diagnostic breakdown?\n\nRegards,\nHAL Operations Desk`
-      );
-    } else if (channel === 'sms') {
-      setRecipient(selectedLead.phone);
-      setBody(`Hi ${selectedLead.ownerName}, sent the ${selectedLead.city} ${selectedLead.niche} speed audit for ${selectedLead.businessName}. Can I text the PDF link? - HAL`);
-    } else if (channel === 'whatsapp') {
-      setRecipient(selectedLead.phone);
-      setBody(`*HAL Commercial Audit*\nHi ${selectedLead.ownerName}, we finalized the territory report for *${selectedLead.businessName}* in ${selectedLead.city}. Urgent score: ${selectedLead.urgencyScore}/10.`);
-    } else {
-      setRecipient('https://api.internal-crm.com/v1/webhook/hal-inbound');
-      setBody(JSON.stringify({
-        event: 'lead.harvested',
-        leadId: selectedLead.id,
-        businessName: selectedLead.businessName,
-        city: selectedLead.city,
-        niche: selectedLead.niche,
-        timestamp: new Date().toISOString()
-      }, null, 2));
-    }
+    setRecipient(channel === 'email' ? selectedLead.email : channel === 'webhook' ? '' : selectedLead.phone);
+    setSubject(channel === 'email' ? `Question about ${selectedLead.businessName || 'your business'}` : '');
+    setBody(selectedLead.id
+      ? `Hello ${selectedLead.ownerName || 'there'},\\n\\nI have not completed a verified technical assessment of ${selectedLead.businessName || 'your business'}. Would you be open to a brief review based on measured findings?\\n\\nRegards,\\nHAL`
+      : '');
   };
 
   const fetchOutboxQueue = async () => {
@@ -262,15 +191,8 @@ export const LiveOutboxDeliveryBridge: React.FC = () => {
     }
   };
 
-  // Compute live HMAC-SHA256 signature for visual inspection
-  const livePayloadString = JSON.stringify({
-    channel: selectedChannel,
-    recipient,
-    lead: selectedLead.businessName,
-    bodyPreview: body.slice(0, 60),
-    timestamp: new Date().toISOString()
-  });
-  const liveSignature = 'sha256=' + signWebhookPayload('hal_outbox_secret_2026', livePayloadString);
+  // Signing secrets must never be embedded in client-side code. Delivery is disabled until a verified server-side adapter exists.
+  const liveSignature = 'Unavailable — server-side signing is not configured for live delivery.';
 
   return (
     <div className="space-y-6">
@@ -285,7 +207,7 @@ export const LiveOutboxDeliveryBridge: React.FC = () => {
               </span>
               <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-500/15 text-emerald-500 border border-emerald-500/30 flex items-center gap-1">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                TRANSACTIONAL GATEWAYS ONLINE
+                PROVIDER STATUS UNVERIFIED
               </span>
             </div>
             <h3 className="text-sm font-bold text-text-primary">
@@ -326,10 +248,10 @@ export const LiveOutboxDeliveryBridge: React.FC = () => {
               </div>
               <span className="w-2 h-2 rounded-full bg-emerald-500" />
             </div>
-            <div className="text-[11px] font-mono text-text-secondary">SendGrid v3 / TLS 1.3</div>
+            <div className="text-[11px] font-mono text-text-secondary">Email provider: not verified</div>
             <div className="flex items-center justify-between text-[10px] font-mono pt-1 border-t border-border-dim/60">
-              <span className="text-text-tertiary">LATENCY: 42ms</span>
-              <span className="text-emerald-500 font-bold">99.4% DELIV</span>
+              <span className="text-text-tertiary">LATENCY: NOT MEASURED</span>
+              <span className="text-emerald-500 font-bold">DELIVERY: UNKNOWN</span>
             </div>
           </div>
 
@@ -341,10 +263,10 @@ export const LiveOutboxDeliveryBridge: React.FC = () => {
               </div>
               <span className="w-2 h-2 rounded-full bg-emerald-500" />
             </div>
-            <div className="text-[11px] font-mono text-text-secondary">Twilio REST / E.164 Clean</div>
+            <div className="text-[11px] font-mono text-text-secondary">SMS provider: not verified</div>
             <div className="flex items-center justify-between text-[10px] font-mono pt-1 border-t border-border-dim/60">
-              <span className="text-text-tertiary">LATENCY: 38ms</span>
-              <span className="text-emerald-500 font-bold">99.1% DELIV</span>
+              <span className="text-text-tertiary">LATENCY: NOT MEASURED</span>
+              <span className="text-emerald-500 font-bold">DELIVERY: UNKNOWN</span>
             </div>
           </div>
 
@@ -356,10 +278,10 @@ export const LiveOutboxDeliveryBridge: React.FC = () => {
               </div>
               <span className="w-2 h-2 rounded-full bg-emerald-500" />
             </div>
-            <div className="text-[11px] font-mono text-text-secondary">Meta Graph Cloud API</div>
+            <div className="text-[11px] font-mono text-text-secondary">WhatsApp provider: not verified</div>
             <div className="flex items-center justify-between text-[10px] font-mono pt-1 border-t border-border-dim/60">
-              <span className="text-text-tertiary">LATENCY: 64ms</span>
-              <span className="text-emerald-500 font-bold">ACTIVE</span>
+              <span className="text-text-tertiary">LATENCY: NOT MEASURED</span>
+              <span className="text-emerald-500 font-bold">UNVERIFIED</span>
             </div>
           </div>
 
@@ -371,10 +293,10 @@ export const LiveOutboxDeliveryBridge: React.FC = () => {
               </div>
               <span className="w-2 h-2 rounded-full bg-emerald-500" />
             </div>
-            <div className="text-[11px] font-mono text-text-secondary">HMAC-SHA256 Signed / 5x Retry</div>
+            <div className="text-[11px] font-mono text-text-secondary">Signing and retry status: not verified</div>
             <div className="flex items-center justify-between text-[10px] font-mono pt-1 border-t border-border-dim/60">
-              <span className="text-text-tertiary">LATENCY: 18ms</span>
-              <span className="text-emerald-500 font-bold">100% AUDITED</span>
+              <span className="text-text-tertiary">LATENCY: NOT MEASURED</span>
+              <span className="text-emerald-500 font-bold">AUDIT: NOT VERIFIED</span>
             </div>
           </div>
         </div>
@@ -454,11 +376,11 @@ export const LiveOutboxDeliveryBridge: React.FC = () => {
             {/* Quick Lead Preset Bar */}
             <div className="space-y-1.5">
               <label className="text-[10px] font-mono text-text-tertiary uppercase flex items-center justify-between">
-                <span>Select Target Real Harvest Lead:</span>
-                <span className="text-accent">{selectedLead.niche} • {selectedLead.city}</span>
+                <span>Verified lead records:</span>
+                <span className="text-accent">{selectedLead.id ? `${selectedLead.niche} • ${selectedLead.city}` : 'No verified lead selected'}</span>
               </label>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                {SAMPLE_TERRITORY_LEADS.map((lead) => (
+                {VERIFIED_TERRITORY_LEADS.map((lead) => (
                   <button
                     key={lead.id}
                     onClick={() => handleSelectLead(lead)}
@@ -525,24 +447,21 @@ export const LiveOutboxDeliveryBridge: React.FC = () => {
               <div className="flex items-center justify-between">
                 <span className="text-[10px] font-mono font-bold text-text-tertiary uppercase flex items-center gap-1">
                   <Lock className="w-3 h-3 text-emerald-500" />
-                  Live Cryptographic Security Envelope
+                  Server-side signing status
                 </span>
                 <span className="text-[9px] font-mono text-emerald-500 font-bold bg-emerald-500/10 px-1.5 py-0.5 rounded">
-                  HMAC-SHA256 SIGNED
+                  NOT CONFIGURED
                 </span>
               </div>
               <div className="font-mono text-[10px] text-text-secondary space-y-1 break-all bg-bg-overlay p-2 rounded border border-border-dim">
                 <div className="flex justify-between text-text-tertiary">
-                  <span>HEADER: x-hal-signature</span>
+                  <span>Signature preview</span>
                   <button
-                    onClick={() => {
-                      navigator.clipboard.writeText(liveSignature);
-                      setCopiedSignature(true);
-                      setTimeout(() => setCopiedSignature(false), 2000);
-                    }}
+                    onClick={() => { setCopiedSignature(false); }}
+                    disabled
                     className="hover:text-text-primary cursor-pointer"
                   >
-                    {copiedSignature ? <Check className="w-3 h-3 text-emerald-500 inline" /> : <Copy className="w-3 h-3 inline" />}
+                    <Lock className="w-3 h-3 inline" />
                   </button>
                 </div>
                 <div className="text-accent select-all">{liveSignature}</div>
@@ -577,7 +496,7 @@ export const LiveOutboxDeliveryBridge: React.FC = () => {
                     <CheckCircle2 className="w-4 h-4 shrink-0" />
                     <span>DELIVERY CONFIRMED (HTTP 200)</span>
                   </div>
-                  <span className="text-[10px] text-text-tertiary">LATENCY: {dispatchResult.latencyMs || 36}ms</span>
+                  <span className="text-[10px] text-text-tertiary">LATENCY: {typeof dispatchResult.latencyMs === 'number' ? `${dispatchResult.latencyMs}ms` : 'Not measured'}</span>
                 </div>
                 <div className="grid grid-cols-2 gap-2 text-[11px]">
                   <div>
@@ -594,7 +513,7 @@ export const LiveOutboxDeliveryBridge: React.FC = () => {
                   </div>
                   <div>
                     <span className="text-text-tertiary block text-[9px]">MERKLE AUDIT BLOCK</span>
-                    <span className="text-emerald-500 font-bold">VERIFIED ON CHAIN</span>
+                    <span className="text-amber-500 font-bold">{dispatchResult.integrity?.valid ? 'INTEGRITY CHECK PASSED' : 'NOT VERIFIED'}</span>
                   </div>
                 </div>
               </div>
@@ -612,7 +531,7 @@ export const LiveOutboxDeliveryBridge: React.FC = () => {
                 <p className="text-[10px] text-text-secondary">Chronological ledger of recent dispatches and delivery receipts.</p>
               </div>
               <span className="text-[10px] font-mono text-emerald-500 bg-emerald-500/10 px-2 py-0.5 rounded font-bold">
-                STREAM ACTIVE
+                RUNTIME STATUS
               </span>
             </div>
 
@@ -620,11 +539,11 @@ export const LiveOutboxDeliveryBridge: React.FC = () => {
             <div className="grid grid-cols-2 gap-2">
               <div className="p-2.5 rounded bg-bg-base border border-border-dim font-mono">
                 <span className="text-[9px] text-text-tertiary block uppercase">Total Dispatches</span>
-                <span className="text-base font-bold text-text-primary">{queueData?.stats?.totalDispatched || 24}</span>
+                <span className="text-base font-bold text-text-primary">{queueData?.stats?.totalDispatched ?? 0}</span>
               </div>
               <div className="p-2.5 rounded bg-bg-base border border-border-dim font-mono">
                 <span className="text-[9px] text-text-tertiary block uppercase">Deliverability</span>
-                <span className="text-base font-bold text-emerald-500">{queueData?.stats?.deliveredRate || '99.4%'}</span>
+                <span className="text-base font-bold text-emerald-500">{queueData?.stats?.deliveredRate ?? 'Not measured'}</span>
               </div>
             </div>
 
@@ -642,7 +561,7 @@ export const LiveOutboxDeliveryBridge: React.FC = () => {
                         <span className="uppercase text-[10px]">{log.channel}</span>
                       </div>
                       <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">
-                        {log.status?.toUpperCase() || 'DELIVERED'}
+                        {log.status?.toUpperCase() || 'UNKNOWN'}
                       </span>
                     </div>
                     <div className="text-[11px] text-text-primary truncate font-sans font-medium">
@@ -656,7 +575,7 @@ export const LiveOutboxDeliveryBridge: React.FC = () => {
                 ))
               ) : (
                 <div className="p-6 text-center text-text-tertiary font-mono text-xs border border-dashed border-border-dim rounded-lg">
-                  No prior dispatches recorded in this session. Trigger your first live dispatch to begin streaming.
+                  No prior dispatches recorded in this session. No dispatch records were returned. Live delivery is currently disabled until provider-backed dispatch is implemented.
                 </div>
               )}
             </div>
@@ -666,7 +585,7 @@ export const LiveOutboxDeliveryBridge: React.FC = () => {
               <ShieldCheck className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
               <div>
                 <span className="text-text-primary font-bold block">Immutable Merkle Chain Audit</span>
-                Every outgoing packet is signed with HMAC-SHA256 and committed to the local AES-256 SQLite ledger before external transmission.
+                Outbound delivery is disabled. No message is sent or marked delivered by this panel until a verified provider adapter and durable audit path are configured.
               </div>
             </div>
 
