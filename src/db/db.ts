@@ -419,10 +419,13 @@ const DB_FILE = path.join(DATA_DIR, 'db.json');
 
 // Helper to get Lead encryption key
 function getEncryptionKey(): Buffer {
-  const b64 = process.env.LEAD_ENCRYPTION_KEY_B64 || 'Z01Xek1XOHpNVGczTnpBek1EUTFORFUxTkRVMU5EVTE=';
-  let key = Buffer.from(b64, 'base64');
+  const b64 = process.env.LEAD_ENCRYPTION_KEY_B64;
+  if (!b64) {
+    throw new Error('LEAD_ENCRYPTION_KEY_B64 is required before encrypting or decrypting personal data.');
+  }
+  const key = Buffer.from(b64, 'base64');
   if (key.length !== 32) {
-    key = crypto.createHash('sha256').update(key).digest();
+    throw new Error('LEAD_ENCRYPTION_KEY_B64 must decode to exactly 32 bytes.');
   }
   return key;
 }
