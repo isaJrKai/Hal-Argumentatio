@@ -243,23 +243,8 @@ export async function generateDualDriveResponse(
     };
   }
 
-  // Graceful autonomous fallback if both cloud AI calls fail or quota is exceeded
-  const fallbackSimulation = {
-    confidence: 84,
-    predictedCpl: 38.5,
-    volume: 24,
-    rationale: "HAL Autonomous Empirical Model: High intent detected for targeted local service campaign. Projected 24 conversions with $38.50 CPL benchmark."
-  };
-
-  const fallbackText = jsonMode ? JSON.stringify(fallbackSimulation) : fallbackSimulation.rationale;
-
-  return {
-    consensus: fallbackText,
-    geminiOutput: null,
-    nemotronOutput: null,
-    engineUsed: 'autonomous_fallback',
-    latencyMs
-  };
+  // Never manufacture a plausible-looking result when every configured model failed.
+  throw new Error('Both Gemini and NVIDIA Nemotron requests failed or are unconfigured. No synthetic analytics fallback is available.');
 }
 
 /**
