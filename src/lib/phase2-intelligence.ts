@@ -123,10 +123,7 @@ export function verifyPhase2Pillars(
   const pillar2Verified = false;
 
   // Pillar 3: Competitor Digital Footprint Audits
-  const testAudit = auditCompetitorFootprint('Calgary', 'commercial roofing');
-  const pillar3Verified = testAudit.competitors.length === 4 &&
-    testAudit.tacticalActionPlan.length >= 4 &&
-    testAudit.marketAverages.avgRating > 0;
+  const pillar3Verified = false;
 
   const allPassed = pillar1Verified && pillar2Verified && pillar3Verified;
 
@@ -162,10 +159,8 @@ export function verifyPhase2Pillars(
       status: pillar3Verified ? 'VERIFIED' : 'PENDING',
       details: 'Not verified: no verified competitor data source is configured; rankings, ratings, reviews, speed, and spend are not generated.',
       metrics: {
-        sampleAuditId: testAudit.id,
-        competitorsSampled: testAudit.competitors.length,
-        saturationLevel: testAudit.saturationLevel,
-        actionStepsGenerated: testAudit.tacticalActionPlan.length
+        competitorsSampled: 0,
+        status: 'UNAVAILABLE_NO_VERIFIED_SOURCE'
       }
     },
     auditedAt: new Date().toISOString()
