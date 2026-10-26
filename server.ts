@@ -504,114 +504,70 @@ app.post('/api/auth/register', async (req, res) => {
 
     res.json({ token, contractor: { id, email: cleanEmail, name, role: 'user', marketId: 'market_default' } });
   } catch (err: any) {
-    // Fallback sandbox registration success
-    const token = signToken({
-      contractorId: id,
-      email: cleanEmail,
-      role: 'user'
-    });
-    db.addSession(id, token, new Date(Date.now() + 30 * 24 * 3600 * 1000));
-    res.json({ token, contractor: { id, email: cleanEmail, name, role: 'user', marketId: 'market_default' } });
+    return res.status(503).json({ error: 'Registration service unavailable. Please try again later.' });
   }
 });
 
 app.post('/api/auth/login', async (req, res) => {
-  const { email, password } = req.body;
-  if (!email || !password) {
+  const { email, password } = req.body || {};
+  if (typeof email !== 'string' || typeof password !== 'string' || !email.trim() || !password) {
     return res.status(400).json({ error: 'Email and password are required' });
   }
 
   const cleanEmail = email.toLowerCase().trim();
-  const isIsaacOrAdmin = cleanEmail.includes('admin') || cleanEmail.includes('kaiso');
-  const designatedId = cleanEmail.includes('kaiso') 
-    ? 'con_isaac_seed' 
-    : (cleanEmail.includes('admin') ? 'con_admin_seed' : crypto.randomUUID());
 
   try {
-    let result = await pgDb.select().from(contractors).where(eq(contractors.email, cleanEmail));
-    if (result.length === 0) {
-      // Auto-create/auto-heal user on login if not found
-      try {
-        await pgDb.insert(contractors).values({
-          id: designatedId,
-          companyName: cleanEmail.includes('kaiso') ? 'Isaac' : (cleanEmail.includes('admin') ? 'Isaac (Admin)' : (cleanEmail.split('@')[0] || 'Workspace')),
-          email: cleanEmail,
-          city: 'Global',
-          serviceType: 'AI Business Intelligence',
-          role: isIsaacOrAdmin ? 'admin' : 'user',
-          passwordHash: hashPassword(password)
-        });
-      } catch (insErr) {}
-      
-      result = await pgDb.select().from(contractors).where(eq(contractors.email, cleanEmail));
+    const result = await pgDb.select().from(contractors).where(eq(contractors.email, cleanEmail)).limit(1);
+    const contractor = result[0];
+
+    // Do not create accounts during login, elevate users based on their email, or issue
+    // sessions when the database is unavailable. Authentication must fail closed.
+    if (!contractor) {
+      recordAuthFailure(req, cleanEmail);
+      return res.status(401).json({ error: 'Invalid email or password' });
     }
 
-    const contractor = result.length > 0 ? result[0] : {
-      id: designatedId,
-      email: cleanEmail,
-      companyName: cleanEmail.includes('kaiso') ? 'Isaac' : (cleanEmail.includes('admin') ? 'Isaac (Admin)' : (cleanEmail.split('@')[0] || 'Workspace')),
-      role: isIsaacOrAdmin ? 'admin' : 'user'
-    };
+    const storedHash = typeof contractor.passwordHash === 'string' ? contractor.passwordHash : '';
+    const suppliedHash = hashPassword(password);
+    const storedBytes = Buffer.from(storedHash, 'utf8');
+    const suppliedBytes = Buffer.from(suppliedHash, 'utf8');
+    const passwordMatches = storedBytes.length === suppliedBytes.length &&
+      crypto.timingSafeEqual(storedBytes, suppliedBytes);
 
-    const assignedRole: 'admin' | 'user' = isIsaacOrAdmin ? 'admin' : (contractor.role === 'admin' ? 'admin' : 'user');
-    const assignedId = (contractor.id === 'con_isaac_seed' || contractor.id === 'con_admin_seed')
-      ? contractor.id
-      : (isIsaacOrAdmin ? designatedId : contractor.id);
+    if (!passwordMatches) {
+      recordAuthFailure(req, cleanEmail);
+      return res.status(401).json({ error: 'Invalid email or password' });
+    }
 
-    const token = signToken({
-      contractorId: assignedId,
-      email: contractor.email,
-      role: assignedRole
-    });
-
-    db.addSession(assignedId, token, new Date(Date.now() + 30 * 24 * 3600 * 1000));
+    const role: 'admin' | 'user' = contractor.role === 'admin' ? 'admin' : 'user';
+    const token = signToken({ contractorId: contractor.id, email: cleanEmail, role });
+    db.addSession(contractor.id, token, new Date(Date.now() + 30 * 24 * 3600 * 1000));
     recordAuthSuccess(req, cleanEmail);
 
     try {
       await pgDb.insert(auditLogs).values({
         id: crypto.randomUUID(),
-        contractorId: assignedId,
+        contractorId: contractor.id,
         action: 'LOGIN_SUCCESS',
         details: `Contractor logged in successfully: ${cleanEmail} from IP: ${req.ip}`
       });
-    } catch (e) {}
+    } catch (auditError) {
+      // Authentication does not depend on the optional audit-log insert succeeding.
+    }
 
-    res.json({
+    return res.json({
       token,
       contractor: {
-        id: assignedId,
+        id: contractor.id,
         email: contractor.email,
-        name: contractor.companyName || (isIsaacOrAdmin ? (cleanEmail.includes('kaiso') ? 'Isaac' : 'Isaac (Admin)') : 'Workspace'),
-        role: assignedRole,
-        marketId: 'market_default'
-      }
-    });
-  } catch (err: any) {
-    // Fallback sandbox login success
-    const fallbackId = isIsaacOrAdmin 
-      ? designatedId 
-      : (db.getContractorByEmail(cleanEmail)?.id || crypto.randomUUID());
-    const role: 'admin' | 'user' = isIsaacOrAdmin ? 'admin' : 'user';
-    const name = isIsaacOrAdmin 
-      ? (cleanEmail.includes('kaiso') ? 'Isaac' : 'Isaac (Admin)')
-      : (cleanEmail.split('@')[0] || 'Workspace');
-
-    const token = signToken({
-      contractorId: fallbackId,
-      email: cleanEmail,
-      role
-    });
-    db.addSession(fallbackId, token, new Date(Date.now() + 30 * 24 * 3600 * 1000));
-    res.json({
-      token,
-      contractor: {
-        id: fallbackId,
-        email: cleanEmail,
-        name,
+        name: contractor.companyName || 'Workspace',
         role,
         marketId: 'market_default'
       }
     });
+  } catch (err) {
+    recordAuthFailure(req, cleanEmail);
+    return res.status(503).json({ error: 'Authentication service unavailable. Please try again later.' });
   }
 });
 
