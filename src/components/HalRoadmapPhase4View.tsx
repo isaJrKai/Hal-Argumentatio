@@ -345,7 +345,7 @@ export const HalRoadmapPhase4View: React.FC = () => {
               <div className="flex items-center justify-between">
                 <span className="text-xs font-mono font-bold text-accent uppercase">PILLAR 1</span>
                 <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-500/15 text-emerald-500 border border-emerald-500/30">
-                  VERIFIED
+                  NOT VERIFIED
                 </span>
               </div>
               <h3 className="text-sm font-bold text-text-primary">Dual-Drive Parallel Consensus</h3>
@@ -364,7 +364,7 @@ export const HalRoadmapPhase4View: React.FC = () => {
               <div className="flex items-center justify-between">
                 <span className="text-xs font-mono font-bold text-accent uppercase">PILLAR 2</span>
                 <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-500/15 text-emerald-500 border border-emerald-500/30">
-                  VERIFIED
+                  NOT VERIFIED
                 </span>
               </div>
               <h3 className="text-sm font-bold text-text-primary">Adaptive Bayesian Weight Tuning</h3>
@@ -383,7 +383,7 @@ export const HalRoadmapPhase4View: React.FC = () => {
               <div className="flex items-center justify-between">
                 <span className="text-xs font-mono font-bold text-accent uppercase">PILLAR 3</span>
                 <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-500/15 text-emerald-500 border border-emerald-500/30">
-                  VERIFIED
+                  NOT VERIFIED
                 </span>
               </div>
               <h3 className="text-sm font-bold text-text-primary">Closed-Loop Strategy Arbitrage</h3>
@@ -644,11 +644,11 @@ export const HalRoadmapPhase4View: React.FC = () => {
                   Urgency multipliers (not calibrated)
                 </h3>
                 <p className="text-xs text-text-secondary">
-                  Automatically calibrated weights derived from real contractor audits and closed-won pipeline transitions.
+                  Intended to use measured outcomes. No calibration dataset or verified outcome history is currently available.
                 </p>
               </div>
               <span className="px-2.5 py-1 rounded text-xs font-mono font-bold bg-accent/15 text-accent border border-accent/30">
-                AUTONOMOUS MODE
+                MODE NOT VERIFIED
               </span>
             </div>
 
@@ -656,25 +656,25 @@ export const HalRoadmapPhase4View: React.FC = () => {
               <div className="p-3 rounded-lg bg-bg-base border border-border-dim space-y-1">
                 <span className="text-[10px] font-mono text-text-tertiary uppercase">Missing SSL</span>
                 <div className="text-lg font-bold font-mono text-text-primary">Not measured</div>
-                <div className="text-[10px] text-text-secondary">High-urgency instant dropoff</div>
+                <div className="text-[10px] text-text-secondary">Impact not measured</div>
               </div>
 
               <div className="p-3 rounded-lg bg-bg-base border border-border-dim space-y-1">
                 <span className="text-[10px] font-mono text-text-tertiary uppercase">Mobile Speed LCP &gt; 4s</span>
                 <div className="text-lg font-bold font-mono text-text-primary">Not measured</div>
-                <div className="text-[10px] text-text-secondary">Conversion rate leakage</div>
+                <div className="text-[10px] text-text-secondary">Impact not measured</div>
               </div>
 
               <div className="p-3 rounded-lg bg-bg-base border border-border-dim space-y-1">
                 <span className="text-[10px] font-mono text-text-tertiary uppercase">Phone Channel Lift</span>
                 <div className="text-lg font-bold font-mono text-text-primary">Not measured</div>
-                <div className="text-[10px] text-text-secondary">Top commercial contractor channel</div>
+                <div className="text-[10px] text-text-secondary">Impact not measured</div>
               </div>
 
               <div className="p-3 rounded-lg bg-bg-base border border-border-dim space-y-1">
                 <span className="text-[10px] font-mono text-text-tertiary uppercase">Review Deficit &lt; 4.0★</span>
-                <div className="text-lg font-bold font-mono text-text-primary">6.8x</div>
-                <div className="text-[10px] text-text-secondary">Local 3-Pack suppression</div>
+                <div className="text-lg font-bold font-mono text-text-primary">Not measured</div>
+                <div className="text-[10px] text-text-secondary">Impact not measured</div>
               </div>
             </div>
           </div>
