@@ -3392,11 +3392,11 @@ app.post('/api/outreach/sequences', authenticate, (req, res) => {
 interface DispatchLogEntry {
   id: string;
   contractorId: string;
-  channel: 'sms' | 'email' | 'webhook';
+  channel: 'sms' | 'email' | 'whatsapp' | 'webhook';
   recipient: string;
   leadId?: string;
   leadBusinessName?: string;
-  status: 'delivered' | 'failed' | 'queued';
+  status: 'delivered' | 'failed' | 'queued' | 'simulated';
   mode: 'live' | 'simulation';
   providerId?: string;
   error?: string;
@@ -3407,17 +3407,18 @@ interface DispatchLogEntry {
 
 const dispatchLogs: DispatchLogEntry[] = [];
 
-app.get('/api/dispatch/status', authenticate, (req, res) => {
+app.get('/api/dispatch/status', authenticate, (_req, res) => {
+  const signingConfigured = Boolean(process.env.JWT_SECRET && process.env.JWT_SECRET.length >= 32);
   res.json({
-    engine: 'HAL Autonomous Outreach Pipeline',
+    engine: 'HAL Outreach Dispatch',
     webhook: {
-      configured: true,
+      configured: signingConfigured,
       signatureAlgorithm: 'HMAC-SHA256',
-      status: 'active'
+      status: signingConfigured ? 'configured_unverified' : 'not_configured'
     },
     messaging: {
-      status: 'active',
-      mode: 'autonomous'
+      status: 'simulation_only',
+      mode: 'simulation'
     }
   });
 });
@@ -3684,30 +3685,41 @@ const contractorBridges = new Map<string, ChannelBridgeSettings>();
 
 function getBridgesForContractor(contractorId: string): ChannelBridgeSettings {
   if (!contractorBridges.has(contractorId)) {
+    const emailProvider: ChannelBridgeSettings['email']['provider'] =
+      process.env.SENDGRID_API_KEY ? 'sendgrid' : process.env.SMTP_HOST ? 'smtp' : 'resend';
+    const calendarProvider: ChannelBridgeSettings['calendar']['provider'] =
+      process.env.CALCOM_BOOKING_URL ? 'cal_com' : 'google_calendar';
     contractorBridges.set(contractorId, {
       whatsapp: {
-        enabled: true,
-        phoneNumberId: '109842519284712',
-        displayNumber: '+1 (403) 555-0199',
-        webhookActive: true,
-        verifiedBusiness: true
+        enabled: Boolean(process.env.WHATSAPP_ACCESS_TOKEN && process.env.WHATSAPP_PHONE_NUMBER_ID),
+        phoneNumberId: process.env.WHATSAPP_PHONE_NUMBER_ID || '',
+        displayNumber: process.env.WHATSAPP_DISPLAY_NUMBER || '',
+        webhookActive: Boolean(process.env.WHATSAPP_VERIFY_TOKEN),
+        verifiedBusiness: false,
+        accessToken: process.env.WHATSAPP_ACCESS_TOKEN
       },
       email: {
-        enabled: true,
-        provider: 'resend',
-        senderEmail: 'dispatch@halbiz.ai',
-        senderName: 'HAL Operating Dispatch'
+        enabled: Boolean(process.env.RESEND_API_KEY || process.env.SENDGRID_API_KEY || process.env.SMTP_HOST),
+        provider: emailProvider,
+        senderEmail: process.env.HAL_SENDER_EMAIL || '',
+        senderName: process.env.HAL_SENDER_NAME || 'HAL',
+        smtpHost: process.env.SMTP_HOST || undefined,
+        smtpPort: process.env.SMTP_PORT ? Number(process.env.SMTP_PORT) : undefined,
+        smtpUser: process.env.SMTP_USER || undefined,
+        apiKey: process.env.RESEND_API_KEY || process.env.SENDGRID_API_KEY
       },
       sms: {
-        enabled: true,
+        enabled: Boolean(process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN && process.env.TWILIO_PHONE_NUMBER),
         provider: 'twilio',
-        virtualNumber: '+1 (403) 555-0199'
+        accountSid: process.env.TWILIO_ACCOUNT_SID || '',
+        authToken: process.env.TWILIO_AUTH_TOKEN,
+        virtualNumber: process.env.TWILIO_PHONE_NUMBER || ''
       },
       calendar: {
-        enabled: true,
-        provider: 'google_calendar',
-        bookingUrl: 'https://cal.com/hal-dispatch/emergency-intake',
-        timezone: 'America/Edmonton'
+        enabled: Boolean(process.env.CALCOM_BOOKING_URL || process.env.GOOGLE_CALENDAR_ID),
+        provider: calendarProvider,
+        bookingUrl: process.env.CALCOM_BOOKING_URL || '',
+        timezone: process.env.TZ || 'UTC'
       }
     });
   }
@@ -3728,16 +3740,16 @@ app.get('/api/outreach/bridges/status', authenticate, (req, res) => {
       whatsapp: {
         ...cfg.whatsapp,
         accessToken: cfg.whatsapp.accessToken ? '••••••••' : undefined,
-        deliveredCount: whatsappDelivered + 14,
-        replyRate: 38.4,
-        status: cfg.whatsapp.enabled ? 'connected' : 'disconnected'
+        deliveredCount: whatsappDelivered,
+        replyRate: null,
+        status: cfg.whatsapp.enabled ? 'configured_unverified' : 'not_configured'
       },
       email: {
         ...cfg.email,
         apiKey: cfg.email.apiKey ? '••••••••' : undefined,
-        deliveredCount: emailDelivered + 42,
-        openRate: 46.2,
-        status: cfg.email.enabled ? 'connected' : 'disconnected'
+        deliveredCount: emailDelivered,
+        openRate: null,
+        status: cfg.email.enabled ? 'configured_unverified' : 'not_configured'
       },
       sms: {
         ...cfg.sms,
@@ -3748,8 +3760,8 @@ app.get('/api/outreach/bridges/status', authenticate, (req, res) => {
       },
       calendar: {
         ...cfg.calendar,
-        bookedAppointments: 8,
-        status: cfg.calendar.enabled ? 'connected' : 'disconnected'
+        bookedAppointments: null,
+        status: cfg.calendar.enabled ? 'configured_unverified' : 'not_configured'
       }
     }
   });
@@ -3812,85 +3824,75 @@ app.post('/api/outreach/dispatch', authenticate, async (req, res) => {
     message,
     variables,
     mode
-  } = req.body;
+  } = req.body || {};
 
   if (!channel || !recipient || !message) {
     return res.status(400).json({ error: 'channel, recipient, and message are required' });
   }
+  if (!['whatsapp', 'email', 'sms'].includes(channel)) {
+    return res.status(400).json({ error: 'Unsupported channel. Use whatsapp, email, or sms.' });
+  }
+  if (mode !== 'simulation') {
+    return res.status(501).json({
+      error: 'Live delivery is not implemented for this endpoint. Use simulation mode; no provider has been contacted.'
+    });
+  }
 
-  let customizedMessage = message;
-  let customizedSubject = subject || '';
-  if (variables && typeof variables === 'object') {
+  let customizedMessage = String(message);
+  let customizedSubject = typeof subject === 'string' ? subject : '';
+  if (variables && typeof variables === 'object' && !Array.isArray(variables)) {
     for (const [key, val] of Object.entries(variables)) {
-      const rx = new RegExp(`\\{\\{${key}\\}\\}`, 'g');
+      const escapedKey = key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const rx = new RegExp(`\\{\\{${escapedKey}\\}\\}`, 'g');
       customizedMessage = customizedMessage.replace(rx, String(val));
       if (customizedSubject) customizedSubject = customizedSubject.replace(rx, String(val));
     }
   }
 
-  const providerPrefix = channel === 'whatsapp' ? 'wamid.HBZ' : channel === 'sms' ? 'SM_tw' : channel === 'calendar' ? 'cal_evt' : 'msg_rs';
-  const providerId = `${providerPrefix}_${crypto.randomBytes(6).toString('hex')}`;
   const now = new Date().toISOString();
-
-  // Record dispatch log
   const entry: DispatchLogEntry = {
-    id: 'outreach_' + crypto.randomBytes(6).toString('hex'),
+    id: 'simulation_' + crypto.randomBytes(6).toString('hex'),
     contractorId,
-    channel: (channel === 'calendar' ? 'webhook' : channel) as any,
-    recipient,
+    channel,
+    recipient: String(recipient),
     leadId,
     leadBusinessName: leadBusinessName || 'Direct Recipient',
-    status: 'delivered',
-    mode: (mode || 'live') as any,
-    providerId,
+    status: 'simulated',
+    mode: 'simulation',
     timestamp: now,
     subject: customizedSubject || undefined,
     preview: customizedMessage.slice(0, 100)
   };
   dispatchLogs.push(entry);
 
-  // If tied to lead, log leadEvent and advance stage
-  if (leadId) {
-    try {
-      await pgDb.insert(leadEvents).values({
-        id: crypto.randomUUID(),
-        leadId,
-        eventType: channel === 'whatsapp' ? 'WhatsAppSent' : channel === 'email' ? 'EmailSent' : 'SmsSent',
-        newStage: 'contacted',
-        notes: `[Unified Bridge - ${channel.toUpperCase()}] Transmitted: ${customizedMessage.slice(0, 80)}...`
-      });
-      await pgDb.update(leads).set({ status: 'contacted', updatedAt: new Date() }).where(and(eq(leads.id, leadId), eq(leads.contractorId, contractorId)));
-    } catch (_) {}
-  }
-
-  // Record to structured ledger
   const auditBlock = db.recordLedgerEntry({
     contractorId,
-    eventType: 'phase3_live_dispatch',
-    entityType: 'unified_outreach',
+    eventType: 'phase3_verification_audit',
+    entityType: 'outreach_simulation',
     entityId: entry.id,
-    delta: {
+    actor: 'HAL Simulation',
+    details: 'Outreach payload prepared in simulation mode. No external message was sent.',
+    metadata: {
       channel,
-      recipient,
-      leadId,
-      providerId,
-      status: 'delivered'
+      leadId: leadId || null,
+      mode: 'simulation',
+      status: 'simulated'
     }
   });
 
-  // Broadcast contractor SSE
   broadcastNotification(
     contractorId,
-    'success',
-    `⚡ ${channel.toUpperCase()} Transmitted`,
-    `Delivered to ${recipient} via ${channel.toUpperCase()} bridge (ID: ${providerId}).`
+    'info',
+    'Outreach Simulation Recorded',
+    `Prepared a ${channel.toUpperCase()} message for ${String(recipient)}. No external message was sent.`
   );
 
-  res.json({
+  return res.json({
     success: true,
     dispatchId: entry.id,
-    providerId,
-    status: 'delivered',
+    status: 'simulated',
+    mode: 'simulation',
+    providerContacted: false,
     timestamp: now,
     renderedMessage: customizedMessage,
     renderedSubject: customizedSubject,
