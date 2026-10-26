@@ -500,11 +500,11 @@ export const HalRoadmapPhase3View: React.FC = () => {
                   </div>
                 </div>
                 <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-500/15 text-emerald-500 border border-emerald-500/30">
-                  {p1?.status || 'VERIFIED'}
+                  {p1?.status || 'NOT VERIFIED'}
                 </span>
               </div>
               <p className="text-xs text-text-secondary leading-relaxed">
-                4-step automated touchpoint cadences with customizable day offsets, dynamic token interpolation, and multi-channel delivery (Email, SMS, Webhook, Calendar).
+                Cadence records and delivery providers are shown only when returned by the runtime; no live sending is claimed by this overview.
               </p>
               <div className="pt-2 border-t border-border-dim/60 space-y-1.5 text-[11px] font-mono text-text-secondary">
                 <div className="flex justify-between">
@@ -513,7 +513,7 @@ export const HalRoadmapPhase3View: React.FC = () => {
                 </div>
                 <div className="flex justify-between">
                   <span>AVERAGE CONVERSION:</span>
-                  <strong className="text-emerald-500">20.2%</strong>
+                  <strong className="text-text-secondary">Not measured</strong>
                 </div>
               </div>
             </div>
@@ -531,11 +531,11 @@ export const HalRoadmapPhase3View: React.FC = () => {
                   </div>
                 </div>
                 <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-500/15 text-emerald-500 border border-emerald-500/30">
-                  {p2?.status || 'VERIFIED'}
+                  {p2?.status || 'NOT VERIFIED'}
                 </span>
               </div>
               <p className="text-xs text-text-secondary leading-relaxed">
-                Guaranteed once-and-only-once conversion delivery with HMAC-SHA256 payload verification, exponential retry backoff (2^n), and dead-letter queue isolation.
+                Signing and retry helpers exist, but provider delivery and exactly-once semantics have not been verified in this deployment.
               </p>
               <div className="pt-2 border-t border-border-dim/60 space-y-1.5 text-[11px] font-mono text-text-secondary">
                 <div className="flex justify-between">
@@ -562,11 +562,11 @@ export const HalRoadmapPhase3View: React.FC = () => {
                   </div>
                 </div>
                 <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-500/15 text-emerald-500 border border-emerald-500/30">
-                  {p3?.status || 'VERIFIED'}
+                  {p3?.status || 'NOT VERIFIED'}
                 </span>
               </div>
               <p className="text-xs text-text-secondary leading-relaxed">
-                Autonomous background scanning for inbound appointment bookings, cadence progression timers, and recurring forecast calibration against closed CRM revenues.
+                Scheduler and calendar integration status is unavailable until persisted job records and an external calendar provider are verified.
               </p>
               <div className="pt-2 border-t border-border-dim/60 space-y-1.5 text-[11px] font-mono text-text-secondary">
                 <div className="flex justify-between">
@@ -575,7 +575,7 @@ export const HalRoadmapPhase3View: React.FC = () => {
                 </div>
                 <div className="flex justify-between">
                   <span>CALENDAR SYNC:</span>
-                  <strong className="text-emerald-500">CONTINUOUS</strong>
+                  <strong className="text-text-secondary">Unverified</strong>
                 </div>
               </div>
             </div>
@@ -591,31 +591,12 @@ export const HalRoadmapPhase3View: React.FC = () => {
                 </h3>
               </div>
               <span className="text-[10px] font-mono text-text-tertiary">
-                IMMUTABLE CHAIN VERIFIED
+                {statusData?.integrity?.valid ? 'HASH CHAIN VERIFIED' : 'HASH CHAIN NOT VERIFIED'}
               </span>
             </div>
 
             <div className="space-y-2">
-              {(statusData?.recentAutomationEvents?.length ? statusData.recentAutomationEvents : [
-                {
-                  eventType: 'phase3_verification_audit',
-                  actor: 'HAL Roadmap Phase 3 Auditor',
-                  details: 'Executed cryptographic verification across Phase 3: Outreach Sequencer, Webhook Outbox, and Scheduled Triggers',
-                  createdAt: new Date().toISOString()
-                },
-                {
-                  eventType: 'outreach_sequence_saved',
-                  actor: 'Operator',
-                  details: 'Saved multi-touch cadence "Commercial HVAC High-Efficiency Audit" with 4 touchpoints.',
-                  createdAt: new Date(Date.now() - 3600000).toISOString()
-                },
-                {
-                  eventType: 'scheduler_job_executed',
-                  actor: 'HAL Background Cron Engine',
-                  details: 'Scanned inbound calendar booking events: 2 leads advanced to "proposal" stage.',
-                  createdAt: new Date(Date.now() - 7200000).toISOString()
-                }
-              ]).map((event, idx) => (
+              {(statusData?.recentAutomationEvents ?? []).map((event, idx) => (
                 <div key={idx} className="p-2.5 rounded-lg bg-bg-base border border-border-dim/60 flex items-start justify-between gap-3 text-xs font-mono">
                   <div className="space-y-0.5">
                     <div className="flex items-center gap-2">
@@ -629,6 +610,7 @@ export const HalRoadmapPhase3View: React.FC = () => {
                   </span>
                 </div>
               ))}
+              {(!statusData?.recentAutomationEvents || statusData.recentAutomationEvents.length === 0) && <p className="p-4 text-xs text-text-tertiary border border-dashed border-border-dim rounded-lg">No persisted automation events were returned by the runtime.</p>}
             </div>
           </div>
         </div>
@@ -907,38 +889,7 @@ export const HalRoadmapPhase3View: React.FC = () => {
 
             {/* Carrier Gateways Status Bar */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-              {(outboxQueueData?.gateways || [
-                {
-                  id: 'smtp_sendgrid',
-                  name: 'SMTP / SendGrid Gateway',
-                  type: 'email',
-                  status: 'active_live',
-                  mode: 'Production Live / Authenticated Sandbox',
-                  latencyMs: 42,
-                  encryption: 'TLS 1.3 / Port 587',
-                  deliverability: '99.4%'
-                },
-                {
-                  id: 'twilio_sms',
-                  name: 'Twilio SMS / WhatsApp',
-                  type: 'sms',
-                  status: 'active_live',
-                  mode: 'Carrier Handover Route',
-                  latencyMs: 38,
-                  encryption: 'REST API / E.164 Format',
-                  deliverability: '99.1%'
-                },
-                {
-                  id: 'webhook_ingest',
-                  name: 'HMAC Webhook Ingest',
-                  type: 'webhook',
-                  status: 'active_live',
-                  mode: 'Production Live Engine',
-                  latencyMs: 18,
-                  encryption: 'HMAC-SHA256 / Backoff Retry',
-                  deliverability: '100%'
-                }
-              ]).map((gw: any) => (
+              {(outboxQueueData?.gateways ?? []).map((gw: any) => (
                 <div key={gw.id} className="p-3.5 rounded-lg bg-bg-base border border-border-dim space-y-2">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
@@ -1233,7 +1184,7 @@ export const HalRoadmapPhase3View: React.FC = () => {
                               DELIVERED
                             </span>
                           </td>
-                          <td className="p-2.5 text-text-secondary">{item.latencyMs || (28 + (idx * 5))}ms</td>
+                          <td className="p-2.5 text-text-secondary">{typeof item.latencyMs === 'number' ? `${item.latencyMs}ms` : 'Not measured'}</td>
                           <td className="p-2.5 text-text-tertiary text-[10px]">
                             {new Date(item.timestamp).toLocaleTimeString()}
                           </td>
