@@ -3428,7 +3428,7 @@ interface DispatchLogEntry {
 const dispatchLogs: DispatchLogEntry[] = [];
 
 app.get('/api/dispatch/status', authenticate, (_req, res) => {
-  const signingConfigured = Boolean(process.env.JWT_SECRET && process.env.JWT_SECRET.length >= 32);
+  const signingConfigured = Boolean(process.env.HAL_WEBHOOK_SIGNING_SECRET && process.env.HAL_WEBHOOK_SIGNING_SECRET.length >= 32);
   res.json({
     engine: 'HAL Outreach Dispatch',
     webhook: {
@@ -3481,7 +3481,7 @@ app.post('/api/dispatch/webhook', authenticate, async (req, res) => {
     data: payload || {}
   });
 
-  const signingSecret = process.env.JWT_SECRET;
+  const signingSecret = process.env.HAL_WEBHOOK_SIGNING_SECRET;
   if (!signingSecret || signingSecret.length < 32) {
     return res.status(503).json({ error: 'Secure webhook signing is not configured.' });
   }
@@ -3702,6 +3702,7 @@ interface ChannelBridgeSettings {
     smtpHost?: string;
     smtpPort?: number;
     smtpUser?: string;
+    smtpPassword?: string;
     apiKey?: string;
   };
   sms: {
@@ -3737,13 +3738,14 @@ function getBridgesForContractor(contractorId: string): ChannelBridgeSettings {
         accessToken: process.env.WHATSAPP_ACCESS_TOKEN
       },
       email: {
-        enabled: Boolean(process.env.RESEND_API_KEY || process.env.SENDGRID_API_KEY || process.env.SMTP_HOST),
+        enabled: Boolean(process.env.RESEND_API_KEY || process.env.SENDGRID_API_KEY || (process.env.SMTP_HOST && process.env.SMTP_PORT && process.env.SMTP_USER && process.env.SMTP_PASSWORD && process.env.HAL_SENDER_EMAIL)),
         provider: emailProvider,
         senderEmail: process.env.HAL_SENDER_EMAIL || '',
         senderName: process.env.HAL_SENDER_NAME || 'HAL',
         smtpHost: process.env.SMTP_HOST || undefined,
         smtpPort: process.env.SMTP_PORT ? Number(process.env.SMTP_PORT) : undefined,
         smtpUser: process.env.SMTP_USER || undefined,
+        smtpPassword: process.env.SMTP_PASSWORD || undefined,
         apiKey: process.env.RESEND_API_KEY || process.env.SENDGRID_API_KEY
       },
       sms: {
