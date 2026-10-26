@@ -97,6 +97,43 @@ label,
   line-height: 1.55;
 }
 
+/* Premium readability: consistent type scale and prevent flex/grid content collisions. */
+:where(p, li, dd, dt, td, th, label, small, figcaption) {
+  overflow-wrap: anywhere;
+}
+
+:where(.flex > *, .inline-flex > *, .grid > *) {
+  min-width: 0;
+}
+
+:where(p, li, dd, dt) {
+  line-height: 1.55;
+}
+
+/* Bring legacy 12px labels and metadata up to a legible size. */
+[class*="text-[12px]"] {
+  font-size: 13px !important;
+  line-height: 1.5;
+}
+
+/* Long uppercase telemetry labels should not collide or force panels wider. */
+.uppercase {
+  overflow-wrap: anywhere;
+  text-wrap: pretty;
+}
+
+@media (max-width: 640px) {
+  [class*="text-[12px]"] {
+    font-size: 14px !important;
+  }
+
+  .metric-label,
+  .label {
+    font-size: 12px !important;
+    letter-spacing: 0.04em;
+  }
+}
+
 /* One restrained product accent; semantic colors remain reserved for status and risk. */
 .badge-active {
   color: var(--color-positive);
