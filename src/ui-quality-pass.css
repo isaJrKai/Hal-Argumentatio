@@ -14,8 +14,20 @@
 
 /* The existing interface overuses micro-labels. Preserve their hierarchy but make them readable. */
 body {
-  font-size: 15px;
-  line-height: 1.55;
+  font-size: 16px;
+  line-height: 1.6;
+  color: var(--text-primary);
+}
+
+/* Keep supporting copy readable against both carbon and paper themes. */
+.text-text-tertiary,
+.text-slate-500,
+.text-gray-500 {
+  color: var(--text-secondary) !important;
+}
+
+.text-text-secondary {
+  color: var(--text-secondary);
 }
 
 button,
@@ -39,7 +51,7 @@ textarea {
 label,
 .label,
 .metric-label {
-  font-size: 12px;
+  font-size: 13px;
   letter-spacing: 0.045em;
 }
 
@@ -76,13 +88,13 @@ label,
 [class*="text-[9.5px]"],
 [class*="text-[10px]"],
 [class*="text-[10.5px]"] {
-  font-size: 12px !important;
-  line-height: 1.45;
+  font-size: 13px !important;
+  line-height: 1.5;
 }
 
 [class*="text-[11px]"] {
-  font-size: 13px !important;
-  line-height: 1.5;
+  font-size: 14px !important;
+  line-height: 1.55;
 }
 
 /* One restrained product accent; semantic colors remain reserved for status and risk. */
