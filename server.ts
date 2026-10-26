@@ -1639,7 +1639,7 @@ app.post('/api/webhooks/crm', async (req, res) => {
           gbraid: attr ? attr.gbraid : null,
           wbraid: attr ? attr.wbraid : null,
           conversionTime: parsedOccurredAt,
-          conversionValue: newDealValue > 0 ? newDealValue : (matchedLead.predictedLtv || 100),
+          conversionValue: newDealValue > 0 ? newDealValue : (matchedLead.predictedLtv ?? null),
           currency: currency || 'USD',
           hashedEmail,
           hashedPhone,
@@ -1671,6 +1671,9 @@ app.post('/api/webhooks/crm', async (req, res) => {
 
 // ─── INBOUND TWILIO SMS & WHATSAPP WEBHOOK RECEIVERS ─────────────────────────
 app.all(['/api/webhooks/twilio', '/api/webhooks/whatsapp'], async (req, res) => {
+  if (process.env.NODE_ENV === 'production') {
+    return res.status(410).json({ error: 'Inbound messaging is disabled until provider signature validation and tenant routing are configured.' });
+  }
   try {
     const rawFrom = req.body?.From || req.query?.From || '';
     const rawBody = req.body?.Body || req.query?.Body || '';
