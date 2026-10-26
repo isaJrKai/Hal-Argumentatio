@@ -141,7 +141,7 @@ export function generateLandingPageHtml(config: LandingPageConfig): string {
 
             <div>
               <label class="block text-[11px] font-semibold text-slate-300 mb-1">Phone Number (For ETA SMS) *</label>
-              <input type="tel" id="lead-phone" name="phone" required placeholder="e.g. (403) 555-0192" class="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-white placeholder-slate-500 text-sm focus:outline-none focus:border-amber-400 transition" />
+              <input type="tel" id="lead-phone" name="phone" required placeholder="Enter phone number" class="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-white placeholder-slate-500 text-sm focus:outline-none focus:border-amber-400 transition" />
             </div>
 
             <div>
