@@ -698,16 +698,16 @@ app.get('/api/public/audit/:id', async (req, res) => {
       city: lead.city,
       serviceType: lead.niche,
       websiteUrl: lead.websiteUrl || null,
-      seoScore: 68,
-      performanceScore: lead.performanceScore ?? 54,
-      sslStatus: lead.sslStatus ?? 'secured',
-      googleRating: 4.4,
-      reviewCount: lead.reviewCount ?? 38,
-      sentimentScore: 0.85,
+      seoScore: null,
+      performanceScore: lead.performanceScore ?? null,
+      sslStatus: lead.sslStatus ?? 'unknown',
+      googleRating: null,
+      reviewCount: lead.reviewCount ?? null,
+      sentimentScore: null,
       notes: lead.notes || '',
       outreachStrategy: '',
-      urgencyScore: lead.urgencyScore ?? 7.5,
-      predictedLtvUsd: lead.predictedLtv ?? 3500,
+      urgencyScore: lead.urgencyScore ?? null,
+      predictedLtvUsd: lead.predictedLtv ?? null,
       createdAt: lead.createdAt
     });
   } catch (err: any) {
@@ -1229,8 +1229,6 @@ app.post('/api/leads/ingest', authenticate, async (req, res) => {
       niche: serviceType,
       source: gclid || gbraid || wbraid ? 'google_ads' : (utmSource || 'direct'),
       status: 'new',
-      urgencyScore: 7.5,
-      predictedLtv: 2500,
       notes
     }).returning();
 
@@ -3045,8 +3043,8 @@ app.post('/api/missions', authenticate, async (req, res) => {
             niche: niche,
             source: 'sourced_intelligence',
             status: 'new',
-            urgencyScore: (hl as any).urgencyScore || 7.5,
-            predictedLtv: (hl as any).predictedLtvUsd || 2500,
+            urgencyScore: (hl as any).urgencyScore ?? 0,
+            predictedLtv: (hl as any).predictedLtvUsd ?? 0,
             notes: hl.notes || `Sourced automatically via Territory Conquest in ${city}.`,
             websiteUrl: hl.websiteUrl,
             seoScore: hl.seoScore,
@@ -7047,7 +7045,7 @@ async function startServer() {
             serviceType: hl.serviceType || niche,
             status: 'new',
             urgencyScore: Math.round((hl.sentimentScore || 0.8) * 100),
-            predictedLtvUsd: 12500,
+            predictedLtvUsd: hl.predictedLtvUsd ?? 0,
             source: 'loop_stage1_harvest',
             isSynthetic: hl.isSynthetic ?? false,
             sourceType: hl.sourceType || 'live_harvest',
@@ -7889,6 +7887,9 @@ async function startServer() {
 
   // 4. Simulate Live End-to-End Pipeline Transaction
   app.post('/api/roadmap/phase1/simulate-transaction', authenticate, async (req, res) => {
+    if (process.env.NODE_ENV === 'production') {
+      return res.status(410).json({ error: 'The sample transaction simulator is disabled in production so synthetic records cannot enter live business data.' });
+    }
     const contractorId = (req as any).contractorId;
     const { businessName, city, niche, phone, email } = req.body || {};
 
@@ -8124,7 +8125,7 @@ async function startServer() {
           source: 'harvested_intelligence',
           status: 'new',
           urgencyScore: Math.round((hl.sentimentScore || 0.8) * 100),
-          predictedLtv: 12500,
+          predictedLtv: (hl as any).predictedLtvUsd ?? 0,
           notes: hl.notes || `Harvested real business profile for ${city} ${niche}.`,
           websiteUrl: hl.websiteUrl,
           performanceScore: hl.performanceScore,
@@ -9002,7 +9003,7 @@ async function startServer() {
       const allLeads = await pgDb.select().from(leads).where(eq(leads.contractorId, contractorId));
       const totalLeadsCount = allLeads.length;
       const syntheticLeadsCount = allLeads.filter(l => l.isSynthetic).length;
-      const verifiedLeadsCount = allLeads.filter(l => (l as any).verificationStatus === 'VERIFIED' || !l.isSynthetic).length;
+      const verifiedLeadsCount = allLeads.filter(l => (l as any).verificationStatus === 'VERIFIED' && !l.isSynthetic).length;
       
       const learningState = autonomousLearning.getState();
 
@@ -9015,7 +9016,7 @@ async function startServer() {
         totalLeadsCount,
         syntheticLeadsCount,
         verifiedLeadsCount,
-        cryptoVerified: true,
+        cryptoVerified: db.verifyLedgerIntegrity(contractorId).valid,
         autonomyReadinessScore: learningState.autonomyReadinessScore,
         learningEpoch: learningState.calibrationEpoch
       };
