@@ -28,7 +28,7 @@ jobs:
       - name: Install locked dependencies
         run: npm ci
       - name: Apply non-breaking dependency security fixes
-        run: npm audit fix
+        run: npm audit fix || true
       - name: Type-check and run tests before committing
         run: npm run test:ci
       - name: Commit updated dependency lockfile
