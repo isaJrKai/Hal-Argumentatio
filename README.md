@@ -2,7 +2,7 @@
 
 HAL is an AI-assisted business operating intelligence application intended to help operators organise business information, manage leads and campaigns, analyse performance, produce forecasts and recommendations, and connect decisions to measured outcomes.
 
-**Project status:** active development; not yet production-certified. On the sale-readiness branch, GitHub Actions has passed `npm ci`, TypeScript checks, the Vitest suite, the production build, and the production dependency audit. The full audit still reports four high-severity Firebase-related entries from orphaned legacy lockfile packages; the production dependency graph reports zero vulnerabilities. Live deployment, database restore, and end-to-end provider checks remain unverified. Feature descriptions below describe intended scope and visible modules, not a warranty that every workflow is complete.
+**Project status:** active development; not yet production-certified. On `main`, GitHub Actions has passed `npm ci`, TypeScript checks, the Vitest suite, the production build, and the production dependency audit. The full audit still reports four high-severity Firebase-related entries from orphaned legacy lockfile packages; the production dependency graph reports zero vulnerabilities. Live deployment, database restore, and end-to-end provider checks remain unverified. Feature descriptions below describe intended scope and visible modules, not a warranty that every workflow is complete.
 
 - **Repository:** https://github.com/isaJrKai/Hal-Argumentatio
 - **Current preview URL:** https://halbiz.ai.studio (availability and transfer arrangements must be confirmed separately)
@@ -71,7 +71,7 @@ Do not connect a local or test run to a production database. Use a separate deve
    npm run dev
    ~~~
 
-GitHub Actions has verified the lockfile install, type-check/test suite, and production build on the sale-readiness branch. That does not verify a live database, provider credentials, migrations, or the deployed preview. The server includes environment-specific behaviour; startup alone is not proof that persistence works.
+GitHub Actions has verified the lockfile install, type-check/test suite, and production build on `main`. That does not verify a live database, provider credentials, migrations, or the deployed preview. The server includes environment-specific behaviour; startup alone is not proof that persistence works.
 
 ## Environment configuration
 
