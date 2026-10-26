@@ -279,59 +279,9 @@ export function signWebhookPayload(secret: string, payload: any): string {
  * Returns default scheduled trigger rules for Phase 3
  */
 export function getDefaultSchedulerRules(): ScheduledTriggerRule[] {
-  const now = Date.now();
-  return [
-    {
-      id: 'rule_calendar_detection',
-      name: 'Inbound Calendar & Booking Synchronization',
-      category: 'calendar_booking',
-      cronExpression: '*/15 * * * *',
-      targetAction: 'Detect scheduled customer calls & auto-advance lead pipeline stage to "proposal"',
-      status: 'active',
-      lastRunAt: new Date(now - 8 * 60000).toISOString(),
-      nextRunAt: new Date(now + 7 * 60000).toISOString(),
-      executionsCount: 284,
-      successRatePct: 99.6
-    },
-    {
-      id: 'rule_cadence_advancement',
-      name: 'Multi-Touch Cadence Timer Evaluator',
-      category: 'cadence_progression',
-      cronExpression: '0 * * * *',
-      targetAction: 'Scan active lead sequence timers, evaluate step delays, and queue follow-up messages',
-      status: 'active',
-      lastRunAt: new Date(now - 34 * 60000).toISOString(),
-      nextRunAt: new Date(now + 26 * 60000).toISOString(),
-      executionsCount: 1420,
-      successRatePct: 99.8
-    },
-    {
-      id: 'rule_outbox_drain',
-      name: 'Google Ads & Webhook Outbox Drain Engine',
-      category: 'outbox_drain',
-      cronExpression: '*/5 * * * *',
-      targetAction: 'Flush pending conversion outbox events with exponential backoff & signature verification',
-      status: 'active',
-      lastRunAt: new Date(now - 2 * 60000).toISOString(),
-      nextRunAt: new Date(now + 3 * 60000).toISOString(),
-      executionsCount: 4280,
-      successRatePct: 100.0
-    },
-    {
-      id: 'rule_forecast_recalibration',
-      name: 'Autonomous Forecast Calibration Loop',
-      category: 'forecast_calibration',
-      cronExpression: '0 0 * * *',
-      targetAction: 'Reconcile expired revenue forecasts against double-entry CRM ledger actuals',
-      status: 'active',
-      lastRunAt: new Date(now - 18 * 3600000).toISOString(),
-      nextRunAt: new Date(now + 6 * 3600000).toISOString(),
-      executionsCount: 88,
-      successRatePct: 100.0
-    }
-  ];
+  // Scheduler telemetry must come from persisted runtime records, never fabricated defaults.
+  return [];
 }
-
 /**
  * Verifies all 3 pillars of Roadmap Phase 3: Automation Engine
  */
@@ -341,7 +291,7 @@ export function verifyPhase3Pillars(
   schedulerRecords: any[] = []
 ): Phase3VerificationReport {
   // Pillar 1: Durable Multi-Step Outreach Sequencer
-  const sequences = sequencesList.length > 0 ? sequencesList : getDefaultCadenceSequences();
+  const sequences = sequencesList;
   const totalSequences = sequences.length;
   const totalStepsConfigured = sequences.reduce((acc, s) => acc + (s.steps?.length || 0), 0);
   const supportedChannels = ['email', 'sms', 'webhook', 'calendar'];
@@ -363,13 +313,13 @@ export function verifyPhase3Pillars(
   const backoff3 = calculateExponentialBackoff(3);
   const backoffVerified = backoff3.delaySeconds === 8;
 
-  const pillar2Verified = hmacSignatureCheck === 'PASSED' && backoffVerified;
+  const pillar2Verified = outboxQueueTotal > 0 && hmacSignatureCheck === 'PASSED' && backoffVerified;
 
   // Pillar 3: Automated Calendar & Scheduled Triggers
-  const rules = getDefaultSchedulerRules();
+  const rules = schedulerRecords;
   const activeTriggers = rules.filter(r => r.status === 'active').length;
-  const schedulerJobsCount = Math.max(schedulerRecords.length, rules.length);
-  const pillar3Verified = activeTriggers >= 3 && schedulerJobsCount > 0;
+  const schedulerJobsCount = rules.length;
+  const pillar3Verified = activeTriggers > 0 && schedulerJobsCount > 0;
 
   const allPassed = pillar1Verified && pillar2Verified && pillar3Verified;
 
@@ -379,19 +329,19 @@ export function verifyPhase3Pillars(
       name: 'Durable Multi-Step Outreach Sequencer',
       verified: pillar1Verified,
       status: pillar1Verified ? 'VERIFIED' : 'PENDING',
-      details: `${totalSequences} active cadences, ${totalStepsConfigured} configured touchpoints across 4 channels (Email, SMS, Webhook, Calendar)`,
+      details: totalSequences > 0 ? `${totalSequences} stored cadence records with ${totalStepsConfigured} configured touchpoints.` : 'No persisted cadence records were supplied; no active sequences are claimed.',
       metrics: {
         totalSequences,
         totalStepsConfigured,
         supportedChannels,
-        sampleSequenceId: sequences[0]?.id || 'seq_hvac_commercial'
+        sampleSequenceId: sequences[0]?.id || ''
       }
     },
     pillar2: {
       name: 'Webhook Event Dispatcher & Outbox Engine',
       verified: pillar2Verified,
       status: pillar2Verified ? 'VERIFIED' : 'PENDING',
-      details: `HMAC-SHA256 cryptographic signature verified, exponential backoff (2^n) active with dead-letter isolation`,
+      details: outboxQueueTotal > 0 ? `Observed ${outboxQueueTotal} persisted outbox records; HMAC helper self-check ${hmacSignatureCheck.toLowerCase()} and backoff helper ${backoffVerified ? 'passed' : 'failed'}. This does not prove provider delivery.` : 'No persisted outbox records are available; provider delivery is unverified.',
       metrics: {
         outboxQueueTotal,
         succeededCount,
@@ -404,12 +354,12 @@ export function verifyPhase3Pillars(
       name: 'Automated Calendar & Scheduled Triggers',
       verified: pillar3Verified,
       status: pillar3Verified ? 'VERIFIED' : 'PENDING',
-      details: `${activeTriggers} autonomous trigger jobs running (calendar booking sync, cadence timers, outbox drain)`,
+      details: schedulerJobsCount > 0 ? `${activeTriggers} active trigger records were returned by the runtime.` : 'No persisted scheduler telemetry is available; no running jobs are claimed.',
       metrics: {
         activeTriggers,
         schedulerJobsCount,
-        calendarTriggerStatus: 'SYNCHRONIZED',
-        latestJobExecution: new Date().toISOString()
+        calendarTriggerStatus: schedulerJobsCount > 0 ? 'OBSERVED' : 'UNAVAILABLE',
+        latestJobExecution: schedulerRecords.map((r: any) => r.lastRunAt).filter(Boolean).sort().at(-1) || null
       }
     },
     auditedAt: new Date().toISOString()
@@ -461,50 +411,6 @@ export interface DeliveryBridgeChannelStatus {
 }
 
 export function getDefaultBridgeChannelStatuses(): DeliveryBridgeChannelStatus[] {
-  return [
-    {
-      id: 'email',
-      name: 'Email Gateway (SMTP / SendGrid)',
-      provider: 'SendGrid v3 / RFC 5322 SMTP',
-      status: 'active',
-      lastPingMs: 42,
-      successRatePct: 99.4,
-      totalDelivered: 1248,
-      supportsRealDispatch: true,
-      authIndicator: 'Bearer API Token / TLS 1.3'
-    },
-    {
-      id: 'sms',
-      name: 'SMS Carrier Gateway (Twilio)',
-      provider: 'Twilio Programmable SMS (E.164)',
-      status: 'active',
-      lastPingMs: 68,
-      successRatePct: 98.9,
-      totalDelivered: 842,
-      supportsRealDispatch: true,
-      authIndicator: 'HTTP Basic Auth / SID-AuthToken'
-    },
-    {
-      id: 'whatsapp',
-      name: 'WhatsApp Business API Bridge',
-      provider: 'Meta Graph Cloud API / Webhook Relay',
-      status: 'sandbox_ready',
-      lastPingMs: 85,
-      successRatePct: 99.1,
-      totalDelivered: 315,
-      supportsRealDispatch: true,
-      authIndicator: 'System User Token / Phone ID'
-    },
-    {
-      id: 'webhook',
-      name: 'Transactional Webhook Outbox',
-      provider: 'HAL HMAC-SHA256 Signed Outbox',
-      status: 'active',
-      lastPingMs: 24,
-      successRatePct: 100.0,
-      totalDelivered: 4280,
-      supportsRealDispatch: true,
-      authIndicator: 'HMAC-SHA256 (X-HAL-Signature)'
-    }
-  ];
+  // Provider connectivity and delivery rates are not known until live checks provide evidence.
+  return [];
 }

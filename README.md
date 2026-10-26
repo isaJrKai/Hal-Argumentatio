@@ -2,12 +2,18 @@
 
 HAL is an AI-assisted business operating intelligence application intended to help operators organise business information, manage leads and campaigns, analyse performance, produce forecasts and recommendations, and connect decisions to measured outcomes.
 
-**Project status:** active development; not yet production-certified. On `main`, GitHub Actions has passed `npm ci`, TypeScript checks, the Vitest suite, the production build, and the production dependency audit. The full audit still reports four high-severity Firebase-related entries from orphaned legacy lockfile packages; the production dependency graph reports zero vulnerabilities. Live deployment, database restore, and end-to-end provider checks remain unverified. Feature descriptions below describe intended scope and visible modules, not a warranty that every workflow is complete.
+**Project status:** active development; not yet production-certified. On `main`, GitHub Actions has passed `npm ci`, TypeScript checks, the Vitest suite, the production build, and the production dependency audit. A clean lockfile regeneration and install have now passed CI; both production and full dependency audits report zero vulnerabilities. Live deployment, database restore, and end-to-end provider checks remain unverified. Feature descriptions below describe intended scope and visible modules, not a warranty that every workflow is complete.
 
 - **Repository:** https://github.com/isaJrKai/Hal-Argumentatio
 - **Current preview URL:** https://halbiz.ai.studio (availability and transfer arrangements must be confirmed separately)
 - **Primary stack:** React, TypeScript, Vite, Node.js/Express, PostgreSQL, Drizzle ORM
 - **AI / integration code:** Google Gemini, Hugging Face, OpenRouter, and a Model Context Protocol (MCP) interface
+
+## Data integrity and current limitations
+
+HAL must not present fixture data as business intelligence. The current code intentionally returns no default historical consensus records, arbitrage opportunities, enterprise tenant records, edge-region telemetry, or cross-industry conversion priors when no measured records are connected. Website and competitor audits require a verified data source; geographic travel-time analytics require coordinates and a real routing provider. Phase verification stays incomplete until evidence exists. The Phase 4 weight-recalibration and Phase 5 brain-sync, edge-federation, and ontology-propagation actions return an unavailable response rather than recording invented success.
+
+These controls make unsupported capabilities visibly unavailable; they do not mean the integrations have been completed.
 
 ## What HAL is designed to do
 

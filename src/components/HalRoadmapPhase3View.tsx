@@ -33,12 +33,10 @@ import {
   SequenceStep,
   ScheduledTriggerRule,
   Phase3VerificationReport,
-  getDefaultCadenceSequences,
   calculateCadenceSchedule,
   substituteTemplateTokens,
   calculateExponentialBackoff,
   signWebhookPayload,
-  getDefaultSchedulerRules
 } from '../lib/phase3-automation';
 
 interface Phase3StatusResponse {
@@ -68,11 +66,11 @@ export const HalRoadmapPhase3View: React.FC = () => {
   const [verificationResult, setVerificationResult] = useState<any | null>(null);
 
   // Sequencer Simulation State
-  const [selectedSequenceId, setSelectedSequenceId] = useState<string>('seq_hvac_commercial');
-  const [targetBusinessName, setTargetBusinessName] = useState('Apex Industrial Facilities');
-  const [targetOwnerName, setTargetOwnerName] = useState('Marcus Vance');
-  const [targetCity, setTargetCity] = useState('Austin');
-  const [targetNiche, setTargetNiche] = useState('Commercial HVAC');
+  const [selectedSequenceId, setSelectedSequenceId] = useState<string>('');
+  const [targetBusinessName, setTargetBusinessName] = useState('');
+  const [targetOwnerName, setTargetOwnerName] = useState('');
+  const [targetCity, setTargetCity] = useState('');
+  const [targetNiche, setTargetNiche] = useState('');
   const [isTriggeringSequence, setIsTriggeringSequence] = useState(false);
   const [sequenceTriggerResult, setSequenceTriggerResult] = useState<any | null>(null);
 
@@ -80,7 +78,7 @@ export const HalRoadmapPhase3View: React.FC = () => {
   const [isProcessingOutbox, setIsProcessingOutbox] = useState(false);
   const [outboxProcessResult, setOutboxProcessResult] = useState<any | null>(null);
   const [testBackoffAttempt, setTestBackoffAttempt] = useState<number>(3);
-  const [testWebhookSecret, setTestWebhookSecret] = useState('hal_secure_outbox_secret_2026');
+  const [testWebhookSecret, setTestWebhookSecret] = useState('');
   const [copiedSignature, setCopiedSignature] = useState(false);
 
   // Live Outbox Delivery Bridge State
@@ -89,14 +87,12 @@ export const HalRoadmapPhase3View: React.FC = () => {
   const [isDispatchingLive, setIsDispatchingLive] = useState(false);
   const [liveDispatchResult, setLiveDispatchResult] = useState<any | null>(null);
   const [liveChannel, setLiveChannel] = useState<'email' | 'sms' | 'webhook'>('email');
-  const [liveRecipient, setLiveRecipient] = useState('marcus.vance@apex-facilities.com');
-  const [liveSubject, setLiveSubject] = useState('Diagnostic Audit & Speed Findings for Apex Industrial Facilities');
-  const [liveMessage, setLiveMessage] = useState(
-    'Hi Marcus,\n\nWe ran an automated territory performance diagnostic on apex-facilities.com.\n\nKey Diagnostic Findings:\n• Core Web Vitals LCP: 4.2s (Threshold: 2.5s)\n• Google 3-Pack Rank: #7 (Competitor Gap: -18 reviews)\n• Estimated Monthly Lead Leakage: ~$14,200\n\nI have prepared the full technical breakdown and remediation SLA for your review.\n\nBest regards,\nHAL Executive Partner'
-  );
-  const [liveBusinessName, setLiveBusinessName] = useState('Apex Industrial Facilities');
-  const [liveTemplateType, setLiveTemplateType] = useState('speed_audit');
-  const [livePriority, setLivePriority] = useState<'standard' | 'high'>('high');
+  const [liveRecipient, setLiveRecipient] = useState('');
+  const [liveSubject, setLiveSubject] = useState('');
+  const [liveMessage, setLiveMessage] = useState('');
+  const [liveBusinessName, setLiveBusinessName] = useState('');
+  const [liveTemplateType, setLiveTemplateType] = useState('');
+  const [livePriority, setLivePriority] = useState<'standard' | 'high'>('standard');
 
   // Scheduler State
   const [isRunningScheduler, setIsRunningScheduler] = useState(false);
@@ -155,24 +151,18 @@ export const HalRoadmapPhase3View: React.FC = () => {
 
   const applyLiveTemplate = (type: string, biz: string = liveBusinessName) => {
     setLiveTemplateType(type);
+    const business = biz.trim() || 'your business';
     if (type === 'speed_audit') {
-      setLiveSubject(`Diagnostic Audit & Speed Findings for ${biz}`);
-      setLiveMessage(
-        `Hi ${biz.split(' ')[0] || 'Team'},\n\nWe ran an automated territory performance diagnostic on your web infrastructure.\n\nKey Diagnostic Findings:\n• Core Web Vitals LCP: 4.2s (Threshold: 2.5s)\n• Google 3-Pack Rank: #7 (Competitor Gap: -18 reviews)\n• Estimated Monthly Lead Leakage: ~$14,200\n\nI have prepared the full technical breakdown and remediation SLA for your review.\n\nBest regards,\nHAL Executive Partner`
-      );
+      setLiveSubject('Request to review the digital presence of ' + business);
+      setLiveMessage('Hello,\\n\\nI have not completed a verified technical assessment of ' + business + ', so I do not want to claim a specific issue or lost revenue. If useful, I can review publicly available information and share only findings with sources and timestamps.\\n\\nWould you be open to a brief, no-obligation review?');
     } else if (type === 'proposal') {
-      setLiveSubject(`Commercial Retainer & Digital Dominance SLA for ${biz}`);
-      setLiveMessage(
-        `Hi ${biz.split(' ')[0] || 'Team'},\n\nFollowing our initial audit, we have structured the guaranteed 3.5x ROAS conversion acceleration proposal for ${biz}.\n\nProposed Scope:\n1. Technical SEO & Sub-Second LCP Speed Optimizations\n2. Real-Time Google Local Services Ads Bidding Synchronizer\n3. Dedicated PII-Vault Lead Capture Engine\n\nReview the enclosed proposal and let us know if we should reserve your territory dispatch slot.`
-      );
+      setLiveSubject('Proposed scope for ' + business);
+      setLiveMessage('Hello,\\n\\nIf you are interested, I can outline a proposed scope, costs, and measurable outcomes for ' + business + '. No performance or revenue guarantee is implied; claims will be tied to agreed measurements.\\n\\nWould you like to review a short proposal?');
     } else if (type === 'followup') {
-      setLiveSubject(`Follow-up: Preserving dispatch slot for ${biz}`);
-      setLiveMessage(
-        `Hi ${biz.split(' ')[0] || 'Team'},\n\nQuick follow-up on the digital performance diagnostic we sent over for ${biz}. We have two competitor audits pending in your zip code and want to confirm if you would like first right of refusal on the territory retainer.`
-      );
+      setLiveSubject('Following up on your interest');
+      setLiveMessage('Hello,\\n\\nI am following up to see whether you would like to discuss a digital presence review. If this is not relevant, let me know and I will not continue contacting you.');
     }
   };
-
   const fetchPhase3Status = async () => {
     try {
       setLoading(true);
@@ -295,19 +285,19 @@ export const HalRoadmapPhase3View: React.FC = () => {
     }
   };
 
-  const sequences = statusData?.sequences?.length ? statusData.sequences : getDefaultCadenceSequences();
+  const sequences = statusData?.sequences ?? [];
   const currentSequence = sequences.find(s => s.id === selectedSequenceId) || sequences[0];
-  const schedulerRules = statusData?.schedulerRules?.length ? statusData.schedulerRules : getDefaultSchedulerRules();
-  const computedSchedule = calculateCadenceSchedule(new Date(), currentSequence.steps);
+  const schedulerRules = statusData?.schedulerRules ?? [];
+  const computedSchedule = currentSequence ? calculateCadenceSchedule(new Date(), currentSequence.steps) : [];
 
   const backoffCalc = calculateExponentialBackoff(testBackoffAttempt);
   const samplePayload = {
-    conversionAction: 'ClosedWon',
-    contractorId: 'HAL-ALPHA-77',
-    dealValue: 7500,
+    conversionAction: 'TestOnly',
+    contractorId: 'test-only',
+    dealValue: 0,
     timestamp: new Date().toISOString()
   };
-  const sampleSignature = signWebhookPayload(testWebhookSecret, samplePayload);
+  const sampleSignature = testWebhookSecret ? signWebhookPayload(testWebhookSecret, samplePayload) : '';
 
   const p1 = statusData?.verification?.pillar1;
   const p2 = statusData?.verification?.pillar2;
@@ -325,7 +315,7 @@ export const HalRoadmapPhase3View: React.FC = () => {
               </span>
               <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 flex items-center gap-1">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                PHASE 3 ACTIVE & 100% VERIFIED
+                {statusData?.phase3Verified ? 'PHASE 3 VERIFIED' : 'PHASE 3 NOT VERIFIED'}
               </span>
             </div>
             <h2 className="text-lg font-bold font-display text-text-primary tracking-tight">
@@ -376,7 +366,7 @@ export const HalRoadmapPhase3View: React.FC = () => {
               <span className="w-2 h-2 rounded-full bg-emerald-500" />
             </div>
             <div className="text-sm font-bold text-text-primary">
-              HMAC-SHA256 Signed
+              {p2?.verified ? 'Helper Check Passed' : 'Not Verified'}
             </div>
             <div className="text-[10px] text-text-secondary">
               2^n Exponential Backoff
@@ -402,10 +392,10 @@ export const HalRoadmapPhase3View: React.FC = () => {
               <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" />
             </div>
             <div className="text-sm font-bold text-text-primary truncate">
-              {statusData?.integrity?.totalEntries || 12} Blocks Sequenced
+              {statusData?.integrity?.totalEntries ?? 0} Recorded Blocks
             </div>
             <div className="text-[10px] font-mono text-emerald-500 font-semibold">
-              HASH CHAIN INTACT
+              {statusData?.integrity?.valid ? 'HASH CHAIN VERIFIED' : 'HASH CHAIN NOT VERIFIED'}
             </div>
           </div>
         </div>
@@ -415,10 +405,10 @@ export const HalRoadmapPhase3View: React.FC = () => {
           <div className="mt-4 p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-between text-xs">
             <div className="flex items-center gap-2 text-emerald-600 dark:text-emerald-400 font-medium">
               <CheckCircle2 className="w-4 h-4 shrink-0" />
-              <span>Phase 3 Automation Verification Complete: All 3 Pillars Passed Invariant Audit</span>
+              <span>{verificationResult.allPassed ? 'Phase 3 verification passed all required checks.' : 'Phase 3 verification is incomplete; one or more checks failed.'}</span>
             </div>
             <span className="font-mono text-[10px] text-emerald-500">
-              BLOCK #{verificationResult.block?.sequenceNumber || 'VERIFIED'}
+              BLOCK #{verificationResult.block?.sequenceNumber ?? 'NO BLOCK'}
             </span>
           </div>
         )}
@@ -690,7 +680,7 @@ export const HalRoadmapPhase3View: React.FC = () => {
                     </div>
 
                     <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">
-                      SCHEDULED READY
+                      PREVIEW ONLY
                     </span>
                   </div>
 
@@ -755,7 +745,7 @@ export const HalRoadmapPhase3View: React.FC = () => {
               <div className="flex items-center justify-between pt-2">
                 <button
                   onClick={handleTriggerSequence}
-                  disabled={isTriggeringSequence}
+                  disabled={isTriggeringSequence || !currentSequence || !targetBusinessName.trim() || !targetCity.trim() || !targetNiche.trim()}
                   className="px-4 py-2 rounded-lg bg-accent text-white hover:bg-accent/90 transition-all text-xs font-semibold flex items-center gap-2 cursor-pointer disabled:opacity-50 shadow-xs"
                 >
                   <Play className={`w-3.5 h-3.5 ${isTriggeringSequence ? 'animate-spin' : ''}`} />
@@ -765,7 +755,7 @@ export const HalRoadmapPhase3View: React.FC = () => {
                 {sequenceTriggerResult && (
                   <span className="text-xs font-mono text-emerald-500 font-semibold flex items-center gap-1.5">
                     <CheckCheck className="w-4 h-4" />
-                    Enrolled {targetBusinessName} into Step 1. Scheduled {sequenceTriggerResult.scheduledSteps?.length || 4} touchpoints.
+                    Enrolled {targetBusinessName} into Step 1. Scheduled {sequenceTriggerResult.scheduledSteps?.length ?? 0} touchpoints.
                   </span>
                 )}
               </div>
@@ -1032,7 +1022,7 @@ export const HalRoadmapPhase3View: React.FC = () => {
                     <button
                       onClick={() => {
                         setLiveChannel('email');
-                        setLiveRecipient('marcus.vance@apex-facilities.com');
+                        setLiveRecipient('');
                         applyLiveTemplate(liveTemplateType, liveBusinessName);
                       }}
                       className={`py-1.5 rounded text-[11px] font-medium flex flex-col items-center gap-1 transition-all cursor-pointer ${
@@ -1045,8 +1035,8 @@ export const HalRoadmapPhase3View: React.FC = () => {
                     <button
                       onClick={() => {
                         setLiveChannel('sms');
-                        setLiveRecipient('+1 (512) 890-4421');
-                        setLiveMessage('[HAL Alert] Marcus, emergency commercial HVAC inquiry in Austin North just requested same-day dispatch ($2,400 est ticket). Reply YES to assign tech.');
+                        setLiveRecipient('');
+                        setLiveMessage('');
                       }}
                       className={`py-1.5 rounded text-[11px] font-medium flex flex-col items-center gap-1 transition-all cursor-pointer ${
                         liveChannel === 'sms' ? 'bg-emerald-600 text-white shadow-xs' : 'text-text-secondary hover:text-text-primary'
@@ -1058,8 +1048,8 @@ export const HalRoadmapPhase3View: React.FC = () => {
                     <button
                       onClick={() => {
                         setLiveChannel('webhook');
-                        setLiveRecipient('https://crm.apex-facilities.com/api/v1/inbound-leads');
-                        setLiveMessage('{\n  "event": "lead_qualified",\n  "business": "Apex Industrial Facilities",\n  "estValue": 14200,\n  "urgency": "high"\n}');
+                        setLiveRecipient('');
+                        setLiveMessage('{\\n  "event": "test_only",\\n  "business": "",\\n  "estValue": 0,\\n  "urgency": "unverified"\\n}');
                       }}
                       className={`py-1.5 rounded text-[11px] font-medium flex flex-col items-center gap-1 transition-all cursor-pointer ${
                         liveChannel === 'webhook' ? 'bg-blue-600 text-white shadow-xs' : 'text-text-secondary hover:text-text-primary'
@@ -1082,7 +1072,7 @@ export const HalRoadmapPhase3View: React.FC = () => {
                       applyLiveTemplate(liveTemplateType, e.target.value);
                     }}
                     className="w-full px-3 py-2 rounded-lg bg-bg-overlay border border-border-dim text-xs text-text-primary focus:outline-none focus:border-accent"
-                    placeholder="e.g. Apex Industrial Facilities"
+                    placeholder="Enter business name"
                   />
                 </div>
 
@@ -1196,7 +1186,7 @@ export const HalRoadmapPhase3View: React.FC = () => {
                   <div className="flex items-center justify-between border-t border-border-dim/50 pt-1">
                     <span className="text-text-tertiary">LEDGER BLOCK ANCHOR:</span>
                     <span className="text-emerald-500 font-bold">
-                      Block #{liveDispatchResult.block?.sequenceNumber || 'N/A'} • {liveDispatchResult.block?.entryHash?.slice(0, 16)}... [HASH CHAIN INTACT]
+                      Block #{liveDispatchResult.block?.sequenceNumber || 'N/A'} • {liveDispatchResult.block?.entryHash?.slice(0, 16)}... [{liveDispatchResult.block?.entryHash ? 'HASH CHAIN VERIFIED' : 'HASH CHAIN NOT VERIFIED'}]
                     </span>
                   </div>
                 </div>
@@ -1226,24 +1216,7 @@ export const HalRoadmapPhase3View: React.FC = () => {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-border-dim/50">
-                      {(outboxQueueData?.recentDispatches?.length ? outboxQueueData.recentDispatches : [
-                        {
-                          id: 'outbox_live_01',
-                          channel: 'email',
-                          recipient: 'marcus.vance@apex-facilities.com',
-                          subject: 'Diagnostic Audit & Speed Findings for Apex Industrial Facilities',
-                          status: 'delivered',
-                          timestamp: new Date().toISOString()
-                        },
-                        {
-                          id: 'outbox_live_02',
-                          channel: 'sms',
-                          recipient: '+1 (512) 890-4421',
-                          subject: 'Urgent Commercial HVAC Dispatch Opportunity',
-                          status: 'delivered',
-                          timestamp: new Date(Date.now() - 3600000).toISOString()
-                        }
-                      ]).slice(0, 8).map((item: any, idx: number) => (
+                      {(outboxQueueData?.recentDispatches ?? []).slice(0, 8).map((item: any, idx: number) => (
                         <tr key={item.id || idx} className="hover:bg-bg-subtle/50 transition-colors">
                           <td className="p-2.5">
                             <span className="flex items-center gap-1.5">

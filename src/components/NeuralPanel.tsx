@@ -57,11 +57,11 @@ export default function NeuralPanel() {
       });
       
       setLearningMetrics({
-        autonomyScore: data.telemetry?.autonomyReadinessScore || 100,
-        epoch: data.telemetry?.calibrationEpoch || 142,
+        autonomyScore: data.telemetry?.autonomyReadinessScore ?? 0,
+        epoch: data.telemetry?.calibrationEpoch ?? 0,
         outcomesDigested: data.telemetry?.totalOutcomesDigested || 1250,
         activeWeights: ((data.nodes || []).length || 0) * 14 + 1024,
-        confidenceGlobal: (data.telemetry?.nicheMap?.general?.confidenceScore || 0.89) * 100
+        confidenceGlobal: (data.telemetry?.nicheMap?.general?.confidenceScore ?? 0) * 100
       });
       
       if (data.nodes && data.links) {

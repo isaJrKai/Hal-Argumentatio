@@ -26,22 +26,18 @@ import {
   BusinessOntologyVertical,
   BrainLayerSynchronization,
   Phase5VerificationResult,
-  getDefaultOrganizationNodes,
-  getDefaultEdgeRegions,
-  getDefaultBusinessOntologies,
-  evaluateBrainSynchronization,
   verifyPhase5Pillars
 } from '../lib/phase5-enterprise';
 
 export const HalRoadmapPhase5View: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'brain_sync' | 'multi_org' | 'edge_federation' | 'ontology'>('brain_sync');
   const [isLoading, setIsLoading] = useState(false);
-  const [orgNodes, setOrgNodes] = useState<OrganizationNode[]>(getDefaultOrganizationNodes);
-  const [edgeRegions, setEdgeRegions] = useState<EdgeRegionNode[]>(getDefaultEdgeRegions);
-  const [ontologies, setOntologies] = useState<BusinessOntologyVertical[]>(getDefaultBusinessOntologies);
-  const [brainLayers, setBrainLayers] = useState<BrainLayerSynchronization[]>(evaluateBrainSynchronization);
+  const [orgNodes, setOrgNodes] = useState<OrganizationNode[]>([]);
+  const [edgeRegions, setEdgeRegions] = useState<EdgeRegionNode[]>([]);
+  const [ontologies, setOntologies] = useState<BusinessOntologyVertical[]>([]);
+  const [brainLayers, setBrainLayers] = useState<BrainLayerSynchronization[]>([]);
   const [verification, setVerification] = useState<Phase5VerificationResult>(() =>
-    verifyPhase5Pillars(getDefaultOrganizationNodes(), getDefaultEdgeRegions(), getDefaultBusinessOntologies())
+    verifyPhase5Pillars([], [], [])
   );
   const [auditBlock, setAuditBlock] = useState<any>(null);
   const [actionNotice, setActionNotice] = useState<string | null>(null);
@@ -86,19 +82,18 @@ export const HalRoadmapPhase5View: React.FC = () => {
       const token = localStorage.getItem('token') || localStorage.getItem('halbiz_auth_token') || localStorage.getItem('hal_auth_token') || '';
       const res = await fetch('/api/roadmap/phase5/sync-brain', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        }
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }
       });
+      const data = await res.json().catch(() => ({}));
       if (res.ok) {
-        const data = await res.json();
         if (data.block) setAuditBlock(data.block);
-        if (data.brainLayers) setBrainLayers(data.brainLayers);
-        setActionNotice('Brain Synchronization verified: All 11 cognitive layers confirmed locked in phase with the HAL Constitution.');
+        if (Array.isArray(data.brainLayers)) setBrainLayers(data.brainLayers);
+        setActionNotice('Diagnostic response received.');
+      } else {
+        setActionNotice(data.error || 'Runtime brain health instrumentation is unavailable.');
       }
-    } catch (err) {
-      setActionNotice('Brain diagnostic completed: 11/11 cognitive layers verified in phase.');
+    } catch {
+      setActionNotice('Brain synchronization request failed. No success state was recorded.');
     } finally {
       setIsSyncingBrain(false);
       setTimeout(() => setActionNotice(null), 6000);
@@ -112,18 +107,18 @@ export const HalRoadmapPhase5View: React.FC = () => {
       const token = localStorage.getItem('token') || localStorage.getItem('halbiz_auth_token') || localStorage.getItem('hal_auth_token') || '';
       const res = await fetch('/api/roadmap/phase5/federate-regions', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        }
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }
       });
+      const data = await res.json().catch(() => ({}));
       if (res.ok) {
-        const data = await res.json();
         if (data.block) setAuditBlock(data.block);
-        setActionNotice('Decentralized Edge Federation complete: 3 global regions synced with zero-trust telemetry.');
+        if (Array.isArray(data.edgeRegions)) setEdgeRegions(data.edgeRegions);
+        setActionNotice('Federation response received.');
+      } else {
+        setActionNotice(data.error || 'Edge federation is unavailable without verified endpoints.');
       }
-    } catch (err) {
-      setActionNotice('Edge federation verified across North America and Europe gateways.');
+    } catch {
+      setActionNotice('Federation request failed. No regions were marked as synced.');
     } finally {
       setIsFederating(false);
       setTimeout(() => setActionNotice(null), 6000);
@@ -137,18 +132,18 @@ export const HalRoadmapPhase5View: React.FC = () => {
       const token = localStorage.getItem('token') || localStorage.getItem('halbiz_auth_token') || localStorage.getItem('hal_auth_token') || '';
       const res = await fetch('/api/roadmap/phase5/propagate-ontology', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        }
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }
       });
+      const data = await res.json().catch(() => ({}));
       if (res.ok) {
-        const data = await res.json();
         if (data.block) setAuditBlock(data.block);
-        setActionNotice('Cross-industry ontology updated: Calibrated Bayesian priors propagated across 3 trade verticals with zero PII leakage.');
+        if (Array.isArray(data.ontologies)) setOntologies(data.ontologies);
+        setActionNotice('Ontology response received.');
+      } else {
+        setActionNotice(data.error || 'Measured cross-industry priors are not configured.');
       }
-    } catch (err) {
-      setActionNotice('Knowledge transfer verified: Bayesian weights distributed across HVAC, Roofing, and Electrical.');
+    } catch {
+      setActionNotice('Ontology request failed. No synthetic priors were applied.');
     } finally {
       setIsPropagating(false);
       setTimeout(() => setActionNotice(null), 6000);
@@ -357,6 +352,7 @@ export const HalRoadmapPhase5View: React.FC = () => {
 
           {/* 11 Layers Diagnostic Table */}
           <div className="space-y-3">
+            {brainLayers.length === 0 && <div className="p-5 rounded-xl border border-border-dim text-sm text-text-secondary">Layer-level runtime health telemetry is unavailable. HAL does not report synthetic integrity scores.</div>}
             {brainLayers.map((layer, idx) => (
               <div key={idx} className="p-4 rounded-xl bg-bg-raised border border-border-dim space-y-2.5 shadow-xs">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-border-dim pb-2">
@@ -459,6 +455,7 @@ export const HalRoadmapPhase5View: React.FC = () => {
           </div>
 
           <div className="space-y-3">
+            {orgNodes.length === 0 && <div className="p-5 rounded-xl border border-border-dim text-sm text-text-secondary">No connected enterprise organization records are available.</div>}
             {orgNodes.map((org) => (
               <div key={org.id} className="p-4 rounded-xl bg-bg-raised border border-border-dim space-y-3">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
@@ -523,6 +520,7 @@ export const HalRoadmapPhase5View: React.FC = () => {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {edgeRegions.length === 0 && <div className="p-5 rounded-xl border border-border-dim text-sm text-text-secondary md:col-span-3">No verified edge endpoints or latency telemetry are configured.</div>}
             {edgeRegions.map((region) => (
               <div key={region.id} className="p-4 rounded-xl bg-bg-raised border border-border-dim space-y-3">
                 <div className="flex items-center justify-between">
@@ -584,6 +582,7 @@ export const HalRoadmapPhase5View: React.FC = () => {
           </div>
 
           <div className="space-y-4">
+            {ontologies.length === 0 && <div className="p-5 rounded-xl border border-border-dim text-sm text-text-secondary">No measured cross-industry conversion priors are available.</div>}
             {ontologies.map((item) => (
               <div key={item.id} className="p-5 rounded-xl bg-bg-raised border border-border-dim space-y-3">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">

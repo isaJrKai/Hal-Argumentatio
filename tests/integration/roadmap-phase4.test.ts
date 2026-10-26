@@ -56,8 +56,12 @@ describe('HAL Roadmap Phase 4: Multi-Agent Consensus & Neural Graph Architecture
     });
 
     it('records consensus decisions immutably onto the cryptographic ledger', () => {
-      const consensusHistory = getDefaultConsensusHistory();
-      const targetConsensus = consensusHistory[0];
+      const targetConsensus = {
+        id: 'test-consensus-record',
+        verdict: 'CONTRACT_VERIFIED_UNANIMOUS',
+        alignmentScore: 90,
+        policyValidationPassed: true
+      };
 
       const block = db.recordLedgerEntry({
         contractorId: testContractorId,
@@ -84,21 +88,11 @@ describe('HAL Roadmap Phase 4: Multi-Agent Consensus & Neural Graph Architecture
   });
 
   describe('Pillar 2: Neural Graph Routing & Bayesian Weight Recalibration', () => {
-    it('maintains active neural routing nodes covering discovery, auditing, copywriting, and critic', () => {
-      const nodes = getDefaultNeuralGraphNodes();
-      expect(nodes.length).toBeGreaterThanOrEqual(5);
-
-      const descriptors = nodes.map(n => `${n.name} ${n.role}`.toLowerCase());
-      expect(descriptors.some(d => d.includes('discovery') || d.includes('serp'))).toBe(true);
-      expect(descriptors.some(d => d.includes('auditor') || d.includes('seo') || d.includes('speed'))).toBe(true);
-      expect(descriptors.some(d => d.includes('copywriter') || d.includes('outreach'))).toBe(true);
-      expect(descriptors.some(d => d.includes('critic') || d.includes('compliance'))).toBe(true);
-      expect(descriptors.some(d => d.includes('arbitrage'))).toBe(true);
-
-      expect(nodes.every(n => n.status === 'active')).toBe(true);
+    it('does not invent active node telemetry when no runtime measurements are stored', () => {
+      expect(getDefaultNeuralGraphNodes()).toEqual([]);
     });
 
-    it('records Bayesian recalibration blocks with updated network efficiency metrics', () => {
+    it('records a ledger event without inventing node telemetry', () => {
       const nodes = getDefaultNeuralGraphNodes();
       const updatedNodes = nodes.map(n => ({
         ...n,
@@ -121,6 +115,7 @@ describe('HAL Roadmap Phase 4: Multi-Agent Consensus & Neural Graph Architecture
         }
       });
 
+      expect(updatedNodes).toEqual([]);
       expect(block.sequenceNumber).toBeGreaterThan(1);
       expect(block.entryHash).toHaveLength(64);
 
@@ -200,18 +195,18 @@ describe('HAL Roadmap Phase 4: Multi-Agent Consensus & Neural Graph Architecture
   });
 
   describe('Full Phase 4 Pillar Invariant Verification', () => {
-    it('passes all 3 Phase 4 pillars with 100% total score', () => {
-      const consensusHistory = getDefaultConsensusHistory();
-      const nodes = getDefaultNeuralGraphNodes();
-      const arbitrage = getDefaultArbitrageOpportunities();
+    it('fails closed while verified consensus, node telemetry, and arbitrage records are unavailable', () => {
+      const verification = verifyPhase4Pillars(
+        getDefaultConsensusHistory(),
+        getDefaultNeuralGraphNodes(),
+        getDefaultArbitrageOpportunities()
+      );
 
-      const verification = verifyPhase4Pillars(consensusHistory, nodes, arbitrage);
-
-      expect(verification.allPassed).toBe(true);
-      expect(verification.totalScore).toBe(100);
-      expect(verification.pillar1.passed).toBe(true);
-      expect(verification.pillar2.passed).toBe(true);
-      expect(verification.pillar3.passed).toBe(true);
+      expect(verification.allPassed).toBe(false);
+      expect(verification.totalScore).toBe(0);
+      expect(verification.pillar1.passed).toBe(false);
+      expect(verification.pillar2.passed).toBe(false);
+      expect(verification.pillar3.passed).toBe(false);
     });
   });
 });

@@ -12,7 +12,7 @@ This document separates observed repository facts from work that still needs evi
 - A root README and sale-readiness handover document are now merged into `main`.
 - GitHub Actions CI runs on pushes to `main`; the latest merge commit has a passing CI run.
 
-**Important:** The latest GitHub Actions run passed `npm ci`, `npm run test:ci`, the production build, and the production dependency audit. The production dependency audit reported **0 vulnerable packages**. The full audit still reports four high-severity Firebase-related packages from orphaned legacy lockfile entries; the app now imports only `@firebase/app` and `@firebase/auth`, and `firebase`/`firebase-admin` are no longer root dependencies, but a clean regenerated lockfile is still needed to eliminate those stale entries. Live end-to-end verification, database restore, full tenant-isolation review, and production deployment have not been demonstrated.
+**Important:** The latest GitHub Actions run passed `npm ci`, `npm run test:ci`, the production build, and the production dependency audit. The production dependency audit reported **0 vulnerable packages**. A clean lockfile regeneration, `npm ci`, type-check/test suite, production build, production dependency audit, and full dependency audit have all passed. The audit reports zero vulnerabilities. Live end-to-end verification, database restore, full tenant-isolation review, and production deployment have not been demonstrated.
 
 The unified outreach UI previously displayed fabricated provider connection states and sample performance figures. The merged `main` revision removes or relabels fabricated pipeline, conversion, outreach, lead-assessment, and activity figures and labels the unified dispatch route as simulation-only; no provider delivery is claimed. Provider adapters, callback/event tracking, webhook SSRF protection, durable encrypted per-account credential storage, and end-to-end tests remain release work.
 
@@ -35,7 +35,7 @@ Record evidence for each item before calling HAL production-ready.
 | CORS / rate limiting | Allowed origins and abuse limits match the deployment threat model | Requires review and testing |
 | AI providers | Missing keys, quota errors, timeouts, and provider failures handled predictably | Requires testing |
 | Deployment | Fresh deployment from documented steps; health check and critical journeys verified | Not yet verified; current host could not be controlled or verified from this session |
-| Dependencies/licences | Advisory report and third-party licence inventory reviewed | Production audit: 0 vulnerabilities. Full audit: 4 high-severity findings from orphaned legacy Firebase lock entries; clean lock regeneration remains open. Third-party licence inventory still needs review |
+| Dependencies/licences | Advisory report and third-party licence inventory reviewed | Production and full dependency audits: 0 vulnerabilities after clean lockfile regeneration. Third-party licence inventory still needs review |
 | Data handling | Tracked data files checked; customer/PII transfer scope documented | Requires review |
 | Domain/hosting | Current host, account ownership, URL transfer limits, and migration plan confirmed | Requires confirmation |
 

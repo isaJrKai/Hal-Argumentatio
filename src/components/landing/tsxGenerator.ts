@@ -157,7 +157,7 @@ export default function ${componentName}() {
                         required
                         value={formData.phone}
                         onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                        placeholder="e.g. (403) 555-0192"
+                        placeholder="Enter phone number"
                         className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-white placeholder-slate-500 text-sm focus:outline-none focus:border-amber-400"
                       />
                     </div>

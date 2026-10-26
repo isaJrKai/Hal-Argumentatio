@@ -1510,9 +1510,13 @@ Next-Gen Waterproofing	Calgary	Waterproofing	Jane Smith	jane@nextgen.ca	403-555-
                     <span className="text-[9px] font-mono bg-amber-500/15 text-amber-400 px-2 py-1 rounded-sm border border-amber-500/40 font-bold uppercase tracking-wider flex items-center gap-1">
                       <AlertTriangle className="w-3 h-3 text-amber-400" /> SYNTHETIC DEMO
                     </span>
-                  ) : (
+                  ) : selectedLead.verificationStatus === 'VERIFIED' && selectedLead.dnsVerified ? (
                     <span className="text-[9px] font-mono bg-emerald-500/10 text-emerald-400 px-2 py-1 rounded-sm border border-emerald-500/20 font-bold uppercase tracking-wider">
-                      VERIFIED LIVE
+                      GROUNDING PROBED
+                    </span>
+                  ) : (
+                    <span className="text-[9px] font-mono bg-amber-500/15 text-amber-400 px-2 py-1 rounded-sm border border-amber-500/30 font-bold uppercase tracking-wider">
+                      UNVERIFIED STAGING
                     </span>
                   )}
                 </div>
@@ -1912,7 +1916,7 @@ Next-Gen Waterproofing	Calgary	Waterproofing	Jane Smith	jane@nextgen.ca	403-555-
                     type="text"
                     value={phone}
                     onChange={(e) => setPhone(e.target.value)}
-                    placeholder="e.g., 555-019-2834"
+                    placeholder="Enter phone number"
                     className="w-full bg-card-inner border border-border-dark rounded-sm p-2 focus:outline-none focus:border-brand text-text-primary placeholder-text-dim"
                   />
                 </div>

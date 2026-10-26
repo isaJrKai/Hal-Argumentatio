@@ -130,7 +130,7 @@ interface PublicLinkConfig {
 }
 
 const publicLinkConfig: PublicLinkConfig = {
-  mode: 'safe_sandbox', // Safe sandbox active by default for Reddit/Community testing
+  mode: 'disabled', // Public demo access remains disabled until explicitly enabled by an authenticated administrator
   rateLimitPerMinute: 60,
   aiLimitPerTenMin: 5
 };
@@ -245,12 +245,12 @@ app.get('/api/public-link/status', (req, res) => {
     mode: publicLinkConfig.mode,
     rateLimitPerMinute: publicLinkConfig.rateLimitPerMinute,
     aiLimitPerTenMin: publicLinkConfig.aiLimitPerTenMin,
-    sharedUrl: 'https://ais-pre-yhe6kkyk2vea7llaamk5bi-536406481799.europe-west1.run.app',
+    sharedUrl: process.env.APP_URL?.trim() || null,
     isSafeDemoActive: publicLinkConfig.mode === 'safe_sandbox'
   });
 });
 
-app.post('/api/public-link/mode', express.json(), (req, res) => {
+app.post('/api/public-link/mode', express.json(), authenticate, requireRole('admin'), (req, res) => {
   const { mode } = req.body;
   if (mode === 'safe_sandbox' || mode === 'disabled' || mode === 'open') {
     publicLinkConfig.mode = mode;
@@ -402,25 +402,37 @@ app.post('/mcp/:secret', express.json(), async (req, res) => {
 app.all('/mcp/:secret', (_req, res) => res.status(405).json({ error: 'Use POST' }));
 
 // Middleware: Authenticate Contractor via JWT
-function authenticate(req: express.Request, res: express.Response, next: express.NextFunction) {
+// Middleware: Authenticate Contractor via JWT and current persisted account state.
+async function authenticate(req: express.Request, res: express.Response, next: express.NextFunction) {
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
     return res.status(401).json({ error: 'Authorization header missing or invalid format' });
   }
 
-  const token = authHeader.split(' ')[1];
+  const token = authHeader.slice('Bearer '.length).trim();
   const decoded = verifyToken(token);
-  
-  if (!decoded) {
+  if (!decoded || typeof decoded.contractorId !== 'string' || !decoded.contractorId) {
     return res.status(401).json({ error: 'Invalid or expired authentication token' });
   }
 
-  // Inject session details into req
-  (req as any).contractorId = decoded.contractorId;
-  (req as any).contractorEmail = decoded.email;
-  (req as any).contractorRole = decoded.role;
+  // JWT claims can become stale after an account is deleted or its role changes.
+  // Always resolve the current account and privileges from PostgreSQL; fail closed
+  // if the account cannot be verified instead of trusting token/email fallbacks.
+  try {
+    const result = await pgDb.select().from(contractors).where(eq(contractors.id, decoded.contractorId)).limit(1);
+    const contractor = result[0];
+    if (!contractor) {
+      return res.status(401).json({ error: 'Account is no longer available' });
+    }
 
-  next();
+    (req as any).contractorId = contractor.id;
+    (req as any).contractorEmail = contractor.email;
+    (req as any).contractorRole = contractor.role === 'admin' ? 'admin' : 'user';
+    next();
+  } catch (err) {
+    console.error('[HAL auth] Unable to verify persisted account:', err);
+    return res.status(503).json({ error: 'Authentication service unavailable. Please try again later.' });
+  }
 }
 
 // Middleware: Require Admin Role
@@ -436,46 +448,38 @@ function requireRole(role: 'admin' | 'user') {
 
 // Helper to resolve workspace contractor IDs (allows admins to view full primary workspace)
 function getTargetContractorIds(contractorId: string, role?: string): string[] {
-  if (role === 'admin' || contractorId === 'con_admin_seed' || contractorId === 'con_isaac_seed') {
+  if (role === 'admin') {
     return ['con_admin_seed', 'con_isaac_seed'];
   }
   return [contractorId];
 }
 
 // ─── AUTHENTICATION ROUTES ───────────────────────────────────────────────────
+// ─── AUTHENTICATION ROUTES ───────────────────────────────────────────────────
 
 app.get('/api/auth/me', authenticate, async (req, res) => {
   const contractorId = (req as any).contractorId;
-  const email = ((req as any).contractorEmail || '').toLowerCase().trim();
-  const role = (req as any).contractorRole || 'user';
-  const isIsaacOrAdmin = email.includes('admin') || email.includes('kaiso') || contractorId === 'con_admin_seed' || contractorId === 'con_isaac_seed';
 
   try {
-    const result = await pgDb.select().from(contractors).where(eq(contractors.id, contractorId));
-    if (result.length > 0) {
-      const con = result[0];
-      return res.json({
-        contractor: {
-          id: con.id,
-          email: con.email,
-          name: con.companyName || (isIsaacOrAdmin ? 'Isaac' : 'Workspace'),
-          role: isIsaacOrAdmin ? 'admin' : (con.role || role),
-          marketId: 'market_default'
-        }
-      });
+    const result = await pgDb.select().from(contractors).where(eq(contractors.id, contractorId)).limit(1);
+    const con = result[0];
+    if (!con) {
+      return res.status(401).json({ error: 'Account is no longer available' });
     }
-  } catch (err) {}
 
-  const localCon = db.getContractorById(contractorId) || db.getContractorByEmail(email);
-  return res.json({
-    contractor: {
-      id: contractorId,
-      email: email,
-      name: localCon?.name || (isIsaacOrAdmin ? (email.includes('admin') ? 'Isaac (Admin)' : 'Isaac') : 'Workspace'),
-      role: isIsaacOrAdmin ? 'admin' : role,
-      marketId: 'market_default'
-    }
-  });
+    return res.json({
+      contractor: {
+        id: con.id,
+        email: con.email,
+        name: con.companyName || 'Workspace',
+        role: con.role === 'admin' ? 'admin' : 'user',
+        marketId: 'market_default'
+      }
+    });
+  } catch (err) {
+    console.error('[HAL auth] Unable to load current account:', err);
+    return res.status(503).json({ error: 'Authentication service unavailable. Please try again later.' });
+  }
 });
 
 app.post('/api/auth/register', async (req, res) => {
@@ -1094,16 +1098,45 @@ app.get('/api/leads', authenticate, async (req, res) => {
   const targetIds = getTargetContractorIds(contractorId, role);
   try {
     const contractorLeads = await pgDb.select().from(leads).where(inArray(leads.contractorId, targetIds)).orderBy(desc(leads.createdAt));
-    const decryptedLeads = contractorLeads.map(l => ({
-      ...l,
-      email: l.emailEncrypted ? (decrypt(l.emailEncrypted) || l.email) : l.email,
-      phone: l.phoneEncrypted ? (decrypt(l.phoneEncrypted) || l.phone) : l.phone
-    }));
+    const leadIds = contractorLeads.map(lead => lead.id);
+    const groundingEvents = leadIds.length
+      ? await pgDb.select({ leadId: leadEvents.leadId, createdAt: leadEvents.createdAt })
+          .from(leadEvents)
+          .where(and(inArray(leadEvents.leadId, leadIds), eq(leadEvents.eventType, 'GroundingVerified')))
+      : [];
+    const latestGroundingEvent = new Map<string, Date>();
+    for (const event of groundingEvents) {
+      if (!event.createdAt) continue;
+      const current = latestGroundingEvent.get(event.leadId);
+      if (!current || event.createdAt > current) latestGroundingEvent.set(event.leadId, event.createdAt);
+    }
+    const decryptedLeads = contractorLeads.map(l => {
+      const lastProbeAt = latestGroundingEvent.get(l.id);
+      // Legacy rows may have been marked VERIFIED by an old default, not a real probe.
+      // A current grounding audit event must exist after the latest lead edit.
+      const hasCurrentGroundingEvidence = Boolean(lastProbeAt && lastProbeAt >= l.updatedAt);
+      const safeVerificationStatus = l.verificationStatus === 'VERIFIED' && !hasCurrentGroundingEvidence
+        ? 'UNVERIFIED_STAGING'
+        : l.verificationStatus;
+      return {
+        ...l,
+        verificationStatus: safeVerificationStatus,
+        dnsVerified: hasCurrentGroundingEvidence ? l.dnsVerified : (safeVerificationStatus === 'VERIFIED' ? l.dnsVerified : false),
+        email: l.emailEncrypted ? (decrypt(l.emailEncrypted) || l.email) : l.email,
+        phone: l.phoneEncrypted ? (decrypt(l.phoneEncrypted) || l.phone) : l.phone
+      };
+    });
     res.json(decryptedLeads);
   } catch (err: any) {
     try {
       const localLeads = db.getLeads(contractorId);
-      return res.json(localLeads);
+      // The in-memory fallback has no durable grounding audit history, so never
+      // present its legacy VERIFIED flag as proof of a current live probe.
+      return res.json(localLeads.map(lead => ({
+        ...lead,
+        verificationStatus: lead.verificationStatus === 'VERIFIED' ? 'UNVERIFIED_STAGING' : lead.verificationStatus,
+        dnsVerified: lead.verificationStatus === 'VERIFIED' ? false : lead.dnsVerified
+      })));
     } catch (localErr) {
       res.json([]);
     }
@@ -4869,22 +4902,10 @@ app.post('/api/ai/simulate-outreach', authenticate, async (req, res) => {
     
     res.json({ success: true, result: parsedResult });
   } catch (err: any) {
-    console.error("Simulation warning, serving empirical fallback:", err);
-    const targetNiche = niche || 'home_services';
-    const targetChannel = channel || 'multichannel';
-    const isHighIntent = /emergency|leak|repair|freeze|storm/i.test(offer || '');
-    const predictedCpl = isHighIntent ? 32.5 : 46.0;
-    const volume = isHighIntent ? 26 : 19;
-    const confidence = isHighIntent ? 86 : 78;
-
-    res.json({
-      success: true,
-      result: {
-        confidence,
-        predictedCpl,
-        volume,
-        rationale: `HAL Empirical Simulation Engine: Validated for ${targetNiche} across ${targetChannel}. Projected ${volume} conversions at $${predictedCpl} CPL based on historical conversion velocity.`
-      }
+    console.error("Simulation request failed; no synthetic metrics were generated:", err);
+    res.status(503).json({
+      success: false,
+      error: 'Simulation unavailable: the model request failed and no verified fallback metrics exist.'
     });
   }
 });
@@ -4913,7 +4934,8 @@ app.post('/api/ai/test-timesfm', authenticate, async (req, res) => {
     res.json(result);
   } catch (err: any) {
     console.error('TimesFM Brain execution error:', err);
-    res.status(500).json({ error: err.message });
+    const unavailable = String(err?.message || '').includes('Forecast unavailable');
+    res.status(unavailable ? 409 : 500).json({ error: err.message });
   }
 });
 
@@ -8667,9 +8689,9 @@ async function startServer() {
         phase: 4,
         id: 'multi_agent',
         name: 'Multi-Agent',
-        status: 'verified_complete',
-        progress: 100,
-        active: true,
+        status: verification.allPassed ? 'verified_complete' : 'not_verified',
+        progress: verification.totalScore,
+        active: verification.allPassed,
         verification,
         consensusHistory,
         nodes,
@@ -8801,45 +8823,11 @@ async function startServer() {
   });
 
   // 4. Bayesian Weight Recalibration
-  app.post('/api/roadmap/phase4/recalibrate-weights', authenticate, async (req, res) => {
-    const contractorId = (req as any).contractorId;
-
-    try {
-      const epoch = 15;
-      const updatedWeights = {
-        missingSslUrgency: 8.6,
-        slowSpeedUrgency: 7.4,
-        lowReviewCountWeight: 6.9,
-        poorGoogleRatingWeight: 7.6,
-        phoneChannelMultiplier: 1.38,
-        emailChannelMultiplier: 0.96
-      };
-
-      const auditBlock = db.recordLedgerEntry({
-        contractorId,
-        eventType: 'phase4_weights_recalibrated',
-        entityType: 'bayesian_weight_matrix',
-        entityId: `epoch_${epoch}`,
-        actor: 'HAL Autonomous Learning Engine',
-        details: `Recalibrated Bayesian weights across commercial contractor niches. Epoch #${epoch} processed with updated technical multipliers.`,
-        metadata: {
-          epoch,
-          updatedWeights,
-          timestamp: new Date().toISOString()
-        }
-      });
-
-      res.json({
-        success: true,
-        epoch,
-        weights: updatedWeights,
-        block: auditBlock,
-        integrity: db.verifyLedgerIntegrity(contractorId)
-      });
-    } catch (err: any) {
-      console.error('[Roadmap Phase 4 Recalibrate Weights Error]', err);
-      res.status(500).json({ success: false, error: err.message });
-    }
+  app.post('/api/roadmap/phase4/recalibrate-weights', authenticate, async (_req, res) => {
+    return res.status(409).json({
+      success: false,
+      error: 'Weight recalibration is unavailable until real outcome data and persisted model parameters are connected.'
+    });
   });
 
   // 5. Strategy & Spend Arbitrage Execution (Closed-Loop Database Reallocation)
@@ -9071,97 +9059,27 @@ async function startServer() {
   });
 
   // POST /api/roadmap/phase5/sync-brain
-  app.post('/api/roadmap/phase5/sync-brain', authenticate, async (req, res) => {
-    try {
-      const contractorId = (req as any).contractorId;
-      const brainLayers = evaluateBrainSynchronization();
-
-      const auditBlock = db.recordLedgerEntry({
-        contractorId,
-        eventType: 'phase5_brain_synced',
-        entityType: 'cognitive_architecture',
-        entityId: '11_layer_brain_synchronization',
-        actor: 'HAL Cognitive Synchronizer',
-        details: 'Synchronized all 11 cognitive layers with the HAL Constitution. Aligned with Junior Colleague desk instrument paradigm; zero hardcoded workflows.',
-        metadata: {
-          layersCount: brainLayers.length,
-          allLocked: brainLayers.every(l => l.synchronizationStatus === 'LOCKED_IN_PHASE'),
-          paradigm: 'constrain_tools_not_behavior'
-        }
-      });
-
-      res.json({
-        success: true,
-        brainLayers,
-        block: auditBlock,
-        integrity: db.verifyLedgerIntegrity(contractorId)
-      });
-    } catch (err: any) {
-      console.error('[Roadmap Phase 5 Sync Brain Error]', err);
-      res.status(500).json({ success: false, error: err.message });
-    }
+  app.post('/api/roadmap/phase5/sync-brain', authenticate, async (_req, res) => {
+    return res.status(409).json({
+      success: false,
+      error: 'Runtime brain synchronization cannot be reported until layer-level health instrumentation exists.'
+    });
   });
 
   // POST /api/roadmap/phase5/federate-regions
-  app.post('/api/roadmap/phase5/federate-regions', authenticate, async (req, res) => {
-    try {
-      const contractorId = (req as any).contractorId;
-      const edgeRegions = getDefaultEdgeRegions();
-
-      const auditBlock = db.recordLedgerEntry({
-        contractorId,
-        eventType: 'phase5_regions_federated',
-        entityType: 'edge_telemetry',
-        entityId: 'global_edge_federation',
-        actor: 'HAL Distributed Edge Router',
-        details: `Federated 3 global edge nodes (US-East, US-West, EU-Central) with latency under 85ms and zero-trust replication.`,
-        metadata: {
-          regions: edgeRegions.map(r => r.name),
-          healthyCount: edgeRegions.filter(r => r.syncStatus === 'HEALTHY').length
-        }
-      });
-
-      res.json({
-        success: true,
-        edgeRegions,
-        block: auditBlock,
-        integrity: db.verifyLedgerIntegrity(contractorId)
-      });
-    } catch (err: any) {
-      console.error('[Roadmap Phase 5 Federate Regions Error]', err);
-      res.status(500).json({ success: false, error: err.message });
-    }
+  app.post('/api/roadmap/phase5/federate-regions', authenticate, async (_req, res) => {
+    return res.status(409).json({
+      success: false,
+      error: 'Edge federation is unavailable until real edge endpoints and verified health probes are configured.'
+    });
   });
 
   // POST /api/roadmap/phase5/propagate-ontology
-  app.post('/api/roadmap/phase5/propagate-ontology', authenticate, async (req, res) => {
-    try {
-      const contractorId = (req as any).contractorId;
-      const ontologies = getDefaultBusinessOntologies();
-
-      const auditBlock = db.recordLedgerEntry({
-        contractorId,
-        eventType: 'phase5_ontology_propagated',
-        entityType: 'business_ontology',
-        entityId: 'cross_industry_knowledge',
-        actor: 'HAL Bayesian Ontology Synthesizer',
-        details: 'Propagated 3 trade ontologies (Commercial HVAC, Apex Roofing, Industrial Electrical) with guaranteed zero-PII leakage.',
-        metadata: {
-          ontologiesCount: ontologies.length,
-          allPrivacyGuaranteed: ontologies.every(o => o.privacyGuaranteed)
-        }
-      });
-
-      res.json({
-        success: true,
-        ontologies,
-        block: auditBlock,
-        integrity: db.verifyLedgerIntegrity(contractorId)
-      });
-    } catch (err: any) {
-      console.error('[Roadmap Phase 5 Propagate Ontology Error]', err);
-      res.status(500).json({ success: false, error: err.message });
-    }
+  app.post('/api/roadmap/phase5/propagate-ontology', authenticate, async (_req, res) => {
+    return res.status(409).json({
+      success: false,
+      error: 'Cross-industry priors are unavailable until measured, privacy-reviewed source data is connected.'
+    });
   });
 
 

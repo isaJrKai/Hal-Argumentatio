@@ -19,7 +19,7 @@ export interface GoogleAdsBaseline {
   empiricalCpl: number;
   empiricalCtr: number;
   empiricalConversionRate: number;
-  source: 'LIVE_POSTGRES_TABLE' | 'CALIBRATED_TERRITORY_SEED';
+  source: 'LIVE_POSTGRES_TABLE' | 'UNAVAILABLE';
   daysSampled: number;
 }
 
@@ -90,8 +90,8 @@ export interface BrainSynchronizedForecastResult {
  */
 export async function ingestAndCalibrateGoogleAds(
   contractorId: string,
-  targetNiche: string = 'roofing',
-  targetCity: string = 'Calgary'
+  _targetNiche: string = 'roofing',
+  _targetCity: string = 'Calgary'
 ): Promise<GoogleAdsBaseline> {
   try {
     const records = await pgDb
@@ -100,112 +100,58 @@ export async function ingestAndCalibrateGoogleAds(
       .where(eq(googleAdsDailyPerformance.contractorId, contractorId))
       .orderBy(desc(googleAdsDailyPerformance.date));
 
-    if (records.length > 0) {
-      const totalCost = records.reduce((acc, r) => acc + Number(r.cost || 0), 0);
-      const totalClicks = records.reduce((acc, r) => acc + Number(r.clicks || 0), 0);
-      const totalImpressions = records.reduce((acc, r) => acc + Number(r.impressions || 0), 0);
-      const totalConversions = records.reduce((acc, r) => acc + Number(r.conversions || 0), 0);
-
-      const empiricalCpl = totalConversions > 0 
-        ? parseFloat((totalCost / totalConversions).toFixed(2)) 
-        : 44.50;
-      const empiricalCtr = totalImpressions > 0 
-        ? parseFloat((totalClicks / totalImpressions).toFixed(4)) 
-        : 0.042;
-      const empiricalConversionRate = totalClicks > 0 
-        ? parseFloat((totalConversions / totalClicks).toFixed(4)) 
-        : 0.088;
-
+    if (records.length === 0) {
       return {
-        recordsCount: records.length,
-        totalCost: Math.round(totalCost),
-        totalClicks,
-        totalImpressions,
-        totalConversions,
-        empiricalCpl,
-        empiricalCtr,
-        empiricalConversionRate,
-        source: 'LIVE_POSTGRES_TABLE',
-        daysSampled: Math.min(records.length, 60)
+        recordsCount: 0,
+        totalCost: 0,
+        totalClicks: 0,
+        totalImpressions: 0,
+        totalConversions: 0,
+        empiricalCpl: 0,
+        empiricalCtr: 0,
+        empiricalConversionRate: 0,
+        source: 'UNAVAILABLE',
+        daysSampled: 0
       };
     }
 
-    // Auto-seed 30 days of calibrated daily performance so the contractor has real records
-    const seededDays = 30;
-    const seededRecords = [];
-    const baseCpc = targetNiche.toLowerCase().includes('roof') ? 6.20 : targetNiche.toLowerCase().includes('plumb') ? 7.80 : 5.40;
-    
-    let simTotalCost = 0;
-    let simTotalClicks = 0;
-    let simTotalImpressions = 0;
-    let simTotalConversions = 0;
-
-    for (let d = seededDays; d >= 1; d--) {
-      const date = new Date(Date.now() - d * 86400000);
-      const impressions = Math.round(180 + Math.sin(d) * 45 + (d % 7 < 2 ? 60 : 0));
-      const clicks = Math.round(impressions * (0.041 + (Math.sin(d * 2.1) * 0.008)));
-      const conversions = Math.max(1, Math.round(clicks * 0.092));
-      const cost = parseFloat((clicks * baseCpc).toFixed(2));
-
-      simTotalCost += cost;
-      simTotalClicks += clicks;
-      simTotalImpressions += impressions;
-      simTotalConversions += conversions;
-
-      seededRecords.push({
-        id: crypto.randomUUID(),
-        contractorId,
-        campaignId: `camp_google_${targetNiche}_${targetCity.toLowerCase()}`,
-        campaignName: `${targetCity} ${targetNiche.toUpperCase()} High-Intent Search`,
-        geo: targetCity,
-        keyword: `${targetNiche} repair ${targetCity.toLowerCase()}`,
-        searchTerm: `emergency ${targetNiche} contractor near me`,
-        date,
-        impressions,
-        clicks,
-        cost,
-        conversions,
-        conversionValue: conversions * 850
-      });
-    }
-
-    // Insert seeded daily records batch
-    if (seededRecords.length > 0) {
-      await pgDb.insert(googleAdsDailyPerformance).values(seededRecords);
-    }
+    const totalCost = records.reduce((acc, r) => acc + Number(r.cost || 0), 0);
+    const totalClicks = records.reduce((acc, r) => acc + Number(r.clicks || 0), 0);
+    const totalImpressions = records.reduce((acc, r) => acc + Number(r.impressions || 0), 0);
+    const totalConversions = records.reduce((acc, r) => acc + Number(r.conversions || 0), 0);
 
     return {
-      recordsCount: seededRecords.length,
-      totalCost: Math.round(simTotalCost),
-      totalClicks: simTotalClicks,
-      totalImpressions: simTotalImpressions,
-      totalConversions: simTotalConversions,
-      empiricalCpl: parseFloat((simTotalCost / simTotalConversions).toFixed(2)),
-      empiricalCtr: parseFloat((simTotalClicks / simTotalImpressions).toFixed(4)),
-      empiricalConversionRate: parseFloat((simTotalConversions / simTotalClicks).toFixed(4)),
-      source: 'CALIBRATED_TERRITORY_SEED',
-      daysSampled: seededDays
+      recordsCount: records.length,
+      totalCost: Math.round(totalCost),
+      totalClicks,
+      totalImpressions,
+      totalConversions,
+      empiricalCpl: totalConversions > 0 ? parseFloat((totalCost / totalConversions).toFixed(2)) : 0,
+      empiricalCtr: totalImpressions > 0 ? parseFloat((totalClicks / totalImpressions).toFixed(4)) : 0,
+      empiricalConversionRate: totalClicks > 0 ? parseFloat((totalConversions / totalClicks).toFixed(4)) : 0,
+      source: 'LIVE_POSTGRES_TABLE',
+      daysSampled: new Set(records.map(r => String(r.date))).size
     };
   } catch (err: any) {
-    console.warn('Google Ads ingestion encountered exception, using fallback baseline:', err.message);
+    console.warn('Google Ads baseline unavailable:', err.message);
     return {
       recordsCount: 0,
-      totalCost: 1840,
-      totalClicks: 260,
-      totalImpressions: 6200,
-      totalConversions: 42,
-      empiricalCpl: 43.80,
-      empiricalCtr: 0.0419,
-      empiricalConversionRate: 0.161,
-      source: 'CALIBRATED_TERRITORY_SEED',
-      daysSampled: 30
+      totalCost: 0,
+      totalClicks: 0,
+      totalImpressions: 0,
+      totalConversions: 0,
+      empiricalCpl: 0,
+      empiricalCtr: 0,
+      empiricalConversionRate: 0,
+      source: 'UNAVAILABLE',
+      daysSampled: 0
     };
   }
 }
 
 /**
- * 2. Weather Trigger Integration (Layer 6: World Model)
- * Couples geocoded service zones with Open-Meteo regional weather warnings.
+ * Reads live weather only for explicitly supported city coordinates.
+ * Missing coordinates or API failure return an unavailable signal, never a synthetic forecast.
  */
 export async function fetchTerritoryWeatherTrigger(
   city: string = 'Calgary',
@@ -213,106 +159,103 @@ export async function fetchTerritoryWeatherTrigger(
 ): Promise<WeatherTriggerSignal> {
   const normCity = city.trim();
   const lowerNiche = niche.toLowerCase();
-
-  // Heuristic territory coordinates
-  const cityCoords: Record<string, { lat: number; lon: number; defaultTemp: number }> = {
-    'calgary': { lat: 51.0447, lon: -114.0719, defaultTemp: 14 },
-    'winnipeg': { lat: 49.8951, lon: -97.1384, defaultTemp: -4 },
-    'edmonton': { lat: 53.5461, lon: -113.4938, defaultTemp: 12 },
-    'austin': { lat: 30.2672, lon: -97.7431, defaultTemp: 31 },
-    'dallas': { lat: 32.7767, lon: -96.7970, defaultTemp: 29 },
-    'chicago': { lat: 41.8781, lon: -87.6298, defaultTemp: 10 },
-    'toronto': { lat: 43.6532, lon: -79.3832, defaultTemp: 16 }
+  const cityCoords: Record<string, { lat: number; lon: number }> = {
+    calgary: { lat: 51.0447, lon: -114.0719 },
+    winnipeg: { lat: 49.8951, lon: -97.1384 },
+    edmonton: { lat: 53.5461, lon: -113.4938 },
+    austin: { lat: 30.2672, lon: -97.7431 },
+    dallas: { lat: 32.7767, lon: -96.7970 },
+    chicago: { lat: 41.8781, lon: -87.6298 },
+    toronto: { lat: 43.6532, lon: -79.3832 }
   };
-
-  const lookupKey = normCity.toLowerCase();
-  const resolved = cityCoords[lookupKey] || { lat: 51.0447, lon: -114.0719, defaultTemp: 12 };
-
-  let currentTempC = resolved.defaultTemp;
-  let windspeedKmh = 18;
-  let weatherCode = 3;
-  let isLive = false;
+  const coords = cityCoords[normCity.toLowerCase()];
+  const unavailable = (): WeatherTriggerSignal => ({
+    city: normCity,
+    currentTempC: 0,
+    windspeedKmh: 0,
+    weatherCode: -1,
+    conditionTitle: 'Weather unavailable — no verified live reading',
+    hazardCategory: 'STABLE_SEASONAL',
+    demandSurgeMultiplier: 1,
+    emergencyRepairWindowWeeks: 0,
+    strategicDirective: 'No weather-driven recommendation is available until live weather data is confirmed.',
+    isLiveForecast: false
+  });
+  if (!coords) return unavailable();
 
   try {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 2500);
-
-    const weatherUrl = `https://api.open-meteo.com/v1/forecast?latitude=${resolved.lat}&longitude=${resolved.lon}&current_weather=true&hourly=precipitation&timezone=auto`;
-    const res = await fetch(weatherUrl, { signal: controller.signal });
-    clearTimeout(timeoutId);
-
-    if (res.ok) {
-      const data = await res.json();
-      if (data.current_weather) {
-        currentTempC = Math.round(data.current_weather.temperature);
-        windspeedKmh = Math.round(data.current_weather.windspeed);
-        weatherCode = data.current_weather.weathercode || 0;
-        isLive = true;
-      }
+    const timeoutId = setTimeout(() => controller.abort(), 5000);
+    let res: Response;
+    try {
+      const weatherUrl = `https://api.open-meteo.com/v1/forecast?latitude=${coords.lat}&longitude=${coords.lon}&current_weather=true&hourly=precipitation&timezone=auto`;
+      res = await fetch(weatherUrl, { signal: controller.signal });
+    } finally {
+      clearTimeout(timeoutId);
     }
-  } catch (err: any) {
-    // Graceful offline fallback
-    isLive = false;
-  }
+    if (!res.ok) return unavailable();
+    const data = await res.json();
+    if (!data.current_weather || typeof data.current_weather.temperature !== 'number' || typeof data.current_weather.windspeed !== 'number') {
+      return unavailable();
+    }
 
-  // Detect weather hazard triggers
-  let hazardCategory: WeatherTriggerSignal['hazardCategory'] = 'STABLE_SEASONAL';
-  let demandSurgeMultiplier = 1.15;
-  let conditionTitle = `Stable regional conditions in ${normCity} (${currentTempC}°C)`;
-  let strategicDirective = `Run baseline search ads with stable target CPA bidding in ${normCity}.`;
-  let emergencyRepairWindowWeeks = 2;
+    const currentTempC = Math.round(data.current_weather.temperature);
+    const windspeedKmh = Math.round(data.current_weather.windspeed);
+    const weatherCode = Number(data.current_weather.weathercode ?? -1);
+    let hazardCategory: WeatherTriggerSignal['hazardCategory'] = 'STABLE_SEASONAL';
+    let demandSurgeMultiplier = 1;
+    let conditionTitle = `Live weather reading for ${normCity} (${currentTempC}°C)`;
+    let strategicDirective = 'No severe weather trigger detected from the current reading.';
+    let emergencyRepairWindowWeeks = 0;
 
-  // 1. Freeze-thaw / severe frost
-  if (currentTempC <= 2) {
-    hazardCategory = 'FREEZE_THAW';
-    const isPlumbing = lowerNiche.includes('plumb') || lowerNiche.includes('pipe') || lowerNiche.includes('hvac');
-    demandSurgeMultiplier = isPlumbing ? 1.55 : 1.35;
-    conditionTitle = `Freeze-Thaw Expansion Warning in ${normCity} (${currentTempC}°C)`;
-    strategicDirective = `Freeze-thaw cycle detected. High probability of burst pipes, foundation fractures, and heat pump overloads. Bump TimesFM demand curve ahead of emergency repair spike.`;
-    emergencyRepairWindowWeeks = 3;
-  }
-  // 2. High wind or hailstorm
-  else if (windspeedKmh >= 35 || weatherCode === 80 || weatherCode === 81 || weatherCode === 82 || weatherCode >= 95) {
-    hazardCategory = 'HAIL_HIGH_WIND';
-    const isRoofing = lowerNiche.includes('roof') || lowerNiche.includes('exterior') || lowerNiche.includes('siding');
-    demandSurgeMultiplier = isRoofing ? 1.78 : 1.40;
-    conditionTitle = `Hailstorm & High-Wind Advisory in ${normCity} (${windspeedKmh} km/h gusts)`;
-    strategicDirective = `Severe wind/hail signals active. Elevated volume of shingle tears, roof membrane punctures, and gutter tears projected. Pre-emptively scale high-intent search bid multipliers.`;
-    emergencyRepairWindowWeeks = 4;
-  }
-  // 3. Heavy rain
-  else if (weatherCode >= 51 && weatherCode <= 67) {
-    hazardCategory = 'HEAVY_PRECIPITATION';
-    demandSurgeMultiplier = 1.45;
-    conditionTitle = `Heavy Rainfall Advisory in ${normCity}`;
-    strategicDirective = `Rainfront active. Sump pump, perimeter drain, and roof drip inspection volume spiking. Prioritize emergency callouts.`;
-    emergencyRepairWindowWeeks = 2;
-  }
+    if (currentTempC <= 2) {
+      hazardCategory = 'FREEZE_THAW';
+      const isPlumbing = lowerNiche.includes('plumb') || lowerNiche.includes('pipe') || lowerNiche.includes('hvac');
+      demandSurgeMultiplier = isPlumbing ? 1.55 : 1.35;
+      conditionTitle = `Freeze-thaw signal from live weather in ${normCity} (${currentTempC}°C)`;
+      strategicDirective = 'A freeze-thaw signal is present. Treat this as a scenario input, not a measured demand increase.';
+      emergencyRepairWindowWeeks = 3;
+    } else if (windspeedKmh >= 35 || [80, 81, 82].includes(weatherCode) || weatherCode >= 95) {
+      hazardCategory = 'HAIL_HIGH_WIND';
+      const isRoofing = lowerNiche.includes('roof') || lowerNiche.includes('exterior') || lowerNiche.includes('siding');
+      demandSurgeMultiplier = isRoofing ? 1.78 : 1.40;
+      conditionTitle = `High-wind or storm signal from live weather in ${normCity} (${windspeedKmh} km/h)`;
+      strategicDirective = 'A severe-weather signal is present. Any demand multiplier remains a scenario assumption, not a measured market response.';
+      emergencyRepairWindowWeeks = 4;
+    } else if (weatherCode >= 51 && weatherCode <= 67) {
+      hazardCategory = 'HEAVY_PRECIPITATION';
+      demandSurgeMultiplier = 1.45;
+      conditionTitle = `Precipitation signal from live weather in ${normCity}`;
+      strategicDirective = 'A precipitation signal is present. Any demand multiplier remains a scenario assumption, not a measured market response.';
+      emergencyRepairWindowWeeks = 2;
+    }
 
-  return {
-    city: normCity,
-    region: 'North America',
-    currentTempC,
-    windspeedKmh,
-    weatherCode,
-    conditionTitle,
-    hazardCategory,
-    demandSurgeMultiplier,
-    emergencyRepairWindowWeeks,
-    strategicDirective,
-    isLiveForecast: isLive
-  };
+    return {
+      city: normCity,
+      region: 'Unknown',
+      currentTempC,
+      windspeedKmh,
+      weatherCode,
+      conditionTitle,
+      hazardCategory,
+      demandSurgeMultiplier,
+      emergencyRepairWindowWeeks,
+      strategicDirective,
+      isLiveForecast: true
+    };
+  } catch {
+    return unavailable();
+  }
 }
 
 /**
- * 3. Automated Budget Guardrails (Layer 2: Goals & Layer 10: Execution)
- * Evaluates TimesFM forward CPL against contractor's target CAC ceiling.
- * Automatically throttles or scales simulated ad campaigns when breaches are detected.
+ * 3. Budget Guardrail Recommendations (Layer 2: Goals & Layer 10: Execution)
+ * Evaluates a heuristic scenario against a configured target CAC. It does not change ad budgets.
  */
 export async function evaluateAndEnforceBudgetGuardrails(
   contractorId: string,
   forecastCurve: BrainForecastCurvePoint[],
-  targetCac: number = 220,
+  targetCac: number,
   applyGuardrails: boolean = false
 ): Promise<GuardrailEvaluationResult> {
   // Allowable CPL is typically ~30-35% of target CAC for home services
@@ -346,24 +289,14 @@ export async function evaluateAndEnforceBudgetGuardrails(
 
     if (applyGuardrails) {
       try {
-        // Adjust simulated campaigns under this contractor
-        const activeCampaigns = await pgDb
-          .select()
-          .from(campaigns)
-          .where(eq(campaigns.contractorId, contractorId));
-
-        for (const camp of activeCampaigns) {
-          actionsExecuted.push(`Adjusted campaign "${camp.name}" budget multiplier to 0.75x (CPL Ceiling Guardrail)`);
-        }
-
-        // Write to revenueRecommendations table
+        // Record a recommendation for human review; this does not modify ad budgets.
         recId = crypto.randomUUID();
         await pgDb.insert(revenueRecommendations).values({
           id: recId,
           contractorId,
           category: 'budget',
-          title: `Budget Guardrail Intervention: CPL Ceiling Breach in ${breachWeeks.join(', ')}`,
-          rationale: `TimesFM signals forward CPL ($${highestProjectedCpl}) breaches target CAC ceiling ($${targetCac}). Automated budget guardrail deployed 0.75x spend throttle.`,
+          title: `Budget Guardrail Recommendation: CPL Ceiling Breach in ${breachWeeks.join(', ')}`,
+          rationale: `The heuristic scenario estimates CPL (${highestProjectedCpl}) above the configured target CAC ceiling (${targetCac}). This is a recommendation for human review; no ad budget was changed.`,
           citationData: {
             breachWeeks,
             highestProjectedCpl,
@@ -371,7 +304,7 @@ export async function evaluateAndEnforceBudgetGuardrails(
             targetCac,
             throttleMultiplier: 0.75
           },
-          impactScore: 88.5,
+          impactScore: 0,
           confidenceScore: 94.0,
           expectedImpact: `Preserves CAC below target of $${targetCac}`,
           status: 'executed',
@@ -443,7 +376,7 @@ export async function executeBrainSynchronizedForecast(
   const applyGuardrails = options.applyGuardrails ?? true;
 
   // Retrieve contractor target CAC if configured
-  let targetCac = 220;
+  let targetCac: number | null = null;
   try {
     const [contractor] = await pgDb
       .select()
@@ -453,15 +386,24 @@ export async function executeBrainSynchronizedForecast(
     if (contractor && (contractor as any).targetCAC) {
       targetCac = Number((contractor as any).targetCAC);
     }
-  } catch (e) {
-    // default target CAC
+  } catch {
+    throw new Error('Forecast unavailable: target CAC could not be loaded from account settings.');
+  }
+  if (targetCac === null || !Number.isFinite(targetCac) || targetCac <= 0) {
+    throw new Error('Forecast unavailable: configure a valid target CAC in account settings first.');
   }
 
-  // Step 1: Ingest Live Google Ads (Layer 5: Knowledge)
+  // Step 1: Require measured advertising history; never seed fictional rows.
   const adsBaseline = await ingestAndCalibrateGoogleAds(contractorId, niche, city);
+  if (adsBaseline.source !== 'LIVE_POSTGRES_TABLE' || adsBaseline.recordsCount === 0) {
+    throw new Error('Forecast unavailable: no Google Ads performance records are connected for this account.');
+  }
 
-  // Step 2: Query Live Weather Triggers (Layer 6: World Model)
+  // Step 2: Require a confirmed live weather reading.
   const weatherTrigger = await fetchTerritoryWeatherTrigger(city, niche);
+  if (!weatherTrigger.isLiveForecast) {
+    throw new Error('Forecast unavailable: live weather data could not be verified for the selected city.');
+  }
 
   // Step 3: Run TimesFM Synthesis Engine (Layer 8: Skills & Layer 9: Tools)
   const forecastCurve: BrainForecastCurvePoint[] = [];
@@ -525,15 +467,15 @@ export async function executeBrainSynchronizedForecast(
 
   return {
     success: true,
-    engine: 'TimesFM-1.0-200M (Google Foundation Time-Series + HAL Brain Bridge)',
+    engine: 'HAL heuristic scenario model (not TimesFM)',
     brainLayerAlignments: {
       layer2Goals: `Target CAC Hurdle Rate locked at $${targetCac} (Max allowable CPL: $${guardrails.maxAllowableCpl}).`,
       layer5Knowledge: `Calibrated with ${adsBaseline.recordsCount} Google Ads daily performance records (${adsBaseline.source}). Trailing CPL: $${adsBaseline.empiricalCpl}.`,
       layer6WorldModel: `${weatherTrigger.conditionTitle}. Emergency repair multiplier: ${weatherTrigger.demandSurgeMultiplier}x.`,
-      layer8Skills: `TimesFM-1.0 foundation time-series inference synthesized with ${horizonWeeks}-week territory horizon.`,
-      layer10Execution: guardrails.breachDetected 
-        ? `Automated Budget Guardrail active: Spend throttled to ${guardrails.budgetMultiplierRecommended}x.` 
-        : `Autonomous pacing verified: Profitable forward efficiency window.`,
+      layer8Skills: `Hand-coded seasonal scenario heuristic with a ${horizonWeeks}-week horizon; not a TimesFM model.`,
+      layer10Execution: guardrails.breachDetected
+        ? `A budget guardrail recommendation is indicated: ${guardrails.suggestedAction}. No ad budget was automatically changed.`
+        : 'No guardrail breach was found in this heuristic scenario; profitability is not verified.',
       layer11Learning: `Bayesian demand priors synchronized. Trailing conversion rate anchor: ${(adsBaseline.empiricalConversionRate * 100).toFixed(1)}%.`
     },
     targetCity: city,
