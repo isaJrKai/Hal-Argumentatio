@@ -2,6 +2,25 @@ import React, { useState } from 'react';
 import { motion } from 'motion/react';
 import { Shield, Eye, EyeOff, Loader2, Sparkles, Download } from 'lucide-react';
 
+async function parseApiResponse(res: Response): Promise<any> {
+  const contentType = res.headers.get('content-type') || '';
+  const body = await res.text();
+
+  if (!contentType.toLowerCase().includes('application/json')) {
+    throw new Error(
+      res.ok
+        ? 'The server returned an unexpected response. Please refresh and try again.'
+        : `The server could not complete the request (HTTP ${res.status}). Please try again later.`
+    );
+  }
+
+  try {
+    return JSON.parse(body);
+  } catch {
+    throw new Error('The server returned an invalid response. Please try again later.');
+  }
+}
+
 interface AuthPageProps {
   onAuthSuccess: (token: string, contractor: any) => void;
 }
@@ -76,7 +95,7 @@ export default function AuthPage({ onAuthSuccess }: AuthPageProps) {
         body: JSON.stringify(payload)
       });
 
-      const data = await res.json();
+      const data = await parseApiResponse(res);
       
       if (!res.ok) {
         throw new Error(data.error || 'Authentication failed');
@@ -104,7 +123,7 @@ export default function AuthPage({ onAuthSuccess }: AuthPageProps) {
         body: JSON.stringify({ email })
       });
 
-      const data = await res.json();
+      const data = await parseApiResponse(res);
 
       if (!res.ok) {
         throw new Error(data.error || 'Failed to request reset token');
@@ -131,7 +150,7 @@ export default function AuthPage({ onAuthSuccess }: AuthPageProps) {
         body: JSON.stringify({ token: email, password }) // email holds reset token in this sandbox form
       });
 
-      const data = await res.json();
+      const data = await parseApiResponse(res);
 
       if (!res.ok) {
         throw new Error(data.error || 'Password reset failed');
