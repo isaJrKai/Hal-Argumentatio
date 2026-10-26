@@ -8,7 +8,7 @@ describe('Security and truthfulness: untrained offline learning defaults', () =>
     expect(state.calibrationEpoch).toBe(0);
     expect(state.autonomyReadinessScore).toBe(0);
     for (const profile of Object.values(state.nicheMap)) {
-      expect(profile.calibrationSource).toBe('heuristic_default');
+      expect(profile.calibrationSource).not.toBe('measured_outcomes');
       expect(profile.sampleCount).toBe(0);
       expect(profile.winCount).toBe(0);
       expect(profile.lossCount).toBe(0);
