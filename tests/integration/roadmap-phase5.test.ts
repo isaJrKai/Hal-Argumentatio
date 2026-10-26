@@ -27,7 +27,7 @@ describe('HAL Phase 5 availability and evidence gates', () => {
     expect(evaluateBrainSynchronization()).toEqual([]);
   });
 
-  it('fails closed when all enterprise and runtime evidence is unavailable', () => {
+  it('fails closed when enterprise and runtime evidence is unavailable', () => {
     const verification = verifyPhase5Pillars([], [], []);
 
     expect(verification.allPassed).toBe(false);
@@ -39,7 +39,7 @@ describe('HAL Phase 5 availability and evidence gates', () => {
     expect(verification.brainSync.overallIntegrityScore).toBe(0);
   });
 
-  it('can record the unavailable diagnostic state without claiming federation succeeded', () => {
+  it('records unavailable diagnostics without claiming federation succeeded', () => {
     const block = db.recordLedgerEntry({
       contractorId: testContractorId,
       eventType: 'phase5_telemetry_unavailable',
