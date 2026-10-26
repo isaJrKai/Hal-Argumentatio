@@ -26,10 +26,6 @@ import {
   BusinessOntologyVertical,
   BrainLayerSynchronization,
   Phase5VerificationResult,
-  getDefaultOrganizationNodes,
-  getDefaultEdgeRegions,
-  getDefaultBusinessOntologies,
-  evaluateBrainSynchronization,
   verifyPhase5Pillars
 } from '../lib/phase5-enterprise';
 
@@ -39,7 +35,7 @@ export const HalRoadmapPhase5View: React.FC = () => {
   const [orgNodes, setOrgNodes] = useState<OrganizationNode[]>([]);
   const [edgeRegions, setEdgeRegions] = useState<EdgeRegionNode[]>([]);
   const [ontologies, setOntologies] = useState<BusinessOntologyVertical[]>([]);
-  const [brainLayers, setBrainLayers] = useState<BrainLayerSynchronization[]>(evaluateBrainSynchronization);
+  const [brainLayers, setBrainLayers] = useState<BrainLayerSynchronization[]>([]);
   const [verification, setVerification] = useState<Phase5VerificationResult>(() =>
     verifyPhase5Pillars([], [], [])
   );
@@ -357,6 +353,7 @@ export const HalRoadmapPhase5View: React.FC = () => {
 
           {/* 11 Layers Diagnostic Table */}
           <div className="space-y-3">
+            {brainLayers.length === 0 && <div className="p-5 rounded-xl border border-border-dim text-sm text-text-secondary">Layer-level runtime health telemetry is unavailable. HAL does not report synthetic integrity scores.</div>}
             {brainLayers.map((layer, idx) => (
               <div key={idx} className="p-4 rounded-xl bg-bg-raised border border-border-dim space-y-2.5 shadow-xs">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-border-dim pb-2">
@@ -459,6 +456,7 @@ export const HalRoadmapPhase5View: React.FC = () => {
           </div>
 
           <div className="space-y-3">
+            {orgNodes.length === 0 && <div className="p-5 rounded-xl border border-border-dim text-sm text-text-secondary">No connected enterprise organization records are available.</div>}
             {orgNodes.map((org) => (
               <div key={org.id} className="p-4 rounded-xl bg-bg-raised border border-border-dim space-y-3">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
@@ -523,6 +521,7 @@ export const HalRoadmapPhase5View: React.FC = () => {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {edgeRegions.length === 0 && <div className="p-5 rounded-xl border border-border-dim text-sm text-text-secondary md:col-span-3">No verified edge endpoints or latency telemetry are configured.</div>}
             {edgeRegions.map((region) => (
               <div key={region.id} className="p-4 rounded-xl bg-bg-raised border border-border-dim space-y-3">
                 <div className="flex items-center justify-between">
@@ -584,6 +583,7 @@ export const HalRoadmapPhase5View: React.FC = () => {
           </div>
 
           <div className="space-y-4">
+            {ontologies.length === 0 && <div className="p-5 rounded-xl border border-border-dim text-sm text-text-secondary">No measured cross-industry conversion priors are available.</div>}
             {ontologies.map((item) => (
               <div key={item.id} className="p-5 rounded-xl bg-bg-raised border border-border-dim space-y-3">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
