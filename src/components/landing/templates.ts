@@ -43,7 +43,7 @@ export const TRADE_TEMPLATES: Record<string, LandingPageConfig> = {
       announcement_bar: {
         active: true,
         text: '⚡ Active Emergency Crews On-Duty in Calgary • Guaranteed 30-Minute Response Window',
-        urgencyBadge: '24/7 EMERGENCY DISPATCH'
+        urgencyBadge: 'SERVICE HOURS — CONFIGURE'
       },
       header: {
         active: true,
@@ -61,7 +61,7 @@ export const TRADE_TEMPLATES: Record<string, LandingPageConfig> = {
         title: 'Request Priority Emergency Dispatch',
         subtitle: 'Immediate intake. Our on-duty dispatcher confirms technician ETA within 60 seconds.',
         buttonText: '⚡ Dispatch Technician Now',
-        dispatchNote: 'Zero trip surcharge in Calgary. 100% upfront quote before tools come out.'
+        dispatchNote: 'Confirm travel fees and written-quote policy with the business before publishing.'
       },
       trust_bar: {
         active: true,
@@ -69,7 +69,7 @@ export const TRADE_TEMPLATES: Record<string, LandingPageConfig> = {
           { id: 'b1', icon: 'ShieldCheck', title: 'Red Seal Certified', subtitle: 'Master Journeymen Only' },
           { id: 'b2', icon: 'Clock', title: '30-Min Arrival', subtitle: 'Priority Emergency Response' },
           { id: 'b3', icon: 'DollarSign', title: 'Upfront Fixed Rate', subtitle: 'No Hidden Surprise Fees' },
-          { id: 'b4', icon: 'Award', title: '1-Year Warranty', subtitle: '100% Labor & Parts Backed' }
+          { id: 'b4', icon: 'Award', title: 'Warranty Terms', subtitle: 'Configure actual labor and parts coverage before publishing' }
         ]
       },
       bento_features: {
@@ -88,7 +88,7 @@ export const TRADE_TEMPLATES: Record<string, LandingPageConfig> = {
           },
           {
             id: 'bf2',
-            title: '100% Upfront Written Quote',
+            title: 'Upfront Written Quote (Confirm Policy)',
             subtitle: 'Zero diagnostic charge when repair is authorized on the spot. No hourly run-up.',
             value: '$0 Trip Fee',
             tag: 'NO SURCHARGES',
@@ -129,7 +129,7 @@ export const TRADE_TEMPLATES: Record<string, LandingPageConfig> = {
               'Complete acoustic line locator check',
               'Digital color camera inspection',
               'Written insurance-ready fault report',
-              'Fee waived 100% if repair is completed'
+              'Configure the diagnostic fee policy before publishing'
             ],
             ctaText: 'Book Diagnostic ($49)'
           },
@@ -208,73 +208,32 @@ export const TRADE_TEMPLATES: Record<string, LandingPageConfig> = {
         ]
       },
       before_after: {
-        active: true,
-        title: 'Real Home Transformations',
-        subtitle: 'Authentic photos of recent plumbing restorations completed in local neighborhoods.',
-        items: [
-          {
-            id: 'ba1',
-            title: 'Complete Basement Sewer Backup Restoration',
-            location: 'Altadore, SW Calgary',
-            beforeImg: 'https://images.unsplash.com/photo-1584622650111-993a426fbf0a?auto=format&fit=crop&w=600&q=80',
-            afterImg: 'https://images.unsplash.com/photo-1620626011761-996317b8d101?auto=format&fit=crop&w=600&q=80',
-            challenge: '4-inch cast iron sewer line crushed by mature poplar root infiltration, causing raw backflow.',
-            solution: 'Excavated without disturbing foundation, installed heavy PVC line with cleanout and backwater valve.'
-          }
-        ]
+        active: false,
+        title: 'Project Gallery — Add Real Work Samples',
+        subtitle: 'No customer project photos are preloaded. Add genuine project images and obtain permission before publishing.',
+        items: []
       },
       reviews: {
-        active: true,
-        title: 'Verified Homeowner Reviews',
-        subtitle: 'Real customer feedback verified directly through Google Local Services.',
-        rating: 4.9,
-        totalReviews: 247,
-        items: [
-          {
-            id: 'r1',
-            name: 'Marcus Henderson',
-            location: 'Mount Royal, Calgary',
-            date: '3 days ago',
-            stars: 5,
-            text: 'Called them on a Sunday evening at 9:30 PM when our water main fitting ruptured. Mike arrived in 25 minutes, had the exact replacement valve on his truck, and fixed it cleanly without price gouging.',
-            verified: true
-          },
-          {
-            id: 'r2',
-            name: 'Elena Rostova',
-            location: 'Bridgeland, Calgary',
-            date: '1 week ago',
-            stars: 5,
-            text: 'Super professional. Camera inspection showed us exactly where the tree root clogged our sewer line. They walked us through the cost before touching anything. Highly recommend.',
-            verified: true
-          },
-          {
-            id: 'r3',
-            name: 'David Tremblay',
-            location: 'Signal Hill, Calgary',
-            date: '2 weeks ago',
-            stars: 5,
-            text: 'Replaced our 15-year-old leaking water heater on the same afternoon. Neat plumbing work and left the mechanical room cleaner than they found it.',
-            verified: true
-          }
-        ]
+        active: false,
+        title: 'Customer Reviews',
+        subtitle: 'Not configured. Add genuine customer feedback with permission before publishing.',
+        rating: 0,
+        totalReviews: 0,
+        items: []
       },
       service_areas: {
-        active: true,
-        title: 'Service Coverage In Your Neighborhood',
-        subtitle: 'Our mobile trucks are distributed across all quadrants to meet our 30-minute dispatch guarantee.',
-        cities: [
-          'Downtown Calgary', 'Beltline', 'Mount Royal', 'Kensington', 
-          'Altadore', 'Signal Hill', 'Airdrie', 'Cochrane', 'Okotoks', 'Chestermere'
-        ],
-        guaranteeText: 'Don\'t see your neighborhood? Call us — we service within 45km of city center with zero additional mileage fees.'
+        active: false,
+        title: 'Service Areas — Configure Before Publishing',
+        subtitle: 'No service coverage is verified by this template. Add only locations the business actually serves.',
+        cities: [],
+        guaranteeText: 'Confirm service radius, travel fees, and response times directly with the business.'
       },
       guarantee: {
-        active: true,
-        badgeText: '100% IRONCLAD RISK REVERSAL',
-        title: 'Fixed Right The First Trip, Or Your Diagnostic Fee Is Waived',
-        description: 'We respect your time and hard-earned money. If our technician cannot diagnose and propose a code-compliant solution on the initial visit, you pay exactly $0. No arguments, no fine print.',
-        ctaText: 'Speak With On-Duty Dispatch'
+        active: false,
+        badgeText: 'GUARANTEE — CONFIGURE ACTUAL TERMS',
+        title: 'Service Terms',
+        description: 'No service guarantee is preconfigured. Add only written terms approved by the business.',
+        ctaText: 'Contact the Business'
       },
       online_booking: {
         active: true,
@@ -417,61 +376,32 @@ export const TRADE_TEMPLATES: Record<string, LandingPageConfig> = {
         ]
       },
       before_after: {
-        active: true,
-        title: 'Recent Heating System Upgrades',
-        subtitle: 'Transforming noisy, inefficient mechanical rooms into clean, whisper-quiet setups.',
-        items: [
-          {
-            id: 'ba1',
-            title: '30-Year Old Low-Efficiency Furnace Conversion',
-            location: 'Varsity, Calgary',
-            beforeImg: 'https://images.unsplash.com/photo-1513694203232-719a280e022f?auto=format&fit=crop&w=600&q=80',
-            afterImg: 'https://images.unsplash.com/photo-1581092160607-ee22621dd758?auto=format&fit=crop&w=600&q=80',
-            challenge: 'Cracked heat exchanger leaking minor carbon monoxide into living quarters. System red-tagged.',
-            solution: 'Permitted same-day install of 97% variable-speed ECM furnace with twin intake venting.'
-          }
-        ]
+        active: false,
+        title: 'Project Gallery — Add Real Work Samples',
+        subtitle: 'No customer project photos are preloaded. Add genuine project images and obtain permission before publishing.',
+        items: []
       },
       reviews: {
-        active: true,
-        title: 'Homeowner Feedback',
-        subtitle: 'Ranked 4.9 stars across 180+ verified Google local reviews.',
-        rating: 4.9,
-        totalReviews: 184,
-        items: [
-          {
-            id: 'r1',
-            name: 'Brenda Campbell',
-            location: 'Edgemont, Calgary',
-            date: '4 days ago',
-            stars: 5,
-            text: 'Furnace stopped working during a -28°C cold snap. Vanguard dispatched a tech within an hour, diagnosed a faulty pressure switch, replaced it from stock on his truck, and had the heat back on in 40 minutes.',
-            verified: true
-          },
-          {
-            id: 'r2',
-            name: 'Jason Wu',
-            location: 'Tuscany, Calgary',
-            date: '2 weeks ago',
-            stars: 5,
-            text: 'Transparent pricing. The tech showed me the worn igniter before doing anything. Clean work, fair price, and zero pressure sales tactics.',
-            verified: true
-          }
-        ]
+        active: false,
+        title: 'Customer Reviews',
+        subtitle: 'Not configured. Add genuine customer feedback with permission before publishing.',
+        rating: 0,
+        totalReviews: 0,
+        items: []
       },
       service_areas: {
-        active: true,
-        title: 'Calgary & Surrounding Service Radius',
-        subtitle: 'Technicians on standby across Northwest, Northeast, Southwest, and Southeast.',
-        cities: ['NW Calgary', 'SW Calgary', 'SE Calgary', 'NE Calgary', 'Airdrie', 'Cochrane', 'Okotoks'],
-        guaranteeText: 'Guaranteed 2-hour arrival windows for all confirmed emergency calls.'
+        active: false,
+        title: 'Service Areas — Configure Before Publishing',
+        subtitle: 'No service coverage is verified by this template. Add only locations the business actually serves.',
+        cities: [],
+        guaranteeText: 'Confirm service radius, travel fees, and response times directly with the business.'
       },
       guarantee: {
-        active: true,
-        badgeText: 'COMFORT SATISFACTION GUARANTEE',
-        title: '100% Warmth Restored Or You Owe Nothing',
-        description: 'If our certified gasfitter does not restore functional heating or provide a clear path forward, your emergency call fee is completely refunded.',
-        ctaText: 'Speak With Dispatcher'
+        active: false,
+        badgeText: 'GUARANTEE — CONFIGURE ACTUAL TERMS',
+        title: 'Service Terms',
+        description: 'No service guarantee is preconfigured. Add only written terms approved by the business.',
+        ctaText: 'Contact the Business'
       },
       online_booking: {
         active: true,
@@ -609,52 +539,32 @@ export const TRADE_TEMPLATES: Record<string, LandingPageConfig> = {
         ]
       },
       before_after: {
-        active: true,
-        title: 'Storm Recovery Case Studies',
-        subtitle: 'Before and after restoration of wind-ravaged and hail-damaged local roofs.',
-        items: [
-          {
-            id: 'ba1',
-            title: 'Hail Storm Shingle Tear-Off & Class 4 Upgrade',
-            location: 'Saddle Ridge, Calgary',
-            beforeImg: 'https://images.unsplash.com/photo-1541888946425-d0fbb18615f3?auto=format&fit=crop&w=600&q=80',
-            afterImg: 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=600&q=80',
-            challenge: 'Golf ball hail bruised 60% of shingles and split vinyl siding, leading to water staining in attic.',
-            solution: 'Assisted homeowner with full insurance claim approval. Installed Class 4 impact shingles with 50-year warranty.'
-          }
-        ]
+        active: false,
+        title: 'Project Gallery — Add Real Work Samples',
+        subtitle: 'No customer project photos are preloaded. Add genuine project images and obtain permission before publishing.',
+        items: []
       },
       reviews: {
-        active: true,
-        title: 'What Homeowners Say',
-        subtitle: 'Over 140 five-star reviews on Google and BBB A+ accredited.',
-        rating: 5.0,
-        totalReviews: 142,
-        items: [
-          {
-            id: 'r1',
-            name: 'Scott MacIntyre',
-            location: 'Rocky Ridge, Calgary',
-            date: '1 week ago',
-            stars: 5,
-            text: 'Ironclad handled our entire insurance claim after the June storm. Their drone photos were so clear that the insurance adjustor approved full replacement on the spot. The crew finished in one day and left our yard spotless.',
-            verified: true
-          }
-        ]
+        active: false,
+        title: 'Customer Reviews',
+        subtitle: 'Not configured. Add genuine customer feedback with permission before publishing.',
+        rating: 0,
+        totalReviews: 0,
+        items: []
       },
       service_areas: {
-        active: true,
-        title: 'Communities We Protect',
-        subtitle: 'Rapid deployment across Southern Alberta.',
-        cities: ['Calgary', 'Airdrie', 'Cochrane', 'Okotoks', 'High River', 'Strathmore'],
-        guaranteeText: 'Complete clean-up guarantee: we run rolling magnetic sweepers across your entire lawn to collect every stray nail.'
+        active: false,
+        title: 'Service Areas — Configure Before Publishing',
+        subtitle: 'No service coverage is verified by this template. Add only locations the business actually serves.',
+        cities: [],
+        guaranteeText: 'Confirm service radius, travel fees, and response times directly with the business.'
       },
       guarantee: {
-        active: true,
-        badgeText: '50-YEAR SYSTEM WARRANTY',
-        title: 'Zero Leak Guarantee Backed By Manufacturer Warranty',
-        description: 'Our installations are certified by major shingle manufacturers, giving you full coverage for materials and workmanship.',
-        ctaText: 'Claim Your Free Inspection'
+        active: false,
+        badgeText: 'GUARANTEE — CONFIGURE ACTUAL TERMS',
+        title: 'Service Terms',
+        description: 'No service guarantee is preconfigured. Add only written terms approved by the business.',
+        ctaText: 'Contact the Business'
       },
       online_booking: {
         active: true,
@@ -746,7 +656,7 @@ export const TRADE_TEMPLATES: Record<string, LandingPageConfig> = {
           { id: 'b1', icon: 'ShieldCheck', title: 'Master Electrician', subtitle: 'Code Compliance Guaranteed' },
           { id: 'b2', icon: 'Clock', title: '45-Min Arrival', subtitle: 'Rapid Hazard Mitigation' },
           { id: 'b3', icon: 'DollarSign', title: 'Fixed Rate Pricing', subtitle: 'No Running Clocks' },
-          { id: 'b4', icon: 'Award', title: 'Lifetime Labor', subtitle: 'On All Panel Upgrades' }
+          { id: 'b4', icon: 'Award', title: 'Labor Warranty', subtitle: 'Configure actual coverage before publishing' }
         ]
       },
       seasonal_alert: {
@@ -792,52 +702,32 @@ export const TRADE_TEMPLATES: Record<string, LandingPageConfig> = {
         ]
       },
       before_after: {
-        active: true,
-        title: 'Panel Hazard Transformations',
-        subtitle: 'Before and after replacements of dangerous, outdated electrical panels.',
-        items: [
-          {
-            id: 'ba1',
-            title: 'Messy 60-Amp Fuse Box to Modern 200-Amp Breaker Center',
-            location: 'Sunnyside, Calgary',
-            beforeImg: 'https://images.unsplash.com/photo-1558494949-ef010cbdcc31?auto=format&fit=crop&w=600&q=80',
-            afterImg: 'https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?auto=format&fit=crop&w=600&q=80',
-            challenge: 'Fire hazard caused by double-tapped breakers and aluminum-copper splices.',
-            solution: 'Permitted full copper rewiring, 200-amp Siemens panel, and whole-home type 2 surge suppressor.'
-          }
-        ]
+        active: false,
+        title: 'Project Gallery — Add Real Work Samples',
+        subtitle: 'No customer project photos are preloaded. Add genuine project images and obtain permission before publishing.',
+        items: []
       },
       reviews: {
-        active: true,
-        title: 'Customer Experiences',
-        subtitle: 'Certified 5.0 stars with over 90 verified local Google reviews.',
-        rating: 5.0,
-        totalReviews: 94,
-        items: [
-          {
-            id: 'r1',
-            name: 'Travis Miller',
-            location: 'Marda Loop, Calgary',
-            date: '5 days ago',
-            stars: 5,
-            text: 'Called VoltCraft when our main breaker started buzzing and tripping during dinner. Tech arrived in 35 minutes, showed me the burnt bus bar connection on his thermal camera, and replaced the breaker safely. Superb service.',
-            verified: true
-          }
-        ]
+        active: false,
+        title: 'Customer Reviews',
+        subtitle: 'Not configured. Add genuine customer feedback with permission before publishing.',
+        rating: 0,
+        totalReviews: 0,
+        items: []
       },
       service_areas: {
-        active: true,
-        title: 'Calgary Wide Electrical Response',
-        subtitle: 'Mobile service trucks stocked with certified electrical components.',
-        cities: ['Calgary', 'Airdrie', 'Cochrane', 'Okotoks', 'Chestermere'],
-        guaranteeText: 'City electrical permit guarantee: we handle all municipal paperwork and arrange final city inspection.'
+        active: false,
+        title: 'Service Areas — Configure Before Publishing',
+        subtitle: 'No service coverage is verified by this template. Add only locations the business actually serves.',
+        cities: [],
+        guaranteeText: 'Confirm service radius, travel fees, and response times directly with the business.'
       },
       guarantee: {
-        active: true,
-        badgeText: 'CANADIAN ELECTRICAL CODE GUARANTEE',
-        title: '100% Code Compliant Work Or We Correct It For Free',
-        description: 'Every circuit, wire gauge, and breaker installed by VoltCraft adheres strictly to CSA and Provincial Electrical Safety codes.',
-        ctaText: 'Schedule Electrical Audit'
+        active: false,
+        badgeText: 'GUARANTEE — CONFIGURE ACTUAL TERMS',
+        title: 'Service Terms',
+        description: 'No service guarantee is preconfigured. Add only written terms approved by the business.',
+        ctaText: 'Contact the Business'
       },
       online_booking: {
         active: true,
