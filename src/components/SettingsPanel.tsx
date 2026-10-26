@@ -85,33 +85,33 @@ export default function SettingsPanel({
   const [operatorNameInput, setOperatorNameInput] = useState(workspaceConfig.operatorName);
   const [brandColorInput, setBrandColorInput] = useState(workspaceConfig.brandColor);
   const [taglineInput, setTaglineInput] = useState(workspaceConfig.tagline);
-  const [bookingUrlInput, setBookingUrlInput] = useState(workspaceConfig.bookingUrl || 'https://cal.com/hal-strategy');
-  const [contactPhoneInput, setContactPhoneInput] = useState(workspaceConfig.contactPhone || '(204) 555-0199');
-  const [stripePaymentUrlInput, setStripePaymentUrlInput] = useState(workspaceConfig.stripePaymentUrl || 'https://buy.stripe.com/demo_retainer');
+  const [bookingUrlInput, setBookingUrlInput] = useState(workspaceConfig.bookingUrl || '');
+  const [contactPhoneInput, setContactPhoneInput] = useState(workspaceConfig.contactPhone || '');
+  const [stripePaymentUrlInput, setStripePaymentUrlInput] = useState(workspaceConfig.stripePaymentUrl || '');
   const [saveWorkspaceSuccess, setSaveWorkspaceSuccess] = useState<string | null>(null);
 
   // Campaign Pivot / Reset State
   const [resetCity, setResetCity] = useState(activeCity);
   const [resetNiche, setResetNiche] = useState(activeNiche);
-  const [resetMode, setResetMode] = useState<'blank' | 'mock'>('mock');
+  const [resetMode, setResetMode] = useState<'blank' | 'mock'>('blank');
   const [resetConfirm, setResetConfirm] = useState('');
   const [resetLoading, setResetLoading] = useState(false);
   const [resetError, setResetError] = useState<string | null>(null);
   const [resetSuccess, setResetSuccess] = useState<string | null>(null);
 
   // Public Link & Reddit Testing Shield State
-  const [publicLinkMode, setPublicLinkMode] = useState<'safe_sandbox' | 'disabled' | 'open'>('safe_sandbox');
+  const [publicLinkMode, setPublicLinkMode] = useState<'safe_sandbox' | 'disabled' | 'open'>('disabled');
   const [publicLinkLoading, setPublicLinkLoading] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
-  const sharedUrl = 'https://ais-pre-yhe6kkyk2vea7llaamk5bi-536406481799.europe-west1.run.app';
+  const [sharedUrl, setSharedUrl] = useState<string | null>(null);
+  const [publicLinkError, setPublicLinkError] = useState<string | null>(null);
 
   useEffect(() => {
     fetch('/api/public-link/status')
       .then(res => res.json())
       .then(data => {
-        if (data && data.mode) {
-          setPublicLinkMode(data.mode);
-        }
+        if (data && data.mode) setPublicLinkMode(data.mode);
+        setSharedUrl(typeof data?.sharedUrl === 'string' && data.sharedUrl.trim() ? data.sharedUrl.trim() : null);
       })
       .catch(() => {});
   }, []);
@@ -121,14 +121,15 @@ export default function SettingsPanel({
     try {
       const res = await fetch('/api/public-link/mode', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
         body: JSON.stringify({ mode: newMode })
       });
       const data = await res.json();
-      if (data.success) {
-        setPublicLinkMode(newMode);
-      }
-    } catch (e) {
+      if (!res.ok || !data.success) throw new Error(data.error || 'Public link setting was not changed.');
+      setPublicLinkMode(newMode);
+      setPublicLinkError(null);
+    } catch (e: any) {
+      setPublicLinkError(e?.message || 'Public link setting was not changed.');
     } finally {
       setPublicLinkLoading(false);
     }
@@ -377,10 +378,6 @@ export default function SettingsPanel({
   };
 
   // Password reset state
-  const [oldPassword, setOldPassword] = useState('');
-  const [newPassword, setNewPassword] = useState('');
-  const [passwordSuccess, setPasswordSuccess] = useState<string | null>(null);
-  const [passwordError, setPasswordError] = useState<string | null>(null);
 
   const handleRegisterKey = (e: React.FormEvent) => {
     e.preventDefault();
@@ -399,37 +396,6 @@ export default function SettingsPanel({
     setKeySuccess('API key has been hashed, prefixed, and stored securely in operational memory.');
     setRawKey('');
     setTimeout(() => setKeySuccess(null), 5000);
-  };
-
-  const handleUpdatePassword = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setPasswordSuccess(null);
-    setPasswordError(null);
-
-    try {
-      const res = await fetch('/api/auth/reset-password', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          token: 'demo-sandbox-token',
-          password: newPassword
-        })
-      });
-
-      const data = await res.json();
-      if (res.ok) {
-        setPasswordSuccess('Password successfully reset. Active sessions revoked.');
-        setOldPassword('');
-        setNewPassword('');
-      } else {
-        setPasswordError(data.error || 'Password update failed');
-      }
-    } catch (err: any) {
-      setPasswordError(err.message);
-    }
   };
 
   const textPrimary = 'text-text-primary';
@@ -1371,57 +1337,17 @@ export default function SettingsPanel({
             Reset password to update identity security policies. Performing this update immediately invalidates all active sessions except your current authenticated window.
           </p>
 
-          {passwordSuccess && (
-            <div className="p-3 bg-accent/10 border border-accent/20 text-accent text-xs rounded-sm font-mono leading-relaxed font-bold uppercase tracking-wider">
-              {passwordSuccess}
-            </div>
-          )}
+          <div className="p-4 border border-amber-500/30 bg-amber-500/5 rounded text-xs leading-relaxed">
+            Password changes are unavailable in this deployment because a secure authenticated change-password flow has not been implemented. No password will be submitted from this screen.
+          </div>
 
-          {passwordError && (
-            <div className="p-3 bg-red-950/30 border border-red-500/20 text-red-400 text-xs rounded-sm font-mono leading-relaxed font-bold uppercase tracking-wider">
-              {passwordError}
-            </div>
-          )}
-
-          <form onSubmit={handleUpdatePassword} className="space-y-4 text-xs font-sans">
-            <div className="space-y-1">
-              <label className="block text-[10px] font-mono opacity-80 uppercase tracking-wider font-bold">Current Password</label>
-              <input
-                type="password"
-                required
-                value={oldPassword}
-                onChange={(e) => setOldPassword(e.target.value)}
-                placeholder="••••••••"
-                className={`w-full border rounded p-2 focus:outline-none focus:border-accent text-inherit ${innerBg} ${borderCol}`}
-              />
-            </div>
-
-            <div className="space-y-1">
-              <label className="block text-[10px] font-mono opacity-80 uppercase tracking-wider font-bold">New Password</label>
-              <input
-                type="password"
-                required
-                value={newPassword}
-                onChange={(e) => setNewPassword(e.target.value)}
-                placeholder="••••••••"
-                className={`w-full border rounded p-2 focus:outline-none focus:border-accent text-inherit ${innerBg} ${borderCol}`}
-              />
-            </div>
-
-            <button
-              type="submit"
-              className="bg-transparent hover:bg-accent hover:text-black py-2 px-4 rounded font-mono text-xs border border-accent transition-colors font-bold uppercase tracking-wider"
-            >
-              Update Secure Password
-            </button>
-          </form>
 
           <div className={`border p-4 rounded flex gap-3.5 items-start ${innerBg} ${borderCol}`}>
             <ShieldAlert className="w-5 h-5 text-accent shrink-0 mt-0.5" />
             <div className="space-y-1 text-xs">
               <span className="font-bold font-sans">Cryptographic Hashing Standard</span>
               <p className="text-inherit opacity-80 leading-normal font-sans text-[11px]">
-                All identity credentials are encrypted with salted **PBKDF2-SHA512** hashes (100,000 iterations), complying with modern administrative security regulations.
+                Password hashing is handled server-side. This screen does not expose a password-change operation until the complete authenticated workflow is available.
               </p>
             </div>
           </div>
@@ -1460,14 +1386,14 @@ export default function SettingsPanel({
               Public Safe Link for Reddit / Beta Testers
             </div>
             <div className="text-xs font-mono text-brand truncate font-bold">
-              {sharedUrl}
+              {sharedUrl || 'No verified public URL configured'}
             </div>
           </div>
           <button
             type="button"
-            onClick={() => copyToClipboard(sharedUrl)}
+            onClick={() => sharedUrl && copyToClipboard(sharedUrl)}
             className="px-3 py-1.5 rounded bg-brand/15 hover:bg-brand/25 border border-brand/40 text-brand text-xs font-mono font-bold transition-colors shrink-0 flex items-center gap-1.5 cursor-pointer"
-            title="Copy Public Testing Link"
+            title={sharedUrl ? 'Copy configured public URL' : 'Configure APP_URL before sharing'}
           >
             {copiedLink ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
             <span>{copiedLink ? 'COPIED' : 'COPY LINK'}</span>
