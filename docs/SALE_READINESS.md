@@ -16,6 +16,8 @@ This document separates observed repository facts from work that still needs evi
 
 The unified outreach UI previously displayed fabricated provider connection states and sample performance figures. The current branch removes those sample figures and labels the unified dispatch route as simulation-only; no provider delivery is claimed. Provider adapters, callback/event tracking, webhook SSRF protection, durable encrypted per-account credential storage, and end-to-end tests remain release work.
 
+CORS and webhook safeguards were tightened on this branch: browser origins are allowlisted, outbound webhook targets require an explicit HTTPS host allowlist, redirects are not followed, and inbound WhatsApp callbacks require HMAC verification. These changes still require end-to-end testing with a real provider account.
+
 ## Verification gate
 
 Record evidence for each item before calling HAL production-ready.
