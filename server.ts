@@ -2277,7 +2277,7 @@ app.post('/api/leads/ingest', authenticate, async (req, res) => {
         source: 'harvested_intelligence',
         status: 'new',
         urgencyScore: hl.urgencyScore ?? 0,
-        predictedLtvUsd: hl.predictedLtvUsd ?? 0,
+        predictedLtvUsd: (hl as any).predictedLtvUsd ?? 0,
         notes: hl.notes || `Harvested real business profile. Niche: ${hl.serviceType}.`,
         websiteUrl: hl.websiteUrl,
         performanceScore: hl.performanceScore,
