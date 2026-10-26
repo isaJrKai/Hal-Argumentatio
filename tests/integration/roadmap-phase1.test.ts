@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import crypto from 'crypto';
-import { db, encrypt, decrypt } from '../../src/db/db';
+import { db, encrypt, decrypt, hashPassword } from '../../src/db/db';
 
 /**
  * HAL ROADMAP PHASE 1 (FOUNDATION) SPECIFICATION TESTS
@@ -133,7 +133,13 @@ describe('HAL Roadmap Phase 1: Foundation Architecture', () => {
 
   describe('Pillar 3: Basic Pipeline End-to-End Flow', () => {
     it('orchestrates attribution -> lead ingestion -> ledger audit -> stage transition', () => {
-      const contractor = db.getContractors()[0];
+      const contractor = db.addContractor({
+        email: `roadmap-phase1-${crypto.randomUUID()}@example.invalid`,
+        passwordHash: hashPassword(crypto.randomBytes(24).toString('hex')),
+        name: 'Roadmap Phase 1 Test Workspace',
+        role: 'user',
+        marketId: 'test-market'
+      });
       expect(contractor).toBeDefined();
 
       // 1. Ingestion of Prospect Lead with encrypted phone
