@@ -255,7 +255,7 @@ export async function fetchTerritoryWeatherTrigger(
 export async function evaluateAndEnforceBudgetGuardrails(
   contractorId: string,
   forecastCurve: BrainForecastCurvePoint[],
-  targetCac: number = 220,
+  targetCac: number,
   applyGuardrails: boolean = false
 ): Promise<GuardrailEvaluationResult> {
   // Allowable CPL is typically ~30-35% of target CAC for home services
