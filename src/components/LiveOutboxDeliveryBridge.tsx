@@ -484,7 +484,7 @@ export const LiveOutboxDeliveryBridge: React.FC = () => {
                 type="text"
                 value={recipient}
                 onChange={(e) => setRecipient(e.target.value)}
-                placeholder={selectedChannel === 'email' ? 'contractor@example.com' : selectedChannel === 'sms' ? '+1 (403) 555-0184' : 'https://...'}
+                placeholder={selectedChannel === 'email' ? 'Recipient email address' : selectedChannel === 'sms' ? 'Recipient phone number' : 'HTTPS webhook URL'}
                 className="w-full px-3 py-2 rounded-lg bg-bg-base border border-border-dim text-xs font-mono text-text-primary focus:outline-none focus:border-accent"
               />
             </div>
