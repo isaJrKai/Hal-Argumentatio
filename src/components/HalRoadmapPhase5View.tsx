@@ -336,17 +336,17 @@ export const HalRoadmapPhase5View: React.FC = () => {
                   Is the System in Phase with the HAL Brain Architecture?
                 </h3>
                 <p className="text-xs text-text-secondary">
-                  Rigorous deterministic audit tracing the 11 cognitive layers from the HAL Constitution down to running production code.
+                  Intended to audit the 11 cognitive layers. Runtime instrumentation is unavailable, so this screen cannot confirm production health.
                 </p>
               </div>
               <div className="px-3 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/25 text-emerald-600 dark:text-emerald-400 text-xs font-mono font-bold flex items-center gap-2 shrink-0">
                 <CheckCircle2 className="w-4 h-4 text-emerald-500" />
-                <span>CONFIRMED: 100% IN-PHASE</span>
+                <span>RUNTIME SYNC UNVERIFIED</span>
               </div>
             </div>
 
             <div className="p-3.5 rounded-lg bg-accent/10 border border-accent/25 text-xs text-text-primary leading-relaxed font-mono">
-              <strong>HAL Brain Verdict:</strong> The system is completely synchronized. Every cognitive stage (Mission ➔ Goals ➔ Planner ➔ Memory ➔ Knowledge ➔ World Model ➔ Agents ➔ Skills ➔ Tools ➔ Integrations ➔ Execution ➔ Learning) operates as a dedicated, single-responsibility module backed by AES-256 encryption, deterministic evidence gating, and dual-drive consensus arbitration.
+              <strong>HAL Brain Verdict:</strong> Runtime synchronization evidence is unavailable. This screen does not confirm that all cognitive stages are connected, healthy, encrypted, or operating in production.
             </div>
           </div>
 
