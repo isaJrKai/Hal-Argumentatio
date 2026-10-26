@@ -371,10 +371,10 @@ export default function PublicAuditPage({ auditId, onNavigateToLogin }: PublicAu
           <div className="bg-bg-base border border-border-dim p-4 rounded-xl flex flex-col sm:flex-row items-center justify-between gap-4 font-mono text-xs">
             <div className="space-y-1 text-center sm:text-left">
               <p className="text-text-primary">
-                {data.performanceScore == null || bouncePenaltyPct == null ? 'A measured speed score is not available, so this page cannot estimate speed-related visitor loss. Use the controls as an illustrative scenario only.' : <>At the recorded performance score ({data.performanceScore}/100), this scenario assumes approximately <strong className="text-rose-400">{Math.round(bouncePenaltyPct * 100)}% of mobile visitors</strong> bounce before seeing your contact phone or quote form.</>}
+                <>This scenario assumes a 22% mobile bounce rate and a 2.5% conversion rate. These are assumptions, not measurements of this business.</>
               </p>
               <p className="text-[11px] text-text-secondary">
-                {estimatedLostLeadsPerMonth == null ? 'No measured loss estimate is available.' : <>Under these assumptions, recovering <strong className="text-emerald-400">{estimatedLostLeadsPerMonth} potential leads/month</strong> represents up to <strong className="text-emerald-400">+${(estimatedLostLeadsPerMonth * avgTicketValue).toLocaleString()}</strong> in illustrative gross revenue.</>}
+                <>Under these assumptions, {estimatedLostLeadsPerMonth} potential leads/month represent up to <strong className="text-emerald-400">+${(estimatedLostLeadsPerMonth * avgTicketValue).toLocaleString()}</strong> in illustrative gross revenue.</>
               </p>
             </div>
 
@@ -383,7 +383,7 @@ export default function PublicAuditPage({ auditId, onNavigateToLogin }: PublicAu
               className="px-5 py-2.5 rounded-lg font-mono font-bold text-white text-xs whitespace-nowrap shadow-lg hover:brightness-110 transition-all cursor-pointer shrink-0"
               style={{ backgroundColor: brandColor }}
             >
-              Fix Speed & Capture Lost Leads
+              Request a Technical Review
             </button>
           </div>
         </div>
@@ -557,7 +557,7 @@ export default function PublicAuditPage({ auditId, onNavigateToLogin }: PublicAu
                       required
                       value={bookingPhone}
                       onChange={(e) => setBookingPhone(e.target.value)}
-                      placeholder="(204) 555-0199"
+                      placeholder="Enter phone number"
                       className="w-full bg-bg-base border border-border-dim rounded-lg p-2.5 text-text-primary focus:outline-none focus:border-indigo-500"
                     />
                   </div>
