@@ -20,8 +20,9 @@ export interface NicheCalibration {
   bestChannel: 'phone' | 'email' | 'sms' | 'in_person';
   topAuditDeficiency: 'missing_ssl' | 'mobile_speed' | 'low_reviews' | 'missing_schema' | 'poor_seo';
   avgDaysToClose: number;
-  confidenceScore: number; // Bayesian confidence 0.0 - 1.0
+  confidenceScore: number; // Heuristic confidence; meaningful only after recorded outcomes
   lastCalibratedAt: string;
+  calibrationSource?: 'measured_outcomes' | 'heuristic_default' | 'unverified_legacy';
 }
 
 export type ObjectionIntentType = 
@@ -46,9 +47,10 @@ export interface ObjectionRule {
   triggerKeywords: string[];
   objectionType: ObjectionIntentType;
   rebuttalScript: string;
-  successRate: number; // Learned win rate after applying this counter
+  successRate: number; // Recorded success rate; zero until outcome tracking is implemented
   timesApplied: number;
   lastUsedAt: string;
+  calibrationSource?: 'recorded_events' | 'heuristic_default' | 'unverified_legacy';
 }
 
 export interface TechnicalWeights {
@@ -87,59 +89,59 @@ const STORAGE_KEY = 'hal_autonomous_learning_state_v2';
 const DEFAULT_NICHE_PROFILES: Record<string, NicheCalibration> = {
   roofing: {
     niche: 'roofing',
-    sampleCount: 42,
-    winCount: 16,
-    lossCount: 26,
-    conversionRate: 0.38,
-    avgClosedValueUsd: 2850,
-    optimalRetainerUsd: 2400,
+    sampleCount: 0,
+    winCount: 0,
+    lossCount: 0,
+    conversionRate: 0,
+    avgClosedValueUsd: 0,
+    optimalRetainerUsd: 0,
     bestChannel: 'phone',
     topAuditDeficiency: 'mobile_speed',
-    avgDaysToClose: 8,
-    confidenceScore: 0.89,
-    lastCalibratedAt: new Date().toISOString()
+    avgDaysToClose: 0,
+    confidenceScore: 0,
+    lastCalibratedAt: ''
   },
   plumbing: {
     niche: 'plumbing',
-    sampleCount: 36,
-    winCount: 14,
-    lossCount: 22,
-    conversionRate: 0.39,
-    avgClosedValueUsd: 2200,
-    optimalRetainerUsd: 1950,
+    sampleCount: 0,
+    winCount: 0,
+    lossCount: 0,
+    conversionRate: 0,
+    avgClosedValueUsd: 0,
+    optimalRetainerUsd: 0,
     bestChannel: 'phone',
     topAuditDeficiency: 'missing_ssl',
-    avgDaysToClose: 6,
-    confidenceScore: 0.86,
-    lastCalibratedAt: new Date().toISOString()
+    avgDaysToClose: 0,
+    confidenceScore: 0,
+    lastCalibratedAt: ''
   },
   hvac: {
     niche: 'hvac',
-    sampleCount: 29,
-    winCount: 11,
-    lossCount: 18,
-    conversionRate: 0.38,
-    avgClosedValueUsd: 3100,
-    optimalRetainerUsd: 2750,
+    sampleCount: 0,
+    winCount: 0,
+    lossCount: 0,
+    conversionRate: 0,
+    avgClosedValueUsd: 0,
+    optimalRetainerUsd: 0,
     bestChannel: 'phone',
     topAuditDeficiency: 'missing_ssl',
-    avgDaysToClose: 11,
-    confidenceScore: 0.82,
-    lastCalibratedAt: new Date().toISOString()
+    avgDaysToClose: 0,
+    confidenceScore: 0,
+    lastCalibratedAt: ''
   },
   general: {
     niche: 'general',
-    sampleCount: 18,
-    winCount: 5,
-    lossCount: 13,
-    conversionRate: 0.28,
-    avgClosedValueUsd: 1800,
-    optimalRetainerUsd: 1500,
+    sampleCount: 0,
+    winCount: 0,
+    lossCount: 0,
+    conversionRate: 0,
+    avgClosedValueUsd: 0,
+    optimalRetainerUsd: 0,
     bestChannel: 'email',
     topAuditDeficiency: 'poor_seo',
-    avgDaysToClose: 14,
-    confidenceScore: 0.75,
-    lastCalibratedAt: new Date().toISOString()
+    avgDaysToClose: 0,
+    confidenceScore: 0,
+    lastCalibratedAt: ''
   }
 };
 
@@ -148,55 +150,55 @@ const DEFAULT_OBJECTION_RULES: ObjectionRule[] = [
     id: 'obj_too_expensive',
     triggerKeywords: ['expensive', 'budget', 'price', 'cost', 'money', 'afford'],
     objectionType: 'price',
-    rebuttalScript: "Totally understand cashflow discipline. We don't view this as a cost; our client audits in your territory show you are leaking an estimated {{predictedMonthlyLostRevenueUsd}}/mo from slow mobile pages and missed Google Maps visibility. A single extra job per month covers our entire retainer.",
-    successRate: 0.64,
-    timesApplied: 28,
-    lastUsedAt: new Date().toISOString()
+    rebuttalScript: "I understand the need to manage costs carefully. I can outline scope and pricing transparently; I won't estimate lost revenue without measured evidence.",
+    successRate: 0,
+    timesApplied: 0,
+    lastUsedAt: ''
   },
   {
     id: 'obj_have_agency',
     triggerKeywords: ['already have', 'current agency', 'in-house', 'web guy', 'someone doing it'],
     objectionType: 'existing_agency',
-    rebuttalScript: "That is great that you're active. We are not asking you to fire your current team. We ran a technical audit and found specific speed and SSL vulnerabilities that are suppressing your local rank. Let us send over the 1-page technical audit for your current web team to review—free of charge.",
-    successRate: 0.71,
-    timesApplied: 34,
-    lastUsedAt: new Date().toISOString()
+    rebuttalScript: "It's good that you already have support. If useful, I can share specific, verifiable observations about your public digital presence for your current team to assess.",
+    successRate: 0,
+    timesApplied: 0,
+    lastUsedAt: ''
   },
   {
     id: 'obj_not_interested',
     triggerKeywords: ['not interested', 'busy', 'no time', 'good right now', 'call back later'],
     objectionType: 'timing',
-    rebuttalScript: "Completely respect that you're booked out on job sites today. Would it be okay if I drop our 30-second video audit into your email so you can look at it when the crew wraps up this evening?",
-    successRate: 0.52,
-    timesApplied: 41,
-    lastUsedAt: new Date().toISOString()
+    rebuttalScript: "Understood. I won't keep pressing. If you'd like information later, I can send a short overview.",
+    successRate: 0,
+    timesApplied: 0,
+    lastUsedAt: ''
   },
   {
     id: 'obj_skeptic',
     triggerKeywords: ['scam', 'seo is fake', 'burned before', 'tired of marketers'],
     objectionType: 'trust_skepticism',
-    rebuttalScript: "You have every right to be skeptical—80% of generic marketing promises are fluff. That is why we don't do vague branding; we fix concrete technical gaps (like your site's 4.8s mobile load delay) and track real phone calls with zero long-term lock-in.",
-    successRate: 0.59,
-    timesApplied: 19,
-    lastUsedAt: new Date().toISOString()
+    rebuttalScript: "That skepticism is reasonable. I can show the checks and sources behind any findings, and I won't promise results that haven't been measured.",
+    successRate: 0,
+    timesApplied: 0,
+    lastUsedAt: ''
   },
   {
     id: 'obj_authority_delegation',
     triggerKeywords: ['partner', 'not decision maker', 'wife handles', 'accountant', 'boss', 'owner is out'],
     objectionType: 'authority_delegation',
-    rebuttalScript: "Completely understand—you need all partners aligned before testing any strategy. What if I email a concise 1-page visual executive summary of the speed & Google Maps audit directly to you and your partner, with zero obligations?",
-    successRate: 0.68,
-    timesApplied: 22,
-    lastUsedAt: new Date().toISOString()
+    rebuttalScript: "Of course. I can prepare a concise summary of the proposed scope, available evidence, and costs for decision-makers to review.",
+    successRate: 0,
+    timesApplied: 0,
+    lastUsedAt: ''
   },
   {
     id: 'obj_diy_referrals',
     triggerKeywords: ['word of mouth', 'referrals only', 'dont need advertising', 'we do it ourselves', 'booked through referrals'],
     objectionType: 'diy_in_house',
-    rebuttalScript: "Word-of-mouth is the best business there is. But when a referral searches your exact business name on Google from their phone, if your site loads slowly or triggers an insecure warning, even referrals hesitate. We ensure you don't leak referrals you've already earned.",
-    successRate: 0.74,
-    timesApplied: 31,
-    lastUsedAt: new Date().toISOString()
+    rebuttalScript: "Referrals can be valuable. If useful, I can review your public digital presence and share specific observations without assuming referrals are being lost.",
+    successRate: 0,
+    timesApplied: 0,
+    lastUsedAt: ''
   }
 ];
 
@@ -303,11 +305,11 @@ export class AutonomousLearningEngine {
 
   private loadState(): LearningState {
     return {
-      version: '2.4-autonomous',
-      calibrationEpoch: 14,
+      version: '2.5-untrained',
+      calibrationEpoch: 0,
       lastUpdated: new Date().toISOString(),
-      totalOutcomesDigested: 125,
-      autonomyReadinessScore: 100,
+      totalOutcomesDigested: 0,
+      autonomyReadinessScore: 0,
       isOfflineModeActive: false,
       technicalWeights: {
         missingSslUrgency: 8.8,
@@ -329,22 +331,39 @@ export class AutonomousLearningEngine {
     try {
       const [record] = await getDrizzleDb().select().from(neuralState).where(eq(neuralState.id, 'singleton'));
       if (record) {
-        const score = Math.max(100, record.autonomyReadinessScore || 100);
+        const storedNiches = (record.nicheMap || {}) as Record<string, NicheCalibration>;
+        const nicheMap: Record<string, NicheCalibration> = {};
+        for (const [key, profile] of Object.entries(storedNiches)) {
+          // Legacy profiles lack provenance and may contain seeded demo statistics.
+          nicheMap[key] = profile.calibrationSource === 'measured_outcomes'
+            ? profile
+            : {
+                ...(DEFAULT_NICHE_PROFILES[key] || DEFAULT_NICHE_PROFILES.general),
+                niche: profile.niche || key,
+                calibrationSource: 'unverified_legacy'
+              };
+        }
+        const trustedOutcomes = Object.values(nicheMap)
+          .filter(profile => profile.calibrationSource === 'measured_outcomes')
+          .reduce((sum, profile) => sum + Math.max(0, profile.sampleCount || 0), 0);
+        const storedObjections = (record.objections || []) as ObjectionRule[];
+        const objections = storedObjections.length && storedObjections.every(rule => rule.calibrationSource === 'recorded_events')
+          ? storedObjections
+          : DEFAULT_OBJECTION_RULES;
         this.state = {
-          version: record.version,
-          calibrationEpoch: record.calibrationEpoch,
+          version: '2.5-untrained',
+          calibrationEpoch: trustedOutcomes,
           lastUpdated: record.updatedAt.toISOString(),
-          totalOutcomesDigested: record.totalOutcomesDigested,
-          autonomyReadinessScore: score,
+          totalOutcomesDigested: trustedOutcomes,
+          autonomyReadinessScore: Math.min(100, trustedOutcomes),
           isOfflineModeActive: record.isOfflineModeActive,
           technicalWeights: record.technicalWeights as TechnicalWeights,
-          nicheMap: record.nicheMap as Record<string, NicheCalibration>,
-          objections: record.objections as ObjectionRule[],
+          nicheMap: Object.keys(nicheMap).length ? nicheMap : DEFAULT_NICHE_PROFILES,
+          objections,
           recentLearningLogs: this.state.recentLearningLogs || []
         };
-        if (record.autonomyReadinessScore < 100) {
-          await this.saveState();
-        }
+        // Persist the sanitized state so legacy seeded statistics are not reloaded.
+        await this.saveState();
       } else {
         await this.saveState();
       }
@@ -414,20 +433,22 @@ export class AutonomousLearningEngine {
     const cleanNiche = (params.niche || 'general').toLowerCase().trim();
     const current = this.state.nicheMap[cleanNiche] || {
       niche: cleanNiche,
-      sampleCount: 1,
+      sampleCount: 0,
       winCount: 0,
       lossCount: 0,
-      conversionRate: 0.25,
-      avgClosedValueUsd: 2000,
-      optimalRetainerUsd: 1800,
+      conversionRate: 0,
+      avgClosedValueUsd: 0,
+      optimalRetainerUsd: 0,
       bestChannel: params.channelUsed || 'phone',
       topAuditDeficiency: 'mobile_speed',
-      avgDaysToClose: 10,
-      confidenceScore: 0.5,
-      lastCalibratedAt: new Date().toISOString()
+      avgDaysToClose: 0,
+      confidenceScore: 0,
+      lastCalibratedAt: '',
+      calibrationSource: 'heuristic_default' as const
     };
 
     current.sampleCount += 1;
+    current.calibrationSource = 'measured_outcomes';
     this.state.totalOutcomesDigested += 1;
     this.state.calibrationEpoch += 1;
     this.state.lastUpdated = new Date().toISOString();
@@ -467,7 +488,7 @@ export class AutonomousLearningEngine {
 
     // Recalculate autonomy score (based on sample volume and model coverage)
     const coveredNiches = Object.keys(this.state.nicheMap).length;
-    this.state.autonomyReadinessScore = Math.min(100, Math.round(65 + Math.min(25, this.state.totalOutcomesDigested * 0.2) + (coveredNiches * 2)));
+    this.state.autonomyReadinessScore = Math.min(100, this.state.totalOutcomesDigested);
 
     // Push to recent logs
     this.state.recentLearningLogs.unshift({
@@ -497,6 +518,7 @@ export class AutonomousLearningEngine {
     if (matchedRule) {
       matchedRule.timesApplied += 1;
       matchedRule.lastUsedAt = new Date().toISOString();
+      matchedRule.calibrationSource = 'recorded_events';
       for (const concept of classification.matchedConcepts) {
         if (!matchedRule.triggerKeywords.includes(concept)) {
           matchedRule.triggerKeywords.push(concept);
@@ -531,10 +553,11 @@ export class AutonomousLearningEngine {
   } {
     const nicheKey = (lead.niche || 'general').toLowerCase();
     const profile = this.state.nicheMap[nicheKey] || this.state.nicheMap.general || DEFAULT_NICHE_PROFILES.general;
-    const isSslBroken = lead.sslStatus === 'missing';
-    const isSpeedSlow = (lead.performanceScore || 50) < 65;
-    const estLoss = lead.predictedMonthlyLostRevenueUsd || 1850;
     const owner = lead.ownerName || 'Business Owner';
+    const verifiedEvidence = lead.auditEvidenceVerified === true;
+    const isSslBroken = verifiedEvidence && lead.sslStatus === 'missing';
+    const isSpeedSlow = verifiedEvidence && typeof lead.performanceScore === 'number'
+      && Number.isFinite(lead.performanceScore) && lead.performanceScore >= 0 && lead.performanceScore < 65;
 
     let hook = '';
     let body = '';
@@ -542,37 +565,33 @@ export class AutonomousLearningEngine {
 
     if (channel === 'phone') {
       subject = `Phone Discovery Script: ${lead.businessName} (${lead.city})`;
-      hook = `Hi ${owner}, this is HAL calling about ${lead.businessName} here in ${lead.city}. I was running our weekly digital speed diagnostic across local ${lead.niche} contractors and noticed a critical issue on your mobile site.`;
-      
-      if (isSslBroken) {
-        body = `Your website is triggering an insecure SSL certificate warning on iPhones, which is scaring off homeowners searching for ${lead.niche} services in ${lead.city}. Based on local traffic volumes, this is costing you roughly $${estLoss} in lost inbound calls every month.`;
-      } else if (isSpeedSlow) {
-        body = `Your mobile site is taking over 4.2 seconds to load for local homeowners on cellular data. Our learned benchmark data shows that 53% of prospects bounce if the page takes longer than 2.5 seconds.`;
-      } else {
-        body = `Your Google Maps profile is missing local geo-structured schema tags, causing competitors down the road to outrank you on high-intent buyer searches in ${lead.city}.`;
-      }
+      hook = `Hi ${owner}, this is HAL calling about ${lead.businessName} in ${lead.city}.`;
     } else if (channel === 'sms') {
-      subject = `SMS Direct Outreach: ${lead.businessName}`;
-      hook = `Hi ${owner}, quick note from the local contractor growth team in ${lead.city}.`;
-      body = `We ran an audit on ${lead.businessName} and found a mobile speed bottleneck leaking ~${estLoss}/mo in homeowner leads. Fixed in <48hrs.`;
+      subject = `SMS Introduction: ${lead.businessName}`;
+      hook = `Hi ${owner}, I'm reaching out about ${lead.businessName} in ${lead.city}.`;
     } else {
-      subject = `Urgent Performance Audit for ${lead.businessName} (${lead.city})`;
-      hook = `Hi ${owner},\n\nI recently completed a digital speed & search audit of leading ${lead.niche} businesses in ${lead.city}.`;
-      body = `I noticed that ${lead.businessName}'s website is currently suffering from ${isSslBroken ? 'an insecure SSL TLS handshake' : 'heavy uncompressed mobile scripts'} that is hurting your position on Google Maps.\n\nWe have resolved this exact bottleneck for other contractors, resulting in an immediate 35-45% increase in verified quote requests.`;
+      subject = `Digital presence review for ${lead.businessName} (${lead.city})`;
+      hook = `Hi ${owner},\\n\\nI'm reaching out about ${lead.businessName}'s public digital presence.`;
     }
 
-    const cta = channel === 'phone' 
-      ? `Do you have 2 minutes to let me send over the 1-page visual proof so your team can inspect it?`
-      : `Would you be open to a 5-minute screen share this Thursday to walk through the exact fixes?`;
+    if (isSslBroken) {
+      body = 'A recorded technical assessment marked the site certificate as missing. I can share the assessment details and timestamp so your team can verify the finding.';
+    } else if (isSpeedSlow) {
+      body = `A recorded assessment lists a mobile performance score of ${lead.performanceScore}/100. If the assessment is current, I can share its source and details for your team to review.`;
+    } else {
+      body = 'I have not confirmed a current technical issue for your business, so I do not want to claim an audit found one. If useful, I can offer a short review and share only specific findings with their sources.';
+    }
+
+    const cta = 'Would you be open to a brief, no-obligation review?';
 
     return {
       subject,
       openingHook: hook,
       body: `${hook}\n\n${body}\n\n${cta}`,
       callToAction: cta,
-      recommendedRetainerUsd: profile.optimalRetainerUsd,
-      confidence: profile.confidenceScore,
-      engine: 'HAL Offline Autonomous Heuristic Engine (Self-Taught)'
+      recommendedRetainerUsd: profile.calibrationSource === 'measured_outcomes' && profile.sampleCount >= 5 ? profile.optimalRetainerUsd : 0,
+      confidence: profile.calibrationSource === 'measured_outcomes' ? profile.confidenceScore : 0,
+      engine: 'HAL offline heuristic; empirical pricing and conversion claims unavailable until outcomes are recorded'
     };
   }
 
@@ -602,7 +621,7 @@ export class AutonomousLearningEngine {
     return {
       matchedObjection: matchedRule.objectionType,
       rebuttal: customizedRebuttal,
-      successRate: matchedRule.successRate,
+      successRate: matchedRule.calibrationSource === 'recorded_events' ? matchedRule.successRate : 0,
       confidence: classification.confidenceScore,
       matchedConcepts: classification.matchedConcepts,
       reasoning: classification.reasoning,
