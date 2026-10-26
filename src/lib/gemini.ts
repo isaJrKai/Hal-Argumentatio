@@ -217,7 +217,7 @@ Return your response in a raw JSON object format (no markdown blocks, no code bl
     const sampleSize = historicalData?.length || 0;
     // Sample depth multiplier: with < 7 records, epistemic uncertainty is high
     const depthWeight = sampleSize >= 60 ? 1.0 : sampleSize >= 14 ? 0.85 : sampleSize >= 7 ? 0.70 : 0.45;
-    const raw = typeof modelScore === 'number' && !isNaN(modelScore) ? modelScore : 0.65;
+    const raw = typeof modelScore === 'number' && Number.isFinite(modelScore) ? modelScore : 0;
     const calibrated = Math.min(0.93, Math.max(0.20, raw * depthWeight));
     return Math.round(calibrated * 100) / 100;
   };
@@ -276,12 +276,7 @@ Return your response in a raw JSON object format (no markdown blocks, no code bl
         ], 0.2, true);
         const cleaned = cleanJSONResponse(text);
         const result = JSON.parse(cleaned);
-        return {
-          predicted: Number(result.predicted) || 15.0,
-          assumptions: result.assumptions || "Fitted on last 90 days performance trend lines.",
-          confidenceScore: calibrateForecastConfidence(Number(result.confidenceScore)),
-          source: 'nvidia-nemotron-70b'
-        };
+        return { ...parseForecastResponse(result), source: 'nvidia-nemotron-70b' };
       } catch (err) {
         console.error("NVIDIA Nemotron forecast generation failed, trying Gemini fallback:", err);
       }
@@ -317,9 +312,9 @@ Return your response in a raw JSON object format (no markdown blocks, no code bl
   const avg = values.reduce((sum, v) => sum + v, 0) / values.length;
   return {
     source: 'fallback_heuristic',
-    predicted: Math.round(avg * 1.05 * 10) / 10,
-    assumptions: `[Fallback Heuristic - Model Offline] Naive linear +5% trend extrapolation across ${historicalData.length} records.`,
-    confidenceScore: 0.40 // Honest confidence rating (< 0.5)
+    predicted: Math.round(avg * 10) / 10,
+    assumptions: `[Fallback Baseline - Model Offline] Historical mean across ${historicalData.length} records; this is a simple baseline, not a validated prediction.`,
+    confidenceScore: 0 // Uncalibrated; no validated model confidence is available
   };
 }
 
