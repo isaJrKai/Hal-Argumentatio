@@ -147,13 +147,8 @@ export default function HalBiblePanel({ initialDocId }: HalBiblePanelProps = {})
     return documents.find(d => d.id === selectedDocId) || documents[1];
   }, [documents, selectedDocId]);
 
-  // Sample data for Table primitive showcase
-  const sampleTableData = [
-    { id: '1', item: 'Strategic Territory Ingestion Scan', status: 'active', priority: 'High', value: '$12,400' },
-    { id: '2', item: 'Google Maps Places API Syncer', status: 'new', priority: 'Medium', value: '$4,250' },
-    { id: '3', item: 'Reputation Harvest Sweep (Calgary)', status: 'warning', priority: 'High', value: '$8,100' },
-    { id: '4', item: 'Isaac\'s Custom Cold Outreach Run', status: 'neutral', priority: 'Low', value: '$1,800' }
-  ];
+  // This component preview must not present invented operational records or revenue.
+  const sampleTableData: Array<{ id: string; item: string; status: string; priority: string; value: string }> = [];
 
   const sortedData = [...sampleTableData].sort((a, b) => {
     if (tableSort === 'asc') return a.value.localeCompare(b.value);
@@ -202,11 +197,11 @@ export default function HalBiblePanel({ initialDocId }: HalBiblePanelProps = {})
     setVerificationPassed(false);
 
     const steps = [
-      { p: 25, label: 'Auditing Network configuration port...' },
-      { p: 50, label: 'Scanning codebase for PII cryptology functions...' },
-      { p: 75, label: 'Evaluating UI visual weights and gradients...' },
-      { p: 90, label: 'Checking for unrequested layout bloat...' },
-      { p: 100, label: 'Verification successfully finalized!' }
+      { p: 25, label: 'Preview step 1 of 4 (no system check performed).' },
+      { p: 50, label: 'Preview step 2 of 4 (no code scan performed).' },
+      { p: 75, label: 'Preview step 3 of 4 (no UI audit performed).' },
+      { p: 90, label: 'Preview step 4 of 4 (no layout audit performed).' },
+      { p: 100, label: 'Preview finished; no verification checks ran.' }
     ];
 
     steps.forEach((step, idx) => {
@@ -637,10 +632,10 @@ export default function HalBiblePanel({ initialDocId }: HalBiblePanelProps = {})
                     <div className="space-y-1">
                       <h3 className="text-sm font-bold text-text-primary uppercase font-mono flex items-center gap-1.5">
                         <Terminal className="w-4 h-4 text-accent animate-pulse" />
-                        Verify System Alignment Engine
+                        Verification Animation Preview (Not a Live Audit)
                       </h3>
                       <p className="text-xs text-text-secondary">
-                        Audit active codebase configurations, port parameters, and cryptology vectors in real-time.
+                        This is a UI animation only. It does not inspect the running server, network ports, security configuration, or encryption.
                       </p>
                     </div>
                     <Button 
@@ -649,7 +644,7 @@ export default function HalBiblePanel({ initialDocId }: HalBiblePanelProps = {})
                       onClick={startSystemVerification}
                       isLoading={isVerifying}
                     >
-                      EXECUTE PHILOSOPHY ALIGNMENT
+                      PLAY PREVIEW
                     </Button>
                   </div>
 
@@ -682,20 +677,20 @@ export default function HalBiblePanel({ initialDocId }: HalBiblePanelProps = {})
                     <div className="bg-bg-base border border-border-dim p-4 rounded font-mono text-xs text-text-secondary space-y-3">
                       <div className="flex items-center gap-2 text-positive">
                         <CheckCircle2 className="w-4 h-4 shrink-0" />
-                        <span className="font-bold">SYSTEM IN PERFECT PHILOSOPHY ALIGNMENT</span>
+                        <span className="font-bold">PREVIEW COMPLETE — NOT A SECURITY AUDIT</span>
                       </div>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-[10.5px] pt-1">
                         <div className="flex justify-between border-b border-border-dim/40 pb-1.5">
                           <span className="opacity-60">PORT 3000 INTEGRITY:</span>
-                          <span className="text-positive font-bold">100% SECURE (COMPLIANT)</span>
+                          <span className="text-positive font-bold">Not checked</span>
                         </div>
                         <div className="flex justify-between border-b border-border-dim/40 pb-1.5">
                           <span className="opacity-60">PII CRYPTOLOGY FIELD:</span>
-                          <span className="text-positive font-bold">ACTIVE (AES-GCM-256)</span>
+                          <span className="text-positive font-bold">Not checked</span>
                         </div>
                         <div className="flex justify-between border-b border-border-dim/40 pb-1.5">
                           <span className="opacity-60">UI GRADIENT DECORATION:</span>
-                          <span className="text-positive font-bold">0% ACCENTS ONLY (COMPLIANT)</span>
+                          <span className="text-positive font-bold">Not checked</span>
                         </div>
                         <div className="flex justify-between border-b border-border-dim/40 pb-1.5">
                           <span className="opacity-60">UNREQUESTED MENUS BLOAT:</span>
@@ -954,7 +949,7 @@ export default function HalBiblePanel({ initialDocId }: HalBiblePanelProps = {})
 
                     {/* TABLE PRIMITIVE DEMONSTRATION */}
                     <div className="space-y-2">
-                      <span className="text-[10px] font-mono tracking-widest text-text-secondary uppercase font-semibold">PREMIUM FLUID TABLES</span>
+                      <span className="text-[10px] font-mono tracking-widest text-text-secondary uppercase font-semibold">OPERATIONAL TABLE PREVIEW — NO LIVE RECORDS</span>
                       <Table>
                         <TableHeader>
                           <TableRow>
@@ -972,7 +967,13 @@ export default function HalBiblePanel({ initialDocId }: HalBiblePanelProps = {})
                           </TableRow>
                         </TableHeader>
                         <TableBody>
-                          {sortedData.map((d) => (
+                          {sortedData.length === 0 ? (
+                            <TableRow>
+                              <TableCell colSpan={4} className="text-xs text-text-secondary">
+                                No live operational records loaded. Revenue and activity values are intentionally omitted until a real data source is connected.
+                              </TableCell>
+                            </TableRow>
+                          ) : sortedData.map((d) => (
                             <TableRow key={d.id} isSelectable={true}>
                               <TableCell className="font-sans font-medium">{d.item}</TableCell>
                               <TableCell>
