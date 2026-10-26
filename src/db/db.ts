@@ -656,9 +656,9 @@ class Database {
     const isSynthetic = lead.isSynthetic !== undefined 
       ? lead.isSynthetic 
       : (lead.phone === '555-0192' || lead.phone === '555-0100' || lead.source === 'synthetic_fallback');
-    const sourceType = lead.sourceType || (isSynthetic ? 'synthetic_fallback' : 'live_harvest');
-    const verificationStatus = lead.verificationStatus || (isSynthetic ? 'FABRICATED_REJECTED' : 'VERIFIED');
-    const dnsVerified = lead.dnsVerified !== undefined ? lead.dnsVerified : !isSynthetic;
+    const sourceType = lead.sourceType || (isSynthetic ? 'synthetic_fallback' : 'manual');
+    const verificationStatus = lead.verificationStatus || (isSynthetic ? 'FABRICATED_REJECTED' : 'UNVERIFIED_STAGING');
+    const dnsVerified = lead.dnsVerified !== undefined ? lead.dnsVerified : false;
 
     const newLead: Lead = {
       ...lead,
