@@ -80,50 +80,22 @@ export const HalRoadmapPhase4View: React.FC = () => {
       const token = localStorage.getItem('token') || localStorage.getItem('halbiz_auth_token') || localStorage.getItem('hal_auth_token') || '';
       const res = await fetch('/api/roadmap/phase4/run-consensus', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
         body: JSON.stringify({ topic: newTopic })
       });
-
-      if (res.ok) {
-        const data = await res.json();
-        if (data.consensusResult) {
-          setConsensusList(prev => [data.consensusResult, ...prev]);
-        }
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setActionNotice(data.error || 'Consensus is unavailable. No simulated result was created.');
+      } else if (data.consensusResult) {
+        setConsensusList(prev => [data.consensusResult, ...prev]);
         if (data.block) setAuditBlock(data.block);
-        setActionNotice(`Dual-Drive Consensus complete: ${data.consensusResult?.alignmentScore || 96}% alignment achieved between Gemini 2.5 and Nemotron 70B.`);
-        // Refresh verification
-        setVerification(prev => ({ ...prev, allPassed: true, totalScore: 100 }));
+        setActionNotice(`Consensus record created with ${data.consensusResult.alignmentScore ?? 'unreported'}% reported alignment.`);
+        await fetchPhase4Status();
+      } else {
+        setActionNotice(data.error || 'No consensus result was returned.');
       }
-    } catch (err) {
-      // Fallback local simulation
-      const mockResult: DualDriveConsensusResult = {
-        id: 'cons_' + Date.now(),
-        topic: newTopic,
-        geminiEngine: {
-          model: 'gemini-2.5-flash',
-          focus: 'Market Positioning & Pain Points',
-          recommendation: 'Target high-latency mobile booking page (LCP 3.9s); propose $2,850/mo retainer with guaranteed lead response time SLA.',
-          confidence: 0.95,
-          latencyMs: 310
-        },
-        nemotronEngine: {
-          model: 'nvidia/nemotron-3.5-lightning-30b-a3b',
-          focus: 'Deterministic Policy & Compliance Verification',
-          recommendation: 'Verified claims against real Core Web Vitals audit; validated pricing fits within 4.0x client ROAS boundary.',
-          confidence: 0.98,
-          latencyMs: 240
-        },
-        alignmentScore: 97,
-        arbitrationMethod: 'weighted_synthesis',
-        synthesizedAction: 'Deploy verified multi-channel sequence with speed audit proof, backed by calibrated retainer and compliance guarantee.',
-        policyValidationPassed: true,
-        timestamp: new Date().toISOString()
-      };
-      setConsensusList(prev => [mockResult, ...prev]);
-      setActionNotice('Dual-Drive Consensus verified locally (97% semantic alignment).');
+    } catch {
+      setActionNotice('Consensus request failed. No simulated result was created.');
     } finally {
       setIsExecutingConsensus(false);
       setTimeout(() => setActionNotice(null), 6000);
@@ -137,18 +109,12 @@ export const HalRoadmapPhase4View: React.FC = () => {
       const token = localStorage.getItem('token') || localStorage.getItem('halbiz_auth_token') || localStorage.getItem('hal_auth_token') || '';
       const res = await fetch('/api/roadmap/phase4/recalibrate-weights', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        }
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }
       });
-      if (res.ok) {
-        const data = await res.json();
-        if (data.block) setAuditBlock(data.block);
-        setActionNotice(`Bayesian recalibration complete. Processed epoch #${data.epoch || 15} with updated technical multipliers.`);
-      }
-    } catch (err) {
-      setActionNotice('Bayesian weights successfully calibrated against 14 conversion epochs.');
+      const data = await res.json().catch(() => ({}));
+      setActionNotice(res.ok ? 'Recalibration request completed.' : (data.error || 'Recalibration is unavailable.'));
+    } catch {
+      setActionNotice('Recalibration request failed. No weights were changed.');
     } finally {
       setIsRecalibrating(false);
       setTimeout(() => setActionNotice(null), 6000);
@@ -162,21 +128,19 @@ export const HalRoadmapPhase4View: React.FC = () => {
       const token = localStorage.getItem('token') || localStorage.getItem('halbiz_auth_token') || localStorage.getItem('hal_auth_token') || '';
       const res = await fetch('/api/roadmap/phase4/execute-arbitrage', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
         body: JSON.stringify({ arbitrageId: arbId })
       });
+      const data = await res.json().catch(() => ({}));
       if (res.ok) {
-        const data = await res.json();
-        setArbitrageList(prev => prev.map(a => a.id === arbId ? { ...a, status: 'executed' } : a));
         if (data.block) setAuditBlock(data.block);
-        setActionNotice(`Strategy Arbitrage executed: Spend shifted securely under financial guardrails.`);
+        await fetchPhase4Status();
+        setActionNotice('Arbitrage action response received. Check recorded campaign data before treating any change as complete.');
+      } else {
+        setActionNotice(data.error || 'Arbitrage execution was blocked.');
       }
-    } catch (err) {
-      setArbitrageList(prev => prev.map(a => a.id === arbId ? { ...a, status: 'executed' } : a));
-      setActionNotice(`Spend reallocation executed locally with immutable ledger verification.`);
+    } catch {
+      setActionNotice('Arbitrage request failed. No local execution was simulated.');
     } finally {
       setIsArbitrating(false);
       setTimeout(() => setActionNotice(null), 6000);
@@ -190,25 +154,24 @@ export const HalRoadmapPhase4View: React.FC = () => {
       const token = localStorage.getItem('token') || localStorage.getItem('halbiz_auth_token') || localStorage.getItem('hal_auth_token') || '';
       const res = await fetch('/api/roadmap/phase4/arbitrage/evaluate', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
         body: JSON.stringify({
           maxBudgetShiftRatio: 0.30,
           minRoasHurdleRatio: 1.25,
           minCampaignLiquidityFloorUsd: 500
         })
       });
-      if (res.ok) {
-        const data = await res.json();
-        if (data.opportunities) {
-          setArbitrageList(data.opportunities);
-          setActionNotice(`Strategy Arbitrage evaluated: ${data.opportunities.length} live opportunities verified under financial guardrails.`);
-        }
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setActionNotice(data.error || 'Arbitrage evaluation is unavailable.');
+      } else if (Array.isArray(data.opportunities)) {
+        setArbitrageList(data.opportunities);
+        setActionNotice(`Evaluation returned ${data.opportunities.length} opportunities from stored campaign data.`);
+      } else {
+        setActionNotice('The evaluation response did not include opportunity records.');
       }
-    } catch (err) {
-      console.warn('Arbitrage evaluation error:', err);
+    } catch {
+      setActionNotice('Arbitrage evaluation failed. No sample opportunities were added.');
     } finally {
       setIsArbitrating(false);
       setTimeout(() => setActionNotice(null), 5000);
