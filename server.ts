@@ -3730,36 +3730,52 @@ app.get('/api/outreach/bridges/status', authenticate, (req, res) => {
   const contractorId = (req as any).contractorId;
   const cfg = getBridgesForContractor(contractorId);
   const userLogs = dispatchLogs.filter(l => l.contractorId === contractorId);
-  const whatsappDelivered = userLogs.filter(l => l.channel === 'whatsapp').length;
-  const emailDelivered = userLogs.filter(l => l.channel === 'email').length;
-  const smsDelivered = userLogs.filter(l => l.channel === 'sms').length;
+  const whatsappDelivered = userLogs.filter(l => l.channel === 'whatsapp' && l.status === 'delivered').length;
+  const emailDelivered = userLogs.filter(l => l.channel === 'email' && l.status === 'delivered').length;
+  const smsDelivered = userLogs.filter(l => l.channel === 'sms' && l.status === 'delivered').length;
 
   res.json({
     success: true,
     bridges: {
       whatsapp: {
-        ...cfg.whatsapp,
+        enabled: cfg.whatsapp.enabled,
+        phoneNumberId: cfg.whatsapp.phoneNumberId,
+        displayNumber: cfg.whatsapp.displayNumber,
+        webhookActive: cfg.whatsapp.webhookActive,
+        verifiedBusiness: cfg.whatsapp.verifiedBusiness,
         accessToken: cfg.whatsapp.accessToken ? '••••••••' : undefined,
         deliveredCount: whatsappDelivered,
         replyRate: null,
         status: cfg.whatsapp.enabled ? 'configured_unverified' : 'not_configured'
       },
       email: {
-        ...cfg.email,
+        enabled: cfg.email.enabled,
+        provider: cfg.email.provider,
+        senderEmail: cfg.email.senderEmail,
+        senderName: cfg.email.senderName,
+        smtpHost: cfg.email.smtpHost,
+        smtpPort: cfg.email.smtpPort,
+        smtpUser: cfg.email.smtpUser,
         apiKey: cfg.email.apiKey ? '••••••••' : undefined,
         deliveredCount: emailDelivered,
         openRate: null,
         status: cfg.email.enabled ? 'configured_unverified' : 'not_configured'
       },
       sms: {
-        ...cfg.sms,
+        enabled: cfg.sms.enabled,
+        provider: cfg.sms.provider,
+        virtualNumber: cfg.sms.virtualNumber,
+        accountSid: cfg.sms.accountSid ? '••••••••' : undefined,
         authToken: cfg.sms.authToken ? '••••••••' : undefined,
-        deliveredCount: smsDelivered + 29,
-        slaResponseSec: 28,
-        status: cfg.sms.enabled ? 'connected' : 'disconnected'
+        deliveredCount: smsDelivered,
+        slaResponseSec: null,
+        status: cfg.sms.enabled ? 'configured_unverified' : 'not_configured'
       },
       calendar: {
-        ...cfg.calendar,
+        enabled: cfg.calendar.enabled,
+        provider: cfg.calendar.provider,
+        bookingUrl: cfg.calendar.bookingUrl,
+        timezone: cfg.calendar.timezone,
         bookedAppointments: null,
         status: cfg.calendar.enabled ? 'configured_unverified' : 'not_configured'
       }
