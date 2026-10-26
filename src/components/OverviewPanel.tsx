@@ -341,7 +341,7 @@ export default function OverviewPanel({
                     Highest-Impact Recommendation
                   </div>
                   <p className="text-[11px] leading-relaxed">
-                    Contacting newly qualified <span className="font-bold text-text-primary">{activeNiche}</span> prospects in <span className="font-bold text-text-primary">{activeCity}</span> represents your highest-impact action today (Est. Avg Deal: <strong className="text-brand">${activeIndustry.ltvRange.averageContract.toLocaleString()}</strong>).
+                    Contacting newly qualified <span className="font-bold text-text-primary">{activeNiche}</span> prospects in <span className="font-bold text-text-primary">{activeCity}</span> represents your highest-impact action today (Industry reference: <strong className="text-brand">${activeIndustry.ltvRange.averageContract.toLocaleString()}</strong>).
                   </p>
                   <button 
                     onClick={() => setActiveTab('leads')}
@@ -381,12 +381,12 @@ export default function OverviewPanel({
             <div className="space-y-3">
               <div className="text-xs font-semibold">Local Trade & Demand Conditions</div>
               <p className="text-[11px] text-text-secondary leading-relaxed">
-                Live market indicators for <strong className="text-text-primary">{(activeNiche || 'Contracting').toUpperCase()}</strong> services in <strong className="text-text-primary">{activeCity}, {regionalProfile.countryCode}</strong>.
+                Configured market profile for <strong className="text-text-primary">{(activeNiche || 'Contracting').toUpperCase()}</strong> services in <strong className="text-text-primary">{activeCity}, {regionalProfile.countryCode}</strong>.
               </p>
               
               <div className={`p-3 rounded-lg border border-dashed border-border-dim bg-bg-base/30 text-[10px] text-text-secondary space-y-1.5`}>
                 <div className="flex items-center justify-between">
-                  <span className="text-accent font-mono font-bold uppercase text-[9px]">Local Weather & Demand Focus</span>
+                  <span className="text-accent font-mono font-bold uppercase text-[9px]">Reference seasonal focus</span>
                   <span className="font-mono text-[9px] text-text-tertiary">{regionalProfile.climateZone}</span>
                 </div>
                 <p className="text-text-primary font-medium leading-snug">
@@ -1253,19 +1253,19 @@ export default function OverviewPanel({
                 <span className="text-[10px] font-mono tracking-widest text-text-tertiary uppercase font-bold block">TODAY'S ACTION PRIORITIES</span>
                 <span className="text-xs font-sans font-semibold text-text-primary">Scheduled Business Tasks</span>
               </div>
-              <span className="text-[9px] font-mono font-bold text-accent px-2 py-0.5 rounded bg-accent-dim">TODAY</span>
+              <span className="text-[9px] font-mono font-bold text-accent px-2 py-0.5 rounded bg-accent-dim">TASKS</span>
             </div>
             
             <div className="space-y-2.5">
               <div className="p-2.5 rounded-lg border border-border-dim bg-bg-subtle/50 space-y-1.5">
                 <div className="flex justify-between items-center text-[9px] font-mono">
                   <span className="text-accent font-bold uppercase flex items-center gap-1">
-                    <span className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse" /> HIGH PRIORITY FOLLOW-UP
+                    <span className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse" /> TASK STATUS NOT TRACKED
                   </span>
-                  <span className="text-text-tertiary">09:00 AM</span>
+                  <span className="text-text-tertiary">—</span>
                 </div>
                 <p className="text-[11px] font-sans font-medium text-text-primary leading-tight">
-                  Follow up with 5 newly scored high-intent {activeNiche} leads in {activeCity}
+                  No verified follow-up task is recorded for {activeCity}
                 </p>
                 <button 
                   onClick={() => setActiveTab('leads')}
@@ -1278,12 +1278,12 @@ export default function OverviewPanel({
               <div className="p-2.5 rounded-lg border border-border-dim bg-bg-subtle/50 space-y-1.5">
                 <div className="flex justify-between items-center text-[9px] font-mono">
                   <span className="text-warning font-bold uppercase flex items-center gap-1">
-                    <span className="w-1.5 h-1.5 rounded-full bg-warning" /> PROPOSAL PENDING
+                    <span className="w-1.5 h-1.5 rounded-full bg-warning" /> TASK STATUS NOT TRACKED
                   </span>
-                  <span className="text-text-tertiary">11:00 AM</span>
+                  <span className="text-text-tertiary">—</span>
                 </div>
                 <p className="text-[11px] font-sans font-medium text-text-primary leading-tight">
-                  Review tailored pitch deck & pricing for commercial contractor prospect
+                  No proposal review task is recorded.
                 </p>
                 <button 
                   onClick={() => setActiveTab('board')}
@@ -1296,18 +1296,18 @@ export default function OverviewPanel({
               <div className="p-2.5 rounded-lg border border-border-dim bg-bg-subtle/50 space-y-1.5">
                 <div className="flex justify-between items-center text-[9px] font-mono">
                   <span className="text-positive font-bold uppercase flex items-center gap-1">
-                    <span className="w-1.5 h-1.5 rounded-full bg-positive" /> CAMPAIGN APPROVAL
+                    <span className="w-1.5 h-1.5 rounded-full bg-positive" /> TASK STATUS NOT TRACKED
                   </span>
-                  <span className="text-text-tertiary">02:00 PM</span>
+                  <span className="text-text-tertiary">—</span>
                 </div>
                 <p className="text-[11px] font-sans font-medium text-text-primary leading-tight">
-                  Authorize automated SEO speed audit outreach for 12 {activeCity} prospects
+                  No campaign approval task is recorded.
                 </p>
                 <button 
                   onClick={() => setActiveTab('campaigns')}
                   className="text-[10px] font-mono text-positive hover:underline flex items-center gap-1 font-bold pt-0.5"
                 >
-                  Approve Outreach Dispatch <ArrowUpRight className="w-3 h-3" />
+                  Open Campaigns <ArrowUpRight className="w-3 h-3" />
                 </button>
               </div>
             </div>
