@@ -215,7 +215,7 @@ export default function OverviewPanel({
   // Historical trend series are not yet stored, so no synthetic sparkline is rendered.
 
   // Forecast chart data
-  const [forecastMetricMode, setForecastMetricMode] = useState<'all' | 'revenue' | 'demand'>('all');
+  const [forecastMetricMode, setForecastMetricMode] = useState<'demand'>('demand');
   const [forecastMetadata, setForecastMetadata] = useState<any>(null);
   const [forecastChartData, setForecastChartData] = useState<any[]>([]);
 
@@ -243,7 +243,6 @@ export default function OverviewPanel({
           setForecastMetadata(data);
           const formatted = data.forecastCurve.map((c: any) => ({
             day: c.week.replace('W+', 'W'),
-            v: Math.round(c.projectedCplUsd * c.predictedDemandIndex * (workspaceConfig.budgetMultiplier || 1.0) * (regionalProfile.territoryMetrics.typicalCPC / 4.5) * 14),
             demand: c.predictedDemandIndex,
             cpl: c.projectedCplUsd,
             isBreach: c.isBreachingCplLimit,
@@ -498,24 +497,24 @@ export default function OverviewPanel({
           </div>
         </section>
 
-        {/* 12-Week Revenue & Demand Forecast (TimesFM + HAL Brain) */}
+        {/* Evidence-gated demand scenario */}
         <section className={`border rounded-xl p-5 flex flex-col justify-between ${cardBg} lg:col-span-7 md:col-span-2 col-span-1 min-w-0 transition-all`}>
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-2">
             <div>
               <div className="flex items-center gap-2">
-                <span className="text-xs font-sans font-semibold tracking-wide block mb-0.5">12-Week Revenue & Demand Forecast</span>
-                <span className="px-1.5 py-0.2 bg-bg-subtle text-text-secondary font-mono text-[9px] font-bold rounded uppercase flex items-center gap-1 border border-border-dim"><Activity className="w-2.5 h-2.5" /> {forecastMetadata ? 'Forecast response received' : 'Awaiting verified forecast'}</span>
+                <span className="text-xs font-sans font-semibold tracking-wide block mb-0.5">12-Week Demand Scenario</span>
+                <span className="px-1.5 py-0.2 bg-bg-subtle text-text-secondary font-mono text-[9px] font-bold rounded uppercase flex items-center gap-1 border border-border-dim"><Activity className="w-2.5 h-2.5" /> {forecastMetadata ? 'Scenario response received' : 'No verified scenario available'}</span>
                 {forecastMetadata?.budgetGuardrails?.breachDetected && (
                   <span className="px-1.5 py-0.2 bg-danger-dim text-danger font-mono text-[9px] font-bold rounded uppercase flex items-center gap-1 border border-danger/30 animate-pulse">
-                    <ShieldAlert className="w-2.5 h-2.5" /> GUARDRAIL THROTTLE
+                    <ShieldAlert className="w-2.5 h-2.5" /> REVIEW RECOMMENDED
                   </span>
                 )}
               </div>
-              <span className="text-[10px] font-mono text-text-tertiary">TimesFM foundation time-series projection synchronized with HAL 11-Layer Brain</span>
+              <span className="text-[10px] font-mono text-text-tertiary">Heuristic scenario only; not a TimesFM model, measured forecast, or revenue prediction.</span>
             </div>
 
-            {/* Metric Mode Filter */}
-            <div className="flex items-center gap-1 bg-bg-base p-1 rounded-lg border border-border-dim text-[9.5px] font-mono shrink-0">
+            <div className="text-[9.5px] font-mono text-text-tertiary px-2 py-1 rounded border border-border-dim">DEMAND INDEX SCENARIO</div>
+            {false && <div className="flex items-center gap-1 bg-bg-base p-1 rounded-lg border border-border-dim text-[9.5px] font-mono shrink-0">
               <button
                 type="button"
                 onClick={() => setForecastMetricMode('all')}
@@ -549,7 +548,7 @@ export default function OverviewPanel({
               >
                 Demand Index
               </button>
-            </div>
+            </div>}
           </div>
 
           {/* Brain Integration Telemetry Pills */}
@@ -561,7 +560,7 @@ export default function OverviewPanel({
                 <span className="text-text-primary font-semibold truncate">
                   {forecastMetadata?.googleAdsBaseline 
                     ? `${forecastMetadata.googleAdsBaseline.recordsCount} Logs · $${forecastMetadata.googleAdsBaseline.empiricalCpl} CPL` 
-                    : 'Ingesting Daily Records...'}
+                    : 'No verified records'}
                 </span>
               </div>
             </div>
@@ -572,8 +571,8 @@ export default function OverviewPanel({
                 <span className="text-text-tertiary block text-[9px] uppercase font-sans">Weather Trigger</span>
                 <span className="text-text-primary font-semibold truncate">
                   {forecastMetadata?.weatherTrigger 
-                    ? `${forecastMetadata.weatherTrigger.hazardCategory === 'FREEZE_THAW' ? '❄️ Freeze Warning' : forecastMetadata.weatherTrigger.hazardCategory === 'HAIL_HIGH_WIND' ? '🌪️ Hail Advisory' : forecastMetadata.weatherTrigger.hazardCategory === 'HEAVY_PRECIPITATION' ? '🌧️ Rain Surge' : '☀️ Stable'} (${forecastMetadata.weatherTrigger.demandSurgeMultiplier}x)`
-                    : 'Querying Open-Meteo...'}
+                    ? `${forecastMetadata.weatherTrigger.hazardCategory.replaceAll('_', ' ')} scenario (${forecastMetadata.weatherTrigger.demandSurgeMultiplier}x)`
+                    : 'No live weather reading'}
                 </span>
               </div>
             </div>
@@ -584,8 +583,8 @@ export default function OverviewPanel({
                 <span className="text-text-tertiary block text-[9px] uppercase font-sans">Budget Guardrail</span>
                 <span className="text-text-primary font-semibold truncate">
                   {forecastMetadata?.budgetGuardrails?.breachDetected
-                    ? `Throttled 0.75x (CAC Target: $${forecastMetadata.budgetGuardrails.targetCac})`
-                    : (forecastMetadata?.budgetGuardrails?.maxAllowableCpl != null ? `Armed & Enforcing (≤${forecastMetadata.budgetGuardrails.maxAllowableCpl} CPL)` : 'Guardrail status unavailable')}
+                    ? `Recommendation: ${forecastMetadata.budgetGuardrails.suggestedAction}; no budget changed`
+                    : (forecastMetadata?.budgetGuardrails?.maxAllowableCpl != null ? `Scenario threshold ≤${forecastMetadata.budgetGuardrails.maxAllowableCpl} CPL; no automatic action`  : 'Not evaluated')}
                 </span>
               </div>
             </div>
@@ -593,7 +592,7 @@ export default function OverviewPanel({
           
           <div className="w-full h-[230px] pt-1">
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={forecastChartData} margin={{ top: 8, right: forecastMetricMode === 'revenue' ? 8 : 16, left: 0, bottom: 4 }}>
+              <AreaChart data={forecastChartData} margin={{ top: 8, right: 16, left: 0, bottom: 4 }}>
                 <defs>
                   <linearGradient id="colorForecast" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor={chartPalette.rev} stopOpacity={0.35}/>
@@ -635,7 +634,6 @@ export default function OverviewPanel({
                   domain={[40, 100]}
                   tickFormatter={(val) => `${val}`}
                   width={30}
-                  hide={forecastMetricMode === 'revenue'}
                 />
                 <ChartTooltip
                   content={({ active, payload, label }) => {
@@ -646,13 +644,6 @@ export default function OverviewPanel({
                         <div className="flex items-center justify-between border-b border-border-dim/60 pb-1">
                           <span className="font-bold text-text-primary">{label || item.day} Horizon</span>
                           <span className="text-[9px] text-accent font-semibold px-1 py-0.2 rounded bg-accent/10">Forecast</span>
-                        </div>
-                        <div className="flex items-center justify-between pt-0.5">
-                          <span className="text-text-secondary flex items-center gap-1.5">
-                            <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: chartPalette.rev }} />
-                            Predicted Revenue:
-                          </span>
-                          <span className="font-bold" style={{ color: chartPalette.rev }}>${Number(item.v || 0).toLocaleString()}</span>
                         </div>
                         {item.demand !== undefined && (
                           <div className="flex items-center justify-between text-[10px]">
@@ -684,18 +675,6 @@ export default function OverviewPanel({
                     );
                   }}
                 />
-                {(forecastMetricMode === 'all' || forecastMetricMode === 'revenue') && (
-                  <Area 
-                    yAxisId="rev" 
-                    type="monotone" 
-                    dataKey="v" 
-                    name="Projected Revenue" 
-                    stroke={chartPalette.rev} 
-                    strokeWidth={2.2} 
-                    fillOpacity={1} 
-                    fill="url(#colorForecast)" 
-                  />
-                )}
                 {(forecastMetricMode === 'all' || forecastMetricMode === 'demand') && (
                   <Area 
                     yAxisId="dem" 
@@ -717,17 +696,13 @@ export default function OverviewPanel({
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 pt-2 border-t border-border-dim/50 text-[9.5px] font-mono text-text-tertiary">
             <div className="flex items-center gap-3">
               <span className="flex items-center gap-1.5">
-                <span className="w-2.5 h-1 rounded-xs" style={{ backgroundColor: chartPalette.rev }} />
-                Projected Revenue ($)
-              </span>
-              <span className="flex items-center gap-1.5">
                 <span className="w-2.5 h-1 rounded-xs" style={{ backgroundColor: chartPalette.demand }} />
                 Demand Index (0-100)
               </span>
             </div>
             <div className="flex items-center gap-2">
               <span className="text-text-secondary truncate">
-                {forecastMetadata?.weatherTrigger?.strategicDirective || `Seasonal Multiplier: ${(workspaceConfig.budgetMultiplier || 1.0).toFixed(1)}x`}
+                {forecastMetadata?.weatherTrigger?.strategicDirective || 'No verified scenario available; no revenue projection is displayed.'}
               </span>
             </div>
           </div>
