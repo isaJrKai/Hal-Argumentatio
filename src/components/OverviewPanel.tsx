@@ -121,7 +121,7 @@ export default function OverviewPanel({
             if (isMounted) fetchConnectorHealth(retryCount + 1);
           }, 1500 * (retryCount + 1));
         } else {
-          console.warn('Connector health status unavailable; using local system metrics.');
+          console.warn('Connector health status unavailable.');
         }
       }
     };
@@ -412,7 +412,7 @@ export default function OverviewPanel({
         <section className={`border rounded-xl bg-bg-raised border-border-dim overflow-hidden shadow-xs lg:col-span-12 md:col-span-2 col-span-1`}>
           <div className="px-5 py-3 border-b border-border-dim bg-bg-subtle/40 flex justify-between items-center">
             <span className="text-[10px] font-mono tracking-widest text-text-secondary uppercase font-semibold">KEY PERFORMANCE (MONTH-TO-DATE)</span>
-            <span className="text-[9px] font-mono text-text-secondary opacity-60">LIVE UPDATED</span>
+            <span className="text-[9px] font-mono text-text-secondary opacity-60">Based on saved workspace records</span>
           </div>
           
           <div className="grid grid-cols-2 sm:grid-cols-5 divide-y sm:divide-y-0 sm:divide-x divide-border-dim bg-bg-raised">
@@ -427,7 +427,7 @@ export default function OverviewPanel({
               </div>
               <div className="flex items-baseline justify-between gap-2">
                 <div className="text-xl font-mono tracking-tight font-light">{formatCurrency(displayRevenueVal)}</div>
-                {renderSpark(sparkData1, chartPalette.spark1, chartPalette.spark1)}
+                
               </div>
               <div className="text-[10px] font-mono text-positive flex items-center gap-1">Historical change unavailable</div>
             </div>
@@ -443,7 +443,7 @@ export default function OverviewPanel({
               </div>
               <div className="flex items-baseline justify-between gap-2">
                 <div className="text-xl font-mono tracking-tight font-light">{displayNewLeadsVal}</div>
-                {renderSpark(sparkData2, chartPalette.spark2, chartPalette.spark2)}
+                
               </div>
               <div className="text-[10px] font-mono text-positive flex items-center gap-1">Historical change unavailable</div>
             </div>
@@ -459,7 +459,7 @@ export default function OverviewPanel({
               </div>
               <div className="flex items-baseline justify-between gap-2">
                 <div className="text-xl font-mono tracking-tight font-light">{formatCurrency(displayAvgDealVal)}</div>
-                {renderSpark(sparkData3, chartPalette.spark3, chartPalette.spark3)}
+                
               </div>
               <div className="text-[10px] font-mono text-positive flex items-center gap-1">Historical change unavailable</div>
             </div>
@@ -475,7 +475,7 @@ export default function OverviewPanel({
               </div>
               <div className="flex items-baseline justify-between gap-2">
                 <div className="text-xl font-mono tracking-tight font-light">{displayActiveClientsVal}</div>
-                {renderSpark(sparkData4, chartPalette.spark4, chartPalette.spark4)}
+                
               </div>
               <div className="text-[10px] font-mono text-positive flex items-center gap-1">Historical change unavailable</div>
             </div>
@@ -491,7 +491,7 @@ export default function OverviewPanel({
               </div>
               <div className="flex items-baseline justify-between gap-2">
                 <div className="text-xl font-mono tracking-tight font-light">{displayOpportunitiesVal}</div>
-                {renderSpark(sparkData5, chartPalette.spark5, chartPalette.spark5)}
+                
               </div>
               <div className="text-[10px] font-mono text-positive flex items-center gap-1">Historical change unavailable</div>
             </div>
@@ -944,11 +944,11 @@ export default function OverviewPanel({
                         <div className="font-bold text-text-primary truncate">{lead.businessName}</div>
                         <div className="text-[9px] text-text-secondary flex items-center gap-2 truncate">
                           <span className="flex items-center gap-0.5"><MapPin className="w-2.5 h-2.5 text-text-tertiary" /> {lead.city}</span>
-                          <span className="flex items-center gap-0.5"><Phone className="w-2.5 h-2.5 text-positive" /> {lead.phone || 'Verified Line'}</span>
+                          <span className="flex items-center gap-0.5"><Phone className="w-2.5 h-2.5 text-positive" /> {lead.phone || 'Not provided'}</span>
                         </div>
                       </div>
                       <div className="text-right shrink-0">
-                        <div className="text-accent font-bold">${(lead.predictedLtvUsd || 4500).toLocaleString()}</div>
+                        <div className="text-accent font-bold">${(lead.predictedLtvUsd ?? 0).toLocaleString()}</div>
                         <button
                           onClick={() => setActiveTab('leads')}
                           className="text-[8.5px] text-text-tertiary hover:text-accent uppercase font-bold"
@@ -995,7 +995,7 @@ export default function OverviewPanel({
                 Reset View <X className="w-2.5 h-2.5" />
               </button>
             ) : (
-              <span className="text-[10px] font-mono text-positive font-semibold shrink-0">↑ 14.8% MoM</span>
+              <span className="text-[10px] font-mono text-positive font-semibold shrink-0">Change unavailable</span>
             )}
           </div>
 
@@ -1114,14 +1114,14 @@ export default function OverviewPanel({
                         </div>
                         <div className="text-[9px] text-text-secondary flex items-center gap-2 truncate">
                           <span className="flex items-center gap-0.5"><MapPin className="w-2.5 h-2.5 text-text-tertiary" /> {lead.city}</span>
-                          <span className="flex items-center gap-0.5"><Phone className="w-2.5 h-2.5 text-positive" /> {lead.phone || '+1 Verified'}</span>
+                          <span className="flex items-center gap-0.5"><Phone className="w-2.5 h-2.5 text-positive" /> {lead.phone || 'Not provided'}</span>
                         </div>
                       </div>
 
                       <div className="text-right shrink-0 flex items-center gap-2">
                         <div>
-                          <div className="text-accent font-bold text-[11px]">${(lead.predictedLtvUsd || 4500).toLocaleString()}</div>
-                          <div className="text-[8px] text-text-tertiary uppercase">Urgency: {lead.urgencyScore || 7}/10</div>
+                          <div className="text-accent font-bold text-[11px]">${(lead.predictedLtvUsd ?? 0).toLocaleString()}</div>
+                          <div className="text-[8px] text-text-tertiary uppercase">Urgency: {lead.urgencyScore != null ? lead.urgencyScore : 'Not assessed'}/10</div>
                         </div>
                         <ChevronRight className="w-3 h-3 text-text-tertiary group-hover:text-accent group-hover:translate-x-0.5 transition-all" />
                       </div>
@@ -1468,7 +1468,7 @@ export default function OverviewPanel({
                     <div className="p-2.5 rounded-lg bg-bg-base border border-border-dim">
                       <span className="block text-[9px] text-text-tertiary uppercase">Reputation</span>
                       <span className="text-xs font-bold text-warning mt-1 block">
-                        {selectedLeadForDetail.googleRating ? `${selectedLeadForDetail.googleRating}★` : '4.2★'}
+                        {selectedLeadForDetail.googleRating != null ? `${selectedLeadForDetail.googleRating}★` : 'Not available'}
                       </span>
                     </div>
                   </div>
@@ -1514,7 +1514,7 @@ export default function OverviewPanel({
                   </div>
                   <p className="text-xs text-text-primary leading-relaxed">
                     {selectedLeadForDetail.outreachStrategy || 
-                      `"We analyzed ${selectedLeadForDetail.businessName}'s digital conversion surface in ${selectedLeadForDetail.city}. Their website ${selectedLeadForDetail.sslStatus === 'missing' ? 'flags an unencrypted SSL error and ' : ''}scores below standard mobile speed, leaking valuable high-intent local customer calls to competitors. Immediate remediation unlocks an estimated +$${(selectedLeadForDetail.predictedLtvUsd || 4500).toLocaleString()} in pipeline value."`}
+                      `"We analyzed ${selectedLeadForDetail.businessName}'s digital conversion surface in ${selectedLeadForDetail.city}. website assessment and valuation data are not available in the saved record. Verify the site and gather evidence before making performance or revenue claims."`}
                   </p>
                 </div>
               </div>
