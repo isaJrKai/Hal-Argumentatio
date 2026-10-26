@@ -3546,7 +3546,7 @@ app.post('/api/dispatch/campaign-batch', authenticate, async (req, res) => {
     : await pgDb.select().from(leads).where(and(eq(leads.contractorId, contractorId), eq(leads.status, 'new')));
 
   const results = [];
-  let successful = 0;
+  let simulated = 0;
   let failed = 0;
 
   for (const lead of targetLeads) {
@@ -3589,43 +3589,42 @@ app.post('/api/dispatch/campaign-batch', authenticate, async (req, res) => {
         .replace(/\{\{ownerName\}\}/g, lead.ownerName || 'Business Principal')
         .replace(/\{\{city\}\}/g, lead.city)
         .replace(/\{\{serviceType\}\}/g, lead.niche)
-        .replace(/\{\{urgencyScore\}\}/g, String(lead.urgencyScore || 7.5))
-        .replace(/\{\{seoScore\}\}/g, String(lead.seoScore || 65))
-        .replace(/\{\{phone\}\}/g, decryptedPhone || 'Phone on file')
-        .replace(/\{\{email\}\}/g, decryptedEmail || 'Email on file');
+        .replace(/\{\{urgencyScore\}\}/g, lead.urgencyScore != null ? String(lead.urgencyScore) : 'Not assessed')
+        .replace(/\{\{seoScore\}\}/g, lead.seoScore != null ? String(lead.seoScore) : 'Not assessed')
+        .replace(/\{\{phone\}\}/g, decryptedPhone || 'Not provided')
+        .replace(/\{\{email\}\}/g, decryptedEmail || 'Not provided');
     };
 
     const customizedSubject = rep(template.subject || `Partnership Proposal for {{businessName}}`);
-    const customizedBody = rep(template.body || `Hi {{ownerName}},\n\nI reviewed {{businessName}} in {{city}} and prepared a digital performance acceleration audit.`);
+    const customizedBody = rep(template.body || `Hi {{ownerName}},\n\nI'm reaching out to ask whether {{businessName}} is open to discussing ways to improve online visibility and lead follow-up in {{city}}. I have not completed a verified audit, so I don't want to assume there is a specific problem. Would you be open to a brief conversation?`);
 
     const recipient = channel === 'email' ? decryptedEmail : decryptedPhone;
     if (recipient && recipient !== '[ENCRYPTED]') {
       await pgDb.insert(leadEvents).values({
         id: crypto.randomUUID(),
         leadId: lead.id,
-        eventType: channel === 'email' ? 'EmailSent' : 'SmsSent',
-        newStage: 'contacted',
-        notes: `[Autonomous Campaign Dispatch - ${channel.toUpperCase()}] Transmitted to ${recipient}. Subject: "${customizedSubject}"`
+        eventType: 'OutreachSimulationRecorded',
+        newStage: lead.status,
+        notes: `[Simulation only - ${channel.toUpperCase()}] No external message was sent. Intended recipient: ${recipient}. Subject: "${customizedSubject}"`
       });
-      await pgDb.update(leads).set({ status: 'contacted', updatedAt: new Date() }).where(and(eq(leads.id, lead.id), eq(leads.contractorId, contractorId)));
 
       dispatchLogs.push({
-        id: 'outreach_' + crypto.randomBytes(6).toString('hex'),
+        id: 'simulation_' + crypto.randomBytes(6).toString('hex'),
         contractorId,
         channel,
         recipient,
         leadId: lead.id,
         leadBusinessName: lead.businessName,
-        status: 'delivered',
-        mode: 'autonomous' as any,
-        providerId: 'HAL_' + crypto.randomBytes(4).toString('hex').toUpperCase(),
+        status: 'simulated',
+        mode: 'simulation' as any,
+        providerId: 'SIMULATION_ONLY',
         timestamp: new Date().toISOString(),
         subject: customizedSubject,
         preview: customizedBody.slice(0, 80)
       });
 
-      successful++;
-      results.push({ leadId: lead.id, businessName: lead.businessName, status: 'delivered', recipient });
+      simulated++;
+      results.push({ leadId: lead.id, businessName: lead.businessName, status: 'simulated', recipient, note: 'No external message was sent; lead status was not changed.' });
     } else {
       results.push({ leadId: lead.id, businessName: lead.businessName, status: 'skipped', reason: 'Missing channel contact info' });
       failed++;
@@ -3642,8 +3641,8 @@ app.post('/api/dispatch/campaign-batch', authenticate, async (req, res) => {
 
   db.addAuditLog({
     contractorId,
-    action: 'BATCH_CAMPAIGN_DISPATCHED',
-    details: `Executed batch outreach to ${targetLeads.length} leads (${successful} delivered, ${failed} failed) via ${channel.toUpperCase()}.`
+    action: 'BATCH_CAMPAIGN_SIMULATED',
+    details: `Recorded ${simulated} simulated outreach attempts out of ${targetLeads.length} leads; ${failed} were blocked or skipped. No external messages were sent.`
   });
 
   const auditBlock = db.recordLedgerEntry({
@@ -3664,16 +3663,16 @@ app.post('/api/dispatch/campaign-batch', authenticate, async (req, res) => {
 
   broadcastNotification(
     contractorId,
-    'success',
-    'Campaign Outreach Dispatched',
-    `Dispatched ${successful} personalized messages via ${channel.toUpperCase()}. Conversion pipeline updated.`
+    'info',
+    'Outreach Simulation Recorded',
+    `Recorded ${simulated} simulated attempts via ${channel.toUpperCase()}. No external messages were sent and lead statuses were not changed.`
   );
 
   res.json({
     success: true,
     totalTargeted: targetLeads.length,
-    successful,
-    successfulCount: successful,
+    simulated,
+    simulatedCount: simulated,
     failed,
     channel,
     results,
