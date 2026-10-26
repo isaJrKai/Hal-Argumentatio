@@ -3525,7 +3525,11 @@ app.post('/api/dispatch/webhook', authenticate, async (req, res) => {
     data: payload || {}
   });
 
-  const hmac = crypto.createHmac('sha256', process.env.JWT_SECRET || 'secret');
+  const signingSecret = process.env.JWT_SECRET;
+  if (!signingSecret || signingSecret.length < 32) {
+    return res.status(503).json({ error: 'Secure webhook signing is not configured.' });
+  }
+  const hmac = crypto.createHmac('sha256', signingSecret);
   hmac.update(payloadString);
   const signature = hmac.digest('hex');
 
@@ -8533,7 +8537,11 @@ async function startServer() {
       timestamp: new Date().toISOString()
     });
 
-    const hmac = crypto.createHmac('sha256', process.env.JWT_SECRET || 'hal_outbox_secret_2026');
+    const signingSecret = process.env.JWT_SECRET;
+    if (!signingSecret || signingSecret.length < 32) {
+      return res.status(503).json({ error: 'Secure outbound signing is not configured.' });
+    }
+    const hmac = crypto.createHmac('sha256', signingSecret);
     hmac.update(payloadString);
     const signature = 'sha256=' + hmac.digest('hex');
 
