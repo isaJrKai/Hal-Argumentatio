@@ -7910,8 +7910,8 @@ async function startServer() {
         city: targetCity,
         serviceType: targetNiche,
         status: 'new',
-        urgencyScore: 92,
-        predictedLtvUsd: 14500,
+        urgencyScore: 0,
+        predictedLtvUsd: 0,
         source: 'phase1_pipeline_simulator'
       });
 
@@ -9045,7 +9045,7 @@ async function startServer() {
       const allLeads = await pgDb.select().from(leads).where(eq(leads.contractorId, contractorId));
       const totalLeadsCount = allLeads.length;
       const syntheticLeadsCount = allLeads.filter(l => l.isSynthetic).length;
-      const verifiedLeadsCount = allLeads.filter(l => (l as any).verificationStatus === 'VERIFIED' || !l.isSynthetic).length;
+      const verifiedLeadsCount = allLeads.filter(l => (l as any).verificationStatus === 'VERIFIED' && !l.isSynthetic).length;
       const learningState = autonomousLearning.getState();
 
       const activeDiagnostics = {
