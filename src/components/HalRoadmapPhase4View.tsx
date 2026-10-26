@@ -198,7 +198,7 @@ export const HalRoadmapPhase4View: React.FC = () => {
               Distributed Autonomous Optimization & Dual-Drive Consensus
             </h2>
             <p className="text-xs text-text-secondary max-w-3xl leading-relaxed">
-              Pairs Google Gemini 2.5 for strategic market synthesis and search grounding with NVIDIA Nemotron 70B for deterministic policy verification, powered by continuous Bayesian weight recalibration and closed-loop strategy arbitrage.
+              Designed to support multi-model consensus and campaign guardrails. Provider availability, measured model latency, and calibration history are not yet verified; no default historical records are shown.
             </p>
           </div>
 
@@ -217,7 +217,7 @@ export const HalRoadmapPhase4View: React.FC = () => {
               className="px-3.5 py-2 rounded-lg bg-bg-overlay hover:bg-bg-subtle text-text-primary border border-border-dim hover:border-border-default transition-all text-xs font-medium flex items-center gap-2 cursor-pointer disabled:opacity-50"
             >
               <Sliders className={`w-3.5 h-3.5 text-accent ${isRecalibrating ? 'animate-spin' : ''}`} />
-              <span>{isRecalibrating ? 'Recalibrating...' : 'Bayesian Epoch Tuning'}</span>
+              <span>{isRecalibrating ? 'Recalibrating...' : 'Recalibration unavailable'}</span>
             </button>
           </div>
         </div>
@@ -369,7 +369,7 @@ export const HalRoadmapPhase4View: React.FC = () => {
               </div>
               <h3 className="text-sm font-bold text-text-primary">Adaptive Bayesian Weight Tuning</h3>
               <p className="text-xs text-text-secondary leading-relaxed">
-                Continuously recalibrates urgency weights (missing SSL, slow speed, poor ratings) based on completed conversion outcomes without human manual intervention, obeying the HAL Constitution.
+                Planned capability: recalibrate urgency weights from completed conversion outcomes. This is unavailable until measured outcomes and persisted model parameters are connected.
               </p>
               <div className="p-3 rounded-lg bg-bg-base border border-border-dim text-[11px] space-y-1 font-mono">
                 <div className="text-text-tertiary">Active Epoch: #14 Multi-Niche Calibrated</div>
