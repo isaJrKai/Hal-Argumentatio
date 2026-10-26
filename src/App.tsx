@@ -117,9 +117,22 @@ export default function App() {
     setActiveNiche 
   } = useBusinessContext();
 
+  // Explicit UI review mode: append ?review=1 to inspect the workspace without signing in.
+  // This never creates a session or grants backend/API access.
+  const [reviewMode] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    return new URLSearchParams(window.location.search).get('review') === '1';
+  });
+
   // Authentication State
-  const [token, setToken] = useState<string | null>(() => localStorage.getItem('halbiz_auth_token') || localStorage.getItem('token'));
+  const [token, setToken] = useState<string | null>(() => {
+    if (reviewMode) return null;
+    return localStorage.getItem('halbiz_auth_token') || localStorage.getItem('token');
+  });
   const [contractor, setContractor] = useState<Contractor | null>(() => {
+    if (reviewMode) {
+      return { id: 'review-mode', email: 'review@halbiz.local', name: 'Workspace Preview', role: 'user' };
+    }
     const saved = localStorage.getItem('halbiz_auth_contractor');
     return saved ? JSON.parse(saved) : null;
   });
@@ -694,7 +707,7 @@ export default function App() {
     );
   }
 
-  if (!token || !contractor) {
+  if ((!token || !contractor) && !reviewMode) {
     return <AuthPage onAuthSuccess={handleAuthSuccess} />;
   }
 
@@ -774,6 +787,12 @@ export default function App() {
         </div>
       )}
       
+      {reviewMode && (
+        <div role="status" className="bg-amber-950 border-b border-amber-700 px-4 py-2 text-amber-100 text-xs font-mono shrink-0">
+          REVIEW MODE — UI inspection only. No account session is created; data and actions that require the server will not work until login is repaired. Do not enter real customer or business information.
+        </div>
+      )}
+
       {/* GLOBAL SSE TOAST ALERT SLIDE-IN */}
       <AnimatePresence>
         {toastAlert && (
