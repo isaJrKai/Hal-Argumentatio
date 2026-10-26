@@ -89,101 +89,34 @@ describe('HAL Roadmap Phase 2: Intelligence & Real Data Harvest Architecture', (
   });
 
   describe('Pillar 2: Live Geo Ranking & Latency Scoring Engine', () => {
-    it('clusters territory entities into 5 distinct spatial quadrants with dispatch latency models', () => {
+    it('does not fabricate spatial quadrants or travel times without verified coordinates and routing evidence', () => {
       const sampleLeads = [
         { id: 'lead_1', businessName: 'Northwest Roofing', city: 'Winnipeg', score: 85 },
-        { id: 'lead_2', businessName: 'Central HVAC Solutions', city: 'Winnipeg', score: 90 },
-        { id: 'lead_3', businessName: 'East Side Plumbing', city: 'Winnipeg', score: 78 },
-        { id: 'lead_4', businessName: 'Southwest Electrical', city: 'Winnipeg', score: 88 },
-        { id: 'lead_5', businessName: 'Southeast Mechanical', city: 'Winnipeg', score: 92 }
+        { id: 'lead_2', businessName: 'Central HVAC Solutions', city: 'Winnipeg', score: 90 }
       ];
 
-      const quadrants = calculateSpatialQuadrants(sampleLeads);
-
-      expect(quadrants.length).toBe(5);
-      const quadNames = quadrants.map(q => q.quadrant);
-      expect(quadNames).toContain('CENTRAL');
-      expect(quadNames).toContain('NW');
-      expect(quadNames).toContain('NE');
-      expect(quadNames).toContain('SW');
-      expect(quadNames).toContain('SE');
-
-      for (const q of quadrants) {
-        expect(q.avgDistanceKm).toBeGreaterThan(0);
-        expect(q.avgDispatchLatencyMins).toBeGreaterThan(5);
-        expect(q.densityIndex).toBeGreaterThan(0);
-        expect(['ACCESSIBLE', 'BALANCED', 'CONGESTED']).toContain(q.saturationRating);
-      }
+      expect(calculateSpatialQuadrants(sampleLeads)).toEqual([]);
     });
   });
 
   describe('Pillar 3: Competitor Digital Footprint Audits & Google 3-Pack Grounding', () => {
-    it('audits local competitors, analyzes Core Web Vitals mobile speeds, and detects vulnerability gaps', () => {
-      const report = auditCompetitorFootprint('Calgary', 'commercial roofing');
-
-      expect(report.territory).toBe('Calgary');
-      expect(report.niche).toBe('Commercial Roofing');
-      expect(report.competitors.length).toBe(4);
-
-      // Verify competitor metrics
-      const topCompetitor = report.competitors[0];
-      expect(topCompetitor.threePackRank).toBe(1);
-      expect(topCompetitor.googleRating).toBeGreaterThanOrEqual(4.0);
-      expect(topCompetitor.reviewCount).toBeGreaterThan(0);
-      expect(topCompetitor.mobileSpeedScore).toBeDefined();
-      expect(topCompetitor.vulnerabilityGap.length).toBeGreaterThan(15);
-      expect(topCompetitor.attackAngle.length).toBeGreaterThan(15);
-
-      // Verify market averages
-      expect(report.marketAverages.avgRating).toBeGreaterThan(3.5);
-      expect(report.marketAverages.avgMobileSpeed).toBeGreaterThan(20);
-      expect(report.marketAverages.sslSecuredPct).toBeGreaterThan(50);
-
-      // Verify 4-step tactical penetration plan
-      expect(report.tacticalActionPlan.length).toBe(4);
-      expect(report.tacticalActionPlan[0].title).toContain('Speed');
-      expect(report.tacticalActionPlan[1].title).toContain('Schema');
-    });
-
-    it('records competitor audit execution directly into the structured cryptographic ledger', () => {
-      const report = auditCompetitorFootprint('Edmonton', 'hvac');
-
-      const auditBlock = db.recordLedgerEntry({
-        contractorId: testContractorId,
-        eventType: 'competitor_audit_completed',
-        entityType: 'competitor_intel',
-        entityId: report.id,
-        actor: 'HAL Market Intelligence Engine',
-        details: `Completed competitor digital footprint audit for Edmonton (HVAC) across 4 local entities`,
-        metadata: {
-          territory: report.territory,
-          niche: report.niche,
-          competitorsAnalyzed: report.competitors.length,
-          avgMobileSpeed: report.marketAverages.avgMobileSpeed,
-          saturationLevel: report.saturationLevel
-        }
-      });
-
-      expect(auditBlock.sequenceNumber).toBeGreaterThan(1);
-      expect(auditBlock.eventType).toBe('competitor_audit_completed');
-      expect(auditBlock.metadata.territory).toBe('Edmonton');
-
-      // Verify hash chaining integrity remains completely intact
-      const integrity = db.verifyLedgerIntegrity();
-      expect(integrity.valid).toBe(true);
+    it('fails closed instead of inventing competitor identities, rankings, ratings, or performance metrics', () => {
+      expect(() => auditCompetitorFootprint('Calgary', 'commercial roofing')).toThrow(
+        /no verified competitor data source is configured/i
+      );
     });
   });
 
   describe('Phase 2 Full Pillar Verification', () => {
-    it('verifies all 3 pillars of Phase 2 pass with complete evidence verification', () => {
+    it('fails closed when the repository has no verified source for all Phase 2 pillars', () => {
       const leads = db.getLeads(testContractorId);
       const verification = verifyPhase2Pillars(leads);
 
-      expect(verification.allPassed).toBe(true);
-      expect(verification.pillar1.verified).toBe(true);
-      expect(verification.pillar2.verified).toBe(true);
-      expect(verification.pillar3.verified).toBe(true);
-      expect(verification.pillar1.status).toBe('VERIFIED');
+      expect(verification.allPassed).toBe(false);
+      expect(verification.pillar1.verified).toBe(false);
+      expect(verification.pillar2.verified).toBe(false);
+      expect(verification.pillar3.verified).toBe(false);
+      expect(verification.pillar1.status).toBe('PENDING');
     });
   });
 });

@@ -7987,7 +7987,10 @@ async function startServer() {
       
       const verification = verifyPhase2Pillars(allLeads as any);
       const quadrants = calculateSpatialQuadrants(allLeads as any);
-      const defaultAudit = auditCompetitorFootprint('Calgary', 'commercial roofing');
+      const competitorAuditStatus = {
+        status: 'UNAVAILABLE_NO_VERIFIED_SOURCE',
+        message: 'Competitor rankings, ratings, reviews, performance, and spend are unavailable until a verified data source is configured.'
+      };
 
       const ledgerEntries = db.getStructuredLedger(contractorId, 20);
       const recentAudits = ledgerEntries.filter(e => e.eventType === 'competitor_audit_completed' || e.eventType === 'lead_harvested');
@@ -7999,7 +8002,8 @@ async function startServer() {
         phase2Verified: verification.allPassed,
         verification,
         quadrants,
-        competitorAuditSample: defaultAudit,
+        competitorAuditSample: null,
+        competitorAuditStatus,
         recentIntelligenceEvents: recentAudits,
         integrity
       });
@@ -8024,7 +8028,7 @@ async function startServer() {
         entityType: 'roadmap_milestone',
         entityId: 'p2_verify_' + Date.now(),
         actor: 'HAL Roadmap Phase 2 Auditor',
-        details: 'Executed cryptographic verification across Phase 2: Local Harvesting, Spatial Geo Scoring, and Competitor Footprints',
+        details: 'Ran Phase 2 evidence checks. Capabilities without verified source data remain pending.',
         metadata: {
           pillar1: verification.pillar1.status,
           pillar2: verification.pillar2.status,
@@ -8050,40 +8054,12 @@ async function startServer() {
   });
 
   // 3. Phase 2 Competitor Digital Footprint Audit
-  app.post('/api/roadmap/phase2/audit-competitors', authenticate, async (req, res) => {
-    const contractorId = (req as any).contractorId;
-    const { city = 'Calgary', niche = 'commercial roofing', competitorNames } = req.body || {};
-
-    try {
-      const report = auditCompetitorFootprint(city, niche, competitorNames);
-
-      // Register competitor audit in structured ledger
-      const auditBlock = db.recordLedgerEntry({
-        contractorId,
-        eventType: 'competitor_audit_completed',
-        entityType: 'competitor_intel',
-        entityId: report.id,
-        actor: 'HAL Market Intelligence Engine',
-        details: `Completed competitor digital footprint audit for ${city} (${niche}) across ${report.competitors.length} local entities`,
-        metadata: {
-          city,
-          niche,
-          competitorsAnalyzed: report.competitors.length,
-          avgMobileSpeed: report.marketAverages.avgMobileSpeed,
-          saturationLevel: report.saturationLevel
-        }
-      });
-
-      res.json({
-        success: true,
-        report,
-        block: auditBlock,
-        integrity: db.verifyLedgerIntegrity(contractorId)
-      });
-    } catch (err: any) {
-      console.error('[Roadmap Phase 2 Competitor Audit Error]', err);
-      res.status(500).json({ success: false, error: err.message });
-    }
+  app.post('/api/roadmap/phase2/audit-competitors', authenticate, async (_req, res) => {
+    return res.status(503).json({
+      success: false,
+      code: 'VERIFIED_COMPETITOR_SOURCE_UNAVAILABLE',
+      error: 'Competitor audit is unavailable until a verified data source is configured. HAL will not invent competitor names, rankings, ratings, reviews, performance scores, or spend estimates.'
+    });
   });
 
   // 4. Phase 2 Territory Real Data Harvest & Seed Purge
