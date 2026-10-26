@@ -577,17 +577,6 @@ export default function OverviewPanel({
                   axisLine={{ stroke: chartPalette.axisLine }} 
                 />
                 <YAxis 
-                  yAxisId="rev"
-                  stroke={chartPalette.axis} 
-                  fontSize={10} 
-                  fontFamily="monospace" 
-                  tickLine={false} 
-                  axisLine={{ stroke: chartPalette.axisLine }} 
-                  tickFormatter={(val) => `$${Math.round(val / 1000)}k`} 
-                  width={46}
-                  hide={forecastMetricMode === 'demand'}
-                />
-                <YAxis 
                   yAxisId="dem"
                   orientation="right"
                   stroke={chartPalette.axis} 
@@ -607,7 +596,7 @@ export default function OverviewPanel({
                       <div className="bg-bg-raised/95 backdrop-blur border border-border-dim rounded-lg p-2.5 shadow-xl font-mono text-[11px] min-w-[190px] space-y-1.5 z-50">
                         <div className="flex items-center justify-between border-b border-border-dim/60 pb-1">
                           <span className="font-bold text-text-primary">{label || item.day} Horizon</span>
-                          <span className="text-[9px] text-accent font-semibold px-1 py-0.2 rounded bg-accent/10">Forecast</span>
+                          <span className="text-[9px] text-accent font-semibold px-1 py-0.2 rounded bg-accent/10" >Scenario</span>
                         </div>
                         {item.demand !== undefined && (
                           <div className="flex items-center justify-between text-[10px]">
@@ -630,7 +619,7 @@ export default function OverviewPanel({
                         {item.weatherSurge && item.weatherSurge > 1.0 && (
                           <div className="flex items-center justify-between text-[9.5px] pt-1 border-t border-border-dim/50 text-warning">
                             <span className="flex items-center gap-1">
-                              <CloudRain className="w-2.5 h-2.5" /> Weather Lift:
+                              <CloudRain className="w-2.5 h-2.5" /> Weather scenario:
                             </span>
                             <span className="font-bold">+{Math.round((item.weatherSurge - 1) * 100)}% Surge</span>
                           </div>
@@ -639,8 +628,7 @@ export default function OverviewPanel({
                     );
                   }}
                 />
-                {(forecastMetricMode === 'all' || forecastMetricMode === 'demand') && (
-                  <Area 
+                <Area 
                     yAxisId="dem" 
                     type="monotone" 
                     dataKey="demand" 
@@ -649,8 +637,7 @@ export default function OverviewPanel({
                     strokeWidth={2} 
                     fillOpacity={1} 
                     fill="url(#colorDemand)" 
-                  />
-                )}
+                />
               </AreaChart>
             </ResponsiveContainer>
           </div>
