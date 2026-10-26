@@ -14,6 +14,8 @@ This document separates observed repository facts from work that still needs evi
 
 **Important:** The source tree and scripts have been inspected remotely. A fresh dependency installation, local build, test suite, security audit, database restore, and live end-to-end run have not yet been demonstrated in this document. Do not describe them as passing until evidence is attached.
 
+The unified outreach UI previously displayed fabricated provider connection states and sample performance figures. The current branch removes those sample figures and labels the unified dispatch route as simulation-only; no provider delivery is claimed. Provider adapters, callback/event tracking, webhook SSRF protection, and end-to-end tests remain release work.
+
 ## Verification gate
 
 Record evidence for each item before calling HAL production-ready.
