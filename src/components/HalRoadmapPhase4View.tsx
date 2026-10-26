@@ -33,11 +33,11 @@ import {
 export const HalRoadmapPhase4View: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'overview' | 'consensus' | 'neural_graph' | 'arbitrage'>('overview');
   const [isLoading, setIsLoading] = useState(false);
-  const [consensusList, setConsensusList] = useState<DualDriveConsensusResult[]>(getDefaultConsensusHistory);
-  const [neuralNodes, setNeuralNodes] = useState<NeuralGraphNode[]>(getDefaultNeuralGraphNodes);
-  const [arbitrageList, setArbitrageList] = useState<StrategyArbitrageOpportunity[]>(getDefaultArbitrageOpportunities);
+  const [consensusList, setConsensusList] = useState<DualDriveConsensusResult[]>([]);
+  const [neuralNodes, setNeuralNodes] = useState<NeuralGraphNode[]>([]);
+  const [arbitrageList, setArbitrageList] = useState<StrategyArbitrageOpportunity[]>([]);
   const [verification, setVerification] = useState<Phase4VerificationResult>(() => 
-    verifyPhase4Pillars(getDefaultConsensusHistory(), getDefaultNeuralGraphNodes(), getDefaultArbitrageOpportunities())
+    verifyPhase4Pillars([], [], [])
   );
   const [auditBlock, setAuditBlock] = useState<any>(null);
   const [actionNotice, setActionNotice] = useState<string | null>(null);
