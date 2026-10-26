@@ -167,13 +167,9 @@ Return ONLY a JSON object matching this schema:
         baseTemplate.sections.before_after.items[0].solution = parsed.beforeAfter.solution || baseTemplate.sections.before_after.items[0].solution;
       }
 
-      if (Array.isArray(parsed.reviews) && parsed.reviews.length > 0) {
-        baseTemplate.sections.reviews.items = parsed.reviews.map((r: any, idx: number) => ({
-          ...r,
-          verified: true,
-          id: 'r_' + idx
-        }));
-      }
+      // Never turn model-generated testimonial text into published reviews.
+      // Reviews must be collected from real customers and verified separately.
+      // Leave the template's review section unchanged when the model returns review copy.
 
       if (Array.isArray(parsed.neighborhoods) && parsed.neighborhoods.length > 0) {
         baseTemplate.sections.service_areas.cities = parsed.neighborhoods;
