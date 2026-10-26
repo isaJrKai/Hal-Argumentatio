@@ -9,6 +9,12 @@ HAL is an AI-assisted business operating intelligence application intended to he
 - **Primary stack:** React, TypeScript, Vite, Node.js/Express, PostgreSQL, Drizzle ORM
 - **AI / integration code:** Google Gemini, Hugging Face, OpenRouter, and a Model Context Protocol (MCP) interface
 
+## Data integrity and current limitations
+
+HAL must not present fixture data as business intelligence. The current code intentionally returns no default historical consensus records, arbitrage opportunities, enterprise tenant records, edge-region telemetry, or cross-industry conversion priors when no measured records are connected. Website and competitor audits require a verified data source; geographic travel-time analytics require coordinates and a real routing provider. Phase verification stays incomplete until evidence exists. The Phase 4 weight-recalibration and Phase 5 brain-sync, edge-federation, and ontology-propagation actions return an unavailable response rather than recording invented success.
+
+These controls make unsupported capabilities visibly unavailable; they do not mean the integrations have been completed.
+
 ## What HAL is designed to do
 
 The product direction is to support a business decision loop:
