@@ -10,6 +10,7 @@ import {
   encrypt, 
   decrypt, 
   hashPassword,
+  verifyPassword,
   Contractor,
   Lead,
   Campaign,
@@ -464,6 +465,9 @@ app.post('/api/auth/register', async (req, res) => {
   if (!email || !password || !name) {
     return res.status(400).json({ error: 'Email, password, and name are required' });
   }
+  if (typeof password !== 'string' || password.length < 12) {
+    return res.status(400).json({ error: 'Password must be at least 12 characters long' });
+  }
 
   const cleanEmail = email.toLowerCase().trim();
   const id = crypto.randomUUID();
@@ -528,15 +532,20 @@ app.post('/api/auth/login', async (req, res) => {
     }
 
     const storedHash = typeof contractor.passwordHash === 'string' ? contractor.passwordHash : '';
-    const suppliedHash = hashPassword(password);
-    const storedBytes = Buffer.from(storedHash, 'utf8');
-    const suppliedBytes = Buffer.from(suppliedHash, 'utf8');
-    const passwordMatches = storedBytes.length === suppliedBytes.length &&
-      crypto.timingSafeEqual(storedBytes, suppliedBytes);
-
-    if (!passwordMatches) {
+    if (!verifyPassword(password, storedHash)) {
       recordAuthFailure(req, cleanEmail);
       return res.status(401).json({ error: 'Invalid email or password' });
+    }
+
+    // Upgrade legacy fixed-salt PBKDF2 hashes after successful verification.
+    if (!/^\$2[aby]\$/.test(storedHash)) {
+      try {
+        await pgDb.update(contractors)
+          .set({ passwordHash: hashPassword(password) })
+          .where(eq(contractors.id, contractor.id));
+      } catch (upgradeError) {
+        console.error('[HAL auth] Legacy password hash upgrade failed; login remains valid.');
+      }
     }
 
     const role: 'admin' | 'user' = contractor.role === 'admin' ? 'admin' : 'user';
@@ -590,65 +599,18 @@ app.post('/api/auth/logout', authenticate, async (req, res) => {
 });
 
 // Password reset triggers
-app.post('/api/auth/forgot-password', async (req, res) => {
-  const { email } = req.body;
-  if (!email) return res.status(400).json({ error: 'Email is required' });
-
-  if (!checkRateLimit(req, res, email)) return;
-
-  try {
-    const result = await pgDb.select().from(contractors).where(eq(contractors.email, email.toLowerCase().trim()));
-    if (result.length === 0) {
-      return res.json({ message: 'If the email exists, a password reset link has been dispatched.' });
-    }
-
-    const contractor = result[0];
-    const token = crypto.randomBytes(32).toString('hex');
-    
-    await pgDb.insert(auditLogs).values({
-      id: crypto.randomUUID(),
-      contractorId: contractor.id,
-      action: 'PASSWORD_RESET_REQUESTED',
-      details: `Password reset token requested for ${email} from IP: ${req.ip}`
-    });
-
-    res.json({ 
-      message: 'If the email exists, a password reset link has been dispatched.'
-    });
-  } catch (err: any) {
-    res.status(500).json({ error: 'Failed to process request' });
-  }
+// Password reset is intentionally disabled until persistent, single-use token storage
+// and a verified delivery provider are implemented. Never reset an account from a caller-supplied token.
+app.post('/api/auth/forgot-password', async (_req, res) => {
+  return res.status(501).json({
+    error: 'Password reset is not configured. Contact the system administrator.'
+  });
 });
 
-app.post('/api/auth/reset-password', async (req, res) => {
-  const { token, password } = req.body;
-  if (!token || !password) return res.status(400).json({ error: 'Token and new password are required' });
-
-  try {
-    // For sandbox, we accept any valid password and reset admin@kaislead.com
-    const result = await pgDb.select().from(contractors).where(eq(contractors.email, 'admin@kaislead.com'));
-    if (result.length > 0) {
-      const adminCon = result[0];
-      await pgDb.update(contractors)
-        .set({ passwordHash: hashPassword(password) })
-        .where(eq(contractors.id, adminCon.id));
-        
-      db.revokeAllSessionsForContractor(adminCon.id);
-
-      await pgDb.insert(auditLogs).values({
-        id: crypto.randomUUID(),
-        contractorId: adminCon.id,
-        action: 'PASSWORD_RESET_COMPLETED',
-        details: `Admin password reset completed from IP: ${req.ip}`
-      });
-
-      return res.json({ success: true, message: 'Password reset successful. All active sessions revoked.' });
-    }
-    
-    res.status(400).json({ error: 'Could not complete password reset' });
-  } catch (err: any) {
-    res.status(500).json({ error: 'Could not complete password reset' });
-  }
+app.post('/api/auth/reset-password', async (_req, res) => {
+  return res.status(501).json({
+    error: 'Password reset is not configured. Contact the system administrator.'
+  });
 });
 
 // ─── SSE REALTIME EVENTS ─────────────────────────────────────────────────────
