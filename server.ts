@@ -402,25 +402,37 @@ app.post('/mcp/:secret', express.json(), async (req, res) => {
 app.all('/mcp/:secret', (_req, res) => res.status(405).json({ error: 'Use POST' }));
 
 // Middleware: Authenticate Contractor via JWT
-function authenticate(req: express.Request, res: express.Response, next: express.NextFunction) {
+// Middleware: Authenticate Contractor via JWT and current persisted account state.
+async function authenticate(req: express.Request, res: express.Response, next: express.NextFunction) {
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
     return res.status(401).json({ error: 'Authorization header missing or invalid format' });
   }
 
-  const token = authHeader.split(' ')[1];
+  const token = authHeader.slice('Bearer '.length).trim();
   const decoded = verifyToken(token);
-  
-  if (!decoded) {
+  if (!decoded || typeof decoded.contractorId !== 'string' || !decoded.contractorId) {
     return res.status(401).json({ error: 'Invalid or expired authentication token' });
   }
 
-  // Inject session details into req
-  (req as any).contractorId = decoded.contractorId;
-  (req as any).contractorEmail = decoded.email;
-  (req as any).contractorRole = decoded.role;
+  // JWT claims can become stale after an account is deleted or its role changes.
+  // Always resolve the current account and privileges from PostgreSQL; fail closed
+  // if the account cannot be verified instead of trusting token/email fallbacks.
+  try {
+    const result = await pgDb.select().from(contractors).where(eq(contractors.id, decoded.contractorId)).limit(1);
+    const contractor = result[0];
+    if (!contractor) {
+      return res.status(401).json({ error: 'Account is no longer available' });
+    }
 
-  next();
+    (req as any).contractorId = contractor.id;
+    (req as any).contractorEmail = contractor.email;
+    (req as any).contractorRole = contractor.role === 'admin' ? 'admin' : 'user';
+    next();
+  } catch (err) {
+    console.error('[HAL auth] Unable to verify persisted account:', err);
+    return res.status(503).json({ error: 'Authentication service unavailable. Please try again later.' });
+  }
 }
 
 // Middleware: Require Admin Role
@@ -436,46 +448,38 @@ function requireRole(role: 'admin' | 'user') {
 
 // Helper to resolve workspace contractor IDs (allows admins to view full primary workspace)
 function getTargetContractorIds(contractorId: string, role?: string): string[] {
-  if (role === 'admin' || contractorId === 'con_admin_seed' || contractorId === 'con_isaac_seed') {
+  if (role === 'admin') {
     return ['con_admin_seed', 'con_isaac_seed'];
   }
   return [contractorId];
 }
 
 // ─── AUTHENTICATION ROUTES ───────────────────────────────────────────────────
+// ─── AUTHENTICATION ROUTES ───────────────────────────────────────────────────
 
 app.get('/api/auth/me', authenticate, async (req, res) => {
   const contractorId = (req as any).contractorId;
-  const email = ((req as any).contractorEmail || '').toLowerCase().trim();
-  const role = (req as any).contractorRole || 'user';
-  const isIsaacOrAdmin = email.includes('admin') || email.includes('kaiso') || contractorId === 'con_admin_seed' || contractorId === 'con_isaac_seed';
 
   try {
-    const result = await pgDb.select().from(contractors).where(eq(contractors.id, contractorId));
-    if (result.length > 0) {
-      const con = result[0];
-      return res.json({
-        contractor: {
-          id: con.id,
-          email: con.email,
-          name: con.companyName || (isIsaacOrAdmin ? 'Isaac' : 'Workspace'),
-          role: isIsaacOrAdmin ? 'admin' : (con.role || role),
-          marketId: 'market_default'
-        }
-      });
+    const result = await pgDb.select().from(contractors).where(eq(contractors.id, contractorId)).limit(1);
+    const con = result[0];
+    if (!con) {
+      return res.status(401).json({ error: 'Account is no longer available' });
     }
-  } catch (err) {}
 
-  const localCon = db.getContractorById(contractorId) || db.getContractorByEmail(email);
-  return res.json({
-    contractor: {
-      id: contractorId,
-      email: email,
-      name: localCon?.name || (isIsaacOrAdmin ? (email.includes('admin') ? 'Isaac (Admin)' : 'Isaac') : 'Workspace'),
-      role: isIsaacOrAdmin ? 'admin' : role,
-      marketId: 'market_default'
-    }
-  });
+    return res.json({
+      contractor: {
+        id: con.id,
+        email: con.email,
+        name: con.companyName || 'Workspace',
+        role: con.role === 'admin' ? 'admin' : 'user',
+        marketId: 'market_default'
+      }
+    });
+  } catch (err) {
+    console.error('[HAL auth] Unable to load current account:', err);
+    return res.status(503).json({ error: 'Authentication service unavailable. Please try again later.' });
+  }
 });
 
 app.post('/api/auth/register', async (req, res) => {
