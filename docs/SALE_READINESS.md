@@ -37,12 +37,12 @@ Record evidence for each item before calling HAL production-ready.
 
 ## Security priorities
 
-1. **Secrets:** The earlier environment example contained fixed sample values for authentication/encryption. Use empty placeholders in examples and generate unique values in every real environment. Search current files and the complete Git history for secrets. If a committed value was ever used outside a disposable local environment, revoke/rotate it. For an encryption key, plan any data re-encryption before changing it.
+1. **Secrets:** The earlier environment example and source contained fixed sample values for authentication/encryption. The current branch removes these defaults from the active configuration path and uses empty placeholders. Search current files and the complete Git history for secrets. If a committed value was ever used outside a disposable local environment, revoke/rotate it. For encryption, migrate existing ciphertext using a controlled, temporary legacy-key configuration before retiring the old key.
 2. **Fallback authentication secrets:** Search server and helper code for fallback signing keys and ensure production fails closed when a required secret is absent. Add tests for missing/weak secret configuration.
 3. **Database startup:** Review database pool initialisation and automatic table bootstrap paths. Ensure missing configuration cannot silently point a deployment at an unintended database and schema changes are safe and repeatable.
 4. **Tenant boundaries:** Test every data-bearing route and MCP tool using two separate accounts. An environment variable that selects an account is not a substitute for request-level authorisation.
 5. **CORS:** The server currently sets wildcard CORS headers. Verify which endpoints are intended to be public and constrain browser origins where credentials or sensitive responses are involved.
-6. **Tracked data and history:** Inspect data/db.json, other fixtures, generated files, and prior commits for private business or personal information. If sensitive material exists, stop distribution and plan history remediation; simply deleting the latest copy is not sufficient.
+6. **Tracked data and history:** The runtime data file contained account/session material and operational records; it has been removed from the current branch and replaced by an empty example. This does not erase prior Git history. Inspect other fixtures and prior commits for private information, rotate/revoke exposed sessions and credentials, and plan history remediation; simply deleting the latest copy is not sufficient.
 
 These are review priorities, not a claim that a specific live exploit has been demonstrated.
 
