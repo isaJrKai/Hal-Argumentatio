@@ -343,7 +343,7 @@ export function verifyPhase3Pillars(
       name: 'Webhook Event Dispatcher & Outbox Engine',
       verified: pillar2Verified,
       status: pillar2Verified ? 'VERIFIED' : 'PENDING',
-      details: outboxQueueTotal > 0 ? `Observed ${outboxQueueTotal} persisted outbox records; local HMAC helper self-check ${hmacSignatureCheck.toLowerCase()} and backoff helper ${backoffVerified ? 'passed' : 'failed'}. External provider delivery, callbacks, and durable dispatch are not verified.` : 'No persisted outbox records are available; provider delivery is unverified.'
+      details: outboxQueueTotal > 0 ? `Observed ${outboxQueueTotal} persisted outbox records; local HMAC helper self-check ${hmacSignatureCheck.toLowerCase()} and backoff helper ${backoffVerified ? 'passed' : 'failed'}. External provider delivery, callbacks, and durable dispatch are not verified.` : 'No persisted outbox records are available; provider delivery is unverified.',
       metrics: {
         outboxQueueTotal,
         succeededCount,
