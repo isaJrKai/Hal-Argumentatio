@@ -29,7 +29,7 @@ import {
   listCalendarEvents, 
   CalendarEvent 
 } from '../lib/googleWorkspace';
-import { User } from 'firebase/auth';
+import { User } from '@firebase/auth';
 
 export default function ConnectorsPanel() {
   const { toast } = useToast();
