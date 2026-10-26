@@ -466,7 +466,7 @@ export default function HalBiblePanel({ initialDocId }: HalBiblePanelProps = {})
                     <div className="flex items-center justify-between border-b border-border-dim/60 pb-2 mb-2.5">
                       <span className="text-[10px] font-mono font-bold text-accent uppercase tracking-wider flex items-center gap-1.5">
                         <Sparkles className="w-3.5 h-3.5 text-accent" />
-                        INTENTIONALITY DIRECTIVE v1.0
+                        INTENTIONALITY DIRECTIVE (DESIGN CONCEPT)
                       </span>
                       <span className="text-[9px] font-mono text-positive bg-positive/10 border border-positive/20 px-1.5 py-0.5 rounded uppercase font-bold">
                         ACTIVE LAW
@@ -761,7 +761,7 @@ export default function HalBiblePanel({ initialDocId }: HalBiblePanelProps = {})
 
                         <div className="border-l border-border-dim pl-3.5 space-y-1">
                           <MetadataText>Cards (Medium)</MetadataText>
-                          <CardTitle>NVIDIA Analytics API Token Key</CardTitle>
+                          <CardTitle>Provider credential status</CardTitle>
                         </div>
 
                         <div className="border-l border-border-dim pl-3.5 space-y-1">
@@ -773,12 +773,12 @@ export default function HalBiblePanel({ initialDocId }: HalBiblePanelProps = {})
 
                         <div className="border-l border-border-dim pl-3.5 space-y-1">
                           <MetadataText>System / Database Values (Monospace)</MetadataText>
-                          <MonoValue>aes-256_hash_value_9f68d2</MonoValue>
+                          <MonoValue>Not configured or verified</MonoValue>
                         </div>
                       </CardContent>
                       <CardFooter>
                         <span>Font families: Inter (Sans) & JetBrains Mono</span>
-                        <span className="font-mono text-accent">100% STANDARDIZED</span>
+                        <span className="font-mono text-accent">STANDARDIZATION NOT VERIFIED</span>
                       </CardFooter>
                     </Card>
 
@@ -1207,7 +1207,7 @@ export default function HalBiblePanel({ initialDocId }: HalBiblePanelProps = {})
                       <span className="opacity-50">STABILITY RANKING:</span>
                       <span className="text-positive uppercase font-bold flex items-center gap-1">
                         <CheckCircle2 className="w-3.5 h-3.5 text-positive" />
-                        100% CANONICAL PRODUCTION CODE
+                        CODE STATUS NOT VERIFIED
                       </span>
                     </div>
                   </div>
@@ -1217,7 +1217,7 @@ export default function HalBiblePanel({ initialDocId }: HalBiblePanelProps = {})
                     <div className="border border-border-dim p-3 rounded-sm bg-bg-base/40">
                       <span className="text-[10px] font-mono text-accent block font-bold mb-1 uppercase tracking-wider">UPSTREAM TRIGGER SOURCES</span>
                       <p className="text-[11px] text-text-secondary leading-relaxed">
-                        Reads from AES-256 encrypted SQLite ledger, live Places API sweeps, or direct operator guidance in plain natural language.
+                        Designed to support database-backed records, map-provider data, and operator guidance. Storage encryption and live provider integrations are not verified in this deployment.
                       </p>
                     </div>
                     <div className="border border-border-dim p-3 rounded-sm bg-bg-base/40">
@@ -1233,7 +1233,7 @@ export default function HalBiblePanel({ initialDocId }: HalBiblePanelProps = {})
                     <span>PHILOSOPHY COMPLIANCE:</span>
                     <div className="flex items-center gap-1 text-positive font-bold">
                       <CheckCircle2 className="w-3.5 h-3.5" />
-                      <span>INTENTIONALITY DIRECTIVE v1.0 VERIFIED</span>
+                      <span>INTENTIONALITY DIRECTIVE (DESIGN CONCEPT) VERIFIED</span>
                     </div>
                   </div>
 
