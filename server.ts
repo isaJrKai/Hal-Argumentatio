@@ -8854,45 +8854,11 @@ async function startServer() {
   });
 
   // 4. Bayesian Weight Recalibration
-  app.post('/api/roadmap/phase4/recalibrate-weights', authenticate, async (req, res) => {
-    const contractorId = (req as any).contractorId;
-
-    try {
-      const epoch = 15;
-      const updatedWeights = {
-        missingSslUrgency: 8.6,
-        slowSpeedUrgency: 7.4,
-        lowReviewCountWeight: 6.9,
-        poorGoogleRatingWeight: 7.6,
-        phoneChannelMultiplier: 1.38,
-        emailChannelMultiplier: 0.96
-      };
-
-      const auditBlock = db.recordLedgerEntry({
-        contractorId,
-        eventType: 'phase4_weights_recalibrated',
-        entityType: 'bayesian_weight_matrix',
-        entityId: `epoch_${epoch}`,
-        actor: 'HAL Autonomous Learning Engine',
-        details: `Recalibrated Bayesian weights across commercial contractor niches. Epoch #${epoch} processed with updated technical multipliers.`,
-        metadata: {
-          epoch,
-          updatedWeights,
-          timestamp: new Date().toISOString()
-        }
-      });
-
-      res.json({
-        success: true,
-        epoch,
-        weights: updatedWeights,
-        block: auditBlock,
-        integrity: db.verifyLedgerIntegrity(contractorId)
-      });
-    } catch (err: any) {
-      console.error('[Roadmap Phase 4 Recalibrate Weights Error]', err);
-      res.status(500).json({ success: false, error: err.message });
-    }
+  app.post('/api/roadmap/phase4/recalibrate-weights', authenticate, async (_req, res) => {
+    return res.status(409).json({
+      success: false,
+      error: 'Weight recalibration is unavailable until real outcome data and persisted model parameters are connected.'
+    });
   });
 
   // 5. Strategy & Spend Arbitrage Execution (Closed-Loop Database Reallocation)
@@ -9124,97 +9090,27 @@ async function startServer() {
   });
 
   // POST /api/roadmap/phase5/sync-brain
-  app.post('/api/roadmap/phase5/sync-brain', authenticate, async (req, res) => {
-    try {
-      const contractorId = (req as any).contractorId;
-      const brainLayers = evaluateBrainSynchronization();
-
-      const auditBlock = db.recordLedgerEntry({
-        contractorId,
-        eventType: 'phase5_brain_synced',
-        entityType: 'cognitive_architecture',
-        entityId: '11_layer_brain_synchronization',
-        actor: 'HAL Cognitive Synchronizer',
-        details: 'Synchronized all 11 cognitive layers with the HAL Constitution. Aligned with Junior Colleague desk instrument paradigm; zero hardcoded workflows.',
-        metadata: {
-          layersCount: brainLayers.length,
-          allLocked: brainLayers.every(l => l.synchronizationStatus === 'LOCKED_IN_PHASE'),
-          paradigm: 'constrain_tools_not_behavior'
-        }
-      });
-
-      res.json({
-        success: true,
-        brainLayers,
-        block: auditBlock,
-        integrity: db.verifyLedgerIntegrity(contractorId)
-      });
-    } catch (err: any) {
-      console.error('[Roadmap Phase 5 Sync Brain Error]', err);
-      res.status(500).json({ success: false, error: err.message });
-    }
+  app.post('/api/roadmap/phase5/sync-brain', authenticate, async (_req, res) => {
+    return res.status(409).json({
+      success: false,
+      error: 'Runtime brain synchronization cannot be reported until layer-level health instrumentation exists.'
+    });
   });
 
   // POST /api/roadmap/phase5/federate-regions
-  app.post('/api/roadmap/phase5/federate-regions', authenticate, async (req, res) => {
-    try {
-      const contractorId = (req as any).contractorId;
-      const edgeRegions = getDefaultEdgeRegions();
-
-      const auditBlock = db.recordLedgerEntry({
-        contractorId,
-        eventType: 'phase5_regions_federated',
-        entityType: 'edge_telemetry',
-        entityId: 'global_edge_federation',
-        actor: 'HAL Distributed Edge Router',
-        details: `Federated 3 global edge nodes (US-East, US-West, EU-Central) with latency under 85ms and zero-trust replication.`,
-        metadata: {
-          regions: edgeRegions.map(r => r.name),
-          healthyCount: edgeRegions.filter(r => r.syncStatus === 'HEALTHY').length
-        }
-      });
-
-      res.json({
-        success: true,
-        edgeRegions,
-        block: auditBlock,
-        integrity: db.verifyLedgerIntegrity(contractorId)
-      });
-    } catch (err: any) {
-      console.error('[Roadmap Phase 5 Federate Regions Error]', err);
-      res.status(500).json({ success: false, error: err.message });
-    }
+  app.post('/api/roadmap/phase5/federate-regions', authenticate, async (_req, res) => {
+    return res.status(409).json({
+      success: false,
+      error: 'Edge federation is unavailable until real edge endpoints and verified health probes are configured.'
+    });
   });
 
   // POST /api/roadmap/phase5/propagate-ontology
-  app.post('/api/roadmap/phase5/propagate-ontology', authenticate, async (req, res) => {
-    try {
-      const contractorId = (req as any).contractorId;
-      const ontologies = getDefaultBusinessOntologies();
-
-      const auditBlock = db.recordLedgerEntry({
-        contractorId,
-        eventType: 'phase5_ontology_propagated',
-        entityType: 'business_ontology',
-        entityId: 'cross_industry_knowledge',
-        actor: 'HAL Bayesian Ontology Synthesizer',
-        details: 'Propagated 3 trade ontologies (Commercial HVAC, Apex Roofing, Industrial Electrical) with guaranteed zero-PII leakage.',
-        metadata: {
-          ontologiesCount: ontologies.length,
-          allPrivacyGuaranteed: ontologies.every(o => o.privacyGuaranteed)
-        }
-      });
-
-      res.json({
-        success: true,
-        ontologies,
-        block: auditBlock,
-        integrity: db.verifyLedgerIntegrity(contractorId)
-      });
-    } catch (err: any) {
-      console.error('[Roadmap Phase 5 Propagate Ontology Error]', err);
-      res.status(500).json({ success: false, error: err.message });
-    }
+  app.post('/api/roadmap/phase5/propagate-ontology', authenticate, async (_req, res) => {
+    return res.status(409).json({
+      success: false,
+      error: 'Cross-industry priors are unavailable until measured, privacy-reviewed source data is connected.'
+    });
   });
 
 
