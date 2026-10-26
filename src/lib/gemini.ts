@@ -222,6 +222,16 @@ Return your response in a raw JSON object format (no markdown blocks, no code bl
     return Math.round(calibrated * 100) / 100;
   };
 
+  const parseForecastResponse = (result: any) => {
+    const predicted = Number(result?.predicted);
+    const modelScore = Number(result?.confidenceScore);
+    const assumptions = typeof result?.assumptions === 'string' ? result.assumptions.trim() : '';
+    if (!Number.isFinite(predicted) || !Number.isFinite(modelScore) || !assumptions) {
+      throw new Error('Forecast model returned incomplete or invalid evidence.');
+    }
+    return { predicted, assumptions, confidenceScore: calibrateForecastConfidence(modelScore) };
+  };
+
   if (activeAI === 'gemini') {
     // 1. Try Gemini first (Strictly 3.5)
     const ai = getAIClient();
@@ -238,12 +248,7 @@ Return your response in a raw JSON object format (no markdown blocks, no code bl
 
         const text = response.text || "{}";
         const result = JSON.parse(text.trim());
-        return {
-          predicted: Number(result.predicted) || 15.0,
-          assumptions: result.assumptions || "Fitted on last 90 days performance trend lines.",
-          confidenceScore: calibrateForecastConfidence(Number(result.confidenceScore)),
-          source: 'gemini-3.8-flash'
-        };
+        return { ...parseForecastResponse(result), source: 'gemini-3.8-flash' };
       } catch (err) {
         console.error("Gemini forecast generation failed, trying Nemotron fallback:", err);
       }
@@ -257,12 +262,7 @@ Return your response in a raw JSON object format (no markdown blocks, no code bl
         ], 0.2, true);
         const cleaned = cleanJSONResponse(text);
         const result = JSON.parse(cleaned);
-        return {
-          predicted: Number(result.predicted) || 15.0,
-          assumptions: result.assumptions || "Fitted on last 90 days performance trend lines.",
-          confidenceScore: calibrateForecastConfidence(Number(result.confidenceScore)),
-          source: 'nvidia-nemotron-70b'
-        };
+        return { ...parseForecastResponse(result), source: 'nvidia-nemotron-70b' };
       } catch (err) {
         console.error("NVIDIA Nemotron forecast fallback failed:", err);
       }
@@ -302,12 +302,7 @@ Return your response in a raw JSON object format (no markdown blocks, no code bl
 
         const text = response.text || "{}";
         const result = JSON.parse(text.trim());
-        return {
-          predicted: Number(result.predicted) || 15.0,
-          assumptions: result.assumptions || "Fitted on last 90 days performance trend lines.",
-          confidenceScore: calibrateForecastConfidence(Number(result.confidenceScore)),
-          source: 'gemini-3.8-flash'
-        };
+        return { ...parseForecastResponse(result), source: 'gemini-3.8-flash' };
       } catch (err) {
         console.error("Gemini forecast fallback failed:", err);
       }
@@ -315,13 +310,8 @@ Return your response in a raw JSON object format (no markdown blocks, no code bl
   }
 
   // 3. Robust linear projection fallback
-  if (historicalData.length === 0) {
-    return {
-      source: 'fallback_heuristic',
-      predicted: 20,
-      assumptions: "[Fallback Heuristic - Model Offline] No historical snapshots found; uncalibrated default baseline.",
-      confidenceScore: 0.30 // Honest confidence rating (< 0.5)
-    };
+  if (!Array.isArray(historicalData) || historicalData.length === 0) {
+    throw new Error('Forecast unavailable: no historical snapshots exist for this metric.');
   }
   const values = historicalData.map(h => h.value);
   const avg = values.reduce((sum, v) => sum + v, 0) / values.length;
