@@ -7,8 +7,6 @@
  * 3. Real-Time Competitor Digital Footprint Auditing & Google 3-Pack Grounding
  */
 
-import crypto from 'crypto';
-
 export interface CompetitorProfile {
   businessName: string;
   domain: string;
