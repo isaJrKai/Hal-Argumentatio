@@ -249,10 +249,8 @@ export async function fetchTerritoryWeatherTrigger(
 }
 
 /**
- * 3. Automated Budget Guardrails/**
- * 3. Automated Budget Guardrails (Layer 2: Goals & Layer 10: Execution)
- * Evaluates TimesFM forward CPL against contractor's target CAC ceiling.
- * Automatically throttles or scales simulated ad campaigns when breaches are detected.
+ * 3. Budget Guardrail Recommendations (Layer 2: Goals & Layer 10: Execution)
+ * Evaluates a heuristic scenario against a configured target CAC. It does not change ad budgets.
  */
 export async function evaluateAndEnforceBudgetGuardrails(
   contractorId: string,
@@ -291,24 +289,14 @@ export async function evaluateAndEnforceBudgetGuardrails(
 
     if (applyGuardrails) {
       try {
-        // Adjust simulated campaigns under this contractor
-        const activeCampaigns = await pgDb
-          .select()
-          .from(campaigns)
-          .where(eq(campaigns.contractorId, contractorId));
-
-        for (const camp of activeCampaigns) {
-          actionsExecuted.push(`Adjusted campaign "${camp.name}" budget multiplier to 0.75x (CPL Ceiling Guardrail)`);
-        }
-
-        // Write to revenueRecommendations table
+        // Record a recommendation for human review; this does not modify ad budgets.
         recId = crypto.randomUUID();
         await pgDb.insert(revenueRecommendations).values({
           id: recId,
           contractorId,
           category: 'budget',
-          title: `Budget Guardrail Intervention: CPL Ceiling Breach in ${breachWeeks.join(', ')}`,
-          rationale: `TimesFM signals forward CPL ($${highestProjectedCpl}) breaches target CAC ceiling ($${targetCac}). Automated budget guardrail deployed 0.75x spend throttle.`,
+          title: `Budget Guardrail Recommendation: CPL Ceiling Breach in ${breachWeeks.join(', ')}`,
+          rationale: `The heuristic scenario estimates CPL (${highestProjectedCpl}) above the configured target CAC ceiling (${targetCac}). This is a recommendation for human review; no ad budget was changed.`,
           citationData: {
             breachWeeks,
             highestProjectedCpl,
@@ -316,7 +304,7 @@ export async function evaluateAndEnforceBudgetGuardrails(
             targetCac,
             throttleMultiplier: 0.75
           },
-          impactScore: 88.5,
+          impactScore: 0,
           confidenceScore: 94.0,
           expectedImpact: `Preserves CAC below target of $${targetCac}`,
           status: 'executed',
@@ -388,7 +376,7 @@ export async function executeBrainSynchronizedForecast(
   const applyGuardrails = options.applyGuardrails ?? true;
 
   // Retrieve contractor target CAC if configured
-  let targetCac = 220;
+  let targetCac: number | null = null;
   try {
     const [contractor] = await pgDb
       .select()
@@ -398,8 +386,11 @@ export async function executeBrainSynchronizedForecast(
     if (contractor && (contractor as any).targetCAC) {
       targetCac = Number((contractor as any).targetCAC);
     }
-  } catch (e) {
-    // default target CAC
+  } catch {
+    throw new Error('Forecast unavailable: target CAC could not be loaded from account settings.');
+  }
+  if (targetCac === null || !Number.isFinite(targetCac) || targetCac <= 0) {
+    throw new Error('Forecast unavailable: configure a valid target CAC in account settings first.');
   }
 
   // Step 1: Require measured advertising history; never seed fictional rows.
