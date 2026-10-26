@@ -347,9 +347,10 @@ export class AutonomousLearningEngine {
           .filter(profile => profile.calibrationSource === 'measured_outcomes')
           .reduce((sum, profile) => sum + Math.max(0, profile.sampleCount || 0), 0);
         const storedObjections = (record.objections || []) as ObjectionRule[];
-        const objections = storedObjections.length && storedObjections.every(rule => rule.calibrationSource === 'recorded_events')
-          ? storedObjections
-          : DEFAULT_OBJECTION_RULES;
+        const objections = DEFAULT_OBJECTION_RULES.map(defaultRule => {
+          const storedRule = storedObjections.find(rule => rule.id === defaultRule.id);
+          return storedRule?.calibrationSource === 'recorded_events' ? storedRule : defaultRule;
+        });
         this.state = {
           version: '2.5-untrained',
           calibrationEpoch: trustedOutcomes,
@@ -487,7 +488,7 @@ export class AutonomousLearningEngine {
     this.state.nicheMap[cleanNiche] = current;
 
     // Recalculate autonomy score (based on sample volume and model coverage)
-    const coveredNiches = Object.keys(this.state.nicheMap).length;
+    // Readiness is a transparent count-based proxy, not a claim of validated autonomy.
     this.state.autonomyReadinessScore = Math.min(100, this.state.totalOutcomesDigested);
 
     // Push to recent logs
@@ -542,6 +543,7 @@ export class AutonomousLearningEngine {
     performanceScore?: number;
     seoScore?: number;
     predictedMonthlyLostRevenueUsd?: number;
+    auditEvidenceVerified?: boolean;
   }, channel: 'phone' | 'email' | 'sms' = 'phone'): {
     subject: string;
     openingHook: string;
