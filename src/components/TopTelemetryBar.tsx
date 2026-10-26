@@ -493,18 +493,18 @@ export const TopTelemetryBar: React.FC<TopTelemetryBarProps> = ({
 
               <div className="flex items-center gap-3 px-3 shrink-0 text-[11px]">
                 <div>
-                  <span className="text-text-tertiary">Total Pipeline Value:</span>{' '}
-                  <strong className="text-positive font-mono text-xs">{formatCurrency(91400)}</strong>
+                  <span className="text-text-tertiary">Pipeline Value:</span>{' '}
+                  <strong className="text-text-secondary font-mono text-xs">Not available</strong>
                 </div>
                 <span className="text-border-default">|</span>
                 <div>
                   <span className="text-text-tertiary">Active Deals:</span>{' '}
-                  <strong className="text-text-primary font-mono text-xs">24 Opportunities</strong>
+                  <strong className="text-text-secondary font-mono text-xs">Not tracked</strong>
                 </div>
                 <span className="text-border-default">|</span>
                 <div>
                   <span className="text-text-tertiary">Win Rate:</span>{' '}
-                  <strong className="text-accent font-mono text-xs">28.4%</strong>
+                  <strong className="text-text-secondary font-mono text-xs">Not available</strong>
                 </div>
               </div>
             </>
@@ -566,17 +566,17 @@ export const TopTelemetryBar: React.FC<TopTelemetryBarProps> = ({
               <div className="flex items-center gap-3 px-3 shrink-0 text-[11px]">
                 <div>
                   <span className="text-text-tertiary">Open Rate:</span>{' '}
-                  <strong className="text-positive font-mono">46.2%</strong>
+                  <strong className="text-text-secondary font-mono">Not tracked</strong>
                 </div>
                 <span className="text-border-default">|</span>
                 <div>
                   <span className="text-text-tertiary">Reply Rate:</span>{' '}
-                  <strong className="text-accent font-mono">14.8%</strong>
+                  <strong className="text-text-secondary font-mono">Not tracked</strong>
                 </div>
                 <span className="text-border-default">|</span>
                 <div>
-                  <span className="text-text-tertiary">Daily Dispatch Cap:</span>{' '}
-                  <strong className="text-text-secondary font-mono">50 messages/day</strong>
+                  <span className="text-text-tertiary">Dispatch Limit:</span>{' '}
+                  <strong className="text-text-secondary font-mono">Not configured</strong>
                 </div>
               </div>
             </>
