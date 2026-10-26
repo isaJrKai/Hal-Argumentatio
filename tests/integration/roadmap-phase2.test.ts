@@ -108,15 +108,15 @@ describe('HAL Roadmap Phase 2: Intelligence & Real Data Harvest Architecture', (
   });
 
   describe('Phase 2 Full Pillar Verification', () => {
-    it('verifies all 3 pillars of Phase 2 pass with complete evidence verification', () => {
+    it('fails closed when the repository has no verified source for all Phase 2 pillars', () => {
       const leads = db.getLeads(testContractorId);
       const verification = verifyPhase2Pillars(leads);
 
-      expect(verification.allPassed).toBe(true);
-      expect(verification.pillar1.verified).toBe(true);
-      expect(verification.pillar2.verified).toBe(true);
-      expect(verification.pillar3.verified).toBe(true);
-      expect(verification.pillar1.status).toBe('VERIFIED');
+      expect(verification.allPassed).toBe(false);
+      expect(verification.pillar1.verified).toBe(false);
+      expect(verification.pillar2.verified).toBe(false);
+      expect(verification.pillar3.verified).toBe(false);
+      expect(verification.pillar1.status).toBe('PENDING');
     });
   });
 });
