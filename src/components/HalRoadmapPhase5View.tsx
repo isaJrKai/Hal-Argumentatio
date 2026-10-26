@@ -36,12 +36,12 @@ import {
 export const HalRoadmapPhase5View: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'brain_sync' | 'multi_org' | 'edge_federation' | 'ontology'>('brain_sync');
   const [isLoading, setIsLoading] = useState(false);
-  const [orgNodes, setOrgNodes] = useState<OrganizationNode[]>(getDefaultOrganizationNodes);
-  const [edgeRegions, setEdgeRegions] = useState<EdgeRegionNode[]>(getDefaultEdgeRegions);
-  const [ontologies, setOntologies] = useState<BusinessOntologyVertical[]>(getDefaultBusinessOntologies);
+  const [orgNodes, setOrgNodes] = useState<OrganizationNode[]>([]);
+  const [edgeRegions, setEdgeRegions] = useState<EdgeRegionNode[]>([]);
+  const [ontologies, setOntologies] = useState<BusinessOntologyVertical[]>([]);
   const [brainLayers, setBrainLayers] = useState<BrainLayerSynchronization[]>(evaluateBrainSynchronization);
   const [verification, setVerification] = useState<Phase5VerificationResult>(() =>
-    verifyPhase5Pillars(getDefaultOrganizationNodes(), getDefaultEdgeRegions(), getDefaultBusinessOntologies())
+    verifyPhase5Pillars([], [], [])
   );
   const [auditBlock, setAuditBlock] = useState<any>(null);
   const [actionNotice, setActionNotice] = useState<string | null>(null);
