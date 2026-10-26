@@ -180,8 +180,6 @@ export const UnifiedCommunicationsHub: React.FC<UnifiedCommunicationsHubProps> =
   // Dispatch Message
   const handleDispatch = async () => {
     if (!selectedLead || !message.trim()) return;
-    setIsDispatching(true);
-
     const recipient = activeChannel === 'email' ? selectedLead.email : selectedLead.phone;
     if (!recipient) {
       showToast({
@@ -192,6 +190,7 @@ export const UnifiedCommunicationsHub: React.FC<UnifiedCommunicationsHubProps> =
       return;
     }
 
+    setIsDispatching(true);
     try {
       const res = await fetch('/api/outreach/dispatch', {
         method: 'POST',
