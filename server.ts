@@ -130,7 +130,7 @@ interface PublicLinkConfig {
 }
 
 const publicLinkConfig: PublicLinkConfig = {
-  mode: 'safe_sandbox', // Safe sandbox active by default for Reddit/Community testing
+  mode: 'disabled', // Public demo access remains disabled until explicitly enabled by an authenticated administrator
   rateLimitPerMinute: 60,
   aiLimitPerTenMin: 5
 };
@@ -245,12 +245,12 @@ app.get('/api/public-link/status', (req, res) => {
     mode: publicLinkConfig.mode,
     rateLimitPerMinute: publicLinkConfig.rateLimitPerMinute,
     aiLimitPerTenMin: publicLinkConfig.aiLimitPerTenMin,
-    sharedUrl: 'https://ais-pre-yhe6kkyk2vea7llaamk5bi-536406481799.europe-west1.run.app',
+    sharedUrl: process.env.APP_URL?.trim() || null,
     isSafeDemoActive: publicLinkConfig.mode === 'safe_sandbox'
   });
 });
 
-app.post('/api/public-link/mode', express.json(), (req, res) => {
+app.post('/api/public-link/mode', express.json(), authenticate, requireRole('admin'), (req, res) => {
   const { mode } = req.body;
   if (mode === 'safe_sandbox' || mode === 'disabled' || mode === 'open') {
     publicLinkConfig.mode = mode;
