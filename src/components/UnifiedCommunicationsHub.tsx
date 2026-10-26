@@ -39,7 +39,7 @@ interface BridgeStatus {
     displayNumber?: string;
     webhookActive: boolean;
     deliveredCount: number;
-    replyRate: number;
+    replyRate: number | null;
     status: string;
   };
   email: {
@@ -47,20 +47,20 @@ interface BridgeStatus {
     provider: string;
     senderEmail: string;
     deliveredCount: number;
-    openRate: number;
+    openRate: number | null;
     status: string;
   };
   sms: {
     enabled: boolean;
     virtualNumber: string;
     deliveredCount: number;
-    slaResponseSec: number;
+    slaResponseSec: number | null;
     status: string;
   };
   calendar: {
     enabled: boolean;
     bookingUrl: string;
-    bookedAppointments: number;
+    bookedAppointments: number | null;
     status: string;
   };
 }
@@ -182,9 +182,15 @@ export const UnifiedCommunicationsHub: React.FC<UnifiedCommunicationsHubProps> =
     if (!selectedLead || !message.trim()) return;
     setIsDispatching(true);
 
-    const recipient = activeChannel === 'email' 
-      ? (selectedLead.email || 'contact@business.com')
-      : (selectedLead.phone || '+14035550199');
+    const recipient = activeChannel === 'email' ? selectedLead.email : selectedLead.phone;
+    if (!recipient) {
+      showToast({
+        title: 'Contact details missing',
+        message: activeChannel === 'email' ? 'This lead has no email address.' : 'This lead has no phone number.',
+        type: 'error'
+      });
+      return;
+    }
 
     try {
       const res = await fetch('/api/outreach/dispatch', {
@@ -200,6 +206,7 @@ export const UnifiedCommunicationsHub: React.FC<UnifiedCommunicationsHubProps> =
           leadBusinessName: selectedLead.businessName,
           subject: subject.trim() || undefined,
           message: message.trim(),
+          mode: 'simulation',
           variables: {
             businessName: selectedLead.businessName,
             ownerName: selectedLead.ownerName || 'Owner',
@@ -216,8 +223,8 @@ export const UnifiedCommunicationsHub: React.FC<UnifiedCommunicationsHubProps> =
       }
 
       showToast({
-        title: `${activeChannel.toUpperCase()} Transmitted`,
-        message: `Dispatched to ${recipient} (Provider ID: ${data.providerId})`,
+        title: 'Simulation recorded',
+        message: `Prepared a ${activeChannel.toUpperCase()} message for ${recipient}. No external message was sent.`,
         type: 'success'
       });
 
@@ -255,16 +262,16 @@ export const UnifiedCommunicationsHub: React.FC<UnifiedCommunicationsHubProps> =
               <span className="text-xs font-bold text-white">WhatsApp Business</span>
             </div>
             <span className="inline-flex items-center gap-1 text-[11px] text-emerald-400 font-mono">
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-              <span>Active</span>
+              <span className={bridges?.whatsapp.enabled ? "w-2 h-2 rounded-full bg-amber-400" : "w-2 h-2 rounded-full bg-slate-500"}></span>
+              <span>{bridges?.whatsapp.status === 'configured_unverified' ? 'Configured · unverified' : 'Not configured'}</span>
             </span>
           </div>
           <div>
             <div className="text-lg font-mono font-black text-white tabular-nums">
-              {bridges?.whatsapp.replyRate ?? 38.4}%
+              {bridges?.whatsapp.replyRate == null ? '—' : `${bridges.whatsapp.replyRate}%`}
             </div>
             <div className="text-[11px] text-slate-400 mt-0.5">
-              Reply Rate · {bridges?.whatsapp.deliveredCount ?? 14} dispatched
+              Reply rate unavailable · {bridges?.whatsapp.deliveredCount ?? 0} delivered
             </div>
           </div>
         </div>
@@ -279,16 +286,16 @@ export const UnifiedCommunicationsHub: React.FC<UnifiedCommunicationsHubProps> =
               <span className="text-xs font-bold text-white">Email Sequences</span>
             </div>
             <span className="inline-flex items-center gap-1 text-[11px] text-sky-400 font-mono">
-              <span className="w-2 h-2 rounded-full bg-sky-400 animate-pulse"></span>
-              <span>Resend / SMTP</span>
+              <span className={bridges?.email.enabled ? "w-2 h-2 rounded-full bg-amber-400" : "w-2 h-2 rounded-full bg-slate-500"}></span>
+              <span>{bridges?.email.status === 'configured_unverified' ? 'Configured · unverified' : 'Not configured'}</span>
             </span>
           </div>
           <div>
             <div className="text-lg font-mono font-black text-white tabular-nums">
-              {bridges?.email.openRate ?? 46.2}%
+              {bridges?.email.openRate == null ? '—' : `${bridges.email.openRate}%`}
             </div>
             <div className="text-[11px] text-slate-400 mt-0.5">
-              Open Rate · {bridges?.email.deliveredCount ?? 42} sent
+              Open rate unavailable · {bridges?.email.deliveredCount ?? 0} delivered
             </div>
           </div>
         </div>
@@ -303,16 +310,16 @@ export const UnifiedCommunicationsHub: React.FC<UnifiedCommunicationsHubProps> =
               <span className="text-xs font-bold text-white">Twilio SMS / Voice</span>
             </div>
             <span className="inline-flex items-center gap-1 text-[11px] text-amber-400 font-mono">
-              <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse"></span>
-              <span>Connected</span>
+              <span className={bridges?.sms.enabled ? "w-2 h-2 rounded-full bg-amber-400" : "w-2 h-2 rounded-full bg-slate-500"}></span>
+              <span>{bridges?.sms.status === 'configured_unverified' ? 'Configured · unverified' : 'Not configured'}</span>
             </span>
           </div>
           <div>
             <div className="text-lg font-mono font-black text-white tabular-nums">
-              {bridges?.sms.slaResponseSec ?? 28}s
+              {bridges?.sms.slaResponseSec == null ? '—' : `${bridges.sms.slaResponseSec}s`}
             </div>
             <div className="text-[11px] text-slate-400 mt-0.5">
-              Average SLA · {bridges?.sms.deliveredCount ?? 29} dispatches
+              Response SLA unavailable · {bridges?.sms.deliveredCount ?? 0} delivered
             </div>
           </div>
         </div>
@@ -327,16 +334,16 @@ export const UnifiedCommunicationsHub: React.FC<UnifiedCommunicationsHubProps> =
               <span className="text-xs font-bold text-white">Calendar Booking</span>
             </div>
             <span className="inline-flex items-center gap-1 text-[11px] text-purple-400 font-mono">
-              <span className="w-2 h-2 rounded-full bg-purple-400 animate-pulse"></span>
-              <span>Cal.com Bridge</span>
+              <span className={bridges?.calendar.enabled ? "w-2 h-2 rounded-full bg-amber-400" : "w-2 h-2 rounded-full bg-slate-500"}></span>
+              <span>{bridges?.calendar.status === 'configured_unverified' ? 'Configured · unverified' : 'Not configured'}</span>
             </span>
           </div>
           <div>
             <div className="text-lg font-mono font-black text-white tabular-nums">
-              {bridges?.calendar.bookedAppointments ?? 8}
+              {bridges?.calendar.bookedAppointments == null ? '—' : bridges.calendar.bookedAppointments}
             </div>
             <div className="text-[11px] text-slate-400 mt-0.5">
-              Appointments Booked · America/Edmonton
+              Appointments booked · reporting not connected
             </div>
           </div>
         </div>
