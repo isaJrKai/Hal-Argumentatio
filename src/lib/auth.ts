@@ -9,11 +9,14 @@ export interface DecodedToken {
 
 export function getJwtSecret(): string {
   const secret = process.env.JWT_SECRET;
-  if (!secret) {
+  if (!secret || secret.length < 32) {
     if (process.env.NODE_ENV === 'production') {
-      throw new Error('FATAL SECURITY ERROR: JWT_SECRET environment variable is required in production.');
+      throw new Error('FATAL SECURITY ERROR: JWT_SECRET must be configured with at least 32 characters in production.');
     }
-    return 'halbiz-ultra-secure-sign-key';
+    if (process.env.NODE_ENV === 'test') {
+      throw new Error('JWT_SECRET must be set by the test environment.');
+    }
+    throw new Error('JWT_SECRET must be configured with at least 32 characters before starting HAL.');
   }
   return secret;
 }
