@@ -555,6 +555,12 @@ export default function OverviewPanel({
           </div>
           
           <div className="w-full h-[230px] pt-1">
+            {forecastChartData.length === 0 ? (
+              <div className="h-full flex flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-border-dim text-center px-5">
+                <span className="text-sm font-semibold text-text-secondary">Scenario unavailable</span>
+                <span className="text-xs text-text-tertiary max-w-md">Connect measured Google Ads records, configure a target CAC, and verify live weather before viewing a demand scenario. No revenue forecast is generated.</span>
+              </div>
+            ) : (
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={forecastChartData} margin={{ top: 8, right: 16, left: 0, bottom: 4 }}>
                 <defs>
@@ -640,6 +646,7 @@ export default function OverviewPanel({
                 />
               </AreaChart>
             </ResponsiveContainer>
+            )}
           </div>
 
           {/* Chart Footnote / Legend */}
