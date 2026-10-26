@@ -130,7 +130,7 @@ export default function PublicAuditPage({ auditId, onNavigateToLogin }: PublicAu
     }
   };
 
-  const bookingUrl = workspaceConfig.bookingUrl || 'https://cal.com/hal-strategy';
+  const bookingUrl = workspaceConfig.bookingUrl?.trim() || '';
   const brandColor = workspaceConfig.brandColor || '#3b82f6';
 
   if (loading) {
@@ -195,16 +195,18 @@ export default function PublicAuditPage({ auditId, onNavigateToLogin }: PublicAu
               <span className="md:hidden">Call</span>
             </a>
           )}
-          <a
-            href={bookingUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="px-4 py-1.5 rounded-md text-xs font-mono font-bold text-white shadow-lg transition-transform hover:scale-[1.02] flex items-center gap-1.5"
-            style={{ backgroundColor: brandColor }}
-          >
-            <Calendar className="w-3.5 h-3.5" />
-            <span>Book 15-Min Call</span>
-          </a>
+          {bookingUrl && (
+            <a
+              href={bookingUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="px-4 py-1.5 rounded-md text-xs font-mono font-bold text-white shadow-lg transition-transform hover:scale-[1.02] flex items-center gap-1.5"
+              style={{ backgroundColor: brandColor }}
+            >
+              <Calendar className="w-3.5 h-3.5" />
+              <span>Book 15-Min Call</span>
+            </a>
+          )}
         </div>
       </header>
 
