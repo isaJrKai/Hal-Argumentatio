@@ -1,4 +1,7 @@
 import { describe, it, expect } from 'vitest';
+
+// Explicit scope for tests that exercise MCP tools; never use this value outside tests.
+process.env.HAL_MCP_CONTRACTOR_ID ||= 'test_mcp_scope';
 import crypto from 'node:crypto';
 import express from 'express';
 import supertest from 'supertest';
