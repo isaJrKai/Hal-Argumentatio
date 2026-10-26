@@ -43,7 +43,7 @@ export const TRADE_TEMPLATES: Record<string, LandingPageConfig> = {
       announcement_bar: {
         active: true,
         text: '⚡ Active Emergency Crews On-Duty in Calgary • Guaranteed 30-Minute Response Window',
-        urgencyBadge: '24/7 EMERGENCY DISPATCH'
+        urgencyBadge: 'SERVICE HOURS — CONFIGURE'
       },
       header: {
         active: true,
@@ -222,21 +222,18 @@ export const TRADE_TEMPLATES: Record<string, LandingPageConfig> = {
         items: []
       },
       service_areas: {
-        active: true,
-        title: 'Service Coverage In Your Neighborhood',
-        subtitle: 'Confirm actual service coverage and response times with the business before publishing.',
-        cities: [
-          'Downtown Calgary', 'Beltline', 'Mount Royal', 'Kensington', 
-          'Altadore', 'Signal Hill', 'Airdrie', 'Cochrane', 'Okotoks', 'Chestermere'
-        ],
-        guaranteeText: 'Don\'t see your neighborhood? Call us — we service within 45km of city center with zero additional mileage fees.'
+        active: false,
+        title: 'Service Areas — Configure Before Publishing',
+        subtitle: 'No service coverage is verified by this template. Add only locations the business actually serves.',
+        cities: [],
+        guaranteeText: 'Confirm service radius, travel fees, and response times directly with the business.'
       },
       guarantee: {
-        active: true,
-        badgeText: 'SERVICE GUARANTEE — CONFIGURE TERMS',
-        title: 'Fixed Right The First Trip, Or Your Diagnostic Fee Is Waived',
-        description: 'We respect your time and hard-earned money. If our technician cannot diagnose and propose a code-compliant solution on the initial visit, you pay exactly $0. No arguments, no fine print.',
-        ctaText: 'Speak With On-Duty Dispatch'
+        active: false,
+        badgeText: 'GUARANTEE — CONFIGURE ACTUAL TERMS',
+        title: 'Service Terms',
+        description: 'No service guarantee is preconfigured. Add only written terms approved by the business.',
+        ctaText: 'Contact the Business'
       },
       online_booking: {
         active: true,
@@ -393,18 +390,18 @@ export const TRADE_TEMPLATES: Record<string, LandingPageConfig> = {
         items: []
       },
       service_areas: {
-        active: true,
-        title: 'Calgary & Surrounding Service Radius',
-        subtitle: 'Technicians on standby across Northwest, Northeast, Southwest, and Southeast.',
-        cities: ['NW Calgary', 'SW Calgary', 'SE Calgary', 'NE Calgary', 'Airdrie', 'Cochrane', 'Okotoks'],
-        guaranteeText: 'Guaranteed 2-hour arrival windows for all confirmed emergency calls.'
+        active: false,
+        title: 'Service Areas — Configure Before Publishing',
+        subtitle: 'No service coverage is verified by this template. Add only locations the business actually serves.',
+        cities: [],
+        guaranteeText: 'Confirm service radius, travel fees, and response times directly with the business.'
       },
       guarantee: {
-        active: true,
-        badgeText: 'COMFORT SATISFACTION GUARANTEE',
-        title: 'Heating Service Guarantee — Confirm Terms',
-        description: 'If our certified gasfitter does not restore functional heating or provide a clear path forward, your emergency call fee is completely refunded.',
-        ctaText: 'Speak With Dispatcher'
+        active: false,
+        badgeText: 'GUARANTEE — CONFIGURE ACTUAL TERMS',
+        title: 'Service Terms',
+        description: 'No service guarantee is preconfigured. Add only written terms approved by the business.',
+        ctaText: 'Contact the Business'
       },
       online_booking: {
         active: true,
@@ -556,18 +553,18 @@ export const TRADE_TEMPLATES: Record<string, LandingPageConfig> = {
         items: []
       },
       service_areas: {
-        active: true,
-        title: 'Communities We Protect',
-        subtitle: 'Rapid deployment across Southern Alberta.',
-        cities: ['Calgary', 'Airdrie', 'Cochrane', 'Okotoks', 'High River', 'Strathmore'],
-        guaranteeText: 'Complete clean-up guarantee: we run rolling magnetic sweepers across your entire lawn to collect every stray nail.'
+        active: false,
+        title: 'Service Areas — Configure Before Publishing',
+        subtitle: 'No service coverage is verified by this template. Add only locations the business actually serves.',
+        cities: [],
+        guaranteeText: 'Confirm service radius, travel fees, and response times directly with the business.'
       },
       guarantee: {
-        active: true,
-        badgeText: '50-YEAR SYSTEM WARRANTY',
-        title: 'Warranty Details — Confirm Manufacturer Terms',
-        description: 'Our installations are certified by major shingle manufacturers, giving you full coverage for materials and workmanship.',
-        ctaText: 'Claim Your Free Inspection'
+        active: false,
+        badgeText: 'GUARANTEE — CONFIGURE ACTUAL TERMS',
+        title: 'Service Terms',
+        description: 'No service guarantee is preconfigured. Add only written terms approved by the business.',
+        ctaText: 'Contact the Business'
       },
       online_booking: {
         active: true,
@@ -719,18 +716,18 @@ export const TRADE_TEMPLATES: Record<string, LandingPageConfig> = {
         items: []
       },
       service_areas: {
-        active: true,
-        title: 'Calgary Wide Electrical Response',
-        subtitle: 'Mobile service trucks stocked with certified electrical components.',
-        cities: ['Calgary', 'Airdrie', 'Cochrane', 'Okotoks', 'Chestermere'],
-        guaranteeText: 'City electrical permit guarantee: we handle all municipal paperwork and arrange final city inspection.'
+        active: false,
+        title: 'Service Areas — Configure Before Publishing',
+        subtitle: 'No service coverage is verified by this template. Add only locations the business actually serves.',
+        cities: [],
+        guaranteeText: 'Confirm service radius, travel fees, and response times directly with the business.'
       },
       guarantee: {
-        active: true,
-        badgeText: 'CANADIAN ELECTRICAL CODE GUARANTEE',
-        title: 'Code Compliance Commitment — Confirm Terms',
-        description: 'Every circuit, wire gauge, and breaker installed by VoltCraft adheres strictly to CSA and Provincial Electrical Safety codes.',
-        ctaText: 'Schedule Electrical Audit'
+        active: false,
+        badgeText: 'GUARANTEE — CONFIGURE ACTUAL TERMS',
+        title: 'Service Terms',
+        description: 'No service guarantee is preconfigured. Add only written terms approved by the business.',
+        ctaText: 'Contact the Business'
       },
       online_booking: {
         active: true,
