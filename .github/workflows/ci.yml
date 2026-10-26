@@ -16,11 +16,13 @@ jobs:
       - name: Check out source
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.ref_name }}
+          ref: ${{ github.event.pull_request.head.ref || github.ref_name }}
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 20
+      - name: Use current npm lockfile tooling
+        run: npm install --global npm@11
       - name: Repair and commit stale lockfile on the sale-readiness branch
         if: github.event_name == 'push' && github.ref == 'refs/heads/sale-readiness/documentation-and-safety'
         run: |
