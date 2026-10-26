@@ -157,27 +157,27 @@ export default function HalBiblePanel({ initialDocId }: HalBiblePanelProps = {})
 
   const triggerToast = (variant: 'info' | 'success' | 'warning' | 'danger' | 'ai') => {
     const titles = {
-      info: 'Operational Scope Alignment',
-      success: 'Database Schema Sync Success',
-      warning: 'Outreach Quota Limit Nearing',
-      danger: 'Lead Connection Interrupted',
-      ai: 'HAL Council Strategy Assessment'
+      info: 'Information Toast Preview',
+      success: 'Success Toast Preview',
+      warning: 'Warning Toast Preview',
+      danger: 'Error Toast Preview',
+      ai: 'AI Toast Preview'
     };
 
     const descs = {
-      info: 'The territorial sweep across Winnipeg plastering leads is completed.',
-      success: 'All prospect records successfully encrypted with AES-256 standard.',
-      warning: 'You have used 85% of your recommended daily active outreach budget.',
-      danger: 'Failed to authenticate with Calgary Map Services API key wrapper.',
-      ai: 'HAL detects 15 roofing websites with speed indices greater than 4.2 seconds.'
+      info: 'UI preview only. No live business data was loaded.',
+      success: 'UI preview only. No database or encryption operation was performed.',
+      warning: 'UI preview only. No usage quota was queried.',
+      danger: 'UI preview only. No integration request was made.',
+      ai: 'UI preview only. No websites were scanned and no performance data was measured.'
     };
 
     const nextActions = {
-      info: 'Verify the newly imported prospect records.',
-      success: 'Proceed to client campaigns launchpad.',
-      warning: 'Upgrade your billing or throttle automated emails.',
-      danger: 'Review active API tokens in your Settings dashboard.',
-      ai: 'Generate performance pitch deck templates instantly.'
+      info: 'Connect a real data source before relying on this workflow.',
+      success: 'Verify the actual operation in the runtime before treating it as successful.',
+      warning: 'Load real usage metrics before making quota decisions.',
+      danger: 'Check the relevant integration logs and configuration.',
+      ai: 'Run a real audit and retain its evidence before generating a report.'
     };
 
     toast({
@@ -186,7 +186,7 @@ export default function HalBiblePanel({ initialDocId }: HalBiblePanelProps = {})
       description: descs[variant],
       whatNext: nextActions[variant],
       actionLabel: 'RESOLVE NOW',
-      onAction: () => alert(`Action taken for ${titles[variant]}`)
+      onAction: () => alert('UI preview only; no action was performed.')
     });
   };
 
