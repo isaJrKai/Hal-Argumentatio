@@ -33,7 +33,7 @@ import { generateResponse, getActiveAI, AIModelType } from '../services/nemotron
 import { Button } from './ui/Button';
 import { Badge } from './ui/Badge';
 import { useToast } from '../context/ToastContext';
-import { User } from 'firebase/auth';
+import { User } from '@firebase/auth';
 
 interface Breadcrumb {
   id: string;
