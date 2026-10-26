@@ -225,11 +225,11 @@ export const HalRoadmapPhase5View: React.FC = () => {
                 Edge Federation
               </span>
               <span className="text-[10px] font-mono font-bold text-emerald-500 bg-emerald-500/10 px-1.5 py-0.5 rounded">
-                3 REGIONS ACTIVE
+                REGION STATUS UNVERIFIED
               </span>
             </div>
             <div className="text-sm font-bold text-text-primary">&lt; 25ms Avg Latency</div>
-            <div className="text-[11px] text-text-tertiary">Zero-downtime failover standby</div>
+            <div className="text-[11px] text-text-tertiary">Failover not verified</div>
           </div>
 
           <div className="p-3.5 rounded-xl bg-bg-base border border-border-dim space-y-1">
@@ -239,11 +239,11 @@ export const HalRoadmapPhase5View: React.FC = () => {
                 Trade Ontologies
               </span>
               <span className="text-[10px] font-mono font-bold text-emerald-500 bg-emerald-500/10 px-1.5 py-0.5 rounded">
-                3 VERTICALS
+                VERTICAL COUNT UNVERIFIED
               </span>
             </div>
-            <div className="text-sm font-bold text-text-primary">Zero-PII Prior Sync</div>
-            <div className="text-[11px] text-text-tertiary">HVAC, Roofing, Electrical</div>
+            <div className="text-sm font-bold text-text-primary">Privacy behavior not verified</div>
+            <div className="text-[11px] text-text-tertiary">No verified ontology records</div>
           </div>
 
           <div className="p-3.5 rounded-xl bg-bg-base border border-border-dim space-y-1">
@@ -253,11 +253,11 @@ export const HalRoadmapPhase5View: React.FC = () => {
                 Brain In-Phase Score
               </span>
               <span className="text-[10px] font-mono font-bold text-emerald-500 bg-emerald-500/10 px-1.5 py-0.5 rounded">
-                99.2% MATCH
+                ALIGNMENT NOT MEASURED
               </span>
             </div>
             <div className="text-sm font-bold text-emerald-500">Layer status not verified</div>
-            <div className="text-[11px] text-text-tertiary">Full HAL Constitution alignment</div>
+            <div className="text-[11px] text-text-tertiary">Constitution alignment not verified</div>
           </div>
         </div>
       </div>
