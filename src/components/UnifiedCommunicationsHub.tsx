@@ -562,7 +562,7 @@ export const UnifiedCommunicationsHub: React.FC<UnifiedCommunicationsHubProps> =
           <div className="flex items-center gap-2">
             <ShieldCheck className="w-4 h-4 text-emerald-400" />
             <h4 className="text-xs font-bold uppercase tracking-wider text-white">
-              Cryptographic Transmission Ledger & Live Receipts
+              Dispatch Simulation Log
             </h4>
           </div>
           <span className="text-[10px] font-mono text-slate-400">AES-256-GCM Verified</span>
