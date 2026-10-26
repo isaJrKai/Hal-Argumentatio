@@ -4,6 +4,7 @@ import {
   Globe, 
   Zap, 
   ShieldCheck, 
+  Shield,
   AlertTriangle, 
   Star, 
   Calendar, 
@@ -306,14 +307,14 @@ export default function PublicAuditPage({ auditId, onNavigateToLogin }: PublicAu
               </div>
               <div>
                 <h2 className="text-lg font-mono font-bold text-text-primary uppercase">Interactive Revenue Leakage Calculator</h2>
-                <p className="text-xs text-text-secondary font-mono">Adjust values below to simulate estimated lost clients due to website latency</p>
+                <p className="text-xs text-text-secondary font-mono">Illustrative scenario only. Traffic, conversion rate, and job value are assumptions unless verified measurements are supplied.</p>
               </div>
             </div>
 
             <div className="text-left sm:text-right font-mono">
               <span className="text-[10px] text-text-secondary uppercase block">Estimated Leaking Revenue</span>
               <span className="text-2xl font-black text-rose-400 tracking-tight">
-                -${estimatedAnnualLostRevenue.toLocaleString()} / year
+                {estimatedAnnualLostRevenue == null ? 'Not available' : `-${estimatedAnnualLostRevenue.toLocaleString()} / year`}
               </span>
             </div>
           </div>
@@ -323,7 +324,7 @@ export default function PublicAuditPage({ auditId, onNavigateToLogin }: PublicAu
             {/* Input 1: Monthly Website Traffic */}
             <div className="space-y-3 bg-bg-base border border-border-dim p-4 rounded-xl">
               <div className="flex justify-between items-center text-xs font-mono">
-                <span className="text-text-primary font-semibold">Estimated Monthly Site Visitors:</span>
+                <span className="text-text-primary font-semibold">Assumed Monthly Site Visitors:</span>
                 <span className="text-indigo-400 font-bold">{monthlyVisitors.toLocaleString()} visits</span>
               </div>
               <input 
@@ -345,7 +346,7 @@ export default function PublicAuditPage({ auditId, onNavigateToLogin }: PublicAu
             {/* Input 2: Average Project / Contract Value */}
             <div className="space-y-3 bg-bg-base border border-border-dim p-4 rounded-xl">
               <div className="flex justify-between items-center text-xs font-mono">
-                <span className="text-text-primary font-semibold">Average Job / Project Ticket Size:</span>
+                <span className="text-text-primary font-semibold">Assumed Job / Project Value:</span>
                 <span className="text-emerald-400 font-bold">${avgTicketValue.toLocaleString()}</span>
               </div>
               <input 
