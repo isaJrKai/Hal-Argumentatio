@@ -2247,7 +2247,7 @@ app.post('/api/leads/ingest', authenticate, async (req, res) => {
         source: 'harvested_intelligence',
         status: 'new',
         urgencyScore: hl.urgencyScore ?? 0,
-        predictedLtv: hl.predictedLtvUsd || 4500,
+        predictedLtv: hl.predictedLtvUsd ?? 0,
         notes: hl.notes || `Harvested real business profile. Niche: ${hl.serviceType}.`,
         websiteUrl: hl.websiteUrl,
         performanceScore: hl.performanceScore,
@@ -2278,15 +2278,15 @@ app.post('/api/leads/ingest', authenticate, async (req, res) => {
         serviceType: hl.serviceType,
         source: 'harvested_intelligence',
         status: 'new',
-        urgencyScore: hl.urgencyScore || 7.5,
-        predictedLtvUsd: hl.predictedLtvUsd || 4500,
+        urgencyScore: hl.urgencyScore ?? 0,
+        predictedLtvUsd: hl.predictedLtvUsd ?? 0,
         notes: hl.notes || `Harvested real business profile. Niche: ${hl.serviceType}.`,
         websiteUrl: hl.websiteUrl,
         performanceScore: hl.performanceScore,
         sslStatus: hl.sslStatus,
         reviewCount: hl.reviewCount,
-        verificationStatus: (hl as any).verificationStatus || 'VERIFIED',
-        dnsVerified: (hl as any).dnsVerified !== undefined ? Boolean((hl as any).dnsVerified) : true,
+        verificationStatus: (hl as any).verificationStatus || 'UNVERIFIED_STAGING',
+        dnsVerified: (hl as any).dnsVerified !== undefined ? Boolean((hl as any).dnsVerified) : false,
       });
 
       addedItems.push(addedLead);
@@ -2352,15 +2352,15 @@ app.post('/api/leads/purge-and-replace', authenticate, async (req, res) => {
         niche: hl.serviceType,
         source: 'harvested_intelligence',
         status: 'new',
-        urgencyScore: hl.urgencyScore || 7.5,
+        urgencyScore: hl.urgencyScore ?? 0,
         predictedLtv: hl.predictedLtvUsd ?? 0,
         notes: hl.notes || `Harvested real business profile. Niche: ${hl.serviceType}.`,
         websiteUrl: hl.websiteUrl,
         performanceScore: hl.performanceScore,
         sslStatus: hl.sslStatus,
         reviewCount: hl.reviewCount,
-        verificationStatus: (hl as any).verificationStatus || 'VERIFIED',
-        dnsVerified: (hl as any).dnsVerified !== undefined ? Boolean((hl as any).dnsVerified) : true,
+        verificationStatus: (hl as any).verificationStatus || 'UNVERIFIED_STAGING',
+        dnsVerified: (hl as any).dnsVerified !== undefined ? Boolean((hl as any).dnsVerified) : false,
       }).returning();
 
       db.addLead({
@@ -2374,15 +2374,15 @@ app.post('/api/leads/purge-and-replace', authenticate, async (req, res) => {
         serviceType: hl.serviceType,
         source: 'harvested_intelligence',
         status: 'new',
-        urgencyScore: hl.urgencyScore || 7.5,
+        urgencyScore: hl.urgencyScore ?? 0,
         predictedLtvUsd: hl.predictedLtvUsd ?? 0,
         notes: hl.notes || `Harvested real business profile. Niche: ${hl.serviceType}.`,
         websiteUrl: hl.websiteUrl,
         performanceScore: hl.performanceScore,
         sslStatus: hl.sslStatus,
         reviewCount: hl.reviewCount,
-        verificationStatus: (hl as any).verificationStatus || 'VERIFIED',
-        dnsVerified: (hl as any).dnsVerified !== undefined ? Boolean((hl as any).dnsVerified) : true,
+        verificationStatus: (hl as any).verificationStatus || 'UNVERIFIED_STAGING',
+        dnsVerified: (hl as any).dnsVerified !== undefined ? Boolean((hl as any).dnsVerified) : false,
       });
 
       // Add a creation event for the newly harvested lead
