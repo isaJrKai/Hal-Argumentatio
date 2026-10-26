@@ -313,7 +313,9 @@ export function verifyPhase3Pillars(
   const backoff3 = calculateExponentialBackoff(3);
   const backoffVerified = backoff3.delaySeconds === 8;
 
-  const pillar2Verified = outboxQueueTotal > 0 && hmacSignatureCheck === 'PASSED' && backoffVerified;
+  // These checks exercise local helper functions only. They do not verify an external provider,
+  // message delivery, durable dispatch, or callback reconciliation, so this pillar must remain unverified.
+  const pillar2Verified = false;
 
   // Pillar 3: Automated Calendar & Scheduled Triggers
   const rules = schedulerRecords;
@@ -341,7 +343,7 @@ export function verifyPhase3Pillars(
       name: 'Webhook Event Dispatcher & Outbox Engine',
       verified: pillar2Verified,
       status: pillar2Verified ? 'VERIFIED' : 'PENDING',
-      details: outboxQueueTotal > 0 ? `Observed ${outboxQueueTotal} persisted outbox records; HMAC helper self-check ${hmacSignatureCheck.toLowerCase()} and backoff helper ${backoffVerified ? 'passed' : 'failed'}. This does not prove provider delivery.` : 'No persisted outbox records are available; provider delivery is unverified.',
+      details: outboxQueueTotal > 0 ? `Observed ${outboxQueueTotal} persisted outbox records; local HMAC helper self-check ${hmacSignatureCheck.toLowerCase()} and backoff helper ${backoffVerified ? 'passed' : 'failed'}. External provider delivery, callbacks, and durable dispatch are not verified.` : 'No persisted outbox records are available; provider delivery is unverified.',
       metrics: {
         outboxQueueTotal,
         succeededCount,

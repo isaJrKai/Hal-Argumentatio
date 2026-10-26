@@ -103,8 +103,8 @@ export const EmailDesignerPanel: React.FC = () => {
   };
 
   // Business profile personalization
-  const companyName = workspaceConfig.agencyName || workspaceConfig.operatorName || 'Rapid Response Pros';
-  const companyPhone = workspaceConfig.contactPhone || '(204) 555-0199';
+  const companyName = workspaceConfig.agencyName || workspaceConfig.operatorName || '';
+  const companyPhone = workspaceConfig.contactPhone || '';
   const companyLogo = workspaceConfig.agencyLogoUrl || '';
   const brandColor = workspaceConfig.brandColor || '#2563EB';
 
@@ -115,68 +115,68 @@ export const EmailDesignerPanel: React.FC = () => {
     businessName: companyName,
     phone: companyPhone,
     logoUrl: companyLogo,
-    headline: `Special Service Priority for ${regionalProfile.city} Homeowners`,
-    subtext: `Get 15% OFF your next certified ${activeNiche || 'priority'} inspection in ${regionalProfile.city}. Use code LOCAL15.`,
-    ctaText: 'Claim Your Priority Slot',
-    ctaLink: workspaceConfig.bookingUrl || 'https://cal.com/hal-strategy',
+    headline: `A note from your service team in ${regionalProfile.city}`,
+    subtext: `Add an approved offer or a factual service update before sending. Do not include discounts, credentials, or guarantees unless the business has confirmed them.`,
+    ctaText: 'Contact Our Team',
+    ctaLink: workspaceConfig.bookingUrl || '',
     ctaBgColor: brandColor,
     ctaTextColor: '#FFFFFF',
     font: 'Inter',
     textColor: '#18181b',
     techImageUrl: 'https://images.unsplash.com/photo-1621905251189-08b45d6a269e?auto=format&fit=crop&w=600&q=80',
-    address: `123 Main St, ${regionalProfile.city}, ${regionalProfile.countryCode}`
+    address: ''
   });
 
   // Pre-configured Personalized Templates
   const systemTemplates = [
     {
       id: 'freeze-alert',
-      name: 'Weather & Emergency Advisory',
-      tag: 'Urgent',
-      subject: `⚠ Urgent Weather Advisory for Homeowners in ${regionalProfile.city}`,
-      headline: `Urgent Weather Advisory: Protect Your Property in ${regionalProfile.city}`,
-      subtext: `Rapid temperature drops are triggering sudden plumbing, heating, and structural emergencies across ${regionalProfile.city}. Claim your free 15-point diagnostic check before severe conditions hit.`,
-      ctaText: `Book Emergency Inspection in ${regionalProfile.city}`,
+      name: 'Seasonal Maintenance Reminder',
+      tag: 'Customer Update',
+      subject: `Seasonal maintenance options in ${regionalProfile.city}`,
+      headline: `Plan ahead for seasonal maintenance in ${regionalProfile.city}`,
+      subtext: `If your business offers seasonal maintenance, invite customers to ask about available services. Confirm current availability, pricing, and terms before sending.`,
+      ctaText: `Ask About Maintenance Options`,
       ctaColor: '#dc2626'
     },
     {
       id: 'review-request',
-      name: 'Post-Job 5-Star Review Request',
+      name: 'Post-Service Honest Feedback Request',
       tag: 'Reputation',
       subject: `Thank you from ${companyName} — how was our service?`,
       headline: `Thank You for Choosing ${companyName}!`,
-      subtext: `Our certified technicians strive for 100% customer satisfaction. If we solved your problem quickly and cleanly, please take 30 seconds to share your review on Google.`,
-      ctaText: `Leave a 5-Star Review`,
+      subtext: `Thank you for choosing ${companyName}. If you have a moment, please share honest feedback about your experience. Your review should reflect your own views, whether positive or negative.`,
+      ctaText: `Share Honest Feedback`,
       ctaColor: '#10b981'
     },
     {
       id: 'vip-reactivation',
-      name: 'Customer Re-activation & Loyalty',
+      name: 'Customer Re-engagement',
       tag: 'Retention',
-      subject: `Exclusive $75 VIP Voucher for ${companyName} Past Clients`,
-      headline: `Exclusive $75 Customer Courtesy Voucher`,
-      subtext: `As a valued past client in ${regionalProfile.city}, your property qualifies for a $75 credit toward any upcoming repair, tune-up, or installation this month.`,
-      ctaText: `Redeem My $75 Credit`,
+      subject: `Checking in from ${companyName}`,
+      headline: `Can we help with a future project?`,
+      subtext: `We appreciate your previous business. If you need help with a future project, contact us to discuss current services, availability, and any offers that may apply.`,
+      ctaText: `Contact Our Team`,
       ctaColor: brandColor
     },
     {
       id: 'seasonal-tuneup',
-      name: 'Annual System Tune-Up Special',
+      name: 'Preventive Maintenance Information',
       tag: 'Preventive',
       subject: `Annual Safety & Efficiency Inspection: ${regionalProfile.city}`,
-      headline: `Complete 21-Point System Inspection & Tune-Up`,
-      subtext: `Prevent costly emergency breakdowns before peak season. Our certified journeymen ensure complete safety, lower energy bills, and peace of mind.`,
+      headline: `Explore Preventive Maintenance Options`,
+      subtext: `Describe only the services your team actually provides. Confirm qualifications, scope, price, and availability before sending; do not promise savings or outcomes without supporting evidence.`,
       ctaText: `Schedule Comprehensive Tune-Up`,
       ctaColor: '#2563eb'
     },
     {
       id: 'lost-leads-speed',
-      name: 'Website Speed & Lost Leads Audit Alert',
+      name: 'Website Review Offer',
       tag: 'Outreach',
-      subject: `Quick heads-up about {{company_name}}'s mobile load speed in ${regionalProfile.city}`,
-      headline: `We Benchmarked ${regionalProfile.city} Contractors: Here's Where You're Losing Leads`,
-      subtext: `During our quarterly local audit, your site showed a 4.2s mobile load delay. High-intent homeowners bounce after 2.5s and call the next contractor. We generated a free 1-click speed patch for your team.`,
-      ctaText: `Review Free Speed & Lead Audit`,
+      subject: `Would a website review be useful for {{company_name}}?`,
+      headline: `An offer to review your website`,
+      subtext: `This template has not measured your website or estimated lost leads. If you are interested, we can perform a review and share findings with their sources and measurement dates.`,
+      ctaText: `Request a Website Review`,
       ctaColor: '#f59e0b'
     },
     {
@@ -766,23 +766,23 @@ export const EmailDesignerPanel: React.FC = () => {
               <div className="flex flex-col items-center">
                 <Clock className="w-4 h-4 text-blue-600 mb-1" />
                 <span className="text-[11px] font-bold">Fast & Reliable</span>
-                <span className="text-[9.5px] text-slate-500">24/7 Service</span>
+                <span className="text-[9.5px] text-slate-500">Configure service hours</span>
               </div>
               <div className="flex flex-col items-center">
                 <ShieldCheck className="w-4 h-4 text-blue-600 mb-1" />
-                <span className="text-[11px] font-bold">Licensed & Insured</span>
-                <span className="text-[9.5px] text-slate-500">Peace of mind</span>
+                <span className="text-[11px] font-bold">Licensing & Insurance</span>
+                <span className="text-[9.5px] text-slate-500">Confirm before publishing</span>
               </div>
               <div className="flex flex-col items-center">
                 <Award className="w-4 h-4 text-blue-600 mb-1" />
-                <span className="text-[11px] font-bold">Satisfaction Guaranteed</span>
-                <span className="text-[9.5px] text-slate-500">100% Quality</span>
+                <span className="text-[11px] font-bold">Service Guarantee</span>
+                <span className="text-[9.5px] text-slate-500">Add approved terms</span>
               </div>
             </div>
 
             {/* FOOTER */}
             <div className="p-6 text-center text-slate-400 text-[10.5px] space-y-2 bg-white">
-              <p>You received this email because you are a valued customer of {emailData.businessName}.</p>
+              <p>You are receiving this message because the sender believes it is relevant to your relationship with their business. Confirm lawful consent and unsubscribe handling before sending.</p>
               <div className="flex justify-center gap-3 text-blue-600 font-medium">
                 <span className="hover:underline cursor-pointer">Unsubscribe</span>
                 <span>•</span>

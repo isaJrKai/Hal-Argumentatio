@@ -163,14 +163,14 @@ export const HalRoadmapPhase5View: React.FC = () => {
               </span>
               <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 flex items-center gap-1">
                 <CheckCircle2 className="w-3 h-3 text-emerald-500" />
-                BRAIN IN PHASE (11/11 LAYERS ACTIVE)
+                RUNTIME STATUS UNVERIFIED
               </span>
             </div>
             <h2 className="text-xl font-bold font-display text-text-primary tracking-tight">
               Global Enterprise Deployment & Unified Business Brain
             </h2>
             <p className="text-xs text-text-secondary max-w-3xl leading-relaxed">
-              Expands HAL into a federated multi-territory operating intelligence system. Manages hierarchical multi-tenant organizations with isolated cryptographic vault keys, multi-region edge mesh resilience, and cross-industry Bayesian knowledge transfer.
+              Designed for future multi-organization support, edge integrations, and cross-industry knowledge transfer. Tenant isolation, edge connectivity, and knowledge-transfer behavior have not been verified in this deployment.
             </p>
           </div>
 
@@ -211,7 +211,7 @@ export const HalRoadmapPhase5View: React.FC = () => {
                 Multi-Org Vaults
               </span>
               <span className="text-[10px] font-mono font-bold text-emerald-500 bg-emerald-500/10 px-1.5 py-0.5 rounded">
-                4 ORGANIZATIONS
+                ORGANIZATION COUNT UNVERIFIED
               </span>
             </div>
             <div className="text-sm font-bold text-text-primary">SHA-256 Key Isolation</div>
@@ -225,11 +225,11 @@ export const HalRoadmapPhase5View: React.FC = () => {
                 Edge Federation
               </span>
               <span className="text-[10px] font-mono font-bold text-emerald-500 bg-emerald-500/10 px-1.5 py-0.5 rounded">
-                3 REGIONS ACTIVE
+                REGION STATUS UNVERIFIED
               </span>
             </div>
             <div className="text-sm font-bold text-text-primary">&lt; 25ms Avg Latency</div>
-            <div className="text-[11px] text-text-tertiary">Zero-downtime failover standby</div>
+            <div className="text-[11px] text-text-tertiary">Failover not verified</div>
           </div>
 
           <div className="p-3.5 rounded-xl bg-bg-base border border-border-dim space-y-1">
@@ -239,11 +239,11 @@ export const HalRoadmapPhase5View: React.FC = () => {
                 Trade Ontologies
               </span>
               <span className="text-[10px] font-mono font-bold text-emerald-500 bg-emerald-500/10 px-1.5 py-0.5 rounded">
-                3 VERTICALS
+                VERTICAL COUNT UNVERIFIED
               </span>
             </div>
-            <div className="text-sm font-bold text-text-primary">Zero-PII Prior Sync</div>
-            <div className="text-[11px] text-text-tertiary">HVAC, Roofing, Electrical</div>
+            <div className="text-sm font-bold text-text-primary">Privacy behavior not verified</div>
+            <div className="text-[11px] text-text-tertiary">No verified ontology records</div>
           </div>
 
           <div className="p-3.5 rounded-xl bg-bg-base border border-border-dim space-y-1">
@@ -253,11 +253,11 @@ export const HalRoadmapPhase5View: React.FC = () => {
                 Brain In-Phase Score
               </span>
               <span className="text-[10px] font-mono font-bold text-emerald-500 bg-emerald-500/10 px-1.5 py-0.5 rounded">
-                99.2% MATCH
+                ALIGNMENT NOT MEASURED
               </span>
             </div>
-            <div className="text-sm font-bold text-emerald-500">11/11 Layers Locked</div>
-            <div className="text-[11px] text-text-tertiary">Full HAL Constitution alignment</div>
+            <div className="text-sm font-bold text-emerald-500">Layer status not verified</div>
+            <div className="text-[11px] text-text-tertiary">Constitution alignment not verified</div>
           </div>
         </div>
       </div>
@@ -336,17 +336,17 @@ export const HalRoadmapPhase5View: React.FC = () => {
                   Is the System in Phase with the HAL Brain Architecture?
                 </h3>
                 <p className="text-xs text-text-secondary">
-                  Rigorous deterministic audit tracing the 11 cognitive layers from the HAL Constitution down to running production code.
+                  Intended to audit the 11 cognitive layers. Runtime instrumentation is unavailable, so this screen cannot confirm production health.
                 </p>
               </div>
               <div className="px-3 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/25 text-emerald-600 dark:text-emerald-400 text-xs font-mono font-bold flex items-center gap-2 shrink-0">
                 <CheckCircle2 className="w-4 h-4 text-emerald-500" />
-                <span>CONFIRMED: 100% IN-PHASE</span>
+                <span>RUNTIME SYNC UNVERIFIED</span>
               </div>
             </div>
 
             <div className="p-3.5 rounded-lg bg-accent/10 border border-accent/25 text-xs text-text-primary leading-relaxed font-mono">
-              <strong>HAL Brain Verdict:</strong> The system is completely synchronized. Every cognitive stage (Mission ➔ Goals ➔ Planner ➔ Memory ➔ Knowledge ➔ World Model ➔ Agents ➔ Skills ➔ Tools ➔ Integrations ➔ Execution ➔ Learning) operates as a dedicated, single-responsibility module backed by AES-256 encryption, deterministic evidence gating, and dual-drive consensus arbitration.
+              <strong>HAL Brain Verdict:</strong> Runtime synchronization evidence is unavailable. This screen does not confirm that all cognitive stages are connected, healthy, encrypted, or operating in production.
             </div>
           </div>
 

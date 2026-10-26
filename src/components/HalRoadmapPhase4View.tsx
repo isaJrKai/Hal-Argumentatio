@@ -40,7 +40,7 @@ export const HalRoadmapPhase4View: React.FC = () => {
   const [actionNotice, setActionNotice] = useState<string | null>(null);
 
   // New Consensus State
-  const [newTopic, setNewTopic] = useState('Outreach Angle & Commercial Pricing for Calgary Commercial Roofing');
+  const [newTopic, setNewTopic] = useState('');
   const [isExecutingConsensus, setIsExecutingConsensus] = useState(false);
   const [isRecalibrating, setIsRecalibrating] = useState(false);
   const [isArbitrating, setIsArbitrating] = useState(false);
@@ -191,7 +191,7 @@ export const HalRoadmapPhase4View: React.FC = () => {
               </span>
               <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 flex items-center gap-1">
                 <CheckCircle2 className="w-3 h-3 text-emerald-500" />
-                100% INVARIANTS VERIFIED
+                RUNTIME STATUS UNVERIFIED
               </span>
             </div>
             <h2 className="text-xl font-bold font-display text-text-primary tracking-tight">
@@ -239,11 +239,11 @@ export const HalRoadmapPhase4View: React.FC = () => {
                 Parallel Consensus
               </span>
               <span className="text-[10px] font-mono font-bold text-emerald-500 bg-emerald-500/10 px-1.5 py-0.5 rounded">
-                96% ALIGNMENT
+                ALIGNMENT NOT MEASURED
               </span>
             </div>
-            <div className="text-sm font-bold text-text-primary">Gemini 2.5 + Nemotron 70B</div>
-            <div className="text-[11px] text-text-tertiary">Zero single-point-of-failure cognitive arbitration</div>
+            <div className="text-sm font-bold text-text-primary">Model providers not verified</div>
+            <div className="text-[11px] text-text-tertiary">Provider redundancy not verified</div>
           </div>
 
           <div className="p-3.5 rounded-xl bg-bg-base border border-border-dim space-y-1">
@@ -253,11 +253,11 @@ export const HalRoadmapPhase4View: React.FC = () => {
                 Neural Agent Routing
               </span>
               <span className="text-[10px] font-mono font-bold text-emerald-500 bg-emerald-500/10 px-1.5 py-0.5 rounded">
-                5 ACTIVE NODES
+                NODES NOT VERIFIED
               </span>
             </div>
-            <div className="text-sm font-bold text-text-primary">Epoch #14 Calibrated</div>
-            <div className="text-[11px] text-text-tertiary">Continuous Bayesian weight adjustments</div>
+            <div className="text-sm font-bold text-text-primary">Calibration not available</div>
+            <div className="text-[11px] text-text-tertiary">Calibration workflow not verified</div>
           </div>
 
           <div className="p-3.5 rounded-xl bg-bg-base border border-border-dim space-y-1">
@@ -267,11 +267,11 @@ export const HalRoadmapPhase4View: React.FC = () => {
                 Strategy Arbitrage
               </span>
               <span className="text-[10px] font-mono font-bold text-emerald-500 bg-emerald-500/10 px-1.5 py-0.5 rounded">
-                +$9,615/MO LIFT
+                LIFT NOT MEASURED
               </span>
             </div>
-            <div className="text-sm font-bold text-text-primary">Guardrail Compliant</div>
-            <div className="text-[11px] text-text-tertiary">Closed-loop autonomous spend shifts</div>
+            <div className="text-sm font-bold text-text-primary">Guardrails not verified</div>
+            <div className="text-[11px] text-text-tertiary">Execution not verified</div>
           </div>
         </div>
       </div>
@@ -345,17 +345,17 @@ export const HalRoadmapPhase4View: React.FC = () => {
               <div className="flex items-center justify-between">
                 <span className="text-xs font-mono font-bold text-accent uppercase">PILLAR 1</span>
                 <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-500/15 text-emerald-500 border border-emerald-500/30">
-                  VERIFIED
+                  NOT VERIFIED
                 </span>
               </div>
               <h3 className="text-sm font-bold text-text-primary">Dual-Drive Parallel Consensus</h3>
               <p className="text-xs text-text-secondary leading-relaxed">
-                Executes strategic decisions through parallel generation using Google Gemini 2.5 (discovery & qualitative angle) and NVIDIA Nemotron 70B (policy verification, price floors, and contract boundaries).
+                Designed to request parallel model analysis. Provider connectivity, model identity, policy enforcement, and consensus quality have not been verified in this deployment.
               </p>
               <div className="p-3 rounded-lg bg-bg-base border border-border-dim text-[11px] space-y-1 font-mono">
-                <div className="text-text-tertiary">Engine A: Google Gemini 2.5 Flash</div>
-                <div className="text-text-tertiary">Engine B: NVIDIA Nemotron 70B Instruct</div>
-                <div className="text-emerald-500 font-semibold">Alignment: 96% Average Semantic Match</div>
+                <div className="text-text-tertiary">Engine A: provider not verified</div>
+                <div className="text-text-tertiary">Engine B: provider not verified</div>
+                <div className="text-emerald-500 font-semibold">Alignment: Not measured</div>
               </div>
             </div>
 
@@ -364,7 +364,7 @@ export const HalRoadmapPhase4View: React.FC = () => {
               <div className="flex items-center justify-between">
                 <span className="text-xs font-mono font-bold text-accent uppercase">PILLAR 2</span>
                 <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-500/15 text-emerald-500 border border-emerald-500/30">
-                  VERIFIED
+                  NOT VERIFIED
                 </span>
               </div>
               <h3 className="text-sm font-bold text-text-primary">Adaptive Bayesian Weight Tuning</h3>
@@ -372,9 +372,9 @@ export const HalRoadmapPhase4View: React.FC = () => {
                 Planned capability: recalibrate urgency weights from completed conversion outcomes. This is unavailable until measured outcomes and persisted model parameters are connected.
               </p>
               <div className="p-3 rounded-lg bg-bg-base border border-border-dim text-[11px] space-y-1 font-mono">
-                <div className="text-text-tertiary">Active Epoch: #14 Multi-Niche Calibrated</div>
-                <div className="text-text-tertiary">Urgency Multiplier: SSL 8.5x | Speed 7.2x</div>
-                <div className="text-emerald-500 font-semibold">Policy Autonomy: Ready (100%)</div>
+                <div className="text-text-tertiary">Calibration epoch: Not available</div>
+                <div className="text-text-tertiary">Urgency weights: Not calibrated from measured outcomes</div>
+                <div className="text-emerald-500 font-semibold">Policy autonomy: Not verified</div>
               </div>
             </div>
 
@@ -383,17 +383,17 @@ export const HalRoadmapPhase4View: React.FC = () => {
               <div className="flex items-center justify-between">
                 <span className="text-xs font-mono font-bold text-accent uppercase">PILLAR 3</span>
                 <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-500/15 text-emerald-500 border border-emerald-500/30">
-                  VERIFIED
+                  NOT VERIFIED
                 </span>
               </div>
               <h3 className="text-sm font-bold text-text-primary">Closed-Loop Strategy Arbitrage</h3>
               <p className="text-xs text-text-secondary leading-relaxed">
-                Detects performance leakage in low-ROAS channels (e.g. broad match search ads, low-intent display) and automatically formulates capital shifts to high-performing outreach cadences and LSAs.
+                Designed to evaluate campaign performance and proposed budget shifts. This requires measured campaign data, verified guardrails, and operator approval; live automation is not verified.
               </p>
               <div className="p-3 rounded-lg bg-bg-base border border-border-dim text-[11px] space-y-1 font-mono">
-                <div className="text-text-tertiary">Evaluated Opportunities: 3 Channels</div>
-                <div className="text-text-tertiary">Guardrail Limits: ±25% Shift Max / Iteration</div>
-                <div className="text-emerald-500 font-semibold">Net Expected Lift: +$9,615 / mo</div>
+                <div className="text-text-tertiary">Evaluated opportunities: None verified</div>
+                <div className="text-text-tertiary">Guardrail policy: Not verified in this deployment</div>
+                <div className="text-emerald-500 font-semibold">Expected lift: Not estimated</div>
               </div>
             </div>
           </div>
@@ -478,7 +478,7 @@ export const HalRoadmapPhase4View: React.FC = () => {
                         : 'bg-rose-500/15 text-rose-500 border-rose-500/30'
                     }`}>
                       <ShieldCheck className="w-3.5 h-3.5" />
-                      {cons.verdict || 'CONTRACT_VERIFIED_UNANIMOUS'} ({cons.alignmentScore}%)
+                      {cons.verdict || 'Verdict unavailable'} ({Number.isFinite(cons.alignmentScore) ? `${cons.alignmentScore}% reported alignment` : 'alignment not reported'})
                     </span>
                     <span className="px-2 py-1 rounded text-[10px] font-mono text-text-tertiary bg-bg-base border border-border-dim">
                       {new Date(cons.timestamp).toLocaleTimeString()}
@@ -641,40 +641,40 @@ export const HalRoadmapPhase4View: React.FC = () => {
               <div>
                 <h3 className="text-sm font-bold text-text-primary flex items-center gap-1.5">
                   <Sliders className="w-4 h-4 text-accent" />
-                  Calibrated Technical Urgency Multipliers (Epoch #14)
+                  Urgency multipliers (not calibrated)
                 </h3>
                 <p className="text-xs text-text-secondary">
-                  Automatically calibrated weights derived from real contractor audits and closed-won pipeline transitions.
+                  Intended to use measured outcomes. No calibration dataset or verified outcome history is currently available.
                 </p>
               </div>
               <span className="px-2.5 py-1 rounded text-xs font-mono font-bold bg-accent/15 text-accent border border-accent/30">
-                AUTONOMOUS MODE
+                MODE NOT VERIFIED
               </span>
             </div>
 
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
               <div className="p-3 rounded-lg bg-bg-base border border-border-dim space-y-1">
                 <span className="text-[10px] font-mono text-text-tertiary uppercase">Missing SSL</span>
-                <div className="text-lg font-bold font-mono text-text-primary">8.5x</div>
-                <div className="text-[10px] text-text-secondary">High-urgency instant dropoff</div>
+                <div className="text-lg font-bold font-mono text-text-primary">Not measured</div>
+                <div className="text-[10px] text-text-secondary">Impact not measured</div>
               </div>
 
               <div className="p-3 rounded-lg bg-bg-base border border-border-dim space-y-1">
                 <span className="text-[10px] font-mono text-text-tertiary uppercase">Mobile Speed LCP &gt; 4s</span>
-                <div className="text-lg font-bold font-mono text-text-primary">7.2x</div>
-                <div className="text-[10px] text-text-secondary">Conversion rate leakage</div>
+                <div className="text-lg font-bold font-mono text-text-primary">Not measured</div>
+                <div className="text-[10px] text-text-secondary">Impact not measured</div>
               </div>
 
               <div className="p-3 rounded-lg bg-bg-base border border-border-dim space-y-1">
                 <span className="text-[10px] font-mono text-text-tertiary uppercase">Phone Channel Lift</span>
-                <div className="text-lg font-bold font-mono text-text-primary">1.35x</div>
-                <div className="text-[10px] text-text-secondary">Top commercial contractor channel</div>
+                <div className="text-lg font-bold font-mono text-text-primary">Not measured</div>
+                <div className="text-[10px] text-text-secondary">Impact not measured</div>
               </div>
 
               <div className="p-3 rounded-lg bg-bg-base border border-border-dim space-y-1">
                 <span className="text-[10px] font-mono text-text-tertiary uppercase">Review Deficit &lt; 4.0★</span>
-                <div className="text-lg font-bold font-mono text-text-primary">6.8x</div>
-                <div className="text-[10px] text-text-secondary">Local 3-Pack suppression</div>
+                <div className="text-lg font-bold font-mono text-text-primary">Not measured</div>
+                <div className="text-[10px] text-text-secondary">Impact not measured</div>
               </div>
             </div>
           </div>
@@ -772,7 +772,7 @@ export const HalRoadmapPhase4View: React.FC = () => {
                     <span>Expected Lift: <strong className="text-emerald-500">+${item.expectedNetMonthlyLiftUsd.toLocaleString()}/mo</strong></span>
                     <span>Risk Rating: <strong className="text-blue-500">{item.riskRating}</strong></span>
                     <span className="text-[10px] text-emerald-500 flex items-center gap-1">
-                      <CheckCircle2 className="w-3 h-3" /> Guardrail Verified
+                      <CheckCircle2 className="w-3 h-3" /> Guardrail check status: {item.guardrailCompliant ? 'passed for this record' : 'not passed'}
                     </span>
                   </div>
 

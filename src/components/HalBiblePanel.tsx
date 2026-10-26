@@ -85,7 +85,7 @@ export default function HalBiblePanel({ initialDocId }: HalBiblePanelProps = {})
 
     // Phase 2 — Intelligence
     { id: '07', number: '07', title: 'Memory', description: 'State persistence engines: AES-256-CBC PII encryption, cryptographic genesis chains, and immutable Merkle ledger.', status: 'canonical', phase: 'intelligence', icon: Database },
-    { id: '08', number: '08', title: 'Knowledge', description: 'Real-time Google Maps Places API grounding & diagnostic audits for Calgary, Winnipeg, and Edmonton.', status: 'canonical', phase: 'intelligence', icon: Compass },
+    { id: '08', number: '08', title: 'Knowledge', description: 'Designed for map grounding and diagnostic audits; live provider access and measured results must be verified.', status: 'canonical', phase: 'intelligence', icon: Compass },
     { id: '09', number: '09', title: 'Skills', description: 'Diagnostic script library: technical SEO scans, speed index calculations, and SSL sweeps.', status: 'canonical', phase: 'intelligence', icon: Cpu },
     { id: '10', number: '10', title: 'Agents', description: 'Dual-Drive Multi-Agent Consensus: Google Gemini 2.5 coupled with NVIDIA Nemotron 70B.', status: 'canonical', phase: 'intelligence', icon: Cpu },
     { id: '11', number: '11', title: 'Council', description: 'Decision orchestrator, Bayesian neural weight recalibration, and strategy arbitrage loops.', status: 'canonical', phase: 'intelligence', icon: Users },
@@ -101,7 +101,7 @@ export default function HalBiblePanel({ initialDocId }: HalBiblePanelProps = {})
     { id: '19', number: '19', title: 'DevOps', description: 'Vite/esbuild bundling, container routing to port 3000, and fast cold-starts.', status: 'canonical', phase: 'engineering', icon: GitPullRequest },
 
     // Phase 4 — Product
-    { id: '20', number: '20', title: 'Roadmap', description: 'All 5 phases verified: Foundation, Real Harvest, Automation Outbox, Multi-Agent Consensus, Enterprise Brain.', status: 'canonical', phase: 'product', icon: LineChart },
+    { id: '20', number: '20', title: 'Roadmap', description: 'Roadmap phases are tracked separately; each remains unverified until its runtime behavior has supporting evidence.', status: 'canonical', phase: 'product', icon: LineChart },
     { id: '21', number: '21', title: 'UI Library', description: 'Standardized layout files, typography primitives, and Document Ribbon studio suite.', status: 'canonical', phase: 'product', icon: Layers },
     { id: '22', number: '22', title: 'Workspaces', description: 'Contractor dashboard orchestration, campaign builders, and leads flow.', status: 'canonical', phase: 'product', icon: Briefcase },
     { id: '23', number: '23', title: 'Future Vision', description: '11-Layer Brain Architecture, decentralized edge federation, and cross-industry ontology transfer.', status: 'canonical', phase: 'product', icon: Sparkles },
@@ -147,13 +147,8 @@ export default function HalBiblePanel({ initialDocId }: HalBiblePanelProps = {})
     return documents.find(d => d.id === selectedDocId) || documents[1];
   }, [documents, selectedDocId]);
 
-  // Sample data for Table primitive showcase
-  const sampleTableData = [
-    { id: '1', item: 'Strategic Territory Ingestion Scan', status: 'active', priority: 'High', value: '$12,400' },
-    { id: '2', item: 'Google Maps Places API Syncer', status: 'new', priority: 'Medium', value: '$4,250' },
-    { id: '3', item: 'Reputation Harvest Sweep (Calgary)', status: 'warning', priority: 'High', value: '$8,100' },
-    { id: '4', item: 'Isaac\'s Custom Cold Outreach Run', status: 'neutral', priority: 'Low', value: '$1,800' }
-  ];
+  // This component preview must not present invented operational records or revenue.
+  const sampleTableData: Array<{ id: string; item: string; status: string; priority: string; value: string }> = [];
 
   const sortedData = [...sampleTableData].sort((a, b) => {
     if (tableSort === 'asc') return a.value.localeCompare(b.value);
@@ -162,27 +157,27 @@ export default function HalBiblePanel({ initialDocId }: HalBiblePanelProps = {})
 
   const triggerToast = (variant: 'info' | 'success' | 'warning' | 'danger' | 'ai') => {
     const titles = {
-      info: 'Operational Scope Alignment',
-      success: 'Database Schema Sync Success',
-      warning: 'Outreach Quota Limit Nearing',
-      danger: 'Lead Connection Interrupted',
-      ai: 'HAL Council Strategy Assessment'
+      info: 'Information Toast Preview',
+      success: 'Success Toast Preview',
+      warning: 'Warning Toast Preview',
+      danger: 'Error Toast Preview',
+      ai: 'AI Toast Preview'
     };
 
     const descs = {
-      info: 'The territorial sweep across Winnipeg plastering leads is completed.',
-      success: 'All prospect records successfully encrypted with AES-256 standard.',
-      warning: 'You have used 85% of your recommended daily active outreach budget.',
-      danger: 'Failed to authenticate with Calgary Map Services API key wrapper.',
-      ai: 'HAL detects 15 roofing websites with speed indices greater than 4.2 seconds.'
+      info: 'UI preview only. No live business data was loaded.',
+      success: 'UI preview only. No database or encryption operation was performed.',
+      warning: 'UI preview only. No usage quota was queried.',
+      danger: 'UI preview only. No integration request was made.',
+      ai: 'UI preview only. No websites were scanned and no performance data was measured.'
     };
 
     const nextActions = {
-      info: 'Verify the newly imported prospect records.',
-      success: 'Proceed to client campaigns launchpad.',
-      warning: 'Upgrade your billing or throttle automated emails.',
-      danger: 'Review active API tokens in your Settings dashboard.',
-      ai: 'Generate performance pitch deck templates instantly.'
+      info: 'Connect a real data source before relying on this workflow.',
+      success: 'Verify the actual operation in the runtime before treating it as successful.',
+      warning: 'Load real usage metrics before making quota decisions.',
+      danger: 'Check the relevant integration logs and configuration.',
+      ai: 'Run a real audit and retain its evidence before generating a report.'
     };
 
     toast({
@@ -191,22 +186,22 @@ export default function HalBiblePanel({ initialDocId }: HalBiblePanelProps = {})
       description: descs[variant],
       whatNext: nextActions[variant],
       actionLabel: 'RESOLVE NOW',
-      onAction: () => alert(`Action taken for ${titles[variant]}`)
+      onAction: () => alert('UI preview only; no action was performed.')
     });
   };
 
-  // Run Philosophy System Alignment check
+  // Play a visual preview only; this does not audit the running system.
   const startSystemVerification = () => {
     setIsVerifying(true);
     setVerificationProgress(10);
     setVerificationPassed(false);
 
     const steps = [
-      { p: 25, label: 'Auditing Network configuration port...' },
-      { p: 50, label: 'Scanning codebase for PII cryptology functions...' },
-      { p: 75, label: 'Evaluating UI visual weights and gradients...' },
-      { p: 90, label: 'Checking for unrequested layout bloat...' },
-      { p: 100, label: 'Verification successfully finalized!' }
+      { p: 25, label: 'Preview step 1 of 4 (no system check performed).' },
+      { p: 50, label: 'Preview step 2 of 4 (no code scan performed).' },
+      { p: 75, label: 'Preview step 3 of 4 (no UI audit performed).' },
+      { p: 90, label: 'Preview step 4 of 4 (no layout audit performed).' },
+      { p: 100, label: 'Preview finished; no verification checks ran.' }
     ];
 
     steps.forEach((step, idx) => {
@@ -217,8 +212,8 @@ export default function HalBiblePanel({ initialDocId }: HalBiblePanelProps = {})
           setVerificationPassed(true);
           toast({
             variant: 'success',
-            title: 'HAL Core Alignment Passed',
-            description: 'Your codebase remains 100% compliant with the HAL Master Philosophy.',
+            title: 'Verification Preview Finished',
+            description: 'The animation completed; no system, codebase, security, or compliance checks were performed.',
             whatNext: 'Proceed with building high-fidelity client features.'
           });
         }
@@ -471,7 +466,7 @@ export default function HalBiblePanel({ initialDocId }: HalBiblePanelProps = {})
                     <div className="flex items-center justify-between border-b border-border-dim/60 pb-2 mb-2.5">
                       <span className="text-[10px] font-mono font-bold text-accent uppercase tracking-wider flex items-center gap-1.5">
                         <Sparkles className="w-3.5 h-3.5 text-accent" />
-                        INTENTIONALITY DIRECTIVE v1.0
+                        INTENTIONALITY DIRECTIVE (DESIGN CONCEPT)
                       </span>
                       <span className="text-[9px] font-mono text-positive bg-positive/10 border border-positive/20 px-1.5 py-0.5 rounded uppercase font-bold">
                         ACTIVE LAW
@@ -637,10 +632,10 @@ export default function HalBiblePanel({ initialDocId }: HalBiblePanelProps = {})
                     <div className="space-y-1">
                       <h3 className="text-sm font-bold text-text-primary uppercase font-mono flex items-center gap-1.5">
                         <Terminal className="w-4 h-4 text-accent animate-pulse" />
-                        Verify System Alignment Engine
+                        Verification Animation Preview (Not a Live Audit)
                       </h3>
                       <p className="text-xs text-text-secondary">
-                        Audit active codebase configurations, port parameters, and cryptology vectors in real-time.
+                        This is a UI animation only. It does not inspect the running server, network ports, security configuration, or encryption.
                       </p>
                     </div>
                     <Button 
@@ -649,7 +644,7 @@ export default function HalBiblePanel({ initialDocId }: HalBiblePanelProps = {})
                       onClick={startSystemVerification}
                       isLoading={isVerifying}
                     >
-                      EXECUTE PHILOSOPHY ALIGNMENT
+                      PLAY PREVIEW
                     </Button>
                   </div>
 
@@ -672,7 +667,7 @@ export default function HalBiblePanel({ initialDocId }: HalBiblePanelProps = {})
                           {verificationProgress >= 25 && verificationProgress < 50 && 'Scanning codebase for PII cryptology functions...'}
                           {verificationProgress >= 50 && verificationProgress < 75 && 'Evaluating UI visual weights and gradients...'}
                           {verificationProgress >= 75 && verificationProgress < 100 && 'Checking for unrequested layout bloat...'}
-                          {verificationProgress === 100 && 'Verification successfully finalized!'}
+                          {verificationProgress === 100 && 'Preview finished; no verification checks ran.'}
                         </span>
                       </div>
                     </div>
@@ -682,20 +677,20 @@ export default function HalBiblePanel({ initialDocId }: HalBiblePanelProps = {})
                     <div className="bg-bg-base border border-border-dim p-4 rounded font-mono text-xs text-text-secondary space-y-3">
                       <div className="flex items-center gap-2 text-positive">
                         <CheckCircle2 className="w-4 h-4 shrink-0" />
-                        <span className="font-bold">SYSTEM IN PERFECT PHILOSOPHY ALIGNMENT</span>
+                        <span className="font-bold">PREVIEW COMPLETE — NOT A SECURITY AUDIT</span>
                       </div>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-[10.5px] pt-1">
                         <div className="flex justify-between border-b border-border-dim/40 pb-1.5">
                           <span className="opacity-60">PORT 3000 INTEGRITY:</span>
-                          <span className="text-positive font-bold">100% SECURE (COMPLIANT)</span>
+                          <span className="text-positive font-bold">Not checked</span>
                         </div>
                         <div className="flex justify-between border-b border-border-dim/40 pb-1.5">
                           <span className="opacity-60">PII CRYPTOLOGY FIELD:</span>
-                          <span className="text-positive font-bold">ACTIVE (AES-GCM-256)</span>
+                          <span className="text-positive font-bold">Not checked</span>
                         </div>
                         <div className="flex justify-between border-b border-border-dim/40 pb-1.5">
                           <span className="opacity-60">UI GRADIENT DECORATION:</span>
-                          <span className="text-positive font-bold">0% ACCENTS ONLY (COMPLIANT)</span>
+                          <span className="text-positive font-bold">Not checked</span>
                         </div>
                         <div className="flex justify-between border-b border-border-dim/40 pb-1.5">
                           <span className="opacity-60">UNREQUESTED MENUS BLOAT:</span>
@@ -756,7 +751,7 @@ export default function HalBiblePanel({ initialDocId }: HalBiblePanelProps = {})
                       <CardContent className="space-y-5">
                         <div className="border-l border-border-dim pl-3.5 space-y-1">
                           <MetadataText>Mission (Largest)</MetadataText>
-                          <MissionTitle>Acquire 20 Roofing Clients</MissionTitle>
+                          <MissionTitle>Example mission (not live data)</MissionTitle>
                         </div>
 
                         <div className="border-l border-border-dim pl-3.5 space-y-1">
@@ -766,7 +761,7 @@ export default function HalBiblePanel({ initialDocId }: HalBiblePanelProps = {})
 
                         <div className="border-l border-border-dim pl-3.5 space-y-1">
                           <MetadataText>Cards (Medium)</MetadataText>
-                          <CardTitle>NVIDIA Analytics API Token Key</CardTitle>
+                          <CardTitle>Provider credential status</CardTitle>
                         </div>
 
                         <div className="border-l border-border-dim pl-3.5 space-y-1">
@@ -778,12 +773,12 @@ export default function HalBiblePanel({ initialDocId }: HalBiblePanelProps = {})
 
                         <div className="border-l border-border-dim pl-3.5 space-y-1">
                           <MetadataText>System / Database Values (Monospace)</MetadataText>
-                          <MonoValue>aes-256_hash_value_9f68d2</MonoValue>
+                          <MonoValue>Not configured or verified</MonoValue>
                         </div>
                       </CardContent>
                       <CardFooter>
                         <span>Font families: Inter (Sans) & JetBrains Mono</span>
-                        <span className="font-mono text-accent">100% STANDARDIZED</span>
+                        <span className="font-mono text-accent">STANDARDIZATION NOT VERIFIED</span>
                       </CardFooter>
                     </Card>
 
@@ -954,7 +949,7 @@ export default function HalBiblePanel({ initialDocId }: HalBiblePanelProps = {})
 
                     {/* TABLE PRIMITIVE DEMONSTRATION */}
                     <div className="space-y-2">
-                      <span className="text-[10px] font-mono tracking-widest text-text-secondary uppercase font-semibold">PREMIUM FLUID TABLES</span>
+                      <span className="text-[10px] font-mono tracking-widest text-text-secondary uppercase font-semibold">OPERATIONAL TABLE PREVIEW — NO LIVE RECORDS</span>
                       <Table>
                         <TableHeader>
                           <TableRow>
@@ -972,7 +967,13 @@ export default function HalBiblePanel({ initialDocId }: HalBiblePanelProps = {})
                           </TableRow>
                         </TableHeader>
                         <TableBody>
-                          {sortedData.map((d) => (
+                          {sortedData.length === 0 ? (
+                            <TableRow>
+                              <TableCell colSpan={4} className="text-xs text-text-secondary">
+                                No live operational records loaded. Revenue and activity values are intentionally omitted until a real data source is connected.
+                              </TableCell>
+                            </TableRow>
+                          ) : sortedData.map((d) => (
                             <TableRow key={d.id} isSelectable={true}>
                               <TableCell className="font-sans font-medium">{d.item}</TableCell>
                               <TableCell>
@@ -993,11 +994,11 @@ export default function HalBiblePanel({ initialDocId }: HalBiblePanelProps = {})
                       <div className="space-y-2">
                         <span className="text-[10px] font-mono tracking-widest text-text-secondary uppercase font-semibold font-bold">PEDAGOGICAL EMPTY STATES</span>
                         <EmptyState 
-                          title="Google Maps Location Cache Cleared"
-                          whyEmpty="The local client cache database is fully optimized and purged of outdated territory entries to comply with PII policies."
-                          whatNext="Click 'Run Harvest Scanner' in your Knowledge workspace to initialize maps grounding."
-                          expectedOutcome="HAL Council will instantly parse 45 new potential roofing candidates inside Alberta."
-                          actionLabel="RUN HARVEST SCANNER"
+                          title="Location Cache Empty-State Preview"
+                          whyEmpty="No location records are loaded in this UI preview. No database purge or cache operation has been performed."
+                          whatNext="Configure and verify a map provider, then load actual harvest results."
+                          expectedOutcome="No result count is promised. Display only records returned by the configured live source."
+                          actionLabel="CONFIGURE DATA SOURCE"
                           onActionClick={() => alert('Harvesting Map grounding!')}
                         />
                       </div>
@@ -1010,7 +1011,7 @@ export default function HalBiblePanel({ initialDocId }: HalBiblePanelProps = {})
                               <TableEmptyState 
                                 colSpan={4}
                                 title="No Connected Google Ads Accounts"
-                                description="Since Calgary Roof Pros hasn't authorized OAuth channels, HAL cannot fetch real-time ad performance metrics."
+                                description="Live ad performance is unavailable until a verified ad-platform connection and authorization are configured."
                                 action={
                                   <Button variant="outline" size="sm">
                                     PROPOSE ENTERPRISE CONNECT
@@ -1152,7 +1153,7 @@ export default function HalBiblePanel({ initialDocId }: HalBiblePanelProps = {})
                       CANONICAL ARCHITECTURAL SPECIFICATION
                     </span>
                     <p className="text-xs text-text-secondary leading-relaxed font-sans">
-                      This specification represents the active, verified implementation directive for HAL's {activeDoc.title} architecture. It enforces strict mathematical bounds, cryptographic data handling, and deterministic runtime behavior.
+                      This page displays the selected specification document. It does not verify runtime behavior or prove that every listed feature is implemented.
                     </p>
                   </div>
                 </div>
@@ -1204,9 +1205,9 @@ export default function HalBiblePanel({ initialDocId }: HalBiblePanelProps = {})
                     </div>
                     <div className="flex justify-between items-center py-0.5">
                       <span className="opacity-50">STABILITY RANKING:</span>
-                      <span className="text-positive uppercase font-bold flex items-center gap-1">
+                      <span className="text-text-secondary uppercase font-bold flex items-center gap-1">
                         <CheckCircle2 className="w-3.5 h-3.5 text-positive" />
-                        100% CANONICAL PRODUCTION CODE
+                        CODE STATUS NOT VERIFIED
                       </span>
                     </div>
                   </div>
@@ -1216,13 +1217,13 @@ export default function HalBiblePanel({ initialDocId }: HalBiblePanelProps = {})
                     <div className="border border-border-dim p-3 rounded-sm bg-bg-base/40">
                       <span className="text-[10px] font-mono text-accent block font-bold mb-1 uppercase tracking-wider">UPSTREAM TRIGGER SOURCES</span>
                       <p className="text-[11px] text-text-secondary leading-relaxed">
-                        Reads from AES-256 encrypted SQLite ledger, live Places API sweeps, or direct operator guidance in plain natural language.
+                        Designed to support database-backed records, map-provider data, and operator guidance. Storage encryption and live provider integrations are not verified in this deployment.
                       </p>
                     </div>
                     <div className="border border-border-dim p-3 rounded-sm bg-bg-base/40">
                       <span className="text-[10px] font-mono text-accent block font-bold mb-1 uppercase tracking-wider">DOWNSTREAM OUTCOME EXECUTION</span>
                       <p className="text-[11px] text-text-secondary leading-relaxed">
-                        Executes through verified desk instruments (Document Studio, SMS/Email Outbox, Territory Diagnostic Audits) with human-in-the-loop approval.
+                        Designed to integrate with Document Studio, the SMS/Email Outbox, and territory audits; each integration must be verified in the deployed environment.
                       </p>
                     </div>
                   </div>
@@ -1232,7 +1233,7 @@ export default function HalBiblePanel({ initialDocId }: HalBiblePanelProps = {})
                     <span>PHILOSOPHY COMPLIANCE:</span>
                     <div className="flex items-center gap-1 text-positive font-bold">
                       <CheckCircle2 className="w-3.5 h-3.5" />
-                      <span>INTENTIONALITY DIRECTIVE v1.0 VERIFIED</span>
+                      <span>INTENTIONALITY DIRECTIVE STATUS UNVERIFIED</span>
                     </div>
                   </div>
 
