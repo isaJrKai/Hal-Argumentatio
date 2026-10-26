@@ -1048,8 +1048,8 @@ export const HalRoadmapPhase3View: React.FC = () => {
                     <button
                       onClick={() => {
                         setLiveChannel('webhook');
-                        setLiveRecipient('https://crm.apex-facilities.com/api/v1/inbound-leads');
-                        setLiveMessage('{\n  "event": "lead_qualified",\n  "business": "Apex Industrial Facilities",\n  "estValue": 14200,\n  "urgency": "high"\n}');
+                        setLiveRecipient('');
+                        setLiveMessage('{\\n  "event": "test_only",\\n  "business": "",\\n  "estValue": 0,\\n  "urgency": "unverified"\\n}');
                       }}
                       className={`py-1.5 rounded text-[11px] font-medium flex flex-col items-center gap-1 transition-all cursor-pointer ${
                         liveChannel === 'webhook' ? 'bg-blue-600 text-white shadow-xs' : 'text-text-secondary hover:text-text-primary'
@@ -1216,24 +1216,7 @@ export const HalRoadmapPhase3View: React.FC = () => {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-border-dim/50">
-                      {(outboxQueueData?.recentDispatches?.length ? outboxQueueData.recentDispatches : [
-                        {
-                          id: 'outbox_live_01',
-                          channel: 'email',
-                          recipient: 'marcus.vance@apex-facilities.com',
-                          subject: 'Diagnostic Audit & Speed Findings for Apex Industrial Facilities',
-                          status: 'delivered',
-                          timestamp: new Date().toISOString()
-                        },
-                        {
-                          id: 'outbox_live_02',
-                          channel: 'sms',
-                          recipient: '+1 (512) 890-4421',
-                          subject: 'Urgent Commercial HVAC Dispatch Opportunity',
-                          status: 'delivered',
-                          timestamp: new Date(Date.now() - 3600000).toISOString()
-                        }
-                      ]).slice(0, 8).map((item: any, idx: number) => (
+                      {(outboxQueueData?.recentDispatches ?? []).slice(0, 8).map((item: any, idx: number) => (
                         <tr key={item.id || idx} className="hover:bg-bg-subtle/50 transition-colors">
                           <td className="p-2.5">
                             <span className="flex items-center gap-1.5">
