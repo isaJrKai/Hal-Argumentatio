@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
+import bcrypt from 'bcryptjs';
 
 // Types for our Database models
 export interface Contractor {
@@ -1792,5 +1793,22 @@ class Database {
 export const db = new Database();
 
 export function hashPassword(password: string): string {
-  return crypto.pbkdf2Sync(password, 'salt-for-halbiz', 1000, 64, 'sha512').toString('hex');
+  return bcrypt.hashSync(password, 12);
+}
+
+export function verifyPassword(password: string, storedHash: string): boolean {
+  if (!password || !storedHash) return false;
+  try {
+    if (/^\$2[aby]\$/.test(storedHash)) {
+      return bcrypt.compareSync(password, storedHash);
+    }
+    // Temporary compatibility for legacy PBKDF2 hashes. Successful logins are
+    // upgraded to bcrypt by the authentication route.
+    const legacyHash = crypto.pbkdf2Sync(password, 'salt-for-halbiz', 1000, 64, 'sha512').toString('hex');
+    const supplied = Buffer.from(legacyHash, 'utf8');
+    const stored = Buffer.from(storedHash, 'utf8');
+    return supplied.length === stored.length && crypto.timingSafeEqual(supplied, stored);
+  } catch {
+    return false;
+  }
 }
