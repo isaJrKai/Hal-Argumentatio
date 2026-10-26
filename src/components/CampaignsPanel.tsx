@@ -823,7 +823,7 @@ export default function CampaignsPanel({ campaigns, leads = [], token, onRefresh
               </h3>
             </div>
             <p className="text-xs text-text-dim mt-1 font-sans">
-              Autonomous multi-touch client outreach dispatch and secured HMAC-SHA256 Webhook integrations.
+              Outreach simulations plus signed webhook requests to explicitly allowlisted targets.
             </p>
           </div>
 
@@ -1055,7 +1055,7 @@ export default function CampaignsPanel({ campaigns, leads = [], token, onRefresh
                 {dispatchResult.simulated !== undefined ? (
                   <span>Batch simulation: {dispatchResult.simulated} recorded, {dispatchResult.failed} blocked or skipped out of {dispatchResult.totalTargeted} targeted. No external messages were sent.</span>
                 ) : (
-                  <span>Provider ID: {dispatchResult.providerId || 'ACK_OK'} • Mode: {dispatchResult.mode || 'live'} • Recipient: {dispatchResult.recipient || dispatchResult.targetUrl}</span>
+                  <span>Provider response: {dispatchResult.providerId || 'Not supplied'} • Mode: {dispatchResult.mode || 'response received'} • Target: {dispatchResult.recipient || dispatchResult.targetUrl || 'Not supplied'}</span>
                 )}
               </div>
             </motion.div>
