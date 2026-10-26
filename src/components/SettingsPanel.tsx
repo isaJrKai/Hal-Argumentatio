@@ -707,7 +707,7 @@ export default function SettingsPanel({
                 type="text"
                 value={contactPhoneInput}
                 onChange={(e) => setContactPhoneInput(e.target.value)}
-                placeholder="e.g. (204) 555-0199"
+                placeholder="Enter business phone number"
                 className="w-full bg-bg-dark border border-border-dim text-text-primary rounded-sm p-2 focus:outline-none focus:border-brand"
               />
             </div>
@@ -1375,8 +1375,10 @@ export default function SettingsPanel({
         </div>
 
         <p className="text-xs text-inherit opacity-85 leading-relaxed font-sans">
-          Use this secure link to share HAL with testers on Reddit or social channels. 
-          When <strong>Safe Sandbox</strong> is active, visitors receive automated 1-click test access with IP rate limits (60 req/min) and Gemini AI burst protection to prevent quota exhaustion while keeping your real business settings intact.
+          Public-link controls are best-effort and must not be treated as an authentication boundary. A verified deployment URL is shown only when APP_URL is configured. Public demo access is disabled by default; do not share a link until deployment and access controls have been tested.
+        </p>
+        {publicLinkError && <div role="alert" className="p-3 text-xs rounded border border-red-500/30 text-red-400">{publicLinkError}</div>}
+        <p className="hidden">
         </p>
 
         {/* Share Link Bar */}
@@ -1392,6 +1394,7 @@ export default function SettingsPanel({
           <button
             type="button"
             onClick={() => sharedUrl && copyToClipboard(sharedUrl)}
+            disabled={!sharedUrl}
             className="px-3 py-1.5 rounded bg-brand/15 hover:bg-brand/25 border border-brand/40 text-brand text-xs font-mono font-bold transition-colors shrink-0 flex items-center gap-1.5 cursor-pointer"
             title={sharedUrl ? 'Copy configured public URL' : 'Configure APP_URL before sharing'}
           >
@@ -1466,19 +1469,19 @@ export default function SettingsPanel({
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-2 border-t border-inherit text-[10px] font-mono opacity-80">
           <div className="flex items-center gap-1.5">
             <Check className="w-3 h-3 text-emerald-400" />
-            <span>IP Rate Limiting (60/m)</span>
+            <span>Rate limiting: in-process best effort</span>
           </div>
           <div className="flex items-center gap-1.5">
             <Check className="w-3 h-3 text-emerald-400" />
-            <span>AI Burst Quota Shield</span>
+            <span>AI throttling: best effort</span>
           </div>
           <div className="flex items-center gap-1.5">
             <Check className="w-3 h-3 text-emerald-400" />
-            <span>AES-256 PII Encrypted</span>
+            <span>Encryption depends on configured key</span>
           </div>
           <div className="flex items-center gap-1.5">
             <Check className="w-3 h-3 text-emerald-400" />
-            <span>1-Click Reddit Demo Access</span>
+            <span>Public demo access disabled by default</span>
           </div>
         </div>
       </div>
