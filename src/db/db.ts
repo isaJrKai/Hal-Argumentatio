@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
+import bcrypt from 'bcryptjs';
 
 // Types for our Database models
 export interface Contractor {
@@ -419,10 +420,16 @@ const DB_FILE = path.join(DATA_DIR, 'db.json');
 
 // Helper to get Lead encryption key
 function getEncryptionKey(): Buffer {
-  const b64 = process.env.LEAD_ENCRYPTION_KEY_B64 || 'Z01Xek1XOHpNVGczTnpBek1EUTFORFUxTkRVMU5EVTE=';
-  let key = Buffer.from(b64, 'base64');
+  const b64 = process.env.LEAD_ENCRYPTION_KEY_B64;
+  if (!b64) {
+    if (process.env.NODE_ENV === 'test') {
+      return Buffer.from('0123456789abcdef0123456789abcdef', 'utf8');
+    }
+    throw new Error('LEAD_ENCRYPTION_KEY_B64 is required before encrypting or decrypting personal data.');
+  }
+  const key = Buffer.from(b64, 'base64');
   if (key.length !== 32) {
-    key = crypto.createHash('sha256').update(key).digest();
+    throw new Error('LEAD_ENCRYPTION_KEY_B64 must decode to exactly 32 bytes.');
   }
   return key;
 }
@@ -475,32 +482,17 @@ export function decrypt(encryptedText: string): string {
     if (result !== null) return result;
   } catch (err) {}
 
-  // 2. Try with the default base64 key raw (32 bytes)
+  // Legacy ciphertext can be migrated only when the operator explicitly supplies
+  // the old key through HAL_LEGACY_ENCRYPTION_KEY_B64. No key is embedded in source.
   try {
-    const defaultB64 = 'Z01Xek1XOHpNVGczTnpBek1EUTFORFUxTkRVMU5EVTE=';
-    const rawDefaultKey = Buffer.from(defaultB64, 'base64');
-    const result = decryptWithKey(encryptedText, rawDefaultKey);
-    if (result !== null) return result;
-  } catch (err) {}
-
-  // 3. Try with the current env key unhashed if it was 32 bytes
-  try {
-    const b64 = process.env.LEAD_ENCRYPTION_KEY_B64;
-    if (b64) {
-      const rawEnvKey = Buffer.from(b64, 'base64');
-      if (rawEnvKey.length === 32) {
-        const result = decryptWithKey(encryptedText, rawEnvKey);
+    const legacyB64 = process.env.HAL_LEGACY_ENCRYPTION_KEY_B64;
+    if (legacyB64) {
+      const legacyKey = Buffer.from(legacyB64, 'base64');
+      if (legacyKey.length === 32) {
+        const result = decryptWithKey(encryptedText, legacyKey);
         if (result !== null) return result;
       }
     }
-  } catch (err) {}
-
-  // 4. Try with default key hashed
-  try {
-    const defaultB64 = 'Z01Xek1XOHpNVGczTnpBek1EUTFORFUxTkRVMU5EVTE=';
-    const defaultKeyHashed = crypto.createHash('sha256').update(Buffer.from(defaultB64, 'base64')).digest();
-    const result = decryptWithKey(encryptedText, defaultKeyHashed);
-    if (result !== null) return result;
   } catch (err) {}
 
   // Fail closed - never return raw ciphertext or corrupted data
@@ -573,75 +565,15 @@ class Database {
 
     if (this.data.contractors.length === 0) {
       this.seed();
-    } else {
-      // Ensure primary admin and Isaac accounts are present
-      if (!this.data.contractors.some(c => c.email.toLowerCase() === 'kaisoisaac@gmail.com')) {
-        const now = new Date().toISOString();
-        this.data.contractors.push({
-          id: 'con_isaac_seed',
-          email: 'kaisoisaac@gmail.com',
-          passwordHash: hashPassword('admin123'),
-          name: 'Isaac',
-          role: 'admin',
-          marketId: 'market_winnipeg_calgary',
-          createdAt: now,
-          updatedAt: now
-        });
-        this.save();
-      }
     }
+
   }
 
   private seed() {
-    console.log('Initializing pristine database for new app...');
-    const now = new Date().toISOString();
-    
-    // 1. Create admin contractor if missing
-    const adminId = 'con_admin_seed';
-    if (!this.data.contractors.some(c => c.id === adminId || c.email === 'admin@kaislead.com')) {
-      const admin: Contractor = {
-        id: adminId,
-        email: 'admin@kaislead.com',
-        passwordHash: hashPassword('admin123'),
-        name: 'Isaac (Admin)',
-        role: 'admin',
-        marketId: 'market_default',
-        createdAt: now,
-        updatedAt: now
-      };
-      this.data.contractors.push(admin);
-    }
-
-    // 2. Create Isaac contractor if missing
-    const isaacId = 'con_isaac_seed';
-    if (!this.data.contractors.some(c => c.id === isaacId || c.email === 'kaisoisaac@gmail.com')) {
-      this.data.contractors.push({
-        id: isaacId,
-        email: 'kaisoisaac@gmail.com',
-        passwordHash: hashPassword('admin123'),
-        name: 'Isaac',
-        role: 'admin',
-        marketId: 'market_default',
-        createdAt: now,
-        updatedAt: now
-      });
-    }
-
-    // Clean slate: 0 mock leads, 0 mock campaigns, 0 mock revenues, 0 mock forecasts, 0 mock recommendations, 0 mock missions
-    this.data.leads = [];
-    this.data.leadEvents = [];
-    this.data.campaigns = [];
-    this.data.revenues = [];
-    this.data.performanceSnapshots = [];
-    this.data.forecasts = [];
-    this.data.predictionOutcomes = [];
-    this.data.recommendations = [];
-    this.data.missions = [];
-    this.data.learningInsights = [];
-    this.data.chatMessages = [];
-
+    // Never create a known-password administrator account in a fresh installation.
+    // Provision the first administrator deliberately in the configured database.
+    console.log('Initialising an empty HAL data store; no default user accounts are created.');
     this.save();
-    console.log('Pristine database ready: 0 mock items.');
   }
 
   public purgeAllMockData() {
@@ -1861,5 +1793,22 @@ class Database {
 export const db = new Database();
 
 export function hashPassword(password: string): string {
-  return crypto.pbkdf2Sync(password, 'salt-for-halbiz', 1000, 64, 'sha512').toString('hex');
+  return bcrypt.hashSync(password, 12);
+}
+
+export function verifyPassword(password: string, storedHash: string): boolean {
+  if (!password || !storedHash) return false;
+  try {
+    if (/^\$2[aby]\$/.test(storedHash)) {
+      return bcrypt.compareSync(password, storedHash);
+    }
+    // Temporary compatibility for legacy PBKDF2 hashes. Successful logins are
+    // upgraded to bcrypt by the authentication route.
+    const legacyHash = crypto.pbkdf2Sync(password, 'salt-for-halbiz', 1000, 64, 'sha512').toString('hex');
+    const supplied = Buffer.from(legacyHash, 'utf8');
+    const stored = Buffer.from(storedHash, 'utf8');
+    return supplied.length === stored.length && crypto.timingSafeEqual(supplied, stored);
+  } catch {
+    return false;
+  }
 }

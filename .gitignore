@@ -6,3 +6,6 @@ coverage/
 *.log
 .env*
 !.env.example
+
+# Runtime database state may contain credentials, sessions, and personal data.
+data/db.json

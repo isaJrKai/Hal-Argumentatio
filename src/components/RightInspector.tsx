@@ -396,15 +396,15 @@ export const RightInspector: React.FC = () => {
             <div className="space-y-2">
               <div className="flex justify-between py-1.5 border-b border-border-dim/40 font-mono text-[11px]">
                 <span className="text-text-tertiary">Predicted LTV</span>
-                <span className="text-positive font-bold">{formatCurrency(data?.predictedLtvUsd || 4500)}</span>
+                <span className="text-positive font-bold">{data?.predictedLtvUsd != null ? formatCurrency(data.predictedLtvUsd) : 'Not assessed'}</span>
               </div>
               <div className="flex justify-between py-1.5 border-b border-border-dim/40 font-mono text-[11px]">
                 <span className="text-text-tertiary">Speed Audit Score</span>
-                <span className="text-amber-400 font-bold">{data?.performanceScore ?? 42}/100</span>
+                <span className="text-amber-400 font-bold">{data?.performanceScore != null ? `${data.performanceScore}/100` : 'Not assessed'}</span>
               </div>
               <div className="flex justify-between py-1.5 border-b border-border-dim/40 font-mono text-[11px]">
                 <span className="text-text-tertiary">SEO Health</span>
-                <span className="text-accent font-bold">{data?.seoScore ?? 68}/100</span>
+                <span className="text-accent font-bold">{data?.seoScore != null ? `${data.seoScore}/100` : 'Not assessed'}</span>
               </div>
             </div>
 

@@ -3,6 +3,7 @@ import express from 'express';
 import path from 'path';
 import fs from 'fs';
 import crypto from 'crypto';
+import { isIP } from 'node:net';
 import { execSync } from 'child_process';
 import { createServer as createViteServer } from 'vite';
 import { 
@@ -10,6 +11,7 @@ import {
   encrypt, 
   decrypt, 
   hashPassword,
+  verifyPassword,
   Contractor,
   Lead,
   Campaign,
@@ -87,17 +89,36 @@ dotenv.config();
 const app = express();
 const PORT = 3000;
 
-app.use(express.json());
+app.use(express.json({
+  verify: (req, _res, buffer) => {
+    (req as any).rawBody = Buffer.from(buffer);
+  }
+}));
 
-// Enable Cross-Origin Resource Sharing (CORS) & Handle Preflights
+// Allow browser origins explicitly; same-origin requests do not require CORS.
+const corsAllowedOrigins = new Set(
+  (process.env.CORS_ALLOWED_ORIGINS || process.env.APP_URL || '')
+    .split(',')
+    .map(value => {
+      try { return new URL(value.trim()).origin; } catch { return ''; }
+    })
+    .filter(Boolean)
+);
+
 app.use((req, res, next) => {
-  res.header('Access-Control-Allow-Origin', '*');
+  const origin = req.headers.origin;
+  res.header('Vary', 'Origin');
   res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS');
   res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, X-Active-AI, Cache-Control');
   res.header('Access-Control-Max-Age', '86400');
-  if (req.method === 'OPTIONS') {
-    return res.sendStatus(204);
+
+  if (origin && corsAllowedOrigins.has(origin)) {
+    res.header('Access-Control-Allow-Origin', origin);
+  } else if (origin && req.method === 'OPTIONS') {
+    return res.sendStatus(403);
   }
+
+  if (req.method === 'OPTIONS') return res.sendStatus(204);
   next();
 });
 
@@ -464,6 +485,9 @@ app.post('/api/auth/register', async (req, res) => {
   if (!email || !password || !name) {
     return res.status(400).json({ error: 'Email, password, and name are required' });
   }
+  if (typeof password !== 'string' || password.length < 12) {
+    return res.status(400).json({ error: 'Password must be at least 12 characters long' });
+  }
 
   const cleanEmail = email.toLowerCase().trim();
   const id = crypto.randomUUID();
@@ -504,114 +528,75 @@ app.post('/api/auth/register', async (req, res) => {
 
     res.json({ token, contractor: { id, email: cleanEmail, name, role: 'user', marketId: 'market_default' } });
   } catch (err: any) {
-    // Fallback sandbox registration success
-    const token = signToken({
-      contractorId: id,
-      email: cleanEmail,
-      role: 'user'
-    });
-    db.addSession(id, token, new Date(Date.now() + 30 * 24 * 3600 * 1000));
-    res.json({ token, contractor: { id, email: cleanEmail, name, role: 'user', marketId: 'market_default' } });
+    return res.status(503).json({ error: 'Registration service unavailable. Please try again later.' });
   }
 });
 
 app.post('/api/auth/login', async (req, res) => {
-  const { email, password } = req.body;
-  if (!email || !password) {
+  const { email, password } = req.body || {};
+  if (typeof email !== 'string' || typeof password !== 'string' || !email.trim() || !password) {
     return res.status(400).json({ error: 'Email and password are required' });
   }
 
   const cleanEmail = email.toLowerCase().trim();
-  const isIsaacOrAdmin = cleanEmail.includes('admin') || cleanEmail.includes('kaiso');
-  const designatedId = cleanEmail.includes('kaiso') 
-    ? 'con_isaac_seed' 
-    : (cleanEmail.includes('admin') ? 'con_admin_seed' : crypto.randomUUID());
 
   try {
-    let result = await pgDb.select().from(contractors).where(eq(contractors.email, cleanEmail));
-    if (result.length === 0) {
-      // Auto-create/auto-heal user on login if not found
-      try {
-        await pgDb.insert(contractors).values({
-          id: designatedId,
-          companyName: cleanEmail.includes('kaiso') ? 'Isaac' : (cleanEmail.includes('admin') ? 'Isaac (Admin)' : (cleanEmail.split('@')[0] || 'Workspace')),
-          email: cleanEmail,
-          city: 'Global',
-          serviceType: 'AI Business Intelligence',
-          role: isIsaacOrAdmin ? 'admin' : 'user',
-          passwordHash: hashPassword(password)
-        });
-      } catch (insErr) {}
-      
-      result = await pgDb.select().from(contractors).where(eq(contractors.email, cleanEmail));
+    const result = await pgDb.select().from(contractors).where(eq(contractors.email, cleanEmail)).limit(1);
+    const contractor = result[0];
+
+    // Do not create accounts during login, elevate users based on their email, or issue
+    // sessions when the database is unavailable. Authentication must fail closed.
+    if (!contractor) {
+      recordAuthFailure(req, cleanEmail);
+      return res.status(401).json({ error: 'Invalid email or password' });
     }
 
-    const contractor = result.length > 0 ? result[0] : {
-      id: designatedId,
-      email: cleanEmail,
-      companyName: cleanEmail.includes('kaiso') ? 'Isaac' : (cleanEmail.includes('admin') ? 'Isaac (Admin)' : (cleanEmail.split('@')[0] || 'Workspace')),
-      role: isIsaacOrAdmin ? 'admin' : 'user'
-    };
+    const storedHash = typeof contractor.passwordHash === 'string' ? contractor.passwordHash : '';
+    if (!verifyPassword(password, storedHash)) {
+      recordAuthFailure(req, cleanEmail);
+      return res.status(401).json({ error: 'Invalid email or password' });
+    }
 
-    const assignedRole: 'admin' | 'user' = isIsaacOrAdmin ? 'admin' : (contractor.role === 'admin' ? 'admin' : 'user');
-    const assignedId = (contractor.id === 'con_isaac_seed' || contractor.id === 'con_admin_seed')
-      ? contractor.id
-      : (isIsaacOrAdmin ? designatedId : contractor.id);
+    // Upgrade legacy fixed-salt PBKDF2 hashes after successful verification.
+    if (!/^\$2[aby]\$/.test(storedHash)) {
+      try {
+        await pgDb.update(contractors)
+          .set({ passwordHash: hashPassword(password) })
+          .where(eq(contractors.id, contractor.id));
+      } catch (upgradeError) {
+        console.error('[HAL auth] Legacy password hash upgrade failed; login remains valid.');
+      }
+    }
 
-    const token = signToken({
-      contractorId: assignedId,
-      email: contractor.email,
-      role: assignedRole
-    });
-
-    db.addSession(assignedId, token, new Date(Date.now() + 30 * 24 * 3600 * 1000));
+    const role: 'admin' | 'user' = contractor.role === 'admin' ? 'admin' : 'user';
+    const token = signToken({ contractorId: contractor.id, email: cleanEmail, role });
+    db.addSession(contractor.id, token, new Date(Date.now() + 30 * 24 * 3600 * 1000));
     recordAuthSuccess(req, cleanEmail);
 
     try {
       await pgDb.insert(auditLogs).values({
         id: crypto.randomUUID(),
-        contractorId: assignedId,
+        contractorId: contractor.id,
         action: 'LOGIN_SUCCESS',
         details: `Contractor logged in successfully: ${cleanEmail} from IP: ${req.ip}`
       });
-    } catch (e) {}
+    } catch (auditError) {
+      // Authentication does not depend on the optional audit-log insert succeeding.
+    }
 
-    res.json({
+    return res.json({
       token,
       contractor: {
-        id: assignedId,
+        id: contractor.id,
         email: contractor.email,
-        name: contractor.companyName || (isIsaacOrAdmin ? (cleanEmail.includes('kaiso') ? 'Isaac' : 'Isaac (Admin)') : 'Workspace'),
-        role: assignedRole,
-        marketId: 'market_default'
-      }
-    });
-  } catch (err: any) {
-    // Fallback sandbox login success
-    const fallbackId = isIsaacOrAdmin 
-      ? designatedId 
-      : (db.getContractorByEmail(cleanEmail)?.id || crypto.randomUUID());
-    const role: 'admin' | 'user' = isIsaacOrAdmin ? 'admin' : 'user';
-    const name = isIsaacOrAdmin 
-      ? (cleanEmail.includes('kaiso') ? 'Isaac' : 'Isaac (Admin)')
-      : (cleanEmail.split('@')[0] || 'Workspace');
-
-    const token = signToken({
-      contractorId: fallbackId,
-      email: cleanEmail,
-      role
-    });
-    db.addSession(fallbackId, token, new Date(Date.now() + 30 * 24 * 3600 * 1000));
-    res.json({
-      token,
-      contractor: {
-        id: fallbackId,
-        email: cleanEmail,
-        name,
+        name: contractor.companyName || 'Workspace',
         role,
         marketId: 'market_default'
       }
     });
+  } catch (err) {
+    recordAuthFailure(req, cleanEmail);
+    return res.status(503).json({ error: 'Authentication service unavailable. Please try again later.' });
   }
 });
 
@@ -634,65 +619,18 @@ app.post('/api/auth/logout', authenticate, async (req, res) => {
 });
 
 // Password reset triggers
-app.post('/api/auth/forgot-password', async (req, res) => {
-  const { email } = req.body;
-  if (!email) return res.status(400).json({ error: 'Email is required' });
-
-  if (!checkRateLimit(req, res, email)) return;
-
-  try {
-    const result = await pgDb.select().from(contractors).where(eq(contractors.email, email.toLowerCase().trim()));
-    if (result.length === 0) {
-      return res.json({ message: 'If the email exists, a password reset link has been dispatched.' });
-    }
-
-    const contractor = result[0];
-    const token = crypto.randomBytes(32).toString('hex');
-    
-    await pgDb.insert(auditLogs).values({
-      id: crypto.randomUUID(),
-      contractorId: contractor.id,
-      action: 'PASSWORD_RESET_REQUESTED',
-      details: `Password reset token requested for ${email} from IP: ${req.ip}`
-    });
-
-    res.json({ 
-      message: 'If the email exists, a password reset link has been dispatched.'
-    });
-  } catch (err: any) {
-    res.status(500).json({ error: 'Failed to process request' });
-  }
+// Password reset is intentionally disabled until persistent, single-use token storage
+// and a verified delivery provider are implemented. Never reset an account from a caller-supplied token.
+app.post('/api/auth/forgot-password', async (_req, res) => {
+  return res.status(501).json({
+    error: 'Password reset is not configured. Contact the system administrator.'
+  });
 });
 
-app.post('/api/auth/reset-password', async (req, res) => {
-  const { token, password } = req.body;
-  if (!token || !password) return res.status(400).json({ error: 'Token and new password are required' });
-
-  try {
-    // For sandbox, we accept any valid password and reset admin@kaislead.com
-    const result = await pgDb.select().from(contractors).where(eq(contractors.email, 'admin@kaislead.com'));
-    if (result.length > 0) {
-      const adminCon = result[0];
-      await pgDb.update(contractors)
-        .set({ passwordHash: hashPassword(password) })
-        .where(eq(contractors.id, adminCon.id));
-        
-      db.revokeAllSessionsForContractor(adminCon.id);
-
-      await pgDb.insert(auditLogs).values({
-        id: crypto.randomUUID(),
-        contractorId: adminCon.id,
-        action: 'PASSWORD_RESET_COMPLETED',
-        details: `Admin password reset completed from IP: ${req.ip}`
-      });
-
-      return res.json({ success: true, message: 'Password reset successful. All active sessions revoked.' });
-    }
-    
-    res.status(400).json({ error: 'Could not complete password reset' });
-  } catch (err: any) {
-    res.status(500).json({ error: 'Could not complete password reset' });
-  }
+app.post('/api/auth/reset-password', async (_req, res) => {
+  return res.status(501).json({
+    error: 'Password reset is not configured. Contact the system administrator.'
+  });
 });
 
 // ─── SSE REALTIME EVENTS ─────────────────────────────────────────────────────
@@ -760,16 +698,16 @@ app.get('/api/public/audit/:id', async (req, res) => {
       city: lead.city,
       serviceType: lead.niche,
       websiteUrl: lead.websiteUrl || null,
-      seoScore: 68,
-      performanceScore: lead.performanceScore ?? 54,
-      sslStatus: lead.sslStatus ?? 'secured',
-      googleRating: 4.4,
-      reviewCount: lead.reviewCount ?? 38,
-      sentimentScore: 0.85,
+      seoScore: null,
+      performanceScore: lead.performanceScore ?? null,
+      sslStatus: lead.sslStatus ?? 'unknown',
+      googleRating: null,
+      reviewCount: lead.reviewCount ?? null,
+      sentimentScore: null,
       notes: lead.notes || '',
       outreachStrategy: '',
-      urgencyScore: lead.urgencyScore ?? 7.5,
-      predictedLtvUsd: lead.predictedLtv ?? 3500,
+      urgencyScore: lead.urgencyScore ?? null,
+      predictedLtvUsd: lead.predictedLtv ?? null,
       createdAt: lead.createdAt
     });
   } catch (err: any) {
@@ -1291,8 +1229,6 @@ app.post('/api/leads/ingest', authenticate, async (req, res) => {
       niche: serviceType,
       source: gclid || gbraid || wbraid ? 'google_ads' : (utmSource || 'direct'),
       status: 'new',
-      urgencyScore: 7.5,
-      predictedLtv: 2500,
       notes
     }).returning();
 
@@ -1703,7 +1639,7 @@ app.post('/api/webhooks/crm', async (req, res) => {
           gbraid: attr ? attr.gbraid : null,
           wbraid: attr ? attr.wbraid : null,
           conversionTime: parsedOccurredAt,
-          conversionValue: newDealValue > 0 ? newDealValue : (matchedLead.predictedLtv || 100),
+          conversionValue: newDealValue > 0 ? newDealValue : (matchedLead.predictedLtv ?? null),
           currency: currency || 'USD',
           hashedEmail,
           hashedPhone,
@@ -1735,6 +1671,9 @@ app.post('/api/webhooks/crm', async (req, res) => {
 
 // ─── INBOUND TWILIO SMS & WHATSAPP WEBHOOK RECEIVERS ─────────────────────────
 app.all(['/api/webhooks/twilio', '/api/webhooks/whatsapp'], async (req, res) => {
+  if (process.env.NODE_ENV === 'production') {
+    return res.status(410).json({ error: 'Inbound messaging is disabled until provider signature validation and tenant routing are configured.' });
+  }
   try {
     const rawFrom = req.body?.From || req.query?.From || '';
     const rawBody = req.body?.Body || req.query?.Body || '';
@@ -2308,15 +2247,15 @@ app.post('/api/leads/ingest', authenticate, async (req, res) => {
         niche: hl.serviceType,
         source: 'harvested_intelligence',
         status: 'new',
-        urgencyScore: hl.urgencyScore || 7.5,
-        predictedLtv: hl.predictedLtvUsd || 4500,
+        urgencyScore: hl.urgencyScore ?? 0,
+        predictedLtv: hl.predictedLtvUsd ?? 0,
         notes: hl.notes || `Harvested real business profile. Niche: ${hl.serviceType}.`,
         websiteUrl: hl.websiteUrl,
         performanceScore: hl.performanceScore,
         sslStatus: hl.sslStatus,
         reviewCount: hl.reviewCount,
-        verificationStatus: (hl as any).verificationStatus || 'VERIFIED',
-        dnsVerified: (hl as any).dnsVerified !== undefined ? Boolean((hl as any).dnsVerified) : true,
+        verificationStatus: (hl as any).verificationStatus || 'UNVERIFIED_STAGING',
+        dnsVerified: (hl as any).dnsVerified !== undefined ? Boolean((hl as any).dnsVerified) : false,
       }).returning();
 
       // 2. Add lead creation event
@@ -2340,15 +2279,15 @@ app.post('/api/leads/ingest', authenticate, async (req, res) => {
         serviceType: hl.serviceType,
         source: 'harvested_intelligence',
         status: 'new',
-        urgencyScore: hl.urgencyScore || 7.5,
-        predictedLtvUsd: hl.predictedLtvUsd || 4500,
+        urgencyScore: hl.urgencyScore ?? 0,
+        predictedLtvUsd: (hl as any).predictedLtvUsd ?? 0,
         notes: hl.notes || `Harvested real business profile. Niche: ${hl.serviceType}.`,
         websiteUrl: hl.websiteUrl,
         performanceScore: hl.performanceScore,
         sslStatus: hl.sslStatus,
         reviewCount: hl.reviewCount,
-        verificationStatus: (hl as any).verificationStatus || 'VERIFIED',
-        dnsVerified: (hl as any).dnsVerified !== undefined ? Boolean((hl as any).dnsVerified) : true,
+        verificationStatus: (hl as any).verificationStatus || 'UNVERIFIED_STAGING',
+        dnsVerified: (hl as any).dnsVerified !== undefined ? Boolean((hl as any).dnsVerified) : false,
       });
 
       addedItems.push(addedLead);
@@ -2366,8 +2305,8 @@ app.post('/api/leads/ingest', authenticate, async (req, res) => {
     broadcastNotification(
       contractorId,
       'success',
-      'Territory Leads Ingested',
-      `Added ${addedItems.length} verified operating local businesses to your active pipeline!`
+      'Territory Leads Imported',
+      `Imported ${addedItems.length} business records. Review verification status before contacting them.`
     );
 
     res.json({ success: true, count: addedItems.length, leads: addedItems });
@@ -2414,15 +2353,15 @@ app.post('/api/leads/purge-and-replace', authenticate, async (req, res) => {
         niche: hl.serviceType,
         source: 'harvested_intelligence',
         status: 'new',
-        urgencyScore: hl.urgencyScore || 7.5,
-        predictedLtv: hl.predictedLtvUsd || 2500,
+        urgencyScore: hl.urgencyScore ?? 0,
+        predictedLtv: hl.predictedLtvUsd ?? 0,
         notes: hl.notes || `Harvested real business profile. Niche: ${hl.serviceType}.`,
         websiteUrl: hl.websiteUrl,
         performanceScore: hl.performanceScore,
         sslStatus: hl.sslStatus,
         reviewCount: hl.reviewCount,
-        verificationStatus: (hl as any).verificationStatus || 'VERIFIED',
-        dnsVerified: (hl as any).dnsVerified !== undefined ? Boolean((hl as any).dnsVerified) : true,
+        verificationStatus: (hl as any).verificationStatus || 'UNVERIFIED_STAGING',
+        dnsVerified: (hl as any).dnsVerified !== undefined ? Boolean((hl as any).dnsVerified) : false,
       }).returning();
 
       db.addLead({
@@ -2436,15 +2375,15 @@ app.post('/api/leads/purge-and-replace', authenticate, async (req, res) => {
         serviceType: hl.serviceType,
         source: 'harvested_intelligence',
         status: 'new',
-        urgencyScore: hl.urgencyScore || 7.5,
-        predictedLtvUsd: hl.predictedLtvUsd || 2500,
+        urgencyScore: hl.urgencyScore ?? 0,
+        predictedLtvUsd: (hl as any).predictedLtvUsd ?? 0,
         notes: hl.notes || `Harvested real business profile. Niche: ${hl.serviceType}.`,
         websiteUrl: hl.websiteUrl,
         performanceScore: hl.performanceScore,
         sslStatus: hl.sslStatus,
         reviewCount: hl.reviewCount,
-        verificationStatus: (hl as any).verificationStatus || 'VERIFIED',
-        dnsVerified: (hl as any).dnsVerified !== undefined ? Boolean((hl as any).dnsVerified) : true,
+        verificationStatus: (hl as any).verificationStatus || 'UNVERIFIED_STAGING',
+        dnsVerified: (hl as any).dnsVerified !== undefined ? Boolean((hl as any).dnsVerified) : false,
       });
 
       // Add a creation event for the newly harvested lead
@@ -2461,16 +2400,16 @@ app.post('/api/leads/purge-and-replace', authenticate, async (req, res) => {
     await pgDb.insert(auditLogs).values({
       id: crypto.randomUUID(),
       contractorId,
-      action: 'MOCK_DATA_REPLACED_ACTUAL',
-      details: `Purged static seed files and replaced with ${harvestedLeads.length} newly harvested local businesses.`
+      action: 'BUSINESS_RECORDS_IMPORTED',
+      details: `Removed identified seed records and imported ${harvestedLeads.length} business records; import does not itself verify authenticity.`
     });
 
     // 4. Broadcast Real-time notification
     broadcastNotification(
       contractorId,
       'success',
-      'Phase 2 Active: Sourced Real Data!',
-      `Successfully purged mock business seeds and replaced them with ${harvestedLeads.length} actual harvested local leads!`
+      'Business Records Imported',
+      `Imported ${harvestedLeads.length} records. Verification must be performed separately.`
     );
 
     res.json({ success: true, count: harvestedLeads.length });
@@ -3107,8 +3046,8 @@ app.post('/api/missions', authenticate, async (req, res) => {
             niche: niche,
             source: 'sourced_intelligence',
             status: 'new',
-            urgencyScore: (hl as any).urgencyScore || 7.5,
-            predictedLtv: (hl as any).predictedLtvUsd || 2500,
+            urgencyScore: (hl as any).urgencyScore ?? 0,
+            predictedLtv: (hl as any).predictedLtvUsd ?? 0,
             notes: hl.notes || `Sourced automatically via Territory Conquest in ${city}.`,
             websiteUrl: hl.websiteUrl,
             seoScore: hl.seoScore,
@@ -3474,11 +3413,11 @@ app.post('/api/outreach/sequences', authenticate, (req, res) => {
 interface DispatchLogEntry {
   id: string;
   contractorId: string;
-  channel: 'sms' | 'email' | 'webhook';
+  channel: 'sms' | 'email' | 'whatsapp' | 'webhook';
   recipient: string;
   leadId?: string;
   leadBusinessName?: string;
-  status: 'delivered' | 'failed' | 'queued';
+  status: 'delivered' | 'failed' | 'queued' | 'simulated';
   mode: 'live' | 'simulation';
   providerId?: string;
   error?: string;
@@ -3489,17 +3428,18 @@ interface DispatchLogEntry {
 
 const dispatchLogs: DispatchLogEntry[] = [];
 
-app.get('/api/dispatch/status', authenticate, (req, res) => {
+app.get('/api/dispatch/status', authenticate, (_req, res) => {
+  const signingConfigured = Boolean(process.env.HAL_WEBHOOK_SIGNING_SECRET && process.env.HAL_WEBHOOK_SIGNING_SECRET.length >= 32);
   res.json({
-    engine: 'HAL Autonomous Outreach Pipeline',
+    engine: 'HAL Outreach Dispatch',
     webhook: {
-      configured: true,
+      configured: signingConfigured,
       signatureAlgorithm: 'HMAC-SHA256',
-      status: 'active'
+      status: signingConfigured ? 'configured_unverified' : 'not_configured'
     },
     messaging: {
-      status: 'active',
-      mode: 'autonomous'
+      status: 'simulation_only',
+      mode: 'simulation'
     }
   });
 });
@@ -3514,8 +3454,25 @@ app.post('/api/dispatch/webhook', authenticate, async (req, res) => {
   const contractorId = (req as any).contractorId;
   const { targetUrl, eventType, payload } = req.body;
 
-  if (!targetUrl) {
+  if (typeof targetUrl !== 'string' || !targetUrl.trim()) {
     return res.status(400).json({ error: 'Target URL is required' });
+  }
+
+  let parsedTarget: URL;
+  try {
+    parsedTarget = new URL(targetUrl);
+  } catch {
+    return res.status(400).json({ error: 'Target URL must be a valid HTTPS URL.' });
+  }
+  if (parsedTarget.protocol !== 'https:' || parsedTarget.username || parsedTarget.password || isIP(parsedTarget.hostname)) {
+    return res.status(400).json({ error: 'Webhook targets must use HTTPS and a hostname, not embedded credentials or an IP literal.' });
+  }
+  const allowedHosts = (process.env.HAL_WEBHOOK_ALLOWED_HOSTS || '')
+    .split(',')
+    .map(host => host.trim().toLowerCase())
+    .filter(Boolean);
+  if (!allowedHosts.includes(parsedTarget.hostname.toLowerCase())) {
+    return res.status(403).json({ error: 'Webhook target host is not allowlisted.' });
   }
 
   const payloadString = JSON.stringify({
@@ -3525,7 +3482,11 @@ app.post('/api/dispatch/webhook', authenticate, async (req, res) => {
     data: payload || {}
   });
 
-  const hmac = crypto.createHmac('sha256', process.env.JWT_SECRET || 'secret');
+  const signingSecret = process.env.HAL_WEBHOOK_SIGNING_SECRET;
+  if (!signingSecret || signingSecret.length < 32) {
+    return res.status(503).json({ error: 'Secure webhook signing is not configured.' });
+  }
+  const hmac = crypto.createHmac('sha256', signingSecret);
   hmac.update(payloadString);
   const signature = hmac.digest('hex');
 
@@ -3535,7 +3496,8 @@ app.post('/api/dispatch/webhook', authenticate, async (req, res) => {
   let responseBody = '';
 
   try {
-    const hookRes = await fetch(targetUrl, {
+    const hookRes = await fetch(parsedTarget.toString(), {
+      redirect: 'manual',
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -3587,7 +3549,7 @@ app.post('/api/dispatch/campaign-batch', authenticate, async (req, res) => {
     : await pgDb.select().from(leads).where(and(eq(leads.contractorId, contractorId), eq(leads.status, 'new')));
 
   const results = [];
-  let successful = 0;
+  let simulated = 0;
   let failed = 0;
 
   for (const lead of targetLeads) {
@@ -3630,43 +3592,42 @@ app.post('/api/dispatch/campaign-batch', authenticate, async (req, res) => {
         .replace(/\{\{ownerName\}\}/g, lead.ownerName || 'Business Principal')
         .replace(/\{\{city\}\}/g, lead.city)
         .replace(/\{\{serviceType\}\}/g, lead.niche)
-        .replace(/\{\{urgencyScore\}\}/g, String(lead.urgencyScore || 7.5))
-        .replace(/\{\{seoScore\}\}/g, String(lead.seoScore || 65))
-        .replace(/\{\{phone\}\}/g, decryptedPhone || 'Phone on file')
-        .replace(/\{\{email\}\}/g, decryptedEmail || 'Email on file');
+        .replace(/\{\{urgencyScore\}\}/g, lead.urgencyScore != null ? String(lead.urgencyScore) : 'Not assessed')
+        .replace(/\{\{seoScore\}\}/g, lead.seoScore != null ? String(lead.seoScore) : 'Not assessed')
+        .replace(/\{\{phone\}\}/g, decryptedPhone || 'Not provided')
+        .replace(/\{\{email\}\}/g, decryptedEmail || 'Not provided');
     };
 
     const customizedSubject = rep(template.subject || `Partnership Proposal for {{businessName}}`);
-    const customizedBody = rep(template.body || `Hi {{ownerName}},\n\nI reviewed {{businessName}} in {{city}} and prepared a digital performance acceleration audit.`);
+    const customizedBody = rep(template.body || `Hi {{ownerName}},\n\nI'm reaching out to ask whether {{businessName}} is open to discussing ways to improve online visibility and lead follow-up in {{city}}. I have not completed a verified audit, so I don't want to assume there is a specific problem. Would you be open to a brief conversation?`);
 
     const recipient = channel === 'email' ? decryptedEmail : decryptedPhone;
     if (recipient && recipient !== '[ENCRYPTED]') {
       await pgDb.insert(leadEvents).values({
         id: crypto.randomUUID(),
         leadId: lead.id,
-        eventType: channel === 'email' ? 'EmailSent' : 'SmsSent',
-        newStage: 'contacted',
-        notes: `[Autonomous Campaign Dispatch - ${channel.toUpperCase()}] Transmitted to ${recipient}. Subject: "${customizedSubject}"`
+        eventType: 'OutreachSimulationRecorded',
+        newStage: lead.status,
+        notes: `[Simulation only - ${channel.toUpperCase()}] No external message was sent. Intended recipient: ${recipient}. Subject: "${customizedSubject}"`
       });
-      await pgDb.update(leads).set({ status: 'contacted', updatedAt: new Date() }).where(and(eq(leads.id, lead.id), eq(leads.contractorId, contractorId)));
 
       dispatchLogs.push({
-        id: 'outreach_' + crypto.randomBytes(6).toString('hex'),
+        id: 'simulation_' + crypto.randomBytes(6).toString('hex'),
         contractorId,
         channel,
         recipient,
         leadId: lead.id,
         leadBusinessName: lead.businessName,
-        status: 'delivered',
-        mode: 'autonomous' as any,
-        providerId: 'HAL_' + crypto.randomBytes(4).toString('hex').toUpperCase(),
+        status: 'simulated',
+        mode: 'simulation' as any,
+        providerId: 'SIMULATION_ONLY',
         timestamp: new Date().toISOString(),
         subject: customizedSubject,
         preview: customizedBody.slice(0, 80)
       });
 
-      successful++;
-      results.push({ leadId: lead.id, businessName: lead.businessName, status: 'delivered', recipient });
+      simulated++;
+      results.push({ leadId: lead.id, businessName: lead.businessName, status: 'simulated', recipient, note: 'No external message was sent; lead status was not changed.' });
     } else {
       results.push({ leadId: lead.id, businessName: lead.businessName, status: 'skipped', reason: 'Missing channel contact info' });
       failed++;
@@ -3683,8 +3644,8 @@ app.post('/api/dispatch/campaign-batch', authenticate, async (req, res) => {
 
   db.addAuditLog({
     contractorId,
-    action: 'BATCH_CAMPAIGN_DISPATCHED',
-    details: `Executed batch outreach to ${targetLeads.length} leads (${successful} delivered, ${failed} failed) via ${channel.toUpperCase()}.`
+    action: 'BATCH_CAMPAIGN_SIMULATED',
+    details: `Recorded ${simulated} simulated outreach attempts out of ${targetLeads.length} leads; ${failed} were blocked or skipped. No external messages were sent.`
   });
 
   const auditBlock = db.recordLedgerEntry({
@@ -3693,10 +3654,10 @@ app.post('/api/dispatch/campaign-batch', authenticate, async (req, res) => {
     entityType: 'campaign_dispatch',
     entityId: 'batch_' + Date.now(),
     actor: 'HAL Outreach Dispatcher',
-    details: `Dispatched ${successful} personalized outreach messages via ${channel.toUpperCase()}. CRM state machine transitioned leads to 'contacted'.`,
+    details: `Recorded ${simulated} simulated outreach attempts via ${channel.toUpperCase()}. No external messages were sent and lead statuses were not changed.`,
     metadata: {
       channel,
-      successful,
+      simulated,
       failed,
       totalTargeted: targetLeads.length,
       timestamp: new Date().toISOString()
@@ -3705,16 +3666,16 @@ app.post('/api/dispatch/campaign-batch', authenticate, async (req, res) => {
 
   broadcastNotification(
     contractorId,
-    'success',
-    'Campaign Outreach Dispatched',
-    `Dispatched ${successful} personalized messages via ${channel.toUpperCase()}. Conversion pipeline updated.`
+    'info',
+    'Outreach Simulation Recorded',
+    `Recorded ${simulated} simulated attempts via ${channel.toUpperCase()}. No external messages were sent and lead statuses were not changed.`
   );
 
   res.json({
     success: true,
     totalTargeted: targetLeads.length,
-    successful,
-    successfulCount: successful,
+    simulated,
+    simulatedCount: simulated,
     failed,
     channel,
     results,
@@ -3741,6 +3702,7 @@ interface ChannelBridgeSettings {
     smtpHost?: string;
     smtpPort?: number;
     smtpUser?: string;
+    smtpPassword?: string;
     apiKey?: string;
   };
   sms: {
@@ -3762,30 +3724,42 @@ const contractorBridges = new Map<string, ChannelBridgeSettings>();
 
 function getBridgesForContractor(contractorId: string): ChannelBridgeSettings {
   if (!contractorBridges.has(contractorId)) {
+    const emailProvider: ChannelBridgeSettings['email']['provider'] =
+      process.env.SENDGRID_API_KEY ? 'sendgrid' : process.env.SMTP_HOST ? 'smtp' : 'resend';
+    const calendarProvider: ChannelBridgeSettings['calendar']['provider'] =
+      process.env.CALCOM_BOOKING_URL ? 'cal_com' : 'google_calendar';
     contractorBridges.set(contractorId, {
       whatsapp: {
-        enabled: true,
-        phoneNumberId: '109842519284712',
-        displayNumber: '+1 (403) 555-0199',
-        webhookActive: true,
-        verifiedBusiness: true
+        enabled: Boolean(process.env.WHATSAPP_ACCESS_TOKEN && process.env.WHATSAPP_PHONE_NUMBER_ID),
+        phoneNumberId: process.env.WHATSAPP_PHONE_NUMBER_ID || '',
+        displayNumber: process.env.WHATSAPP_DISPLAY_NUMBER || '',
+        webhookActive: Boolean(process.env.WHATSAPP_VERIFY_TOKEN),
+        verifiedBusiness: false,
+        accessToken: process.env.WHATSAPP_ACCESS_TOKEN
       },
       email: {
-        enabled: true,
-        provider: 'resend',
-        senderEmail: 'dispatch@halbiz.ai',
-        senderName: 'HAL Operating Dispatch'
+        enabled: Boolean(process.env.RESEND_API_KEY || process.env.SENDGRID_API_KEY || (process.env.SMTP_HOST && process.env.SMTP_PORT && process.env.SMTP_USER && process.env.SMTP_PASSWORD && process.env.HAL_SENDER_EMAIL)),
+        provider: emailProvider,
+        senderEmail: process.env.HAL_SENDER_EMAIL || '',
+        senderName: process.env.HAL_SENDER_NAME || 'HAL',
+        smtpHost: process.env.SMTP_HOST || undefined,
+        smtpPort: process.env.SMTP_PORT ? Number(process.env.SMTP_PORT) : undefined,
+        smtpUser: process.env.SMTP_USER || undefined,
+        smtpPassword: process.env.SMTP_PASSWORD || undefined,
+        apiKey: process.env.RESEND_API_KEY || process.env.SENDGRID_API_KEY
       },
       sms: {
-        enabled: true,
+        enabled: Boolean(process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN && process.env.TWILIO_PHONE_NUMBER),
         provider: 'twilio',
-        virtualNumber: '+1 (403) 555-0199'
+        accountSid: process.env.TWILIO_ACCOUNT_SID || '',
+        authToken: process.env.TWILIO_AUTH_TOKEN,
+        virtualNumber: process.env.TWILIO_PHONE_NUMBER || ''
       },
       calendar: {
-        enabled: true,
-        provider: 'google_calendar',
-        bookingUrl: 'https://cal.com/hal-dispatch/emergency-intake',
-        timezone: 'America/Edmonton'
+        enabled: Boolean(process.env.CALCOM_BOOKING_URL || process.env.GOOGLE_CALENDAR_ID),
+        provider: calendarProvider,
+        bookingUrl: process.env.CALCOM_BOOKING_URL || '',
+        timezone: process.env.TZ || 'UTC'
       }
     });
   }
@@ -3796,38 +3770,54 @@ app.get('/api/outreach/bridges/status', authenticate, (req, res) => {
   const contractorId = (req as any).contractorId;
   const cfg = getBridgesForContractor(contractorId);
   const userLogs = dispatchLogs.filter(l => l.contractorId === contractorId);
-  const whatsappDelivered = userLogs.filter(l => l.channel === 'whatsapp').length;
-  const emailDelivered = userLogs.filter(l => l.channel === 'email').length;
-  const smsDelivered = userLogs.filter(l => l.channel === 'sms').length;
+  const whatsappDelivered = userLogs.filter(l => l.channel === 'whatsapp' && l.status === 'delivered').length;
+  const emailDelivered = userLogs.filter(l => l.channel === 'email' && l.status === 'delivered').length;
+  const smsDelivered = userLogs.filter(l => l.channel === 'sms' && l.status === 'delivered').length;
 
   res.json({
     success: true,
     bridges: {
       whatsapp: {
-        ...cfg.whatsapp,
+        enabled: cfg.whatsapp.enabled,
+        phoneNumberId: cfg.whatsapp.phoneNumberId,
+        displayNumber: cfg.whatsapp.displayNumber,
+        webhookActive: cfg.whatsapp.webhookActive,
+        verifiedBusiness: cfg.whatsapp.verifiedBusiness,
         accessToken: cfg.whatsapp.accessToken ? '••••••••' : undefined,
-        deliveredCount: whatsappDelivered + 14,
-        replyRate: 38.4,
-        status: cfg.whatsapp.enabled ? 'connected' : 'disconnected'
+        deliveredCount: whatsappDelivered,
+        replyRate: null,
+        status: cfg.whatsapp.enabled ? 'configured_unverified' : 'not_configured'
       },
       email: {
-        ...cfg.email,
+        enabled: cfg.email.enabled,
+        provider: cfg.email.provider,
+        senderEmail: cfg.email.senderEmail,
+        senderName: cfg.email.senderName,
+        smtpHost: cfg.email.smtpHost,
+        smtpPort: cfg.email.smtpPort,
+        smtpUser: cfg.email.smtpUser,
         apiKey: cfg.email.apiKey ? '••••••••' : undefined,
-        deliveredCount: emailDelivered + 42,
-        openRate: 46.2,
-        status: cfg.email.enabled ? 'connected' : 'disconnected'
+        deliveredCount: emailDelivered,
+        openRate: null,
+        status: cfg.email.enabled ? 'configured_unverified' : 'not_configured'
       },
       sms: {
-        ...cfg.sms,
+        enabled: cfg.sms.enabled,
+        provider: cfg.sms.provider,
+        virtualNumber: cfg.sms.virtualNumber,
+        accountSid: cfg.sms.accountSid ? '••••••••' : undefined,
         authToken: cfg.sms.authToken ? '••••••••' : undefined,
-        deliveredCount: smsDelivered + 29,
-        slaResponseSec: 28,
-        status: cfg.sms.enabled ? 'connected' : 'disconnected'
+        deliveredCount: smsDelivered,
+        slaResponseSec: null,
+        status: cfg.sms.enabled ? 'configured_unverified' : 'not_configured'
       },
       calendar: {
-        ...cfg.calendar,
-        bookedAppointments: 8,
-        status: cfg.calendar.enabled ? 'connected' : 'disconnected'
+        enabled: cfg.calendar.enabled,
+        provider: cfg.calendar.provider,
+        bookingUrl: cfg.calendar.bookingUrl,
+        timezone: cfg.calendar.timezone,
+        bookedAppointments: null,
+        status: cfg.calendar.enabled ? 'configured_unverified' : 'not_configured'
       }
     }
   });
@@ -3890,85 +3880,75 @@ app.post('/api/outreach/dispatch', authenticate, async (req, res) => {
     message,
     variables,
     mode
-  } = req.body;
+  } = req.body || {};
 
   if (!channel || !recipient || !message) {
     return res.status(400).json({ error: 'channel, recipient, and message are required' });
   }
+  if (!['whatsapp', 'email', 'sms'].includes(channel)) {
+    return res.status(400).json({ error: 'Unsupported channel. Use whatsapp, email, or sms.' });
+  }
+  if (mode !== 'simulation') {
+    return res.status(501).json({
+      error: 'Live delivery is not implemented for this endpoint. Use simulation mode; no provider has been contacted.'
+    });
+  }
 
-  let customizedMessage = message;
-  let customizedSubject = subject || '';
-  if (variables && typeof variables === 'object') {
+  let customizedMessage = String(message);
+  let customizedSubject = typeof subject === 'string' ? subject : '';
+  if (variables && typeof variables === 'object' && !Array.isArray(variables)) {
     for (const [key, val] of Object.entries(variables)) {
-      const rx = new RegExp(`\\{\\{${key}\\}\\}`, 'g');
+      const escapedKey = key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const rx = new RegExp(`\\{\\{${escapedKey}\\}\\}`, 'g');
       customizedMessage = customizedMessage.replace(rx, String(val));
       if (customizedSubject) customizedSubject = customizedSubject.replace(rx, String(val));
     }
   }
 
-  const providerPrefix = channel === 'whatsapp' ? 'wamid.HBZ' : channel === 'sms' ? 'SM_tw' : channel === 'calendar' ? 'cal_evt' : 'msg_rs';
-  const providerId = `${providerPrefix}_${crypto.randomBytes(6).toString('hex')}`;
   const now = new Date().toISOString();
-
-  // Record dispatch log
   const entry: DispatchLogEntry = {
-    id: 'outreach_' + crypto.randomBytes(6).toString('hex'),
+    id: 'simulation_' + crypto.randomBytes(6).toString('hex'),
     contractorId,
-    channel: (channel === 'calendar' ? 'webhook' : channel) as any,
-    recipient,
+    channel,
+    recipient: String(recipient),
     leadId,
     leadBusinessName: leadBusinessName || 'Direct Recipient',
-    status: 'delivered',
-    mode: (mode || 'live') as any,
-    providerId,
+    status: 'simulated',
+    mode: 'simulation',
     timestamp: now,
     subject: customizedSubject || undefined,
     preview: customizedMessage.slice(0, 100)
   };
   dispatchLogs.push(entry);
 
-  // If tied to lead, log leadEvent and advance stage
-  if (leadId) {
-    try {
-      await pgDb.insert(leadEvents).values({
-        id: crypto.randomUUID(),
-        leadId,
-        eventType: channel === 'whatsapp' ? 'WhatsAppSent' : channel === 'email' ? 'EmailSent' : 'SmsSent',
-        newStage: 'contacted',
-        notes: `[Unified Bridge - ${channel.toUpperCase()}] Transmitted: ${customizedMessage.slice(0, 80)}...`
-      });
-      await pgDb.update(leads).set({ status: 'contacted', updatedAt: new Date() }).where(and(eq(leads.id, leadId), eq(leads.contractorId, contractorId)));
-    } catch (_) {}
-  }
-
-  // Record to structured ledger
   const auditBlock = db.recordLedgerEntry({
     contractorId,
-    eventType: 'phase3_live_dispatch',
-    entityType: 'unified_outreach',
+    eventType: 'phase3_verification_audit',
+    entityType: 'outreach_simulation',
     entityId: entry.id,
-    delta: {
+    actor: 'HAL Simulation',
+    details: 'Outreach payload prepared in simulation mode. No external message was sent.',
+    metadata: {
       channel,
-      recipient,
-      leadId,
-      providerId,
-      status: 'delivered'
+      leadId: leadId || null,
+      mode: 'simulation',
+      status: 'simulated'
     }
   });
 
-  // Broadcast contractor SSE
   broadcastNotification(
     contractorId,
-    'success',
-    `⚡ ${channel.toUpperCase()} Transmitted`,
-    `Delivered to ${recipient} via ${channel.toUpperCase()} bridge (ID: ${providerId}).`
+    'info',
+    'Outreach Simulation Recorded',
+    `Prepared a ${channel.toUpperCase()} message for ${String(recipient)}. No external message was sent.`
   );
 
-  res.json({
+  return res.json({
     success: true,
     dispatchId: entry.id,
-    providerId,
-    status: 'delivered',
+    status: 'simulated',
+    mode: 'simulation',
+    providerContacted: false,
     timestamp: now,
     renderedMessage: customizedMessage,
     renderedSubject: customizedSubject,
@@ -3981,17 +3961,36 @@ app.get('/api/outreach/whatsapp/webhook', (req, res) => {
   const mode = req.query['hub.mode'];
   const token = req.query['hub.verify_token'];
   const challenge = req.query['hub.challenge'];
+  const expectedToken = process.env.WHATSAPP_VERIFY_TOKEN;
 
-  const expectedToken = process.env.WHATSAPP_VERIFY_TOKEN || 'hal_whatsapp_verify_token';
-  if (mode === 'subscribe' && token === expectedToken) {
-    res.status(200).send(challenge);
-  } else {
-    res.status(403).json({ error: 'Verification failed' });
+  if (!expectedToken) {
+    return res.status(503).json({ error: 'WhatsApp webhook verification is not configured.' });
   }
+  if (mode === 'subscribe' && typeof token === 'string' && token === expectedToken && typeof challenge === 'string') {
+    return res.status(200).send(challenge);
+  }
+  return res.status(403).json({ error: 'Verification failed' });
 });
 
 // WhatsApp Inbound Message Listener
 app.post('/api/outreach/whatsapp/webhook', (req, res) => {
+  const appSecret = process.env.WHATSAPP_APP_SECRET;
+  const signature = req.header('x-hub-signature-256');
+  const rawBody = (req as any).rawBody as Buffer | undefined;
+
+  if (!appSecret) {
+    return res.status(503).json({ error: 'WhatsApp inbound signature verification is not configured.' });
+  }
+  if (!signature || !rawBody || !signature.startsWith('sha256=')) {
+    return res.status(401).json({ error: 'Missing or invalid webhook signature.' });
+  }
+
+  const expected = Buffer.from('sha256=' + crypto.createHmac('sha256', appSecret).update(rawBody).digest('hex'));
+  const received = Buffer.from(signature);
+  if (expected.length !== received.length || !crypto.timingSafeEqual(expected, received)) {
+    return res.status(401).json({ error: 'Invalid webhook signature.' });
+  }
+
   const body = req.body;
   try {
     if (body.object === 'whatsapp_business_account') {
@@ -7048,7 +7047,7 @@ async function startServer() {
             serviceType: hl.serviceType || niche,
             status: 'new',
             urgencyScore: Math.round((hl.sentimentScore || 0.8) * 100),
-            predictedLtvUsd: 12500,
+            predictedLtvUsd: (hl as any).predictedLtvUsd ?? 0,
             source: 'loop_stage1_harvest',
             isSynthetic: hl.isSynthetic ?? false,
             sourceType: hl.sourceType || 'live_harvest',
@@ -7890,6 +7889,9 @@ async function startServer() {
 
   // 4. Simulate Live End-to-End Pipeline Transaction
   app.post('/api/roadmap/phase1/simulate-transaction', authenticate, async (req, res) => {
+    if (process.env.NODE_ENV === 'production') {
+      return res.status(410).json({ error: 'The sample transaction simulator is disabled in production so synthetic records cannot enter live business data.' });
+    }
     const contractorId = (req as any).contractorId;
     const { businessName, city, niche, phone, email } = req.body || {};
 
@@ -7910,8 +7912,8 @@ async function startServer() {
         city: targetCity,
         serviceType: targetNiche,
         status: 'new',
-        urgencyScore: 92,
-        predictedLtvUsd: 14500,
+        urgencyScore: 0,
+        predictedLtvUsd: 0,
         source: 'phase1_pipeline_simulator'
       });
 
@@ -8125,7 +8127,7 @@ async function startServer() {
           source: 'harvested_intelligence',
           status: 'new',
           urgencyScore: Math.round((hl.sentimentScore || 0.8) * 100),
-          predictedLtv: 12500,
+          predictedLtv: (hl as any).predictedLtvUsd ?? 0,
           notes: hl.notes || `Harvested real business profile for ${city} ${niche}.`,
           websiteUrl: hl.websiteUrl,
           performanceScore: hl.performanceScore,
@@ -8416,7 +8418,7 @@ async function startServer() {
 
   // 6. Phase 3 Live Outbox Delivery Bridge - Status & Queue
   app.get('/api/roadmap/phase3/outbox-queue', authenticate, async (req, res) => {
-    const contractorId = (req as any).contractorId || (req as any).user?.id || 'demo_contractor';
+    const contractorId = (req as any).contractorId;
 
     try {
       const records = await pgDb.select().from(conversionOutbox).where(eq(conversionOutbox.contractorId, contractorId)).limit(50);
@@ -8484,7 +8486,7 @@ async function startServer() {
 
   // 7. Phase 3 Live Outbox Delivery Bridge - Immediate Dispatch
   app.post('/api/roadmap/phase3/live-dispatch', authenticate, async (req, res) => {
-    const contractorId = (req as any).contractorId || (req as any).user?.id || 'demo_contractor';
+    const contractorId = (req as any).contractorId;
     const {
       channel = 'email',
       recipient,
@@ -8533,7 +8535,11 @@ async function startServer() {
       timestamp: new Date().toISOString()
     });
 
-    const hmac = crypto.createHmac('sha256', process.env.JWT_SECRET || 'hal_outbox_secret_2026');
+    const signingSecret = process.env.JWT_SECRET;
+    if (!signingSecret || signingSecret.length < 32) {
+      return res.status(503).json({ error: 'Secure outbound signing is not configured.' });
+    }
+    const hmac = crypto.createHmac('sha256', signingSecret);
     hmac.update(payloadString);
     const signature = 'sha256=' + hmac.digest('hex');
 
@@ -8995,11 +9001,11 @@ async function startServer() {
   // GET /api/roadmap/phase5/status
   app.get('/api/roadmap/phase5/status', authenticate, async (req, res) => {
     try {
-      const contractorId = (req as any).contractorId || (req as any).user?.id || 'demo_contractor';
+      const contractorId = (req as any).contractorId;
       const allLeads = await pgDb.select().from(leads).where(eq(leads.contractorId, contractorId));
       const totalLeadsCount = allLeads.length;
       const syntheticLeadsCount = allLeads.filter(l => l.isSynthetic).length;
-      const verifiedLeadsCount = allLeads.filter(l => (l as any).verificationStatus === 'VERIFIED' || !l.isSynthetic).length;
+      const verifiedLeadsCount = allLeads.filter(l => (l as any).verificationStatus === 'VERIFIED' && !l.isSynthetic).length;
       
       const learningState = autonomousLearning.getState();
 
@@ -9012,7 +9018,7 @@ async function startServer() {
         totalLeadsCount,
         syntheticLeadsCount,
         verifiedLeadsCount,
-        cryptoVerified: true,
+        cryptoVerified: db.verifyLedgerIntegrity(contractorId).valid,
         autonomyReadinessScore: learningState.autonomyReadinessScore,
         learningEpoch: learningState.calibrationEpoch
       };
@@ -9037,11 +9043,11 @@ async function startServer() {
   // POST /api/roadmap/phase5/verify
   app.post('/api/roadmap/phase5/verify', authenticate, async (req, res) => {
     try {
-      const contractorId = (req as any).contractorId || (req as any).user?.id || 'demo_contractor';
+      const contractorId = (req as any).contractorId;
       const allLeads = await pgDb.select().from(leads).where(eq(leads.contractorId, contractorId));
       const totalLeadsCount = allLeads.length;
       const syntheticLeadsCount = allLeads.filter(l => l.isSynthetic).length;
-      const verifiedLeadsCount = allLeads.filter(l => (l as any).verificationStatus === 'VERIFIED' || !l.isSynthetic).length;
+      const verifiedLeadsCount = allLeads.filter(l => (l as any).verificationStatus === 'VERIFIED' && !l.isSynthetic).length;
       const learningState = autonomousLearning.getState();
 
       const activeDiagnostics = {
@@ -9050,7 +9056,7 @@ async function startServer() {
         totalLeadsCount,
         syntheticLeadsCount,
         verifiedLeadsCount,
-        cryptoVerified: true,
+        cryptoVerified: db.verifyLedgerIntegrity(contractorId).valid,
         autonomyReadinessScore: learningState.autonomyReadinessScore,
         learningEpoch: learningState.calibrationEpoch
       };
@@ -9091,7 +9097,7 @@ async function startServer() {
   // POST /api/roadmap/phase5/sync-brain
   app.post('/api/roadmap/phase5/sync-brain', authenticate, async (req, res) => {
     try {
-      const contractorId = (req as any).contractorId || (req as any).user?.id || 'demo_contractor';
+      const contractorId = (req as any).contractorId;
       const brainLayers = evaluateBrainSynchronization();
 
       const auditBlock = db.recordLedgerEntry({
@@ -9123,7 +9129,7 @@ async function startServer() {
   // POST /api/roadmap/phase5/federate-regions
   app.post('/api/roadmap/phase5/federate-regions', authenticate, async (req, res) => {
     try {
-      const contractorId = (req as any).contractorId || (req as any).user?.id || 'demo_contractor';
+      const contractorId = (req as any).contractorId;
       const edgeRegions = getDefaultEdgeRegions();
 
       const auditBlock = db.recordLedgerEntry({
@@ -9154,7 +9160,7 @@ async function startServer() {
   // POST /api/roadmap/phase5/propagate-ontology
   app.post('/api/roadmap/phase5/propagate-ontology', authenticate, async (req, res) => {
     try {
-      const contractorId = (req as any).contractorId || (req as any).user?.id || 'demo_contractor';
+      const contractorId = (req as any).contractorId;
       const ontologies = getDefaultBusinessOntologies();
 
       const auditBlock = db.recordLedgerEntry({

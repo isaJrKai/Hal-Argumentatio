@@ -121,7 +121,7 @@ export default function OverviewPanel({
             if (isMounted) fetchConnectorHealth(retryCount + 1);
           }, 1500 * (retryCount + 1));
         } else {
-          console.warn('Connector health status unavailable; using local system metrics.');
+          console.warn('Connector health status unavailable.');
         }
       }
     };
@@ -149,13 +149,7 @@ export default function OverviewPanel({
     } else if (selectedSegment === 'Low Value') {
       filtered = leads.filter(l => (l.urgencyScore || 0) < 4);
     }
-    
-    // Graceful fallback sample if leads list is small
-    if (filtered.length === 0 && leads.length > 0) {
-      if (selectedSegment === 'High Value') filtered = leads.slice(0, 3);
-      else if (selectedSegment === 'Medium Value') filtered = leads.slice(1, 4);
-      else filtered = leads.slice(2, 5);
-    }
+    // Only show leads that actually match the selected segment.
     return filtered;
   }, [leads, selectedSegment]);
 
@@ -163,12 +157,12 @@ export default function OverviewPanel({
   const segmentStats = useMemo(() => {
     if (!selectedSegment) return null;
     const count = segmentLeads.length;
-    const totalVal = segmentLeads.reduce((sum, l) => sum + (l.predictedLtvUsd || 4500), 0);
-    const avgUrgency = count > 0 
-      ? (segmentLeads.reduce((sum, l) => sum + (l.urgencyScore || 5), 0) / count).toFixed(1)
-      : '7.5';
+    const totalVal = segmentLeads.reduce((sum, l) => sum + (l.predictedLtvUsd ?? 0), 0);
+    const avgUrgency = count > 0
+      ? (segmentLeads.reduce((sum, l) => sum + (l.urgencyScore ?? 0), 0) / count).toFixed(1)
+      : '—';
     const missingSsl = segmentLeads.filter(l => l.sslStatus === 'missing').length;
-    const slowSpeed = segmentLeads.filter(l => (l.performanceScore || 100) < 60).length;
+    const slowSpeed = segmentLeads.filter(l => l.performanceScore != null && l.performanceScore < 60).length;
     
     let dominantPitch = 'Immediate Outreach: Target technical speed & local SEO gap.';
     let color = chartPalette.medVal;
@@ -214,64 +208,16 @@ export default function OverviewPanel({
     { name: 'High Value', value: highValLeads, color: chartPalette.highVal },
     { name: 'Medium Value', value: medValLeads, color: chartPalette.medVal },
     { name: 'Low Value', value: lowValLeads, color: chartPalette.lowVal },
-  ] : [
-    { name: 'Pipeline Ready', value: 1, color: chartPalette.medVal }
-  ];
+  ] : [];
 
   const totalOpportunities = totalLeads;
 
-  // Sparkline data for cards
-  const sparkData1 = [12, 15, 13, 18, 16, 22, 20, 25, 22, 28, 26, 31];
-  const sparkData2 = [42, 38, 45, 40, 48, 52, 50, 58, 55, 64, 61, 68];
-  const sparkData3 = [82, 80, 85, 83, 87, 86, 89, 88, 91, 87, 93, 95];
-  const sparkData4 = [15, 18, 14, 22, 19, 26, 23, 28, 25, 32, 30, 36];
-  const sparkData5 = [35, 40, 38, 48, 46, 55, 52, 60, 58, 67, 65, 74];
-
-  // Helper to render crisp inline SVG sparklines with smooth curves
-  const renderSpark = (data: number[], stroke: string, fill: string) => {
-    const min = Math.min(...data);
-    const max = Math.max(...data);
-    const range = max - min || 1;
-    const w = 64;
-    const h = 22;
-    const pts = data.map((val, i) => {
-      const x = (i / (data.length - 1)) * w;
-      const y = h - 2 - ((val - min) / range) * (h - 5);
-      return `${x.toFixed(1)},${y.toFixed(1)}`;
-    });
-    const pathD = `M ${pts.join(' L ')}`;
-    const areaD = `M 0,${h} L ${pts.join(' L ')} L ${w},${h} Z`;
-    return (
-      <svg className="w-[64px] h-[22px] overflow-visible shrink-0 opacity-85" viewBox={`0 0 ${w} ${h}`}>
-        <defs>
-          <linearGradient id={`grad-${stroke.replace(/[^a-zA-Z0-9]/g, '')}`} x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor={fill} stopOpacity={0.4} />
-            <stop offset="100%" stopColor={fill} stopOpacity={0.0} />
-          </linearGradient>
-        </defs>
-        <path d={areaD} fill={`url(#grad-${stroke.replace(/[^a-zA-Z0-9]/g, '')})`} />
-        <path d={pathD} fill="none" stroke={stroke} strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round" />
-      </svg>
-    );
-  };
+  // Historical trend series are not yet stored, so no synthetic sparkline is rendered.
 
   // Forecast chart data
   const [forecastMetricMode, setForecastMetricMode] = useState<'all' | 'revenue' | 'demand'>('all');
   const [forecastMetadata, setForecastMetadata] = useState<any>(null);
-  const [forecastChartData, setForecastChartData] = useState<any[]>([
-    { day: 'W1', v: 52000, demand: 64, cpl: 44.5 },
-    { day: 'W2', v: 58500, demand: 67, cpl: 43.8 },
-    { day: 'W3', v: 66000, demand: 71, cpl: 42.1 },
-    { day: 'W4', v: 74000, demand: 75, cpl: 41.5 },
-    { day: 'W5', v: 88000, demand: 81, cpl: 39.8 },
-    { day: 'W6', v: 96000, demand: 84, cpl: 38.9 },
-    { day: 'W7', v: 108000, demand: 88, cpl: 37.5 },
-    { day: 'W8', v: 122000, demand: 92, cpl: 36.2 },
-    { day: 'W9', v: 129000, demand: 90, cpl: 37.0 },
-    { day: 'W10', v: 136000, demand: 93, cpl: 35.8 },
-    { day: 'W11', v: 145000, demand: 96, cpl: 34.9 },
-    { day: 'W12', v: 152000, demand: 98, cpl: 34.2 },
-  ]);
+  const [forecastChartData, setForecastChartData] = useState<any[]>([]);
 
   useEffect(() => {
     let isMounted = true;
@@ -311,7 +257,7 @@ export default function OverviewPanel({
             if (isMounted) fetchForecast(retryCount + 1);
           }, 1500 * (retryCount + 1));
         } else {
-          console.warn('TimesFM forward curve temporarily unreachable; operating with deterministic baseline model.');
+          console.warn('TimesFM forecast unavailable; no synthetic forecast will be displayed.');
         }
       }
     };
@@ -320,33 +266,14 @@ export default function OverviewPanel({
   }, [activeCity, activeNiche, workspaceConfig.budgetMultiplier, regionalProfile.territoryMetrics.typicalCPC]);
 
   // Activities list dynamic
-  const recentActivities = leads.slice(0, 5).map((l, idx) => {
-    const statuses = ['New', 'Completed', 'Sent', 'Positive', 'Updated'];
-    const types = ['Lead', 'Audit', 'Proposal', 'Reputation', 'Campaign'];
-    const statusColors = {
-      'New': 'bg-accent-dim text-accent border-accent/20',
-      'Completed': 'bg-positive-dim text-positive border-positive/20',
-      'Sent': 'bg-info-dim text-info border-info/20',
-      'Positive': 'bg-positive-dim text-positive border-positive/20',
-      'Updated': 'bg-warning-dim text-warning border-warning/20',
-    };
-    return {
-      id: l.id,
-      activity: `Prospect captured: ${l.businessName}`,
-      type: types[idx % types.length],
-      entity: l.businessName,
-      time: '10 mins ago',
-      status: statuses[idx % statuses.length] as keyof typeof statusColors,
-    };
-  });
-
-  const displayActivities = recentActivities.length > 0 ? recentActivities : [
-    { id: '1', activity: 'New prospect captured', type: 'Lead', entity: `${activeCity} Prime ${(activeNiche || 'Contracting').toUpperCase()}`, time: '10 mins ago', status: 'New' },
-    { id: '2', activity: 'Speed & SSL audit completed', type: 'Audit', entity: `${activeCity} Apex ${activeIndustry?.name || 'Trade'}`, time: '1 hour ago', status: 'Completed' },
-    { id: '3', activity: 'Growth proposal prepared', type: 'Proposal', entity: `Elite ${(activeNiche || 'Contracting')} Solutions`, time: '2 hours ago', status: 'Sent' },
-    { id: '4', activity: 'High sentiment review detected', type: 'Reputation', entity: `${activeCity} ${(activeNiche || 'Contracting')} Masters`, time: '4 hours ago', status: 'Positive' },
-    { id: '5', activity: 'Territory crawl synchronized', type: 'Campaign', entity: `${regionalProfile.countryCode} Regional Sector`, time: '5 hours ago', status: 'Updated' },
-  ];
+  const displayActivities = leads.slice(0, 5).map((lead) => ({
+    id: lead.id,
+    activity: `Prospect captured: ${lead.businessName}`,
+    type: 'Lead',
+    entity: lead.businessName,
+    time: 'Time not recorded',
+    status: lead.status
+  }));
 
   // Dynamic Theme Styling Classes
   const cardBg = 'bg-bg-raised border border-border-dim text-text-primary shadow-xs';
@@ -387,8 +314,7 @@ export default function OverviewPanel({
             {/* Literary summary layout as specified in guidelines */}
             <div className="space-y-4 pt-1 font-sans text-xs md:text-sm text-text-secondary leading-relaxed">
               <p>
-                Your <span className="text-text-primary font-bold">{(activeNiche || 'Contracting').toUpperCase()}</span> business health in <span className="text-text-primary font-bold">{activeCity}</span> is <span className="text-positive font-semibold">excellent</span>. 
-                Revenue increased by <span className="text-text-primary font-semibold font-mono">18.6%</span> this month, tracking ahead of the target run-rate.
+                Your <span className="text-text-primary font-bold">{(activeNiche || 'Contracting').toUpperCase()}</span> workspace is configured for <span className="text-text-primary font-bold">{activeCity}</span>. Performance and revenue trends will appear when verified historical records are available.
               </p>
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
@@ -400,11 +326,11 @@ export default function OverviewPanel({
                   <ul className="space-y-2 text-[11px] leading-relaxed">
                     <li className="flex items-start gap-2">
                       <span className="text-warning font-bold">•</span>
-                      <span>One outreach campaign requires attention ({activeCity} {activeNiche}).</span>
+                      <span>{activeCampaignsCount} active campaign{activeCampaignsCount === 1 ? '' : 's'} recorded in this workspace.</span>
                     </li>
                     <li className="flex items-start gap-2">
                       <span className="text-negative font-bold">•</span>
-                      <span>Two important scheduling tasks are pending approval today.</span>
+                      <span>Scheduling task counts are unavailable until calendar activity is connected.</span>
                     </li>
                   </ul>
                 </div>
@@ -415,7 +341,7 @@ export default function OverviewPanel({
                     Highest-Impact Recommendation
                   </div>
                   <p className="text-[11px] leading-relaxed">
-                    Contacting newly qualified <span className="font-bold text-text-primary">{activeNiche}</span> prospects in <span className="font-bold text-text-primary">{activeCity}</span> represents your highest-impact action today (Est. Avg Deal: <strong className="text-brand">${activeIndustry.ltvRange.averageContract.toLocaleString()}</strong>).
+                    Contacting newly qualified <span className="font-bold text-text-primary">{activeNiche}</span> prospects in <span className="font-bold text-text-primary">{activeCity}</span> represents your highest-impact action today (Industry reference: <strong className="text-brand">${activeIndustry.ltvRange.averageContract.toLocaleString()}</strong>).
                   </p>
                   <button 
                     onClick={() => setActiveTab('leads')}
@@ -431,13 +357,13 @@ export default function OverviewPanel({
               <div>
                 <div className="text-[10px] font-mono tracking-wider opacity-60 uppercase mb-0.5">ACTIVE STRATEGIC MISSION</div>
                 <span className="text-xs font-semibold text-text-primary">
-                  Acquire 20 {(activeNiche || 'Contracting').toUpperCase()} Clients <span className="text-text-tertiary font-mono ml-1.5 text-[10px]">(12 / 20 Achieved)</span>
+                  Workspace goal: acquire {(activeNiche || 'Contracting').toUpperCase()} clients
                 </span>
               </div>
               <div className="flex items-center gap-3">
                 <span className="text-[10px] font-mono opacity-60">STATUS</span>
                 <span className="inline-flex items-center px-2 py-0.5 rounded text-[9px] font-mono font-bold bg-accent-dim text-accent border border-accent/20 uppercase tracking-wider">
-                  60% Mandate Completed
+                  Progress not tracked
                 </span>
               </div>
             </div>
@@ -455,12 +381,12 @@ export default function OverviewPanel({
             <div className="space-y-3">
               <div className="text-xs font-semibold">Local Trade & Demand Conditions</div>
               <p className="text-[11px] text-text-secondary leading-relaxed">
-                Live market indicators for <strong className="text-text-primary">{(activeNiche || 'Contracting').toUpperCase()}</strong> services in <strong className="text-text-primary">{activeCity}, {regionalProfile.countryCode}</strong>.
+                Configured market profile for <strong className="text-text-primary">{(activeNiche || 'Contracting').toUpperCase()}</strong> services in <strong className="text-text-primary">{activeCity}, {regionalProfile.countryCode}</strong>.
               </p>
               
               <div className={`p-3 rounded-lg border border-dashed border-border-dim bg-bg-base/30 text-[10px] text-text-secondary space-y-1.5`}>
                 <div className="flex items-center justify-between">
-                  <span className="text-accent font-mono font-bold uppercase text-[9px]">Local Weather & Demand Focus</span>
+                  <span className="text-accent font-mono font-bold uppercase text-[9px]">Reference seasonal focus</span>
                   <span className="font-mono text-[9px] text-text-tertiary">{regionalProfile.climateZone}</span>
                 </div>
                 <p className="text-text-primary font-medium leading-snug">
@@ -486,7 +412,7 @@ export default function OverviewPanel({
         <section className={`border rounded-xl bg-bg-raised border-border-dim overflow-hidden shadow-xs lg:col-span-12 md:col-span-2 col-span-1`}>
           <div className="px-5 py-3 border-b border-border-dim bg-bg-subtle/40 flex justify-between items-center">
             <span className="text-[10px] font-mono tracking-widest text-text-secondary uppercase font-semibold">KEY PERFORMANCE (MONTH-TO-DATE)</span>
-            <span className="text-[9px] font-mono text-text-secondary opacity-60">LIVE UPDATED</span>
+            <span className="text-[9px] font-mono text-text-secondary opacity-60">Based on saved workspace records</span>
           </div>
           
           <div className="grid grid-cols-2 sm:grid-cols-5 divide-y sm:divide-y-0 sm:divide-x divide-border-dim bg-bg-raised">
@@ -501,9 +427,9 @@ export default function OverviewPanel({
               </div>
               <div className="flex items-baseline justify-between gap-2">
                 <div className="text-xl font-mono tracking-tight font-light">{formatCurrency(displayRevenueVal)}</div>
-                {renderSpark(sparkData1, chartPalette.spark1, chartPalette.spark1)}
+                
               </div>
-              <div className="text-[10px] font-mono text-positive flex items-center gap-1">↑ 18.6% vs last period</div>
+              <div className="text-[10px] font-mono text-positive flex items-center gap-1">Historical change unavailable</div>
             </div>
 
             <div 
@@ -517,9 +443,9 @@ export default function OverviewPanel({
               </div>
               <div className="flex items-baseline justify-between gap-2">
                 <div className="text-xl font-mono tracking-tight font-light">{displayNewLeadsVal}</div>
-                {renderSpark(sparkData2, chartPalette.spark2, chartPalette.spark2)}
+                
               </div>
-              <div className="text-[10px] font-mono text-positive flex items-center gap-1">↑ 14% vs last period</div>
+              <div className="text-[10px] font-mono text-positive flex items-center gap-1">Historical change unavailable</div>
             </div>
 
             <div 
@@ -533,9 +459,9 @@ export default function OverviewPanel({
               </div>
               <div className="flex items-baseline justify-between gap-2">
                 <div className="text-xl font-mono tracking-tight font-light">{formatCurrency(displayAvgDealVal)}</div>
-                {renderSpark(sparkData3, chartPalette.spark3, chartPalette.spark3)}
+                
               </div>
-              <div className="text-[10px] font-mono text-positive flex items-center gap-1">↑ 8.2% vs last period</div>
+              <div className="text-[10px] font-mono text-positive flex items-center gap-1">Historical change unavailable</div>
             </div>
 
             <div 
@@ -549,9 +475,9 @@ export default function OverviewPanel({
               </div>
               <div className="flex items-baseline justify-between gap-2">
                 <div className="text-xl font-mono tracking-tight font-light">{displayActiveClientsVal}</div>
-                {renderSpark(sparkData4, chartPalette.spark4, chartPalette.spark4)}
+                
               </div>
-              <div className="text-[10px] font-mono text-positive flex items-center gap-1">↑ 5% vs last period</div>
+              <div className="text-[10px] font-mono text-positive flex items-center gap-1">Historical change unavailable</div>
             </div>
 
             <div 
@@ -565,9 +491,9 @@ export default function OverviewPanel({
               </div>
               <div className="flex items-baseline justify-between gap-2">
                 <div className="text-xl font-mono tracking-tight font-light">{displayOpportunitiesVal}</div>
-                {renderSpark(sparkData5, chartPalette.spark5, chartPalette.spark5)}
+                
               </div>
-              <div className="text-[10px] font-mono text-positive flex items-center gap-1">↑ 12% vs last period</div>
+              <div className="text-[10px] font-mono text-positive flex items-center gap-1">Historical change unavailable</div>
             </div>
           </div>
         </section>
@@ -578,9 +504,7 @@ export default function OverviewPanel({
             <div>
               <div className="flex items-center gap-2">
                 <span className="text-xs font-sans font-semibold tracking-wide block mb-0.5">12-Week Revenue & Demand Forecast</span>
-                <span className="px-1.5 py-0.2 bg-warning-dim text-warning font-mono text-[9px] font-bold rounded uppercase flex items-center gap-1 border border-warning/30">
-                  <Activity className="w-2.5 h-2.5" /> BRAIN SYNCED
-                </span>
+                <span className="px-1.5 py-0.2 bg-bg-subtle text-text-secondary font-mono text-[9px] font-bold rounded uppercase flex items-center gap-1 border border-border-dim"><Activity className="w-2.5 h-2.5" /> {forecastMetadata ? 'Forecast response received' : 'Awaiting verified forecast'}</span>
                 {forecastMetadata?.budgetGuardrails?.breachDetected && (
                   <span className="px-1.5 py-0.2 bg-danger-dim text-danger font-mono text-[9px] font-bold rounded uppercase flex items-center gap-1 border border-danger/30 animate-pulse">
                     <ShieldAlert className="w-2.5 h-2.5" /> GUARDRAIL THROTTLE
@@ -661,7 +585,7 @@ export default function OverviewPanel({
                 <span className="text-text-primary font-semibold truncate">
                   {forecastMetadata?.budgetGuardrails?.breachDetected
                     ? `Throttled 0.75x (CAC Target: $${forecastMetadata.budgetGuardrails.targetCac})`
-                    : `Armed & Enforcing (≤$${forecastMetadata?.budgetGuardrails?.maxAllowableCpl || 77} CPL)`}
+                    : (forecastMetadata?.budgetGuardrails?.maxAllowableCpl != null ? `Armed & Enforcing (≤${forecastMetadata.budgetGuardrails.maxAllowableCpl} CPL)` : 'Guardrail status unavailable')}
                 </span>
               </div>
             </div>
@@ -721,7 +645,7 @@ export default function OverviewPanel({
                       <div className="bg-bg-raised/95 backdrop-blur border border-border-dim rounded-lg p-2.5 shadow-xl font-mono text-[11px] min-w-[190px] space-y-1.5 z-50">
                         <div className="flex items-center justify-between border-b border-border-dim/60 pb-1">
                           <span className="font-bold text-text-primary">{label || item.day} Horizon</span>
-                          <span className="text-[9px] text-accent font-semibold px-1 py-0.2 rounded bg-accent/10">TimesFM 1.0</span>
+                          <span className="text-[9px] text-accent font-semibold px-1 py-0.2 rounded bg-accent/10">Forecast</span>
                         </div>
                         <div className="flex items-center justify-between pt-0.5">
                           <span className="text-text-secondary flex items-center gap-1.5">
@@ -834,14 +758,14 @@ export default function OverviewPanel({
           {/* Interactive Illustrated Funnel */}
           <div className="my-2 space-y-1.5 relative">
             {(() => {
-              const c1 = untouchedLeads > 0 ? untouchedLeads : 128;
-              const c2 = contactedLeads > 0 ? contactedLeads : 64;
-              const c3 = convertedLeads.length > 0 ? convertedLeads.length * 2 : 22;
-              const c4 = convertedLeads.length > 0 ? convertedLeads.length : 9;
+              const c1 = untouchedLeads;
+              const c2 = contactedLeads;
+              const c3 = leads.filter(l => l.status === 'contacted' && (l.urgencyScore ?? 0) >= 5).length;
+              const c4 = convertedLeads.length;
 
-              const rate1to2 = ((c2 / (c1 || 1)) * 100).toFixed(1);
-              const rate2to3 = ((c3 / (c2 || 1)) * 100).toFixed(1);
-              const rate3to4 = ((c4 / (c3 || 1)) * 100).toFixed(1);
+              const rate1to2 = c1 > 0 ? ((c2 / c1) * 100).toFixed(1) : '—';
+              const rate2to3 = c2 > 0 ? ((c3 / c2) * 100).toFixed(1) : '—';
+              const rate3to4 = c3 > 0 ? ((c4 / c3) * 100).toFixed(1) : '—';
 
               return (
                 <>
@@ -1014,17 +938,17 @@ export default function OverviewPanel({
                 </div>
 
                 <div className="space-y-1.5 max-h-[140px] overflow-y-auto pr-1">
-                  {(stageFilteredLeads.length > 0 ? stageFilteredLeads.slice(0, 4) : leads.slice(0, 3)).map((lead, idx) => (
+                  {(selectedStage ? stageFilteredLeads.slice(0, 4) : leads.slice(0, 3)).map((lead, idx) => (
                     <div key={lead.id || idx} className="p-2 bg-bg-raised rounded border border-border-dim flex items-center justify-between text-[10.5px] font-mono hover:border-accent/50 transition-colors">
                       <div className="space-y-0.5 min-w-0 pr-2">
                         <div className="font-bold text-text-primary truncate">{lead.businessName}</div>
                         <div className="text-[9px] text-text-secondary flex items-center gap-2 truncate">
                           <span className="flex items-center gap-0.5"><MapPin className="w-2.5 h-2.5 text-text-tertiary" /> {lead.city}</span>
-                          <span className="flex items-center gap-0.5"><Phone className="w-2.5 h-2.5 text-positive" /> {lead.phone || 'Verified Line'}</span>
+                          <span className="flex items-center gap-0.5"><Phone className="w-2.5 h-2.5 text-positive" /> {lead.phone || 'Not provided'}</span>
                         </div>
                       </div>
                       <div className="text-right shrink-0">
-                        <div className="text-accent font-bold">${(lead.predictedLtvUsd || 4500).toLocaleString()}</div>
+                        <div className="text-accent font-bold">${(lead.predictedLtvUsd ?? 0).toLocaleString()}</div>
                         <button
                           onClick={() => setActiveTab('leads')}
                           className="text-[8.5px] text-text-tertiary hover:text-accent uppercase font-bold"
@@ -1071,7 +995,7 @@ export default function OverviewPanel({
                 Reset View <X className="w-2.5 h-2.5" />
               </button>
             ) : (
-              <span className="text-[10px] font-mono text-positive font-semibold shrink-0">↑ 14.8% MoM</span>
+              <span className="text-[10px] font-mono text-positive font-semibold shrink-0">Change unavailable</span>
             )}
           </div>
 
@@ -1190,14 +1114,14 @@ export default function OverviewPanel({
                         </div>
                         <div className="text-[9px] text-text-secondary flex items-center gap-2 truncate">
                           <span className="flex items-center gap-0.5"><MapPin className="w-2.5 h-2.5 text-text-tertiary" /> {lead.city}</span>
-                          <span className="flex items-center gap-0.5"><Phone className="w-2.5 h-2.5 text-positive" /> {lead.phone || '+1 Verified'}</span>
+                          <span className="flex items-center gap-0.5"><Phone className="w-2.5 h-2.5 text-positive" /> {lead.phone || 'Not provided'}</span>
                         </div>
                       </div>
 
                       <div className="text-right shrink-0 flex items-center gap-2">
                         <div>
-                          <div className="text-accent font-bold text-[11px]">${(lead.predictedLtvUsd || 4500).toLocaleString()}</div>
-                          <div className="text-[8px] text-text-tertiary uppercase">Urgency: {lead.urgencyScore || 7}/10</div>
+                          <div className="text-accent font-bold text-[11px]">${(lead.predictedLtvUsd ?? 0).toLocaleString()}</div>
+                          <div className="text-[8px] text-text-tertiary uppercase">Urgency: {lead.urgencyScore != null ? lead.urgencyScore : 'Not assessed'}/10</div>
                         </div>
                         <ChevronRight className="w-3 h-3 text-text-tertiary group-hover:text-accent group-hover:translate-x-0.5 transition-all" />
                       </div>
@@ -1329,19 +1253,19 @@ export default function OverviewPanel({
                 <span className="text-[10px] font-mono tracking-widest text-text-tertiary uppercase font-bold block">TODAY'S ACTION PRIORITIES</span>
                 <span className="text-xs font-sans font-semibold text-text-primary">Scheduled Business Tasks</span>
               </div>
-              <span className="text-[9px] font-mono font-bold text-accent px-2 py-0.5 rounded bg-accent-dim">TODAY</span>
+              <span className="text-[9px] font-mono font-bold text-accent px-2 py-0.5 rounded bg-accent-dim">TASKS</span>
             </div>
             
             <div className="space-y-2.5">
               <div className="p-2.5 rounded-lg border border-border-dim bg-bg-subtle/50 space-y-1.5">
                 <div className="flex justify-between items-center text-[9px] font-mono">
                   <span className="text-accent font-bold uppercase flex items-center gap-1">
-                    <span className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse" /> HIGH PRIORITY FOLLOW-UP
+                    <span className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse" /> TASK STATUS NOT TRACKED
                   </span>
-                  <span className="text-text-tertiary">09:00 AM</span>
+                  <span className="text-text-tertiary">—</span>
                 </div>
                 <p className="text-[11px] font-sans font-medium text-text-primary leading-tight">
-                  Follow up with 5 newly scored high-intent {activeNiche} leads in {activeCity}
+                  No verified follow-up task is recorded for {activeCity}
                 </p>
                 <button 
                   onClick={() => setActiveTab('leads')}
@@ -1354,12 +1278,12 @@ export default function OverviewPanel({
               <div className="p-2.5 rounded-lg border border-border-dim bg-bg-subtle/50 space-y-1.5">
                 <div className="flex justify-between items-center text-[9px] font-mono">
                   <span className="text-warning font-bold uppercase flex items-center gap-1">
-                    <span className="w-1.5 h-1.5 rounded-full bg-warning" /> PROPOSAL PENDING
+                    <span className="w-1.5 h-1.5 rounded-full bg-warning" /> TASK STATUS NOT TRACKED
                   </span>
-                  <span className="text-text-tertiary">11:00 AM</span>
+                  <span className="text-text-tertiary">—</span>
                 </div>
                 <p className="text-[11px] font-sans font-medium text-text-primary leading-tight">
-                  Review tailored pitch deck & pricing for commercial contractor prospect
+                  No proposal review task is recorded.
                 </p>
                 <button 
                   onClick={() => setActiveTab('board')}
@@ -1372,18 +1296,18 @@ export default function OverviewPanel({
               <div className="p-2.5 rounded-lg border border-border-dim bg-bg-subtle/50 space-y-1.5">
                 <div className="flex justify-between items-center text-[9px] font-mono">
                   <span className="text-positive font-bold uppercase flex items-center gap-1">
-                    <span className="w-1.5 h-1.5 rounded-full bg-positive" /> CAMPAIGN APPROVAL
+                    <span className="w-1.5 h-1.5 rounded-full bg-positive" /> TASK STATUS NOT TRACKED
                   </span>
-                  <span className="text-text-tertiary">02:00 PM</span>
+                  <span className="text-text-tertiary">—</span>
                 </div>
                 <p className="text-[11px] font-sans font-medium text-text-primary leading-tight">
-                  Authorize automated SEO speed audit outreach for 12 {activeCity} prospects
+                  No campaign approval task is recorded.
                 </p>
                 <button 
                   onClick={() => setActiveTab('campaigns')}
                   className="text-[10px] font-mono text-positive hover:underline flex items-center gap-1 font-bold pt-0.5"
                 >
-                  Approve Outreach Dispatch <ArrowUpRight className="w-3 h-3" />
+                  Open Campaigns <ArrowUpRight className="w-3 h-3" />
                 </button>
               </div>
             </div>
@@ -1406,7 +1330,7 @@ export default function OverviewPanel({
             <div className="flex justify-between items-center mb-4">
               <div>
                 <span className="text-[10px] font-mono tracking-widest text-text-tertiary uppercase block font-bold">RECENT BUSINESS ACTIVITY</span>
-                <span className="text-xs font-sans font-semibold text-text-primary">Live Customer & Territory Event Stream</span>
+                <span className="text-xs font-sans font-semibold text-text-primary">Recent saved lead records</span>
               </div>
               <button 
                 onClick={() => setActiveTab('leads')}
@@ -1428,6 +1352,13 @@ export default function OverviewPanel({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-inherit">
+                  {displayActivities.length === 0 && (
+                    <tr>
+                      <td colSpan={5} className="py-6 text-center text-xs text-text-tertiary">
+                        No activity recorded yet. Imported leads and completed actions will appear here.
+                      </td>
+                    </tr>
+                  )}
                   {displayActivities.map((act) => (
                     <tr key={act.id} className="hover:bg-bg-subtle/50 transition-colors">
                       <td className="py-2.5 text-[11px] font-sans text-text-primary">{act.activity}</td>
@@ -1436,10 +1367,10 @@ export default function OverviewPanel({
                       <td className="py-2.5 text-[10px] font-mono text-text-tertiary">{act.time}</td>
                       <td className="py-2.5 text-right">
                         <span className={`inline-block text-[9px] font-mono px-2 py-0.5 rounded border font-semibold ${
-                          act.status === 'New' ? 'bg-accent-dim text-accent border-accent/20' :
-                          act.status === 'Completed' ? 'bg-positive-dim text-positive border-positive/20' :
-                          act.status === 'Sent' ? 'bg-info-dim text-info border-info/20' :
-                          act.status === 'Positive' ? 'bg-positive-dim text-positive border-positive/20' :
+                          act.status === 'new' ? 'bg-accent-dim text-accent border-accent/20' :
+                          act.status === 'converted' ? 'bg-positive-dim text-positive border-positive/20' :
+                          act.status === 'contacted' ? 'bg-info-dim text-info border-info/20' :
+                          act.status === 'dead' ? 'bg-negative-dim text-negative border-negative/20' :
                           'bg-warning-dim text-warning border-warning/20'
                         }`}>
                           {act.status}
@@ -1530,21 +1461,21 @@ export default function OverviewPanel({
                       <span className={`text-xs font-bold mt-1 block flex items-center justify-center gap-1 ${
                         (selectedLeadForDetail.performanceScore || 50) < 60 ? 'text-warning' : 'text-positive'
                       }`}>
-                        <Gauge className="w-3 h-3" /> {selectedLeadForDetail.performanceScore || 48}/100
+                        <Gauge className="w-3 h-3" /> {selectedLeadForDetail.performanceScore != null ? `${selectedLeadForDetail.performanceScore}/100` : 'Not assessed'}
                       </span>
                     </div>
 
                     <div className="p-2.5 rounded-lg bg-bg-base border border-border-dim">
                       <span className="block text-[9px] text-text-tertiary uppercase">SEO Health</span>
                       <span className="text-xs font-bold text-accent mt-1 block">
-                        {selectedLeadForDetail.seoScore || 68}%
+                        {selectedLeadForDetail.seoScore != null ? `${selectedLeadForDetail.seoScore}%` : 'Not assessed'}
                       </span>
                     </div>
 
                     <div className="p-2.5 rounded-lg bg-bg-base border border-border-dim">
                       <span className="block text-[9px] text-text-tertiary uppercase">Reputation</span>
                       <span className="text-xs font-bold text-warning mt-1 block">
-                        {selectedLeadForDetail.googleRating ? `${selectedLeadForDetail.googleRating}★` : '4.2★'}
+                        {selectedLeadForDetail.googleRating != null ? `${selectedLeadForDetail.googleRating}★` : 'Not available'}
                       </span>
                     </div>
                   </div>
@@ -1556,13 +1487,13 @@ export default function OverviewPanel({
                     <span className="text-[9px] text-text-tertiary uppercase block">Verified Telephone</span>
                     <span className="font-bold text-positive flex items-center gap-1.5">
                       <Phone className="w-3.5 h-3.5" />
-                      {selectedLeadForDetail.phone || '+1 (403) 555-0192'}
+                      {selectedLeadForDetail.phone || 'Not provided'}
                     </span>
                   </div>
                   <div className="p-3 bg-bg-base rounded-lg border border-border-dim space-y-1">
                     <span className="text-[9px] text-text-tertiary uppercase block">Predicted Deal LTV</span>
                     <span className="font-bold text-accent">
-                      ${(selectedLeadForDetail.predictedLtvUsd || 4500).toLocaleString()} USD
+                      ${(selectedLeadForDetail.predictedLtvUsd ?? 0).toLocaleString()} USD
                     </span>
                   </div>
                 </div>
@@ -1590,7 +1521,7 @@ export default function OverviewPanel({
                   </div>
                   <p className="text-xs text-text-primary leading-relaxed">
                     {selectedLeadForDetail.outreachStrategy || 
-                      `"We analyzed ${selectedLeadForDetail.businessName}'s digital conversion surface in ${selectedLeadForDetail.city}. Their website ${selectedLeadForDetail.sslStatus === 'missing' ? 'flags an unencrypted SSL error and ' : ''}scores below standard mobile speed, leaking valuable high-intent local customer calls to competitors. Immediate remediation unlocks an estimated +$${(selectedLeadForDetail.predictedLtvUsd || 4500).toLocaleString()} in pipeline value."`}
+                      `"We analyzed ${selectedLeadForDetail.businessName}'s digital conversion surface in ${selectedLeadForDetail.city}. website assessment and valuation data are not available in the saved record. Verify the site and gather evidence before making performance or revenue claims."`}
                   </p>
                 </div>
               </div>

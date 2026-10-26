@@ -64,61 +64,10 @@ function isPostgresConfigured(): boolean {
 // Resolves the contractorId from env or automatically identifies the owner/first account
 export async function getEffectiveContractorId(): Promise<string> {
   const envId = process.env.HAL_MCP_CONTRACTOR_ID?.trim();
-  if (envId && envId.length > 0) {
-    return envId;
+  if (!envId) {
+    throw new Error('HAL_MCP_CONTRACTOR_ID must be explicitly configured before MCP tools can access account data.');
   }
-
-  // 1. Try PostgreSQL: look for owner/admin account first, or earliest registered contractor
-  try {
-    const adminContractors = await pgDb
-      .select({ id: contractors.id, role: contractors.role, createdAt: contractors.createdAt })
-      .from(contractors)
-      .where(eq(contractors.role, 'admin'))
-      .orderBy(contractors.createdAt)
-      .limit(1);
-
-    if (adminContractors.length > 0 && adminContractors[0]?.id) {
-      return adminContractors[0].id;
-    }
-
-    const firstContractors = await pgDb
-      .select({ id: contractors.id })
-      .from(contractors)
-      .orderBy(contractors.createdAt)
-      .limit(1);
-
-    if (firstContractors.length > 0 && firstContractors[0]?.id) {
-      return firstContractors[0].id;
-    }
-  } catch {
-    // PostgreSQL query fallback
-  }
-
-  // 2. Try Local DB Store: look for owner/admin account or first contractor
-  try {
-    const localContractors = localDb.getContractors();
-    if (localContractors.length > 0) {
-      const admin = localContractors.find(c => c.role === 'admin' || c.email === 'admin@kaislead.com' || c.email === 'kaisoisaac@gmail.com');
-      if (admin) {
-        return admin.id;
-      }
-      return localContractors[0].id;
-    }
-  } catch {
-    // Local DB query fallback
-  }
-
-  // 3. Fallback discovery from existing leads
-  try {
-    const localLeads = localDb.getLeads();
-    if (localLeads && localLeads.length > 0 && localLeads[0].contractorId) {
-      return localLeads[0].contractorId;
-    }
-  } catch {
-    // ignore
-  }
-
-  return 'con_admin_seed';
+  return envId;
 }
 
 // Strips sensitive fields and decrypts PII safely

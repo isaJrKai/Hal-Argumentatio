@@ -3,7 +3,11 @@ import { contractors } from './src/db/schema.ts';
 import fs from 'fs';
 
 async function sync() {
-  const data = JSON.parse(fs.readFileSync('./data/db.json', 'utf8'));
+  const sourcePath = process.env.HAL_SOURCE_JSON || './data/db.json';
+  if (!fs.existsSync(sourcePath)) {
+    throw new Error('HAL source JSON not found. Runtime data is excluded from source control; set HAL_SOURCE_JSON to a private export path.');
+  }
+  const data = JSON.parse(fs.readFileSync(sourcePath, 'utf8'));
   for (const c of data.contractors) {
     if (c.email === 'admin@kaislead.com') continue; // already did
     await db.insert(contractors).values({

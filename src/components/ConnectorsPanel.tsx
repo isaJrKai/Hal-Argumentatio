@@ -29,7 +29,7 @@ import {
   listCalendarEvents, 
   CalendarEvent 
 } from '../lib/googleWorkspace';
-import { User } from 'firebase/auth';
+import { User } from '@firebase/auth';
 
 export default function ConnectorsPanel() {
   const { toast } = useToast();
@@ -213,8 +213,8 @@ export default function ConnectorsPanel() {
   const [metaToken, setMetaToken] = useState(() => localStorage.getItem('hal_meta_token') || '');
   const [metaAdAccountId, setMetaAdAccountId] = useState(() => localStorage.getItem('hal_meta_ad_account_id') || '');
   const [isTestingMeta, setIsTestingMeta] = useState(false);
-  const [metaStatus, setMetaStatus] = useState<'idle' | 'connected' | 'error'>(() => {
-    return localStorage.getItem('hal_meta_token') ? 'connected' : 'idle';
+  const [metaStatus, setMetaStatus] = useState<'idle' | 'configured' | 'connected' | 'error'>(() => {
+    return localStorage.getItem('hal_meta_token') ? 'configured' : 'idle';
   });
 
   const handleSaveMetaCredentials = async () => {
@@ -278,8 +278,8 @@ export default function ConnectorsPanel() {
       toast({
         variant: 'success',
         title: 'Mock Seed Residue Purged',
-        description: `All mock templates removed. Exactly ${data.remainingRealLeads} authentic harvested leads remain in your encrypted database.`,
-        whatNext: 'Database is 100% verified authentic.'
+        description: `Purge completed. ${typeof data.remainingRealLeads === 'number' ? data.remainingRealLeads : 'Unknown number of'} records remain; their authenticity has not been independently verified.`,
+        whatNext: 'Review remaining records and source evidence before live outreach.'
       });
     } catch (err: any) {
       toast({
@@ -299,14 +299,14 @@ export default function ConnectorsPanel() {
         <div>
           <div className="flex items-center gap-2">
             <h1 className="text-2xl font-bold tracking-tight text-zinc-900 dark:text-zinc-100">
-              Living Integration Conduits
+              Integrations & Verification
             </h1>
-            <Badge variant="active">
-              0% Fake Props
+            <Badge variant="neutral">
+              Verification required
             </Badge>
           </div>
           <p className="text-sm text-zinc-600 dark:text-zinc-400 mt-1 max-w-2xl">
-            Pure, operational connections. Only active services with genuine OAuth tokens, cryptographic keys, and live bidirectional webhooks.
+            Integration status is shown only where configuration or live verification is available. A saved token alone does not prove that a service is connected.
           </p>
         </div>
 
@@ -546,10 +546,10 @@ export default function ConnectorsPanel() {
               </div>
               <div>
                 <h3 className="text-base font-semibold text-zinc-900 dark:text-zinc-100">
-                  Two-Way Twilio WhatsApp & SMS Webhook Conduit
+                  Inbound Messaging Webhooks
                 </h3>
                 <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
-                  Live endpoint receiving contractor replies. Instantly updates lead status, commits ledger proof, and triggers real-time in-app alerts.
+                  Inbound webhook support is present in the code; provider signatures, event processing, and live alerts require end-to-end verification.
                 </p>
               </div>
             </div>
@@ -558,7 +558,7 @@ export default function ConnectorsPanel() {
               {/* Webhook URLs */}
               <div className="space-y-3">
                 <label className="text-xs font-semibold text-zinc-700 dark:text-zinc-300">
-                  Carrier Ingestion Webhook URLs (Point Twilio Here)
+                  Inbound webhook endpoints (provider signature validation required)
                 </label>
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -758,7 +758,7 @@ export default function ConnectorsPanel() {
               <div className="flex items-center justify-between pt-2">
                 <div className="flex items-center gap-2">
                   <Badge variant={metaStatus === 'connected' ? 'active' : metaStatus === 'error' ? 'danger' : 'neutral'}>
-                    {metaStatus === 'connected' ? 'Authenticated' : metaStatus === 'error' ? 'Invalid Credentials' : 'Not Configured'}
+                    {metaStatus === 'connected' ? 'API validated' : metaStatus === 'configured' ? 'Saved · unverified' : metaStatus === 'error' ? 'Validation failed' : 'Not configured'}
                   </Badge>
                 </div>
 
@@ -789,20 +789,20 @@ export default function ConnectorsPanel() {
                   </div>
                   <div>
                     <h4 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
-                      Cloud SQL PostgreSQL Relational Storage
+                      PostgreSQL Database
                     </h4>
                     <p className="text-xs text-zinc-500 mt-0.5">
-                      PostgreSQL 18.3 engine with 34 active enterprise tables.
+                      Database version, schema inventory, and connection status have not been checked here.
                     </p>
                   </div>
                 </div>
-                <Badge variant="active">
-                  Operational
+                <Badge variant="neutral">
+                  Not checked
                 </Badge>
               </div>
               <div className="mt-4 pt-3 border-t border-zinc-100 dark:border-zinc-800/60 flex items-center justify-between text-xs text-zinc-500">
-                <span>Latency: ~3ms</span>
-                <span>Security: Drizzle ORM + Connection Pooling</span>
+                <span>Latency: not measured</span>
+                <span>Schema and access controls require live verification</span>
               </div>
             </Card>
 
@@ -818,17 +818,17 @@ export default function ConnectorsPanel() {
                       Merkle Ledger & AES-256 PII Vault
                     </h4>
                     <p className="text-xs text-zinc-500 mt-0.5">
-                      SHA-256 immutable audit chain with AES-256-GCM field encryption.
+                      Ledger implementation is present; live integrity and encryption configuration must be verified.
                     </p>
                   </div>
                 </div>
-                <Badge variant="active">
-                  Verified Clean
+                <Badge variant="neutral">
+                  Not verified
                 </Badge>
               </div>
               <div className="mt-4 pt-3 border-t border-zinc-100 dark:border-zinc-800/60 flex items-center justify-between text-xs text-zinc-500">
-                <span>Ledger Sequence: #94+</span>
-                <span>Audit Blocks: Verified</span>
+                <span>Ledger sequence: not checked</span>
+                <span>Audit blocks: not verified</span>
               </div>
             </Card>
 
@@ -841,20 +841,20 @@ export default function ConnectorsPanel() {
                   </div>
                   <div>
                     <h4 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
-                      Google Gemini 2.5 Multi-Modal AI
+                      Google Gemini integration
                     </h4>
                     <p className="text-xs text-zinc-500 mt-0.5">
-                      Primary cognitive engine powering territory audits and market reasoning.
+                      AI provider status depends on configured credentials and a successful live request.
                     </p>
                   </div>
                 </div>
-                <Badge variant="active">
-                  Connected
+                <Badge variant="neutral">
+                  Status not checked
                 </Badge>
               </div>
               <div className="mt-4 pt-3 border-t border-zinc-100 dark:border-zinc-800/60 flex items-center justify-between text-xs text-zinc-500">
-                <span>Model: gemini-2.5-flash</span>
-                <span>Grounded: Google Search API</span>
+                <span>Model: configured at runtime</span>
+                <span>Search grounding: not verified</span>
               </div>
             </Card>
 
@@ -870,17 +870,17 @@ export default function ConnectorsPanel() {
                       Territory Intelligence Harvest Engine
                     </h4>
                     <p className="text-xs text-zinc-500 mt-0.5">
-                      Real Core Web Vitals speed tests, SSL tracking, and public review sentiment.
+                      Website and public-review enrichment requires provider data and separate verification.
                     </p>
                   </div>
                 </div>
-                <Badge variant="active">
-                  26 Authentic Leads
+                <Badge variant="neutral">
+                  Lead verification not run
                 </Badge>
               </div>
               <div className="mt-4 pt-3 border-t border-zinc-100 dark:border-zinc-800/60 flex items-center justify-between text-xs text-zinc-500">
-                <span>Mock Seeds: 0 (Purged)</span>
-                <span>Coverage: Calgary & Edmonton</span>
+                <span>Seed status: not checked</span>
+                <span>Coverage: depends on search scope</span>
               </div>
             </Card>
           </div>

@@ -39,7 +39,7 @@ interface BridgeStatus {
     displayNumber?: string;
     webhookActive: boolean;
     deliveredCount: number;
-    replyRate: number;
+    replyRate: number | null;
     status: string;
   };
   email: {
@@ -47,20 +47,20 @@ interface BridgeStatus {
     provider: string;
     senderEmail: string;
     deliveredCount: number;
-    openRate: number;
+    openRate: number | null;
     status: string;
   };
   sms: {
     enabled: boolean;
     virtualNumber: string;
     deliveredCount: number;
-    slaResponseSec: number;
+    slaResponseSec: number | null;
     status: string;
   };
   calendar: {
     enabled: boolean;
     bookingUrl: string;
-    bookedAppointments: number;
+    bookedAppointments: number | null;
     status: string;
   };
 }
@@ -121,16 +121,16 @@ export const UnifiedCommunicationsHub: React.FC<UnifiedCommunicationsHubProps> =
 
     if (activeChannel === 'whatsapp') {
       setSubject('');
-      setMessage(`Hi ${owner}, following up on our diagnostic of ${biz} in ${city}. We identified urgent homeowner search volume that is currently dropping off before calling your on-duty team. Can I send over the 2-minute teardown?`);
+      setMessage(`Hi ${owner}, I'm reaching out to ask whether ${biz} is open to discussing ways to improve online visibility and lead follow-up in ${city}. If useful, I can share a brief assessment based on publicly available information. Would you be interested?`);
     } else if (activeChannel === 'email') {
-      setSubject(`Performance diagnostic & emergency call capture for ${biz} (${city})`);
-      setMessage(`Hi ${owner},\n\nI reviewed ${biz}'s local search presence in ${city} and identified that local homeowners needing ${selectedLead.serviceType || 'urgent service'} face a delay in your mobile intake flow.\n\nWe engineered a direct call-routing solution that connects inbound homeowners in under 30 seconds with zero wasted ad spend.\n\nWould you have 5 minutes this Thursday for a quick walkthrough?\n\nBest regards,\n${workspaceConfig.operatorName || 'HAL Dispatch Team'}\n${workspaceConfig.agencyName || 'HAL Business Operating Intelligence'}`);
+      setSubject(`Introductory conversation about online visibility — ${biz}`);
+      setMessage(`Hi ${owner},\n\nI'm contacting ${biz} about potential ways to improve online visibility and lead follow-up in ${city}. I have not completed a verified technical audit, so I don't want to assume there is a specific problem.\n\nIf you're interested, I can review publicly available information and share evidence-based findings before recommending any changes.\n\nWould you be open to a brief conversation?\n\nRegards,\n${workspaceConfig.operatorName || 'HAL Team'}`);
     } else if (activeChannel === 'sms') {
       setSubject('');
-      setMessage(`Hi ${owner}, we have qualified homeowner requests for ${selectedLead.serviceType || 'trade service'} in ${city}. Does ${biz} have capacity to take priority calls this week?`);
+      setMessage(`Hi ${owner}, I'm reaching out about potential improvements to ${biz}'s online visibility and lead follow-up in ${city}. Would you be open to a short conversation?`);
     } else if (activeChannel === 'calendar') {
       setSubject(`HAL Emergency Dispatch Walkthrough — ${biz}`);
-      setMessage(`15-Minute Technical Intake Walkthrough\nAgenda:\n1. Review live speed deficit & missed call leak\n2. Demonstrate 30-sec automated dispatcher\n3. Confirm local service territory coverage in ${city}`);
+      setMessage(`15-Minute Introductory Review\nAgenda:\n1. Understand your current website and lead follow-up process\n2. Confirm which performance data is available\n3. Agree on next steps based on verified findings in ${city}`);
     }
   }, [activeChannel, selectedLead]);
 
@@ -161,7 +161,7 @@ export const UnifiedCommunicationsHub: React.FC<UnifiedCommunicationsHubProps> =
           if (data.draft.body) setMessage(data.draft.body);
           showToast({
             title: 'AI Copy Generated',
-            message: `Crafted tailored ${activeChannel.toUpperCase()} message using Gemini 3.8-Flash.`,
+            message: `AI draft generated; provider and model are configured at runtime.`,
             type: 'success'
           });
         }
@@ -180,12 +180,17 @@ export const UnifiedCommunicationsHub: React.FC<UnifiedCommunicationsHubProps> =
   // Dispatch Message
   const handleDispatch = async () => {
     if (!selectedLead || !message.trim()) return;
+    const recipient = activeChannel === 'email' ? selectedLead.email : selectedLead.phone;
+    if (!recipient) {
+      showToast({
+        title: 'Contact details missing',
+        message: activeChannel === 'email' ? 'This lead has no email address.' : 'This lead has no phone number.',
+        type: 'error'
+      });
+      return;
+    }
+
     setIsDispatching(true);
-
-    const recipient = activeChannel === 'email' 
-      ? (selectedLead.email || 'contact@business.com')
-      : (selectedLead.phone || '+14035550199');
-
     try {
       const res = await fetch('/api/outreach/dispatch', {
         method: 'POST',
@@ -200,6 +205,7 @@ export const UnifiedCommunicationsHub: React.FC<UnifiedCommunicationsHubProps> =
           leadBusinessName: selectedLead.businessName,
           subject: subject.trim() || undefined,
           message: message.trim(),
+          mode: 'simulation',
           variables: {
             businessName: selectedLead.businessName,
             ownerName: selectedLead.ownerName || 'Owner',
@@ -216,8 +222,8 @@ export const UnifiedCommunicationsHub: React.FC<UnifiedCommunicationsHubProps> =
       }
 
       showToast({
-        title: `${activeChannel.toUpperCase()} Transmitted`,
-        message: `Dispatched to ${recipient} (Provider ID: ${data.providerId})`,
+        title: 'Simulation recorded',
+        message: `Prepared a ${activeChannel.toUpperCase()} message for ${recipient}. No external message was sent.`,
         type: 'success'
       });
 
@@ -255,16 +261,16 @@ export const UnifiedCommunicationsHub: React.FC<UnifiedCommunicationsHubProps> =
               <span className="text-xs font-bold text-white">WhatsApp Business</span>
             </div>
             <span className="inline-flex items-center gap-1 text-[11px] text-emerald-400 font-mono">
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-              <span>Active</span>
+              <span className={bridges?.whatsapp.enabled ? "w-2 h-2 rounded-full bg-amber-400" : "w-2 h-2 rounded-full bg-slate-500"}></span>
+              <span>{bridges?.whatsapp.status === 'configured_unverified' ? 'Configured · unverified' : 'Not configured'}</span>
             </span>
           </div>
           <div>
             <div className="text-lg font-mono font-black text-white tabular-nums">
-              {bridges?.whatsapp.replyRate ?? 38.4}%
+              {bridges?.whatsapp.replyRate == null ? '—' : `${bridges.whatsapp.replyRate}%`}
             </div>
             <div className="text-[11px] text-slate-400 mt-0.5">
-              Reply Rate · {bridges?.whatsapp.deliveredCount ?? 14} dispatched
+              Reply rate unavailable · {bridges?.whatsapp.deliveredCount ?? 0} delivered
             </div>
           </div>
         </div>
@@ -279,16 +285,16 @@ export const UnifiedCommunicationsHub: React.FC<UnifiedCommunicationsHubProps> =
               <span className="text-xs font-bold text-white">Email Sequences</span>
             </div>
             <span className="inline-flex items-center gap-1 text-[11px] text-sky-400 font-mono">
-              <span className="w-2 h-2 rounded-full bg-sky-400 animate-pulse"></span>
-              <span>Resend / SMTP</span>
+              <span className={bridges?.email.enabled ? "w-2 h-2 rounded-full bg-amber-400" : "w-2 h-2 rounded-full bg-slate-500"}></span>
+              <span>{bridges?.email.status === 'configured_unverified' ? 'Configured · unverified' : 'Not configured'}</span>
             </span>
           </div>
           <div>
             <div className="text-lg font-mono font-black text-white tabular-nums">
-              {bridges?.email.openRate ?? 46.2}%
+              {bridges?.email.openRate == null ? '—' : `${bridges.email.openRate}%`}
             </div>
             <div className="text-[11px] text-slate-400 mt-0.5">
-              Open Rate · {bridges?.email.deliveredCount ?? 42} sent
+              Open rate unavailable · {bridges?.email.deliveredCount ?? 0} delivered
             </div>
           </div>
         </div>
@@ -303,16 +309,16 @@ export const UnifiedCommunicationsHub: React.FC<UnifiedCommunicationsHubProps> =
               <span className="text-xs font-bold text-white">Twilio SMS / Voice</span>
             </div>
             <span className="inline-flex items-center gap-1 text-[11px] text-amber-400 font-mono">
-              <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse"></span>
-              <span>Connected</span>
+              <span className={bridges?.sms.enabled ? "w-2 h-2 rounded-full bg-amber-400" : "w-2 h-2 rounded-full bg-slate-500"}></span>
+              <span>{bridges?.sms.status === 'configured_unverified' ? 'Configured · unverified' : 'Not configured'}</span>
             </span>
           </div>
           <div>
             <div className="text-lg font-mono font-black text-white tabular-nums">
-              {bridges?.sms.slaResponseSec ?? 28}s
+              {bridges?.sms.slaResponseSec == null ? '—' : `${bridges.sms.slaResponseSec}s`}
             </div>
             <div className="text-[11px] text-slate-400 mt-0.5">
-              Average SLA · {bridges?.sms.deliveredCount ?? 29} dispatches
+              Response SLA unavailable · {bridges?.sms.deliveredCount ?? 0} delivered
             </div>
           </div>
         </div>
@@ -327,16 +333,16 @@ export const UnifiedCommunicationsHub: React.FC<UnifiedCommunicationsHubProps> =
               <span className="text-xs font-bold text-white">Calendar Booking</span>
             </div>
             <span className="inline-flex items-center gap-1 text-[11px] text-purple-400 font-mono">
-              <span className="w-2 h-2 rounded-full bg-purple-400 animate-pulse"></span>
-              <span>Cal.com Bridge</span>
+              <span className={bridges?.calendar.enabled ? "w-2 h-2 rounded-full bg-amber-400" : "w-2 h-2 rounded-full bg-slate-500"}></span>
+              <span>{bridges?.calendar.status === 'configured_unverified' ? 'Configured · unverified' : 'Not configured'}</span>
             </span>
           </div>
           <div>
             <div className="text-lg font-mono font-black text-white tabular-nums">
-              {bridges?.calendar.bookedAppointments ?? 8}
+              {bridges?.calendar.bookedAppointments == null ? '—' : bridges.calendar.bookedAppointments}
             </div>
             <div className="text-[11px] text-slate-400 mt-0.5">
-              Appointments Booked · America/Edmonton
+              Appointments booked · reporting not connected
             </div>
           </div>
         </div>
@@ -483,7 +489,7 @@ export const UnifiedCommunicationsHub: React.FC<UnifiedCommunicationsHubProps> =
               <div className="text-right">
                 <span className="text-[10px] text-slate-500 uppercase tracking-wider block font-semibold">Destination</span>
                 <span className="font-mono text-amber-400 font-bold">
-                  {activeChannel === 'email' ? (selectedLead.email || 'Email on file') : (selectedLead.phone || 'Phone on file')}
+                  {activeChannel === 'email' ? (selectedLead.email || 'Not provided') : (selectedLead.phone || 'Not provided')}
                 </span>
               </div>
             </div>
@@ -537,12 +543,12 @@ export const UnifiedCommunicationsHub: React.FC<UnifiedCommunicationsHubProps> =
               {isDispatching ? (
                 <>
                   <RefreshCw className="w-4 h-4 animate-spin" />
-                  <span>Transmitting...</span>
+                  <span>Recording simulation...</span>
                 </>
               ) : (
                 <>
                   <Send className="w-4 h-4" />
-                  <span>Transmit via {activeChannel.toUpperCase()}</span>
+                  <span>Record simulated dispatch</span>
                 </>
               )}
             </button>
@@ -556,15 +562,15 @@ export const UnifiedCommunicationsHub: React.FC<UnifiedCommunicationsHubProps> =
           <div className="flex items-center gap-2">
             <ShieldCheck className="w-4 h-4 text-emerald-400" />
             <h4 className="text-xs font-bold uppercase tracking-wider text-white">
-              Cryptographic Transmission Ledger & Live Receipts
+              Dispatch Simulation Log
             </h4>
           </div>
-          <span className="text-[10px] font-mono text-slate-400">AES-256-GCM Verified</span>
+          <span className="text-[10px] font-mono text-slate-400">Encryption status not verified</span>
         </div>
 
         {dispatchHistory.length === 0 ? (
           <div className="p-8 text-center text-slate-500 text-xs">
-            No live dispatches logged yet. Transmit an outreach message above to start the conversion ledger.
+            No simulations recorded yet. Use the button above to record a simulation; no external message will be sent.
           </div>
         ) : (
           <div className="divide-y divide-slate-800/60 max-h-72 overflow-y-auto">
@@ -583,9 +589,9 @@ export const UnifiedCommunicationsHub: React.FC<UnifiedCommunicationsHubProps> =
                   </div>
                 </div>
                 <div className="flex items-center gap-4 text-[11px]">
-                  <span className="text-slate-400 font-mono hidden sm:inline">{item.providerId}</span>
-                  <span className="text-emerald-400 font-semibold flex items-center gap-1">
-                    <CheckCircle2 className="w-3.5 h-3.5" /> Delivered
+                  <span className="text-slate-400 font-mono hidden sm:inline">{item.providerId || 'Simulation only'}</span>
+                  <span className="text-slate-400 font-semibold flex items-center gap-1">
+                    <CheckCircle2 className="w-3.5 h-3.5" /> {item.status === "delivered" ? "Delivered" : "Simulation recorded"}
                   </span>
                   <span className="text-slate-500 font-mono text-[10px]">
                     {new Date(item.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}

@@ -4,6 +4,7 @@ import {
   Globe, 
   Zap, 
   ShieldCheck, 
+  Shield,
   AlertTriangle, 
   Star, 
   Calendar, 
@@ -36,16 +37,16 @@ interface AuditData {
   city: string;
   serviceType: string;
   websiteUrl?: string;
-  seoScore: number;
-  performanceScore: number;
-  sslStatus: 'secured' | 'missing';
-  googleRating: number;
-  reviewCount: number;
-  sentimentScore: number;
+  seoScore: number | null;
+  performanceScore: number | null;
+  sslStatus: 'secured' | 'missing' | 'unknown';
+  googleRating: number | null;
+  reviewCount: number | null;
+  sentimentScore: number | null;
   notes: string;
   outreachStrategy: string;
-  urgencyScore: number;
-  predictedLtvUsd: number;
+  urgencyScore: number | null;
+  predictedLtvUsd: number | null;
   createdAt: string;
 }
 
@@ -93,12 +94,10 @@ export default function PublicAuditPage({ auditId, onNavigateToLogin }: PublicAu
     }
   }, [auditId]);
 
-  // Derived calculations:
-  // Google benchmarks show mobile bounce increases by 32% as page load goes from 1s to 3s, and 90% if >5s.
-  const perfScore = data?.performanceScore ?? 50;
-  const bouncePenaltyPct = perfScore < 50 ? 0.38 : perfScore < 75 ? 0.22 : 0.08;
-  const currentConversionRate = 0.025; // 2.5% standard
-  const estimatedLostLeadsPerMonth = Math.round(monthlyVisitors * bouncePenaltyPct * currentConversionRate);
+  // Scenario calculations only: these assumptions are not measured business results.
+  const assumedBounceRate = 0.22;
+  const currentConversionRate = 0.025;
+  const estimatedLostLeadsPerMonth = Math.round(monthlyVisitors * assumedBounceRate * currentConversionRate);
   const estimatedAnnualLostRevenue = Math.round(estimatedLostLeadsPerMonth * avgTicketValue * 12);
 
   const handleBookingSubmit = async (e: React.FormEvent) => {
@@ -129,7 +128,7 @@ export default function PublicAuditPage({ auditId, onNavigateToLogin }: PublicAu
     }
   };
 
-  const bookingUrl = workspaceConfig.bookingUrl || 'https://cal.com/hal-strategy';
+  const bookingUrl = workspaceConfig.bookingUrl?.trim() || '';
   const brandColor = workspaceConfig.brandColor || '#3b82f6';
 
   if (loading) {
@@ -194,16 +193,18 @@ export default function PublicAuditPage({ auditId, onNavigateToLogin }: PublicAu
               <span className="md:hidden">Call</span>
             </a>
           )}
-          <a
-            href={bookingUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="px-4 py-1.5 rounded-md text-xs font-mono font-bold text-white shadow-lg transition-transform hover:scale-[1.02] flex items-center gap-1.5"
-            style={{ backgroundColor: brandColor }}
-          >
-            <Calendar className="w-3.5 h-3.5" />
-            <span>Book 15-Min Call</span>
-          </a>
+          {bookingUrl && (
+            <a
+              href={bookingUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="px-4 py-1.5 rounded-md text-xs font-mono font-bold text-white shadow-lg transition-transform hover:scale-[1.02] flex items-center gap-1.5"
+              style={{ backgroundColor: brandColor }}
+            >
+              <Calendar className="w-3.5 h-3.5" />
+              <span>Book 15-Min Call</span>
+            </a>
+          )}
         </div>
       </header>
 
@@ -232,16 +233,16 @@ export default function PublicAuditPage({ auditId, onNavigateToLogin }: PublicAu
           <div className="bg-bg-raised border border-border-dim rounded-xl p-5 space-y-3 relative overflow-hidden">
             <div className="flex justify-between items-start">
               <span className="text-[10px] font-mono uppercase tracking-wider text-text-secondary font-bold">Mobile Speed</span>
-              <Zap className={`w-4 h-4 ${data.performanceScore >= 70 ? 'text-emerald-400' : data.performanceScore >= 50 ? 'text-amber-400' : 'text-rose-400'}`} />
+              <Zap className={`w-4 h-4 ${data.performanceScore == null ? 'text-text-tertiary' : data.performanceScore >= 70 ? 'text-emerald-400' : data.performanceScore >= 50 ? 'text-amber-400' : 'text-rose-400'}`} />
             </div>
             <div className="flex items-baseline gap-2">
-              <span className={`text-3xl font-extrabold font-mono ${data.performanceScore >= 70 ? 'text-emerald-400' : data.performanceScore >= 50 ? 'text-amber-400' : 'text-rose-400'}`}>
-                {data.performanceScore}
+              <span className={`text-3xl font-extrabold font-mono ${data.performanceScore == null ? 'text-text-tertiary' : data.performanceScore >= 70 ? 'text-emerald-400' : data.performanceScore >= 50 ? 'text-amber-400' : 'text-rose-400'}`}>
+                {data.performanceScore ?? 'Not assessed'}
               </span>
               <span className="text-xs text-text-tertiary font-mono">/ 100</span>
             </div>
             <p className="text-[11px] text-text-secondary leading-snug">
-              {data.performanceScore < 60 ? 'High mobile bounce risk. Heavy friction on smartphones.' : 'Acceptable mobile load speed benchmark.'}
+              {data.performanceScore == null ? 'No measured speed score is stored for this report.' : data.performanceScore < 60 ? 'Measured score indicates potential mobile performance issues.' : 'Measured score is within the selected acceptable range.'}
             </p>
           </div>
 
@@ -249,11 +250,11 @@ export default function PublicAuditPage({ auditId, onNavigateToLogin }: PublicAu
           <div className="bg-bg-raised border border-border-dim rounded-xl p-5 space-y-3 relative overflow-hidden">
             <div className="flex justify-between items-start">
               <span className="text-[10px] font-mono uppercase tracking-wider text-text-secondary font-bold">Search Visibility</span>
-              <Globe className={`w-4 h-4 ${data.seoScore >= 70 ? 'text-emerald-400' : 'text-amber-400'}`} />
+              <Globe className={`w-4 h-4 ${data.seoScore == null ? 'text-text-tertiary' : data.seoScore >= 70 ? 'text-emerald-400' : 'text-amber-400'}`} />
             </div>
             <div className="flex items-baseline gap-2">
-              <span className={`text-3xl font-extrabold font-mono ${data.seoScore >= 70 ? 'text-emerald-400' : 'text-amber-400'}`}>
-                {data.seoScore}
+              <span className={`text-3xl font-extrabold font-mono ${data.seoScore == null ? 'text-text-tertiary' : data.seoScore >= 70 ? 'text-emerald-400' : 'text-amber-400'}`}>
+                {data.seoScore ?? 'Not assessed'}
               </span>
               <span className="text-xs text-text-tertiary font-mono">/ 100</span>
             </div>
@@ -266,15 +267,15 @@ export default function PublicAuditPage({ auditId, onNavigateToLogin }: PublicAu
           <div className="bg-bg-raised border border-border-dim rounded-xl p-5 space-y-3 relative overflow-hidden">
             <div className="flex justify-between items-start">
               <span className="text-[10px] font-mono uppercase tracking-wider text-text-secondary font-bold">Security Lock</span>
-              {data.sslStatus === 'secured' ? <ShieldCheck className="w-4 h-4 text-emerald-400" /> : <AlertTriangle className="w-4 h-4 text-rose-400" />}
+              {data.sslStatus === 'secured' ? <ShieldCheck className="w-4 h-4 text-emerald-400" /> : data.sslStatus === 'missing' ? <AlertTriangle className="w-4 h-4 text-rose-400" /> : <Shield className="w-4 h-4 text-text-tertiary" />}
             </div>
             <div className="flex items-baseline gap-2">
-              <span className={`text-xl font-bold font-mono uppercase ${data.sslStatus === 'secured' ? 'text-emerald-400' : 'text-rose-400'}`}>
-                {data.sslStatus}
+              <span className={`text-xl font-bold font-mono uppercase ${data.sslStatus === 'secured' ? 'text-emerald-400' : data.sslStatus === 'missing' ? 'text-rose-400' : 'text-text-tertiary'}`}>
+                {data.sslStatus === 'unknown' ? 'Not assessed' : data.sslStatus}
               </span>
             </div>
             <p className="text-[11px] text-text-secondary leading-snug">
-              {data.sslStatus === 'secured' ? 'Verified HTTPS SSL encryption lock active.' : 'Browser security warning flag active.'}
+              {data.sslStatus === 'secured' ? 'HTTPS was recorded as secured for this report.' : data.sslStatus === 'missing' ? 'HTTPS was recorded as missing for this report.' : 'No SSL assessment is stored for this report.'}
             </p>
           </div>
 
@@ -286,12 +287,12 @@ export default function PublicAuditPage({ auditId, onNavigateToLogin }: PublicAu
             </div>
             <div className="flex items-baseline gap-2">
               <span className="text-3xl font-extrabold font-mono text-text-primary">
-                {data.googleRating}
+                {data.googleRating ?? 'Not available'}
               </span>
-              <span className="text-xs text-text-tertiary font-mono">({data.reviewCount} reviews)</span>
+              <span className="text-xs text-text-tertiary font-mono">({data.reviewCount == null ? 'review count unavailable' : `${data.reviewCount} reviews`})</span>
             </div>
             <p className="text-[11px] text-text-secondary leading-snug">
-              Verified public customer feedback & reputation index.
+              Public review and reputation data has not been verified for this report.
             </p>
           </div>
 
@@ -306,14 +307,14 @@ export default function PublicAuditPage({ auditId, onNavigateToLogin }: PublicAu
               </div>
               <div>
                 <h2 className="text-lg font-mono font-bold text-text-primary uppercase">Interactive Revenue Leakage Calculator</h2>
-                <p className="text-xs text-text-secondary font-mono">Adjust values below to simulate estimated lost clients due to website latency</p>
+                <p className="text-xs text-text-secondary font-mono">Illustrative scenario only. Traffic, conversion rate, and job value are assumptions unless verified measurements are supplied.</p>
               </div>
             </div>
 
             <div className="text-left sm:text-right font-mono">
-              <span className="text-[10px] text-text-secondary uppercase block">Estimated Leaking Revenue</span>
+              <span className="text-[10px] text-text-secondary uppercase block">Scenario Estimate — Not a Forecast</span>
               <span className="text-2xl font-black text-rose-400 tracking-tight">
-                -${estimatedAnnualLostRevenue.toLocaleString()} / year
+                {estimatedAnnualLostRevenue == null ? 'Not available' : `-${estimatedAnnualLostRevenue.toLocaleString()} / year`}
               </span>
             </div>
           </div>
@@ -323,7 +324,7 @@ export default function PublicAuditPage({ auditId, onNavigateToLogin }: PublicAu
             {/* Input 1: Monthly Website Traffic */}
             <div className="space-y-3 bg-bg-base border border-border-dim p-4 rounded-xl">
               <div className="flex justify-between items-center text-xs font-mono">
-                <span className="text-text-primary font-semibold">Estimated Monthly Site Visitors:</span>
+                <span className="text-text-primary font-semibold">Assumed Monthly Site Visitors:</span>
                 <span className="text-indigo-400 font-bold">{monthlyVisitors.toLocaleString()} visits</span>
               </div>
               <input 
@@ -345,7 +346,7 @@ export default function PublicAuditPage({ auditId, onNavigateToLogin }: PublicAu
             {/* Input 2: Average Project / Contract Value */}
             <div className="space-y-3 bg-bg-base border border-border-dim p-4 rounded-xl">
               <div className="flex justify-between items-center text-xs font-mono">
-                <span className="text-text-primary font-semibold">Average Job / Project Ticket Size:</span>
+                <span className="text-text-primary font-semibold">Assumed Job / Project Value:</span>
                 <span className="text-emerald-400 font-bold">${avgTicketValue.toLocaleString()}</span>
               </div>
               <input 
@@ -370,10 +371,10 @@ export default function PublicAuditPage({ auditId, onNavigateToLogin }: PublicAu
           <div className="bg-bg-base border border-border-dim p-4 rounded-xl flex flex-col sm:flex-row items-center justify-between gap-4 font-mono text-xs">
             <div className="space-y-1 text-center sm:text-left">
               <p className="text-text-primary">
-                At your current performance score ({data.performanceScore}/100), approximately <strong className="text-rose-400">{Math.round(bouncePenaltyPct * 100)}% of mobile visitors</strong> bounce before seeing your contact phone or quote form.
+                <>This scenario assumes a 22% mobile bounce rate and a 2.5% conversion rate. These are assumptions, not measurements of this business.</>
               </p>
               <p className="text-[11px] text-text-secondary">
-                Recovering just <strong className="text-emerald-400">{estimatedLostLeadsPerMonth} missed contracts/month</strong> yields <strong className="text-emerald-400">+${(estimatedLostLeadsPerMonth * avgTicketValue).toLocaleString()}</strong> in gross revenue.
+                <>Under these assumptions, {estimatedLostLeadsPerMonth} potential leads/month represent up to <strong className="text-emerald-400">+${(estimatedLostLeadsPerMonth * avgTicketValue).toLocaleString()}</strong> in illustrative gross revenue.</>
               </p>
             </div>
 
@@ -382,7 +383,7 @@ export default function PublicAuditPage({ auditId, onNavigateToLogin }: PublicAu
               className="px-5 py-2.5 rounded-lg font-mono font-bold text-white text-xs whitespace-nowrap shadow-lg hover:brightness-110 transition-all cursor-pointer shrink-0"
               style={{ backgroundColor: brandColor }}
             >
-              Fix Speed & Capture Lost Leads
+              Request a Technical Review
             </button>
           </div>
         </div>
@@ -392,7 +393,7 @@ export default function PublicAuditPage({ auditId, onNavigateToLogin }: PublicAu
           <div className="flex items-center gap-2 border-b border-border-dim pb-4">
             <Award className="w-5 h-5 text-indigo-400" />
             <h3 className="text-base font-mono font-bold text-text-primary uppercase tracking-tight">
-              Recommended Optimization Strategy for {data.city}
+              Suggested Review Areas for {data.city}
             </h3>
           </div>
 
@@ -403,7 +404,7 @@ export default function PublicAuditPage({ auditId, onNavigateToLogin }: PublicAu
                 <span>1. Core Web Vitals & Mobile Speed Fix</span>
               </div>
               <p className="text-[11px] text-text-secondary leading-relaxed">
-                Compress hero imagery, defer blocking scripts, and load page styles within 1.2 seconds to satisfy Google's mobile ranking algorithm.
+                Potential checks include image weight, render-blocking resources, and measured Core Web Vitals. No issue is asserted until the site is tested.
               </p>
             </div>
 
@@ -413,7 +414,7 @@ export default function PublicAuditPage({ auditId, onNavigateToLogin }: PublicAu
                 <span>2. Instant Click-to-Call & Quote Friction</span>
               </div>
               <p className="text-[11px] text-text-secondary leading-relaxed">
-                Add persistent 1-tap emergency calling and high-converting 2-step estimate forms for local homeowners searching on mobile.
+                Review whether contact actions are visible, accessible, and easy to complete on mobile.
               </p>
             </div>
 
@@ -423,7 +424,7 @@ export default function PublicAuditPage({ auditId, onNavigateToLogin }: PublicAu
                 <span>3. Local Map Pack & Reputation Sync</span>
               </div>
               <p className="text-[11px] text-text-secondary leading-relaxed">
-                Optimize Google My Business category tags, local schema markup, and showcase recent 5-star customer reviews directly in search previews.
+                Review local business details, structured data, and current public reviews where these data sources are available.
               </p>
             </div>
 
@@ -433,7 +434,7 @@ export default function PublicAuditPage({ auditId, onNavigateToLogin }: PublicAu
                 <span>4. Automated Lead Notification Router</span>
               </div>
               <p className="text-[11px] text-text-secondary leading-relaxed">
-                Send incoming quote inquiries directly to your team's mobile via instant SMS dispatch to close jobs before competitors respond.
+                Review lead-notification options after a messaging provider has been configured and delivery has been tested.
               </p>
             </div>
           </div>
@@ -448,21 +449,25 @@ export default function PublicAuditPage({ auditId, onNavigateToLogin }: PublicAu
             Schedule a 15-Minute Technical Review Call
           </h2>
           <p className="text-xs sm:text-sm text-text-secondary max-w-lg mx-auto font-mono leading-relaxed">
-            We will walk through your live site architecture, show the exact scripts causing mobile lag, and outline a simple fix plan.
+            Request a technical review. Findings will be based on an actual assessment; this report does not claim unmeasured site issues.
           </p>
 
           <div className="flex flex-col sm:flex-row justify-center items-center gap-3 pt-2">
-            <a
-              href={bookingUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="w-full sm:w-auto px-6 py-3 rounded-xl font-mono font-bold text-white text-xs shadow-xl transition-transform hover:scale-105 flex items-center justify-center gap-2"
-              style={{ backgroundColor: brandColor }}
-            >
-              <Calendar className="w-4 h-4" />
-              <span>Choose Time on Calendar</span>
-              <ExternalLink className="w-3.5 h-3.5 opacity-80" />
-            </a>
+            {bookingUrl ? (
+              <a
+                href={bookingUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-full sm:w-auto px-6 py-3 rounded-xl font-mono font-bold text-white text-xs shadow-xl transition-transform hover:scale-105 flex items-center justify-center gap-2"
+                style={{ backgroundColor: brandColor }}
+              >
+                <Calendar className="w-4 h-4" />
+                <span>Choose Time on Calendar</span>
+                <ExternalLink className="w-3.5 h-3.5 opacity-80" />
+              </a>
+            ) : (
+              <span className="text-xs text-text-tertiary">Calendar booking link not configured</span>
+            )}
 
             <button
               onClick={() => setShowBookingModal(true)}
@@ -481,7 +486,7 @@ export default function PublicAuditPage({ auditId, onNavigateToLogin }: PublicAu
         {/* FOOTER */}
         <footer className="pt-8 border-t border-border-dim text-center font-mono text-xs text-text-tertiary space-y-2">
           <p>© {new Date().getFullYear()} {workspaceConfig.agencyName}. All Rights Reserved.</p>
-          <p className="text-[10px]">Confidential Business Performance Audit prepared by {workspaceConfig.operatorName}.</p>
+          <p className="text-[10px]">Technical assessment report prepared by {workspaceConfig.operatorName}.</p>
           {onNavigateToLogin && (
             <div className="pt-3">
               <button
@@ -552,7 +557,7 @@ export default function PublicAuditPage({ auditId, onNavigateToLogin }: PublicAu
                       required
                       value={bookingPhone}
                       onChange={(e) => setBookingPhone(e.target.value)}
-                      placeholder="(204) 555-0199"
+                      placeholder="Enter phone number"
                       className="w-full bg-bg-base border border-border-dim rounded-lg p-2.5 text-text-primary focus:outline-none focus:border-indigo-500"
                     />
                   </div>

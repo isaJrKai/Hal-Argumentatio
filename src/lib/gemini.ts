@@ -817,7 +817,7 @@ Tell me which city or niche you want to tackle right now and I will pull up the 
   } else if (lower.includes("mission") || lower.includes("conquest")) {
     reply += "A **Territory Conquest Mission** coordinates automated workflows to harvest active niche services in specific cities, audit their page speed, and output targeted cold-pitch decks instantly.";
   } else {
-    reply += "Regarding your request: I can confirm that HAL is fully structured on the 'Mission ➔ Goals ➔ Planner ➔ Memory ➔ Knowledge ➔ World Model ➔ Agents' pipeline. All core processes are fully functional, including our AES-256-GCM PII decryption engine, SQLite database, and multi-turn execution pipelines.";
+    reply += "HAL is designed around a Mission → Goals → Planner → Memory → Knowledge → World Model → Agents pipeline. Actual feature availability depends on the configured deployment, database, credentials, and integrations. Verify each workflow in the current environment before treating it as production-ready.";
   }
   return { text: reply };
 }
@@ -903,11 +903,15 @@ Return ONLY a valid JSON object matching:
       }
     });
 
-    const parsed = cleanJSONResponse(response.text || '{}');
+    const parsed = JSON.parse(cleanJSONResponse(response.text || '{}')) as Record<string, unknown>;
     return {
-      subject: parsed.subject,
-      body: parsed.body || `Hi ${targetOwner}, following up regarding ${lead.businessName} in ${targetCity}.`,
-      callToAction: parsed.callToAction || 'Schedule Consultation'
+      subject: typeof parsed.subject === 'string' ? parsed.subject : undefined,
+      body: typeof parsed.body === 'string' && parsed.body.trim()
+        ? parsed.body
+        : `Hi ${targetOwner}, following up regarding ${lead.businessName} in ${targetCity}.`,
+      callToAction: typeof parsed.callToAction === 'string' && parsed.callToAction.trim()
+        ? parsed.callToAction
+        : 'Schedule Consultation'
     };
   } catch (err) {
     console.warn('[Gemini draftOutreachMessage error, using heuristic fallback]:', err);

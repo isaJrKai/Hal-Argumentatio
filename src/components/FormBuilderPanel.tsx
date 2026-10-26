@@ -43,7 +43,7 @@ export const FormBuilderPanel: React.FC = () => {
 
   const [fields, setFields] = useState<FormField[]>([
     { id: '1', label: 'Full Name', type: 'text', required: true, placeholder: 'e.g. John Doe' },
-    { id: '2', label: 'Phone Number', type: 'tel', required: true, placeholder: workspaceConfig.contactPhone || '(204) 555-0199' },
+    { id: '2', label: 'Phone Number', type: 'tel', required: true, placeholder: workspaceConfig.contactPhone || 'Enter business phone number' },
     { id: '3', label: 'Service Address / Neighborhood', type: 'text', required: true, placeholder: `${regionalProfile.city} Street & Postal Code` },
     { id: '4', label: 'Emergency Urgency', type: 'select', required: true, options: ['Critical Emergency (Within 1 Hour)', 'Same Day Priority', 'Preventive Inspection'] },
     { id: '5', label: 'Describe the Issue', type: 'textarea', required: false, placeholder: `Briefly describe the ${activeNiche} repair needed...` }

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion } from 'motion/react';
-import { Shield, Eye, EyeOff, KeyRound, Loader2, Sparkles, Download } from 'lucide-react';
+import { Shield, Eye, EyeOff, Loader2, Sparkles, Download } from 'lucide-react';
 
 interface AuthPageProps {
   onAuthSuccess: (token: string, contractor: any) => void;
@@ -11,10 +11,10 @@ export default function AuthPage({ onAuthSuccess }: AuthPageProps) {
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   
   const [email, setEmail] = useState(() => {
-    if (typeof window === 'undefined') return 'kaisoisaac@gmail.com';
-    return localStorage.getItem('halbiz_last_email') || 'kaisoisaac@gmail.com';
+    if (typeof window === 'undefined') return '';
+    return localStorage.getItem('halbiz_last_email') || '';
   });
-  const [password, setPassword] = useState('admin123');
+  const [password, setPassword] = useState('');
   const [name, setName] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   
@@ -58,36 +58,6 @@ export default function AuthPage({ onAuthSuccess }: AuthPageProps) {
 
     setIsAppInstalled(true);
     localStorage.setItem('hal_app_installed', 'true');
-  };
-
-  const handleQuickLogin = async (quickEmail: string, quickPass: string) => {
-    setEmail(quickEmail);
-    setPassword(quickPass);
-    setIsLogin(true);
-    setLoading(true);
-    setError(null);
-    setSuccess(null);
-
-    try {
-      const res = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: quickEmail, password: quickPass })
-      });
-
-      const data = await res.json();
-      
-      if (!res.ok) {
-        throw new Error(data.error || 'Authentication failed');
-      }
-
-      localStorage.setItem('halbiz_last_email', quickEmail);
-      onAuthSuccess(data.token, data.contractor);
-    } catch (err: any) {
-      setError(err.message || 'An error occurred. Please try again.');
-    } finally {
-      setLoading(false);
-    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -250,7 +220,7 @@ export default function AuthPage({ onAuthSuccess }: AuthPageProps) {
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder={email.length > 20 ? "Paste token here..." : "e.g., admin@kaislead.com"}
+                placeholder={email.length > 20 ? "Paste token here..." : "you@company.com"}
                 className="w-full bg-card-inner border border-border-dark rounded-sm py-2 px-3 text-sm text-text-primary placeholder-text-dim focus:outline-none focus:border-brand transition-colors font-sans"
               />
             </div>
@@ -326,7 +296,7 @@ export default function AuthPage({ onAuthSuccess }: AuthPageProps) {
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="e.g., admin@kaislead.com"
+                placeholder="you@company.com"
                 className="w-full bg-card-inner border border-border-dark rounded-sm py-2 px-3 text-sm text-text-primary placeholder-text-dim focus:outline-none focus:border-brand transition-colors"
               />
             </div>
@@ -403,38 +373,9 @@ export default function AuthPage({ onAuthSuccess }: AuthPageProps) {
           </form>
         )}
 
-        <div className="mt-8 border-t border-border-dark pt-4 text-center space-y-2.5">
-          <p className="text-[10px] font-mono text-text-dim leading-normal uppercase tracking-widest flex items-center justify-center gap-1.5">
-            <KeyRound className="w-3.5 h-3.5 text-text-dim" /> SECURE SANDBOX ENVIRONMENT
-          </p>
-
-          <div className="flex flex-col gap-2 justify-center">
-            <button
-              id="quick-login-isaac"
-              type="button"
-              disabled={loading}
-              onClick={() => handleQuickLogin('kaisoisaac@gmail.com', 'admin123')}
-              className="text-[10px] font-mono py-2 px-3 rounded bg-brand/15 hover:bg-brand/25 border border-brand/40 text-brand transition-all cursor-pointer flex items-center justify-center gap-1.5 font-bold shadow-xs hover:scale-[1.01] active:scale-[0.99]"
-              title="Click to automatically login as Isaac (kaisoisaac@gmail.com)"
-            >
-              <span>⚡ Fast Login: Isaac (kaisoisaac@gmail.com)</span>
-            </button>
-            <button
-              id="quick-login-admin"
-              type="button"
-              disabled={loading}
-              onClick={() => handleQuickLogin('admin@kaislead.com', 'admin123')}
-              className="text-[10px] font-mono py-1.5 px-3 rounded bg-white/5 hover:bg-white/10 border border-border-dark text-text-secondary hover:text-white transition-all cursor-pointer flex items-center justify-center gap-1.5 font-bold shadow-xs hover:scale-[1.01] active:scale-[0.99]"
-              title="Click to automatically login as admin@kaislead.com"
-            >
-              <span>⚡ Fast Login: Admin (admin@kaislead.com)</span>
-            </button>
-          </div>
-
-          <p className="text-[9.5px] font-mono text-text-dim leading-normal">
-            Default Master Password: <strong className="text-text-secondary font-mono">admin123</strong>
-          </p>
-        </div>
+        <p className="mt-6 border-t border-border-dark pt-4 text-center text-xs text-text-dim">
+          Use your own account credentials. Default demo credentials are not provided.
+        </p>
       </motion.div>
     </div>
   );

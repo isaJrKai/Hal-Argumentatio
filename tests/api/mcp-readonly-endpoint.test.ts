@@ -1,4 +1,7 @@
 import { describe, it, expect } from 'vitest';
+
+// Explicit scope for tests that exercise MCP tools; never use this value outside tests.
+process.env.HAL_MCP_CONTRACTOR_ID ||= 'test_mcp_scope';
 import crypto from 'node:crypto';
 import express from 'express';
 import supertest from 'supertest';
@@ -126,16 +129,12 @@ describe('HAL Read-Only MCP Endpoint (/mcp/:secret)', () => {
     expect(parsed.count).toBeLessThanOrEqual(3);
   });
 
-  it('automatically falls back to owner account when HAL_MCP_CONTRACTOR_ID is not set', async () => {
+  it('fails closed when no explicit MCP account scope or account can be resolved', async () => {
     const originalEnv = process.env.HAL_MCP_CONTRACTOR_ID;
     try {
       delete process.env.HAL_MCP_CONTRACTOR_ID;
       const { getEffectiveContractorId } = await import('../../src/services/mcp/halMcpServer');
-      const resolved = await getEffectiveContractorId();
-      expect(resolved).toBeTruthy();
-      expect(typeof resolved).toBe('string');
-      // Should resolve to owner account
-      expect(resolved).toBe('con_admin_seed');
+      await expect(getEffectiveContractorId()).rejects.toThrow(/HAL_MCP_CONTRACTOR_ID/);
     } finally {
       if (originalEnv !== undefined) {
         process.env.HAL_MCP_CONTRACTOR_ID = originalEnv;

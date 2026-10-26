@@ -84,11 +84,13 @@ export const TopTelemetryBar: React.FC<TopTelemetryBarProps> = ({
   const [showRibbon, setShowRibbon] = useState(true);
   const [quickNotification, setQuickNotification] = useState<string | null>(null);
 
-  // Trigger brief user-friendly feedback on quick ribbon actions
-  const triggerRibbonAction = (actionName: string, tabRedirect?: string) => {
-    setQuickNotification(actionName);
+  // Ribbon items are shortcuts, not evidence that a background operation ran.
+  const triggerRibbonAction = (_actionName: string, tabRedirect?: string) => {
     if (tabRedirect) {
       setActiveTab(tabRedirect);
+      setQuickNotification('Workspace opened. No scan, verification, export, or message was run.');
+    } else {
+      setQuickNotification('This shortcut is not connected to a live operation yet.');
     }
     setTimeout(() => {
       setQuickNotification(null);
@@ -185,11 +187,11 @@ export const TopTelemetryBar: React.FC<TopTelemetryBarProps> = ({
           <button
             onClick={() => setActiveTab('hermes-lab')}
             className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-accent-dim border border-accent/30 text-accent hover:bg-accent-mid text-xs font-sans font-medium transition-all cursor-pointer shadow-xs"
-            title="AI Business Assistant: Online and ready"
+            title="Open the AI Assistant workspace"
           >
             <Sparkles className="w-3.5 h-3.5 text-accent" />
             <span className="hidden sm:inline">AI Assistant</span>
-            <span className="w-1.5 h-1.5 rounded-full bg-positive animate-pulse" />
+            <span className="w-1.5 h-1.5 rounded-full bg-text-tertiary" />
           </button>
 
           {/* Dedicated Theme Toggle: Paper & Ink / Dark Carbon */}
@@ -408,12 +410,12 @@ export const TopTelemetryBar: React.FC<TopTelemetryBarProps> = ({
               <div className="flex items-center gap-4 pl-2 shrink-0 text-[11px] font-sans">
                 <div className="flex items-center gap-1">
                   <span className="text-text-tertiary">Revenue (MTD):</span>
-                  <span className="font-bold text-text-primary font-mono">{formatCurrency(42850)}</span>
-                  <span className="text-positive font-medium">(+18.4%)</span>
+                  <span className="font-bold text-text-primary font-mono">Not available</span>
+                  <span className="text-positive font-medium">(change unavailable)</span>
                 </div>
                 <div className="flex items-center gap-1">
                   <span className="text-text-tertiary">Pipeline:</span>
-                  <span className="font-bold text-accent font-mono">{formatCurrency(91400)}</span>
+                  <span className="font-bold text-accent font-mono">Not available</span>
                 </div>
               </div>
             </>
@@ -453,16 +455,16 @@ export const TopTelemetryBar: React.FC<TopTelemetryBarProps> = ({
               <div className="flex items-center gap-2 px-3 shrink-0">
                 <span className="text-[11px] text-text-tertiary">Quick Filters:</span>
                 <button className="px-2 py-0.5 rounded bg-bg-raised text-text-secondary hover:text-text-primary border border-border-dim text-[11px] transition-colors cursor-pointer">
-                  All (142)
+                  All
                 </button>
                 <button className="px-2 py-0.5 rounded bg-accent-dim text-accent border border-accent/30 text-[11px] font-medium transition-colors cursor-pointer">
-                  Uncontacted (128)
+                  Uncontacted
                 </button>
                 <button className="px-2 py-0.5 rounded bg-negative-dim text-negative border border-negative/30 text-[11px] transition-colors cursor-pointer">
-                  Missing Website SSL (34)
+                  Missing Website SSL
                 </button>
                 <button className="px-2 py-0.5 rounded bg-positive-dim text-positive border border-positive/30 text-[11px] font-medium transition-colors cursor-pointer">
-                  High Deal Value $5k+ (48)
+                  High Deal Value
                 </button>
               </div>
             </>
@@ -493,18 +495,18 @@ export const TopTelemetryBar: React.FC<TopTelemetryBarProps> = ({
 
               <div className="flex items-center gap-3 px-3 shrink-0 text-[11px]">
                 <div>
-                  <span className="text-text-tertiary">Total Pipeline Value:</span>{' '}
-                  <strong className="text-positive font-mono text-xs">{formatCurrency(91400)}</strong>
+                  <span className="text-text-tertiary">Pipeline Value:</span>{' '}
+                  <strong className="text-text-secondary font-mono text-xs">Not available</strong>
                 </div>
                 <span className="text-border-default">|</span>
                 <div>
                   <span className="text-text-tertiary">Active Deals:</span>{' '}
-                  <strong className="text-text-primary font-mono text-xs">24 Opportunities</strong>
+                  <strong className="text-text-secondary font-mono text-xs">Not tracked</strong>
                 </div>
                 <span className="text-border-default">|</span>
                 <div>
                   <span className="text-text-tertiary">Win Rate:</span>{' '}
-                  <strong className="text-accent font-mono text-xs">28.4%</strong>
+                  <strong className="text-text-secondary font-mono text-xs">Not available</strong>
                 </div>
               </div>
             </>
@@ -535,7 +537,7 @@ export const TopTelemetryBar: React.FC<TopTelemetryBarProps> = ({
               <div className="flex items-center gap-2 px-3 shrink-0 text-[11px]">
                 <span className="text-text-tertiary">Territory:</span>
                 <span className="font-bold text-text-primary">{activeCity}, {regionalProfile.countryCode}</span>
-                <span className="text-text-tertiary">({regionalProfile.territoryMetrics.activeCompetitorDensity} local competitors analyzed)</span>
+                <span className="text-text-tertiary">(reference estimate: {regionalProfile.territoryMetrics.activeCompetitorDensity} competitors)</span>
               </div>
             </>
           )}
@@ -566,17 +568,17 @@ export const TopTelemetryBar: React.FC<TopTelemetryBarProps> = ({
               <div className="flex items-center gap-3 px-3 shrink-0 text-[11px]">
                 <div>
                   <span className="text-text-tertiary">Open Rate:</span>{' '}
-                  <strong className="text-positive font-mono">46.2%</strong>
+                  <strong className="text-text-secondary font-mono">Not tracked</strong>
                 </div>
                 <span className="text-border-default">|</span>
                 <div>
                   <span className="text-text-tertiary">Reply Rate:</span>{' '}
-                  <strong className="text-accent font-mono">14.8%</strong>
+                  <strong className="text-text-secondary font-mono">Not tracked</strong>
                 </div>
                 <span className="text-border-default">|</span>
                 <div>
-                  <span className="text-text-tertiary">Daily Dispatch Cap:</span>{' '}
-                  <strong className="text-text-secondary font-mono">50 messages/day</strong>
+                  <span className="text-text-tertiary">Dispatch Limit:</span>{' '}
+                  <strong className="text-text-secondary font-mono">Not configured</strong>
                 </div>
               </div>
             </>
@@ -616,12 +618,12 @@ export const TopTelemetryBar: React.FC<TopTelemetryBarProps> = ({
               <div className="flex items-center gap-3 px-3 shrink-0 text-[11px]">
                 <div>
                   <span className="text-text-tertiary">Monthly Run-Rate:</span>{' '}
-                  <strong className="text-positive font-mono">{formatCurrency(42850)}</strong>
+                  <strong className="text-text-secondary font-mono">Not available</strong>
                 </div>
                 <span className="text-border-default">|</span>
                 <div>
                   <span className="text-text-tertiary">Retainers Active:</span>{' '}
-                  <strong className="text-accent font-mono">12 Contractors</strong>
+                  <strong className="text-text-secondary font-mono">Not tracked</strong>
                 </div>
               </div>
             </>
