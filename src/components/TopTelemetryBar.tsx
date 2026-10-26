@@ -56,7 +56,7 @@ export const TopTelemetryBar: React.FC<TopTelemetryBarProps> = ({
   setActiveTab,
   onOpenCommandPalette,
   onOpenGitHubDeploy,
-  contractorName = 'Acme Services',
+  contractorName = 'Workspace',
   companyLogo,
   unreadNotificationsCount = 0,
   notifications = [],
@@ -255,7 +255,7 @@ export const TopTelemetryBar: React.FC<TopTelemetryBarProps> = ({
                     ))
                   ) : (
                     <div className="text-center py-4 text-text-tertiary text-xs">
-                      All systems operating smoothly. No pending alerts.
+                      No notifications to show.
                     </div>
                   )}
                 </div>
@@ -354,27 +354,27 @@ export const TopTelemetryBar: React.FC<TopTelemetryBarProps> = ({
               {/* Mini-Panel: Daily Actions */}
               <div className="flex items-center gap-1.5 pr-3 border-r border-border-dim/50 shrink-0">
                 <button
-                  onClick={() => triggerRibbonAction('Scanning website speed and mobile health for local leads...', 'leads')}
+                  onClick={() => triggerRibbonAction('Open prospect workspace', 'leads')}
                   className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-accent-dim hover:bg-accent-mid text-accent border border-accent/40 font-medium transition-all cursor-pointer shadow-xs"
                 >
                   <RefreshCw className="w-3.5 h-3.5 text-accent" />
-                  <span>Scan Website Health</span>
+                  <span>Open Prospects</span>
                 </button>
 
                 <button
-                  onClick={() => triggerRibbonAction(`Weather Demand Alert checked for ${activeCity}: High demand active`)}
+                  onClick={() => triggerRibbonAction(`Weather data is not connected`)}
                   className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-warning-dim hover:bg-warning-dim/80 text-warning border border-warning/30 font-medium transition-all cursor-pointer"
                 >
                   <AlertTriangle className="w-3.5 h-3.5 text-warning" />
-                  <span>Weather Demand Alert</span>
+                  <span>Weather Data</span>
                 </button>
 
                 <button
-                  onClick={() => triggerRibbonAction('Viewing today’s highest-priority trade lead', 'leads')}
+                  onClick={() => triggerRibbonAction('Open prospect list', 'leads')}
                   className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-bg-raised hover:bg-bg-subtle text-text-secondary hover:text-text-primary border border-border-default font-medium transition-all cursor-pointer"
                 >
                   <Sparkles className="w-3.5 h-3.5 text-accent" />
-                  <span>Today's Priority Deal</span>
+                  <span>View Prospects</span>
                 </button>
               </div>
 
