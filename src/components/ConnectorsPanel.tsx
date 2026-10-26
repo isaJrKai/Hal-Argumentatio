@@ -278,8 +278,8 @@ export default function ConnectorsPanel() {
       toast({
         variant: 'success',
         title: 'Mock Seed Residue Purged',
-        description: `All mock templates removed. Exactly ${data.remainingRealLeads} authentic harvested leads remain in your encrypted database.`,
-        whatNext: 'Database is 100% verified authentic.'
+        description: `Purge completed. ${typeof data.remainingRealLeads === 'number' ? data.remainingRealLeads : 'Unknown number of'} records remain; their authenticity has not been independently verified.`,
+        whatNext: 'Review remaining records and source evidence before live outreach.'
       });
     } catch (err: any) {
       toast({
@@ -302,11 +302,11 @@ export default function ConnectorsPanel() {
               Living Integration Conduits
             </h1>
             <Badge variant="active">
-              0% Fake Props
+              Verification required
             </Badge>
           </div>
           <p className="text-sm text-zinc-600 dark:text-zinc-400 mt-1 max-w-2xl">
-            Pure, operational connections. Only active services with genuine OAuth tokens, cryptographic keys, and live bidirectional webhooks.
+            Integration status is shown only where configuration or live verification is available. A saved token alone does not prove that a service is connected.
           </p>
         </div>
 
