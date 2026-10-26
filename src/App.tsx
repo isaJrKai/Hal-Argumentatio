@@ -46,8 +46,7 @@ import {
   MessageSquare,
   LineChart,
   RefreshCw,
-  Send,
-  GitBranch
+  Send
 } from 'lucide-react';
 
 import AuthPage from './components/AuthPage';
@@ -91,7 +90,6 @@ import { DocumentStudioPanel } from './components/DocumentStudioPanel';
 import CalculatorsSection from './components/CalculatorsSection';
 import { ChatBotPanel } from './components/ChatBotPanel';
 import { UnifiedCommunicationsHub } from './components/UnifiedCommunicationsHub';
-import { GitHubDeployModal } from './components/GitHubDeployModal';
 
 import { useBusinessContext } from './context/BusinessContext';
 
@@ -232,7 +230,6 @@ export default function App() {
   const [toastAlert, setToastAlert] = useState<{ id: string; title: string; message: string; type: string } | null>(null);
   const [sseConnected, setSseConnected] = useState(false);
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
-  const [isGitHubModalOpen, setIsGitHubModalOpen] = useState(false);
   const [isSidebarHovered, setIsSidebarHovered] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
@@ -948,7 +945,6 @@ export default function App() {
         activeTab={activeTab}
         setActiveTab={setActiveTab}
         onOpenCommandPalette={() => setIsCommandPaletteOpen(true)}
-        onOpenGitHubDeploy={() => setIsGitHubModalOpen(true)}
         contractorName={contractor?.name}
         companyLogo={companyLogo}
         unreadNotificationsCount={unreadNotificationsCount}
@@ -1517,13 +1513,6 @@ export default function App() {
         }}
         leads={leads}
         campaigns={campaigns}
-      />
-
-      {/* GITHUB REPOSITORY DEPLOY / PUSH MODAL */}
-      <GitHubDeployModal
-        isOpen={isGitHubModalOpen}
-        onClose={() => setIsGitHubModalOpen(false)}
-        token={token}
       />
       </div>
     </InspectorProvider>
