@@ -117,7 +117,7 @@ export const BusinessProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       brandColor: 'system',
       tagline: 'AI Business Operating Intelligence Platform',
       bookingUrl: 'https://cal.com/hal-strategy',
-      contactPhone: '(214) 555-0199',
+      contactPhone: '',
       contactEmail: 'advisory@hal-operating.com',
       customCities: [],
       customNiches: [],
