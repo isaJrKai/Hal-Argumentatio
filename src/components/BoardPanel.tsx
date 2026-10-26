@@ -604,7 +604,7 @@ export default function BoardPanel({ leads, token, onRefresh }: BoardPanelProps)
                     <span className="text-[9px] text-text-tertiary uppercase block">Verified Telephone</span>
                     <span className="font-bold text-positive flex items-center gap-1.5">
                       <Phone className="w-3.5 h-3.5" />
-                      {selectedBoardLead.phone || '+1 (403) 555-0192'}
+                      {selectedBoardLead.phone || 'Not provided'}
                     </span>
                   </div>
                   <div className="p-3 bg-bg-base rounded-lg border border-border-dim space-y-1">
