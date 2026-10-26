@@ -121,16 +121,16 @@ export const UnifiedCommunicationsHub: React.FC<UnifiedCommunicationsHubProps> =
 
     if (activeChannel === 'whatsapp') {
       setSubject('');
-      setMessage(`Hi ${owner}, following up on our diagnostic of ${biz} in ${city}. We identified urgent homeowner search volume that is currently dropping off before calling your on-duty team. Can I send over the 2-minute teardown?`);
+      setMessage(`Hi ${owner}, I'm reaching out to ask whether ${biz} is open to discussing ways to improve online visibility and lead follow-up in ${city}. If useful, I can share a brief assessment based on publicly available information. Would you be interested?`);
     } else if (activeChannel === 'email') {
       setSubject(`Performance diagnostic & emergency call capture for ${biz} (${city})`);
-      setMessage(`Hi ${owner},\n\nI reviewed ${biz}'s local search presence in ${city} and identified that local homeowners needing ${selectedLead.serviceType || 'urgent service'} face a delay in your mobile intake flow.\n\nWe engineered a direct call-routing solution that connects inbound homeowners in under 30 seconds with zero wasted ad spend.\n\nWould you have 5 minutes this Thursday for a quick walkthrough?\n\nBest regards,\n${workspaceConfig.operatorName || 'HAL Dispatch Team'}\n${workspaceConfig.agencyName || 'HAL Business Operating Intelligence'}`);
+      setMessage(`Hi ${owner},\n\nI'm contacting ${biz} about potential ways to improve online visibility and lead follow-up in ${city}. I have not completed a verified technical audit, so I don't want to assume there is a specific problem.\n\nIf you're interested, I can review publicly available information and share evidence-based findings before recommending any changes.\n\nWould you be open to a brief conversation?\n\nRegards,\n${workspaceConfig.operatorName || 'HAL Team'}`);
     } else if (activeChannel === 'sms') {
       setSubject('');
-      setMessage(`Hi ${owner}, we have qualified homeowner requests for ${selectedLead.serviceType || 'trade service'} in ${city}. Does ${biz} have capacity to take priority calls this week?`);
+      setMessage(`Hi ${owner}, I'm reaching out about potential improvements to ${biz}'s online visibility and lead follow-up in ${city}. Would you be open to a short conversation?`);
     } else if (activeChannel === 'calendar') {
       setSubject(`HAL Emergency Dispatch Walkthrough — ${biz}`);
-      setMessage(`15-Minute Technical Intake Walkthrough\nAgenda:\n1. Review live speed deficit & missed call leak\n2. Demonstrate 30-sec automated dispatcher\n3. Confirm local service territory coverage in ${city}`);
+      setMessage(`15-Minute Introductory Review\nAgenda:\n1. Understand your current website and lead follow-up process\n2. Confirm which performance data is available\n3. Agree on next steps based on verified findings in ${city}`);
     }
   }, [activeChannel, selectedLead]);
 
@@ -161,7 +161,7 @@ export const UnifiedCommunicationsHub: React.FC<UnifiedCommunicationsHubProps> =
           if (data.draft.body) setMessage(data.draft.body);
           showToast({
             title: 'AI Copy Generated',
-            message: `Crafted tailored ${activeChannel.toUpperCase()} message using Gemini 3.8-Flash.`,
+            message: `AI draft generated; provider and model are configured at runtime.`,
             type: 'success'
           });
         }
@@ -543,7 +543,7 @@ export const UnifiedCommunicationsHub: React.FC<UnifiedCommunicationsHubProps> =
               {isDispatching ? (
                 <>
                   <RefreshCw className="w-4 h-4 animate-spin" />
-                  <span>Transmitting...</span>
+                  <span>Recording simulation...</span>
                 </>
               ) : (
                 <>
@@ -565,12 +565,12 @@ export const UnifiedCommunicationsHub: React.FC<UnifiedCommunicationsHubProps> =
               Dispatch Simulation Log
             </h4>
           </div>
-          <span className="text-[10px] font-mono text-slate-400">AES-256-GCM Verified</span>
+          <span className="text-[10px] font-mono text-slate-400">Encryption status not verified</span>
         </div>
 
         {dispatchHistory.length === 0 ? (
           <div className="p-8 text-center text-slate-500 text-xs">
-            No live dispatches logged yet. Transmit an outreach message above to start the conversion ledger.
+            No simulations recorded yet. Use the button above to record a simulation; no external message will be sent.
           </div>
         ) : (
           <div className="divide-y divide-slate-800/60 max-h-72 overflow-y-auto">
