@@ -82,9 +82,9 @@ The tracked .env.example lists the current configuration surface, including:
 - DATABASE_URL, NEON_DATABASE_URL, and/or SQL_HOST / SQL_USER / SQL_PASSWORD / SQL_DB_NAME
 - Optional provider keys for Hugging Face, OpenRouter, NVIDIA, and Google Maps
 - HAL_ACTIVE_AI
-- MCP_SECRET and optional HAL_MCP_CONTRACTOR_ID
+- MCP_SECRET and HAL_MCP_CONTRACTOR_ID (required when MCP is enabled)
 
-Password reset is intentionally disabled until persistent single-use tokens and a verified delivery provider are implemented. New accounts require passwords of at least 12 characters. Exact requirements depend on the route and feature being used. Generate unique secrets for each environment. The JWT secret must be high-entropy and private. The lead-encryption key must be managed carefully: changing it can make existing encrypted records unreadable unless the data is migrated correctly. HAL_LEGACY_ENCRYPTION_KEY_B64 exists only for a controlled migration; leave it empty in normal operation. Never copy example values into production.
+Password reset is intentionally disabled until persistent single-use tokens and a verified delivery provider are implemented. New accounts require passwords of at least 12 characters. When MCP is enabled, HAL_MCP_CONTRACTOR_ID must explicitly identify the intended account; automatic owner/first-account selection is disabled. Exact requirements depend on the route and feature being used. Generate unique secrets for each environment. The JWT secret must be high-entropy and private. The lead-encryption key must be managed carefully: changing it can make existing encrypted records unreadable unless the data is migrated correctly. HAL_LEGACY_ENCRYPTION_KEY_B64 exists only for a controlled migration; leave it empty in normal operation. Never copy example values into production.
 
 Legacy JSON-to-PostgreSQL migration scripts read a private export path from HAL_SOURCE_JSON. Runtime data is intentionally excluded from source control; do not commit a live export. Review each migration script and take a database backup before running it.
 
