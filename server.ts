@@ -8002,7 +8002,8 @@ async function startServer() {
         phase2Verified: verification.allPassed,
         verification,
         quadrants,
-        competitorAuditSample: null,\n        competitorAuditStatus,
+        competitorAuditSample: null,
+        competitorAuditStatus,
         recentIntelligenceEvents: recentAudits,
         integrity
       });
