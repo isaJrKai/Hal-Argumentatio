@@ -208,20 +208,10 @@ export const TRADE_TEMPLATES: Record<string, LandingPageConfig> = {
         ]
       },
       before_after: {
-        active: true,
+        active: false,
         title: 'Project Gallery — Add Real Work Samples',
         subtitle: 'No customer project photos are preloaded. Add genuine project images and obtain permission before publishing.',
-        items: [
-          {
-            id: 'ba1',
-            title: 'Complete Basement Sewer Backup Restoration',
-            location: 'Altadore, SW Calgary',
-            beforeImg: 'https://images.unsplash.com/photo-1584622650111-993a426fbf0a?auto=format&fit=crop&w=600&q=80',
-            afterImg: 'https://images.unsplash.com/photo-1620626011761-996317b8d101?auto=format&fit=crop&w=600&q=80',
-            challenge: '4-inch cast iron sewer line crushed by mature poplar root infiltration, causing raw backflow.',
-            solution: 'Excavated without disturbing foundation, installed heavy PVC line with cleanout and backwater valve.'
-          }
-        ]
+        items: []
       },
       reviews: {
         active: false,
@@ -234,7 +224,7 @@ export const TRADE_TEMPLATES: Record<string, LandingPageConfig> = {
       service_areas: {
         active: true,
         title: 'Service Coverage In Your Neighborhood',
-        subtitle: 'Our mobile trucks are distributed across all quadrants to meet our 30-minute dispatch guarantee.',
+        subtitle: 'Confirm actual service coverage and response times with the business before publishing.',
         cities: [
           'Downtown Calgary', 'Beltline', 'Mount Royal', 'Kensington', 
           'Altadore', 'Signal Hill', 'Airdrie', 'Cochrane', 'Okotoks', 'Chestermere'
@@ -389,20 +379,10 @@ export const TRADE_TEMPLATES: Record<string, LandingPageConfig> = {
         ]
       },
       before_after: {
-        active: true,
-        title: 'Recent Heating System Upgrades',
-        subtitle: 'Transforming noisy, inefficient mechanical rooms into clean, whisper-quiet setups.',
-        items: [
-          {
-            id: 'ba1',
-            title: '30-Year Old Low-Efficiency Furnace Conversion',
-            location: 'Varsity, Calgary',
-            beforeImg: 'https://images.unsplash.com/photo-1513694203232-719a280e022f?auto=format&fit=crop&w=600&q=80',
-            afterImg: 'https://images.unsplash.com/photo-1581092160607-ee22621dd758?auto=format&fit=crop&w=600&q=80',
-            challenge: 'Cracked heat exchanger leaking minor carbon monoxide into living quarters. System red-tagged.',
-            solution: 'Permitted same-day install of 97% variable-speed ECM furnace with twin intake venting.'
-          }
-        ]
+        active: false,
+        title: 'Project Gallery — Add Real Work Samples',
+        subtitle: 'No customer project photos are preloaded. Add genuine project images and obtain permission before publishing.',
+        items: []
       },
       reviews: {
         active: false,
@@ -562,20 +542,10 @@ export const TRADE_TEMPLATES: Record<string, LandingPageConfig> = {
         ]
       },
       before_after: {
-        active: true,
-        title: 'Storm Recovery Case Studies',
-        subtitle: 'Before and after restoration of wind-ravaged and hail-damaged local roofs.',
-        items: [
-          {
-            id: 'ba1',
-            title: 'Hail Storm Shingle Tear-Off & Class 4 Upgrade',
-            location: 'Saddle Ridge, Calgary',
-            beforeImg: 'https://images.unsplash.com/photo-1541888946425-d0fbb18615f3?auto=format&fit=crop&w=600&q=80',
-            afterImg: 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=600&q=80',
-            challenge: 'Golf ball hail bruised 60% of shingles and split vinyl siding, leading to water staining in attic.',
-            solution: 'Assisted homeowner with full insurance claim approval. Installed Class 4 impact shingles with 50-year warranty.'
-          }
-        ]
+        active: false,
+        title: 'Project Gallery — Add Real Work Samples',
+        subtitle: 'No customer project photos are preloaded. Add genuine project images and obtain permission before publishing.',
+        items: []
       },
       reviews: {
         active: false,
@@ -735,20 +705,10 @@ export const TRADE_TEMPLATES: Record<string, LandingPageConfig> = {
         ]
       },
       before_after: {
-        active: true,
-        title: 'Panel Hazard Transformations',
-        subtitle: 'Before and after replacements of dangerous, outdated electrical panels.',
-        items: [
-          {
-            id: 'ba1',
-            title: 'Messy 60-Amp Fuse Box to Modern 200-Amp Breaker Center',
-            location: 'Sunnyside, Calgary',
-            beforeImg: 'https://images.unsplash.com/photo-1558494949-ef010cbdcc31?auto=format&fit=crop&w=600&q=80',
-            afterImg: 'https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?auto=format&fit=crop&w=600&q=80',
-            challenge: 'Fire hazard caused by double-tapped breakers and aluminum-copper splices.',
-            solution: 'Permitted full copper rewiring, 200-amp Siemens panel, and whole-home type 2 surge suppressor.'
-          }
-        ]
+        active: false,
+        title: 'Project Gallery — Add Real Work Samples',
+        subtitle: 'No customer project photos are preloaded. Add genuine project images and obtain permission before publishing.',
+        items: []
       },
       reviews: {
         active: false,
