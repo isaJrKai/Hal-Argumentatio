@@ -1126,7 +1126,13 @@ app.get('/api/leads', authenticate, async (req, res) => {
   } catch (err: any) {
     try {
       const localLeads = db.getLeads(contractorId);
-      return res.json(localLeads);
+      // The in-memory fallback has no durable grounding audit history, so never
+      // present its legacy VERIFIED flag as proof of a current live probe.
+      return res.json(localLeads.map(lead => ({
+        ...lead,
+        verificationStatus: lead.verificationStatus === 'VERIFIED' ? 'UNVERIFIED_STAGING' : lead.verificationStatus,
+        dnsVerified: lead.verificationStatus === 'VERIFIED' ? false : lead.dnsVerified
+      })));
     } catch (localErr) {
       res.json([]);
     }
