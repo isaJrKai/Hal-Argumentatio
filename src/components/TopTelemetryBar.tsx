@@ -435,37 +435,11 @@ export const TopTelemetryBar: React.FC<TopTelemetryBarProps> = ({
                   <span>Find New Prospects</span>
                 </button>
 
-                <button
-                  onClick={() => triggerRibbonAction('Phone numbers and line types verified')}
-                  className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-positive-dim hover:bg-positive-dim/80 text-positive border border-positive/30 font-medium transition-all cursor-pointer"
-                >
-                  <Phone className="w-3.5 h-3.5" />
-                  <span>Verify Phone Lines</span>
-                </button>
-
-                <button
-                  onClick={() => triggerRibbonAction('Exporting prospect data to spreadsheet')}
-                  className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-bg-raised hover:bg-bg-subtle text-text-secondary hover:text-text-primary border border-border-default font-medium transition-all cursor-pointer"
-                >
-                  <Download className="w-3.5 h-3.5" />
-                  <span>Export to Excel</span>
-                </button>
+                <span className="text-[12px] text-text-secondary px-2">Phone verification and spreadsheet export are not connected yet.</span>
               </div>
 
-              <div className="flex items-center gap-2 px-3 shrink-0">
-                <span className="text-[11px] text-text-tertiary">Quick Filters:</span>
-                <button className="px-2 py-0.5 rounded bg-bg-raised text-text-secondary hover:text-text-primary border border-border-dim text-[11px] transition-colors cursor-pointer">
-                  All
-                </button>
-                <button className="px-2 py-0.5 rounded bg-accent-dim text-accent border border-accent/30 text-[11px] font-medium transition-colors cursor-pointer">
-                  Uncontacted
-                </button>
-                <button className="px-2 py-0.5 rounded bg-negative-dim text-negative border border-negative/30 text-[11px] transition-colors cursor-pointer">
-                  Missing Website SSL
-                </button>
-                <button className="px-2 py-0.5 rounded bg-positive-dim text-positive border border-positive/30 text-[11px] font-medium transition-colors cursor-pointer">
-                  High Deal Value
-                </button>
+              <div className="flex items-center gap-2 px-3 shrink-0 text-[12px] text-text-secondary">
+                Filters are available in Prospect Finder; no sample filter results are shown here.
               </div>
             </>
           )}
