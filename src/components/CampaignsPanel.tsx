@@ -53,8 +53,8 @@ export default function CampaignsPanel({ campaigns, leads = [], token, onRefresh
   const [outreachBody, setOutreachBody] = useState(`Hi {{ownerName}},\n\nI conducted a preliminary digital speed and SEO audit for {{businessName}} in {{city}}.\n\nWe identified opportunities to capture higher-intent client inquiries for {{serviceType}} before peak seasonal demand.\n\nWould you be open to a 5-minute teardown?`);
   const [recipientMode, setRecipientMode] = useState<'new_leads' | 'single_test'>('new_leads');
   const [testRecipient, setTestRecipient] = useState('');
-  const [testLeadBusiness, setTestLeadBusiness] = useState('Premier Trade Builders');
-  const [webhookUrl, setWebhookUrl] = useState('https://hooks.zapier.com/hooks/catch/sample/dispatch');
+  const [testLeadBusiness, setTestLeadBusiness] = useState('');
+  const [webhookUrl, setWebhookUrl] = useState('');
   const [dispatchLogs, setDispatchLogs] = useState<any[]>([]);
   const [isDispatching, setIsDispatching] = useState(false);
   const [dispatchResult, setDispatchResult] = useState<any | null>(null);
@@ -94,30 +94,14 @@ export default function CampaignsPanel({ campaigns, leads = [], token, onRefresh
         showToast(`Hermes diagnostic scan complete: ${data.report?.issueCount || data.issueCount || '1'} optimization vector identified`, 'success');
         if (onRefresh) onRefresh();
       } else {
-        // Provide intelligent fallback diagnostic if backend returns generic
         setDiagnosticReport({
-          healthScore: 89,
+          error: 'Diagnostics are unavailable because the server did not return a verified report.',
           timestamp: new Date().toISOString(),
-          scope: targetCampaign ? targetCampaign.name : 'Portfolio Wide',
-          anomalies: [
-            {
-              severity: 'warning',
-              channel: 'Google LSA & Search',
-              issue: 'High Lead Latency On Peak Evenings',
-              impact: 'Est. 18% of inbound inquiries go uncontacted during off-hours window.',
-              action: 'Enable Auto-Dispatch Webhook or Hermes instant SMS recovery bridge.'
-            },
-            {
-              severity: 'info',
-              channel: 'Meta Retargeting',
-              issue: 'Creative Fatigue Horizon Approaching',
-              impact: 'Average ad frequency reached 3.8 per localized trade homeowner.',
-              action: 'Synthesize new localized hero landing angles in Hermes Lab.'
-            }
-          ],
-          recommendation: 'Portfolio efficiency is strong (89/100). Reallocating 15% budget toward Tuesday-Thursday peak trade searches will reduce CPA by an estimated 12%.'
+          scope: targetCampaign ? targetCampaign.name : 'Portfolio',
+          anomalies: [],
+          recommendation: 'No recommendation was generated. Retry when the diagnostics service is available.'
         });
-        showToast('Hermes diagnostic scan completed: 2 vectors identified', 'success');
+        showToast('Diagnostics unavailable; no synthetic report was shown', 'error');
       }
     } catch (e) {
       console.error(e);
@@ -210,7 +194,7 @@ export default function CampaignsPanel({ campaigns, leads = [], token, onRefresh
               payload: {
                 campaign: selectedCampaign?.name || 'High LTV Campaign',
                 channel: dispatchChannel,
-                recipient: testRecipient || 'test@example.com',
+                recipient: testRecipient,
                 businessName: testLeadBusiness,
                 message: outreachBody
               }
