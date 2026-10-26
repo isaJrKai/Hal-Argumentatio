@@ -549,7 +549,7 @@ export default function ConnectorsPanel() {
                   Two-Way Twilio WhatsApp & SMS Webhook Conduit
                 </h3>
                 <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
-                  Live endpoint receiving contractor replies. Instantly updates lead status, commits ledger proof, and triggers real-time in-app alerts.
+                  Inbound webhook support is present in the code; provider signatures, event processing, and live alerts require end-to-end verification.
                 </p>
               </div>
             </div>
@@ -792,17 +792,17 @@ export default function ConnectorsPanel() {
                       Cloud SQL PostgreSQL Relational Storage
                     </h4>
                     <p className="text-xs text-zinc-500 mt-0.5">
-                      PostgreSQL 18.3 engine with 34 active enterprise tables.
+                      Database version, schema inventory, and connection status have not been checked here.
                     </p>
                   </div>
                 </div>
-                <Badge variant="active">
-                  Operational
+                <Badge variant="neutral">
+                  Not checked
                 </Badge>
               </div>
               <div className="mt-4 pt-3 border-t border-zinc-100 dark:border-zinc-800/60 flex items-center justify-between text-xs text-zinc-500">
-                <span>Latency: ~3ms</span>
-                <span>Security: Drizzle ORM + Connection Pooling</span>
+                <span>Latency: not measured</span>
+                <span>Schema and access controls require live verification</span>
               </div>
             </Card>
 
@@ -818,17 +818,17 @@ export default function ConnectorsPanel() {
                       Merkle Ledger & AES-256 PII Vault
                     </h4>
                     <p className="text-xs text-zinc-500 mt-0.5">
-                      SHA-256 immutable audit chain with AES-256-GCM field encryption.
+                      Ledger implementation is present; live integrity and encryption configuration must be verified.
                     </p>
                   </div>
                 </div>
-                <Badge variant="active">
-                  Verified Clean
+                <Badge variant="neutral">
+                  Not verified
                 </Badge>
               </div>
               <div className="mt-4 pt-3 border-t border-zinc-100 dark:border-zinc-800/60 flex items-center justify-between text-xs text-zinc-500">
-                <span>Ledger Sequence: #94+</span>
-                <span>Audit Blocks: Verified</span>
+                <span>Ledger sequence: not checked</span>
+                <span>Audit blocks: not verified</span>
               </div>
             </Card>
 
@@ -870,11 +870,11 @@ export default function ConnectorsPanel() {
                       Territory Intelligence Harvest Engine
                     </h4>
                     <p className="text-xs text-zinc-500 mt-0.5">
-                      Real Core Web Vitals speed tests, SSL tracking, and public review sentiment.
+                      Website and public-review enrichment requires provider data and separate verification.
                     </p>
                   </div>
                 </div>
-                <Badge variant="active">
+                <Badge variant="neutral">
                   Lead verification not run
                 </Badge>
               </div>
