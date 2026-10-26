@@ -192,7 +192,7 @@ export default function CampaignsPanel({ campaigns, leads = [], token, onRefresh
               targetUrl: webhookUrl,
               eventType: 'campaign.outreach_triggered',
               payload: {
-                campaign: selectedCampaign?.name || 'High LTV Campaign',
+                campaign: selectedCampaign?.name || 'Unassigned campaign',
                 channel: dispatchChannel,
                 recipient: testRecipient,
                 businessName: testLeadBusiness,
@@ -545,12 +545,12 @@ export default function CampaignsPanel({ campaigns, leads = [], token, onRefresh
             </p>
             <button
               onClick={() => {
-                showToast('Hermes automated pacing calibration applied to active pipelines', 'success');
+                showToast('Diagnostic report dismissed. No pipeline settings were changed.', 'info');
                 setDiagnosticReport(null);
               }}
               className="px-3 py-1.5 bg-brand text-black font-mono text-xs font-bold uppercase rounded-sm hover:opacity-90 transition-opacity cursor-pointer shrink-0"
             >
-              Apply 1-Click Calibration
+              Dismiss Report
             </button>
           </div>
         </div>
@@ -831,7 +831,7 @@ export default function CampaignsPanel({ campaigns, leads = [], token, onRefresh
           <div className="flex items-center gap-2 font-mono text-[10px]">
             <div className="px-2.5 py-1 rounded border bg-emerald-500/10 border-emerald-500/30 text-emerald-400 font-bold flex items-center gap-1.5">
               <Zap className="w-3 h-3" />
-              <span>OUTREACH PIPELINE: ACTIVE</span>
+              <span>OUTREACH SIMULATION: READY</span>
             </div>
 
             <div className="px-2.5 py-1 rounded border bg-blue-500/10 border-blue-500/30 text-blue-400 flex items-center gap-1.5">
@@ -854,7 +854,7 @@ export default function CampaignsPanel({ campaigns, leads = [], token, onRefresh
             <Mail className="w-5 h-5 shrink-0 mt-0.5" />
             <div>
               <div className="font-mono text-xs font-bold uppercase">Email Outreach Channel</div>
-              <div className="text-[11px] text-text-dim mt-0.5">High-deliverability custom pitch teardowns and audits</div>
+              <div className="text-[11px] text-text-dim mt-0.5">Prepare email copy; provider delivery is not connected to this simulation workflow</div>
             </div>
           </button>
 
@@ -869,7 +869,7 @@ export default function CampaignsPanel({ campaigns, leads = [], token, onRefresh
             <Phone className="w-5 h-5 shrink-0 mt-0.5" />
             <div>
               <div className="font-mono text-xs font-bold uppercase">SMS Mobile Channel</div>
-              <div className="text-[11px] text-text-dim mt-0.5">Instant mobile touchpoints and time-sensitive alerts</div>
+              <div className="text-[11px] text-text-dim mt-0.5">Prepare SMS copy; provider delivery is not connected to this simulation workflow</div>
             </div>
           </button>
 
@@ -916,7 +916,7 @@ export default function CampaignsPanel({ campaigns, leads = [], token, onRefresh
                       : 'bg-bg-subtle border-border-dim text-text-secondary hover:text-text-primary'
                   }`}
                 >
-                  SINGLE TEST TRANSMISSION
+                  SINGLE TEST SIMULATION
                 </button>
               </div>
             </div>
@@ -931,7 +931,7 @@ export default function CampaignsPanel({ campaigns, leads = [], token, onRefresh
                     type="url"
                     value={webhookUrl}
                     onChange={(e) => setWebhookUrl(e.target.value)}
-                    placeholder="https://hooks.zapier.com/..."
+                    placeholder="HTTPS webhook URL (allowlisted host)"
                     className="w-full bg-bg-subtle border border-border-dim rounded p-2 text-text-primary focus:outline-none focus:border-brand"
                   />
                 ) : (
@@ -939,7 +939,7 @@ export default function CampaignsPanel({ campaigns, leads = [], token, onRefresh
                     type="text"
                     value={testRecipient}
                     onChange={(e) => setTestRecipient(e.target.value)}
-                    placeholder={dispatchChannel === 'email' ? 'client@business.com' : '+12045550199'}
+                    placeholder={dispatchChannel === 'email' ? 'Recipient email address' : 'Recipient phone number'}
                     className="w-full bg-bg-subtle border border-border-dim rounded p-2 text-text-primary focus:outline-none focus:border-brand"
                   />
                 )}
@@ -1010,8 +1010,8 @@ export default function CampaignsPanel({ campaigns, leads = [], token, onRefresh
               <Zap className="w-3.5 h-3.5 text-brand" />
               <span>
                 {recipientMode === 'new_leads' 
-                  ? 'Batch transmission triggers real-time lead event logging and updates pipeline stage.'
-                  : 'Test transmission immediately validates credentials and returns provider metadata.'}
+                  ? 'Batch mode records simulation attempts only; it does not send messages or change lead stages.'
+                  : 'Email/SMS test mode records a simulation. Webhook mode sends only to a configured HTTPS allowlisted host.'}
               </span>
             </div>
 
@@ -1023,7 +1023,7 @@ export default function CampaignsPanel({ campaigns, leads = [], token, onRefresh
               {isDispatching ? (
                 <>
                   <Loader2 className="w-4 h-4 animate-spin" />
-                  <span>TRANSMITTING...</span>
+                  <span>RUNNING TEST...</span>
                 </>
               ) : (
                 <>
@@ -1048,12 +1048,12 @@ export default function CampaignsPanel({ campaigns, leads = [], token, onRefresh
               <div className="flex items-center gap-2 font-bold uppercase">
                 {dispatchResult.success !== false ? <CheckCircle2 className="w-4 h-4" /> : <AlertCircle className="w-4 h-4" />}
                 <span>
-                  {dispatchResult.success !== false ? 'Dispatch Successful' : 'Transmission Alert'}
+                  {dispatchResult.simulated !== undefined ? 'Simulation Recorded' : dispatchResult.success !== false ? 'Webhook Response' : 'Dispatch Alert'}
                 </span>
               </div>
               <div className="mt-1 text-[11px] font-mono text-text-secondary">
-                {dispatchResult.successful !== undefined ? (
-                  <span>Batch Complete: {dispatchResult.successful} delivered, {dispatchResult.failed} failed out of {dispatchResult.totalTargeted} targeted.</span>
+                {dispatchResult.simulated !== undefined ? (
+                  <span>Batch simulation: {dispatchResult.simulated} recorded, {dispatchResult.failed} blocked or skipped out of {dispatchResult.totalTargeted} targeted. No external messages were sent.</span>
                 ) : (
                   <span>Provider ID: {dispatchResult.providerId || 'ACK_OK'} • Mode: {dispatchResult.mode || 'live'} • Recipient: {dispatchResult.recipient || dispatchResult.targetUrl}</span>
                 )}
@@ -1067,7 +1067,7 @@ export default function CampaignsPanel({ campaigns, leads = [], token, onRefresh
           <div className="flex items-center justify-between">
             <h4 className="text-xs font-bold text-text-primary uppercase tracking-wider font-mono flex items-center gap-2">
               <Clock className="w-3.5 h-3.5 text-text-dim" />
-              Recent Dispatch Transmission Audit Logs
+              Recent Dispatch and Simulation Logs
             </h4>
             <button
               onClick={fetchDispatchHistory}
@@ -1112,10 +1112,10 @@ export default function CampaignsPanel({ campaigns, leads = [], token, onRefresh
                         </td>
                         <td className="py-2 px-3">
                           <span className={`flex items-center gap-1 font-bold ${
-                            log.status === 'delivered' ? 'text-positive' : 'text-rose-400'
+                            log.status === 'delivered' ? 'text-positive' : log.status === 'simulated' ? 'text-text-secondary' : 'text-rose-400'
                           }`}>
-                            {log.status === 'delivered' ? <CheckCircle2 className="w-3 h-3" /> : <AlertCircle className="w-3 h-3" />}
-                            {(log.status || 'SENT').toUpperCase()}
+                            {log.status === 'delivered' || log.status === 'simulated' ? <CheckCircle2 className="w-3 h-3" /> : <AlertCircle className="w-3 h-3" />}
+                            {(log.status || 'RECORDED').toUpperCase()}
                           </span>
                         </td>
                         <td className="py-2 px-3 text-text-dim text-[10px]">
@@ -1129,7 +1129,7 @@ export default function CampaignsPanel({ campaigns, leads = [], token, onRefresh
             </div>
           ) : (
             <div className="p-4 border border-dashed border-border-dark rounded text-center text-text-dim font-mono text-[11px]">
-              No dispatch transmissions recorded yet. Select an outreach channel above to send your first message.
+              No dispatch or simulation records yet. Test email/SMS mode records a simulation; webhook mode requires an allowlisted HTTPS target.
             </div>
           )}
         </div>
