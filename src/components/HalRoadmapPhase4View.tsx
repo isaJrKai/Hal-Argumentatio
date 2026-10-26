@@ -40,7 +40,7 @@ export const HalRoadmapPhase4View: React.FC = () => {
   const [actionNotice, setActionNotice] = useState<string | null>(null);
 
   // New Consensus State
-  const [newTopic, setNewTopic] = useState('Outreach Angle & Commercial Pricing for Calgary Commercial Roofing');
+  const [newTopic, setNewTopic] = useState('');
   const [isExecutingConsensus, setIsExecutingConsensus] = useState(false);
   const [isRecalibrating, setIsRecalibrating] = useState(false);
   const [isArbitrating, setIsArbitrating] = useState(false);
@@ -191,7 +191,7 @@ export const HalRoadmapPhase4View: React.FC = () => {
               </span>
               <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 flex items-center gap-1">
                 <CheckCircle2 className="w-3 h-3 text-emerald-500" />
-                RUNTIME STATUS UNUNVERIFIED
+                RUNTIME STATUS UNVERIFIED
               </span>
             </div>
             <h2 className="text-xl font-bold font-display text-text-primary tracking-tight">
@@ -239,11 +239,11 @@ export const HalRoadmapPhase4View: React.FC = () => {
                 Parallel Consensus
               </span>
               <span className="text-[10px] font-mono font-bold text-emerald-500 bg-emerald-500/10 px-1.5 py-0.5 rounded">
-                96% ALIGNMENT
+                ALIGNMENT NOT MEASURED
               </span>
             </div>
-            <div className="text-sm font-bold text-text-primary">Gemini 2.5 + Nemotron 70B</div>
-            <div className="text-[11px] text-text-tertiary">Zero single-point-of-failure cognitive arbitration</div>
+            <div className="text-sm font-bold text-text-primary">Model providers not verified</div>
+            <div className="text-[11px] text-text-tertiary">Provider redundancy not verified</div>
           </div>
 
           <div className="p-3.5 rounded-xl bg-bg-base border border-border-dim space-y-1">
@@ -253,11 +253,11 @@ export const HalRoadmapPhase4View: React.FC = () => {
                 Neural Agent Routing
               </span>
               <span className="text-[10px] font-mono font-bold text-emerald-500 bg-emerald-500/10 px-1.5 py-0.5 rounded">
-                5 ACTIVE NODES
+                NODES NOT VERIFIED
               </span>
             </div>
-            <div className="text-sm font-bold text-text-primary">Epoch #14 Calibrated</div>
-            <div className="text-[11px] text-text-tertiary">Continuous Bayesian weight adjustments</div>
+            <div className="text-sm font-bold text-text-primary">Calibration not available</div>
+            <div className="text-[11px] text-text-tertiary">Calibration workflow not verified</div>
           </div>
 
           <div className="p-3.5 rounded-xl bg-bg-base border border-border-dim space-y-1">
@@ -267,11 +267,11 @@ export const HalRoadmapPhase4View: React.FC = () => {
                 Strategy Arbitrage
               </span>
               <span className="text-[10px] font-mono font-bold text-emerald-500 bg-emerald-500/10 px-1.5 py-0.5 rounded">
-                +$9,615/MO LIFT
+                LIFT NOT MEASURED
               </span>
             </div>
-            <div className="text-sm font-bold text-text-primary">Guardrail Compliant</div>
-            <div className="text-[11px] text-text-tertiary">Closed-loop autonomous spend shifts</div>
+            <div className="text-sm font-bold text-text-primary">Guardrails not verified</div>
+            <div className="text-[11px] text-text-tertiary">Execution not verified</div>
           </div>
         </div>
       </div>
@@ -478,7 +478,7 @@ export const HalRoadmapPhase4View: React.FC = () => {
                         : 'bg-rose-500/15 text-rose-500 border-rose-500/30'
                     }`}>
                       <ShieldCheck className="w-3.5 h-3.5" />
-                      {cons.verdict || 'CONTRACT_VERIFIED_UNANIMOUS'} ({cons.alignmentScore}%)
+                      {cons.verdict || 'Verdict unavailable'} ({Number.isFinite(cons.alignmentScore) ? `${cons.alignmentScore}% reported alignment` : 'alignment not reported'})
                     </span>
                     <span className="px-2 py-1 rounded text-[10px] font-mono text-text-tertiary bg-bg-base border border-border-dim">
                       {new Date(cons.timestamp).toLocaleTimeString()}
@@ -641,7 +641,7 @@ export const HalRoadmapPhase4View: React.FC = () => {
               <div>
                 <h3 className="text-sm font-bold text-text-primary flex items-center gap-1.5">
                   <Sliders className="w-4 h-4 text-accent" />
-                  Calibrated Technical Urgency Multipliers (Epoch #14)
+                  Urgency multipliers (not calibrated)
                 </h3>
                 <p className="text-xs text-text-secondary">
                   Automatically calibrated weights derived from real contractor audits and closed-won pipeline transitions.
@@ -655,19 +655,19 @@ export const HalRoadmapPhase4View: React.FC = () => {
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
               <div className="p-3 rounded-lg bg-bg-base border border-border-dim space-y-1">
                 <span className="text-[10px] font-mono text-text-tertiary uppercase">Missing SSL</span>
-                <div className="text-lg font-bold font-mono text-text-primary">8.5x</div>
+                <div className="text-lg font-bold font-mono text-text-primary">Not measured</div>
                 <div className="text-[10px] text-text-secondary">High-urgency instant dropoff</div>
               </div>
 
               <div className="p-3 rounded-lg bg-bg-base border border-border-dim space-y-1">
                 <span className="text-[10px] font-mono text-text-tertiary uppercase">Mobile Speed LCP &gt; 4s</span>
-                <div className="text-lg font-bold font-mono text-text-primary">7.2x</div>
+                <div className="text-lg font-bold font-mono text-text-primary">Not measured</div>
                 <div className="text-[10px] text-text-secondary">Conversion rate leakage</div>
               </div>
 
               <div className="p-3 rounded-lg bg-bg-base border border-border-dim space-y-1">
                 <span className="text-[10px] font-mono text-text-tertiary uppercase">Phone Channel Lift</span>
-                <div className="text-lg font-bold font-mono text-text-primary">1.35x</div>
+                <div className="text-lg font-bold font-mono text-text-primary">Not measured</div>
                 <div className="text-[10px] text-text-secondary">Top commercial contractor channel</div>
               </div>
 
