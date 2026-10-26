@@ -9054,7 +9054,7 @@ async function startServer() {
         totalLeadsCount,
         syntheticLeadsCount,
         verifiedLeadsCount,
-        cryptoVerified: true,
+        cryptoVerified: db.verifyLedgerIntegrity(contractorId).valid,
         autonomyReadinessScore: learningState.autonomyReadinessScore,
         learningEpoch: learningState.calibrationEpoch
       };
