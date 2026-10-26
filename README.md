@@ -2,7 +2,7 @@
 
 HAL is an AI-assisted business operating intelligence application intended to help operators organise business information, manage leads and campaigns, analyse performance, produce forecasts and recommendations, and connect decisions to measured outcomes.
 
-**Project status:** active development. Independent clean-install, runtime, security, and production checks have not yet been completed as part of this sale-readiness pass. Feature descriptions below describe the codebase's intended scope and visible modules, not a warranty that every workflow is complete or production-ready.
+**Project status:** active development; not yet production-certified. On the sale-readiness branch, GitHub Actions has passed `npm ci`, TypeScript checks, the Vitest suite, the production build, and the production dependency audit. The full audit still reports four high-severity Firebase-related entries from orphaned legacy lockfile packages; the production dependency graph reports zero vulnerabilities. Live deployment, database restore, and end-to-end provider checks remain unverified. Feature descriptions below describe intended scope and visible modules, not a warranty that every workflow is complete.
 
 - **Repository:** https://github.com/isaJrKai/Hal-Argumentatio
 - **Current preview URL:** https://halbiz.ai.studio (availability and transfer arrangements must be confirmed separately)
@@ -71,7 +71,7 @@ Do not connect a local or test run to a production database. Use a separate deve
    npm run dev
    ~~~
 
-These commands document the repository's intended workflow; they have not yet been verified by a clean install in this sale-readiness pass. The server includes environment-specific behaviour, and a missing database URL may not produce a safe, useful local configuration. Startup alone is not proof that persistence works.
+GitHub Actions has verified the lockfile install, type-check/test suite, and production build on the sale-readiness branch. That does not verify a live database, provider credentials, migrations, or the deployed preview. The server includes environment-specific behaviour; startup alone is not proof that persistence works.
 
 ## Environment configuration
 
@@ -103,11 +103,11 @@ Legacy JSON-to-PostgreSQL migration scripts read a private export path from HAL_
 | npm run test:security | Run security tests |
 | npm run test:ci | Run TypeScript checking followed by the full Vitest suite |
 
-These are package scripts, not a statement that they currently pass. Record the Node/npm versions, exact command, exit code, and test summary when validating the project.
+CI evidence on the sale-readiness branch: `npm ci`, `npm run test:ci`, and `npm run build` passed. Re-run them after any further changes and verify the target deployment separately.
 
 ## Communications integration status
 
-The current unified outreach endpoint records simulations only; it does not send WhatsApp, SMS, or email messages. Provider cards indicate whether configuration values are present, not whether a real provider connection has been verified. Delivery, reply, open, SLA, and booking metrics remain unavailable until provider adapters and event tracking are implemented and tested. Bridge configuration is held in process memory by the current configuration endpoint and is not a durable multi-tenant credential store. The separate signed webhook endpoint requires a dedicated HAL_WEBHOOK_SIGNING_SECRET and an explicit HAL_WEBHOOK_ALLOWED_HOSTS allowlist; redirects are not followed. The inbound WhatsApp webhook requires a configured app secret and validates the raw-body HMAC signature. Cross-origin browser access is controlled by CORS_ALLOWED_ORIGINS or APP_URL.
+The current unified outreach endpoint records simulations only; it does not send WhatsApp, SMS, or email messages. Provider cards indicate whether configuration values are present, not whether a real provider connection has been verified. Delivery, reply, open, SLA, and booking metrics remain unavailable until provider adapters and event tracking are implemented and tested. Bridge configuration is held in process memory by the current configuration endpoint and is not a durable multi-tenant credential store. The separate signed webhook endpoint requires a dedicated HAL_WEBHOOK_SIGNING_SECRET and an explicit HAL_WEBHOOK_ALLOWED_HOSTS allowlist; redirects are not followed. The `/api/outreach/whatsapp/webhook` route requires a configured app secret and validates the raw-body HMAC signature. The legacy `/api/webhooks/twilio` and `/api/webhooks/whatsapp` handlers are disabled in production until provider signature validation and tenant routing are implemented. Cross-origin browser access is controlled by CORS_ALLOWED_ORIGINS or APP_URL.
 
 ## Security and operational notes
 
