@@ -2246,15 +2246,15 @@ app.post('/api/leads/ingest', authenticate, async (req, res) => {
         niche: hl.serviceType,
         source: 'harvested_intelligence',
         status: 'new',
-        urgencyScore: hl.urgencyScore || 7.5,
+        urgencyScore: hl.urgencyScore ?? 0,
         predictedLtv: hl.predictedLtvUsd || 4500,
         notes: hl.notes || `Harvested real business profile. Niche: ${hl.serviceType}.`,
         websiteUrl: hl.websiteUrl,
         performanceScore: hl.performanceScore,
         sslStatus: hl.sslStatus,
         reviewCount: hl.reviewCount,
-        verificationStatus: (hl as any).verificationStatus || 'VERIFIED',
-        dnsVerified: (hl as any).dnsVerified !== undefined ? Boolean((hl as any).dnsVerified) : true,
+        verificationStatus: (hl as any).verificationStatus || 'UNVERIFIED_STAGING',
+        dnsVerified: (hl as any).dnsVerified !== undefined ? Boolean((hl as any).dnsVerified) : false,
       }).returning();
 
       // 2. Add lead creation event
@@ -2304,8 +2304,8 @@ app.post('/api/leads/ingest', authenticate, async (req, res) => {
     broadcastNotification(
       contractorId,
       'success',
-      'Territory Leads Ingested',
-      `Added ${addedItems.length} verified operating local businesses to your active pipeline!`
+      'Territory Leads Imported',
+      `Imported ${addedItems.length} business records. Review verification status before contacting them.`
     );
 
     res.json({ success: true, count: addedItems.length, leads: addedItems });
@@ -2353,7 +2353,7 @@ app.post('/api/leads/purge-and-replace', authenticate, async (req, res) => {
         source: 'harvested_intelligence',
         status: 'new',
         urgencyScore: hl.urgencyScore || 7.5,
-        predictedLtv: hl.predictedLtvUsd || 2500,
+        predictedLtv: hl.predictedLtvUsd ?? 0,
         notes: hl.notes || `Harvested real business profile. Niche: ${hl.serviceType}.`,
         websiteUrl: hl.websiteUrl,
         performanceScore: hl.performanceScore,
@@ -2375,7 +2375,7 @@ app.post('/api/leads/purge-and-replace', authenticate, async (req, res) => {
         source: 'harvested_intelligence',
         status: 'new',
         urgencyScore: hl.urgencyScore || 7.5,
-        predictedLtvUsd: hl.predictedLtvUsd || 2500,
+        predictedLtvUsd: hl.predictedLtvUsd ?? 0,
         notes: hl.notes || `Harvested real business profile. Niche: ${hl.serviceType}.`,
         websiteUrl: hl.websiteUrl,
         performanceScore: hl.performanceScore,
@@ -2399,16 +2399,16 @@ app.post('/api/leads/purge-and-replace', authenticate, async (req, res) => {
     await pgDb.insert(auditLogs).values({
       id: crypto.randomUUID(),
       contractorId,
-      action: 'MOCK_DATA_REPLACED_ACTUAL',
-      details: `Purged static seed files and replaced with ${harvestedLeads.length} newly harvested local businesses.`
+      action: 'BUSINESS_RECORDS_IMPORTED',
+      details: `Removed identified seed records and imported ${harvestedLeads.length} business records; import does not itself verify authenticity.`
     });
 
     // 4. Broadcast Real-time notification
     broadcastNotification(
       contractorId,
       'success',
-      'Phase 2 Active: Sourced Real Data!',
-      `Successfully purged mock business seeds and replaced them with ${harvestedLeads.length} actual harvested local leads!`
+      'Business Records Imported',
+      `Imported ${harvestedLeads.length} records. Verification must be performed separately.`
     );
 
     res.json({ success: true, count: harvestedLeads.length });
