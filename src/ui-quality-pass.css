@@ -5,7 +5,7 @@
  */
 
 :root {
-  font-size: 16px;
+  font-size: 14px;
   --ui-motion-fast: 140ms;
   --ui-motion-standard: 190ms;
   --ui-ease-out: cubic-bezier(0.23, 1, 0.32, 1);
@@ -14,8 +14,8 @@
 
 /* The existing interface overuses micro-labels. Preserve their hierarchy but make them readable. */
 body {
-  font-size: 16px;
-  line-height: 1.6;
+  font-size: 14px;
+  line-height: 1.55;
   color: var(--text-primary);
 }
 
@@ -45,23 +45,23 @@ input,
 select,
 textarea {
   min-height: 40px;
-  font-size: 15px;
+  font-size: 14px;
 }
 
 label,
 .label,
 .metric-label {
-  font-size: 13px;
-  letter-spacing: 0.045em;
+  font-size: 12px;
+  letter-spacing: 0.035em;
 }
 
 .body {
-  font-size: 15px;
-  line-height: 1.65;
+  font-size: 14px;
+  line-height: 1.6;
 }
 
 .data-cell {
-  font-size: 14px;
+  font-size: 13px;
 }
 
 .btn-primary,
@@ -69,14 +69,14 @@ label,
 .btn-danger {
   min-height: 38px;
   font-family: var(--font-sans);
-  font-size: 13px;
-  letter-spacing: 0.025em;
+  font-size: 12px;
+  letter-spacing: 0.02em;
   text-transform: none;
 }
 
 .badge {
   font-family: var(--font-sans);
-  font-size: 12px;
+  font-size: 11px;
   letter-spacing: 0.01em;
   padding: 3px 8px;
 }
