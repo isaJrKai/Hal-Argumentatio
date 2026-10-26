@@ -118,7 +118,7 @@ export async function getEffectiveContractorId(): Promise<string> {
     // ignore
   }
 
-  return 'con_admin_seed';
+  throw new Error('MCP account scope is not configured and no account could be resolved. Set HAL_MCP_CONTRACTOR_ID explicitly.');
 }
 
 // Strips sensitive fields and decrypts PII safely
