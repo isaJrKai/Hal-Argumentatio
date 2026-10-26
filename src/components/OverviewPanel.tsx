@@ -585,7 +585,7 @@ export default function OverviewPanel({
                 <span className="text-text-primary font-semibold truncate">
                   {forecastMetadata?.budgetGuardrails?.breachDetected
                     ? `Throttled 0.75x (CAC Target: $${forecastMetadata.budgetGuardrails.targetCac})`
-                    : `Armed & Enforcing (≤$${forecastMetadata?.budgetGuardrails?.maxAllowableCpl || 77} CPL)`}
+                    : (forecastMetadata?.budgetGuardrails?.maxAllowableCpl != null ? `Armed & Enforcing (≤${forecastMetadata.budgetGuardrails.maxAllowableCpl} CPL)` : 'Guardrail status unavailable')}
                 </span>
               </div>
             </div>
@@ -645,7 +645,7 @@ export default function OverviewPanel({
                       <div className="bg-bg-raised/95 backdrop-blur border border-border-dim rounded-lg p-2.5 shadow-xl font-mono text-[11px] min-w-[190px] space-y-1.5 z-50">
                         <div className="flex items-center justify-between border-b border-border-dim/60 pb-1">
                           <span className="font-bold text-text-primary">{label || item.day} Horizon</span>
-                          <span className="text-[9px] text-accent font-semibold px-1 py-0.2 rounded bg-accent/10">TimesFM 1.0</span>
+                          <span className="text-[9px] text-accent font-semibold px-1 py-0.2 rounded bg-accent/10">Forecast</span>
                         </div>
                         <div className="flex items-center justify-between pt-0.5">
                           <span className="text-text-secondary flex items-center gap-1.5">
@@ -758,14 +758,14 @@ export default function OverviewPanel({
           {/* Interactive Illustrated Funnel */}
           <div className="my-2 space-y-1.5 relative">
             {(() => {
-              const c1 = untouchedLeads > 0 ? untouchedLeads : 128;
-              const c2 = contactedLeads > 0 ? contactedLeads : 64;
-              const c3 = convertedLeads.length > 0 ? convertedLeads.length * 2 : 22;
-              const c4 = convertedLeads.length > 0 ? convertedLeads.length : 9;
+              const c1 = untouchedLeads;
+              const c2 = contactedLeads;
+              const c3 = leads.filter(l => l.status === 'contacted' && (l.urgencyScore ?? 0) >= 5).length;
+              const c4 = convertedLeads.length;
 
-              const rate1to2 = ((c2 / (c1 || 1)) * 100).toFixed(1);
-              const rate2to3 = ((c3 / (c2 || 1)) * 100).toFixed(1);
-              const rate3to4 = ((c4 / (c3 || 1)) * 100).toFixed(1);
+              const rate1to2 = c1 > 0 ? ((c2 / c1) * 100).toFixed(1) : '—';
+              const rate2to3 = c2 > 0 ? ((c3 / c2) * 100).toFixed(1) : '—';
+              const rate3to4 = c3 > 0 ? ((c4 / c3) * 100).toFixed(1) : '—';
 
               return (
                 <>
@@ -938,7 +938,7 @@ export default function OverviewPanel({
                 </div>
 
                 <div className="space-y-1.5 max-h-[140px] overflow-y-auto pr-1">
-                  {(stageFilteredLeads.length > 0 ? stageFilteredLeads.slice(0, 4) : leads.slice(0, 3)).map((lead, idx) => (
+                  {(selectedStage ? stageFilteredLeads.slice(0, 4) : leads.slice(0, 3)).map((lead, idx) => (
                     <div key={lead.id || idx} className="p-2 bg-bg-raised rounded border border-border-dim flex items-center justify-between text-[10.5px] font-mono hover:border-accent/50 transition-colors">
                       <div className="space-y-0.5 min-w-0 pr-2">
                         <div className="font-bold text-text-primary truncate">{lead.businessName}</div>
