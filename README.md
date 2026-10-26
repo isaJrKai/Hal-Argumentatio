@@ -105,6 +105,10 @@ Legacy JSON-to-PostgreSQL migration scripts read a private export path from HAL_
 
 These are package scripts, not a statement that they currently pass. Record the Node/npm versions, exact command, exit code, and test summary when validating the project.
 
+## Communications integration status
+
+The current unified outreach endpoint records simulations only; it does not send WhatsApp, SMS, or email messages. Provider cards indicate whether configuration values are present, not whether a real provider connection has been verified. Delivery, reply, open, SLA, and booking metrics remain unavailable until provider adapters and event tracking are implemented and tested. The separate signed webhook endpoint can make outbound HTTP requests and must only be used with trusted, allowlisted targets.
+
 ## Security and operational notes
 
 - Use unique, randomly generated secrets; never rely on a fallback or example value for authentication or encryption.
