@@ -191,7 +191,7 @@ export const HalRoadmapPhase4View: React.FC = () => {
               </span>
               <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 flex items-center gap-1">
                 <CheckCircle2 className="w-3 h-3 text-emerald-500" />
-                100% INVARIANTS VERIFIED
+                RUNTIME STATUS UNUNVERIFIED
               </span>
             </div>
             <h2 className="text-xl font-bold font-display text-text-primary tracking-tight">
@@ -350,12 +350,12 @@ export const HalRoadmapPhase4View: React.FC = () => {
               </div>
               <h3 className="text-sm font-bold text-text-primary">Dual-Drive Parallel Consensus</h3>
               <p className="text-xs text-text-secondary leading-relaxed">
-                Executes strategic decisions through parallel generation using Google Gemini 2.5 (discovery & qualitative angle) and NVIDIA Nemotron 70B (policy verification, price floors, and contract boundaries).
+                Designed to request parallel model analysis. Provider connectivity, model identity, policy enforcement, and consensus quality have not been verified in this deployment.
               </p>
               <div className="p-3 rounded-lg bg-bg-base border border-border-dim text-[11px] space-y-1 font-mono">
-                <div className="text-text-tertiary">Engine A: Google Gemini 2.5 Flash</div>
-                <div className="text-text-tertiary">Engine B: NVIDIA Nemotron 70B Instruct</div>
-                <div className="text-emerald-500 font-semibold">Alignment: 96% Average Semantic Match</div>
+                <div className="text-text-tertiary">Engine A: provider not verified</div>
+                <div className="text-text-tertiary">Engine B: provider not verified</div>
+                <div className="text-emerald-500 font-semibold">Alignment: Not measured</div>
               </div>
             </div>
 
@@ -372,9 +372,9 @@ export const HalRoadmapPhase4View: React.FC = () => {
                 Planned capability: recalibrate urgency weights from completed conversion outcomes. This is unavailable until measured outcomes and persisted model parameters are connected.
               </p>
               <div className="p-3 rounded-lg bg-bg-base border border-border-dim text-[11px] space-y-1 font-mono">
-                <div className="text-text-tertiary">Active Epoch: #14 Multi-Niche Calibrated</div>
-                <div className="text-text-tertiary">Urgency Multiplier: SSL 8.5x | Speed 7.2x</div>
-                <div className="text-emerald-500 font-semibold">Policy Autonomy: Ready (100%)</div>
+                <div className="text-text-tertiary">Calibration epoch: Not available</div>
+                <div className="text-text-tertiary">Urgency weights: Not calibrated from measured outcomes</div>
+                <div className="text-emerald-500 font-semibold">Policy autonomy: Not verified</div>
               </div>
             </div>
 
@@ -388,12 +388,12 @@ export const HalRoadmapPhase4View: React.FC = () => {
               </div>
               <h3 className="text-sm font-bold text-text-primary">Closed-Loop Strategy Arbitrage</h3>
               <p className="text-xs text-text-secondary leading-relaxed">
-                Detects performance leakage in low-ROAS channels (e.g. broad match search ads, low-intent display) and automatically formulates capital shifts to high-performing outreach cadences and LSAs.
+                Designed to evaluate campaign performance and proposed budget shifts. This requires measured campaign data, verified guardrails, and operator approval; live automation is not verified.
               </p>
               <div className="p-3 rounded-lg bg-bg-base border border-border-dim text-[11px] space-y-1 font-mono">
-                <div className="text-text-tertiary">Evaluated Opportunities: 3 Channels</div>
-                <div className="text-text-tertiary">Guardrail Limits: ±25% Shift Max / Iteration</div>
-                <div className="text-emerald-500 font-semibold">Net Expected Lift: +$9,615 / mo</div>
+                <div className="text-text-tertiary">Evaluated opportunities: None verified</div>
+                <div className="text-text-tertiary">Guardrail policy: Not verified in this deployment</div>
+                <div className="text-emerald-500 font-semibold">Expected lift: Not estimated</div>
               </div>
             </div>
           </div>
@@ -772,7 +772,7 @@ export const HalRoadmapPhase4View: React.FC = () => {
                     <span>Expected Lift: <strong className="text-emerald-500">+${item.expectedNetMonthlyLiftUsd.toLocaleString()}/mo</strong></span>
                     <span>Risk Rating: <strong className="text-blue-500">{item.riskRating}</strong></span>
                     <span className="text-[10px] text-emerald-500 flex items-center gap-1">
-                      <CheckCircle2 className="w-3 h-3" /> Guardrail Verified
+                      <CheckCircle2 className="w-3 h-3" /> Guardrail check status: {item.guardrailCompliant ? 'passed for this record' : 'not passed'}
                     </span>
                   </div>
 
