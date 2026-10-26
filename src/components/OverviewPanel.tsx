@@ -1352,6 +1352,13 @@ export default function OverviewPanel({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-inherit">
+                  {displayActivities.length === 0 && (
+                    <tr>
+                      <td colSpan={5} className="py-6 text-center text-xs text-text-tertiary">
+                        No activity recorded yet. Imported leads and completed actions will appear here.
+                      </td>
+                    </tr>
+                  )}
                   {displayActivities.map((act) => (
                     <tr key={act.id} className="hover:bg-bg-subtle/50 transition-colors">
                       <td className="py-2.5 text-[11px] font-sans text-text-primary">{act.activity}</td>
