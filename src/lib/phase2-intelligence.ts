@@ -119,7 +119,6 @@ export function verifyPhase2Pillars(
 
   // Pillar 2: Live Geo Ranking & Latency Scoring
   const quadrants = calculateSpatialQuadrants(leadsList);
-  const totalQuadrantLeads = quadrants.reduce((acc, q) => acc + q.leadCount, 0);
   const pillar2Verified = false;
 
   // Pillar 3: Competitor Digital Footprint Audits
