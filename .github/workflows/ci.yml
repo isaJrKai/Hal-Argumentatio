@@ -24,6 +24,8 @@ jobs:
         run: npm ci
       - name: Type-check and run automated tests
         run: npm run test:ci
+      - name: Build production artifacts
+        run: npm run build
       - name: Audit dependency advisories
         run: |
           npm audit --json > /tmp/hal-npm-audit.json || true
