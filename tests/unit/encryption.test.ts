@@ -1,6 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import { encrypt, decrypt } from '../../src/db/db';
 
+// Deterministic test-only key. Never reuse this value outside tests.
+process.env.LEAD_ENCRYPTION_KEY_B64 = Buffer.from('0123456789abcdef0123456789abcdef').toString('base64');
+
 describe('Unit: PII Encryption Invariants & Fail-Closed Auditing', () => {
   const samplePlaintext = 'client-personal-phone-403-555-0199';
 
@@ -44,11 +47,6 @@ describe('Unit: PII Encryption Invariants & Fail-Closed Auditing', () => {
   });
 
   describe('Remediated Fail-Closed Invariants', () => {
-    it('verifies that encryption key derivation produces a valid 32-byte AES key', () => {
-      const defaultStaticKey = 'Z01Xek1XOHpNVGczTnpBek1EUTFORFUxTkRVMU5EVTE=';
-      expect(Buffer.from(defaultStaticKey, 'base64').length).toBe(32);
-    });
-
     it('verifies encrypt returns empty string for empty input', () => {
       expect(encrypt('')).toBe('');
     });
