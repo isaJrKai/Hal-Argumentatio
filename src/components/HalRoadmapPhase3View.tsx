@@ -89,9 +89,7 @@ export const HalRoadmapPhase3View: React.FC = () => {
   const [liveChannel, setLiveChannel] = useState<'email' | 'sms' | 'webhook'>('email');
   const [liveRecipient, setLiveRecipient] = useState('');
   const [liveSubject, setLiveSubject] = useState('');
-  const [liveMessage, setLiveMessage] = useState(
-    'Hi Marcus,\n\nWe ran an automated territory performance diagnostic on apex-facilities.com.\n\nKey Diagnostic Findings:\n• Core Web Vitals LCP: 4.2s (Threshold: 2.5s)\n• Google 3-Pack Rank: #7 (Competitor Gap: -18 reviews)\n• Estimated Monthly Lead Leakage: ~$14,200\n\nI have prepared the full technical breakdown and remediation SLA for your review.\n\nBest regards,\nHAL Executive Partner'
-  );
+  const [liveMessage, setLiveMessage] = useState('');
   const [liveBusinessName, setLiveBusinessName] = useState('');
   const [liveTemplateType, setLiveTemplateType] = useState('');
   const [livePriority, setLivePriority] = useState<'standard' | 'high'>('high');
@@ -153,24 +151,18 @@ export const HalRoadmapPhase3View: React.FC = () => {
 
   const applyLiveTemplate = (type: string, biz: string = liveBusinessName) => {
     setLiveTemplateType(type);
+    const business = biz.trim() || 'your business';
     if (type === 'speed_audit') {
-      setLiveSubject(`Diagnostic Audit & Speed Findings for ${biz}`);
-      setLiveMessage(
-        `Hi ${biz.split(' ')[0] || 'Team'},\n\nWe ran an automated territory performance diagnostic on your web infrastructure.\n\nKey Diagnostic Findings:\n• Core Web Vitals LCP: 4.2s (Threshold: 2.5s)\n• Google 3-Pack Rank: #7 (Competitor Gap: -18 reviews)\n• Estimated Monthly Lead Leakage: ~$14,200\n\nI have prepared the full technical breakdown and remediation SLA for your review.\n\nBest regards,\nHAL Executive Partner`
-      );
+      setLiveSubject('Request to review the digital presence of ' + business);
+      setLiveMessage('Hello,\\n\\nI have not completed a verified technical assessment of ' + business + ', so I do not want to claim a specific issue or lost revenue. If useful, I can review publicly available information and share only findings with sources and timestamps.\\n\\nWould you be open to a brief, no-obligation review?');
     } else if (type === 'proposal') {
-      setLiveSubject(`Commercial Retainer & Digital Dominance SLA for ${biz}`);
-      setLiveMessage(
-        `Hi ${biz.split(' ')[0] || 'Team'},\n\nFollowing our initial audit, we have structured the guaranteed 3.5x ROAS conversion acceleration proposal for ${biz}.\n\nProposed Scope:\n1. Technical SEO & Sub-Second LCP Speed Optimizations\n2. Real-Time Google Local Services Ads Bidding Synchronizer\n3. Dedicated PII-Vault Lead Capture Engine\n\nReview the enclosed proposal and let us know if we should reserve your territory dispatch slot.`
-      );
+      setLiveSubject('Proposed scope for ' + business);
+      setLiveMessage('Hello,\\n\\nIf you are interested, I can outline a proposed scope, costs, and measurable outcomes for ' + business + '. No performance or revenue guarantee is implied; claims will be tied to agreed measurements.\\n\\nWould you like to review a short proposal?');
     } else if (type === 'followup') {
-      setLiveSubject(`Follow-up: Preserving dispatch slot for ${biz}`);
-      setLiveMessage(
-        `Hi ${biz.split(' ')[0] || 'Team'},\n\nQuick follow-up on the digital performance diagnostic we sent over for ${biz}. We have two competitor audits pending in your zip code and want to confirm if you would like first right of refusal on the territory retainer.`
-      );
+      setLiveSubject('Following up on your interest');
+      setLiveMessage('Hello,\\n\\nI am following up to see whether you would like to discuss a digital presence review. If this is not relevant, let me know and I will not continue contacting you.');
     }
   };
-
   const fetchPhase3Status = async () => {
     try {
       setLoading(true);
@@ -374,7 +366,7 @@ export const HalRoadmapPhase3View: React.FC = () => {
               <span className="w-2 h-2 rounded-full bg-emerald-500" />
             </div>
             <div className="text-sm font-bold text-text-primary">
-              HMAC-SHA256 Signed
+              {p2?.verified ? 'Helper Check Passed' : 'Not Verified'}
             </div>
             <div className="text-[10px] text-text-secondary">
               2^n Exponential Backoff
@@ -688,7 +680,7 @@ export const HalRoadmapPhase3View: React.FC = () => {
                     </div>
 
                     <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">
-                      SCHEDULED READY
+                      PREVIEW ONLY
                     </span>
                   </div>
 
@@ -753,7 +745,7 @@ export const HalRoadmapPhase3View: React.FC = () => {
               <div className="flex items-center justify-between pt-2">
                 <button
                   onClick={handleTriggerSequence}
-                  disabled={isTriggeringSequence}
+                  disabled={isTriggeringSequence || !currentSequence || !targetBusinessName.trim() || !targetCity.trim() || !targetNiche.trim()}
                   className="px-4 py-2 rounded-lg bg-accent text-white hover:bg-accent/90 transition-all text-xs font-semibold flex items-center gap-2 cursor-pointer disabled:opacity-50 shadow-xs"
                 >
                   <Play className={`w-3.5 h-3.5 ${isTriggeringSequence ? 'animate-spin' : ''}`} />
@@ -763,7 +755,7 @@ export const HalRoadmapPhase3View: React.FC = () => {
                 {sequenceTriggerResult && (
                   <span className="text-xs font-mono text-emerald-500 font-semibold flex items-center gap-1.5">
                     <CheckCheck className="w-4 h-4" />
-                    Enrolled {targetBusinessName} into Step 1. Scheduled {sequenceTriggerResult.scheduledSteps?.length || 4} touchpoints.
+                    Enrolled {targetBusinessName} into Step 1. Scheduled {sequenceTriggerResult.scheduledSteps?.length ?? 0} touchpoints.
                   </span>
                 )}
               </div>
@@ -1080,7 +1072,7 @@ export const HalRoadmapPhase3View: React.FC = () => {
                       applyLiveTemplate(liveTemplateType, e.target.value);
                     }}
                     className="w-full px-3 py-2 rounded-lg bg-bg-overlay border border-border-dim text-xs text-text-primary focus:outline-none focus:border-accent"
-                    placeholder="e.g. Apex Industrial Facilities"
+                    placeholder="Enter business name"
                   />
                 </div>
 
