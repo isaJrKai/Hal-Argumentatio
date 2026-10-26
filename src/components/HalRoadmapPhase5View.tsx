@@ -82,19 +82,18 @@ export const HalRoadmapPhase5View: React.FC = () => {
       const token = localStorage.getItem('token') || localStorage.getItem('halbiz_auth_token') || localStorage.getItem('hal_auth_token') || '';
       const res = await fetch('/api/roadmap/phase5/sync-brain', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        }
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }
       });
+      const data = await res.json().catch(() => ({}));
       if (res.ok) {
-        const data = await res.json();
         if (data.block) setAuditBlock(data.block);
-        if (data.brainLayers) setBrainLayers(data.brainLayers);
-        setActionNotice('Brain Synchronization verified: All 11 cognitive layers confirmed locked in phase with the HAL Constitution.');
+        if (Array.isArray(data.brainLayers)) setBrainLayers(data.brainLayers);
+        setActionNotice('Diagnostic response received.');
+      } else {
+        setActionNotice(data.error || 'Runtime brain health instrumentation is unavailable.');
       }
-    } catch (err) {
-      setActionNotice('Brain diagnostic completed: 11/11 cognitive layers verified in phase.');
+    } catch {
+      setActionNotice('Brain synchronization request failed. No success state was recorded.');
     } finally {
       setIsSyncingBrain(false);
       setTimeout(() => setActionNotice(null), 6000);
@@ -108,18 +107,18 @@ export const HalRoadmapPhase5View: React.FC = () => {
       const token = localStorage.getItem('token') || localStorage.getItem('halbiz_auth_token') || localStorage.getItem('hal_auth_token') || '';
       const res = await fetch('/api/roadmap/phase5/federate-regions', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        }
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }
       });
+      const data = await res.json().catch(() => ({}));
       if (res.ok) {
-        const data = await res.json();
         if (data.block) setAuditBlock(data.block);
-        setActionNotice('Decentralized Edge Federation complete: 3 global regions synced with zero-trust telemetry.');
+        if (Array.isArray(data.edgeRegions)) setEdgeRegions(data.edgeRegions);
+        setActionNotice('Federation response received.');
+      } else {
+        setActionNotice(data.error || 'Edge federation is unavailable without verified endpoints.');
       }
-    } catch (err) {
-      setActionNotice('Edge federation verified across North America and Europe gateways.');
+    } catch {
+      setActionNotice('Federation request failed. No regions were marked as synced.');
     } finally {
       setIsFederating(false);
       setTimeout(() => setActionNotice(null), 6000);
@@ -133,18 +132,18 @@ export const HalRoadmapPhase5View: React.FC = () => {
       const token = localStorage.getItem('token') || localStorage.getItem('halbiz_auth_token') || localStorage.getItem('hal_auth_token') || '';
       const res = await fetch('/api/roadmap/phase5/propagate-ontology', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        }
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }
       });
+      const data = await res.json().catch(() => ({}));
       if (res.ok) {
-        const data = await res.json();
         if (data.block) setAuditBlock(data.block);
-        setActionNotice('Cross-industry ontology updated: Calibrated Bayesian priors propagated across 3 trade verticals with zero PII leakage.');
+        if (Array.isArray(data.ontologies)) setOntologies(data.ontologies);
+        setActionNotice('Ontology response received.');
+      } else {
+        setActionNotice(data.error || 'Measured cross-industry priors are not configured.');
       }
-    } catch (err) {
-      setActionNotice('Knowledge transfer verified: Bayesian weights distributed across HVAC, Roofing, and Electrical.');
+    } catch {
+      setActionNotice('Ontology request failed. No synthetic priors were applied.');
     } finally {
       setIsPropagating(false);
       setTimeout(() => setActionNotice(null), 6000);
