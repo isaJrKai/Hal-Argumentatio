@@ -1186,7 +1186,7 @@ export const HalRoadmapPhase3View: React.FC = () => {
                   <div className="flex items-center justify-between border-t border-border-dim/50 pt-1">
                     <span className="text-text-tertiary">LEDGER BLOCK ANCHOR:</span>
                     <span className="text-emerald-500 font-bold">
-                      Block #{liveDispatchResult.block?.sequenceNumber || 'N/A'} • {liveDispatchResult.block?.entryHash?.slice(0, 16)}... [HASH CHAIN INTACT]
+                      Block #{liveDispatchResult.block?.sequenceNumber || 'N/A'} • {liveDispatchResult.block?.entryHash?.slice(0, 16)}... [{liveDispatchResult.block?.entryHash ? 'HASH CHAIN VERIFIED' : 'HASH CHAIN NOT VERIFIED'}]
                     </span>
                   </div>
                 </div>
