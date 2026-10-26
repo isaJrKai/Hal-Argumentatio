@@ -494,7 +494,7 @@ export const LiveOutboxDeliveryBridge: React.FC = () => {
                 <div className="flex items-center justify-between border-b border-emerald-500/20 pb-2">
                   <div className="flex items-center gap-2 text-emerald-600 dark:text-emerald-400 font-bold">
                     <CheckCircle2 className="w-4 h-4 shrink-0" />
-                    <span>DELIVERY CONFIRMED (HTTP 200)</span>
+                    <span>REQUEST ACCEPTED — DELIVERY NOT VERIFIED</span>
                   </div>
                   <span className="text-[10px] text-text-tertiary">LATENCY: {typeof dispatchResult.latencyMs === 'number' ? `${dispatchResult.latencyMs}ms` : 'Not measured'}</span>
                 </div>
