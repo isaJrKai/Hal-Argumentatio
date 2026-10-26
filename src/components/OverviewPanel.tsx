@@ -1330,7 +1330,7 @@ export default function OverviewPanel({
             <div className="flex justify-between items-center mb-4">
               <div>
                 <span className="text-[10px] font-mono tracking-widest text-text-tertiary uppercase block font-bold">RECENT BUSINESS ACTIVITY</span>
-                <span className="text-xs font-sans font-semibold text-text-primary">Live Customer & Territory Event Stream</span>
+                <span className="text-xs font-sans font-semibold text-text-primary">Recent saved lead records</span>
               </div>
               <button 
                 onClick={() => setActiveTab('leads')}
