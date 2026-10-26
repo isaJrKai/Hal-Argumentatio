@@ -576,75 +576,15 @@ class Database {
 
     if (this.data.contractors.length === 0) {
       this.seed();
-    } else {
-      // Ensure primary admin and Isaac accounts are present
-      if (!this.data.contractors.some(c => c.email.toLowerCase() === 'kaisoisaac@gmail.com')) {
-        const now = new Date().toISOString();
-        this.data.contractors.push({
-          id: 'con_isaac_seed',
-          email: 'kaisoisaac@gmail.com',
-          passwordHash: hashPassword('admin123'),
-          name: 'Isaac',
-          role: 'admin',
-          marketId: 'market_winnipeg_calgary',
-          createdAt: now,
-          updatedAt: now
-        });
-        this.save();
-      }
     }
+
   }
 
   private seed() {
-    console.log('Initializing pristine database for new app...');
-    const now = new Date().toISOString();
-    
-    // 1. Create admin contractor if missing
-    const adminId = 'con_admin_seed';
-    if (!this.data.contractors.some(c => c.id === adminId || c.email === 'admin@kaislead.com')) {
-      const admin: Contractor = {
-        id: adminId,
-        email: 'admin@kaislead.com',
-        passwordHash: hashPassword('admin123'),
-        name: 'Isaac (Admin)',
-        role: 'admin',
-        marketId: 'market_default',
-        createdAt: now,
-        updatedAt: now
-      };
-      this.data.contractors.push(admin);
-    }
-
-    // 2. Create Isaac contractor if missing
-    const isaacId = 'con_isaac_seed';
-    if (!this.data.contractors.some(c => c.id === isaacId || c.email === 'kaisoisaac@gmail.com')) {
-      this.data.contractors.push({
-        id: isaacId,
-        email: 'kaisoisaac@gmail.com',
-        passwordHash: hashPassword('admin123'),
-        name: 'Isaac',
-        role: 'admin',
-        marketId: 'market_default',
-        createdAt: now,
-        updatedAt: now
-      });
-    }
-
-    // Clean slate: 0 mock leads, 0 mock campaigns, 0 mock revenues, 0 mock forecasts, 0 mock recommendations, 0 mock missions
-    this.data.leads = [];
-    this.data.leadEvents = [];
-    this.data.campaigns = [];
-    this.data.revenues = [];
-    this.data.performanceSnapshots = [];
-    this.data.forecasts = [];
-    this.data.predictionOutcomes = [];
-    this.data.recommendations = [];
-    this.data.missions = [];
-    this.data.learningInsights = [];
-    this.data.chatMessages = [];
-
+    // Never create a known-password administrator account in a fresh installation.
+    // Provision the first administrator deliberately in the configured database.
+    console.log('Initialising an empty HAL data store; no default user accounts are created.');
     this.save();
-    console.log('Pristine database ready: 0 mock items.');
   }
 
   public purgeAllMockData() {
