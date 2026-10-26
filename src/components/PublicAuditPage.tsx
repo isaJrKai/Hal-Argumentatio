@@ -36,16 +36,16 @@ interface AuditData {
   city: string;
   serviceType: string;
   websiteUrl?: string;
-  seoScore: number;
-  performanceScore: number;
-  sslStatus: 'secured' | 'missing';
-  googleRating: number;
-  reviewCount: number;
-  sentimentScore: number;
+  seoScore: number | null;
+  performanceScore: number | null;
+  sslStatus: 'secured' | 'missing' | 'unknown';
+  googleRating: number | null;
+  reviewCount: number | null;
+  sentimentScore: number | null;
   notes: string;
   outreachStrategy: string;
-  urgencyScore: number;
-  predictedLtvUsd: number;
+  urgencyScore: number | null;
+  predictedLtvUsd: number | null;
   createdAt: string;
 }
 
@@ -95,11 +95,11 @@ export default function PublicAuditPage({ auditId, onNavigateToLogin }: PublicAu
 
   // Derived calculations:
   // Google benchmarks show mobile bounce increases by 32% as page load goes from 1s to 3s, and 90% if >5s.
-  const perfScore = data?.performanceScore ?? 50;
-  const bouncePenaltyPct = perfScore < 50 ? 0.38 : perfScore < 75 ? 0.22 : 0.08;
-  const currentConversionRate = 0.025; // 2.5% standard
-  const estimatedLostLeadsPerMonth = Math.round(monthlyVisitors * bouncePenaltyPct * currentConversionRate);
-  const estimatedAnnualLostRevenue = Math.round(estimatedLostLeadsPerMonth * avgTicketValue * 12);
+  const perfScore = data?.performanceScore ?? null;
+  const bouncePenaltyPct = perfScore == null ? null : perfScore < 50 ? 0.38 : perfScore < 75 ? 0.22 : 0.08;
+  const currentConversionRate = 0.025; // illustrative assumption, not a measured site conversion rate
+  const estimatedLostLeadsPerMonth = bouncePenaltyPct == null ? null : Math.round(monthlyVisitors * bouncePenaltyPct * currentConversionRate);
+  const estimatedAnnualLostRevenue = estimatedLostLeadsPerMonth == null ? null : Math.round(estimatedLostLeadsPerMonth * avgTicketValue * 12);
 
   const handleBookingSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -232,16 +232,16 @@ export default function PublicAuditPage({ auditId, onNavigateToLogin }: PublicAu
           <div className="bg-bg-raised border border-border-dim rounded-xl p-5 space-y-3 relative overflow-hidden">
             <div className="flex justify-between items-start">
               <span className="text-[10px] font-mono uppercase tracking-wider text-text-secondary font-bold">Mobile Speed</span>
-              <Zap className={`w-4 h-4 ${data.performanceScore >= 70 ? 'text-emerald-400' : data.performanceScore >= 50 ? 'text-amber-400' : 'text-rose-400'}`} />
+              <Zap className={`w-4 h-4 ${data.performanceScore == null ? 'text-text-tertiary' : data.performanceScore >= 70 ? 'text-emerald-400' : data.performanceScore >= 50 ? 'text-amber-400' : 'text-rose-400'}`} />
             </div>
             <div className="flex items-baseline gap-2">
-              <span className={`text-3xl font-extrabold font-mono ${data.performanceScore >= 70 ? 'text-emerald-400' : data.performanceScore >= 50 ? 'text-amber-400' : 'text-rose-400'}`}>
-                {data.performanceScore}
+              <span className={`text-3xl font-extrabold font-mono ${data.performanceScore == null ? 'text-text-tertiary' : data.performanceScore >= 70 ? 'text-emerald-400' : data.performanceScore >= 50 ? 'text-amber-400' : 'text-rose-400'}`}>
+                {data.performanceScore ?? 'Not assessed'}
               </span>
               <span className="text-xs text-text-tertiary font-mono">/ 100</span>
             </div>
             <p className="text-[11px] text-text-secondary leading-snug">
-              {data.performanceScore < 60 ? 'High mobile bounce risk. Heavy friction on smartphones.' : 'Acceptable mobile load speed benchmark.'}
+              {data.performanceScore == null ? 'No measured speed score is stored for this report.' : data.performanceScore < 60 ? 'Measured score indicates potential mobile performance issues.' : 'Measured score is within the selected acceptable range.'}
             </p>
           </div>
 
@@ -249,11 +249,11 @@ export default function PublicAuditPage({ auditId, onNavigateToLogin }: PublicAu
           <div className="bg-bg-raised border border-border-dim rounded-xl p-5 space-y-3 relative overflow-hidden">
             <div className="flex justify-between items-start">
               <span className="text-[10px] font-mono uppercase tracking-wider text-text-secondary font-bold">Search Visibility</span>
-              <Globe className={`w-4 h-4 ${data.seoScore >= 70 ? 'text-emerald-400' : 'text-amber-400'}`} />
+              <Globe className={`w-4 h-4 ${data.seoScore == null ? 'text-text-tertiary' : data.seoScore >= 70 ? 'text-emerald-400' : 'text-amber-400'}`} />
             </div>
             <div className="flex items-baseline gap-2">
-              <span className={`text-3xl font-extrabold font-mono ${data.seoScore >= 70 ? 'text-emerald-400' : 'text-amber-400'}`}>
-                {data.seoScore}
+              <span className={`text-3xl font-extrabold font-mono ${data.seoScore == null ? 'text-text-tertiary' : data.seoScore >= 70 ? 'text-emerald-400' : 'text-amber-400'}`}>
+                {data.seoScore ?? 'Not assessed'}
               </span>
               <span className="text-xs text-text-tertiary font-mono">/ 100</span>
             </div>
@@ -266,15 +266,15 @@ export default function PublicAuditPage({ auditId, onNavigateToLogin }: PublicAu
           <div className="bg-bg-raised border border-border-dim rounded-xl p-5 space-y-3 relative overflow-hidden">
             <div className="flex justify-between items-start">
               <span className="text-[10px] font-mono uppercase tracking-wider text-text-secondary font-bold">Security Lock</span>
-              {data.sslStatus === 'secured' ? <ShieldCheck className="w-4 h-4 text-emerald-400" /> : <AlertTriangle className="w-4 h-4 text-rose-400" />}
+              {data.sslStatus === 'secured' ? <ShieldCheck className="w-4 h-4 text-emerald-400" /> : data.sslStatus === 'missing' ? <AlertTriangle className="w-4 h-4 text-rose-400" /> : <Shield className="w-4 h-4 text-text-tertiary" />}
             </div>
             <div className="flex items-baseline gap-2">
-              <span className={`text-xl font-bold font-mono uppercase ${data.sslStatus === 'secured' ? 'text-emerald-400' : 'text-rose-400'}`}>
-                {data.sslStatus}
+              <span className={`text-xl font-bold font-mono uppercase ${data.sslStatus === 'secured' ? 'text-emerald-400' : data.sslStatus === 'missing' ? 'text-rose-400' : 'text-text-tertiary'}`}>
+                {data.sslStatus === 'unknown' ? 'Not assessed' : data.sslStatus}
               </span>
             </div>
             <p className="text-[11px] text-text-secondary leading-snug">
-              {data.sslStatus === 'secured' ? 'Verified HTTPS SSL encryption lock active.' : 'Browser security warning flag active.'}
+              {data.sslStatus === 'secured' ? 'HTTPS was recorded as secured for this report.' : data.sslStatus === 'missing' ? 'HTTPS was recorded as missing for this report.' : 'No SSL assessment is stored for this report.'}
             </p>
           </div>
 
@@ -286,12 +286,12 @@ export default function PublicAuditPage({ auditId, onNavigateToLogin }: PublicAu
             </div>
             <div className="flex items-baseline gap-2">
               <span className="text-3xl font-extrabold font-mono text-text-primary">
-                {data.googleRating}
+                {data.googleRating ?? 'Not available'}
               </span>
-              <span className="text-xs text-text-tertiary font-mono">({data.reviewCount} reviews)</span>
+              <span className="text-xs text-text-tertiary font-mono">({data.reviewCount == null ? 'review count unavailable' : `${data.reviewCount} reviews`})</span>
             </div>
             <p className="text-[11px] text-text-secondary leading-snug">
-              Verified public customer feedback & reputation index.
+              Public review and reputation data has not been verified for this report.
             </p>
           </div>
 
@@ -370,10 +370,10 @@ export default function PublicAuditPage({ auditId, onNavigateToLogin }: PublicAu
           <div className="bg-bg-base border border-border-dim p-4 rounded-xl flex flex-col sm:flex-row items-center justify-between gap-4 font-mono text-xs">
             <div className="space-y-1 text-center sm:text-left">
               <p className="text-text-primary">
-                At your current performance score ({data.performanceScore}/100), approximately <strong className="text-rose-400">{Math.round(bouncePenaltyPct * 100)}% of mobile visitors</strong> bounce before seeing your contact phone or quote form.
+                {data.performanceScore == null || bouncePenaltyPct == null ? 'A measured speed score is not available, so this page cannot estimate speed-related visitor loss. Use the controls as an illustrative scenario only.' : <>At the recorded performance score ({data.performanceScore}/100), this scenario assumes approximately <strong className="text-rose-400">{Math.round(bouncePenaltyPct * 100)}% of mobile visitors</strong> bounce before seeing your contact phone or quote form.</>}
               </p>
               <p className="text-[11px] text-text-secondary">
-                Recovering just <strong className="text-emerald-400">{estimatedLostLeadsPerMonth} missed contracts/month</strong> yields <strong className="text-emerald-400">+${(estimatedLostLeadsPerMonth * avgTicketValue).toLocaleString()}</strong> in gross revenue.
+                {estimatedLostLeadsPerMonth == null ? 'No measured loss estimate is available.' : <>Under these assumptions, recovering <strong className="text-emerald-400">{estimatedLostLeadsPerMonth} potential leads/month</strong> represents up to <strong className="text-emerald-400">+${(estimatedLostLeadsPerMonth * avgTicketValue).toLocaleString()}</strong> in illustrative gross revenue.</>}
               </p>
             </div>
 
