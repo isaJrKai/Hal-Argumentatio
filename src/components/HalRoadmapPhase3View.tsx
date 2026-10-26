@@ -92,7 +92,7 @@ export const HalRoadmapPhase3View: React.FC = () => {
   const [liveMessage, setLiveMessage] = useState('');
   const [liveBusinessName, setLiveBusinessName] = useState('');
   const [liveTemplateType, setLiveTemplateType] = useState('');
-  const [livePriority, setLivePriority] = useState<'standard' | 'high'>('high');
+  const [livePriority, setLivePriority] = useState<'standard' | 'high'>('standard');
 
   // Scheduler State
   const [isRunningScheduler, setIsRunningScheduler] = useState(false);
@@ -1022,7 +1022,7 @@ export const HalRoadmapPhase3View: React.FC = () => {
                     <button
                       onClick={() => {
                         setLiveChannel('email');
-                        setLiveRecipient('marcus.vance@apex-facilities.com');
+                        setLiveRecipient('');
                         applyLiveTemplate(liveTemplateType, liveBusinessName);
                       }}
                       className={`py-1.5 rounded text-[11px] font-medium flex flex-col items-center gap-1 transition-all cursor-pointer ${
@@ -1035,8 +1035,8 @@ export const HalRoadmapPhase3View: React.FC = () => {
                     <button
                       onClick={() => {
                         setLiveChannel('sms');
-                        setLiveRecipient('+1 (512) 890-4421');
-                        setLiveMessage('[HAL Alert] Marcus, emergency commercial HVAC inquiry in Austin North just requested same-day dispatch ($2,400 est ticket). Reply YES to assign tech.');
+                        setLiveRecipient('');
+                        setLiveMessage('');
                       }}
                       className={`py-1.5 rounded text-[11px] font-medium flex flex-col items-center gap-1 transition-all cursor-pointer ${
                         liveChannel === 'sms' ? 'bg-emerald-600 text-white shadow-xs' : 'text-text-secondary hover:text-text-primary'
