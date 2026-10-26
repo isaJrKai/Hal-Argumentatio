@@ -33,12 +33,10 @@ import {
   SequenceStep,
   ScheduledTriggerRule,
   Phase3VerificationReport,
-  getDefaultCadenceSequences,
   calculateCadenceSchedule,
   substituteTemplateTokens,
   calculateExponentialBackoff,
   signWebhookPayload,
-  getDefaultSchedulerRules
 } from '../lib/phase3-automation';
 
 interface Phase3StatusResponse {
@@ -68,11 +66,11 @@ export const HalRoadmapPhase3View: React.FC = () => {
   const [verificationResult, setVerificationResult] = useState<any | null>(null);
 
   // Sequencer Simulation State
-  const [selectedSequenceId, setSelectedSequenceId] = useState<string>('seq_hvac_commercial');
-  const [targetBusinessName, setTargetBusinessName] = useState('Apex Industrial Facilities');
-  const [targetOwnerName, setTargetOwnerName] = useState('Marcus Vance');
-  const [targetCity, setTargetCity] = useState('Austin');
-  const [targetNiche, setTargetNiche] = useState('Commercial HVAC');
+  const [selectedSequenceId, setSelectedSequenceId] = useState<string>('');
+  const [targetBusinessName, setTargetBusinessName] = useState('');
+  const [targetOwnerName, setTargetOwnerName] = useState('');
+  const [targetCity, setTargetCity] = useState('');
+  const [targetNiche, setTargetNiche] = useState('');
   const [isTriggeringSequence, setIsTriggeringSequence] = useState(false);
   const [sequenceTriggerResult, setSequenceTriggerResult] = useState<any | null>(null);
 
@@ -80,7 +78,7 @@ export const HalRoadmapPhase3View: React.FC = () => {
   const [isProcessingOutbox, setIsProcessingOutbox] = useState(false);
   const [outboxProcessResult, setOutboxProcessResult] = useState<any | null>(null);
   const [testBackoffAttempt, setTestBackoffAttempt] = useState<number>(3);
-  const [testWebhookSecret, setTestWebhookSecret] = useState('hal_secure_outbox_secret_2026');
+  const [testWebhookSecret, setTestWebhookSecret] = useState('');
   const [copiedSignature, setCopiedSignature] = useState(false);
 
   // Live Outbox Delivery Bridge State
@@ -89,13 +87,13 @@ export const HalRoadmapPhase3View: React.FC = () => {
   const [isDispatchingLive, setIsDispatchingLive] = useState(false);
   const [liveDispatchResult, setLiveDispatchResult] = useState<any | null>(null);
   const [liveChannel, setLiveChannel] = useState<'email' | 'sms' | 'webhook'>('email');
-  const [liveRecipient, setLiveRecipient] = useState('marcus.vance@apex-facilities.com');
-  const [liveSubject, setLiveSubject] = useState('Diagnostic Audit & Speed Findings for Apex Industrial Facilities');
+  const [liveRecipient, setLiveRecipient] = useState('');
+  const [liveSubject, setLiveSubject] = useState('');
   const [liveMessage, setLiveMessage] = useState(
     'Hi Marcus,\n\nWe ran an automated territory performance diagnostic on apex-facilities.com.\n\nKey Diagnostic Findings:\n• Core Web Vitals LCP: 4.2s (Threshold: 2.5s)\n• Google 3-Pack Rank: #7 (Competitor Gap: -18 reviews)\n• Estimated Monthly Lead Leakage: ~$14,200\n\nI have prepared the full technical breakdown and remediation SLA for your review.\n\nBest regards,\nHAL Executive Partner'
   );
-  const [liveBusinessName, setLiveBusinessName] = useState('Apex Industrial Facilities');
-  const [liveTemplateType, setLiveTemplateType] = useState('speed_audit');
+  const [liveBusinessName, setLiveBusinessName] = useState('');
+  const [liveTemplateType, setLiveTemplateType] = useState('');
   const [livePriority, setLivePriority] = useState<'standard' | 'high'>('high');
 
   // Scheduler State
@@ -295,16 +293,16 @@ export const HalRoadmapPhase3View: React.FC = () => {
     }
   };
 
-  const sequences = statusData?.sequences?.length ? statusData.sequences : getDefaultCadenceSequences();
+  const sequences = statusData?.sequences ?? [];
   const currentSequence = sequences.find(s => s.id === selectedSequenceId) || sequences[0];
-  const schedulerRules = statusData?.schedulerRules?.length ? statusData.schedulerRules : getDefaultSchedulerRules();
-  const computedSchedule = calculateCadenceSchedule(new Date(), currentSequence.steps);
+  const schedulerRules = statusData?.schedulerRules ?? [];
+  const computedSchedule = currentSequence ? calculateCadenceSchedule(new Date(), currentSequence.steps) : [];
 
   const backoffCalc = calculateExponentialBackoff(testBackoffAttempt);
   const samplePayload = {
-    conversionAction: 'ClosedWon',
-    contractorId: 'HAL-ALPHA-77',
-    dealValue: 7500,
+    conversionAction: 'TestOnly',
+    contractorId: 'test-only',
+    dealValue: 0,
     timestamp: new Date().toISOString()
   };
   const sampleSignature = signWebhookPayload(testWebhookSecret, samplePayload);
@@ -325,7 +323,7 @@ export const HalRoadmapPhase3View: React.FC = () => {
               </span>
               <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 flex items-center gap-1">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                PHASE 3 ACTIVE & 100% VERIFIED
+                {statusData?.phase3Verified ? 'PHASE 3 VERIFIED' : 'PHASE 3 NOT VERIFIED'}
               </span>
             </div>
             <h2 className="text-lg font-bold font-display text-text-primary tracking-tight">
