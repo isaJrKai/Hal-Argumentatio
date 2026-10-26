@@ -1094,11 +1094,34 @@ app.get('/api/leads', authenticate, async (req, res) => {
   const targetIds = getTargetContractorIds(contractorId, role);
   try {
     const contractorLeads = await pgDb.select().from(leads).where(inArray(leads.contractorId, targetIds)).orderBy(desc(leads.createdAt));
-    const decryptedLeads = contractorLeads.map(l => ({
-      ...l,
-      email: l.emailEncrypted ? (decrypt(l.emailEncrypted) || l.email) : l.email,
-      phone: l.phoneEncrypted ? (decrypt(l.phoneEncrypted) || l.phone) : l.phone
-    }));
+    const leadIds = contractorLeads.map(lead => lead.id);
+    const groundingEvents = leadIds.length
+      ? await pgDb.select({ leadId: leadEvents.leadId, createdAt: leadEvents.createdAt })
+          .from(leadEvents)
+          .where(and(inArray(leadEvents.leadId, leadIds), eq(leadEvents.eventType, 'GroundingVerified')))
+      : [];
+    const latestGroundingEvent = new Map<string, Date>();
+    for (const event of groundingEvents) {
+      if (!event.createdAt) continue;
+      const current = latestGroundingEvent.get(event.leadId);
+      if (!current || event.createdAt > current) latestGroundingEvent.set(event.leadId, event.createdAt);
+    }
+    const decryptedLeads = contractorLeads.map(l => {
+      const lastProbeAt = latestGroundingEvent.get(l.id);
+      // Legacy rows may have been marked VERIFIED by an old default, not a real probe.
+      // A current grounding audit event must exist after the latest lead edit.
+      const hasCurrentGroundingEvidence = Boolean(lastProbeAt && lastProbeAt >= l.updatedAt);
+      const safeVerificationStatus = l.verificationStatus === 'VERIFIED' && !hasCurrentGroundingEvidence
+        ? 'UNVERIFIED_STAGING'
+        : l.verificationStatus;
+      return {
+        ...l,
+        verificationStatus: safeVerificationStatus,
+        dnsVerified: hasCurrentGroundingEvidence ? l.dnsVerified : (safeVerificationStatus === 'VERIFIED' ? l.dnsVerified : false),
+        email: l.emailEncrypted ? (decrypt(l.emailEncrypted) || l.email) : l.email,
+        phone: l.phoneEncrypted ? (decrypt(l.phoneEncrypted) || l.phone) : l.phone
+      };
+    });
     res.json(decryptedLeads);
   } catch (err: any) {
     try {
