@@ -85,7 +85,7 @@ export interface LearningState {
 
 const STORAGE_KEY = 'hal_autonomous_learning_state_v2';
 
-// Baseline seed data distilled from historical real-world contractor intelligence
+// Empty calibration defaults only; no historical outcome rates or performance claims are assumed.
 const DEFAULT_NICHE_PROFILES: Record<string, NicheCalibration> = {
   roofing: {
     niche: 'roofing',
