@@ -386,7 +386,7 @@ export class AutonomousLearningEngine {
         technicalWeights: this.state.technicalWeights,
         nicheMap: this.state.nicheMap,
         objections: this.state.objections,
-        activeNodes: [{ name: 'Bayesian Base', status: 'online' }]
+        activeNodes: []
       }).onConflictDoUpdate({
         target: neuralState.id,
         set: {
