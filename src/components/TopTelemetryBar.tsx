@@ -537,7 +537,7 @@ export const TopTelemetryBar: React.FC<TopTelemetryBarProps> = ({
               <div className="flex items-center gap-2 px-3 shrink-0 text-[11px]">
                 <span className="text-text-tertiary">Territory:</span>
                 <span className="font-bold text-text-primary">{activeCity}, {regionalProfile.countryCode}</span>
-                <span className="text-text-tertiary">({regionalProfile.territoryMetrics.activeCompetitorDensity} local competitors analyzed)</span>
+                <span className="text-text-tertiary">(reference estimate: {regionalProfile.territoryMetrics.activeCompetitorDensity} competitors)</span>
               </div>
             </>
           )}
