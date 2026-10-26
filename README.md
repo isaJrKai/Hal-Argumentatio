@@ -78,13 +78,13 @@ These commands document the repository's intended workflow; they have not yet be
 The tracked .env.example lists the current configuration surface, including:
 
 - GEMINI_API_KEY and APP_URL
-- JWT_SECRET and LEAD_ENCRYPTION_KEY_B64
+- JWT_SECRET, LEAD_ENCRYPTION_KEY_B64, and migration-only HAL_LEGACY_ENCRYPTION_KEY_B64
 - DATABASE_URL, NEON_DATABASE_URL, and/or SQL_HOST / SQL_USER / SQL_PASSWORD / SQL_DB_NAME
 - Optional provider keys for Hugging Face, OpenRouter, NVIDIA, and Google Maps
 - HAL_ACTIVE_AI
 - MCP_SECRET and optional HAL_MCP_CONTRACTOR_ID
 
-Exact requirements depend on the route and feature being used. Generate unique secrets for each environment. The JWT secret must be high-entropy and private. The lead-encryption key must be managed carefully: changing it can make existing encrypted records unreadable unless the data is migrated correctly. Never copy example values into production.
+Exact requirements depend on the route and feature being used. Generate unique secrets for each environment. The JWT secret must be high-entropy and private. The lead-encryption key must be managed carefully: changing it can make existing encrypted records unreadable unless the data is migrated correctly. HAL_LEGACY_ENCRYPTION_KEY_B64 exists only for a controlled migration; leave it empty in normal operation. Never copy example values into production.
 
 ## Available commands
 
