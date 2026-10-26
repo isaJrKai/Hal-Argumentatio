@@ -437,7 +437,7 @@ export default function CampaignsPanel({ campaigns, leads = [], token, onRefresh
           <div>
             <h2 className="text-xl font-bold tracking-tight text-text-primary">Marketing & Campaigns</h2>
             <p className="text-xs text-text-secondary max-w-2xl mt-0.5 leading-relaxed">
-              Track the reach, spend, and cost per lead across active client outreach pipelines. Compare marketing channels side-by-side using real snapshots to maximize your return on ad spend (ROAS).
+              Review recorded campaign spend and performance snapshots when available. Metrics remain blank until actual campaign events are recorded.
             </p>
           </div>
           <div className="flex items-center gap-3 text-xs font-mono shrink-0">
@@ -456,7 +456,7 @@ export default function CampaignsPanel({ campaigns, leads = [], token, onRefresh
             </div>
             <div className="px-3.5 py-1.5 border border-border-dim rounded bg-bg-raised text-center min-w-[100px]">
               <span className="block text-[10px] text-text-secondary uppercase">Total Spend</span>
-              <span className="text-sm font-semibold text-accent mt-0.5 block">$12,450</span>
+              <span className="text-sm font-semibold text-accent mt-0.5 block">{campaigns.reduce((sum, campaign) => sum + (campaign.spent || 0), 0).toLocaleString(undefined, { style: 'currency', currency: 'USD', maximumFractionDigits: 0 })}</span>
             </div>
           </div>
         </div>
