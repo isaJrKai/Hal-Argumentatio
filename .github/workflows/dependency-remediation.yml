@@ -8,6 +8,8 @@ on:
       - .github/workflows/dependency-remediation.yml
       - package.json
       - package-lock.json
+      - server.ts
+      - src/components/PublicAuditPage.tsx
 
 permissions:
   contents: write
