@@ -751,7 +751,7 @@ export default function HalBiblePanel({ initialDocId }: HalBiblePanelProps = {})
                       <CardContent className="space-y-5">
                         <div className="border-l border-border-dim pl-3.5 space-y-1">
                           <MetadataText>Mission (Largest)</MetadataText>
-                          <MissionTitle>Acquire 20 Roofing Clients</MissionTitle>
+                          <MissionTitle>Example mission (not live data)</MissionTitle>
                         </div>
 
                         <div className="border-l border-border-dim pl-3.5 space-y-1">
@@ -1205,7 +1205,7 @@ export default function HalBiblePanel({ initialDocId }: HalBiblePanelProps = {})
                     </div>
                     <div className="flex justify-between items-center py-0.5">
                       <span className="opacity-50">STABILITY RANKING:</span>
-                      <span className="text-positive uppercase font-bold flex items-center gap-1">
+                      <span className="text-text-secondary uppercase font-bold flex items-center gap-1">
                         <CheckCircle2 className="w-3.5 h-3.5 text-positive" />
                         CODE STATUS NOT VERIFIED
                       </span>
@@ -1233,7 +1233,7 @@ export default function HalBiblePanel({ initialDocId }: HalBiblePanelProps = {})
                     <span>PHILOSOPHY COMPLIANCE:</span>
                     <div className="flex items-center gap-1 text-positive font-bold">
                       <CheckCircle2 className="w-3.5 h-3.5" />
-                      <span>INTENTIONALITY DIRECTIVE (DESIGN CONCEPT) VERIFIED</span>
+                      <span>INTENTIONALITY DIRECTIVE STATUS UNVERIFIED</span>
                     </div>
                   </div>
 
