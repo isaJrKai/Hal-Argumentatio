@@ -129,10 +129,52 @@ export default function HermesLabPanel({ token }: { token: string | null }) {
   const [executing, setExecuting] = useState(false);
   const [activeArtifact, setActiveArtifact] = useState<LabArtifact | null>(null);
   const [viewMode, setViewMode] = useState<'preview' | 'code'>('preview');
+  const [configMode, setConfigMode] = useState<'visual' | 'code'>('visual');
   const [devicePreview, setDevicePreview] = useState<'mobile' | 'desktop'>('desktop');
   const [copiedCode, setCopiedCode] = useState(false);
   const [loading, setLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
+
+  const humanizeFieldName = (key: string): string => {
+    const customMap: Record<string, string> = {
+      niche: 'Trade & Specialty',
+      city: 'Operating Territory / City',
+      phone: 'Direct Phone Number',
+      primaryOffer: 'Primary Seasonal Offer',
+      serviceHighlights: 'Key Service Highlights',
+      targetKeywords: 'Target Search Keywords',
+      uniqueSellingPoints: 'Key Selling Points',
+      businessName: 'Business Name',
+      address: 'Physical Address',
+      priceRange: 'Price Range',
+      services: 'Service Offerings',
+      campaignType: 'Campaign Objective',
+      dealType: 'Commercial Deal Type',
+      averageQuoteValue: 'Average Quote Value',
+      objectionTarget: 'Primary Objection',
+      technicianName: 'Assigned Technician',
+      jobType: 'Job Description',
+      delayMinutes: 'Delay Before Sending (Minutes)',
+      currentMobileSpeedScore: 'Mobile Speed Score (0-100)',
+      lcpSeconds: 'Page Load Delay (Seconds)',
+      issuesIdentified: 'Known Technical Bottlenecks',
+      market: 'Target Market',
+      competitors: 'Known Local Competitors',
+      sourceCrm: 'Source CRM / Software',
+      incomingPayloadStructure: 'Incoming Data Format'
+    };
+    if (customMap[key]) return customMap[key];
+    return key
+      .replace(/([A-Z])/g, ' $1')
+      .replace(/^./, str => str.toUpperCase())
+      .trim();
+  };
+
+  const updateParamField = (key: string, value: any) => {
+    const updated = { ...toolParameters, [key]: value };
+    setToolParameters(updated);
+    setRawParamsText(JSON.stringify(updated, null, 2));
+  };
 
   // Helper to extract reliable auth headers across storage & props
   const getAuthHeaders = (extraHeaders: Record<string, string> = {}): Record<string, string> => {
@@ -673,32 +715,156 @@ export default function HermesLabPanel({ token }: { token: string | null }) {
                   />
                 </div>
 
-                {/* JSON Parameters Tuning */}
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-text-primary flex items-center justify-between">
-                    <span>Configuration Payload (JSON)</span>
-                    <span className="text-[10px] font-mono text-text-tertiary">Auto-filled from Business Profile</span>
-                  </label>
-                  <textarea
-                    value={rawParamsText}
-                    onChange={(e) => {
-                      setRawParamsText(e.target.value);
-                      try {
-                        setToolParameters(JSON.parse(e.target.value));
-                      } catch (_) {
-                        // ignore typing syntax errors
-                      }
-                    }}
-                    rows={8}
-                    className="w-full bg-bg-base border border-border-dim rounded-lg p-2.5 text-xs text-cyan-400 font-mono focus:outline-none focus:border-cyan-500"
-                  />
+                {/* Visual Business Form vs Code JSON Configuration */}
+                <div className="space-y-2.5">
+                  <div className="flex items-center justify-between border-b border-border-dim/50 pb-2">
+                    <div>
+                      <span className="text-xs font-semibold text-text-primary block">
+                        {configMode === 'visual' ? 'Business Details & Setup' : 'Configuration Payload (JSON)'}
+                      </span>
+                      <span className="text-[11px] text-text-tertiary">
+                        {configMode === 'visual' ? 'Pre-filled from your business profile; edit directly' : 'Direct JSON payload for technical operators'}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1 bg-bg-base p-0.5 rounded-lg border border-border-dim text-[11px]">
+                      <button
+                        type="button"
+                        onClick={() => setConfigMode('visual')}
+                        className={`px-2.5 py-1 rounded-md font-medium transition-colors cursor-pointer ${
+                          configMode === 'visual' 
+                            ? 'bg-accent text-accent-contrast shadow-xs' 
+                            : 'text-text-tertiary hover:text-text-secondary'
+                        }`}
+                      >
+                        Visual Form
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setConfigMode('code')}
+                        className={`px-2.5 py-1 rounded-md font-mono text-[10px] transition-colors cursor-pointer ${
+                          configMode === 'code' 
+                            ? 'bg-accent text-accent-contrast shadow-xs' 
+                            : 'text-text-tertiary hover:text-text-secondary'
+                        }`}
+                      >
+                        Code (JSON)
+                      </button>
+                    </div>
+                  </div>
+
+                  {configMode === 'visual' ? (
+                    <div className="space-y-3 bg-bg-base/60 p-3.5 rounded-lg border border-border-dim/60">
+                      {Object.keys(toolParameters).length === 0 ? (
+                        <div className="text-xs text-text-tertiary py-3 text-center">
+                          No extra business parameters required for this tool.
+                        </div>
+                      ) : (
+                        Object.entries(toolParameters).map(([key, val]) => {
+                          const label = humanizeFieldName(key);
+
+                          if (Array.isArray(val)) {
+                            return (
+                              <div key={key} className="space-y-1">
+                                <label className="block text-xs font-medium text-text-secondary">
+                                  {label}
+                                </label>
+                                <textarea
+                                  rows={Math.min(5, Math.max(2, val.length + 1))}
+                                  value={val.join('\n')}
+                                  onChange={(e) => {
+                                    const lines = e.target.value.split('\n');
+                                    updateParamField(key, lines);
+                                  }}
+                                  placeholder="One item per line..."
+                                  className="w-full bg-bg-base border border-border-dim rounded-md p-2 text-xs text-text-primary focus:outline-none focus:border-accent"
+                                />
+                                <span className="text-[10px] text-text-tertiary block">Enter one entry per line</span>
+                              </div>
+                            );
+                          }
+
+                          if (typeof val === 'object' && val !== null) {
+                            return (
+                              <div key={key} className="space-y-1">
+                                <label className="block text-xs font-medium text-text-secondary">
+                                  {label}
+                                </label>
+                                <div className="grid grid-cols-2 gap-2 bg-bg-base p-2 rounded-md border border-border-dim">
+                                  {Object.entries(val).map(([subKey, subVal]) => (
+                                    <div key={subKey} className="space-y-0.5">
+                                      <span className="text-[10px] text-text-tertiary uppercase">{subKey}</span>
+                                      <input
+                                        type={typeof subVal === 'number' ? 'number' : 'text'}
+                                        value={subVal as string | number}
+                                        onChange={(e) => {
+                                          const num = typeof subVal === 'number' ? parseFloat(e.target.value) || 0 : e.target.value;
+                                          updateParamField(key, { ...val, [subKey]: num });
+                                        }}
+                                        className="w-full bg-bg-raised border border-border-dim rounded p-1.5 text-xs text-text-primary focus:outline-none focus:border-accent"
+                                      />
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            );
+                          }
+
+                          if (typeof val === 'number') {
+                            return (
+                              <div key={key} className="space-y-1">
+                                <label className="block text-xs font-medium text-text-secondary">
+                                  {label}
+                                </label>
+                                <input
+                                  type="number"
+                                  value={val}
+                                  onChange={(e) => updateParamField(key, parseFloat(e.target.value) || 0)}
+                                  className="w-full bg-bg-base border border-border-dim rounded-md p-2 text-xs text-text-primary focus:outline-none focus:border-accent"
+                                />
+                              </div>
+                            );
+                          }
+
+                          return (
+                            <div key={key} className="space-y-1">
+                              <label className="block text-xs font-medium text-text-secondary">
+                                {label}
+                              </label>
+                              <input
+                                type="text"
+                                value={String(val || '')}
+                                onChange={(e) => updateParamField(key, e.target.value)}
+                                className="w-full bg-bg-base border border-border-dim rounded-md p-2 text-xs text-text-primary focus:outline-none focus:border-accent"
+                              />
+                            </div>
+                          );
+                        })
+                      )}
+                    </div>
+                  ) : (
+                    <div className="space-y-1.5">
+                      <textarea
+                        value={rawParamsText}
+                        onChange={(e) => {
+                          setRawParamsText(e.target.value);
+                          try {
+                            setToolParameters(JSON.parse(e.target.value));
+                          } catch (_) {
+                            // ignore typing syntax errors
+                          }
+                        }}
+                        rows={8}
+                        className="w-full bg-bg-base border border-border-dim rounded-lg p-2.5 text-xs text-accent font-mono focus:outline-none focus:border-accent"
+                      />
+                    </div>
+                  )}
                 </div>
 
                 {/* Attribution Safety Notice */}
-                <div className="p-3 rounded-lg bg-indigo-500/10 border border-indigo-500/20 flex items-start gap-2 text-xs text-indigo-300">
-                  <ShieldCheck className="w-4 h-4 shrink-0 mt-0.5 text-indigo-400" />
+                <div className="p-3 rounded-lg bg-accent/10 border border-accent/20 flex items-start gap-2 text-xs text-text-secondary">
+                  <ShieldCheck className="w-4 h-4 shrink-0 mt-0.5 text-accent" />
                   <div>
-                    <span className="font-bold">HAL Safe Sandbox Rail:</span> All assets synthesized inside this lab automatically inherit your GCLID capture tags, CRM webhook listeners, and zero-leak attribution routes.
+                    <span className="font-semibold text-text-primary">HAL Attribution Guarantee:</span> All assets synthesized inside this lab automatically inherit your tracking tags, CRM webhooks, and attribution routes.
                   </div>
                 </div>
 
@@ -706,17 +872,17 @@ export default function HermesLabPanel({ token }: { token: string | null }) {
                 <button
                   onClick={handleExecuteTool}
                   disabled={executing}
-                  className="w-full py-3 bg-gradient-to-r from-cyan-600 to-indigo-600 hover:from-cyan-500 hover:to-indigo-500 text-white font-bold rounded-lg text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-lg shadow-indigo-600/20 cursor-pointer disabled:opacity-50"
+                  className="w-full py-2.5 bg-accent hover:opacity-90 active:scale-[0.99] text-accent-contrast font-semibold rounded-lg text-xs tracking-wide flex items-center justify-center gap-2 shadow-xs cursor-pointer transition-all disabled:opacity-50"
                 >
                   {executing ? (
                     <>
                       <RefreshCw className="w-4 h-4 animate-spin" />
-                      Hermes Synthesizing Asset...
+                      Synthesizing Marketing Asset...
                     </>
                   ) : (
                     <>
                       <Sparkles className="w-4 h-4" />
-                      Synthesize Production Asset in Lab
+                      Generate Production Marketing Asset
                     </>
                   )}
                 </button>

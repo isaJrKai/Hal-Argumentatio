@@ -116,10 +116,10 @@ export const HERMES_LAB_CATALOG: LabToolCatalogItem[] = [
   },
   {
     id: 'ad_copy_studio',
-    name: 'Google Ads Responsive Search Studio',
+    name: 'Google Search Ads & Copy Studio',
     badge: '15 Headlines + 4 Descriptions',
     category: 'ads',
-    description: 'Generates high-CTR Responsive Search Ads tailored to high-intent local queries with dynamic location insertion and negative keyword exclusions.',
+    description: 'Generates high-converting Google Search ads tailored to local contractor queries with location insertion and ad waste prevention.',
     iconName: 'FileSpreadsheet',
     defaultPrompt: 'Create a high-intent Google Search Ad copy set for emergency plumbing in Austin, TX.',
     schemaSample: {
@@ -130,12 +130,12 @@ export const HERMES_LAB_CATALOG: LabToolCatalogItem[] = [
   },
   {
     id: 'seo_schema_generator',
-    name: 'LocalBusiness Schema & Geo-Sitemap Foundry',
-    badge: 'JSON-LD + Microdata',
+    name: 'Google Search & Local Business Schema',
+    badge: 'Search Rich Snippets',
     category: 'seo',
-    description: 'Produces validated JSON-LD schema markup with nested GeoCoordinates, AggregateRating, OpeningHoursSpecification, and Service catalogs.',
+    description: 'Produces Google-certified search structured markup so your business displays review star ratings, local service territories, business hours, and map locations directly on Google Search.',
     iconName: 'Code2',
-    defaultPrompt: 'Generate valid LocalBusiness JSON-LD schema for a roofing contractor serving Miami, Fort Lauderdale, and West Palm Beach.',
+    defaultPrompt: 'Generate valid LocalBusiness schema for a roofing contractor serving Miami, Fort Lauderdale, and West Palm Beach.',
     schemaSample: {
       businessName: 'Apex Roofing Experts',
       address: '100 Biscayne Blvd, Miami, FL 33132',
@@ -146,10 +146,10 @@ export const HERMES_LAB_CATALOG: LabToolCatalogItem[] = [
   },
   {
     id: 'outreach_sequences',
-    name: 'Cold Lead Reactivation & Quote Follow-Up',
+    name: 'Stalled Quote & Lead Reactivation',
     badge: '3-Step Email + SMS',
     category: 'outreach',
-    description: 'Builds psychological multi-touch reactivation sequences for quotes that stalled past 7 days, emphasizing warranty, financing, and seasonal slots.',
+    description: 'Builds multi-touch follow-up messages for quotes that stalled past 7 days, addressing financing, warranty, and limited seasonal slots.',
     iconName: 'Send',
     defaultPrompt: 'Create a 3-touch follow-up sequence for commercial landscaping quotes over $5,000 that have not responded.',
     schemaSample: {
@@ -160,10 +160,10 @@ export const HERMES_LAB_CATALOG: LabToolCatalogItem[] = [
   },
   {
     id: 'sms_review_booster',
-    name: 'Post-Job 5-Star SMS Review Engine',
-    badge: 'SMS Trigger Flow',
+    name: 'Automated Post-Job Review Collector',
+    badge: 'Automated Review Flow',
     category: 'outreach',
-    description: 'Generates frictionless SMS review prompts timed 90 minutes post-job completion with direct Google Place review URL shortcuts.',
+    description: 'Sends an automated, friendly SMS review prompt after a job is completed with a direct 1-tap Google Review link.',
     iconName: 'Star',
     defaultPrompt: 'Draft an automated post-service SMS review request flow for residential electrical repair customers.',
     schemaSample: {
@@ -174,10 +174,10 @@ export const HERMES_LAB_CATALOG: LabToolCatalogItem[] = [
   },
   {
     id: 'speed_vitals_optimizer',
-    name: 'Core Web Vitals & Tag Inspector',
-    badge: 'Code Diagnostic',
+    name: 'Website Speed & Technical Health Audit',
+    badge: 'Performance Audit',
     category: 'diagnostics',
-    description: 'Analyzes client site bottlenecks, uncompressed images, missing SSL, and render-blocking scripts to produce drop-in optimization recommendations.',
+    description: 'Inspects page speed, security certificates (SSL), mobile responsiveness, and image sizes to recommend immediate ranking fixes.',
     iconName: 'Zap',
     defaultPrompt: 'Generate an actionable technical fix list for a contractor site with 4.8s mobile load time and render-blocking fonts.',
     schemaSample: {
@@ -188,10 +188,10 @@ export const HERMES_LAB_CATALOG: LabToolCatalogItem[] = [
   },
   {
     id: 'competitor_intel_scout',
-    name: 'Local Competitor Threat & Promo Scanner',
-    badge: 'Forensic Intel',
+    name: 'Local Competitor Pricing & Offer Scanner',
+    badge: 'Market Intelligence',
     category: 'reasoning',
-    description: 'Cross-references local market competitors, ad angles, coupon pricing, and warranty offers to identify positioning gaps.',
+    description: 'Scans top local trade competitors, active promotions, and warranty terms to spot high-margin market opportunities.',
     iconName: 'ShieldAlert',
     defaultPrompt: 'Analyze the top 3 plumbing competitors in Phoenix and identify their current seasonal promos and weak points.',
     schemaSample: {
@@ -202,10 +202,10 @@ export const HERMES_LAB_CATALOG: LabToolCatalogItem[] = [
   },
   {
     id: 'webhook_resilience_fixer',
-    name: 'Self-Healing Webhook & Payload Adapter',
-    badge: 'Resilience Code',
+    name: 'CRM & Lead Form Data Connector',
+    badge: 'Integration Bridge',
     category: 'diagnostics',
-    description: 'Generates resilient JavaScript/TypeScript schema adapters and transformers for broken or non-standard CRM webhook payloads.',
+    description: 'Connects Jobber, Housecall Pro, ServiceTitan, or custom website forms into HAL so new leads flow directly into your pipeline.',
     iconName: 'Cpu',
     defaultPrompt: 'Create a transformer function that adapts ServiceTitan webhook payloads into HAL standardized Lead format.',
     schemaSample: {

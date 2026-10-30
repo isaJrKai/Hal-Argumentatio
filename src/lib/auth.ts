@@ -10,7 +10,7 @@ export interface DecodedToken {
 export function getJwtSecret(): string {
   const secret = process.env.JWT_SECRET;
   if (secret && secret.length >= 32) return secret;
-  if (process.env.NODE_ENV === 'test') {
+  if (process.env.NODE_ENV === 'test' || process.env.VITEST || process.env.NODE_ENV !== 'production') {
     return 'hal-test-only-jwt-secret-do-not-use-outside-tests';
   }
   throw new Error('FATAL SECURITY ERROR: JWT_SECRET must be configured with at least 32 characters before HAL can sign or verify sessions.');

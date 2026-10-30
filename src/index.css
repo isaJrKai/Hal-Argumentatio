@@ -64,10 +64,10 @@
   --text-secondary: #9da6b8; /* Refined steel-graphite */
   --text-tertiary: #626c82;  /* Muted charcoal */
 
-  --accent: #e5a43b;         /* Antique gold leaf & brass seal - dignified, authoritative */
-  --accent-dim: rgba(229, 164, 59, 0.10);
-  --accent-mid: rgba(229, 164, 59, 0.20);
-  --accent-contrast: #0c0e12;
+  --accent: #2563eb;         /* Executive sapphire blue - high-definition precision */
+  --accent-dim: rgba(37, 99, 235, 0.12);
+  --accent-mid: rgba(37, 99, 235, 0.24);
+  --accent-contrast: #ffffff;
 
   --color-positive: #10b981;
   --color-positive-dim: rgba(16, 185, 129, 0.12);
@@ -99,9 +99,9 @@
   --text-secondary: #48453d; /* Sepia-toned charcoal ink */
   --text-tertiary: #7d786d;  /* Muted wash ink */
 
-  --accent: #b83a28;         /* Editorial vermilion / sealing wax terracotta */
-  --accent-dim: rgba(184, 58, 40, 0.08);
-  --accent-mid: rgba(184, 58, 40, 0.16);
+  --accent: #1d4ed8;         /* Deep executive cobalt blue */
+  --accent-dim: rgba(29, 78, 216, 0.08);
+  --accent-mid: rgba(29, 78, 216, 0.16);
   --accent-contrast: #ffffff;
 
   --color-positive: #166534; /* Rich forest bookcloth green - deep readability */

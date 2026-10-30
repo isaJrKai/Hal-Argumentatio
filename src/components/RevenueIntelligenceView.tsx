@@ -219,7 +219,7 @@ export default function RevenueIntelligenceView({ token }: RevenueIntelligenceVi
 
               return (
                 <div className="space-y-4 pt-2">
-                  <div className="grid grid-cols-1 sm:grid-cols-7 gap-2.5 relative">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-7 gap-2.5 relative min-w-0">
                     {stages.map((stage, idx) => {
                       const prev = idx > 0 ? stages[idx - 1] : null;
                       const conversionRate = prev && prev.num > 0 
@@ -227,8 +227,8 @@ export default function RevenueIntelligenceView({ token }: RevenueIntelligenceVi
                         : null;
 
                       return (
-                        <div key={idx} className="relative group">
-                          <div className="p-3.5 rounded-lg border border-border-dim bg-bg-overlay flex flex-col justify-between text-center relative overflow-hidden h-full shadow-xs">
+                        <div key={idx} className="relative group min-w-0">
+                          <div className="p-3 rounded-lg border border-border-dim bg-bg-overlay flex flex-col justify-between text-center relative overflow-hidden h-full min-h-[110px] shadow-xs">
                             {/* Proportional visual height fill bar */}
                             <div 
                               className="absolute bottom-0 left-0 right-0 opacity-15 pointer-events-none transition-all"
@@ -238,14 +238,14 @@ export default function RevenueIntelligenceView({ token }: RevenueIntelligenceVi
                               }}
                             />
                             
-                            <div className="text-[9.5px] font-mono text-text-tertiary uppercase tracking-wider relative z-10">{stage.label}</div>
-                            <div className="text-base sm:text-lg font-bold font-mono text-text-primary my-1.5 relative z-10">{stage.val}</div>
+                            <div className="text-[10px] font-sans font-semibold text-text-secondary uppercase tracking-wide relative z-10 truncate">{stage.label}</div>
+                            <div className="text-base font-bold font-sans text-text-primary my-1 relative z-10 truncate">{stage.val}</div>
                             
                             <div className="space-y-1 relative z-10">
-                              <div className="text-[9px] font-mono text-accent font-semibold">{stage.sub}</div>
+                              <div className="text-[10px] font-mono text-accent font-semibold truncate">{stage.sub}</div>
                               {conversionRate && (
-                                <div className="text-[8.5px] font-mono text-emerald-400 bg-emerald-500/10 rounded px-1 py-0.5 border border-emerald-500/20">
-                                  {conversionRate}% of prev
+                                <div className="text-[9px] font-mono text-positive bg-positive-dim rounded px-1.5 py-0.5 border border-positive/20 whitespace-nowrap inline-block">
+                                  {conversionRate}% step
                                 </div>
                               )}
                             </div>

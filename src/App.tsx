@@ -713,10 +713,10 @@ export default function App() {
     {
       group: 'OPERATING INTELLIGENCE',
       items: [
-        { id: 'chat', label: 'HAL Copilot (Chat)', icon: Bot },
-        { id: 'loop-engine', label: 'HAL Operating Loop (10-Stage)', icon: RefreshCw },
-        { id: 'hermes-lab', label: 'Hermes Lab Studio', icon: Sparkles },
-        { id: 'neural', label: 'Neural Decision Graph', icon: Network },
+        { id: 'chat', label: 'HAL Copilot', icon: Bot },
+        { id: 'loop-engine', label: 'Operating Loop', icon: RefreshCw },
+        { id: 'hermes-lab', label: 'Hermes Studio', icon: Sparkles },
+        { id: 'neural', label: 'Decision Engine', icon: Network },
       ]
     },
     {
@@ -724,36 +724,36 @@ export default function App() {
       items: [
         { id: 'delivery', label: 'Client Work Orders', icon: Briefcase },
         { id: 'contracts', label: 'Contracts & Agreements', icon: FileCheck2 },
-        { id: 'whitelabel-reports', label: 'Client Performance Reports', icon: Building2 },
+        { id: 'whitelabel-reports', label: 'Client Reports', icon: Building2 },
         { id: 'form-builder', label: 'Lead Capture Forms', icon: FileCheck },
-        { id: 'debrief', label: 'Win/Loss Deal Logger', icon: Check },
+        { id: 'debrief', label: 'Deal Logger', icon: Check },
       ]
     },
     {
       group: 'MARKETING & DESIGN STUDIO',
       items: [
-        { id: 'communications', label: 'Multi-Channel Outreach Hub', icon: Send },
-        { id: 'document-studio', label: 'Document Design Studio', icon: FileText },
-        { id: 'email-designer', label: 'Email Template Designer', icon: Mail },
-        { id: 'landing-studio', label: 'Website Landing Pages', icon: Globe },
-        { id: 'calculators', label: 'Business & ROI Calculators', icon: Calculator },
+        { id: 'communications', label: 'Outreach Hub', icon: Send },
+        { id: 'document-studio', label: 'Document Studio', icon: FileText },
+        { id: 'email-designer', label: 'Email Designer', icon: Mail },
+        { id: 'landing-studio', label: 'Landing Pages', icon: Globe },
+        { id: 'calculators', label: 'ROI Calculators', icon: Calculator },
       ]
     },
     {
       group: 'COMPANY KNOWLEDGE & TASKS',
       items: [
-        { id: 'drive', label: 'Company File Vault', icon: FileText },
+        { id: 'drive', label: 'Company Vault', icon: FileText },
         { id: 'skills', label: 'AI Business Skills', icon: Sparkles },
-        { id: 'scheduler', label: 'Scheduled Tasks & Scans', icon: Play },
+        { id: 'scheduler', label: 'Task Schedule', icon: Play },
       ]
     },
     {
       group: 'SETTINGS & INTEGRATIONS',
       items: [
         { id: 'connectors', label: 'Connected Apps', icon: Share2 },
-        { id: 'credentials', label: 'Company Settings & Keys', icon: Settings },
-        { id: 'about', label: 'About & Operating Manual', icon: BookOpen },
-        { id: 'health', label: 'System & Server Status', icon: Activity }
+        { id: 'credentials', label: 'Settings & Keys', icon: Settings },
+        { id: 'about', label: 'Operating Manual', icon: BookOpen },
+        { id: 'health', label: 'System Status', icon: Activity }
       ]
     }
   ];
@@ -885,7 +885,7 @@ export default function App() {
                             <item.icon className={`w-4 h-4 shrink-0 transition-colors mr-3 ${
                               active ? 'text-accent' : 'text-text-secondary'
                             }`} />
-                            <span className="text-xs font-mono uppercase tracking-wide truncate">
+                            <span className="text-xs font-sans font-medium truncate">
                               {item.label}
                             </span>
                           </button>
@@ -896,45 +896,10 @@ export default function App() {
                 </div>
               </div>
 
-              {/* Footer of Sidebar */}
-              <div className="p-4 border-t bg-bg-overlay/60 flex flex-col gap-2.5 border-border-dim/40">
-                <div className="flex items-center justify-between text-[10px] font-mono">
-                  <span className="text-text-tertiary">HAL 2.0.0</span>
-                  
-                  {/* Theme Toggle Button */}
-                  <button 
-                    onClick={toggleTheme}
-                    className="min-h-[44px] px-3 py-2 flex items-center gap-2 rounded-lg border transition-colors bg-bg-subtle hover:bg-bg-raised active:bg-bg-subtle border-border-default text-text-primary cursor-pointer"
-                    title="Toggle System Theme"
-                    aria-label="Toggle System Theme"
-                  >
-                    {isDark ? (
-                      <>
-                        <Sun className="w-4 h-4 text-accent" />
-                        <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-accent">PAPER & INK</span>
-                      </>
-                    ) : (
-                      <>
-                        <Moon className="w-4 h-4 text-accent" />
-                        <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-accent">DARK CARBON</span>
-                      </>
-                    )}
-                  </button>
-                </div>
-                
-                <button 
-                  onClick={() => {
-                    setActiveTab('credentials');
-                    setIsMobileMenuOpen(false);
-                  }}
-                  className="min-h-[44px] px-3.5 py-2.5 flex items-center justify-between w-full border rounded-lg text-xs font-mono transition-all text-left bg-bg-overlay hover:bg-bg-subtle active:bg-bg-subtle border-border-dim text-text-secondary hover:text-text-primary cursor-pointer"
-                >
-                  <span className="flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full bg-indigo-500" />
-                    HAL Council
-                  </span>
-                  <span className="text-[10px] px-2 py-0.5 bg-indigo-500/10 text-indigo-400 font-bold rounded">LIVE</span>
-                </button>
+              {/* Footer of Mobile Menu */}
+              <div className="p-3.5 border-t bg-bg-overlay/60 flex items-center justify-between text-xs font-sans text-text-tertiary border-border-dim/40">
+                <span className="font-semibold text-text-secondary text-xs">HAL Enterprise</span>
+                <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-accent-dim text-accent font-bold">v2.0</span>
               </div>
             </motion.aside>
         )}
@@ -965,14 +930,14 @@ export default function App() {
       <div className="flex-1 flex flex-row overflow-hidden w-full h-full min-w-0">
         
         {/* FIXED HIGH-DENSITY SIDEBAR NAV */}
-        <aside className={`w-60 shrink-0 border-r flex flex-col justify-between hidden md:flex h-full select-none transition-colors ${sidebarBg}`}>
+        <aside className={`w-64 shrink-0 border-r flex flex-col justify-between hidden md:flex h-full select-none transition-colors ${sidebarBg}`}>
           
           <div className="flex flex-col flex-1 overflow-hidden">
             {/* Scrollable category list */}
             <div className="flex-1 overflow-y-auto py-3 px-3 space-y-4">
               {navigationGroups.map((group) => (
                 <div key={group.group} className="space-y-0.5">
-                  <div className="px-2.5 pb-1 text-[7.5px] font-mono font-bold tracking-widest text-text-tertiary uppercase opacity-75">
+                  <div className="px-2.5 pb-1 text-[8px] font-mono font-bold tracking-widest text-text-tertiary uppercase opacity-85">
                     {group.group}
                   </div>
                   {group.items.map((item) => {
@@ -981,7 +946,7 @@ export default function App() {
                       <button
                         key={item.id}
                         onClick={() => setActiveTab(item.id)}
-                        className={`flex items-center h-7.5 px-2.5 w-full text-left rounded transition-all border ${
+                        className={`flex items-center h-8 px-2.5 w-full text-left rounded-md transition-all border ${
                           active 
                             ? 'text-text-primary bg-bg-subtle border-border-dim/80 font-semibold shadow-xs'
                             : 'text-text-secondary hover:text-text-primary border-transparent hover:bg-bg-subtle/50'
@@ -990,7 +955,7 @@ export default function App() {
                         <item.icon className={`w-3.5 h-3.5 shrink-0 transition-colors mr-2.5 ${
                           active ? 'text-accent' : 'text-text-secondary'
                         }`} />
-                        <span className="text-[10px] font-mono uppercase tracking-wider truncate">
+                        <span className="text-[11.5px] font-sans font-medium text-inherit truncate">
                           {item.label}
                         </span>
                       </button>
@@ -1002,40 +967,11 @@ export default function App() {
           </div>
 
           {/* Footer of Sidebar */}
-          <div className="p-4 border-t bg-bg-overlay/60 flex flex-col gap-2 border-border-dim/40">
-            <div className="flex items-center justify-between text-[9px] font-mono">
-              <span className="text-text-tertiary">HAL 2.0.0</span>
-              
-              {/* Theme Toggle Button */}
-              <button 
-                onClick={toggleTheme}
-                className="flex items-center gap-1.5 px-2 py-1 rounded border transition-colors bg-bg-subtle hover:bg-bg-raised border-border-default text-text-primary cursor-pointer"
-                title="Toggle System Theme"
-              >
-                {isDark ? (
-                  <>
-                    <Sun className="w-3 h-3 text-accent" />
-                    <span className="text-[8px] font-mono font-bold uppercase tracking-wider text-accent">PAPER & INK</span>
-                  </>
-                ) : (
-                  <>
-                    <Moon className="w-3 h-3 text-accent" />
-                    <span className="text-[8px] font-mono font-bold uppercase tracking-wider text-accent">DARK CARBON</span>
-                  </>
-                )}
-              </button>
+          <div className="p-3 border-t bg-bg-overlay/60 space-y-2 border-border-dim/40">
+            <div className="flex items-center justify-between text-xs font-sans text-text-tertiary">
+              <span className="font-semibold text-text-secondary text-[11px]">HAL Enterprise</span>
+              <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-accent-dim text-accent font-bold">v2.0</span>
             </div>
-            
-            <button 
-              onClick={() => setActiveTab('credentials')}
-              className="flex items-center justify-between w-full h-8 px-2.5 border rounded text-[10px] font-mono transition-all text-left bg-bg-overlay hover:bg-bg-subtle border-border-dim text-text-secondary hover:text-text-primary"
-            >
-              <span className="flex items-center gap-1.5">
-                <span className="w-1.5 h-1.5 rounded-full bg-indigo-500" />
-                HAL Council
-              </span>
-              <span className="text-[9px] px-1.5 py-0.5 bg-indigo-500/10 text-indigo-400 font-bold rounded">LIVE</span>
-            </button>
 
             {!isAppInstalled && (
               <button

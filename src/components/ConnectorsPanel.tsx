@@ -42,6 +42,85 @@ export default function ConnectorsPanel() {
   const [calendarEvents, setCalendarEvents] = useState<CalendarEvent[]>([]);
   const [isLoadingEvents, setIsLoadingEvents] = useState(false);
 
+  // ─── EMAIL DISPATCH & PASSWORD RESET DELIVERY STATE ───────────────────────
+  const [resendApiKey, setResendApiKey] = useState(() => localStorage.getItem('hal_resend_api_key') || '');
+  const [isSavingEmailKey, setIsSavingEmailKey] = useState(false);
+  const [testEmailAddress, setTestEmailAddress] = useState('kaisoisaac@gmail.com');
+  const [isSendingTestEmail, setIsSendingTestEmail] = useState(false);
+  const [testEmailResult, setTestEmailResult] = useState<{
+    success: boolean;
+    message: string;
+    resetUrl?: string;
+    emailDispatched?: boolean;
+  } | null>(null);
+
+  const handleSaveResendKey = async () => {
+    setIsSavingEmailKey(true);
+    try {
+      localStorage.setItem('hal_resend_api_key', resendApiKey.trim());
+      const token = localStorage.getItem('token') || localStorage.getItem('halbiz_auth_token') || '';
+      await fetch('/api/connectors/credentials', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ service: 'resend', keyVal: resendApiKey.trim() })
+      });
+      toast({
+        variant: 'success',
+        title: 'Email Dispatch API Key Saved',
+        description: 'Resend API key stored securely in backend credentials.',
+        whatNext: 'You can now dispatch a test password reset email below.'
+      });
+    } catch (err: any) {
+      toast({
+        variant: 'danger',
+        title: 'Failed to Save Key',
+        description: err.message
+      });
+    } finally {
+      setIsSavingEmailKey(false);
+    }
+  };
+
+  const handleSendTestResetEmail = async () => {
+    if (!testEmailAddress.trim()) {
+      toast({ variant: 'warning', title: 'Email Required', description: 'Enter an email address to send the test password reset link.' });
+      return;
+    }
+    setIsSendingTestEmail(true);
+    setTestEmailResult(null);
+    try {
+      const res = await fetch('/api/auth/forgot-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: testEmailAddress.trim() })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to dispatch test reset link');
+      setTestEmailResult({
+        success: true,
+        message: data.message,
+        resetUrl: data.resetUrl,
+        emailDispatched: data.emailDispatched
+      });
+      toast({
+        variant: data.emailDispatched ? 'success' : 'info',
+        title: data.emailDispatched ? 'Reset Email Dispatched to Inbox!' : 'Reset Link Generated',
+        description: data.emailDispatched ? `Sent to ${testEmailAddress}. Check inbox.` : 'Link created. Connect Resend or Gmail to deliver directly.'
+      });
+    } catch (err: any) {
+      setTestEmailResult({
+        success: false,
+        message: err.message
+      });
+      toast({ variant: 'danger', title: 'Test Dispatch Failed', description: err.message });
+    } finally {
+      setIsSendingTestEmail(false);
+    }
+  };
+
   useEffect(() => {
     const unsubscribe = initGoogleWorkspaceAuth(
       (user, token) => {
@@ -531,6 +610,142 @@ export default function ConnectorsPanel() {
                   )}
                 </div>
               )}
+            </div>
+          </Card>
+
+          {/* Email Dispatch & Password Reset Delivery Configuration Card */}
+          <Card className="border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm p-5">
+            <div className="flex items-center gap-3 pb-4 border-b border-zinc-100 dark:border-zinc-800">
+              <div className="p-2.5 rounded-xl bg-blue-500/10 text-blue-600 dark:text-blue-400">
+                <Mail className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="text-base font-semibold text-zinc-900 dark:text-zinc-100">
+                  Production Email Dispatch & Password Reset Delivery
+                </h3>
+                <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
+                  Configure your email delivery gateway to send password reset links and customer notifications directly to inboxes.
+                </p>
+              </div>
+            </div>
+
+            <div className="space-y-6 pt-4">
+              {/* Buyer Handover Guide Callout */}
+              <div className="p-4 rounded-xl bg-blue-500/5 border border-blue-500/20 space-y-2">
+                <div className="flex items-center gap-2 text-xs font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wider font-mono">
+                  <ShieldCheck className="w-4 h-4" />
+                  Buyer / New Owner Setup Guide: Real Email API Integration
+                </div>
+                <p className="text-xs text-zinc-600 dark:text-zinc-300 leading-relaxed">
+                  For the buyer tomorrow: Standard web applications require an external email provider to deliver password reset emails directly to user inboxes. HAL provides two seamless, zero-code options:
+                </p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2 text-xs">
+                  <div className="p-3 bg-white dark:bg-zinc-800/80 rounded-lg border border-zinc-200 dark:border-zinc-700/60 space-y-1">
+                    <span className="font-semibold text-zinc-900 dark:text-zinc-100 block">Option A: Google Workspace (Gmail API)</span>
+                    <p className="text-[11px] text-zinc-500 dark:text-zinc-400 leading-relaxed">
+                      Click the "Connect Google Workspace" button above. Authorizing the Gmail scope allows HAL to dispatch system emails and password reset links directly through your corporate Gmail address.
+                    </p>
+                  </div>
+                  <div className="p-3 bg-white dark:bg-zinc-800/80 rounded-lg border border-zinc-200 dark:border-zinc-700/60 space-y-1">
+                    <span className="font-semibold text-zinc-900 dark:text-zinc-100 block">Option B: Resend Email API</span>
+                    <p className="text-[11px] text-zinc-500 dark:text-zinc-400 leading-relaxed">
+                      Create an account at Resend.com, generate an API key (re_...), and paste it below. HAL will automatically use high-reputation transactional delivery for all reset requests.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Resend API Key Configuration */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+                <div className="md:col-span-2 space-y-1.5">
+                  <label className="text-xs font-semibold text-zinc-700 dark:text-zinc-300 font-mono uppercase text-[11px]">
+                    Resend API Key (RESEND_API_KEY)
+                  </label>
+                  <input
+                    type="password"
+                    value={resendApiKey}
+                    onChange={(e) => setResendApiKey(e.target.value)}
+                    placeholder="re_123456789_abcdef..."
+                    className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg py-2 px-3 text-xs font-mono text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 focus:outline-none focus:border-blue-500"
+                  />
+                </div>
+                <div>
+                  <Button
+                    onClick={handleSaveResendKey}
+                    disabled={isSavingEmailKey}
+                    className="w-full text-xs h-9 bg-zinc-900 hover:bg-zinc-800 dark:bg-zinc-100 dark:hover:bg-zinc-200 text-white dark:text-zinc-900 font-semibold"
+                  >
+                    {isSavingEmailKey ? 'Saving...' : 'Save Email Key'}
+                  </Button>
+                </div>
+              </div>
+
+              {/* Test Live Password Reset Dispatch Tool */}
+              <div className="pt-4 border-t border-zinc-100 dark:border-zinc-800 space-y-3">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-semibold text-zinc-700 dark:text-zinc-300 font-mono uppercase text-[11px]">
+                    Dispatch Live Password Reset Test
+                  </label>
+                  <span className="text-[11px] text-zinc-500 font-mono">
+                    Tests real email delivery &amp; link generation
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+                  <div className="md:col-span-2 space-y-1.5">
+                    <input
+                      type="email"
+                      value={testEmailAddress}
+                      onChange={(e) => setTestEmailAddress(e.target.value)}
+                      placeholder="owner@yourcompany.com"
+                      className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg py-2 px-3 text-xs text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 focus:outline-none focus:border-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <Button
+                      onClick={handleSendTestResetEmail}
+                      disabled={isSendingTestEmail}
+                      className="w-full text-xs h-9 bg-blue-600 hover:bg-blue-700 text-white font-semibold"
+                    >
+                      <Send className="w-3.5 h-3.5 mr-1.5" />
+                      {isSendingTestEmail ? 'Dispatching...' : 'Send Test Reset Email'}
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Test Output Box */}
+                {testEmailResult && (
+                  <div className={`p-4 rounded-xl border text-xs space-y-2 ${testEmailResult.success ? 'bg-zinc-50 dark:bg-zinc-800/60 border-zinc-200 dark:border-zinc-700' : 'bg-red-500/10 border-red-500/20 text-red-400'}`}>
+                    <div className="flex items-center gap-2 font-bold font-mono">
+                      {testEmailResult.emailDispatched ? (
+                        <span className="text-emerald-500 flex items-center gap-1.5">
+                          <CheckCircle2 className="w-4 h-4" />
+                          Email Dispatched Directly to Inbox!
+                        </span>
+                      ) : (
+                        <span className="text-blue-500 flex items-center gap-1.5">
+                          <Sparkles className="w-4 h-4" />
+                          Production Reset Link Ready
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-zinc-600 dark:text-zinc-300 leading-relaxed">
+                      {testEmailResult.message}
+                    </p>
+                    {testEmailResult.resetUrl && (
+                      <div className="pt-2 flex flex-col sm:flex-row sm:items-center gap-2">
+                        <span className="text-[11px] font-mono text-zinc-400 shrink-0">Clickable Link:</span>
+                        <a
+                          href={testEmailResult.resetUrl}
+                          className="text-blue-600 dark:text-blue-400 font-mono text-xs hover:underline break-all"
+                        >
+                          {testEmailResult.resetUrl}
+                        </a>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
           </Card>
         </div>

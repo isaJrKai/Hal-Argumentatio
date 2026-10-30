@@ -191,28 +191,6 @@ export const TopTelemetryBar: React.FC<TopTelemetryBarProps> = ({
             <span className="w-1.5 h-1.5 rounded-full bg-text-tertiary" />
           </button>
 
-          {/* Dedicated Theme Toggle: Paper & Ink / Dark Carbon */}
-          {onToggleTheme && (
-            <button
-              onClick={onToggleTheme}
-              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-border-default hover:border-accent/60 bg-bg-subtle hover:bg-bg-base text-text-primary text-xs transition-all cursor-pointer shadow-xs"
-              title={theme === 'light' ? 'Switch to Dark Carbon Mode' : 'Switch to Paper & Ink Light Theme'}
-              aria-label="Toggle Theme"
-            >
-              {theme === 'light' ? (
-                <>
-                  <Sun className="w-3.5 h-3.5 text-accent shrink-0" />
-                  <span className="hidden sm:inline text-[10px] font-mono font-bold tracking-wider uppercase text-accent">PAPER & INK</span>
-                </>
-              ) : (
-                <>
-                  <Moon className="w-3.5 h-3.5 text-accent shrink-0" />
-                  <span className="hidden sm:inline text-[10px] font-mono font-bold tracking-wider uppercase text-accent">DARK CARBON</span>
-                </>
-              )}
-            </button>
-          )}
-
           {/* Notifications */}
           <div className="relative">
             <button

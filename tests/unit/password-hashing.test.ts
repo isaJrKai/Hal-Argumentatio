@@ -17,4 +17,39 @@ describe('Password hashing', () => {
     expect(verifyPassword(password, legacyHash)).toBe(true);
     expect(verifyPassword('incorrect', legacyHash)).toBe(false);
   });
+
+  describe('Password Reset Engine', () => {
+    it('creates single-use hashed reset tokens and consumes them safely', async () => {
+      const { db } = await import('../../src/db/db');
+      const testEmail = 'reset-test@example.com';
+      const rawToken = 'test-token-' + crypto.randomBytes(16).toString('hex');
+
+      const record = db.createPasswordReset(testEmail, rawToken, 3600 * 1000);
+      expect(record.email).toBe(testEmail);
+      expect(record.used).toBe(false);
+
+      // Verify and consume the token
+      const result = db.verifyAndConsumePasswordReset(rawToken);
+      expect(result.valid).toBe(true);
+      expect(result.email).toBe(testEmail);
+
+      // Second attempt to use the same token must fail (single-use guarantee)
+      const secondAttempt = db.verifyAndConsumePasswordReset(rawToken);
+      expect(secondAttempt.valid).toBe(false);
+      expect(secondAttempt.error).toContain('already used');
+    });
+
+    it('rejects expired password reset tokens', async () => {
+      const { db } = await import('../../src/db/db');
+      const testEmail = 'expired-test@example.com';
+      const rawToken = 'expired-token-' + crypto.randomBytes(16).toString('hex');
+
+      // Create token with -1000 ms TTL (already expired)
+      db.createPasswordReset(testEmail, rawToken, -1000);
+
+      const result = db.verifyAndConsumePasswordReset(rawToken);
+      expect(result.valid).toBe(false);
+      expect(result.error).toContain('expired');
+    });
+  });
 });

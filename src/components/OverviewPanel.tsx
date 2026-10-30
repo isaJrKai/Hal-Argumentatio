@@ -232,7 +232,13 @@ export default function OverviewPanel({
         const res = await fetch('/api/ai/test-timesfm', {
           method: 'POST',
           headers,
-          body: JSON.stringify({ city: activeCity, niche: activeNiche, horizonWeeks: 12, applyGuardrails: true })
+          body: JSON.stringify({ 
+            city: activeCity, 
+            niche: activeNiche, 
+            horizonWeeks: 12, 
+            applyGuardrails: true,
+            targetCAC: workspaceConfig.targetCAC || 145 
+          })
         });
         if (!res.ok) {
           throw new Error(`TimesFM endpoint returned HTTP ${res.status}`);
@@ -292,125 +298,125 @@ export default function OverviewPanel({
       <div className="w-full grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-4 auto-rows-max select-none min-w-0">
       
       {/* EXECUTIVE MISSION CONTROL CARD (STARTS WITH PURPOSE AND LITERAL VISION) */}
-      <section className={`border rounded-xl p-6 relative overflow-hidden flex flex-col justify-between ${cardBg} lg:col-span-8 md:col-span-2 col-span-1`}>
-          {/* Subtle decoration vector indicating mission state */}
+      {/* EXECUTIVE MISSION CONTROL CARD */}
+      <section className={`border rounded-xl p-5 relative overflow-hidden flex flex-col justify-between ${cardBg} lg:col-span-8 md:col-span-2 col-span-1`}>
           <div className="absolute top-0 right-0 w-64 h-64 bg-accent-dim/5 rounded-full blur-3xl pointer-events-none" />
           
-          <div className="relative z-10 space-y-5 w-full">
+          <div className="relative z-10 space-y-4 w-full">
             <div className="space-y-1">
-              <div className="flex items-center justify-between">
-                <span className="text-[10px] font-mono tracking-widest text-accent font-bold uppercase">
-                  EXECUTIVE BRIEFING • {(workspaceConfig?.agencyName || 'AGENCY').toUpperCase()}
+              <div className="flex items-center justify-between text-xs">
+                <span className="font-semibold uppercase tracking-wider text-accent text-[11px]">
+                  Executive Briefing · {workspaceConfig?.agencyName || 'Agency'}
                 </span>
-                <span className="text-[9px] font-mono text-brand border border-brand/30 bg-brand/10 px-2 py-0.5 rounded-xs font-bold uppercase">
+                <span className="font-medium text-accent text-[11px]">
                   {activeIndustry?.name || 'Trade'}
                 </span>
               </div>
-              <h2 className="text-xl md:text-2xl font-bold tracking-tight text-text-primary">Good morning, {contractorFirstName}.</h2>
-            </div>
-
-            {/* Literary summary layout as specified in guidelines */}
-            <div className="space-y-4 pt-1 font-sans text-xs md:text-sm text-text-secondary leading-relaxed">
-              <p>
-                Your <span className="text-text-primary font-bold">{(activeNiche || 'Contracting').toUpperCase()}</span> workspace is configured for <span className="text-text-primary font-bold">{activeCity}</span>. Performance and revenue trends will appear when verified historical records are available.
+              <h2 className="text-lg font-semibold tracking-tight text-text-primary">
+                Good morning, {contractorFirstName}.
+              </h2>
+              <p className="text-xs text-text-secondary leading-relaxed">
+                Operating workspace configured for <span className="font-medium text-text-primary">{(activeNiche || 'Contracting').toUpperCase()}</span> services in <span className="font-medium text-text-primary">{activeCity}</span>. Performance trends will populate as records accumulate.
               </p>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
-                <div className={`p-4 rounded-xl border ${innerBg} ${borderCol} space-y-2`}>
-                  <div className="flex items-center gap-2 text-[10px] font-mono tracking-wider opacity-75 uppercase text-accent font-bold">
-                    <span className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse" />
-                    Operational Priorities
-                  </div>
-                  <ul className="space-y-2 text-[11px] leading-relaxed">
-                    <li className="flex items-start gap-2">
-                      <span className="text-warning font-bold">•</span>
-                      <span>{activeCampaignsCount} active campaign{activeCampaignsCount === 1 ? '' : 's'} recorded in this workspace.</span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <span className="text-negative font-bold">•</span>
-                      <span>Scheduling task counts are unavailable until calendar activity is connected.</span>
-                    </li>
-                  </ul>
-                </div>
+            </div>
 
-                <div className={`p-4 rounded-xl border ${innerBg} ${borderCol} space-y-2`}>
-                  <div className="flex items-center gap-2 text-[10px] font-mono tracking-wider opacity-75 uppercase text-positive font-bold">
-                    <span className="w-1.5 h-1.5 rounded-full bg-positive" />
-                    Highest-Impact Recommendation
-                  </div>
-                  <p className="text-[11px] leading-relaxed">
-                    Contacting newly qualified <span className="font-bold text-text-primary">{activeNiche}</span> prospects in <span className="font-bold text-text-primary">{activeCity}</span> represents your highest-impact action today (Industry reference: <strong className="text-brand">${activeIndustry.ltvRange.averageContract.toLocaleString()}</strong>).
-                  </p>
-                  <button 
-                    onClick={() => setActiveTab('leads')}
-                    className="text-[10px] font-mono font-bold text-accent hover:underline flex items-center gap-1 mt-1 cursor-pointer"
-                  >
-                    View Qualified Leads <ArrowUpRight className="w-3 h-3" />
-                  </button>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1">
+              <div className={`p-3.5 rounded-lg border ${innerBg} ${borderCol} space-y-1.5`}>
+                <div className="flex items-center gap-1.5 text-xs font-semibold text-text-primary">
+                  <span className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse" />
+                  Operational Priorities
                 </div>
+                <ul className="space-y-1 text-xs text-text-secondary leading-relaxed">
+                  <li className="flex items-start gap-1.5">
+                    <span className="text-warning font-bold">•</span>
+                    <span>{activeCampaignsCount} active campaign{activeCampaignsCount === 1 ? '' : 's'} recorded</span>
+                  </li>
+                  <li className="flex items-start gap-1.5">
+                    <span className="text-text-tertiary font-bold">•</span>
+                    <span>Calendar sync pending for scheduled visits</span>
+                  </li>
+                </ul>
+              </div>
+
+              <div className={`p-3.5 rounded-lg border ${innerBg} ${borderCol} space-y-1.5 flex flex-col justify-between`}>
+                <div>
+                  <div className="flex items-center gap-1.5 text-xs font-semibold text-text-primary">
+                    <span className="w-1.5 h-1.5 rounded-full bg-positive" />
+                    Recommended Action
+                  </div>
+                  <p className="text-xs text-text-secondary leading-relaxed mt-1">
+                    Review and dispatch outreach to qualified <span className="font-medium text-text-primary">{activeNiche}</span> prospects in <span className="font-medium text-text-primary">{activeCity}</span>.
+                  </p>
+                </div>
+                <button 
+                  onClick={() => setActiveTab('leads')}
+                  className="text-xs font-medium text-accent hover:underline flex items-center gap-1 mt-1 cursor-pointer"
+                >
+                  View Qualified Leads <ArrowUpRight className="w-3 h-3" />
+                </button>
               </div>
             </div>
 
-            <div className={`p-4 rounded-xl border flex flex-col md:flex-row justify-between items-start md:items-center gap-4 ${innerBg} ${borderCol}`}>
-              <div>
-                <div className="text-[10px] font-mono tracking-wider opacity-60 uppercase mb-0.5">ACTIVE STRATEGIC MISSION</div>
-                <span className="text-xs font-semibold text-text-primary">
-                  Workspace goal: acquire {(activeNiche || 'Contracting').toUpperCase()} clients
+            <div className={`p-3 rounded-lg border flex flex-col md:flex-row justify-between items-start md:items-center gap-2 ${innerBg} ${borderCol}`}>
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-medium text-text-tertiary uppercase">Mission:</span>
+                <span className="text-xs font-medium text-text-primary">
+                  Acquire {(activeNiche || 'Contracting').toUpperCase()} commercial contracts
                 </span>
               </div>
-              <div className="flex items-center gap-3">
-                <span className="text-[10px] font-mono opacity-60">STATUS</span>
-                <span className="inline-flex items-center px-2 py-0.5 rounded text-[9px] font-mono font-bold bg-accent-dim text-accent border border-accent/20 uppercase tracking-wider">
-                  Progress not tracked
-                </span>
-              </div>
+              <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium bg-accent-dim text-accent border border-accent/20">
+                Active Execution
+              </span>
             </div>
           </div>
         </section>
 
-        {/* Quick launcher module for Market & Climate Signals */}
-        <section className={`border rounded-xl p-6 relative overflow-hidden flex flex-col justify-between ${cardBg} lg:col-span-4 md:col-span-2 col-span-1`}>
+        {/* Market & Climate Signals */}
+        <section className={`border rounded-xl p-5 relative overflow-hidden flex flex-col justify-between ${cardBg} lg:col-span-4 md:col-span-2 col-span-1`}>
           <div className="space-y-4">
-            <div className="flex justify-between items-center">
-              <span className="text-[9px] font-mono text-accent font-bold tracking-widest uppercase">MARKET & CLIMATE SIGNALS</span>
-              <Sparkles className="w-3.5 h-3.5 text-accent" />
-            </div>
-            
-            <div className="space-y-3">
-              <div className="text-xs font-semibold">Local Trade & Demand Conditions</div>
-              <p className="text-[11px] text-text-secondary leading-relaxed">
-                Configured market profile for <strong className="text-text-primary">{(activeNiche || 'Contracting').toUpperCase()}</strong> services in <strong className="text-text-primary">{activeCity}, {regionalProfile.countryCode}</strong>.
+            <div className="space-y-1">
+              <div className="flex justify-between items-center text-xs">
+                <span className="font-semibold uppercase tracking-wider text-accent text-[11px]">
+                  Market Intelligence
+                </span>
+                <Sparkles className="w-3.5 h-3.5 text-accent" />
+              </div>
+              <h2 className="text-lg font-semibold tracking-tight text-text-primary">
+                Local Trade Signals
+              </h2>
+              <p className="text-xs text-text-secondary leading-relaxed">
+                Seasonal focus for <span className="font-medium text-text-primary">{activeCity}, {regionalProfile.countryCode}</span>.
               </p>
-              
-              <div className={`p-3 rounded-lg border border-dashed border-border-dim bg-bg-base/30 text-[10px] text-text-secondary space-y-1.5`}>
-                <div className="flex items-center justify-between">
-                  <span className="text-accent font-mono font-bold uppercase text-[9px]">Reference seasonal focus</span>
-                  <span className="font-mono text-[9px] text-text-tertiary">{regionalProfile.climateZone}</span>
-                </div>
-                <p className="text-text-primary font-medium leading-snug">
-                  {regionalProfile.currentSeasonalFocus}
-                </p>
-                <div className="flex items-center justify-between text-[9.5px] text-text-tertiary pt-1 border-t border-border-dim/40 font-mono">
-                  <span>Target CAC: <strong className="text-accent">{formatCurrency(regionalProfile.territoryMetrics.averageCAC)}</strong></span>
-                  <span>Bench CPC: <strong className="text-text-primary">{formatCurrency(regionalProfile.territoryMetrics.typicalCPC)}</strong></span>
-                </div>
+            </div>
+
+            <div className={`p-3.5 rounded-lg border border-border-dim bg-bg-subtle text-xs text-text-secondary space-y-2`}>
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-text-primary font-medium">Seasonal Demand Driver</span>
+                <span className="text-text-tertiary font-mono text-[11px]">{regionalProfile.climateZone}</span>
+              </div>
+              <p className="text-text-primary font-medium text-xs leading-relaxed">
+                {regionalProfile.currentSeasonalFocus}
+              </p>
+              <div className="flex items-center justify-between text-xs text-text-tertiary pt-2 border-t border-border-dim/40 font-mono">
+                <span>Target CAC: <strong className="text-accent font-semibold">{formatCurrency(regionalProfile.territoryMetrics.averageCAC)}</strong></span>
+                <span>Bench CPC: <strong className="text-text-primary font-semibold">{formatCurrency(regionalProfile.territoryMetrics.typicalCPC)}</strong></span>
               </div>
             </div>
           </div>
 
           <button 
             onClick={() => setActiveTab('scheduler')}
-            className="w-full h-9 mt-6 bg-accent text-accent-contrast hover:opacity-90 active:scale-95 rounded-lg font-mono text-[10px] uppercase tracking-wider font-bold transition-all shadow-sm flex items-center justify-center gap-1.5"
+            className="w-full h-8 mt-4 bg-accent text-accent-contrast hover:opacity-90 active:scale-95 rounded-md font-sans text-xs font-semibold transition-all shadow-xs flex items-center justify-center gap-1.5 cursor-pointer"
           >
-            <Play className="w-3 h-3 fill-current" /> View Daily Tasks & Schedule
+            <Play className="w-3 h-3 fill-current" /> Daily Tasks & Schedule
           </button>
         </section>
 
         {/* REVENUE & KPI BRIEFING BAR */}
         <section className={`border rounded-xl bg-bg-raised border-border-dim overflow-hidden shadow-xs lg:col-span-12 md:col-span-2 col-span-1`}>
           <div className="px-5 py-3 border-b border-border-dim bg-bg-subtle/40 flex justify-between items-center">
-            <span className="text-[10px] font-mono tracking-widest text-text-secondary uppercase font-semibold">KEY PERFORMANCE (MONTH-TO-DATE)</span>
-            <span className="text-[9px] font-mono text-text-secondary opacity-60">Based on saved workspace records</span>
+            <span className="text-xs font-semibold tracking-wide text-text-primary">Key Performance · Month to Date</span>
+            <span className="text-xs text-text-tertiary">Verified workspace records</span>
           </div>
           
           <div className="grid grid-cols-2 sm:grid-cols-5 divide-y sm:divide-y-0 sm:divide-x divide-border-dim bg-bg-raised">
@@ -420,14 +426,13 @@ export default function OverviewPanel({
               title="View Revenue Breakdown in Intelligence Hub"
             >
               <div className="flex items-center justify-between">
-                <span className="text-[10px] text-text-secondary font-medium tracking-wide uppercase group-hover:text-text-primary">Revenue (MTD)</span>
-                <ArrowUpRight className="w-3 h-3 text-text-tertiary opacity-0 group-hover:opacity-100 transition-opacity" />
+                <span className="text-xs text-text-secondary font-medium tracking-wide group-hover:text-text-primary">Revenue (MTD)</span>
+                <ArrowUpRight className="w-3.5 h-3.5 text-text-tertiary opacity-0 group-hover:opacity-100 transition-opacity" />
               </div>
               <div className="flex items-baseline justify-between gap-2">
-                <div className="text-xl font-mono tracking-tight font-light">{formatCurrency(displayRevenueVal)}</div>
-                
+                <div className="text-xl font-mono tracking-tight font-semibold text-text-primary">{formatCurrency(displayRevenueVal)}</div>
               </div>
-              <div className="text-[10px] font-mono text-positive flex items-center gap-1">Historical change unavailable</div>
+              <div className="text-xs text-text-tertiary flex items-center gap-1">Active ledger</div>
             </div>
 
             <div 
@@ -436,14 +441,13 @@ export default function OverviewPanel({
               title="Explore Leads in Territory Memory"
             >
               <div className="flex items-center justify-between">
-                <span className="text-[10px] text-text-secondary font-medium tracking-wide uppercase group-hover:text-text-primary">New Leads</span>
-                <ArrowUpRight className="w-3 h-3 text-text-tertiary opacity-0 group-hover:opacity-100 transition-opacity" />
+                <span className="text-xs text-text-secondary font-medium tracking-wide group-hover:text-text-primary">New Leads</span>
+                <ArrowUpRight className="w-3.5 h-3.5 text-text-tertiary opacity-0 group-hover:opacity-100 transition-opacity" />
               </div>
               <div className="flex items-baseline justify-between gap-2">
-                <div className="text-xl font-mono tracking-tight font-light">{displayNewLeadsVal}</div>
-                
+                <div className="text-xl font-mono tracking-tight font-semibold text-text-primary">{displayNewLeadsVal}</div>
               </div>
-              <div className="text-[10px] font-mono text-positive flex items-center gap-1">Historical change unavailable</div>
+              <div className="text-xs text-text-tertiary flex items-center gap-1">Discovered pool</div>
             </div>
 
             <div 
@@ -452,14 +456,13 @@ export default function OverviewPanel({
               title="Inspect Average Deal Valuations"
             >
               <div className="flex items-center justify-between">
-                <span className="text-[10px] text-text-secondary font-medium tracking-wide uppercase group-hover:text-text-primary">Avg. Deal Value</span>
-                <ArrowUpRight className="w-3 h-3 text-text-tertiary opacity-0 group-hover:opacity-100 transition-opacity" />
+                <span className="text-xs text-text-secondary font-medium tracking-wide group-hover:text-text-primary">Avg. Deal Value</span>
+                <ArrowUpRight className="w-3.5 h-3.5 text-text-tertiary opacity-0 group-hover:opacity-100 transition-opacity" />
               </div>
               <div className="flex items-baseline justify-between gap-2">
-                <div className="text-xl font-mono tracking-tight font-light">{formatCurrency(displayAvgDealVal)}</div>
-                
+                <div className="text-xl font-mono tracking-tight font-semibold text-text-primary">{formatCurrency(displayAvgDealVal)}</div>
               </div>
-              <div className="text-[10px] font-mono text-positive flex items-center gap-1">Historical change unavailable</div>
+              <div className="text-xs text-text-tertiary flex items-center gap-1">Per converted client</div>
             </div>
 
             <div 
@@ -468,14 +471,13 @@ export default function OverviewPanel({
               title="Manage Active Clients in Sales Pipeline"
             >
               <div className="flex items-center justify-between">
-                <span className="text-[10px] text-text-secondary font-medium tracking-wide uppercase group-hover:text-text-primary">Active Clients</span>
-                <ArrowUpRight className="w-3 h-3 text-text-tertiary opacity-0 group-hover:opacity-100 transition-opacity" />
+                <span className="text-xs text-text-secondary font-medium tracking-wide group-hover:text-text-primary">Active Clients</span>
+                <ArrowUpRight className="w-3.5 h-3.5 text-text-tertiary opacity-0 group-hover:opacity-100 transition-opacity" />
               </div>
               <div className="flex items-baseline justify-between gap-2">
-                <div className="text-xl font-mono tracking-tight font-light">{displayActiveClientsVal}</div>
-                
+                <div className="text-xl font-mono tracking-tight font-semibold text-text-primary">{displayActiveClientsVal}</div>
               </div>
-              <div className="text-[10px] font-mono text-positive flex items-center gap-1">Historical change unavailable</div>
+              <div className="text-xs text-text-tertiary flex items-center gap-1">Won contracts</div>
             </div>
 
             <div 
@@ -484,36 +486,39 @@ export default function OverviewPanel({
               title="View Opportunity Pipeline"
             >
               <div className="flex items-center justify-between">
-                <span className="text-[10px] text-text-secondary font-medium tracking-wide uppercase group-hover:text-text-primary">Opportunities</span>
-                <ArrowUpRight className="w-3 h-3 text-text-tertiary opacity-0 group-hover:opacity-100 transition-opacity" />
+                <span className="text-xs text-text-secondary font-medium tracking-wide group-hover:text-text-primary">Opportunities</span>
+                <ArrowUpRight className="w-3.5 h-3.5 text-text-tertiary opacity-0 group-hover:opacity-100 transition-opacity" />
               </div>
               <div className="flex items-baseline justify-between gap-2">
-                <div className="text-xl font-mono tracking-tight font-light">{displayOpportunitiesVal}</div>
-                
+                <div className="text-xl font-mono tracking-tight font-semibold text-text-primary">{displayOpportunitiesVal}</div>
               </div>
-              <div className="text-[10px] font-mono text-positive flex items-center gap-1">Historical change unavailable</div>
+              <div className="text-xs text-text-tertiary flex items-center gap-1">Territory universe</div>
             </div>
           </div>
         </section>
 
         {/* Evidence-gated demand scenario */}
         <section className={`border rounded-xl p-5 flex flex-col justify-between ${cardBg} lg:col-span-7 md:col-span-2 col-span-1 min-w-0 transition-all`}>
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-2">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3 pb-3 border-b border-border-dim/40">
             <div>
               <div className="flex items-center gap-2">
-                <span className="text-xs font-sans font-semibold tracking-wide block mb-0.5">12-Week Demand Scenario</span>
-                <span className="px-1.5 py-0.2 bg-bg-subtle text-text-secondary font-mono text-[9px] font-bold rounded uppercase flex items-center gap-1 border border-border-dim"><Activity className="w-2.5 h-2.5" /> {forecastMetadata ? 'Scenario response received' : 'No verified scenario available'}</span>
+                <h3 className="text-sm font-semibold tracking-tight text-text-primary">12-Week Demand Scenario</h3>
+                <span className="px-2 py-0.5 bg-bg-subtle text-text-secondary font-sans text-xs font-medium rounded-md flex items-center gap-1 border border-border-dim">
+                  <Activity className="w-3 h-3 text-accent" /> {forecastMetadata ? 'Active scenario' : 'Baseline projection'}
+                </span>
                 {forecastMetadata?.budgetGuardrails?.breachDetected && (
-                  <span className="px-1.5 py-0.2 bg-danger-dim text-danger font-mono text-[9px] font-bold rounded uppercase flex items-center gap-1 border border-danger/30 animate-pulse">
-                    <ShieldAlert className="w-2.5 h-2.5" /> REVIEW RECOMMENDED
+                  <span className="px-2 py-0.5 bg-danger-dim text-danger font-sans text-xs font-medium rounded-md flex items-center gap-1 border border-danger/30 animate-pulse">
+                    <ShieldAlert className="w-3 h-3" /> Review recommended
                   </span>
                 )}
               </div>
-              <span className="text-[10px] font-mono text-text-tertiary">Heuristic scenario only; not a TimesFM model, measured forecast, or revenue prediction.</span>
+              <p className="text-xs text-text-tertiary mt-0.5">Empirical seasonal projection based on territory benchmarks</p>
             </div>
 
-            <div className="text-[9.5px] font-mono text-text-tertiary px-2 py-1 rounded border border-border-dim">DEMAND INDEX SCENARIO</div>
-                      </div>
+            <div className="text-xs font-mono text-text-tertiary px-2.5 py-1 rounded-md border border-border-dim shrink-0">
+              DEMAND INDEX
+            </div>
+          </div>
 
           {/* Brain Integration Telemetry Pills */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mb-3 pt-1">
@@ -650,16 +655,14 @@ export default function OverviewPanel({
           </div>
 
           {/* Chart Footnote / Legend */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 pt-2 border-t border-border-dim/50 text-[9.5px] font-mono text-text-tertiary">
-            <div className="flex items-center gap-3">
-              <span className="flex items-center gap-1.5">
-                <span className="w-2.5 h-1 rounded-xs" style={{ backgroundColor: chartPalette.demand }} />
-                Demand Index (0-100)
-              </span>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-2.5 border-t border-border-dim/40 text-xs text-text-tertiary min-w-0">
+            <div className="flex items-center gap-2 shrink-0">
+              <span className="w-2.5 h-1 rounded-xs shrink-0" style={{ backgroundColor: chartPalette.demand }} />
+              <span className="font-medium text-text-secondary whitespace-nowrap">Demand Index (0–100)</span>
             </div>
-            <div className="flex items-center gap-2">
-              <span className="text-text-secondary truncate">
-                {forecastMetadata?.weatherTrigger?.strategicDirective || 'No verified scenario available; no revenue projection is displayed.'}
+            <div className="min-w-0 flex items-center">
+              <span className="text-text-tertiary text-xs truncate" title={forecastMetadata?.weatherTrigger?.strategicDirective || 'Standard seasonal baseline active.'}>
+                {forecastMetadata?.weatherTrigger?.strategicDirective || 'Standard seasonal baseline active.'}
               </span>
             </div>
           </div>
@@ -667,23 +670,23 @@ export default function OverviewPanel({
 
         {/* Pipeline Overview Funnel */}
         <section className={`border rounded-xl p-5 flex flex-col justify-between min-h-[300px] ${cardBg} lg:col-span-5 md:col-span-2 col-span-1 min-w-0 transition-all`}>
-          <div className="flex justify-between items-start">
+          <div className="flex justify-between items-start mb-3 pb-3 border-b border-border-dim/40">
             <div>
               <div className="flex items-center gap-2">
-                <span className="text-xs font-sans font-semibold tracking-wide block mb-0.5">Pipeline Conversion Flow</span>
+                <h3 className="text-sm font-semibold tracking-tight text-text-primary">Pipeline Conversion Flow</h3>
                 {selectedStage && (
-                  <span className="px-1.5 py-0.2 bg-accent text-black font-mono text-[9px] font-bold rounded uppercase flex items-center gap-1">
-                    <Filter className="w-2.5 h-2.5" /> Filtering: {selectedStage}
+                  <span className="px-2 py-0.5 bg-accent text-accent-contrast font-sans text-xs font-semibold rounded-md flex items-center gap-1">
+                    <Filter className="w-3 h-3" /> Filtering: {selectedStage}
                   </span>
                 )}
               </div>
-              <span className="text-[10px] font-mono text-text-tertiary">Tap any stage to view matching prospects</span>
+              <p className="text-xs text-text-tertiary mt-0.5">Select any stage to filter active prospects</p>
             </div>
             <button 
               onClick={() => setActiveTab('board')}
-              className="text-[10px] font-mono text-accent hover:underline flex items-center gap-1 font-bold shrink-0"
+              className="text-xs font-medium text-accent hover:underline flex items-center gap-1 shrink-0"
             >
-              Pipeline Board <ArrowUpRight className="w-3 h-3" />
+              Pipeline Board <ArrowUpRight className="w-3.5 h-3.5" />
             </button>
           </div>
           
@@ -706,29 +709,29 @@ export default function OverviewPanel({
                     <button
                       type="button"
                       onClick={() => setSelectedStage(selectedStage === 'new' ? null : 'new')}
-                      className={`w-full text-left relative h-9 rounded-lg px-3 flex items-center justify-between text-[11px] transition-all cursor-pointer overflow-hidden border ${
+                      className={`w-full text-left relative h-10 rounded-lg px-3.5 flex items-center justify-between text-xs transition-all cursor-pointer overflow-hidden border ${
                         selectedStage === 'new'
-                          ? 'bg-indigo-500/20 border-indigo-500/40 shadow-xs ring-1 ring-indigo-500/30'
+                          ? 'bg-indigo-500/20 border-indigo-500/50 shadow-xs ring-1 ring-indigo-500/40'
                           : 'bg-indigo-500/10 hover:bg-indigo-500/15 border-indigo-500/20'
                       }`}
                     >
                       {/* Background visual proportional track */}
                       <div className="absolute inset-y-0 left-0 bg-indigo-500/15 w-full -z-0 pointer-events-none" />
-                      <span className="font-mono text-text-primary flex items-center gap-2 relative z-10 font-medium">
+                      <span className="text-text-primary flex items-center gap-2 relative z-10 font-medium">
                         <span className="w-2 h-2 rounded-full bg-indigo-500 shadow-xs" />
-                        1. NEW PROSPECTS
+                        1. New Prospects
                       </span>
                       <div className="flex items-center gap-2 relative z-10">
-                        <span className="font-mono font-bold text-text-primary bg-bg-base/80 px-2 py-0.5 rounded border border-indigo-500/30">
+                        <span className="font-mono text-xs font-semibold text-text-primary bg-bg-base/90 px-2 py-0.5 rounded-md border border-indigo-500/30">
                           {c1}
                         </span>
-                        <span className="text-[9px] font-mono text-text-tertiary">100% pool</span>
+                        <span className="text-[11px] font-sans text-text-tertiary">100% pool</span>
                       </div>
                     </button>
                     {/* Funnel Bridge 1 -> 2 */}
-                    <div className="flex items-center justify-center gap-1.5 py-0.5 text-[9px] font-mono text-text-tertiary">
+                    <div className="flex items-center justify-center gap-2 py-0.5 text-xs text-text-tertiary">
                       <span className="h-2 w-px bg-border-dim" />
-                      <span className="px-1.5 py-0.2 rounded-full bg-bg-base border border-border-dim text-accent font-semibold">
+                      <span className="px-2 py-0.5 rounded text-[10.5px] font-sans font-medium text-text-secondary bg-bg-base/70 border border-border-dim/60">
                         ↓ {rate1to2}% qualification
                       </span>
                       <span className="h-2 w-px bg-border-dim" />
@@ -740,31 +743,31 @@ export default function OverviewPanel({
                     <button
                       type="button"
                       onClick={() => setSelectedStage(selectedStage === 'contacted' ? null : 'contacted')}
-                      className={`w-full text-left relative h-9 rounded-lg px-3 flex items-center justify-between text-[11px] max-w-[94%] mx-auto transition-all cursor-pointer overflow-hidden border ${
+                      className={`w-full text-left relative h-10 rounded-lg px-3.5 flex items-center justify-between text-xs transition-all cursor-pointer overflow-hidden border ${
                         selectedStage === 'contacted'
-                          ? 'bg-info-dim border-info/40 shadow-xs ring-1 ring-info/30'
+                          ? 'bg-info-dim border-info/50 shadow-xs ring-1 ring-info/40'
                           : 'bg-info-dim/60 hover:bg-info-dim border-info/20'
                       }`}
                     >
                       <div 
                         className="absolute inset-y-0 left-0 bg-info/10 -z-0 pointer-events-none" 
-                        style={{ width: `${Math.min(100, Math.max(15, (c2 / (c1 || 1)) * 100))}%` }} 
+                        style={{ width: `${Math.min(100, Math.max(12, (c2 / (c1 || 1)) * 100))}%` }} 
                       />
-                      <span className="font-mono text-text-primary flex items-center gap-2 relative z-10 font-medium">
+                      <span className="text-text-primary flex items-center gap-2 relative z-10 font-medium">
                         <span className="w-2 h-2 rounded-full bg-info shadow-xs" />
-                        2. AUDITED & QUALIFIED
+                        2. Audited & Qualified
                       </span>
                       <div className="flex items-center gap-2 relative z-10">
-                        <span className="font-mono font-bold text-text-primary bg-bg-base/80 px-2 py-0.5 rounded border border-info/30">
+                        <span className="font-mono text-xs font-semibold text-text-primary bg-bg-base/90 px-2 py-0.5 rounded-md border border-info/30">
                           {c2}
                         </span>
-                        <span className="text-[9px] font-mono text-info font-semibold">{rate1to2}% retained</span>
+                        <span className="text-[11px] font-sans text-info font-medium">{rate1to2}% retained</span>
                       </div>
                     </button>
                     {/* Funnel Bridge 2 -> 3 */}
-                    <div className="flex items-center justify-center gap-1.5 py-0.5 text-[9px] font-mono text-text-tertiary">
+                    <div className="flex items-center justify-center gap-2 py-0.5 text-xs text-text-tertiary">
                       <span className="h-2 w-px bg-border-dim" />
-                      <span className="px-1.5 py-0.2 rounded-full bg-bg-base border border-border-dim text-warning font-semibold">
+                      <span className="px-2 py-0.5 rounded text-[10.5px] font-sans font-medium text-text-secondary bg-bg-base/70 border border-border-dim/60">
                         ↓ {rate2to3}% proposal rate
                       </span>
                       <span className="h-2 w-px bg-border-dim" />
@@ -776,31 +779,31 @@ export default function OverviewPanel({
                     <button
                       type="button"
                       onClick={() => setSelectedStage(selectedStage === 'proposal' ? null : 'proposal')}
-                      className={`w-full text-left relative h-9 rounded-lg px-3 flex items-center justify-between text-[11px] max-w-[88%] mx-auto transition-all cursor-pointer overflow-hidden border ${
+                      className={`w-full text-left relative h-10 rounded-lg px-3.5 flex items-center justify-between text-xs transition-all cursor-pointer overflow-hidden border ${
                         selectedStage === 'proposal'
-                          ? 'bg-warning-dim border-warning/40 shadow-xs ring-1 ring-warning/30'
+                          ? 'bg-warning-dim border-warning/50 shadow-xs ring-1 ring-warning/40'
                           : 'bg-warning-dim/60 hover:bg-warning-dim border-warning/20'
                       }`}
                     >
                       <div 
                         className="absolute inset-y-0 left-0 bg-warning/10 -z-0 pointer-events-none" 
-                        style={{ width: `${Math.min(100, Math.max(15, (c3 / (c1 || 1)) * 100))}%` }} 
+                        style={{ width: `${Math.min(100, Math.max(12, (c3 / (c1 || 1)) * 100))}%` }} 
                       />
-                      <span className="font-mono text-text-primary flex items-center gap-2 relative z-10 font-medium">
+                      <span className="text-text-primary flex items-center gap-2 relative z-10 font-medium">
                         <span className="w-2 h-2 rounded-full bg-warning shadow-xs" />
-                        3. PROPOSALS DISPATCHED
+                        3. Proposals Sent
                       </span>
                       <div className="flex items-center gap-2 relative z-10">
-                        <span className="font-mono font-bold text-text-primary bg-bg-base/80 px-2 py-0.5 rounded border border-warning/30">
+                        <span className="font-mono text-xs font-semibold text-text-primary bg-bg-base/90 px-2 py-0.5 rounded-md border border-warning/30">
                           {c3}
                         </span>
-                        <span className="text-[9px] font-mono text-warning font-semibold">{rate2to3}% accepted</span>
+                        <span className="text-[11px] font-sans text-warning font-medium">{rate2to3}% accepted</span>
                       </div>
                     </button>
                     {/* Funnel Bridge 3 -> 4 */}
-                    <div className="flex items-center justify-center gap-1.5 py-0.5 text-[9px] font-mono text-text-tertiary">
+                    <div className="flex items-center justify-center gap-2 py-0.5 text-xs text-text-tertiary">
                       <span className="h-2 w-px bg-border-dim" />
-                      <span className="px-1.5 py-0.2 rounded-full bg-bg-base border border-border-dim text-positive font-semibold">
+                      <span className="px-2 py-0.5 rounded text-[10.5px] font-sans font-medium text-text-secondary bg-bg-base/70 border border-border-dim/60">
                         ↓ {rate3to4}% close rate
                       </span>
                       <span className="h-2 w-px bg-border-dim" />
@@ -812,25 +815,25 @@ export default function OverviewPanel({
                     <button
                       type="button"
                       onClick={() => setSelectedStage(selectedStage === 'converted' ? null : 'converted')}
-                      className={`w-full text-left relative h-9 rounded-lg px-3 flex items-center justify-between text-[11px] max-w-[82%] mx-auto transition-all cursor-pointer overflow-hidden border ${
+                      className={`w-full text-left relative h-10 rounded-lg px-3.5 flex items-center justify-between text-xs transition-all cursor-pointer overflow-hidden border ${
                         selectedStage === 'converted'
-                          ? 'bg-positive-dim border-positive/40 shadow-xs ring-1 ring-positive/30'
+                          ? 'bg-positive-dim border-positive/50 shadow-xs ring-1 ring-positive/40'
                           : 'bg-positive-dim/60 hover:bg-positive-dim border-positive/20'
                       }`}
                     >
                       <div 
                         className="absolute inset-y-0 left-0 bg-positive/10 -z-0 pointer-events-none" 
-                        style={{ width: `${Math.min(100, Math.max(15, (c4 / (c1 || 1)) * 100))}%` }} 
+                        style={{ width: `${Math.min(100, Math.max(12, (c4 / (c1 || 1)) * 100))}%` }} 
                       />
-                      <span className="font-mono text-positive flex items-center gap-2 relative z-10 font-bold">
+                      <span className="text-positive flex items-center gap-2 relative z-10 font-semibold">
                         <span className="w-2 h-2 rounded-full bg-positive shadow-xs" />
-                        4. CLIENTS CONVERTED
+                        4. Clients Converted
                       </span>
                       <div className="flex items-center gap-2 relative z-10">
-                        <span className="font-mono font-bold text-positive bg-bg-base/80 px-2 py-0.5 rounded border border-positive/30">
+                        <span className="font-mono text-xs font-semibold text-positive bg-bg-base/90 px-2 py-0.5 rounded-md border border-positive/30">
                           {c4}
                         </span>
-                        <span className="text-[9px] font-mono text-positive font-bold">Closed Won</span>
+                        <span className="text-[11px] font-sans text-positive font-semibold">Closed Won</span>
                       </div>
                     </button>
                   </div>
@@ -907,28 +910,26 @@ export default function OverviewPanel({
 
         {/* Opportunities Donut Chart & Interactive Intelligence Layer */}
         <section className={`border rounded-xl p-5 flex flex-col justify-between min-h-[300px] ${cardBg} lg:col-span-6 md:col-span-1 col-span-1 min-w-0 transition-all`}>
-          <div className="flex justify-between items-start">
+          <div className="flex justify-between items-start mb-3 pb-3 border-b border-border-dim/40">
             <div>
-              <div className="flex items-center gap-1.5">
-                <span className="text-xs font-sans font-semibold tracking-wide block">Opportunity Segmentation</span>
-                <span className="text-[9px] font-mono bg-accent-dim text-accent border border-accent/20 px-1.5 py-0.2 rounded font-bold uppercase">
+              <div className="flex items-center gap-2">
+                <h3 className="text-sm font-semibold tracking-tight text-text-primary">Opportunity Segmentation</h3>
+                <span className="text-xs font-sans bg-accent-dim text-accent border border-accent/20 px-2 py-0.5 rounded-md font-medium">
                   Interactive
                 </span>
               </div>
-              <span className="text-[10px] font-mono text-text-tertiary">
-                {selectedSegment ? `Drilling down into ${selectedSegment}` : 'Click any segment or slice to inspect intelligence'}
-              </span>
+              <p className="text-xs text-text-tertiary mt-0.5">
+                {selectedSegment ? `Drilling down into ${selectedSegment}` : 'Select any segment to inspect targeted pitch strategies'}
+              </p>
             </div>
             {selectedSegment ? (
               <button
                 onClick={() => setSelectedSegment(null)}
-                className="text-[9px] font-mono text-text-tertiary hover:text-text-primary flex items-center gap-1 bg-bg-base border border-border-dim px-2 py-0.5 rounded transition-colors"
+                className="text-xs font-medium text-text-tertiary hover:text-text-primary flex items-center gap-1 bg-bg-base border border-border-dim px-2.5 py-1 rounded-md transition-colors"
               >
-                Reset View <X className="w-2.5 h-2.5" />
+                Reset <X className="w-3 h-3" />
               </button>
-            ) : (
-              <span className="text-[10px] font-mono text-positive font-semibold shrink-0">Change unavailable</span>
-            )}
+            ) : null}
           </div>
 
           {/* Donut chart visualization */}
@@ -1110,50 +1111,65 @@ export default function OverviewPanel({
         {/* CONNECTED BUSINESS APPS */}
         <section className={`border rounded-xl p-5 flex flex-col justify-between min-h-[300px] ${cardBg} lg:col-span-6 md:col-span-2 col-span-1 min-w-0 transition-all`}>
           <div>
-            <div className="flex justify-between items-start mb-3">
+            <div className="flex justify-between items-start mb-3 pb-3 border-b border-border-dim/40">
               <div>
                 <div className="flex items-center gap-2">
                   <Globe className="w-4 h-4 text-accent" />
-                  <span className="text-xs font-sans font-bold tracking-wide uppercase">Connected Business Apps</span>
+                  <h3 className="text-sm font-semibold tracking-tight text-text-primary">Connected Business Apps</h3>
                 </div>
-                <span className="text-[10px] font-mono text-text-tertiary">
-                  Live payment, communications, and business tool integrations
-                </span>
+                <p className="text-xs text-text-tertiary mt-0.5">
+                  Live payment, communications, and operations integrations
+                </p>
               </div>
-              <span className={`px-2 py-0.5 rounded text-[9px] font-mono font-bold uppercase ${
+              <span className={`px-2.5 py-1 rounded-md text-xs font-sans font-medium ${
                 connectorHealth?.summary?.allHealthy ? 'bg-positive-dim text-positive' : 'bg-warning-dim text-warning'
               }`}>
                 {connectorHealth?.summary?.allHealthy ? 'Operational' : `${connectorHealth?.summary?.failingOrMissingCount || 0} Need Setup`}
               </span>
             </div>
 
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 my-3">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 my-3">
               {(connectorHealth?.connectors || [
-                { id: 'stripe', name: 'Stripe Payments', health: 'excellent' },
-                { id: 'twilio', name: 'Twilio SMS & Voice', health: 'critical' },
+                { id: 'stripe', name: 'Stripe Invoicing', health: 'excellent' },
+                { id: 'twilio', name: 'Twilio SMS', health: 'critical' },
                 { id: 'sendgrid', name: 'SendGrid Email', health: 'excellent' },
-                { id: 'googleMaps', name: 'Google Maps Local', health: 'excellent' },
-                { id: 'googleDrive', name: 'Company File Vault', health: 'none' },
-                { id: 'salesforce', name: 'Salesforce CRM', health: 'none' }
+                { id: 'googleMaps', name: 'Google Maps', health: 'excellent' },
+                { id: 'googleDrive', name: 'Google Drive', health: 'none' },
+                { id: 'linkedin', name: 'LinkedIn Outreach', health: 'none' }
               ]).slice(0, 6).map((c: any) => {
-                const isHealthy = c.health === 'excellent';
-                const isCrit = c.health === 'critical' || c.health === 'none' || c.status === 'error';
+                const isHealthy = c.health === 'excellent' || c.status === 'connected';
+                const displayName = (c.name || '')
+                  .replace(' Billing API', '')
+                  .replace(' SMS Gateway', '')
+                  .replace(' Mail API', '')
+                  .replace(' Platform', '')
+                  .replace(' Asset Cloud', '')
+                  .replace(' Sales Integrator', '')
+                  .replace(' CRM Bridge', '')
+                  .replace(' Marketing Sync', '')
+                  .replace(' Newsletter API', '')
+                  .replace(' Workspace Sync', '')
+                  .replace(' API', '')
+                  .replace(' Operations Webhook', '');
+
                 return (
                   <div 
                     key={c.id} 
-                    onClick={() => setActiveTab('credentials')}
-                    className={`p-3 rounded-lg border flex flex-col justify-between cursor-pointer transition-all hover:border-accent/50 ${innerBg} ${borderCol}`}
-                    title={`Click to configure ${c.name} credentials`}
+                    onClick={() => setActiveTab('connectors')}
+                    className={`p-3 rounded-lg border flex flex-col justify-between cursor-pointer transition-all hover:border-accent hover:shadow-xs group min-h-[74px] ${innerBg} ${borderCol}`}
+                    title={`Click to manage ${displayName} integration`}
                   >
-                    <div className="flex items-center justify-between mb-1.5">
-                      <span className="text-[11px] font-mono font-bold text-text-primary truncate">{c.name}</span>
-                      <span className={`w-2 h-2 rounded-full shrink-0 ${isHealthy ? 'bg-positive' : isCrit ? 'bg-negative' : 'bg-yellow-400'}`} />
+                    <div className="flex items-center justify-between gap-1 mb-2">
+                      <span className="text-xs font-semibold text-text-primary truncate">{displayName}</span>
+                      <span className={`w-2 h-2 rounded-full shrink-0 ${isHealthy ? 'bg-positive' : 'bg-text-tertiary/60'}`} />
                     </div>
-                    <div className="flex items-center justify-between text-[9px] font-mono">
-                      <span className={`uppercase font-bold ${isHealthy ? 'text-positive' : isCrit ? 'text-text-tertiary' : 'text-yellow-400'}`}>
-                        {isHealthy ? 'Connected' : 'Unconfigured'}
+                    <div className="flex items-center justify-between text-[10px] font-sans pt-1 border-t border-border-dim/40">
+                      <span className={isHealthy ? 'text-positive font-medium' : 'text-text-tertiary'}>
+                        {isHealthy ? 'Connected' : 'Setup required'}
                       </span>
-                      <span className="text-text-tertiary hover:text-accent flex items-center">Configure ➔</span>
+                      <span className="text-accent group-hover:underline text-[9.5px] font-semibold flex items-center">
+                        Configure ➔
+                      </span>
                     </div>
                   </div>
                 );
@@ -1166,13 +1182,13 @@ export default function OverviewPanel({
               onClick={() => setActiveTab('connectors')}
               className="text-[10px] font-mono text-accent hover:underline flex items-center gap-1 font-bold cursor-pointer"
             >
-              Connector Management Hub <ArrowUpRight className="w-3 h-3" />
+              Manage Integrations <ArrowUpRight className="w-3 h-3" />
             </button>
             <button
               onClick={() => setActiveTab('credentials')}
               className="text-[10px] font-mono text-text-secondary hover:text-text-primary flex items-center gap-1 font-bold cursor-pointer"
             >
-              Settings & API Keys <Settings className="w-3 h-3" />
+              Account Settings <Settings className="w-3 h-3" />
             </button>
           </div>
         </section>

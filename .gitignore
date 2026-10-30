@@ -6,6 +6,8 @@ coverage/
 *.log
 .env*
 !.env.example
+.aistudio/
 
 # Runtime database state may contain credentials, sessions, and personal data.
 data/db.json
+

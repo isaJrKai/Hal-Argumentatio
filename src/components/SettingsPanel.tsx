@@ -296,21 +296,7 @@ export default function SettingsPanel({
     setTimeout(() => setPostgresSuccess(null), 5000);
   };
 
-  // Key state
-  const [keyName, setKeyName] = useState('NVIDIA Analytics Key');
-  const [rawKey, setRawKey] = useState('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');
-  const [createdKeys, setCreatedKeys] = useState<any[]>([
-    {
-      id: 'key_1',
-      name: 'NVIDIA API Channel',
-      prefix: 'nvapi-wd7g',
-      createdAt: new Date().toLocaleDateString(),
-      expiresAt: 'Never'
-    }
-  ]);
-  const [keySuccess, setKeySuccess] = useState<string | null>(null);
-
-  // Connector API Keys individual configuration state
+  // Real connector API keys configuration state
   const [connectorKeys, setConnectorKeys] = useState({
     stripe: '',
     twilio: '',
@@ -379,24 +365,7 @@ export default function SettingsPanel({
 
   // Password reset state
 
-  const handleRegisterKey = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!rawKey.trim()) return;
 
-    const prefix = rawKey.slice(0, 10);
-    const newKeyRecord = {
-      id: `key_${Date.now()}`,
-      name: keyName,
-      prefix,
-      createdAt: new Date().toLocaleDateString(),
-      expiresAt: 'Never'
-    };
-
-    setCreatedKeys([...createdKeys, newKeyRecord]);
-    setKeySuccess('API key has been hashed, prefixed, and stored securely in operational memory.');
-    setRawKey('');
-    setTimeout(() => setKeySuccess(null), 5000);
-  };
 
   const textPrimary = 'text-text-primary';
   const textSecondary = 'text-text-secondary';
@@ -982,87 +951,16 @@ export default function SettingsPanel({
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* API Key Register Bento Board */}
-        <div className={`border rounded-lg p-5 space-y-6 ${cardBg}`}>
-          <div className="flex items-center gap-2 border-b pb-3 border-inherit">
-            <Key className="w-4 h-4 text-accent" />
-            <span className="text-xs font-mono uppercase tracking-wider font-bold">Third-Party API Credentials</span>
-          </div>
-
-          <p className="text-xs text-inherit opacity-80 leading-relaxed font-sans">
-            Store secure API credentials (such as your NVIDIA Deep Analytics keys) inside HAL's encrypted identity memory tier. Plaintext keys are processed in-memory and never exposed over public web interfaces.
-          </p>
-
-          {keySuccess && (
-            <div className="p-3 bg-accent/10 border border-accent/20 text-accent text-xs rounded-sm font-mono leading-relaxed font-bold uppercase tracking-wider">
-              {keySuccess}
-            </div>
-          )}
-
-          {/* Create API Key Form */}
-          <form onSubmit={handleRegisterKey} className="space-y-4 text-xs font-sans">
-            <div className="space-y-1">
-              <label className="block text-[10px] font-mono opacity-80 uppercase tracking-wider font-bold">Credential Descriptor Name</label>
-              <input
-                type="text"
-                required
-                value={keyName}
-                onChange={(e) => setKeyName(e.target.value)}
-                placeholder="e.g., NVIDIA Llama Analytics"
-                className={`w-full border rounded p-2 focus:outline-none focus:border-accent text-inherit ${innerBg} ${borderCol}`}
-              />
-            </div>
-
-            <div className="space-y-1">
-              <label className="block text-[10px] font-mono opacity-80 uppercase tracking-wider font-bold">Secret Key (NVIDIA / Third Party)</label>
-              <input
-                type="password"
-                required
-                value={rawKey}
-                onChange={(e) => setRawKey(e.target.value)}
-                placeholder="nvapi-..."
-                className={`w-full border rounded p-2 focus:outline-none focus:border-accent text-inherit font-mono ${innerBg} ${borderCol}`}
-              />
-            </div>
-
-            <button
-              type="submit"
-              className="bg-accent text-black hover:bg-accent/80 py-2 px-4 rounded font-mono text-xs font-bold uppercase transition-colors tracking-wider shadow-sm"
-            >
-              Hash & Register Credential
-            </button>
-          </form>
-
-          {/* Existing keys list */}
-          <div className="space-y-3 pt-4 border-t border-inherit">
-            <span className="text-[10px] font-mono uppercase tracking-widest opacity-60 block font-bold">Registered Credential Prefixes</span>
-            <div className="space-y-2">
-              {createdKeys.map(k => (
-                <div key={k.id} className={`border p-3 rounded flex justify-between items-center text-xs ${innerBg} ${borderCol}`}>
-                  <div className="space-y-0.5">
-                    <span className="font-bold block font-sans">{k.name}</span>
-                    <span className="text-[10px] font-mono opacity-60">Prefix: <strong className="text-inherit">{k.prefix}...</strong></span>
-                  </div>
-                  <div className="text-right font-mono text-[10px] opacity-60 font-bold uppercase">
-                    <span>Registered: {k.createdAt}</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
+      {/* Connected Business Services & Third-Party API Credentials */}
+      <div className={`border rounded-lg p-5 space-y-6 ${cardBg} mt-6`}>
+        <div className="flex items-center gap-2 border-b pb-3 border-inherit">
+          <Globe className="w-4 h-4 text-accent" />
+          <span className="text-xs font-mono uppercase tracking-wider font-bold">Connected Business Services & Third-Party API Credentials</span>
         </div>
 
-        {/* Individual Connector API Key Configurations */}
-        <div className={`border rounded-lg p-5 space-y-6 ${cardBg} mt-6`}>
-          <div className="flex items-center gap-2 border-b pb-3 border-inherit">
-            <Globe className="w-4 h-4 text-accent" />
-            <span className="text-xs font-mono uppercase tracking-wider font-bold">Individual Connector & Third-Party API Credentials</span>
-          </div>
-
-          <p className="text-xs text-inherit opacity-80 leading-relaxed font-sans">
-            Configure your active live API credentials for external integrations. These keys are securely stored and used to power live billing, SMS messaging, ad spend syncs, and territory intelligence.
-          </p>
+        <p className="text-xs text-inherit opacity-80 leading-relaxed font-sans">
+          Configure real API credentials for external integrations. When saved, keys are encrypted and stored in your isolated database tier to power billing, SMS notifications, ad spend syncs, and territory intelligence.
+        </p>
 
           {connectorKeySuccess && (
             <div className="p-3 bg-accent/10 border border-accent/20 text-accent text-xs rounded-sm font-mono leading-relaxed font-bold uppercase tracking-wider flex items-center gap-2">
@@ -1352,7 +1250,6 @@ export default function SettingsPanel({
             </div>
           </div>
         </div>
-      </div>
 
       {/* PUBLIC SHARE & REDDIT TESTING SHIELD */}
       <div className={`border rounded-lg p-5 mt-6 space-y-5 ${cardBg}`}>
