@@ -564,7 +564,7 @@ export default function SkillsPanel({ token }: SkillsPanelProps) {
                                 <div className="grid grid-cols-2 gap-2 text-[10px] text-text-secondary font-mono leading-relaxed">
                                   <div>WEB: <a href={r.websiteUrl} target="_blank" rel="noreferrer" className="text-blue-400 underline">{r.websiteUrl || 'None'}</a></div>
                                   <div>PHONE: {r.phone || 'None'}</div>
-                                  <div>PERFORMANCE: <span className="text-yellow-400 font-bold">{r.performanceScore || '65'}/100</span></div>
+                                  <div>PERFORMANCE <span className="text-amber-500 font-bold">(ESTIMATE)</span>: <span className="text-yellow-400 font-bold">{r.performanceScore ?? 'Not assessed'}{r.performanceScore == null ? '' : '/100'}</span></div>
                                   <div>SSL: <span className="text-accent font-bold">{r.sslStatus === 'secured' ? 'SECURE' : 'NOT SECURE'}</span></div>
                                 </div>
                                 <p className="text-[10px] font-sans text-text-secondary italic leading-normal border-t border-border-dim/60 pt-1.5 mt-1.5">

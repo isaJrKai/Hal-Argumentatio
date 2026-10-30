@@ -233,6 +233,7 @@ export default function PublicAuditPage({ auditId, onNavigateToLogin }: PublicAu
           <div className="bg-bg-raised border border-border-dim rounded-xl p-5 space-y-3 relative overflow-hidden">
             <div className="flex justify-between items-start">
               <span className="text-[10px] font-mono uppercase tracking-wider text-text-secondary font-bold">Mobile Speed</span>
+                <span className="text-[9px] font-mono font-bold tracking-wide text-amber-500 border border-amber-500/30 rounded px-1.5 py-0.5">ESTIMATE</span>
               <Zap className={`w-4 h-4 ${data.performanceScore == null ? 'text-text-tertiary' : data.performanceScore >= 70 ? 'text-emerald-400' : data.performanceScore >= 50 ? 'text-amber-400' : 'text-rose-400'}`} />
             </div>
             <div className="flex items-baseline gap-2">
@@ -242,7 +243,7 @@ export default function PublicAuditPage({ auditId, onNavigateToLogin }: PublicAu
               <span className="text-xs text-text-tertiary font-mono">/ 100</span>
             </div>
             <p className="text-[11px] text-text-secondary leading-snug">
-              {data.performanceScore == null ? 'No measured speed score is stored for this report.' : data.performanceScore < 60 ? 'Measured score indicates potential mobile performance issues.' : 'Measured score is within the selected acceptable range.'}
+              {data.performanceScore == null ? 'No estimate is available.' : 'Indicative estimate only; this score has not been measured with a live performance test.'}
             </p>
           </div>
 
@@ -250,6 +251,7 @@ export default function PublicAuditPage({ auditId, onNavigateToLogin }: PublicAu
           <div className="bg-bg-raised border border-border-dim rounded-xl p-5 space-y-3 relative overflow-hidden">
             <div className="flex justify-between items-start">
               <span className="text-[10px] font-mono uppercase tracking-wider text-text-secondary font-bold">Search Visibility</span>
+                <span className="text-[9px] font-mono font-bold tracking-wide text-amber-500 border border-amber-500/30 rounded px-1.5 py-0.5">ESTIMATE</span>
               <Globe className={`w-4 h-4 ${data.seoScore == null ? 'text-text-tertiary' : data.seoScore >= 70 ? 'text-emerald-400' : 'text-amber-400'}`} />
             </div>
             <div className="flex items-baseline gap-2">
@@ -259,7 +261,7 @@ export default function PublicAuditPage({ auditId, onNavigateToLogin }: PublicAu
               <span className="text-xs text-text-tertiary font-mono">/ 100</span>
             </div>
             <p className="text-[11px] text-text-secondary leading-snug">
-              Local indexing and search keyword ranking strength in {data.city}.
+              Indicative estimate only; no live SEO crawl or search-ranking measurement was performed.
             </p>
           </div>
 

@@ -730,7 +730,7 @@ export const HalRoadmapPhase2View: React.FC = () => {
                     <th className="py-2 px-3">Competitor Entity</th>
                     <th className="py-2 px-3">Google Rating</th>
                     <th className="py-2 px-3">Review Velocity</th>
-                    <th className="py-2 px-3">Mobile Speed</th>
+                    <th className="py-2 px-3">Mobile Speed (ESTIMATE)</th>
                     <th className="py-2 px-3">SSL Security</th>
                     <th className="py-2 px-3">Vulnerability Gap & Angle</th>
                   </tr>
