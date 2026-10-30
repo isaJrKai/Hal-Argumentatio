@@ -146,12 +146,13 @@ export const LandingPageStudioPanel: React.FC<{ token: string | null }> = ({ tok
 
           // If artifact has saved pageConfig, restore it
           if (first.content?.pageConfig) {
-            setConfig(first.content.pageConfig);
+            setConfig({ ...first.content.pageConfig, contractorId: first.content.pageConfig.contractorId || first.contractorId });
           } else {
             // Personalize template with artifact title
             setConfig(prev => ({
               ...prev,
               id: first.id,
+              contractorId: first.contractorId,
               title: first.title || prev.title
             }));
           }
@@ -174,11 +175,12 @@ export const LandingPageStudioPanel: React.FC<{ token: string | null }> = ({ tok
     if (found) {
       setSelectedArtifactId(found.id);
       if (found.content?.pageConfig) {
-        setConfig(found.content.pageConfig);
+        setConfig({ ...found.content.pageConfig, contractorId: found.content.pageConfig.contractorId || found.contractorId });
       } else {
         setConfig(prev => ({
           ...prev,
           id: found.id,
+          contractorId: found.contractorId,
           title: found.title || prev.title
         }));
       }
@@ -210,7 +212,9 @@ export const LandingPageStudioPanel: React.FC<{ token: string | null }> = ({ tok
 
       const data = await res.json();
       if (res.ok && data.success) {
-        saveSnapshot(`Saved: ${config.title}`, config);
+        const savedConfig = { ...config, id: data.id || config.id, contractorId: data.contractorId || config.contractorId };
+        setConfig(savedConfig);
+        saveSnapshot(`Saved: ${config.title}`, savedConfig);
         showToast({
           title: 'Landing Page Saved',
           message: `Changes published live to ${data.liveUrl}`,

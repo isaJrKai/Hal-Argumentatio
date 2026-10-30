@@ -12,6 +12,7 @@ export interface ContractorGeneratorParams {
   businessName?: string;
   phone?: string;
   address?: string;
+  contractorId?: string;
   audience?: string;
   primaryGoal?: string;
   coreOffer?: string;
@@ -27,6 +28,7 @@ export async function generateContractorLandingPage(params: ContractorGeneratorP
     businessName, 
     phone, 
     address,
+    contractorId,
     audience, 
     primaryGoal, 
     coreOffer, 
@@ -44,6 +46,7 @@ export async function generateContractorLandingPage(params: ContractorGeneratorP
   if (city) baseTemplate.city = city;
   if (phone) baseTemplate.phone = phone;
   if (address) baseTemplate.sections.footer.address = address;
+  if (contractorId) baseTemplate.contractorId = contractorId;
 
   // Set directional archetype branding/tone
   if (variantArchetype === 'emergency_dispatch') {

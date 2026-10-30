@@ -36,6 +36,7 @@ import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/
 import { buildHalMcpServer } from './src/services/mcp/halMcpServer';
 import { HERMES_LAB_CATALOG, executeHermesLabTool, chatWithHermesAgent, LabToolType } from './src/services/hermesLab';
 import { generateContractorLandingPage, regenerateLandingSection } from './src/services/landingGenerator';
+import { generateLandingPageHtml } from './src/components/landing/htmlGenerator';
 import { validateCrmTransition } from './src/lib/crmStateMachine';
 import { validateLoopGate } from './src/lib/loopGating';
 import { 
@@ -1096,6 +1097,7 @@ app.post('/api/landing-pages/generate-ai', authenticate, async (req, res) => {
       businessName,
       phone,
       address,
+      contractorId: (req as any).contractorId,
       audience,
       primaryGoal,
       coreOffer,
@@ -1154,6 +1156,10 @@ app.post('/api/landing-pages/save', authenticate, async (req, res) => {
 
   try {
     const artifactId = id && id.length > 5 ? id : ('lp_' + crypto.randomUUID().slice(0, 8));
+    const ownedPageConfig = pageConfig && typeof pageConfig === 'object'
+      ? { ...pageConfig, id: artifactId, contractorId }
+      : null;
+    const ownedRenderedHtml = ownedPageConfig ? generateLandingPageHtml(ownedPageConfig) : renderedHtml;
 
     const [existing] = await pgDb
       .select()
@@ -1166,8 +1172,8 @@ app.post('/api/landing-pages/save', authenticate, async (req, res) => {
         .set({
           title,
           content: {
-            pageConfig,
-            renderedOutput: renderedHtml
+            pageConfig: ownedPageConfig,
+            renderedOutput: ownedRenderedHtml
           },
           status: 'ready',
           updatedAt: new Date()
@@ -1182,8 +1188,8 @@ app.post('/api/landing-pages/save', authenticate, async (req, res) => {
         title,
         status: 'ready',
         content: {
-          pageConfig,
-          renderedOutput: renderedHtml
+          pageConfig: ownedPageConfig,
+          renderedOutput: ownedRenderedHtml
         },
         createdAt: new Date(),
         updatedAt: new Date()
@@ -1193,6 +1199,7 @@ app.post('/api/landing-pages/save', authenticate, async (req, res) => {
     res.json({
       success: true,
       id: artifactId,
+      contractorId,
       liveUrl: `/landing/${artifactId}`
     });
   } catch (err: any) {
@@ -1205,15 +1212,22 @@ app.post('/api/public/landing-leads', async (req, res) => {
   const { contractorId, landingPageId, name, phone, serviceDetails, city } = req.body;
 
   if (!phone || !name) {
-    return res.status(400).json({ error: 'Name and phone are required for emergency dispatch' });
+    return res.status(400).json({ error: 'Name and phone are required for this service request' });
+  }
+  if (!contractorId || typeof contractorId !== 'string') {
+    return res.status(400).json({ error: 'This landing page is missing its contractor assignment. Please contact the business directly.' });
   }
 
   try {
-    let targetContractorId = contractorId;
-    if (!targetContractorId) {
-      const [firstContractor] = await pgDb.select().from(contractors).limit(1);
-      targetContractorId = firstContractor?.id || 'demo-contractor-id';
+    const [assignedContractor] = await pgDb
+      .select({ id: contractors.id })
+      .from(contractors)
+      .where(eq(contractors.id, contractorId))
+      .limit(1);
+    if (!assignedContractor) {
+      return res.status(404).json({ error: 'The assigned business could not be found.' });
     }
+    const targetContractorId = assignedContractor.id;
 
     const leadId = crypto.randomUUID();
     const phoneEncrypted = encrypt(String(phone));
