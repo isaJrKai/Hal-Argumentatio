@@ -41,10 +41,10 @@ export const BrandingControls: React.FC<BrandingControlsProps> = ({ config, onCh
   };
 
   return (
-    <div className="space-y-5 p-4 rounded-xl bg-slate-900/60 border border-slate-800">
-      <div className="flex items-center gap-2 pb-2 border-b border-slate-800">
+    <div className="space-y-5 p-4 rounded-xl bg-bg-raised/60 border border-border-dim">
+      <div className="flex items-center gap-2 pb-2 border-b border-border-dim">
         <Palette className="w-4 h-4 text-amber-400" />
-        <h4 className="text-xs font-bold uppercase tracking-wider text-slate-200">
+        <h4 className="text-xs font-bold uppercase tracking-wider text-text-primary">
           Brand Identity & Emergency Contact
         </h4>
       </div>
@@ -52,27 +52,27 @@ export const BrandingControls: React.FC<BrandingControlsProps> = ({ config, onCh
       {/* Core Identity */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
         <div>
-          <label className="block text-[11px] font-semibold text-slate-400 mb-1">Company / Trade Name</label>
+          <label className="block text-[11px] font-semibold text-text-secondary mb-1">Company / Trade Name</label>
           <input
             type="text"
             value={config.businessName}
             onChange={(e) => onChange({ ...config, businessName: e.target.value })}
-            className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-slate-700 text-white text-xs focus:outline-none focus:border-amber-400"
+            className="w-full px-3 py-2 rounded-lg bg-bg-base border border-border-dim text-text-primary text-xs focus:outline-none focus:border-amber-400"
           />
         </div>
 
         <div>
-          <label className="block text-[11px] font-semibold text-slate-400 mb-1">Primary City / Region</label>
+          <label className="block text-[11px] font-semibold text-text-secondary mb-1">Primary City / Region</label>
           <input
             type="text"
             value={config.city}
             onChange={(e) => onChange({ ...config, city: e.target.value })}
-            className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-slate-700 text-white text-xs focus:outline-none focus:border-amber-400"
+            className="w-full px-3 py-2 rounded-lg bg-bg-base border border-border-dim text-text-primary text-xs focus:outline-none focus:border-amber-400"
           />
         </div>
 
         <div>
-          <label className="block text-[11px] font-semibold text-slate-400 mb-1 flex items-center gap-1">
+          <label className="block text-[11px] font-semibold text-text-secondary mb-1 flex items-center gap-1">
             <Phone className="w-3 h-3 text-amber-400" />
             <span>Click-to-Call Phone Number</span>
           </label>
@@ -80,12 +80,12 @@ export const BrandingControls: React.FC<BrandingControlsProps> = ({ config, onCh
             type="text"
             value={config.phone}
             onChange={(e) => onChange({ ...config, phone: e.target.value })}
-            className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-slate-700 text-white text-xs focus:outline-none focus:border-amber-400"
+            className="w-full px-3 py-2 rounded-lg bg-bg-base border border-border-dim text-text-primary text-xs focus:outline-none focus:border-amber-400"
           />
         </div>
 
         <div>
-          <label className="block text-[11px] font-semibold text-slate-400 mb-1 flex items-center gap-1">
+          <label className="block text-[11px] font-semibold text-text-secondary mb-1 flex items-center gap-1">
             <Shield className="w-3 h-3 text-sky-400" />
             <span>Master License / Bond #</span>
           </label>
@@ -93,14 +93,14 @@ export const BrandingControls: React.FC<BrandingControlsProps> = ({ config, onCh
             type="text"
             value={config.licenseNumber}
             onChange={(e) => onChange({ ...config, licenseNumber: e.target.value })}
-            className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-slate-700 text-white text-xs focus:outline-none focus:border-amber-400"
+            className="w-full px-3 py-2 rounded-lg bg-bg-base border border-border-dim text-text-primary text-xs focus:outline-none focus:border-amber-400"
           />
         </div>
       </div>
 
       {/* Color Presets */}
       <div>
-        <label className="block text-[11px] font-semibold text-slate-400 mb-2">
+        <label className="block text-[11px] font-semibold text-text-secondary mb-2">
           One-Click Trade Color Palettes
         </label>
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
@@ -114,7 +114,7 @@ export const BrandingControls: React.FC<BrandingControlsProps> = ({ config, onCh
                 className={`p-2 rounded-lg border text-left transition flex items-center gap-2 text-xs ${
                   isSelected
                     ? 'border-amber-400 bg-amber-500/10 text-white'
-                    : 'border-slate-800 bg-slate-950/60 text-slate-400 hover:border-slate-700'
+                    : 'border-border-dim bg-bg-base/60 text-text-secondary hover:border-border-dim'
                 }`}
               >
                 <div className="flex gap-1 shrink-0">
@@ -130,8 +130,8 @@ export const BrandingControls: React.FC<BrandingControlsProps> = ({ config, onCh
 
       {/* Font Archetype */}
       <div>
-        <label className="block text-[11px] font-semibold text-slate-400 mb-1 flex items-center gap-1">
-          <Type className="w-3 h-3 text-slate-400" />
+        <label className="block text-[11px] font-semibold text-text-secondary mb-1 flex items-center gap-1">
+          <Type className="w-3 h-3 text-text-secondary" />
           <span>Typographic Archetype</span>
         </label>
         <select
@@ -142,7 +142,7 @@ export const BrandingControls: React.FC<BrandingControlsProps> = ({ config, onCh
               branding: { ...config.branding, fontStyle: e.target.value as any }
             })
           }
-          className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-slate-700 text-white text-xs focus:outline-none focus:border-amber-400"
+          className="w-full px-3 py-2 rounded-lg bg-bg-base border border-border-dim text-text-primary text-xs focus:outline-none focus:border-amber-400"
         >
           <option value="modern_sans">Modern Clean Sans (High Legibility)</option>
           <option value="impact_bold">Industrial Impact Bold (Contractor Power)</option>

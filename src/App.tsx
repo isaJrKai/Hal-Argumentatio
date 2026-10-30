@@ -261,7 +261,9 @@ export default function App() {
 
   // Theme & Identity States
   const [theme, setTheme] = useState<'dark' | 'light'>(() => {
-    return (localStorage.getItem('hal_theme') as 'dark' | 'light') || 'dark';
+    const saved = localStorage.getItem('hal_theme') as 'dark' | 'light' | null;
+    if (saved === 'dark' || saved === 'light') return saved;
+    return window.matchMedia?.('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
   });
   const [profilePhoto, setProfilePhoto] = useState<string | null>(() => {
     return localStorage.getItem('hal_profile_photo');
@@ -293,6 +295,17 @@ export default function App() {
     localStorage.setItem('hal_theme', next);
     setTheme(next);
   };
+
+  // Follow OS theme changes live while the user has not picked a theme manually
+  useEffect(() => {
+    const mq = window.matchMedia?.('(prefers-color-scheme: light)');
+    if (!mq) return;
+    const onChange = (e: MediaQueryListEvent) => {
+      if (!localStorage.getItem('hal_theme')) setTheme(e.matches ? 'light' : 'dark');
+    };
+    mq.addEventListener('change', onChange);
+    return () => mq.removeEventListener('change', onChange);
+  }, []);
 
   // Synchronize theme with document element classList to ensure proper background and variable values
   useEffect(() => {

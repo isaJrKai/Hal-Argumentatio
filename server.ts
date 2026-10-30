@@ -1071,7 +1071,7 @@ app.get('/landing/:id', async (req, res) => {
 
 // ─── CONTRACTOR LANDING PAGE STUDIO ENGINE ─────────────────────────────────
 
-app.post('/api/landing-pages/generate-ai', async (req, res) => {
+app.post('/api/landing-pages/generate-ai', authenticate, async (req, res) => {
   try {
     const { 
       prompt, 
@@ -1107,7 +1107,7 @@ app.post('/api/landing-pages/generate-ai', async (req, res) => {
   }
 });
 
-app.post('/api/landing-pages/regenerate-section', async (req, res) => {
+app.post('/api/landing-pages/regenerate-section', authenticate, async (req, res) => {
   try {
     const { 
       sectionKey, 
@@ -1649,17 +1649,17 @@ function mapCrmStageToCanonical(stage: string): string {
 // ─── SECURE CRM WEBHOOK ENDPOINT (n8n / Zapier / HubSpot / Salesforce) ────────
 app.post('/api/webhooks/crm', async (req, res) => {
   const envSecret = process.env.HAL_CRM_WEBHOOK_SECRET;
-  if (!envSecret && process.env.NODE_ENV === 'production') {
-    return res.status(500).json({ error: 'Critical Security Error: HAL_CRM_WEBHOOK_SECRET is not configured in production environment.' });
+  if (!envSecret || envSecret.length < 16) {
+    return res.status(503).json({ error: 'CRM webhook is disabled: set HAL_CRM_WEBHOOK_SECRET (16+ chars) to enable it.' });
   }
-  const webhookSecret = envSecret || 'hal_secure_crm_secret_2026';
   const authHeader = req.headers['authorization'];
   const headerSecret = req.headers['x-webhook-secret'] as string;
   const eventIdHeader = req.headers['x-event-id'] as string;
 
-  const providedSecret = headerSecret || (authHeader?.startsWith('Bearer ') ? authHeader.substring(7) : null);
-
-  if (!providedSecret || providedSecret !== webhookSecret) {
+  const providedSecret = headerSecret || (authHeader?.startsWith('Bearer ') ? authHeader.substring(7) : '');
+  const a = Buffer.from(String(providedSecret || ''));
+  const b = Buffer.from(envSecret);
+  if (!providedSecret || a.length !== b.length || !crypto.timingSafeEqual(a, b)) {
     return res.status(401).json({ error: 'Unauthorized: Invalid or missing webhook secret' });
   }
 
@@ -3077,18 +3077,12 @@ app.delete('/api/skills/:id', authenticate, (req, res) => {
 
 // Helper for resilient chat contractor ID resolution
 function resolveChatContractorId(req: express.Request): string {
-  const authHeader = req.headers.authorization;
-  if (authHeader && authHeader.startsWith('Bearer ')) {
-    const token = authHeader.split(' ')[1];
-    const decoded = verifyToken(token);
-    if (decoded?.contractorId) {
-      return decoded.contractorId;
-    }
-  }
-  return 'con_admin_seed';
+  // Routes using this helper are protected by `authenticate`, which sets contractorId.
+  // There is intentionally NO fallback to an admin/seed account.
+  return (req as any).contractorId as string;
 }
 
-app.get('/api/intelligence/chat/history', async (req, res) => {
+app.get('/api/intelligence/chat/history', authenticate, async (req, res) => {
   const contractorId = resolveChatContractorId(req);
   const targetIds = getTargetContractorIds(contractorId);
   try {
@@ -3099,7 +3093,7 @@ app.get('/api/intelligence/chat/history', async (req, res) => {
   }
 });
 
-app.delete('/api/intelligence/chat/history', async (req, res) => {
+app.delete('/api/intelligence/chat/history', authenticate, async (req, res) => {
   const contractorId = resolveChatContractorId(req);
   try {
     await pgDb.delete(chatMessages).where(eq(chatMessages.contractorId, contractorId));
@@ -3109,7 +3103,7 @@ app.delete('/api/intelligence/chat/history', async (req, res) => {
   }
 });
 
-app.delete('/api/intelligence/chat/message/:id', async (req, res) => {
+app.delete('/api/intelligence/chat/message/:id', authenticate, async (req, res) => {
   const contractorId = resolveChatContractorId(req);
   const { id } = req.params;
   try {
@@ -3124,7 +3118,7 @@ app.delete('/api/intelligence/chat/message/:id', async (req, res) => {
   }
 });
 
-app.post('/api/intelligence/chat', async (req, res) => {
+app.post('/api/intelligence/chat', authenticate, async (req, res) => {
   const contractorId = resolveChatContractorId(req);
   const { message, enableGrounding, activeAi } = req.body;
   try {

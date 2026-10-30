@@ -356,10 +356,10 @@ export const LandingPageStudioPanel: React.FC<{ token: string | null }> = ({ tok
   };
 
   return (
-    <div className="flex flex-col h-full w-full bg-slate-950 text-slate-100 select-none overflow-hidden font-sans">
+    <div className="flex flex-col h-full w-full bg-bg-base text-text-primary select-none overflow-hidden font-sans">
       
       {/* ─── TOP STUDIO TOOLBAR ─── */}
-      <header className="px-4 py-2.5 border-b border-slate-800 bg-slate-900/90 backdrop-blur-md flex flex-wrap items-center justify-between gap-3 shrink-0">
+      <header className="px-4 py-2.5 border-b border-border-dim bg-bg-raised/90 backdrop-blur-md flex flex-wrap items-center justify-between gap-3 shrink-0">
         
         {/* Left: App Identity & Lander Switcher */}
         <div className="flex items-center gap-3">
@@ -368,7 +368,7 @@ export const LandingPageStudioPanel: React.FC<{ token: string | null }> = ({ tok
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h2 className="text-xs font-bold text-white tracking-wide uppercase">
+              <h2 className="text-xs font-bold text-text-primary tracking-wide uppercase">
                 Contractor Landing Page Studio
               </h2>
               <span className="px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400 text-[10px] font-black uppercase border border-emerald-500/30">
@@ -380,7 +380,7 @@ export const LandingPageStudioPanel: React.FC<{ token: string | null }> = ({ tok
                 type="text"
                 value={config.title}
                 onChange={(e) => setConfig({ ...config, title: e.target.value })}
-                className="text-xs text-slate-300 font-semibold bg-transparent border-b border-dashed border-slate-700 hover:border-amber-400 focus:outline-none focus:border-amber-400 w-48 sm:w-64 truncate"
+                className="text-xs text-text-secondary font-semibold bg-transparent border-b border-dashed border-border-dim hover:border-amber-400 focus:outline-none focus:border-amber-400 w-48 sm:w-64 truncate"
                 title="Click to rename page"
               />
             </div>
@@ -390,12 +390,12 @@ export const LandingPageStudioPanel: React.FC<{ token: string | null }> = ({ tok
         {/* Center: Workspace Layout, Viewport Controls & Tab Navigation */}
         <div className="flex items-center gap-2 flex-wrap">
           {/* Studio Tabs */}
-          <div className="flex p-0.5 bg-slate-950 border border-slate-800 rounded-xl text-xs">
+          <div className="flex p-0.5 bg-bg-base border border-border-dim rounded-xl text-xs">
             <button
               type="button"
               onClick={() => { setActiveTab('builder'); if (workspaceMode === 'canvas') setWorkspaceMode('split'); setSidebarCollapsed(false); }}
               className={`px-3 py-1.5 rounded-lg font-medium transition flex items-center gap-1.5 ${
-                activeTab === 'builder' ? 'bg-amber-500 text-slate-950 font-bold shadow' : 'text-slate-400 hover:text-white'
+                activeTab === 'builder' ? 'bg-amber-500 text-accent-contrast font-bold shadow' : 'text-text-secondary hover:text-text-primary'
               }`}
             >
               <Layers className="w-3.5 h-3.5" />
@@ -405,7 +405,7 @@ export const LandingPageStudioPanel: React.FC<{ token: string | null }> = ({ tok
               type="button"
               onClick={() => { setActiveTab('templates'); if (workspaceMode === 'canvas') setWorkspaceMode('split'); setSidebarCollapsed(false); }}
               className={`px-3 py-1.5 rounded-lg font-medium transition flex items-center gap-1.5 ${
-                activeTab === 'templates' ? 'bg-amber-500 text-slate-950 font-bold shadow' : 'text-slate-400 hover:text-white'
+                activeTab === 'templates' ? 'bg-amber-500 text-accent-contrast font-bold shadow' : 'text-text-secondary hover:text-text-primary'
               }`}
             >
               <Sliders className="w-3.5 h-3.5" />
@@ -415,7 +415,7 @@ export const LandingPageStudioPanel: React.FC<{ token: string | null }> = ({ tok
               type="button"
               onClick={() => { setActiveTab('branding'); if (workspaceMode === 'canvas') setWorkspaceMode('split'); setSidebarCollapsed(false); }}
               className={`px-3 py-1.5 rounded-lg font-medium transition flex items-center gap-1.5 ${
-                activeTab === 'branding' ? 'bg-amber-500 text-slate-950 font-bold shadow' : 'text-slate-400 hover:text-white'
+                activeTab === 'branding' ? 'bg-amber-500 text-accent-contrast font-bold shadow' : 'text-text-secondary hover:text-text-primary'
               }`}
             >
               <Palette className="w-3.5 h-3.5" />
@@ -425,7 +425,7 @@ export const LandingPageStudioPanel: React.FC<{ token: string | null }> = ({ tok
               type="button"
               onClick={() => { setActiveTab('seo'); if (workspaceMode === 'canvas') setWorkspaceMode('split'); setSidebarCollapsed(false); }}
               className={`px-3 py-1.5 rounded-lg font-medium transition flex items-center gap-1.5 ${
-                activeTab === 'seo' ? 'bg-amber-500 text-slate-950 font-bold shadow' : 'text-slate-400 hover:text-white'
+                activeTab === 'seo' ? 'bg-amber-500 text-accent-contrast font-bold shadow' : 'text-text-secondary hover:text-text-primary'
               }`}
             >
               <ShieldCheck className="w-3.5 h-3.5" />
@@ -435,7 +435,7 @@ export const LandingPageStudioPanel: React.FC<{ token: string | null }> = ({ tok
               type="button"
               onClick={() => { setActiveTab('quality_gates'); if (workspaceMode === 'canvas') setWorkspaceMode('split'); setSidebarCollapsed(false); }}
               className={`px-3 py-1.5 rounded-lg font-medium transition flex items-center gap-1.5 ${
-                activeTab === 'quality_gates' ? 'bg-amber-500 text-slate-950 font-bold shadow' : 'text-slate-400 hover:text-white'
+                activeTab === 'quality_gates' ? 'bg-amber-500 text-accent-contrast font-bold shadow' : 'text-text-secondary hover:text-text-primary'
               }`}
             >
               <CheckCircle2 className="w-3.5 h-3.5" />
@@ -445,7 +445,7 @@ export const LandingPageStudioPanel: React.FC<{ token: string | null }> = ({ tok
               type="button"
               onClick={() => { setActiveTab('code'); if (workspaceMode === 'canvas') setWorkspaceMode('split'); setSidebarCollapsed(false); }}
               className={`px-3 py-1.5 rounded-lg font-medium transition flex items-center gap-1.5 ${
-                activeTab === 'code' ? 'bg-amber-500 text-slate-950 font-bold shadow' : 'text-slate-400 hover:text-white'
+                activeTab === 'code' ? 'bg-amber-500 text-accent-contrast font-bold shadow' : 'text-text-secondary hover:text-text-primary'
               }`}
             >
               <Code className="w-3.5 h-3.5" />
@@ -454,12 +454,12 @@ export const LandingPageStudioPanel: React.FC<{ token: string | null }> = ({ tok
           </div>
 
           {/* Workspace Layout Mode (Split vs Canvas Focus vs Full Editor) */}
-          <div className="hidden lg:flex p-0.5 bg-slate-950 border border-slate-800 rounded-xl text-xs" title="Workspace Layout Mode">
+          <div className="hidden lg:flex p-0.5 bg-bg-base border border-border-dim rounded-xl text-xs" title="Workspace Layout Mode">
             <button
               type="button"
               onClick={() => { setWorkspaceMode('split'); setSidebarCollapsed(false); }}
               className={`px-2.5 py-1.5 rounded-lg flex items-center gap-1.5 transition ${
-                workspaceMode === 'split' ? 'bg-slate-800 text-amber-400 font-bold' : 'text-slate-400 hover:text-white'
+                workspaceMode === 'split' ? 'bg-bg-subtle text-amber-400 font-bold' : 'text-text-secondary hover:text-text-primary'
               }`}
               title="Split View (Editor + Live Canvas)"
             >
@@ -470,7 +470,7 @@ export const LandingPageStudioPanel: React.FC<{ token: string | null }> = ({ tok
               type="button"
               onClick={() => { setWorkspaceMode('canvas'); setSidebarCollapsed(true); }}
               className={`px-2.5 py-1.5 rounded-lg flex items-center gap-1.5 transition ${
-                workspaceMode === 'canvas' ? 'bg-slate-800 text-amber-400 font-bold' : 'text-slate-400 hover:text-white'
+                workspaceMode === 'canvas' ? 'bg-bg-subtle text-amber-400 font-bold' : 'text-text-secondary hover:text-text-primary'
               }`}
               title="Maximize Live Preview Canvas (More Working Space)"
             >
@@ -481,7 +481,7 @@ export const LandingPageStudioPanel: React.FC<{ token: string | null }> = ({ tok
               type="button"
               onClick={() => { setWorkspaceMode('editor'); setSidebarCollapsed(false); }}
               className={`px-2.5 py-1.5 rounded-lg flex items-center gap-1.5 transition ${
-                workspaceMode === 'editor' ? 'bg-slate-800 text-amber-400 font-bold' : 'text-slate-400 hover:text-white'
+                workspaceMode === 'editor' ? 'bg-bg-subtle text-amber-400 font-bold' : 'text-text-secondary hover:text-text-primary'
               }`}
               title="Maximize Editor (Full-width Copywriting & Settings)"
             >
@@ -491,13 +491,13 @@ export const LandingPageStudioPanel: React.FC<{ token: string | null }> = ({ tok
           </div>
 
           {/* Viewport Width Controls */}
-          <div className="hidden md:flex p-0.5 bg-slate-950 border border-slate-800 rounded-xl">
+          <div className="hidden md:flex p-0.5 bg-bg-base border border-border-dim rounded-xl">
             <button
               type="button"
               onClick={() => setViewport('desktop')}
               title="Desktop View (1200px)"
               className={`p-1.5 rounded-lg transition ${
-                viewport === 'desktop' ? 'bg-slate-800 text-amber-400' : 'text-slate-400 hover:text-white'
+                viewport === 'desktop' ? 'bg-bg-subtle text-amber-400' : 'text-text-secondary hover:text-text-primary'
               }`}
             >
               <Monitor className="w-3.5 h-3.5" />
@@ -507,7 +507,7 @@ export const LandingPageStudioPanel: React.FC<{ token: string | null }> = ({ tok
               onClick={() => setViewport('tablet')}
               title="Tablet View (768px)"
               className={`p-1.5 rounded-lg transition ${
-                viewport === 'tablet' ? 'bg-slate-800 text-amber-400' : 'text-slate-400 hover:text-white'
+                viewport === 'tablet' ? 'bg-bg-subtle text-amber-400' : 'text-text-secondary hover:text-text-primary'
               }`}
             >
               <Tablet className="w-3.5 h-3.5" />
@@ -517,7 +517,7 @@ export const LandingPageStudioPanel: React.FC<{ token: string | null }> = ({ tok
               onClick={() => setViewport('mobile')}
               title="Mobile First View (375px)"
               className={`p-1.5 rounded-lg transition ${
-                viewport === 'mobile' ? 'bg-slate-800 text-amber-400' : 'text-slate-400 hover:text-white'
+                viewport === 'mobile' ? 'bg-bg-subtle text-amber-400' : 'text-text-secondary hover:text-text-primary'
               }`}
             >
               <Smartphone className="w-3.5 h-3.5" />
@@ -525,14 +525,14 @@ export const LandingPageStudioPanel: React.FC<{ token: string | null }> = ({ tok
           </div>
 
           {/* Zoom Scale Controls */}
-          <div className="hidden xl:flex p-0.5 bg-slate-950 border border-slate-800 rounded-xl text-[11px] font-mono">
+          <div className="hidden xl:flex p-0.5 bg-bg-base border border-border-dim rounded-xl text-[11px] font-mono">
             {(['100', '85', '75'] as const).map(z => (
               <button
                 key={z}
                 type="button"
                 onClick={() => setZoomLevel(z)}
                 className={`px-1.5 py-1 rounded-lg transition ${
-                  zoomLevel === z ? 'bg-slate-800 text-amber-400 font-bold' : 'text-slate-400 hover:text-white'
+                  zoomLevel === z ? 'bg-bg-subtle text-amber-400 font-bold' : 'text-text-secondary hover:text-text-primary'
                 }`}
                 title={`Scale Live Canvas ${z}%`}
               >
@@ -546,7 +546,7 @@ export const LandingPageStudioPanel: React.FC<{ token: string | null }> = ({ tok
             type="button"
             onClick={() => setShowFullscreenModal(true)}
             title="Distraction-Free Fullscreen Preview"
-            className="hidden md:flex p-1.5 rounded-xl border border-slate-800 bg-slate-950 hover:bg-slate-800 text-slate-300 hover:text-amber-400 transition"
+            className="hidden md:flex p-1.5 rounded-xl border border-border-dim bg-bg-base hover:bg-bg-subtle text-text-secondary hover:text-amber-400 transition"
           >
             <Maximize2 className="w-3.5 h-3.5" />
           </button>
@@ -555,7 +555,7 @@ export const LandingPageStudioPanel: React.FC<{ token: string | null }> = ({ tok
         {/* Right: AI Synthesis, History, Save, Share & Live Actions */}
         <div className="flex items-center gap-2">
           {/* Quick Theme Selector Dropdown */}
-          <div className="flex items-center gap-1 bg-slate-900 border border-slate-800 rounded-xl px-2 py-1">
+          <div className="flex items-center gap-1 bg-bg-raised border border-border-dim rounded-xl px-2 py-1">
             <Palette className="w-3.5 h-3.5 text-amber-400 shrink-0" />
             <select
               value={config.branding.colorPreset || 'emergency_amber'}
@@ -593,15 +593,15 @@ export const LandingPageStudioPanel: React.FC<{ token: string | null }> = ({ tok
                   type: 'info'
                 });
               }}
-              className="bg-transparent text-xs font-semibold text-slate-200 focus:outline-none cursor-pointer py-0.5"
+              className="bg-transparent text-xs font-semibold text-text-primary focus:outline-none cursor-pointer py-0.5"
             >
-              <option value="paper_ink" className="bg-slate-900">📜 Paper & Ink</option>
-              <option value="executive_carbon" className="bg-slate-900">⬛ Executive Carbon</option>
-              <option value="modern_swiss" className="bg-slate-900">⚪ Modern Swiss</option>
-              <option value="nordic_obsidian" className="bg-slate-900">🌌 Nordic Obsidian</option>
-              <option value="artisan_warmth" className="bg-slate-900">🪵 Artisan Warmth</option>
-              <option value="emergency_amber" className="bg-slate-900">⚡ Emergency Amber</option>
-              <option value="trust_navy" className="bg-slate-900">🛡️ Trust Navy</option>
+              <option value="paper_ink" className="bg-bg-raised">📜 Paper & Ink</option>
+              <option value="executive_carbon" className="bg-bg-raised">⬛ Executive Carbon</option>
+              <option value="modern_swiss" className="bg-bg-raised">⚪ Modern Swiss</option>
+              <option value="nordic_obsidian" className="bg-bg-raised">🌌 Nordic Obsidian</option>
+              <option value="artisan_warmth" className="bg-bg-raised">🪵 Artisan Warmth</option>
+              <option value="emergency_amber" className="bg-bg-raised">⚡ Emergency Amber</option>
+              <option value="trust_navy" className="bg-bg-raised">🛡️ Trust Navy</option>
             </select>
           </div>
 
@@ -624,7 +624,7 @@ export const LandingPageStudioPanel: React.FC<{ token: string | null }> = ({ tok
               openInspector('landing_config', `${config.businessName} (Lander Settings)`, config);
             }}
             title="Inspect in Workspace Sidebar"
-            className="p-1.5 rounded-xl border border-slate-800 bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-amber-400 transition cursor-pointer"
+            className="p-1.5 rounded-xl border border-border-dim bg-bg-raised hover:bg-bg-subtle text-text-secondary hover:text-amber-400 transition cursor-pointer"
           >
             <Sliders className="w-4 h-4" />
           </button>
@@ -633,7 +633,7 @@ export const LandingPageStudioPanel: React.FC<{ token: string | null }> = ({ tok
           <button
             type="button"
             onClick={() => setShowAiModal(true)}
-            className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 font-black text-xs transition flex items-center gap-1.5 shadow-md hover:shadow-amber-500/20"
+            className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-accent-contrast font-black text-xs transition flex items-center gap-1.5 shadow-md hover:shadow-amber-500/20"
           >
             <Sparkles className="w-3.5 h-3.5" />
             <span className="hidden md:inline">AI Generate</span>
@@ -644,7 +644,7 @@ export const LandingPageStudioPanel: React.FC<{ token: string | null }> = ({ tok
             type="button"
             onClick={() => setShowHistoryModal(true)}
             title="Rollback & Version History"
-            className="p-1.5 rounded-xl border border-slate-800 bg-slate-900 hover:bg-slate-800 text-slate-300 transition"
+            className="p-1.5 rounded-xl border border-border-dim bg-bg-raised hover:bg-bg-subtle text-text-secondary transition"
           >
             <History className="w-4 h-4" />
           </button>
@@ -665,7 +665,7 @@ export const LandingPageStudioPanel: React.FC<{ token: string | null }> = ({ tok
             type="button"
             onClick={handleCopyLink}
             title="Copy Public Landing Page Link"
-            className="p-1.5 rounded-xl border border-slate-800 bg-slate-900 hover:bg-slate-800 text-slate-300 transition"
+            className="p-1.5 rounded-xl border border-border-dim bg-bg-raised hover:bg-bg-subtle text-text-secondary transition"
           >
             {copiedLink ? <Check className="w-4 h-4 text-emerald-400" /> : <Share2 className="w-4 h-4" />}
           </button>
@@ -675,7 +675,7 @@ export const LandingPageStudioPanel: React.FC<{ token: string | null }> = ({ tok
             type="button"
             onClick={handleDownloadHtml}
             title="Export Standalone HTML"
-            className="p-1.5 rounded-xl border border-slate-800 bg-slate-900 hover:bg-slate-800 text-slate-300 transition"
+            className="p-1.5 rounded-xl border border-border-dim bg-bg-raised hover:bg-bg-subtle text-text-secondary transition"
           >
             <Download className="w-4 h-4" />
           </button>
@@ -685,7 +685,7 @@ export const LandingPageStudioPanel: React.FC<{ token: string | null }> = ({ tok
             href={liveUrl}
             target="_blank"
             rel="noreferrer"
-            className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs transition flex items-center gap-1.5 border border-slate-700"
+            className="px-3 py-1.5 rounded-xl bg-bg-subtle hover:bg-slate-700 text-text-primary font-bold text-xs transition flex items-center gap-1.5 border border-border-dim"
           >
             <ExternalLink className="w-3.5 h-3.5" />
             <span className="hidden sm:inline">Live</span>
@@ -693,12 +693,12 @@ export const LandingPageStudioPanel: React.FC<{ token: string | null }> = ({ tok
         </div>
 
         {/* Mobile View Toggle (Editor vs Preview) */}
-        <div className="flex md:hidden p-0.5 bg-slate-950 border border-slate-800 rounded-xl text-xs w-full">
+        <div className="flex md:hidden p-0.5 bg-bg-base border border-border-dim rounded-xl text-xs w-full">
           <button
             type="button"
             onClick={() => setMobileActiveView('editor')}
             className={`flex-1 py-1.5 rounded-lg font-bold transition flex items-center justify-center gap-1.5 ${
-              mobileActiveView === 'editor' ? 'bg-amber-500 text-slate-950 shadow' : 'text-slate-400'
+              mobileActiveView === 'editor' ? 'bg-amber-500 text-accent-contrast shadow' : 'text-text-secondary'
             }`}
           >
             <Layout className="w-3.5 h-3.5" />
@@ -708,7 +708,7 @@ export const LandingPageStudioPanel: React.FC<{ token: string | null }> = ({ tok
             type="button"
             onClick={() => setMobileActiveView('preview')}
             className={`flex-1 py-1.5 rounded-lg font-bold transition flex items-center justify-center gap-1.5 ${
-              mobileActiveView === 'preview' ? 'bg-amber-500 text-slate-950 shadow' : 'text-slate-400'
+              mobileActiveView === 'preview' ? 'bg-amber-500 text-accent-contrast shadow' : 'text-text-secondary'
             }`}
           >
             <Eye className="w-3.5 h-3.5" />
@@ -723,11 +723,11 @@ export const LandingPageStudioPanel: React.FC<{ token: string | null }> = ({ tok
         {/* Left Interactive Control Panel (Builder / Templates / Branding / SEO / Code) */}
         {workspaceMode !== 'canvas' && (
           <aside
-            className={`transition-all duration-300 ease-in-out border-r border-slate-800 bg-slate-900/70 p-4 overflow-y-auto space-y-4 shrink-0 ${
+            className={`transition-all duration-300 ease-in-out border-r border-border-dim bg-bg-raised/70 p-4 overflow-y-auto space-y-4 shrink-0 ${
               mobileActiveView === 'editor' ? 'flex flex-col' : 'hidden md:flex md:flex-col'
             } ${
               workspaceMode === 'editor'
-                ? 'w-full max-w-4xl mx-auto border-r-0 border-x border-slate-800 my-2 rounded-2xl shadow-xl'
+                ? 'w-full max-w-4xl mx-auto border-r-0 border-x border-border-dim my-2 rounded-2xl shadow-xl'
                 : sidebarCollapsed
                 ? 'w-14 p-2 items-center space-y-3'
                 : 'w-full md:w-[420px] lg:w-[440px]'
@@ -740,16 +740,16 @@ export const LandingPageStudioPanel: React.FC<{ token: string | null }> = ({ tok
                   type="button"
                   onClick={() => setSidebarCollapsed(false)}
                   title="Expand Editor Sidebar"
-                  className="p-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 transition shadow cursor-pointer"
+                  className="p-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-accent-contrast transition shadow cursor-pointer"
                 >
                   <PanelLeftOpen className="w-4 h-4" />
                 </button>
-                <div className="w-6 h-px bg-slate-800 my-1" />
+                <div className="w-6 h-px bg-bg-subtle my-1" />
                 <button
                   type="button"
                   onClick={() => { setActiveTab('builder'); setSidebarCollapsed(false); }}
                   title="Builder"
-                  className={`p-2 rounded-lg ${activeTab === 'builder' ? 'text-amber-400 bg-slate-800' : 'text-slate-400 hover:text-white'}`}
+                  className={`p-2 rounded-lg ${activeTab === 'builder' ? 'text-amber-400 bg-bg-subtle' : 'text-text-secondary hover:text-text-primary'}`}
                 >
                   <Layers className="w-4 h-4" />
                 </button>
@@ -757,7 +757,7 @@ export const LandingPageStudioPanel: React.FC<{ token: string | null }> = ({ tok
                   type="button"
                   onClick={() => { setActiveTab('templates'); setSidebarCollapsed(false); }}
                   title="Trades"
-                  className={`p-2 rounded-lg ${activeTab === 'templates' ? 'text-amber-400 bg-slate-800' : 'text-slate-400 hover:text-white'}`}
+                  className={`p-2 rounded-lg ${activeTab === 'templates' ? 'text-amber-400 bg-bg-subtle' : 'text-text-secondary hover:text-text-primary'}`}
                 >
                   <Sliders className="w-4 h-4" />
                 </button>
@@ -765,7 +765,7 @@ export const LandingPageStudioPanel: React.FC<{ token: string | null }> = ({ tok
                   type="button"
                   onClick={() => { setActiveTab('branding'); setSidebarCollapsed(false); }}
                   title="Branding"
-                  className={`p-2 rounded-lg ${activeTab === 'branding' ? 'text-amber-400 bg-slate-800' : 'text-slate-400 hover:text-white'}`}
+                  className={`p-2 rounded-lg ${activeTab === 'branding' ? 'text-amber-400 bg-bg-subtle' : 'text-text-secondary hover:text-text-primary'}`}
                 >
                   <Palette className="w-4 h-4" />
                 </button>
@@ -773,7 +773,7 @@ export const LandingPageStudioPanel: React.FC<{ token: string | null }> = ({ tok
                   type="button"
                   onClick={() => { setActiveTab('seo'); setSidebarCollapsed(false); }}
                   title="SEO"
-                  className={`p-2 rounded-lg ${activeTab === 'seo' ? 'text-amber-400 bg-slate-800' : 'text-slate-400 hover:text-white'}`}
+                  className={`p-2 rounded-lg ${activeTab === 'seo' ? 'text-amber-400 bg-bg-subtle' : 'text-text-secondary hover:text-text-primary'}`}
                 >
                   <ShieldCheck className="w-4 h-4" />
                 </button>
@@ -781,7 +781,7 @@ export const LandingPageStudioPanel: React.FC<{ token: string | null }> = ({ tok
                   type="button"
                   onClick={() => { setActiveTab('quality_gates'); setSidebarCollapsed(false); }}
                   title="Quality Gates"
-                  className={`p-2 rounded-lg ${activeTab === 'quality_gates' ? 'text-amber-400 bg-slate-800' : 'text-slate-400 hover:text-white'}`}
+                  className={`p-2 rounded-lg ${activeTab === 'quality_gates' ? 'text-amber-400 bg-bg-subtle' : 'text-text-secondary hover:text-text-primary'}`}
                 >
                   <CheckCircle2 className="w-4 h-4" />
                 </button>
@@ -789,9 +789,9 @@ export const LandingPageStudioPanel: React.FC<{ token: string | null }> = ({ tok
             ) : (
               <>
                 {/* Header with quick collapse and focus buttons */}
-                <div className="flex items-center justify-between pb-2 border-b border-slate-800">
+                <div className="flex items-center justify-between pb-2 border-b border-border-dim">
                   <div className="flex items-center gap-2">
-                    <span className="text-xs font-bold uppercase tracking-wider text-slate-300">
+                    <span className="text-xs font-bold uppercase tracking-wider text-text-secondary">
                       {activeTab === 'builder' ? 'Modular Section Editor' :
                        activeTab === 'templates' ? 'Trade Template Library' :
                        activeTab === 'branding' ? 'Brand & Call Settings' :
@@ -805,7 +805,7 @@ export const LandingPageStudioPanel: React.FC<{ token: string | null }> = ({ tok
                         type="button"
                         onClick={() => setSidebarCollapsed(true)}
                         title="Collapse Sidebar (Maximize Preview Workspace)"
-                        className="p-1.5 rounded-lg text-slate-400 hover:text-amber-400 hover:bg-slate-800 transition cursor-pointer"
+                        className="p-1.5 rounded-lg text-text-secondary hover:text-amber-400 hover:bg-bg-subtle transition cursor-pointer"
                       >
                         <PanelLeftClose className="w-4 h-4" />
                       </button>
@@ -815,7 +815,7 @@ export const LandingPageStudioPanel: React.FC<{ token: string | null }> = ({ tok
                         type="button"
                         onClick={() => setWorkspaceMode('split')}
                         title="Return to Split View"
-                        className="px-2 py-1 rounded-lg text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 transition"
+                        className="px-2 py-1 rounded-lg text-xs bg-bg-subtle hover:bg-slate-700 text-text-secondary transition"
                       >
                         Split View
                       </button>
@@ -831,15 +831,15 @@ export const LandingPageStudioPanel: React.FC<{ token: string | null }> = ({ tok
                 {/* TAB 2: TRADE TEMPLATES */}
                 {activeTab === 'templates' && (
                   <div className="space-y-4">
-                    <div className="flex items-center justify-between pb-2 border-b border-slate-800">
+                    <div className="flex items-center justify-between pb-2 border-b border-border-dim">
                       <div className="flex items-center gap-2">
                         <Sliders className="w-4 h-4 text-amber-400" />
-                        <h4 className="text-xs font-bold uppercase tracking-wider text-slate-200">
+                        <h4 className="text-xs font-bold uppercase tracking-wider text-text-primary">
                           Trade-Specific Template Library
                         </h4>
                       </div>
                     </div>
-                    <p className="text-xs text-slate-400 leading-relaxed">
+                    <p className="text-xs text-text-secondary leading-relaxed">
                       One-click mobile-first templates engineered specifically for local home service trades with proven high-converting conversion blocks.
                     </p>
 
@@ -847,29 +847,29 @@ export const LandingPageStudioPanel: React.FC<{ token: string | null }> = ({ tok
                       {Object.entries(TRADE_TEMPLATES).map(([key, t]) => (
                         <div
                           key={key}
-                          className="p-4 rounded-xl bg-slate-950 border border-slate-800 hover:border-amber-400/80 transition space-y-2 flex flex-col justify-between"
+                          className="p-4 rounded-xl bg-bg-base border border-border-dim hover:border-amber-400/80 transition space-y-2 flex flex-col justify-between"
                         >
                           <div>
                             <div className="flex items-center justify-between">
-                              <span className="text-xs font-bold text-white uppercase">{t.trade}</span>
+                              <span className="text-xs font-bold text-text-primary uppercase">{t.trade}</span>
                               <span className="px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400 text-[10px] font-semibold">
                                 30-Min SLA
                               </span>
                             </div>
-                            <h5 className="text-sm font-bold text-slate-200 mt-1">{t.title}</h5>
-                            <p className="text-[11px] text-slate-400 mt-1 line-clamp-2">
+                            <h5 className="text-sm font-bold text-text-primary mt-1">{t.title}</h5>
+                            <p className="text-[11px] text-text-secondary mt-1 line-clamp-2">
                               {t.sections.hero.headline}
                             </p>
                           </div>
 
                           <div className="pt-2 border-t border-slate-900 flex items-center justify-between">
-                            <span className="text-[10px] text-slate-500 font-mono">
+                            <span className="text-[10px] text-text-tertiary font-mono">
                               {t.sectionOrder.length} Modules Included
                             </span>
                             <button
                               type="button"
                               onClick={() => handleApplyTemplate(key)}
-                              className="px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs transition cursor-pointer"
+                              className="px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-accent-contrast font-black text-xs transition cursor-pointer"
                             >
                               Apply Template
                             </button>
@@ -906,10 +906,10 @@ export const LandingPageStudioPanel: React.FC<{ token: string | null }> = ({ tok
                 {/* TAB 6: CODE EXPORT & SOURCE */}
                 {activeTab === 'code' && (
                   <div className="space-y-3">
-                    <div className="flex items-center justify-between pb-2 border-b border-slate-800">
+                    <div className="flex items-center justify-between pb-2 border-b border-border-dim">
                       <div className="flex items-center gap-2">
                         <Code className="w-4 h-4 text-sky-400" />
-                        <h4 className="text-xs font-bold uppercase tracking-wider text-slate-200">
+                        <h4 className="text-xs font-bold uppercase tracking-wider text-text-primary">
                           Export Production Source
                         </h4>
                       </div>
@@ -925,7 +925,7 @@ export const LandingPageStudioPanel: React.FC<{ token: string | null }> = ({ tok
                               type: 'success'
                             });
                           }}
-                          className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs text-slate-200 font-bold flex items-center gap-1 cursor-pointer transition"
+                          className="px-2.5 py-1 rounded-lg bg-bg-subtle hover:bg-slate-700 text-xs text-text-primary font-bold flex items-center gap-1 cursor-pointer transition"
                         >
                           <Copy className="w-3.5 h-3.5" />
                           <span>Copy</span>
@@ -942,12 +942,12 @@ export const LandingPageStudioPanel: React.FC<{ token: string | null }> = ({ tok
                     </div>
 
                     {/* Format Toggle Bar */}
-                    <div className="flex p-0.5 bg-slate-950 border border-slate-800 rounded-lg text-xs">
+                    <div className="flex p-0.5 bg-bg-base border border-border-dim rounded-lg text-xs">
                       <button
                         type="button"
                         onClick={() => setCodeFormat('html')}
                         className={`flex-1 py-1 px-2 rounded-md font-bold transition flex items-center justify-center gap-1.5 cursor-pointer ${
-                          codeFormat === 'html' ? 'bg-amber-500 text-slate-950 shadow' : 'text-slate-400 hover:text-white'
+                          codeFormat === 'html' ? 'bg-amber-500 text-accent-contrast shadow' : 'text-text-secondary hover:text-text-primary'
                         }`}
                       >
                         <span>Single-File HTML</span>
@@ -957,7 +957,7 @@ export const LandingPageStudioPanel: React.FC<{ token: string | null }> = ({ tok
                         type="button"
                         onClick={() => setCodeFormat('tsx')}
                         className={`flex-1 py-1 px-2 rounded-md font-bold transition flex items-center justify-center gap-1.5 cursor-pointer ${
-                          codeFormat === 'tsx' ? 'bg-sky-500 text-white shadow' : 'text-slate-400 hover:text-white'
+                          codeFormat === 'tsx' ? 'bg-sky-500 text-white shadow' : 'text-text-secondary hover:text-text-primary'
                         }`}
                       >
                         <span>React / Next.js TSX</span>
@@ -969,7 +969,7 @@ export const LandingPageStudioPanel: React.FC<{ token: string | null }> = ({ tok
                       readOnly
                       value={codeFormat === 'html' ? renderedHtml : renderedTsx}
                       rows={21}
-                      className="w-full p-3 rounded-xl bg-slate-950 border border-slate-800 font-mono text-[10.5px] text-slate-300 leading-relaxed focus:outline-none focus:border-amber-400"
+                      className="w-full p-3 rounded-xl bg-bg-base border border-border-dim font-mono text-[10.5px] text-text-secondary leading-relaxed focus:outline-none focus:border-amber-400"
                     />
                   </div>
                 )}
@@ -983,7 +983,7 @@ export const LandingPageStudioPanel: React.FC<{ token: string | null }> = ({ tok
           <main className={`flex-1 flex-col items-center justify-start p-3 sm:p-6 overflow-y-auto relative transition-colors duration-200 ${
             mobileActiveView === 'preview' ? 'flex flex-col' : 'hidden md:flex md:flex-col'
           } ${
-            config.branding.colorPreset === 'paper_ink' ? 'bg-[#ede7db]' : 'bg-slate-950/90'
+            config.branding.colorPreset === 'paper_ink' ? 'bg-[#ede7db]' : 'bg-bg-base/90'
           }`}>
             
             {/* If sidebar is hidden/collapsed: Floating Reopen Button */}
@@ -992,7 +992,7 @@ export const LandingPageStudioPanel: React.FC<{ token: string | null }> = ({ tok
                 <button
                   type="button"
                   onClick={() => { setWorkspaceMode('split'); setSidebarCollapsed(false); }}
-                  className="px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs shadow-lg transition flex items-center gap-1.5 cursor-pointer"
+                  className="px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-accent-contrast font-bold text-xs shadow-lg transition flex items-center gap-1.5 cursor-pointer"
                   title="Open Editor Sidebar"
                 >
                   <PanelLeftOpen className="w-4 h-4" />
@@ -1005,12 +1005,12 @@ export const LandingPageStudioPanel: React.FC<{ token: string | null }> = ({ tok
             <div className="w-full max-w-5xl flex items-center justify-between pb-3 text-xs">
               <div className="flex items-center gap-2">
                 <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-                <span className={`font-mono text-[11px] ${config.branding.colorPreset === 'paper_ink' ? 'text-stone-700 font-semibold' : 'text-slate-400'}`}>
+                <span className={`font-mono text-[11px] ${config.branding.colorPreset === 'paper_ink' ? 'text-stone-700 font-semibold' : 'text-text-secondary'}`}>
                   Live Preview: {viewport.toUpperCase()} ({viewport === 'desktop' ? '1200px' : viewport === 'tablet' ? '768px' : '375px'}) {zoomLevel !== '100' ? `• Zoom ${zoomLevel}%` : ''}
                 </span>
               </div>
               <div className="flex items-center gap-2">
-                <span className={`text-[11px] font-mono hidden sm:inline ${config.branding.colorPreset === 'paper_ink' ? 'text-stone-500' : 'text-slate-500'}`}>
+                <span className={`text-[11px] font-mono hidden sm:inline ${config.branding.colorPreset === 'paper_ink' ? 'text-stone-500' : 'text-text-tertiary'}`}>
                   Instant Lead-Capture to HAL CRM
                 </span>
                 <button
@@ -1019,7 +1019,7 @@ export const LandingPageStudioPanel: React.FC<{ token: string | null }> = ({ tok
                   className={`text-[11px] font-semibold px-2.5 py-1 rounded-lg transition flex items-center gap-1.5 cursor-pointer ${
                     config.branding.colorPreset === 'paper_ink'
                       ? 'bg-stone-200 hover:bg-stone-300 text-stone-800'
-                      : 'bg-slate-800 hover:bg-slate-700 text-slate-300'
+                      : 'bg-bg-subtle hover:bg-slate-700 text-text-secondary'
                   }`}
                   title="Open Distraction-Free Preview"
                 >
@@ -1039,7 +1039,7 @@ export const LandingPageStudioPanel: React.FC<{ token: string | null }> = ({ tok
               className={`transition-all duration-300 ease-in-out rounded-2xl shadow-2xl overflow-hidden flex flex-col ${
                 config.branding.colorPreset === 'paper_ink'
                   ? 'bg-white border border-[#dcd5c7] shadow-stone-300/40'
-                  : 'bg-slate-900 border border-slate-800'
+                  : 'bg-bg-raised border border-border-dim'
               } ${
                 viewport === 'desktop'
                   ? 'w-full max-w-5xl h-[860px]'
@@ -1053,7 +1053,7 @@ export const LandingPageStudioPanel: React.FC<{ token: string | null }> = ({ tok
                 <div className={`px-4 py-2 flex items-center gap-2 shrink-0 ${
                   config.branding.colorPreset === 'paper_ink'
                     ? 'bg-[#f7f5f0] border-b border-[#dcd5c7]'
-                    : 'bg-slate-950 border-b border-slate-800'
+                    : 'bg-bg-base border-b border-border-dim'
                 }`}>
                   <div className="flex items-center gap-1.5">
                     <span className="w-2.5 h-2.5 rounded-full bg-red-500/80" />
@@ -1063,7 +1063,7 @@ export const LandingPageStudioPanel: React.FC<{ token: string | null }> = ({ tok
                   <div className={`flex-1 mx-4 px-3 py-1 rounded-md text-[11px] font-mono truncate text-center ${
                     config.branding.colorPreset === 'paper_ink'
                       ? 'bg-white border border-[#dcd5c7] text-stone-700'
-                      : 'bg-slate-900 border border-slate-800 text-slate-400'
+                      : 'bg-bg-raised border border-border-dim text-text-secondary'
                   }`}>
                     https://hal.ai/landing/{config.id}
                   </div>
@@ -1072,8 +1072,8 @@ export const LandingPageStudioPanel: React.FC<{ token: string | null }> = ({ tok
 
               {/* Mobile Speaker Notch */}
               {viewport === 'mobile' && (
-                <div className="pt-2 pb-1 bg-slate-950 flex justify-center shrink-0">
-                  <span className="w-16 h-1 rounded-full bg-slate-800" />
+                <div className="pt-2 pb-1 bg-bg-base flex justify-center shrink-0">
+                  <span className="w-16 h-1 rounded-full bg-bg-subtle" />
                 </div>
               )}
 
@@ -1083,7 +1083,7 @@ export const LandingPageStudioPanel: React.FC<{ token: string | null }> = ({ tok
                 srcDoc={renderedHtml}
                 title="Landing Page Preview"
                 className={`w-full flex-1 border-0 ${
-                  config.branding.colorPreset === 'paper_ink' ? 'bg-[#f7f5f0]' : 'bg-slate-950'
+                  config.branding.colorPreset === 'paper_ink' ? 'bg-[#f7f5f0]' : 'bg-bg-base'
                 }`}
               />
             </div>
@@ -1101,30 +1101,30 @@ export const LandingPageStudioPanel: React.FC<{ token: string | null }> = ({ tok
 
       {/* ─── VERSION HISTORY & ROLLBACK MODAL ─── */}
       {showHistoryModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
-          <div className="w-full max-w-md rounded-2xl bg-slate-900 border border-slate-700 shadow-2xl p-5 space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-bg-base/80 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-2xl bg-bg-raised border border-border-dim shadow-2xl p-5 space-y-4">
+            <div className="flex items-center justify-between border-b border-border-dim pb-3">
               <div className="flex items-center gap-2">
                 <History className="w-4 h-4 text-amber-400" />
-                <h4 className="text-xs font-bold uppercase tracking-wider text-white">
+                <h4 className="text-xs font-bold uppercase tracking-wider text-text-primary">
                   Version History & Rollback
                 </h4>
               </div>
               <button
                 type="button"
                 onClick={() => setShowHistoryModal(false)}
-                className="text-slate-400 hover:text-white text-xs"
+                className="text-text-secondary hover:text-text-primary text-xs"
               >
                 ✕
               </button>
             </div>
 
-            <p className="text-xs text-slate-400">
+            <p className="text-xs text-text-secondary">
               Restore previous iterations of your landing page layout, headlines, and color presets.
             </p>
 
             {versionHistory.length === 0 ? (
-              <div className="p-6 text-center text-xs text-slate-500 rounded-xl bg-slate-950 border border-slate-800">
+              <div className="p-6 text-center text-xs text-text-tertiary rounded-xl bg-bg-base border border-border-dim">
                 No previous snapshots yet. Changes will appear here as you save.
               </div>
             ) : (
@@ -1132,16 +1132,16 @@ export const LandingPageStudioPanel: React.FC<{ token: string | null }> = ({ tok
                 {versionHistory.map((v) => (
                   <div
                     key={v.id}
-                    className="p-3 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-between gap-3 text-xs"
+                    className="p-3 rounded-xl bg-bg-base border border-border-dim flex items-center justify-between gap-3 text-xs"
                   >
                     <div>
-                      <div className="font-bold text-white">{v.title}</div>
-                      <div className="text-[10px] text-slate-500 font-mono">{v.timestamp}</div>
+                      <div className="font-bold text-text-primary">{v.title}</div>
+                      <div className="text-[10px] text-text-tertiary font-mono">{v.timestamp}</div>
                     </div>
                     <button
                       type="button"
                       onClick={() => handleRollback(v)}
-                      className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-amber-400 font-bold text-[11px] flex items-center gap-1 transition"
+                      className="px-2.5 py-1 rounded-lg bg-bg-subtle hover:bg-slate-700 text-amber-400 font-bold text-[11px] flex items-center gap-1 transition"
                     >
                       <RotateCcw className="w-3 h-3" /> Restore
                     </button>
@@ -1155,36 +1155,36 @@ export const LandingPageStudioPanel: React.FC<{ token: string | null }> = ({ tok
 
       {/* ─── FULLSCREEN DISTRACTION-FREE PREVIEW MODAL ─── */}
       {showFullscreenModal && (
-        <div className="fixed inset-0 z-50 flex flex-col bg-slate-950">
+        <div className="fixed inset-0 z-50 flex flex-col bg-bg-base">
           {/* Header */}
-          <div className="px-6 py-3 border-b border-slate-800 bg-slate-900/90 backdrop-blur flex items-center justify-between shrink-0">
+          <div className="px-6 py-3 border-b border-border-dim bg-bg-raised/90 backdrop-blur flex items-center justify-between shrink-0">
             <div className="flex items-center gap-3">
               <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping"></span>
-              <h3 className="text-sm font-bold text-white uppercase tracking-wider">
+              <h3 className="text-sm font-bold text-text-primary uppercase tracking-wider">
                 Distraction-Free Live Preview • {config.sections.hero.headline || config.title}
               </h3>
             </div>
             
             <div className="flex items-center gap-2">
-              <div className="flex p-0.5 bg-slate-950 border border-slate-800 rounded-xl">
+              <div className="flex p-0.5 bg-bg-base border border-border-dim rounded-xl">
                 <button
                   type="button"
                   onClick={() => setViewport('desktop')}
-                  className={`p-1.5 rounded-lg transition ${viewport === 'desktop' ? 'bg-slate-800 text-amber-400' : 'text-slate-400 hover:text-white'}`}
+                  className={`p-1.5 rounded-lg transition ${viewport === 'desktop' ? 'bg-bg-subtle text-amber-400' : 'text-text-secondary hover:text-text-primary'}`}
                 >
                   <Monitor className="w-4 h-4" />
                 </button>
                 <button
                   type="button"
                   onClick={() => setViewport('tablet')}
-                  className={`p-1.5 rounded-lg transition ${viewport === 'tablet' ? 'bg-slate-800 text-amber-400' : 'text-slate-400 hover:text-white'}`}
+                  className={`p-1.5 rounded-lg transition ${viewport === 'tablet' ? 'bg-bg-subtle text-amber-400' : 'text-text-secondary hover:text-text-primary'}`}
                 >
                   <Tablet className="w-4 h-4" />
                 </button>
                 <button
                   type="button"
                   onClick={() => setViewport('mobile')}
-                  className={`p-1.5 rounded-lg transition ${viewport === 'mobile' ? 'bg-slate-800 text-amber-400' : 'text-slate-400 hover:text-white'}`}
+                  className={`p-1.5 rounded-lg transition ${viewport === 'mobile' ? 'bg-bg-subtle text-amber-400' : 'text-text-secondary hover:text-text-primary'}`}
                 >
                   <Smartphone className="w-4 h-4" />
                 </button>
@@ -1194,7 +1194,7 @@ export const LandingPageStudioPanel: React.FC<{ token: string | null }> = ({ tok
                 href={liveUrl}
                 target="_blank"
                 rel="noreferrer"
-                className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs transition flex items-center gap-1.5 border border-slate-700"
+                className="px-3 py-1.5 rounded-xl bg-bg-subtle hover:bg-slate-700 text-text-primary font-bold text-xs transition flex items-center gap-1.5 border border-border-dim"
               >
                 <ExternalLink className="w-3.5 h-3.5" />
                 <span>New Tab</span>
@@ -1203,7 +1203,7 @@ export const LandingPageStudioPanel: React.FC<{ token: string | null }> = ({ tok
               <button
                 type="button"
                 onClick={() => setShowFullscreenModal(false)}
-                className="px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs transition flex items-center gap-1.5 cursor-pointer"
+                className="px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-accent-contrast font-bold text-xs transition flex items-center gap-1.5 cursor-pointer"
               >
                 <Minimize2 className="w-3.5 h-3.5" />
                 <span>Close Fullscreen</span>
@@ -1213,10 +1213,10 @@ export const LandingPageStudioPanel: React.FC<{ token: string | null }> = ({ tok
 
           {/* Canvas Container */}
           <div className={`flex-1 flex items-center justify-center p-4 overflow-hidden ${
-            config.branding.colorPreset === 'paper_ink' ? 'bg-[#ede7db]' : 'bg-slate-950'
+            config.branding.colorPreset === 'paper_ink' ? 'bg-[#ede7db]' : 'bg-bg-base'
           }`}>
             <div className={`h-full transition-all duration-300 rounded-2xl shadow-2xl overflow-hidden border flex flex-col ${
-              config.branding.colorPreset === 'paper_ink' ? 'bg-white border-[#dcd5c7]' : 'bg-slate-900 border-slate-800'
+              config.branding.colorPreset === 'paper_ink' ? 'bg-white border-[#dcd5c7]' : 'bg-bg-raised border-border-dim'
             } ${
               viewport === 'desktop'
                 ? 'w-full max-w-6xl'
@@ -1229,7 +1229,7 @@ export const LandingPageStudioPanel: React.FC<{ token: string | null }> = ({ tok
                 srcDoc={renderedHtml}
                 title="Fullscreen Preview"
                 className={`w-full flex-1 border-0 ${
-                  config.branding.colorPreset === 'paper_ink' ? 'bg-[#f7f5f0]' : 'bg-slate-950'
+                  config.branding.colorPreset === 'paper_ink' ? 'bg-[#f7f5f0]' : 'bg-bg-base'
                 }`}
               />
             </div>
