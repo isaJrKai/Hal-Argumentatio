@@ -71,7 +71,7 @@ export async function generateContractorLandingPage(params: ContractorGeneratorP
 
   if (!apiKey) {
     // Graceful fallback if API key is not configured in environment
-    const safeConfig = applyVerifiedBusinessDetails(baseTemplate, { businessName, city, phone, address, trade });
+    const safeConfig = applyVerifiedBusinessDetails(baseTemplate, { businessName, city, phone, address, trade, prompt });
     const html = generateLandingPageHtml(safeConfig);
     return { config: safeConfig, html };
   }
@@ -198,7 +198,7 @@ Return ONLY a JSON object matching this schema:
 
   // Mandatory Quality Gate: Pass all generated copy through the Anti-Slop Humanizer
   const { cleanedConfig } = applyHumanizerPass(baseTemplate);
-  const safeConfig = applyVerifiedBusinessDetails(cleanedConfig, { businessName, city, phone, address, trade });
+  const safeConfig = applyVerifiedBusinessDetails(cleanedConfig, { businessName, city, phone, address, trade, prompt });
 
   const html = generateLandingPageHtml(safeConfig);
   return { config: safeConfig, html };
@@ -206,13 +206,21 @@ Return ONLY a JSON object matching this schema:
 
 function applyVerifiedBusinessDetails(
   config: LandingPageConfig,
-  details: { businessName?: string; city?: string; phone?: string; address?: string; trade: TradeType }
+  details: { businessName?: string; city?: string; phone?: string; address?: string; trade: TradeType; prompt: string }
 ): LandingPageConfig {
   const businessName = details.businessName?.trim() || 'Business Name';
   const city = details.city?.trim() || 'Service Area';
   const phone = details.phone?.trim() || '';
   const address = details.address?.trim() || '';
   const tradeLabel = details.trade.replace(/_/g, ' ').replace(/\b\w/g, letter => letter.toUpperCase());
+  const promptText = details.prompt.toLowerCase();
+  const serviceFocus = /\bsump\s*pumps?\b/.test(promptText)
+    ? 'Sump Pump'
+    : /\bwaterproofing\b/.test(promptText)
+      ? 'Waterproofing'
+      : /\bflood(?:ing)?\s*(?:damage|restoration|cleanup)?\b/.test(promptText)
+        ? 'Flood Restoration'
+        : tradeLabel;
 
   config.businessName = businessName;
   config.city = city;
@@ -221,13 +229,13 @@ function applyVerifiedBusinessDetails(
   config.emergencyService = false;
   config.dispatchWindow = '';
   config.branding.logoText = businessName;
-  config.title = `${businessName} — ${tradeLabel} in ${city}`;
+  config.title = `${businessName} — ${serviceFocus} Services in ${city}`;
 
   config.sections.announcement_bar.active = false;
   config.sections.header.ctaText = phone ? `Call ${phone}` : 'Contact Us';
-  config.sections.hero.badgeText = `${tradeLabel} in ${city}`;
-  config.sections.hero.headline = `${tradeLabel} Services in ${city}`;
-  config.sections.hero.subheadline = `${businessName} provides ${tradeLabel.toLowerCase()} services in ${city}. Contact the business to discuss your requirements and confirm availability.`;
+  config.sections.hero.badgeText = `${serviceFocus} in ${city}`;
+  config.sections.hero.headline = `${serviceFocus} Services in ${city}`;
+  config.sections.hero.subheadline = `${businessName} provides ${serviceFocus.toLowerCase()} services in ${city}. Contact the business to discuss your requirements and confirm availability.`;
   config.sections.lead_form.title = `Contact ${businessName}`;
   config.sections.lead_form.subtitle = 'Share your contact details and a brief description of the work you need.';
   config.sections.lead_form.buttonText = 'Send Service Request';
@@ -250,7 +258,7 @@ function applyVerifiedBusinessDetails(
   config.sections.services.subtitle = 'Contact the business to discuss the work you need.';
   config.sections.services.items = [{
     id: 'service-enquiry',
-    title: `${tradeLabel} Service Enquiries`,
+    title: `${serviceFocus} Service Enquiries`,
     description: 'Contact the business to discuss scope, availability, and pricing.',
   }];
 
@@ -260,8 +268,8 @@ function applyVerifiedBusinessDetails(
   config.sections.sticky_mobile_call.crewStatus = `Contact ${businessName}`;
   config.sections.sticky_mobile_call.buttonText = phone ? `Call ${phone}` : 'Contact Us';
 
-  config.seo.metaTitle = `${businessName} | ${tradeLabel} in ${city}`;
-  config.seo.metaDescription = `Contact ${businessName} in ${city} about ${tradeLabel.toLowerCase()} services.`;
+  config.seo.metaTitle = `${businessName} | ${serviceFocus} in ${city}`;
+  config.seo.metaDescription = `Contact ${businessName} in ${city} about ${serviceFocus.toLowerCase()} services.`;
   config.seo.schemaType = 'LocalBusiness';
 
   return config;
