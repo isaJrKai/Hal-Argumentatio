@@ -36,6 +36,7 @@ import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/
 import { buildHalMcpServer } from './src/services/mcp/halMcpServer';
 import { HERMES_LAB_CATALOG, executeHermesLabTool, chatWithHermesAgent, LabToolType } from './src/services/hermesLab';
 import { generateContractorLandingPage, regenerateLandingSection } from './src/services/landingGenerator';
+import { generateLandingPageHtml } from './src/components/landing/htmlGenerator';
 import { validateCrmTransition } from './src/lib/crmStateMachine';
 import { validateLoopGate } from './src/lib/loopGating';
 import { 
@@ -1071,7 +1072,7 @@ app.get('/landing/:id', async (req, res) => {
 
 // ─── CONTRACTOR LANDING PAGE STUDIO ENGINE ─────────────────────────────────
 
-app.post('/api/landing-pages/generate-ai', async (req, res) => {
+app.post('/api/landing-pages/generate-ai', authenticate, async (req, res) => {
   try {
     const { 
       prompt, 
@@ -1079,6 +1080,7 @@ app.post('/api/landing-pages/generate-ai', async (req, res) => {
       city, 
       businessName, 
       phone,
+      address,
       audience,
       primaryGoal,
       coreOffer,
@@ -1094,6 +1096,8 @@ app.post('/api/landing-pages/generate-ai', async (req, res) => {
       city: city || 'Calgary',
       businessName,
       phone,
+      address,
+      contractorId: (req as any).contractorId,
       audience,
       primaryGoal,
       coreOffer,
@@ -1107,7 +1111,7 @@ app.post('/api/landing-pages/generate-ai', async (req, res) => {
   }
 });
 
-app.post('/api/landing-pages/regenerate-section', async (req, res) => {
+app.post('/api/landing-pages/regenerate-section', authenticate, async (req, res) => {
   try {
     const { 
       sectionKey, 
@@ -1152,6 +1156,10 @@ app.post('/api/landing-pages/save', authenticate, async (req, res) => {
 
   try {
     const artifactId = id && id.length > 5 ? id : ('lp_' + crypto.randomUUID().slice(0, 8));
+    const ownedPageConfig = pageConfig && typeof pageConfig === 'object'
+      ? { ...pageConfig, id: artifactId, contractorId }
+      : null;
+    const ownedRenderedHtml = ownedPageConfig ? generateLandingPageHtml(ownedPageConfig) : renderedHtml;
 
     const [existing] = await pgDb
       .select()
@@ -1164,8 +1172,8 @@ app.post('/api/landing-pages/save', authenticate, async (req, res) => {
         .set({
           title,
           content: {
-            pageConfig,
-            renderedOutput: renderedHtml
+            pageConfig: ownedPageConfig,
+            renderedOutput: ownedRenderedHtml
           },
           status: 'ready',
           updatedAt: new Date()
@@ -1180,8 +1188,8 @@ app.post('/api/landing-pages/save', authenticate, async (req, res) => {
         title,
         status: 'ready',
         content: {
-          pageConfig,
-          renderedOutput: renderedHtml
+          pageConfig: ownedPageConfig,
+          renderedOutput: ownedRenderedHtml
         },
         createdAt: new Date(),
         updatedAt: new Date()
@@ -1191,6 +1199,7 @@ app.post('/api/landing-pages/save', authenticate, async (req, res) => {
     res.json({
       success: true,
       id: artifactId,
+      contractorId,
       liveUrl: `/landing/${artifactId}`
     });
   } catch (err: any) {
@@ -1203,15 +1212,22 @@ app.post('/api/public/landing-leads', async (req, res) => {
   const { contractorId, landingPageId, name, phone, serviceDetails, city } = req.body;
 
   if (!phone || !name) {
-    return res.status(400).json({ error: 'Name and phone are required for emergency dispatch' });
+    return res.status(400).json({ error: 'Name and phone are required for this service request' });
+  }
+  if (!contractorId || typeof contractorId !== 'string') {
+    return res.status(400).json({ error: 'This landing page is missing its contractor assignment. Please contact the business directly.' });
   }
 
   try {
-    let targetContractorId = contractorId;
-    if (!targetContractorId) {
-      const [firstContractor] = await pgDb.select().from(contractors).limit(1);
-      targetContractorId = firstContractor?.id || 'demo-contractor-id';
+    const [assignedContractor] = await pgDb
+      .select({ id: contractors.id })
+      .from(contractors)
+      .where(eq(contractors.id, contractorId))
+      .limit(1);
+    if (!assignedContractor) {
+      return res.status(404).json({ error: 'The assigned business could not be found.' });
     }
+    const targetContractorId = assignedContractor.id;
 
     const leadId = crypto.randomUUID();
     const phoneEncrypted = encrypt(String(phone));
@@ -1649,17 +1665,17 @@ function mapCrmStageToCanonical(stage: string): string {
 // ─── SECURE CRM WEBHOOK ENDPOINT (n8n / Zapier / HubSpot / Salesforce) ────────
 app.post('/api/webhooks/crm', async (req, res) => {
   const envSecret = process.env.HAL_CRM_WEBHOOK_SECRET;
-  if (!envSecret && process.env.NODE_ENV === 'production') {
-    return res.status(500).json({ error: 'Critical Security Error: HAL_CRM_WEBHOOK_SECRET is not configured in production environment.' });
+  if (!envSecret || envSecret.length < 16) {
+    return res.status(503).json({ error: 'CRM webhook is disabled: set HAL_CRM_WEBHOOK_SECRET (16+ chars) to enable it.' });
   }
-  const webhookSecret = envSecret || 'hal_secure_crm_secret_2026';
   const authHeader = req.headers['authorization'];
   const headerSecret = req.headers['x-webhook-secret'] as string;
   const eventIdHeader = req.headers['x-event-id'] as string;
 
-  const providedSecret = headerSecret || (authHeader?.startsWith('Bearer ') ? authHeader.substring(7) : null);
-
-  if (!providedSecret || providedSecret !== webhookSecret) {
+  const providedSecret = headerSecret || (authHeader?.startsWith('Bearer ') ? authHeader.substring(7) : '');
+  const a = Buffer.from(String(providedSecret || ''));
+  const b = Buffer.from(envSecret);
+  if (!providedSecret || a.length !== b.length || !crypto.timingSafeEqual(a, b)) {
     return res.status(401).json({ error: 'Unauthorized: Invalid or missing webhook secret' });
   }
 
@@ -3077,18 +3093,12 @@ app.delete('/api/skills/:id', authenticate, (req, res) => {
 
 // Helper for resilient chat contractor ID resolution
 function resolveChatContractorId(req: express.Request): string {
-  const authHeader = req.headers.authorization;
-  if (authHeader && authHeader.startsWith('Bearer ')) {
-    const token = authHeader.split(' ')[1];
-    const decoded = verifyToken(token);
-    if (decoded?.contractorId) {
-      return decoded.contractorId;
-    }
-  }
-  return 'con_admin_seed';
+  // Routes using this helper are protected by `authenticate`, which sets contractorId.
+  // There is intentionally NO fallback to an admin/seed account.
+  return (req as any).contractorId as string;
 }
 
-app.get('/api/intelligence/chat/history', async (req, res) => {
+app.get('/api/intelligence/chat/history', authenticate, async (req, res) => {
   const contractorId = resolveChatContractorId(req);
   const targetIds = getTargetContractorIds(contractorId);
   try {
@@ -3099,7 +3109,7 @@ app.get('/api/intelligence/chat/history', async (req, res) => {
   }
 });
 
-app.delete('/api/intelligence/chat/history', async (req, res) => {
+app.delete('/api/intelligence/chat/history', authenticate, async (req, res) => {
   const contractorId = resolveChatContractorId(req);
   try {
     await pgDb.delete(chatMessages).where(eq(chatMessages.contractorId, contractorId));
@@ -3109,7 +3119,7 @@ app.delete('/api/intelligence/chat/history', async (req, res) => {
   }
 });
 
-app.delete('/api/intelligence/chat/message/:id', async (req, res) => {
+app.delete('/api/intelligence/chat/message/:id', authenticate, async (req, res) => {
   const contractorId = resolveChatContractorId(req);
   const { id } = req.params;
   try {
@@ -3124,7 +3134,7 @@ app.delete('/api/intelligence/chat/message/:id', async (req, res) => {
   }
 });
 
-app.post('/api/intelligence/chat', async (req, res) => {
+app.post('/api/intelligence/chat', authenticate, async (req, res) => {
   const contractorId = resolveChatContractorId(req);
   const { message, enableGrounding, activeAi } = req.body;
   try {

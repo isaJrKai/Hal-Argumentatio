@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { WhatsAppIcon } from './icons/WhatsAppIcon';
 import { 
   MessageSquare, 
   Mail, 
@@ -252,13 +253,13 @@ export const UnifiedCommunicationsHub: React.FC<UnifiedCommunicationsHubProps> =
       {/* ─── TOP BRIDGE CONNECTION TELEMETRY STRIP ─── */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
         {/* WhatsApp Bridge Card */}
-        <div className="p-4 rounded-xl bg-slate-900 border border-slate-800 flex flex-col justify-between space-y-3">
+        <div className="p-4 rounded-xl bg-bg-raised border border-border-dim flex flex-col justify-between space-y-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <span className="p-1.5 rounded-lg bg-emerald-500/10 text-emerald-400">
-                <MessageSquare className="w-4 h-4" />
+                <WhatsAppIcon className="w-4 h-4" />
               </span>
-              <span className="text-xs font-bold text-white">WhatsApp Business</span>
+              <span className="text-xs font-bold text-text-primary">WhatsApp Business</span>
             </div>
             <span className="inline-flex items-center gap-1 text-[11px] text-emerald-400 font-mono">
               <span className={bridges?.whatsapp.enabled ? "w-2 h-2 rounded-full bg-amber-400" : "w-2 h-2 rounded-full bg-slate-500"}></span>
@@ -266,23 +267,23 @@ export const UnifiedCommunicationsHub: React.FC<UnifiedCommunicationsHubProps> =
             </span>
           </div>
           <div>
-            <div className="text-lg font-mono font-black text-white tabular-nums">
+            <div className="text-lg font-mono font-black text-text-primary tabular-nums">
               {bridges?.whatsapp.replyRate == null ? '—' : `${bridges.whatsapp.replyRate}%`}
             </div>
-            <div className="text-[11px] text-slate-400 mt-0.5">
+            <div className="text-[11px] text-text-secondary mt-0.5">
               Reply rate unavailable · {bridges?.whatsapp.deliveredCount ?? 0} delivered
             </div>
           </div>
         </div>
 
         {/* Email Sequence Bridge Card */}
-        <div className="p-4 rounded-xl bg-slate-900 border border-slate-800 flex flex-col justify-between space-y-3">
+        <div className="p-4 rounded-xl bg-bg-raised border border-border-dim flex flex-col justify-between space-y-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <span className="p-1.5 rounded-lg bg-sky-500/10 text-sky-400">
                 <Mail className="w-4 h-4" />
               </span>
-              <span className="text-xs font-bold text-white">Email Sequences</span>
+              <span className="text-xs font-bold text-text-primary">Email Sequences</span>
             </div>
             <span className="inline-flex items-center gap-1 text-[11px] text-sky-400 font-mono">
               <span className={bridges?.email.enabled ? "w-2 h-2 rounded-full bg-amber-400" : "w-2 h-2 rounded-full bg-slate-500"}></span>
@@ -290,23 +291,23 @@ export const UnifiedCommunicationsHub: React.FC<UnifiedCommunicationsHubProps> =
             </span>
           </div>
           <div>
-            <div className="text-lg font-mono font-black text-white tabular-nums">
+            <div className="text-lg font-mono font-black text-text-primary tabular-nums">
               {bridges?.email.openRate == null ? '—' : `${bridges.email.openRate}%`}
             </div>
-            <div className="text-[11px] text-slate-400 mt-0.5">
+            <div className="text-[11px] text-text-secondary mt-0.5">
               Open rate unavailable · {bridges?.email.deliveredCount ?? 0} delivered
             </div>
           </div>
         </div>
 
         {/* Twilio SMS Bridge Card */}
-        <div className="p-4 rounded-xl bg-slate-900 border border-slate-800 flex flex-col justify-between space-y-3">
+        <div className="p-4 rounded-xl bg-bg-raised border border-border-dim flex flex-col justify-between space-y-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <span className="p-1.5 rounded-lg bg-amber-500/10 text-amber-400">
                 <Phone className="w-4 h-4" />
               </span>
-              <span className="text-xs font-bold text-white">Twilio SMS / Voice</span>
+              <span className="text-xs font-bold text-text-primary">Twilio SMS / Voice</span>
             </div>
             <span className="inline-flex items-center gap-1 text-[11px] text-amber-400 font-mono">
               <span className={bridges?.sms.enabled ? "w-2 h-2 rounded-full bg-amber-400" : "w-2 h-2 rounded-full bg-slate-500"}></span>
@@ -314,23 +315,23 @@ export const UnifiedCommunicationsHub: React.FC<UnifiedCommunicationsHubProps> =
             </span>
           </div>
           <div>
-            <div className="text-lg font-mono font-black text-white tabular-nums">
+            <div className="text-lg font-mono font-black text-text-primary tabular-nums">
               {bridges?.sms.slaResponseSec == null ? '—' : `${bridges.sms.slaResponseSec}s`}
             </div>
-            <div className="text-[11px] text-slate-400 mt-0.5">
+            <div className="text-[11px] text-text-secondary mt-0.5">
               Response SLA unavailable · {bridges?.sms.deliveredCount ?? 0} delivered
             </div>
           </div>
         </div>
 
         {/* Calendar Sync Card */}
-        <div className="p-4 rounded-xl bg-slate-900 border border-slate-800 flex flex-col justify-between space-y-3">
+        <div className="p-4 rounded-xl bg-bg-raised border border-border-dim flex flex-col justify-between space-y-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <span className="p-1.5 rounded-lg bg-purple-500/10 text-purple-400">
                 <Calendar className="w-4 h-4" />
               </span>
-              <span className="text-xs font-bold text-white">Calendar Booking</span>
+              <span className="text-xs font-bold text-text-primary">Calendar Booking</span>
             </div>
             <span className="inline-flex items-center gap-1 text-[11px] text-purple-400 font-mono">
               <span className={bridges?.calendar.enabled ? "w-2 h-2 rounded-full bg-amber-400" : "w-2 h-2 rounded-full bg-slate-500"}></span>
@@ -338,10 +339,10 @@ export const UnifiedCommunicationsHub: React.FC<UnifiedCommunicationsHubProps> =
             </span>
           </div>
           <div>
-            <div className="text-lg font-mono font-black text-white tabular-nums">
+            <div className="text-lg font-mono font-black text-text-primary tabular-nums">
               {bridges?.calendar.bookedAppointments == null ? '—' : bridges.calendar.bookedAppointments}
             </div>
-            <div className="text-[11px] text-slate-400 mt-0.5">
+            <div className="text-[11px] text-text-secondary mt-0.5">
               Appointments booked · reporting not connected
             </div>
           </div>
@@ -352,11 +353,11 @@ export const UnifiedCommunicationsHub: React.FC<UnifiedCommunicationsHubProps> =
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         
         {/* Left Column: Targeted Prospect Directory (5 cols) */}
-        <div className="lg:col-span-5 rounded-2xl bg-slate-900 border border-slate-800 p-4 space-y-4">
-          <div className="flex items-center justify-between pb-2 border-b border-slate-800">
+        <div className="lg:col-span-5 rounded-2xl bg-bg-raised border border-border-dim p-4 space-y-4">
+          <div className="flex items-center justify-between pb-2 border-b border-border-dim">
             <div>
-              <h3 className="text-sm font-bold text-white">Harvested Prospect Directory</h3>
-              <p className="text-[11px] text-slate-400">Select prospect for individualized outreach</p>
+              <h3 className="text-sm font-bold text-text-primary">Harvested Prospect Directory</h3>
+              <p className="text-[11px] text-text-secondary">Select prospect for individualized outreach</p>
             </div>
             <span className="text-xs font-mono font-bold text-amber-400 tabular-nums">
               {filteredLeads.length} leads
@@ -365,20 +366,20 @@ export const UnifiedCommunicationsHub: React.FC<UnifiedCommunicationsHubProps> =
 
           {/* Search Input */}
           <div className="relative">
-            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+            <Search className="w-4 h-4 text-text-secondary absolute left-3 top-1/2 -translate-y-1/2" />
             <input
               type="text"
               placeholder="Filter by business or city..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-9 pr-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-white placeholder-slate-500 text-xs focus:outline-none focus:border-amber-400"
+              className="w-full pl-9 pr-3 py-2 rounded-xl bg-bg-base border border-border-default text-text-primary placeholder-text-tertiary text-xs focus:outline-none focus:border-amber-400"
             />
           </div>
 
           {/* Lead List */}
           <div className="space-y-2 max-h-[500px] overflow-y-auto pr-1">
             {filteredLeads.length === 0 ? (
-              <div className="p-6 text-center text-slate-500 text-xs">
+              <div className="p-6 text-center text-text-tertiary text-xs">
                 No leads match your search query.
               </div>
             ) : (
@@ -391,17 +392,17 @@ export const UnifiedCommunicationsHub: React.FC<UnifiedCommunicationsHubProps> =
                     className={`p-3 rounded-xl border transition cursor-pointer flex items-center justify-between gap-3 ${
                       isSelected
                         ? 'bg-amber-500/10 border-amber-500/60 shadow-sm'
-                        : 'bg-slate-950/60 border-slate-800 hover:border-slate-700'
+                        : 'bg-bg-base/60 border-border-dim hover:border-border-default'
                     }`}
                   >
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-1.5">
-                        <h4 className="text-xs font-bold text-white truncate">{ld.businessName}</h4>
+                        <h4 className="text-xs font-bold text-text-primary truncate">{ld.businessName}</h4>
                         {ld.status === 'contacted' && (
                           <span className="text-[10px] text-emerald-400 font-semibold shrink-0">✓ Contacted</span>
                         )}
                       </div>
-                      <div className="flex items-center gap-2 text-[11px] text-slate-400 mt-0.5">
+                      <div className="flex items-center gap-2 text-[11px] text-text-secondary mt-0.5">
                         <span>{ld.city}</span>
                         <span>·</span>
                         <span>{ld.ownerName || 'Owner'}</span>
@@ -411,7 +412,7 @@ export const UnifiedCommunicationsHub: React.FC<UnifiedCommunicationsHubProps> =
                       <div className="text-xs font-mono font-bold text-amber-400 tabular-nums">
                         {ld.urgencyScore ? `${ld.urgencyScore}/10` : 'Urgent'}
                       </div>
-                      <span className="text-[10px] text-slate-500 block">KAISO Score</span>
+                      <span className="text-[10px] text-text-tertiary block">KAISO Score</span>
                     </div>
                   </div>
                 );
@@ -421,25 +422,25 @@ export const UnifiedCommunicationsHub: React.FC<UnifiedCommunicationsHubProps> =
         </div>
 
         {/* Right Column: Multi-Channel Composer & Dispatch Studio (7 cols) */}
-        <div className="lg:col-span-7 rounded-2xl bg-slate-900 border border-slate-800 p-5 space-y-4">
+        <div className="lg:col-span-7 rounded-2xl bg-bg-raised border border-border-dim p-5 space-y-4">
           {/* Channel Selector Tab Bar */}
-          <div className="flex items-center justify-between pb-3 border-b border-slate-800">
-            <div className="flex p-0.5 bg-slate-950 border border-slate-800 rounded-xl text-xs">
+          <div className="flex items-center justify-between pb-3 border-b border-border-dim">
+            <div className="flex p-0.5 bg-bg-base border border-border-dim rounded-xl text-xs">
               <button
                 type="button"
                 onClick={() => setActiveChannel('whatsapp')}
                 className={`px-3 py-1.5 rounded-lg font-bold transition flex items-center gap-1.5 cursor-pointer ${
-                  activeChannel === 'whatsapp' ? 'bg-emerald-600 text-white shadow' : 'text-slate-400 hover:text-white'
+                  activeChannel === 'whatsapp' ? 'bg-emerald-600 text-white shadow' : 'text-text-secondary hover:text-text-primary'
                 }`}
               >
-                <MessageSquare className="w-3.5 h-3.5" />
+                <WhatsAppIcon className="w-3.5 h-3.5" />
                 <span>WhatsApp</span>
               </button>
               <button
                 type="button"
                 onClick={() => setActiveChannel('email')}
                 className={`px-3 py-1.5 rounded-lg font-bold transition flex items-center gap-1.5 cursor-pointer ${
-                  activeChannel === 'email' ? 'bg-sky-600 text-white shadow' : 'text-slate-400 hover:text-white'
+                  activeChannel === 'email' ? 'bg-sky-600 text-white shadow' : 'text-text-secondary hover:text-text-primary'
                 }`}
               >
                 <Mail className="w-3.5 h-3.5" />
@@ -449,7 +450,7 @@ export const UnifiedCommunicationsHub: React.FC<UnifiedCommunicationsHubProps> =
                 type="button"
                 onClick={() => setActiveChannel('sms')}
                 className={`px-3 py-1.5 rounded-lg font-bold transition flex items-center gap-1.5 cursor-pointer ${
-                  activeChannel === 'sms' ? 'bg-amber-500 text-slate-950 shadow' : 'text-slate-400 hover:text-white'
+                  activeChannel === 'sms' ? 'bg-amber-500 text-accent-contrast shadow' : 'text-text-secondary hover:text-text-primary'
                 }`}
               >
                 <Phone className="w-3.5 h-3.5" />
@@ -459,7 +460,7 @@ export const UnifiedCommunicationsHub: React.FC<UnifiedCommunicationsHubProps> =
                 type="button"
                 onClick={() => setActiveChannel('calendar')}
                 className={`px-3 py-1.5 rounded-lg font-bold transition flex items-center gap-1.5 cursor-pointer ${
-                  activeChannel === 'calendar' ? 'bg-purple-600 text-white shadow' : 'text-slate-400 hover:text-white'
+                  activeChannel === 'calendar' ? 'bg-purple-600 text-text-primary shadow' : 'text-text-secondary hover:text-text-primary'
                 }`}
               >
                 <Calendar className="w-3.5 h-3.5" />
@@ -471,7 +472,7 @@ export const UnifiedCommunicationsHub: React.FC<UnifiedCommunicationsHubProps> =
               type="button"
               disabled={isDrafting}
               onClick={handleAiDraft}
-              className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 font-black text-xs transition flex items-center gap-1.5 shadow cursor-pointer disabled:opacity-50"
+              className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-accent-contrast font-black text-xs transition flex items-center gap-1.5 shadow cursor-pointer disabled:opacity-50"
             >
               <Sparkles className="w-3.5 h-3.5" />
               <span>{isDrafting ? 'Drafting...' : 'AI Polish with Gemini'}</span>
@@ -480,14 +481,14 @@ export const UnifiedCommunicationsHub: React.FC<UnifiedCommunicationsHubProps> =
 
           {/* Active Target Banner */}
           {selectedLead && (
-            <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-between text-xs">
+            <div className="p-3 rounded-xl bg-bg-base border border-border-dim flex items-center justify-between text-xs">
               <div>
-                <span className="text-[10px] text-slate-500 uppercase tracking-wider block font-semibold">Recipient</span>
-                <span className="font-bold text-white">{selectedLead.businessName}</span>
-                <span className="text-slate-400 ml-1">({selectedLead.city} · {selectedLead.ownerName || 'Owner'})</span>
+                <span className="text-[10px] text-text-tertiary uppercase tracking-wider block font-semibold">Recipient</span>
+                <span className="font-bold text-text-primary">{selectedLead.businessName}</span>
+                <span className="text-text-secondary ml-1">({selectedLead.city} · {selectedLead.ownerName || 'Owner'})</span>
               </div>
               <div className="text-right">
-                <span className="text-[10px] text-slate-500 uppercase tracking-wider block font-semibold">Destination</span>
+                <span className="text-[10px] text-text-tertiary uppercase tracking-wider block font-semibold">Destination</span>
                 <span className="font-mono text-amber-400 font-bold">
                   {activeChannel === 'email' ? (selectedLead.email || 'Not provided') : (selectedLead.phone || 'Not provided')}
                 </span>
@@ -498,13 +499,13 @@ export const UnifiedCommunicationsHub: React.FC<UnifiedCommunicationsHubProps> =
           {/* Subject Line (For Email / Calendar) */}
           {(activeChannel === 'email' || activeChannel === 'calendar') && (
             <div>
-              <label className="block text-[11px] font-semibold text-slate-300 mb-1">Subject Line</label>
+              <label className="block text-[11px] font-semibold text-text-secondary mb-1">Subject Line</label>
               <input
                 type="text"
                 value={subject}
                 onChange={(e) => setSubject(e.target.value)}
                 placeholder="Enter compelling, personalized subject line..."
-                className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-white text-xs focus:outline-none focus:border-amber-400"
+                className="w-full px-3 py-2 rounded-xl bg-bg-base border border-border-default text-text-primary text-xs focus:outline-none focus:border-amber-400"
               />
             </div>
           )}
@@ -512,8 +513,8 @@ export const UnifiedCommunicationsHub: React.FC<UnifiedCommunicationsHubProps> =
           {/* Message Body */}
           <div>
             <div className="flex items-center justify-between mb-1">
-              <label className="text-[11px] font-semibold text-slate-300">Message Content</label>
-              <span className="text-[10px] font-mono text-slate-500">
+              <label className="text-[11px] font-semibold text-text-secondary">Message Content</label>
+              <span className="text-[10px] font-mono text-text-tertiary">
                 Variables: {'{{businessName}} · {{city}} · {{ownerName}}'}
               </span>
             </div>
@@ -521,7 +522,7 @@ export const UnifiedCommunicationsHub: React.FC<UnifiedCommunicationsHubProps> =
               rows={8}
               value={message}
               onChange={(e) => setMessage(e.target.value)}
-              className="w-full p-3 rounded-xl bg-slate-950 border border-slate-700 text-white text-xs font-mono leading-relaxed focus:outline-none focus:border-amber-400"
+              className="w-full p-3 rounded-xl bg-bg-base border border-border-default text-text-primary text-xs font-mono leading-relaxed focus:outline-none focus:border-amber-400"
             />
           </div>
 
@@ -532,13 +533,13 @@ export const UnifiedCommunicationsHub: React.FC<UnifiedCommunicationsHubProps> =
               placeholder="Custom AI guidance (e.g., 'Emphasize frozen pipe weekend emergencies')..."
               value={customInstructions}
               onChange={(e) => setCustomInstructions(e.target.value)}
-              className="flex-1 px-3 py-1.5 text-xs rounded-xl bg-slate-950 border border-slate-800 text-white placeholder-slate-500 focus:outline-none focus:border-amber-400"
+              className="flex-1 px-3 py-1.5 text-xs rounded-xl bg-bg-base border border-border-dim text-text-primary placeholder-text-tertiary focus:outline-none focus:border-amber-400"
             />
             <button
               type="button"
               disabled={isDispatching}
               onClick={handleDispatch}
-              className="px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs transition flex items-center gap-2 shadow-lg cursor-pointer disabled:opacity-50"
+              className="px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-accent-contrast font-black text-xs transition flex items-center gap-2 shadow-lg cursor-pointer disabled:opacity-50"
             >
               {isDispatching ? (
                 <>
@@ -557,23 +558,23 @@ export const UnifiedCommunicationsHub: React.FC<UnifiedCommunicationsHubProps> =
       </div>
 
       {/* ─── LIVE DISPATCH & CONVERSION AUDIT LEDGER ─── */}
-      <div className="rounded-2xl bg-slate-900 border border-slate-800 p-5 space-y-3">
-        <div className="flex items-center justify-between pb-2 border-b border-slate-800">
+      <div className="rounded-2xl bg-bg-raised border border-border-dim p-5 space-y-3">
+        <div className="flex items-center justify-between pb-2 border-b border-border-dim">
           <div className="flex items-center gap-2">
             <ShieldCheck className="w-4 h-4 text-emerald-400" />
-            <h4 className="text-xs font-bold uppercase tracking-wider text-white">
+            <h4 className="text-xs font-bold uppercase tracking-wider text-text-primary">
               Dispatch Simulation Log
             </h4>
           </div>
-          <span className="text-[10px] font-mono text-slate-400">Encryption status not verified</span>
+          <span className="text-[10px] font-mono text-text-secondary">Encryption status not verified</span>
         </div>
 
         {dispatchHistory.length === 0 ? (
-          <div className="p-8 text-center text-slate-500 text-xs">
+          <div className="p-8 text-center text-text-tertiary text-xs">
             No simulations recorded yet. Use the button above to record a simulation; no external message will be sent.
           </div>
         ) : (
-          <div className="divide-y divide-slate-800/60 max-h-72 overflow-y-auto">
+          <div className="divide-y divide-border-dim/60 max-h-72 overflow-y-auto">
             {dispatchHistory.map((item) => (
               <div key={item.id} className="py-2.5 flex items-center justify-between text-xs">
                 <div className="flex items-center gap-3">
@@ -584,16 +585,16 @@ export const UnifiedCommunicationsHub: React.FC<UnifiedCommunicationsHubProps> =
                     {item.channel}
                   </span>
                   <div>
-                    <span className="font-bold text-white">{item.leadBusinessName}</span>
-                    <span className="text-slate-400 text-[11px] ml-2 font-mono">{item.recipient}</span>
+                    <span className="font-bold text-text-primary">{item.leadBusinessName}</span>
+                    <span className="text-text-secondary text-[11px] ml-2 font-mono">{item.recipient}</span>
                   </div>
                 </div>
                 <div className="flex items-center gap-4 text-[11px]">
-                  <span className="text-slate-400 font-mono hidden sm:inline">{item.providerId || 'Simulation only'}</span>
-                  <span className="text-slate-400 font-semibold flex items-center gap-1">
+                  <span className="text-text-secondary font-mono hidden sm:inline">{item.providerId || 'Simulation only'}</span>
+                  <span className="text-text-secondary font-semibold flex items-center gap-1">
                     <CheckCircle2 className="w-3.5 h-3.5" /> {item.status === "delivered" ? "Delivered" : "Simulation recorded"}
                   </span>
-                  <span className="text-slate-500 font-mono text-[10px]">
+                  <span className="text-text-tertiary font-mono text-[10px]">
                     {new Date(item.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                   </span>
                 </div>

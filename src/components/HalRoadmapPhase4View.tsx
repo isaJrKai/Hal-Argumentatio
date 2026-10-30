@@ -213,11 +213,12 @@ export const HalRoadmapPhase4View: React.FC = () => {
             </button>
             <button
               onClick={handleRecalibrateWeights}
-              disabled={isRecalibrating}
-              className="px-3.5 py-2 rounded-lg bg-bg-overlay hover:bg-bg-subtle text-text-primary border border-border-dim hover:border-border-default transition-all text-xs font-medium flex items-center gap-2 cursor-pointer disabled:opacity-50"
+              disabled
+              title="Not connected: outcome data and persisted model parameters are not configured."
+              className="px-3.5 py-2 rounded-lg bg-bg-overlay text-text-tertiary border border-border-dim transition-all text-xs font-medium flex items-center gap-2 cursor-not-allowed opacity-60"
             >
               <Sliders className={`w-3.5 h-3.5 text-accent ${isRecalibrating ? 'animate-spin' : ''}`} />
-              <span>{isRecalibrating ? 'Recalibrating...' : 'Recalibration unavailable'}</span>
+              <span>Not connected</span>
             </button>
           </div>
         </div>

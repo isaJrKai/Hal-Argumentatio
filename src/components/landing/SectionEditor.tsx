@@ -117,14 +117,14 @@ export const SectionEditor: React.FC<SectionEditorProps> = ({ config, onChange }
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between pb-2 border-b border-slate-800">
+      <div className="flex items-center justify-between pb-2 border-b border-border-dim">
         <div className="flex items-center gap-2">
           <Layers className="w-4 h-4 text-amber-400" />
-          <h4 className="text-xs font-bold uppercase tracking-wider text-slate-200">
+          <h4 className="text-xs font-bold uppercase tracking-wider text-text-primary">
             Page Layout & Section Reordering
           </h4>
         </div>
-        <span className="text-[10px] text-slate-400">
+        <span className="text-[10px] text-text-secondary">
           Drag & arrange high-converting sections
         </span>
       </div>
@@ -142,9 +142,9 @@ export const SectionEditor: React.FC<SectionEditorProps> = ({ config, onChange }
               className={`rounded-xl border transition ${
                 isActive
                   ? isExpanded
-                    ? 'border-amber-400/80 bg-slate-900 shadow-md'
-                    : 'border-slate-800 bg-slate-900/50 hover:border-slate-700'
-                  : 'border-slate-800/50 bg-slate-950/40 opacity-60'
+                    ? 'border-amber-400/80 bg-bg-raised shadow-md'
+                    : 'border-border-dim bg-bg-raised/50 hover:border-border-dim'
+                  : 'border-border-dim/50 bg-bg-base/40 opacity-60'
               }`}
             >
               {/* Header Bar for Section */}
@@ -153,7 +153,7 @@ export const SectionEditor: React.FC<SectionEditorProps> = ({ config, onChange }
                   <button
                     type="button"
                     onClick={() => setExpandedSection(isExpanded ? null : secKey)}
-                    className="text-slate-400 hover:text-white p-1 rounded transition"
+                    className="text-text-secondary hover:text-text-primary p-1 rounded transition"
                   >
                     {isExpanded ? (
                       <ChevronDown className="w-3.5 h-3.5" />
@@ -162,7 +162,7 @@ export const SectionEditor: React.FC<SectionEditorProps> = ({ config, onChange }
                     )}
                   </button>
 
-                  <span className="text-xs font-semibold text-white truncate">
+                  <span className="text-xs font-semibold text-text-primary truncate">
                     {meta.label}
                   </span>
                 </div>
@@ -174,7 +174,7 @@ export const SectionEditor: React.FC<SectionEditorProps> = ({ config, onChange }
                     title="Move Up"
                     disabled={idx === 0}
                     onClick={() => moveSection(idx, 'up')}
-                    className="p-1 rounded text-slate-400 hover:text-white disabled:opacity-30 transition"
+                    className="p-1 rounded text-text-secondary hover:text-text-primary disabled:opacity-30 transition"
                   >
                     <ArrowUp className="w-3.5 h-3.5" />
                   </button>
@@ -183,7 +183,7 @@ export const SectionEditor: React.FC<SectionEditorProps> = ({ config, onChange }
                     title="Move Down"
                     disabled={idx === config.sectionOrder.length - 1}
                     onClick={() => moveSection(idx, 'down')}
-                    className="p-1 rounded text-slate-400 hover:text-white disabled:opacity-30 transition"
+                    className="p-1 rounded text-text-secondary hover:text-text-primary disabled:opacity-30 transition"
                   >
                     <ArrowDown className="w-3.5 h-3.5" />
                   </button>
@@ -220,7 +220,7 @@ export const SectionEditor: React.FC<SectionEditorProps> = ({ config, onChange }
                     title={isActive ? 'Hide Section' : 'Show Section'}
                     onClick={() => toggleSectionActive(secKey)}
                     className={`p-1 rounded transition ml-1 ${
-                      isActive ? 'text-amber-400 hover:text-amber-300' : 'text-slate-600 hover:text-slate-400'
+                      isActive ? 'text-amber-400 hover:text-amber-300' : 'text-slate-600 hover:text-text-secondary'
                     }`}
                   >
                     {isActive ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
@@ -231,7 +231,7 @@ export const SectionEditor: React.FC<SectionEditorProps> = ({ config, onChange }
                     type="button"
                     title="Inspect in Workspace Sidebar"
                     onClick={() => openInspector('landing_section', meta.label, { sectionKey: secKey, sectionData: secData })}
-                    className="p-1 rounded text-slate-400 hover:text-amber-400 transition"
+                    className="p-1 rounded text-text-secondary hover:text-amber-400 transition"
                   >
                     <Sliders className="w-3.5 h-3.5" />
                   </button>
@@ -240,7 +240,7 @@ export const SectionEditor: React.FC<SectionEditorProps> = ({ config, onChange }
 
               {/* Quick AI Polish Input Bar */}
               {quickPromptSection === secKey && (
-                <div className="px-3 py-2 border-t border-slate-800 bg-amber-500/10 flex items-center gap-2">
+                <div className="px-3 py-2 border-t border-border-dim bg-amber-500/10 flex items-center gap-2">
                   <input
                     type="text"
                     placeholder="Instructions (e.g., 'Make punchier for frozen pipe emergencies') or leave blank for auto-polish..."
@@ -249,13 +249,13 @@ export const SectionEditor: React.FC<SectionEditorProps> = ({ config, onChange }
                     onKeyDown={(e) => {
                       if (e.key === 'Enter') handleRegenerateSection(secKey);
                     }}
-                    className="flex-1 px-2.5 py-1 text-xs rounded bg-slate-950 border border-slate-700 text-white placeholder-slate-500 focus:outline-none focus:border-amber-400"
+                    className="flex-1 px-2.5 py-1 text-xs rounded bg-bg-base border border-border-dim text-text-primary placeholder-text-tertiary focus:outline-none focus:border-amber-400"
                   />
                   <button
                     type="button"
                     disabled={polishingSection === secKey}
                     onClick={() => handleRegenerateSection(secKey)}
-                    className="px-2.5 py-1 text-xs rounded bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold transition flex items-center gap-1 cursor-pointer shrink-0"
+                    className="px-2.5 py-1 text-xs rounded bg-amber-500 hover:bg-amber-400 text-accent-contrast font-bold transition flex items-center gap-1 cursor-pointer shrink-0"
                   >
                     <Sparkles className="w-3 h-3" />
                     <span>{polishingSection === secKey ? 'Polishing...' : 'Polish'}</span>
@@ -263,7 +263,7 @@ export const SectionEditor: React.FC<SectionEditorProps> = ({ config, onChange }
                   <button
                     type="button"
                     onClick={() => setQuickPromptSection(null)}
-                    className="text-slate-400 hover:text-white text-xs px-1"
+                    className="text-text-secondary hover:text-text-primary text-xs px-1"
                   >
                     ✕
                   </button>
@@ -272,11 +272,11 @@ export const SectionEditor: React.FC<SectionEditorProps> = ({ config, onChange }
 
               {/* Expandable Form for Specific Section Fields */}
               {isExpanded && isActive && (
-                <div className="p-4 border-t border-slate-800/80 bg-slate-950/60 space-y-3 text-xs">
+                <div className="p-4 border-t border-border-dim/80 bg-bg-base/60 space-y-3 text-xs">
                   {secKey === 'hero' && (
                     <div className="space-y-2.5">
                       <div>
-                        <label className="block text-[11px] text-slate-400 font-semibold mb-1">
+                        <label className="block text-[11px] text-text-secondary font-semibold mb-1">
                           Hero Main Headline
                         </label>
                         <input
@@ -291,11 +291,11 @@ export const SectionEditor: React.FC<SectionEditorProps> = ({ config, onChange }
                               }
                             })
                           }
-                          className="w-full px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-white text-xs focus:outline-none focus:border-amber-400"
+                          className="w-full px-3 py-1.5 rounded-lg bg-bg-raised border border-border-dim text-text-primary text-xs focus:outline-none focus:border-amber-400"
                         />
                       </div>
                       <div>
-                        <label className="block text-[11px] text-slate-400 font-semibold mb-1">
+                        <label className="block text-[11px] text-text-secondary font-semibold mb-1">
                           Sub-headline / Dispatch Promise
                         </label>
                         <textarea
@@ -310,11 +310,11 @@ export const SectionEditor: React.FC<SectionEditorProps> = ({ config, onChange }
                               }
                             })
                           }
-                          className="w-full px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-white text-xs focus:outline-none focus:border-amber-400"
+                          className="w-full px-3 py-1.5 rounded-lg bg-bg-raised border border-border-dim text-text-primary text-xs focus:outline-none focus:border-amber-400"
                         />
                       </div>
                       <div>
-                        <label className="block text-[11px] text-slate-400 font-semibold mb-1">
+                        <label className="block text-[11px] text-text-secondary font-semibold mb-1">
                           Authority Pill Badge
                         </label>
                         <input
@@ -329,7 +329,7 @@ export const SectionEditor: React.FC<SectionEditorProps> = ({ config, onChange }
                               }
                             })
                           }
-                          className="w-full px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-white text-xs focus:outline-none focus:border-amber-400"
+                          className="w-full px-3 py-1.5 rounded-lg bg-bg-raised border border-border-dim text-text-primary text-xs focus:outline-none focus:border-amber-400"
                         />
                       </div>
                     </div>
@@ -338,7 +338,7 @@ export const SectionEditor: React.FC<SectionEditorProps> = ({ config, onChange }
                   {secKey === 'seasonal_alert' && (
                     <div className="space-y-2.5">
                       <div>
-                        <label className="block text-[11px] text-slate-400 font-semibold mb-1">
+                        <label className="block text-[11px] text-text-secondary font-semibold mb-1">
                           Emergency Tag (e.g. Winter Freeze / Hail Storm)
                         </label>
                         <input
@@ -353,11 +353,11 @@ export const SectionEditor: React.FC<SectionEditorProps> = ({ config, onChange }
                               }
                             })
                           }
-                          className="w-full px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-white text-xs focus:outline-none focus:border-amber-400"
+                          className="w-full px-3 py-1.5 rounded-lg bg-bg-raised border border-border-dim text-text-primary text-xs focus:outline-none focus:border-amber-400"
                         />
                       </div>
                       <div>
-                        <label className="block text-[11px] text-slate-400 font-semibold mb-1">
+                        <label className="block text-[11px] text-text-secondary font-semibold mb-1">
                           Alert Headline
                         </label>
                         <input
@@ -372,11 +372,11 @@ export const SectionEditor: React.FC<SectionEditorProps> = ({ config, onChange }
                               }
                             })
                           }
-                          className="w-full px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-white text-xs focus:outline-none focus:border-amber-400"
+                          className="w-full px-3 py-1.5 rounded-lg bg-bg-raised border border-border-dim text-text-primary text-xs focus:outline-none focus:border-amber-400"
                         />
                       </div>
                       <div>
-                        <label className="block text-[11px] text-slate-400 font-semibold mb-1">
+                        <label className="block text-[11px] text-text-secondary font-semibold mb-1">
                           Homeowner Advisory Details
                         </label>
                         <textarea
@@ -391,7 +391,7 @@ export const SectionEditor: React.FC<SectionEditorProps> = ({ config, onChange }
                               }
                             })
                           }
-                          className="w-full px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-white text-xs focus:outline-none focus:border-amber-400"
+                          className="w-full px-3 py-1.5 rounded-lg bg-bg-raised border border-border-dim text-text-primary text-xs focus:outline-none focus:border-amber-400"
                         />
                       </div>
                     </div>
@@ -400,7 +400,7 @@ export const SectionEditor: React.FC<SectionEditorProps> = ({ config, onChange }
                   {secKey === 'services' && (
                     <div className="space-y-3">
                       <div className="flex items-center justify-between">
-                        <span className="text-[11px] text-slate-400 font-semibold">Service Cards</span>
+                        <span className="text-[11px] text-text-secondary font-semibold">Service Cards</span>
                         <button
                           type="button"
                           onClick={() => {
@@ -429,7 +429,7 @@ export const SectionEditor: React.FC<SectionEditorProps> = ({ config, onChange }
                       </div>
 
                       {config.sections.services.items.map((srv, sIdx) => (
-                        <div key={srv.id} className="p-2.5 rounded-lg bg-slate-900 border border-slate-800 space-y-2">
+                        <div key={srv.id} className="p-2.5 rounded-lg bg-bg-raised border border-border-dim space-y-2">
                           <div className="flex items-center justify-between gap-2">
                             <input
                               type="text"
@@ -445,7 +445,7 @@ export const SectionEditor: React.FC<SectionEditorProps> = ({ config, onChange }
                                   }
                                 });
                               }}
-                              className="font-bold text-white bg-transparent border-b border-slate-700 focus:outline-none focus:border-amber-400 text-xs flex-1"
+                              className="font-bold text-text-primary bg-transparent border-b border-border-dim focus:outline-none focus:border-amber-400 text-xs flex-1"
                             />
                             <button
                               type="button"
@@ -480,7 +480,7 @@ export const SectionEditor: React.FC<SectionEditorProps> = ({ config, onChange }
                                   }
                                 });
                               }}
-                              className="px-2 py-1 rounded bg-slate-950 border border-slate-800 text-[11px] text-amber-400"
+                              className="px-2 py-1 rounded bg-bg-base border border-border-dim text-[11px] text-amber-400"
                             />
                             <input
                               type="text"
@@ -497,7 +497,7 @@ export const SectionEditor: React.FC<SectionEditorProps> = ({ config, onChange }
                                   }
                                 });
                               }}
-                              className="px-2 py-1 rounded bg-slate-950 border border-slate-800 text-[11px] text-slate-300"
+                              className="px-2 py-1 rounded bg-bg-base border border-border-dim text-[11px] text-text-secondary"
                             />
                           </div>
                           <textarea
@@ -514,7 +514,7 @@ export const SectionEditor: React.FC<SectionEditorProps> = ({ config, onChange }
                                 }
                               });
                             }}
-                            className="w-full px-2 py-1 rounded bg-slate-950 border border-slate-800 text-[11px] text-slate-400"
+                            className="w-full px-2 py-1 rounded bg-bg-base border border-border-dim text-[11px] text-text-secondary"
                           />
                         </div>
                       ))}
@@ -523,7 +523,7 @@ export const SectionEditor: React.FC<SectionEditorProps> = ({ config, onChange }
 
                   {secKey === 'service_areas' && (
                     <div className="space-y-2">
-                      <label className="block text-[11px] text-slate-400 font-semibold">
+                      <label className="block text-[11px] text-text-secondary font-semibold">
                         Neighborhoods & Cities (Comma Separated)
                       </label>
                       <input
@@ -539,14 +539,14 @@ export const SectionEditor: React.FC<SectionEditorProps> = ({ config, onChange }
                             }
                           });
                         }}
-                        className="w-full px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-white text-xs focus:outline-none focus:border-amber-400"
+                        className="w-full px-3 py-1.5 rounded-lg bg-bg-raised border border-border-dim text-text-primary text-xs focus:outline-none focus:border-amber-400"
                       />
                     </div>
                   )}
 
                   {secKey === 'announcement_bar' && (
                     <div className="space-y-2">
-                      <label className="block text-[11px] text-slate-400 font-semibold">
+                      <label className="block text-[11px] text-text-secondary font-semibold">
                         Emergency Top Text
                       </label>
                       <input
@@ -561,14 +561,14 @@ export const SectionEditor: React.FC<SectionEditorProps> = ({ config, onChange }
                             }
                           })
                         }
-                        className="w-full px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-white text-xs focus:outline-none focus:border-amber-400"
+                        className="w-full px-3 py-1.5 rounded-lg bg-bg-raised border border-border-dim text-text-primary text-xs focus:outline-none focus:border-amber-400"
                       />
                     </div>
                   )}
 
                   {secKey === 'guarantee' && (
                     <div className="space-y-2">
-                      <label className="block text-[11px] text-slate-400 font-semibold">
+                      <label className="block text-[11px] text-text-secondary font-semibold">
                         Risk-Reversal Guarantee Statement
                       </label>
                       <textarea
@@ -583,7 +583,7 @@ export const SectionEditor: React.FC<SectionEditorProps> = ({ config, onChange }
                             }
                           })
                         }
-                        className="w-full px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-white text-xs focus:outline-none focus:border-amber-400"
+                        className="w-full px-3 py-1.5 rounded-lg bg-bg-raised border border-border-dim text-text-primary text-xs focus:outline-none focus:border-amber-400"
                       />
                     </div>
                   )}
@@ -592,7 +592,7 @@ export const SectionEditor: React.FC<SectionEditorProps> = ({ config, onChange }
                     <div className="space-y-3">
                       <div className="grid grid-cols-2 gap-2">
                         <div>
-                          <label className="block text-[11px] text-slate-400 font-semibold mb-1">Badge</label>
+                          <label className="block text-[11px] text-text-secondary font-semibold mb-1">Badge</label>
                           <input
                             type="text"
                             value={config.sections.bento_features.badge || ''}
@@ -605,11 +605,11 @@ export const SectionEditor: React.FC<SectionEditorProps> = ({ config, onChange }
                                 }
                               })
                             }
-                            className="w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-white text-xs focus:outline-none focus:border-amber-400"
+                            className="w-full px-2.5 py-1.5 rounded-lg bg-bg-raised border border-border-dim text-text-primary text-xs focus:outline-none focus:border-amber-400"
                           />
                         </div>
                         <div>
-                          <label className="block text-[11px] text-slate-400 font-semibold mb-1">Headline</label>
+                          <label className="block text-[11px] text-text-secondary font-semibold mb-1">Headline</label>
                           <input
                             type="text"
                             value={config.sections.bento_features.title || ''}
@@ -622,12 +622,12 @@ export const SectionEditor: React.FC<SectionEditorProps> = ({ config, onChange }
                                 }
                               })
                             }
-                            className="w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-white text-xs focus:outline-none focus:border-amber-400"
+                            className="w-full px-2.5 py-1.5 rounded-lg bg-bg-raised border border-border-dim text-text-primary text-xs focus:outline-none focus:border-amber-400"
                           />
                         </div>
                       </div>
                       <div>
-                        <label className="block text-[11px] text-slate-400 font-semibold mb-1">Subheadline</label>
+                        <label className="block text-[11px] text-text-secondary font-semibold mb-1">Subheadline</label>
                         <input
                           type="text"
                           value={config.sections.bento_features.subtitle || ''}
@@ -640,13 +640,13 @@ export const SectionEditor: React.FC<SectionEditorProps> = ({ config, onChange }
                               }
                             })
                           }
-                          className="w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-white text-xs focus:outline-none focus:border-amber-400"
+                          className="w-full px-2.5 py-1.5 rounded-lg bg-bg-raised border border-border-dim text-text-primary text-xs focus:outline-none focus:border-amber-400"
                         />
                       </div>
 
-                      <div className="pt-2 border-t border-slate-800">
+                      <div className="pt-2 border-t border-border-dim">
                         <div className="flex items-center justify-between mb-2">
-                          <span className="text-[11px] text-slate-400 font-semibold">Bento Cards</span>
+                          <span className="text-[11px] text-text-secondary font-semibold">Bento Cards</span>
                           <button
                             type="button"
                             onClick={() => {
@@ -677,7 +677,7 @@ export const SectionEditor: React.FC<SectionEditorProps> = ({ config, onChange }
                         </div>
                         <div className="space-y-2">
                           {(config.sections.bento_features.items || []).map((item, bIdx) => (
-                            <div key={item.id} className="p-2.5 rounded-lg bg-slate-900 border border-slate-800 space-y-2">
+                            <div key={item.id} className="p-2.5 rounded-lg bg-bg-raised border border-border-dim space-y-2">
                               <div className="flex items-center justify-between gap-2">
                                 <input
                                   type="text"
@@ -694,7 +694,7 @@ export const SectionEditor: React.FC<SectionEditorProps> = ({ config, onChange }
                                       }
                                     });
                                   }}
-                                  className="font-bold text-white bg-transparent border-b border-slate-700 text-xs flex-1 focus:outline-none focus:border-amber-400"
+                                  className="font-bold text-text-primary bg-transparent border-b border-border-dim text-xs flex-1 focus:outline-none focus:border-amber-400"
                                 />
                                 <select
                                   value={item.colSpan || '1'}
@@ -709,7 +709,7 @@ export const SectionEditor: React.FC<SectionEditorProps> = ({ config, onChange }
                                       }
                                     });
                                   }}
-                                  className="bg-slate-950 border border-slate-700 text-[10px] rounded px-1.5 py-0.5 text-slate-300"
+                                  className="bg-bg-base border border-border-dim text-[10px] rounded px-1.5 py-0.5 text-text-secondary"
                                 >
                                   <option value="1">Span 1</option>
                                   <option value="2">Span 2 (Wide)</option>
@@ -747,7 +747,7 @@ export const SectionEditor: React.FC<SectionEditorProps> = ({ config, onChange }
                                     }
                                   });
                                 }}
-                                className="w-full px-2 py-1 rounded bg-slate-950 border border-slate-800 text-[11px] text-slate-300"
+                                className="w-full px-2 py-1 rounded bg-bg-base border border-border-dim text-[11px] text-text-secondary"
                               />
                               <div className="grid grid-cols-3 gap-1.5">
                                 <input
@@ -765,7 +765,7 @@ export const SectionEditor: React.FC<SectionEditorProps> = ({ config, onChange }
                                       }
                                     });
                                   }}
-                                  className="px-2 py-1 rounded bg-slate-950 border border-slate-800 text-[10px] text-amber-400 font-bold"
+                                  className="px-2 py-1 rounded bg-bg-base border border-border-dim text-[10px] text-amber-400 font-bold"
                                 />
                                 <input
                                   type="text"
@@ -782,7 +782,7 @@ export const SectionEditor: React.FC<SectionEditorProps> = ({ config, onChange }
                                       }
                                     });
                                   }}
-                                  className="px-2 py-1 rounded bg-slate-950 border border-slate-800 text-[10px] text-slate-300"
+                                  className="px-2 py-1 rounded bg-bg-base border border-border-dim text-[10px] text-text-secondary"
                                 />
                                 <input
                                   type="text"
@@ -799,7 +799,7 @@ export const SectionEditor: React.FC<SectionEditorProps> = ({ config, onChange }
                                       }
                                     });
                                   }}
-                                  className="px-2 py-1 rounded bg-slate-950 border border-slate-800 text-[10px] text-slate-300"
+                                  className="px-2 py-1 rounded bg-bg-base border border-border-dim text-[10px] text-text-secondary"
                                 />
                               </div>
                             </div>
@@ -813,7 +813,7 @@ export const SectionEditor: React.FC<SectionEditorProps> = ({ config, onChange }
                     <div className="space-y-3">
                       <div className="grid grid-cols-2 gap-2">
                         <div>
-                          <label className="block text-[11px] text-slate-400 font-semibold mb-1">Badge</label>
+                          <label className="block text-[11px] text-text-secondary font-semibold mb-1">Badge</label>
                           <input
                             type="text"
                             value={config.sections.pricing_packages.badge || ''}
@@ -826,11 +826,11 @@ export const SectionEditor: React.FC<SectionEditorProps> = ({ config, onChange }
                                 }
                               })
                             }
-                            className="w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-white text-xs focus:outline-none focus:border-amber-400"
+                            className="w-full px-2.5 py-1.5 rounded-lg bg-bg-raised border border-border-dim text-text-primary text-xs focus:outline-none focus:border-amber-400"
                           />
                         </div>
                         <div>
-                          <label className="block text-[11px] text-slate-400 font-semibold mb-1">Headline</label>
+                          <label className="block text-[11px] text-text-secondary font-semibold mb-1">Headline</label>
                           <input
                             type="text"
                             value={config.sections.pricing_packages.title || ''}
@@ -843,12 +843,12 @@ export const SectionEditor: React.FC<SectionEditorProps> = ({ config, onChange }
                                 }
                               })
                             }
-                            className="w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-white text-xs focus:outline-none focus:border-amber-400"
+                            className="w-full px-2.5 py-1.5 rounded-lg bg-bg-raised border border-border-dim text-text-primary text-xs focus:outline-none focus:border-amber-400"
                           />
                         </div>
                       </div>
                       <div>
-                        <label className="block text-[11px] text-slate-400 font-semibold mb-1">Subheadline</label>
+                        <label className="block text-[11px] text-text-secondary font-semibold mb-1">Subheadline</label>
                         <input
                           type="text"
                           value={config.sections.pricing_packages.subtitle || ''}
@@ -861,13 +861,13 @@ export const SectionEditor: React.FC<SectionEditorProps> = ({ config, onChange }
                               }
                             })
                           }
-                          className="w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-white text-xs focus:outline-none focus:border-amber-400"
+                          className="w-full px-2.5 py-1.5 rounded-lg bg-bg-raised border border-border-dim text-text-primary text-xs focus:outline-none focus:border-amber-400"
                         />
                       </div>
 
-                      <div className="pt-2 border-t border-slate-800">
+                      <div className="pt-2 border-t border-border-dim">
                         <div className="flex items-center justify-between mb-2">
-                          <span className="text-[11px] text-slate-400 font-semibold">Pricing Packages</span>
+                          <span className="text-[11px] text-text-secondary font-semibold">Pricing Packages</span>
                           <button
                             type="button"
                             onClick={() => {
@@ -899,7 +899,7 @@ export const SectionEditor: React.FC<SectionEditorProps> = ({ config, onChange }
                         </div>
                         <div className="space-y-3">
                           {(config.sections.pricing_packages.items || []).map((tier, pIdx) => (
-                            <div key={tier.id} className="p-2.5 rounded-lg bg-slate-900 border border-slate-800 space-y-2">
+                            <div key={tier.id} className="p-2.5 rounded-lg bg-bg-raised border border-border-dim space-y-2">
                               <div className="flex items-center justify-between gap-2">
                                 <input
                                   type="text"
@@ -916,7 +916,7 @@ export const SectionEditor: React.FC<SectionEditorProps> = ({ config, onChange }
                                       }
                                     });
                                   }}
-                                  className="font-bold text-white bg-transparent border-b border-slate-700 text-xs flex-1 focus:outline-none focus:border-amber-400"
+                                  className="font-bold text-text-primary bg-transparent border-b border-border-dim text-xs flex-1 focus:outline-none focus:border-amber-400"
                                 />
                                 <label className="flex items-center gap-1 text-[10px] text-amber-400 font-medium cursor-pointer">
                                   <input
@@ -933,7 +933,7 @@ export const SectionEditor: React.FC<SectionEditorProps> = ({ config, onChange }
                                         }
                                       });
                                     }}
-                                    className="rounded border-slate-700"
+                                    className="rounded border-border-dim"
                                   />
                                   <span>Popular</span>
                                 </label>
@@ -970,7 +970,7 @@ export const SectionEditor: React.FC<SectionEditorProps> = ({ config, onChange }
                                       }
                                     });
                                   }}
-                                  className="px-2 py-1 rounded bg-slate-950 border border-slate-800 text-[11px] text-amber-400 font-bold"
+                                  className="px-2 py-1 rounded bg-bg-base border border-border-dim text-[11px] text-amber-400 font-bold"
                                 />
                                 <input
                                   type="text"
@@ -987,7 +987,7 @@ export const SectionEditor: React.FC<SectionEditorProps> = ({ config, onChange }
                                       }
                                     });
                                   }}
-                                  className="px-2 py-1 rounded bg-slate-950 border border-slate-800 text-[11px] text-slate-300"
+                                  className="px-2 py-1 rounded bg-bg-base border border-border-dim text-[11px] text-text-secondary"
                                 />
                               </div>
                               <input
@@ -1005,10 +1005,10 @@ export const SectionEditor: React.FC<SectionEditorProps> = ({ config, onChange }
                                     }
                                   });
                                 }}
-                                className="w-full px-2 py-1 rounded bg-slate-950 border border-slate-800 text-[11px] text-slate-300"
+                                className="w-full px-2 py-1 rounded bg-bg-base border border-border-dim text-[11px] text-text-secondary"
                               />
                               <div>
-                                <label className="block text-[10px] text-slate-400 mb-1">Features (one per line)</label>
+                                <label className="block text-[10px] text-text-secondary mb-1">Features (one per line)</label>
                                 <textarea
                                   rows={2}
                                   value={(tier.features || []).join('\n')}
@@ -1023,7 +1023,7 @@ export const SectionEditor: React.FC<SectionEditorProps> = ({ config, onChange }
                                       }
                                     });
                                   }}
-                                  className="w-full px-2 py-1 rounded bg-slate-950 border border-slate-800 text-[11px] text-slate-300"
+                                  className="w-full px-2 py-1 rounded bg-bg-base border border-border-dim text-[11px] text-text-secondary"
                                 />
                               </div>
                             </div>

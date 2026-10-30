@@ -237,7 +237,7 @@ export default function HalBiblePanel({ initialDocId }: HalBiblePanelProps = {})
         {/* Master Completion Badge */}
         <div className="flex items-center gap-4 bg-bg-base border border-border-dim p-3 rounded-sm shrink-0">
           <div className="space-y-0.5">
-            <span className="text-[9px] font-mono text-text-secondary uppercase block">Master Spec Completion</span>
+            <span className="text-[11px] font-mono text-text-secondary uppercase block">Master Spec Completion</span>
             <div className="flex items-center gap-2">
               <div className="w-24 h-1.5 bg-bg-subtle rounded-full overflow-hidden border border-border-dim/55">
                 <div 
@@ -249,17 +249,17 @@ export default function HalBiblePanel({ initialDocId }: HalBiblePanelProps = {})
             </div>
           </div>
           <div className="border-l border-border-dim pl-3 text-right">
-            <span className="text-[8px] font-mono text-text-secondary uppercase block">Status</span>
+            <span className="text-[11px] font-mono text-text-secondary uppercase block">Status</span>
             <span className="text-xs font-mono font-bold text-positive-dim text-positive">CANONICAL</span>
           </div>
         </div>
       </div>
 
       {/* TWO COLUMN GRID WORKSPACE */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6 items-start min-w-0">
         
         {/* LEFT COLUMN: INDEX DRAWER (col-span-4) */}
-        <div className="lg:col-span-4 space-y-4">
+        <div className="lg:col-span-4 min-w-0 space-y-4">
           
           {/* SEARCH & FILTER */}
           <div className="relative">
@@ -279,7 +279,7 @@ export default function HalBiblePanel({ initialDocId }: HalBiblePanelProps = {})
             {/* PHASE 1 — FOUNDATION */}
             {groupedDocs.foundation.length > 0 && (
               <div className="p-3 space-y-1.5">
-                <span className="text-[9px] font-mono font-bold text-accent tracking-widest uppercase block mb-1">
+                <span className="text-[11px] font-mono font-bold text-accent tracking-wider uppercase block mb-1 break-words">
                   Phase 1 — Foundation
                 </span>
                 <div className="space-y-1">
@@ -287,16 +287,16 @@ export default function HalBiblePanel({ initialDocId }: HalBiblePanelProps = {})
                     <button
                       key={doc.id}
                       onClick={() => setSelectedDocId(doc.id)}
-                      className={`w-full flex items-center justify-between text-left p-2 rounded-sm transition-all border ${
+                      className={`w-full flex flex-wrap sm:flex-nowrap items-center justify-between gap-2 text-left p-2 rounded-sm transition-all border ${
                         selectedDocId === doc.id
                           ? 'bg-accent/10 border-accent/30 text-text-primary font-medium'
                           : 'border-transparent hover:bg-white/[0.02] text-text-secondary'
                       }`}
                     >
-                      <div className="flex items-center gap-2.5 min-w-0">
-                        <span className="text-[10px] font-mono text-text-tertiary w-4 shrink-0">{doc.number}</span>
+                      <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                        <span className="text-[11px] font-mono text-text-tertiary w-4 shrink-0">{doc.number}</span>
                         <doc.icon className={`w-3.5 h-3.5 shrink-0 ${selectedDocId === doc.id ? 'text-accent' : 'text-text-tertiary'}`} />
-                        <span className="text-[11px] font-sans truncate">{doc.title}</span>
+                        <span className="text-[11px] font-sans min-w-0 flex-1 break-words whitespace-normal">{doc.title}</span>
                       </div>
                       <Badge variant={doc.status}>
                         {doc.status}
@@ -310,7 +310,7 @@ export default function HalBiblePanel({ initialDocId }: HalBiblePanelProps = {})
             {/* PHASE 2 — INTELLIGENCE */}
             {groupedDocs.intelligence.length > 0 && (
               <div className="p-3 space-y-1.5">
-                <span className="text-[9px] font-mono font-bold text-[#8b5cf6] tracking-widest uppercase block mb-1">
+                <span className="text-[11px] font-mono font-bold text-[#8b5cf6] tracking-wider uppercase block mb-1 break-words">
                   Phase 2 — Intelligence
                 </span>
                 <div className="space-y-1">
@@ -318,16 +318,16 @@ export default function HalBiblePanel({ initialDocId }: HalBiblePanelProps = {})
                     <button
                       key={doc.id}
                       onClick={() => setSelectedDocId(doc.id)}
-                      className={`w-full flex items-center justify-between text-left p-2 rounded-sm transition-all border ${
+                      className={`w-full flex flex-wrap sm:flex-nowrap items-center justify-between gap-2 text-left p-2 rounded-sm transition-all border ${
                         selectedDocId === doc.id
                           ? 'bg-[#8b5cf6]/10 border-[#8b5cf6]/30 text-text-primary font-medium'
                           : 'border-transparent hover:bg-white/[0.02] text-text-secondary'
                       }`}
                     >
-                      <div className="flex items-center gap-2.5 min-w-0">
-                        <span className="text-[10px] font-mono text-text-tertiary w-4 shrink-0">{doc.number}</span>
+                      <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                        <span className="text-[11px] font-mono text-text-tertiary w-4 shrink-0">{doc.number}</span>
                         <doc.icon className={`w-3.5 h-3.5 shrink-0 ${selectedDocId === doc.id ? 'text-[#8b5cf6]' : 'text-text-tertiary'}`} />
-                        <span className="text-[11px] font-sans truncate">{doc.title}</span>
+                        <span className="text-[11px] font-sans min-w-0 flex-1 break-words whitespace-normal">{doc.title}</span>
                       </div>
                       <Badge variant={doc.status}>
                         {doc.status}
@@ -341,7 +341,7 @@ export default function HalBiblePanel({ initialDocId }: HalBiblePanelProps = {})
             {/* PHASE 3 — ENGINEERING */}
             {groupedDocs.engineering.length > 0 && (
               <div className="p-3 space-y-1.5">
-                <span className="text-[9px] font-mono font-bold text-sky-400 tracking-widest uppercase block mb-1">
+                <span className="text-[11px] font-mono font-bold text-sky-400 tracking-wider uppercase block mb-1 break-words">
                   Phase 3 — Engineering
                 </span>
                 <div className="space-y-1">
@@ -349,16 +349,16 @@ export default function HalBiblePanel({ initialDocId }: HalBiblePanelProps = {})
                     <button
                       key={doc.id}
                       onClick={() => setSelectedDocId(doc.id)}
-                      className={`w-full flex items-center justify-between text-left p-2 rounded-sm transition-all border ${
+                      className={`w-full flex flex-wrap sm:flex-nowrap items-center justify-between gap-2 text-left p-2 rounded-sm transition-all border ${
                         selectedDocId === doc.id
                           ? 'bg-sky-500/10 border-sky-500/30 text-text-primary font-medium'
                           : 'border-transparent hover:bg-white/[0.02] text-text-secondary'
                       }`}
                     >
-                      <div className="flex items-center gap-2.5 min-w-0">
-                        <span className="text-[10px] font-mono text-text-tertiary w-4 shrink-0">{doc.number}</span>
+                      <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                        <span className="text-[11px] font-mono text-text-tertiary w-4 shrink-0">{doc.number}</span>
                         <doc.icon className={`w-3.5 h-3.5 shrink-0 ${selectedDocId === doc.id ? 'text-sky-400' : 'text-text-tertiary'}`} />
-                        <span className="text-[11px] font-sans truncate">{doc.title}</span>
+                        <span className="text-[11px] font-sans min-w-0 flex-1 break-words whitespace-normal">{doc.title}</span>
                       </div>
                       <Badge variant={doc.status}>
                         {doc.status}
@@ -372,7 +372,7 @@ export default function HalBiblePanel({ initialDocId }: HalBiblePanelProps = {})
             {/* PHASE 4 — PRODUCT */}
             {groupedDocs.product.length > 0 && (
               <div className="p-3 space-y-1.5">
-                <span className="text-[9px] font-mono font-bold text-[#f59e0b] tracking-widest uppercase block mb-1">
+                <span className="text-[11px] font-mono font-bold text-[#f59e0b] tracking-wider uppercase block mb-1 break-words">
                   Phase 4 — Product
                 </span>
                 <div className="space-y-1">
@@ -380,16 +380,16 @@ export default function HalBiblePanel({ initialDocId }: HalBiblePanelProps = {})
                     <button
                       key={doc.id}
                       onClick={() => setSelectedDocId(doc.id)}
-                      className={`w-full flex items-center justify-between text-left p-2 rounded-sm transition-all border ${
+                      className={`w-full flex flex-wrap sm:flex-nowrap items-center justify-between gap-2 text-left p-2 rounded-sm transition-all border ${
                         selectedDocId === doc.id
                           ? 'bg-[#f59e0b]/10 border-[#f59e0b]/30 text-text-primary font-medium'
                           : 'border-transparent hover:bg-white/[0.02] text-text-secondary'
                       }`}
                     >
-                      <div className="flex items-center gap-2.5 min-w-0">
-                        <span className="text-[10px] font-mono text-text-tertiary w-4 shrink-0">{doc.number}</span>
+                      <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                        <span className="text-[11px] font-mono text-text-tertiary w-4 shrink-0">{doc.number}</span>
                         <doc.icon className={`w-3.5 h-3.5 shrink-0 ${selectedDocId === doc.id ? 'text-[#f59e0b]' : 'text-text-tertiary'}`} />
-                        <span className="text-[11px] font-sans truncate">{doc.title}</span>
+                        <span className="text-[11px] font-sans min-w-0 flex-1 break-words whitespace-normal">{doc.title}</span>
                       </div>
                       <Badge variant={doc.status}>
                         {doc.status}
@@ -403,7 +403,7 @@ export default function HalBiblePanel({ initialDocId }: HalBiblePanelProps = {})
           </div>
 
           {/* METRIC BOX: BIBLE FOOTER CREDITS */}
-          <div className="bg-bg-raised border border-border-dim p-4 rounded-sm space-y-1 font-mono text-[10px] text-text-secondary">
+          <div className="bg-bg-raised border border-border-dim p-4 rounded-sm space-y-1 font-mono text-[11px] text-text-secondary">
             <div className="flex justify-between">
               <span>CANONICAL:</span>
               <span className="text-text-primary font-bold">{stats.canonical} Docs</span>
@@ -421,20 +421,20 @@ export default function HalBiblePanel({ initialDocId }: HalBiblePanelProps = {})
         </div>
 
         {/* RIGHT COLUMN: ACTIVE CANVAS (col-span-8) */}
-        <div className="lg:col-span-8 bg-bg-raised border border-border-dim rounded-sm p-6 min-h-[500px]">
+        <div className="lg:col-span-8 min-w-0 bg-bg-raised border border-border-dim rounded-sm p-4 sm:p-6 min-h-[500px]">
           
           {/* ACTIVE SPECIFICATION TEMPLATE VIEW */}
           <div className="space-y-6">
             
             {/* DOCUMENT SUB-HEADER */}
-            <div className="flex items-center justify-between border-b border-border-dim pb-4">
+            <div className="flex flex-wrap items-start justify-between gap-3 border-b border-border-dim pb-4 min-w-0">
               <div className="space-y-1">
-                <div className="flex items-center gap-2 text-[10px] font-mono text-text-secondary uppercase">
+                <div className="flex flex-wrap items-center gap-2 text-[11px] font-mono text-text-secondary uppercase min-w-0">
                   <span>SPECIFICATION DOCUMENT {activeDoc.number}</span>
                   <span>•</span>
                   <span className="text-accent uppercase tracking-wider">{activeDoc.phase}</span>
                 </div>
-                <h2 className="text-2xl font-bold tracking-tight text-text-primary">{activeDoc.title}</h2>
+                <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-text-primary break-words">{activeDoc.title}</h2>
               </div>
               <Badge variant={activeDoc.status}>
                 {activeDoc.status.toUpperCase()} SPECIFICATION
@@ -450,11 +450,11 @@ export default function HalBiblePanel({ initialDocId }: HalBiblePanelProps = {})
                 {/* 1. HERO CONVICTION ELEMENT */}
                 <div className="bg-bg-base border border-border-dim rounded p-6 flex flex-col items-center justify-center text-center py-10 relative overflow-hidden">
                   <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-accent via-indigo-500 to-accent" />
-                  <span className="text-[10px] font-mono tracking-widest text-text-secondary uppercase mb-3">HAL CORE SUBSTANCE</span>
-                  <h1 className="text-4xl font-extrabold tracking-tight text-text-primary font-sans max-w-lg leading-tight">
+                  <span className="text-[11px] font-mono tracking-wider text-text-secondary uppercase mb-3">HAL CORE SUBSTANCE</span>
+                  <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-text-primary font-sans max-w-lg leading-tight break-words">
                     HAL IS AN
                   </h1>
-                  <h1 className="text-3xl font-extrabold tracking-tight text-accent font-sans max-w-lg mt-1 select-all">
+                  <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-accent font-sans max-w-lg mt-1 select-all break-words">
                     AI Business Operating Intelligence System
                   </h1>
                   <p className="text-xs text-text-secondary max-w-md mt-4 font-sans leading-relaxed">
@@ -463,19 +463,19 @@ export default function HalBiblePanel({ initialDocId }: HalBiblePanelProps = {})
 
                   {/* SUPREME INTENTIONALITY DIRECTIVE CARD */}
                   <div className="mt-6 w-full max-w-2xl bg-bg-overlay/80 border border-accent/30 rounded-lg p-4 text-left shadow-sm">
-                    <div className="flex items-center justify-between border-b border-border-dim/60 pb-2 mb-2.5">
-                      <span className="text-[10px] font-mono font-bold text-accent uppercase tracking-wider flex items-center gap-1.5">
+                    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border-dim/60 pb-2 mb-2.5">
+                      <span className="text-[11px] font-mono font-bold text-accent uppercase tracking-wider flex items-center gap-1.5">
                         <Sparkles className="w-3.5 h-3.5 text-accent" />
                         INTENTIONALITY DIRECTIVE (DESIGN CONCEPT)
                       </span>
-                      <span className="text-[9px] font-mono text-positive bg-positive/10 border border-positive/20 px-1.5 py-0.5 rounded uppercase font-bold">
+                      <span className="text-[11px] font-mono text-positive bg-positive/10 border border-positive/20 px-1.5 py-0.5 rounded uppercase font-bold">
                         ACTIVE LAW
                       </span>
                     </div>
                     <blockquote className="text-xs sm:text-sm font-sans font-medium text-text-primary leading-relaxed italic border-l-2 border-accent pl-3 my-1">
                       "HAL does not exist to answer everything. HAL exists to understand what matters, reason about it, and help the operator move the business forward."
                     </blockquote>
-                    <p className="text-[10px] text-text-secondary mt-2 font-mono">
+                    <p className="text-[11px] text-text-secondary mt-2 font-mono">
                       Every behavior must have intent: <span className="text-text-primary">Evidence ➔ Interpretation ➔ Decision</span>. Never fabricate reality or manufacture certainty where evidence is absent.
                     </p>
                   </div>
@@ -486,7 +486,7 @@ export default function HalBiblePanel({ initialDocId }: HalBiblePanelProps = {})
                   
                   {/* Mission */}
                   <div className="border border-border-dim bg-bg-overlay p-4 rounded-sm space-y-2">
-                    <span className="text-[10px] font-mono font-bold text-accent uppercase tracking-wider">Mission</span>
+                    <span className="text-[11px] font-mono font-bold text-accent uppercase tracking-wider">Mission</span>
                     <p className="text-xs text-text-primary leading-relaxed">
                       To help humans make better business decisions through intelligence, memory, reasoning, planning, learning, and execution.
                     </p>
@@ -494,7 +494,7 @@ export default function HalBiblePanel({ initialDocId }: HalBiblePanelProps = {})
 
                   {/* Identity */}
                   <div className="border border-border-dim bg-bg-overlay p-4 rounded-sm space-y-2">
-                    <span className="text-[10px] font-mono font-bold text-accent uppercase tracking-wider">Identity</span>
+                    <span className="text-[11px] font-mono font-bold text-accent uppercase tracking-wider">Identity</span>
                     <p className="text-xs text-text-primary leading-relaxed">
                       HAL is an executive partner. Not a tool. Not an assistant. Not an employee. A partner.
                     </p>
@@ -502,7 +502,7 @@ export default function HalBiblePanel({ initialDocId }: HalBiblePanelProps = {})
 
                   {/* Product Philosophy */}
                   <div className="border border-border-dim bg-bg-overlay p-4 rounded-sm space-y-2">
-                    <span className="text-[10px] font-mono font-bold text-indigo-400 uppercase tracking-wider">Product Philosophy</span>
+                    <span className="text-[11px] font-mono font-bold text-indigo-400 uppercase tracking-wider">Product Philosophy</span>
                     <p className="text-xs text-text-primary leading-relaxed">
                       HAL exists to answer one question: <span className="text-indigo-300">"What should I do next to grow this business?"</span> Everything else supports this.
                     </p>
@@ -510,7 +510,7 @@ export default function HalBiblePanel({ initialDocId }: HalBiblePanelProps = {})
 
                   {/* Intelligence Philosophy */}
                   <div className="border border-border-dim bg-bg-overlay p-4 rounded-sm space-y-2">
-                    <span className="text-[10px] font-mono font-bold text-indigo-400 uppercase tracking-wider">Intelligence Philosophy</span>
+                    <span className="text-[11px] font-mono font-bold text-indigo-400 uppercase tracking-wider">Intelligence Philosophy</span>
                     <p className="text-xs text-text-primary leading-relaxed">
                       HAL does not simply retrieve information. HAL understands relationships, reasons, explains, learns, reflects, recommends, and improves.
                     </p>
@@ -518,7 +518,7 @@ export default function HalBiblePanel({ initialDocId }: HalBiblePanelProps = {})
 
                   {/* Design Philosophy */}
                   <div className="border border-border-dim bg-bg-overlay p-4 rounded-sm space-y-2">
-                    <span className="text-[10px] font-mono font-bold text-sky-400 uppercase tracking-wider">Design Philosophy</span>
+                    <span className="text-[11px] font-mono font-bold text-sky-400 uppercase tracking-wider">Design Philosophy</span>
                     <p className="text-xs text-text-primary leading-relaxed">
                       Every screen reduces cognitive load. Every interaction increases clarity. Every recommendation is evidence-based. Every action serves a mission.
                     </p>
@@ -526,7 +526,7 @@ export default function HalBiblePanel({ initialDocId }: HalBiblePanelProps = {})
 
                   {/* UI Philosophy */}
                   <div className="border border-border-dim bg-bg-overlay p-4 rounded-sm space-y-2">
-                    <span className="text-[10px] font-mono font-bold text-sky-400 uppercase tracking-wider">UI Philosophy</span>
+                    <span className="text-[11px] font-mono font-bold text-sky-400 uppercase tracking-wider">UI Philosophy</span>
                     <p className="text-xs text-text-primary leading-relaxed">
                       HAL never resembles a traditional CRM. HAL resembles an executive operating system.
                     </p>
@@ -534,7 +534,7 @@ export default function HalBiblePanel({ initialDocId }: HalBiblePanelProps = {})
 
                   {/* Architecture Philosophy */}
                   <div className="border border-border-dim bg-bg-overlay p-4 rounded-sm space-y-2">
-                    <span className="text-[10px] font-mono font-bold text-[#f59e0b] uppercase tracking-wider">Architecture Philosophy</span>
+                    <span className="text-[11px] font-mono font-bold text-[#f59e0b] uppercase tracking-wider">Architecture Philosophy</span>
                     <p className="text-xs text-text-primary leading-relaxed">
                       HAL Core remains permanently small. New capability is added through: Skills, Agents, Connectors, Workspaces. Never by increasing HAL Core complexity.
                     </p>
@@ -542,25 +542,25 @@ export default function HalBiblePanel({ initialDocId }: HalBiblePanelProps = {})
 
                   {/* Knowledge Philosophy */}
                   <div className="border border-border-dim bg-bg-overlay p-4 rounded-sm space-y-2">
-                    <span className="text-[10px] font-mono font-bold text-[#f59e0b] uppercase tracking-wider">Knowledge Philosophy</span>
+                    <span className="text-[11px] font-mono font-bold text-[#f59e0b] uppercase tracking-wider">Knowledge Philosophy</span>
                     <div className="text-[11px] text-text-primary flex flex-col items-center gap-1 font-mono pt-1">
                       <span>Data</span>
-                      <span className="text-[9px] opacity-40">↓</span>
+                      <span className="text-[11px] opacity-40">↓</span>
                       <span>Information</span>
-                      <span className="text-[9px] opacity-40">↓</span>
+                      <span className="text-[11px] opacity-40">↓</span>
                       <span>Knowledge</span>
-                      <span className="text-[9px] opacity-40">↓</span>
+                      <span className="text-[11px] opacity-40">↓</span>
                       <span>Understanding</span>
-                      <span className="text-[9px] opacity-40">↓</span>
+                      <span className="text-[11px] opacity-40">↓</span>
                       <span>Recommendations</span>
-                      <span className="text-[9px] opacity-40">↓</span>
+                      <span className="text-[11px] opacity-40">↓</span>
                       <span className="text-accent font-bold">Action</span>
                     </div>
                   </div>
 
                   {/* Decision Philosophy */}
                   <div className="border border-border-dim bg-bg-overlay p-4 rounded-sm space-y-2">
-                    <span className="text-[10px] font-mono font-bold text-purple-400 uppercase tracking-wider">Decision Philosophy</span>
+                    <span className="text-[11px] font-mono font-bold text-purple-400 uppercase tracking-wider">Decision Philosophy</span>
                     <p className="text-xs text-text-primary leading-relaxed">
                       Every page must answer: What matters? Why? What should happen next?
                     </p>
@@ -568,7 +568,7 @@ export default function HalBiblePanel({ initialDocId }: HalBiblePanelProps = {})
 
                   {/* Learning Philosophy */}
                   <div className="border border-border-dim bg-bg-overlay p-4 rounded-sm space-y-2">
-                    <span className="text-[10px] font-mono font-bold text-purple-400 uppercase tracking-wider">Learning Philosophy</span>
+                    <span className="text-[11px] font-mono font-bold text-purple-400 uppercase tracking-wider">Learning Philosophy</span>
                     <p className="text-xs text-text-primary leading-relaxed">
                       Every interaction teaches HAL. Every outcome improves HAL. Every mistake becomes knowledge.
                     </p>
@@ -576,7 +576,7 @@ export default function HalBiblePanel({ initialDocId }: HalBiblePanelProps = {})
 
                   {/* Business Philosophy */}
                   <div className="border border-border-dim bg-bg-overlay p-4 rounded-sm space-y-2">
-                    <span className="text-[10px] font-mono font-bold text-emerald-400 uppercase tracking-wider">Business Philosophy</span>
+                    <span className="text-[11px] font-mono font-bold text-emerald-400 uppercase tracking-wider">Business Philosophy</span>
                     <p className="text-xs text-text-primary leading-relaxed">
                       HAL does not manage businesses. HAL helps businesses make better decisions.
                     </p>
@@ -584,7 +584,7 @@ export default function HalBiblePanel({ initialDocId }: HalBiblePanelProps = {})
 
                   {/* Human Philosophy */}
                   <div className="border border-border-dim bg-bg-overlay p-4 rounded-sm space-y-2">
-                    <span className="text-[10px] font-mono font-bold text-emerald-400 uppercase tracking-wider">Human Philosophy</span>
+                    <span className="text-[11px] font-mono font-bold text-emerald-400 uppercase tracking-wider">Human Philosophy</span>
                     <p className="text-xs text-text-primary leading-relaxed">
                       The human always owns the final decision. HAL recommends. Humans approve.
                     </p>
@@ -594,24 +594,24 @@ export default function HalBiblePanel({ initialDocId }: HalBiblePanelProps = {})
 
                 {/* PRINCIPLES LIST */}
                 <div className="space-y-3 pt-4 border-t border-border-dim">
-                  <span className="text-[10px] font-mono tracking-widest text-text-secondary uppercase font-semibold block">SYSTEM PRINCIPLES</span>
+                  <span className="text-[11px] font-mono tracking-wider text-text-secondary uppercase font-semibold block">SYSTEM PRINCIPLES</span>
                   
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div className="p-3 border border-border-dim bg-bg-base/40 rounded-sm">
                       <h4 className="text-[11px] font-mono font-bold text-accent uppercase">Design Principle</h4>
-                      <p className="text-[10px] text-text-secondary mt-1">
+                      <p className="text-[11px] text-text-secondary mt-1">
                         Order over decoration. Consistency over creativity. Clarity over complexity. Speed over unnecessary animation. Depth over clutter.
                       </p>
                     </div>
                     <div className="p-3 border border-border-dim bg-bg-base/40 rounded-sm">
                       <h4 className="text-[11px] font-mono font-bold text-accent uppercase">Engineering Principle</h4>
-                      <p className="text-[10px] text-text-secondary mt-1">
+                      <p className="text-[11px] text-text-secondary mt-1">
                         Architecture first. Features second. Polish always.
                       </p>
                     </div>
                     <div className="p-3 border border-border-dim bg-bg-base/40 rounded-sm">
                       <h4 className="text-[11px] font-mono font-bold text-accent uppercase">Growth Principle</h4>
-                      <p className="text-[10px] text-text-secondary mt-1">
+                      <p className="text-[11px] text-text-secondary mt-1">
                         Never build because it is possible. Build because it advances the mission.
                       </p>
                     </div>
@@ -619,7 +619,7 @@ export default function HalBiblePanel({ initialDocId }: HalBiblePanelProps = {})
 
                   {/* Golden Rule banner */}
                   <div className="bg-accent-dim/10 border border-accent/25 p-4 rounded-sm text-center">
-                    <span className="text-[10px] font-mono text-accent uppercase font-bold block mb-1">THE GOLDEN RULE</span>
+                    <span className="text-[11px] font-mono text-accent uppercase font-bold block mb-1">THE GOLDEN RULE</span>
                     <p className="text-xs text-text-primary max-w-xl mx-auto leading-relaxed">
                       Every new feature must answer: <span className="text-accent font-semibold">"Does this help the user make better business decisions?"</span> If the answer is no, it does not belong in HAL.
                     </p>
@@ -650,7 +650,7 @@ export default function HalBiblePanel({ initialDocId }: HalBiblePanelProps = {})
 
                   {isVerifying && (
                     <div className="bg-bg-base border border-border-dim p-4 rounded font-mono text-xs text-text-secondary space-y-3">
-                      <div className="flex justify-between items-center text-[10px]">
+                      <div className="flex justify-between items-center text-[11px]">
                         <span>CORE ALIGNMENT PROGRESS:</span>
                         <span className="text-accent">{verificationProgress}%</span>
                       </div>
@@ -660,7 +660,7 @@ export default function HalBiblePanel({ initialDocId }: HalBiblePanelProps = {})
                           style={{ width: `${verificationProgress}%` }}
                         />
                       </div>
-                      <div className="flex items-center gap-2 text-[10px] text-text-tertiary">
+                      <div className="flex items-center gap-2 text-[11px] text-text-tertiary">
                         <Loader2 className="w-3 h-3 animate-spin text-accent" />
                         <span>
                           {verificationProgress < 25 && 'Auditing Network configuration port...'}
@@ -679,7 +679,7 @@ export default function HalBiblePanel({ initialDocId }: HalBiblePanelProps = {})
                         <CheckCircle2 className="w-4 h-4 shrink-0" />
                         <span className="font-bold">PREVIEW COMPLETE — NOT A SECURITY AUDIT</span>
                       </div>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-[10.5px] pt-1">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-[11px] pt-1">
                         <div className="flex justify-between border-b border-border-dim/40 pb-1.5">
                           <span className="opacity-60">PORT 3000 INTEGRITY:</span>
                           <span className="text-positive font-bold">Not checked</span>
@@ -711,7 +711,7 @@ export default function HalBiblePanel({ initialDocId }: HalBiblePanelProps = {})
                 
                 {/* Embedded Design System Toggle and Categories */}
                 <div className="flex items-center justify-between border-b border-border-dim pb-3">
-                  <span className="text-[10px] font-mono text-text-secondary uppercase">
+                  <span className="text-[11px] font-mono text-text-secondary uppercase">
                     LIVE SHIELDS & INTERACTIVE COMPONENT PREVIEWS
                   </span>
                   <div className="flex items-center gap-1 bg-bg-base border border-border-dim p-1 rounded-sm shrink-0">
@@ -791,7 +791,7 @@ export default function HalBiblePanel({ initialDocId }: HalBiblePanelProps = {})
                       />
                       <CardContent className="space-y-4">
                         <div className="space-y-2">
-                          <span className="text-[10px] font-mono text-text-secondary uppercase">Active Variants</span>
+                          <span className="text-[11px] font-mono text-text-secondary uppercase">Active Variants</span>
                           <div className="flex flex-wrap gap-2">
                             <Button variant="primary">Primary Accent</Button>
                             <Button variant="secondary">Secondary</Button>
@@ -801,7 +801,7 @@ export default function HalBiblePanel({ initialDocId }: HalBiblePanelProps = {})
                         </div>
 
                         <div className="space-y-2">
-                          <span className="text-[10px] font-mono text-text-secondary uppercase">Semantic Actions</span>
+                          <span className="text-[11px] font-mono text-text-secondary uppercase">Semantic Actions</span>
                           <div className="flex flex-wrap gap-2">
                             <Button variant="success">Success state</Button>
                             <Button variant="danger">Critical Danger</Button>
@@ -809,7 +809,7 @@ export default function HalBiblePanel({ initialDocId }: HalBiblePanelProps = {})
                         </div>
 
                         <div className="space-y-2">
-                          <span className="text-[10px] font-mono text-text-secondary uppercase">Interactive Loader Feedbacks</span>
+                          <span className="text-[11px] font-mono text-text-secondary uppercase">Interactive Loader Feedbacks</span>
                           <div className="flex flex-wrap gap-2">
                             <Button variant="primary" isLoading={true}>Button Loading</Button>
                             <Button variant="danger" isLoading={true}>Destructive loading</Button>
@@ -818,7 +818,7 @@ export default function HalBiblePanel({ initialDocId }: HalBiblePanelProps = {})
                         </div>
 
                         <div className="space-y-2">
-                          <span className="text-[10px] font-mono text-text-secondary uppercase">Responsive Scale Bounds</span>
+                          <span className="text-[11px] font-mono text-text-secondary uppercase">Responsive Scale Bounds</span>
                           <div className="flex flex-wrap items-center gap-2">
                             <Button size="sm">Small (sm)</Button>
                             <Button size="md">Medium (md)</Button>
@@ -841,31 +841,31 @@ export default function HalBiblePanel({ initialDocId }: HalBiblePanelProps = {})
                       />
                       <CardContent className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-7 gap-3">
                         <div className="bg-bg-base border border-border-dim p-3 rounded text-center space-y-2">
-                          <span className="text-[9px] font-mono opacity-50 block uppercase">New / Fresh</span>
+                          <span className="text-[11px] font-mono opacity-50 block uppercase">New / Fresh</span>
                           <Badge variant="new">Prospect New</Badge>
                         </div>
                         <div className="bg-bg-base border border-border-dim p-3 rounded text-center space-y-2">
-                          <span className="text-[9px] font-mono opacity-50 block uppercase">Active / Good</span>
+                          <span className="text-[11px] font-mono opacity-50 block uppercase">Active / Good</span>
                           <Badge variant="active">Operational</Badge>
                         </div>
                         <div className="bg-bg-base border border-border-dim p-3 rounded text-center space-y-2">
-                          <span className="text-[9px] font-mono opacity-50 block uppercase">Warning / Attn</span>
+                          <span className="text-[11px] font-mono opacity-50 block uppercase">Warning / Attn</span>
                           <Badge variant="warning">Quota Warning</Badge>
                         </div>
                         <div className="bg-bg-base border border-border-dim p-3 rounded text-center space-y-2">
-                          <span className="text-[9px] font-mono opacity-50 block uppercase">Danger / Critical</span>
+                          <span className="text-[11px] font-mono opacity-50 block uppercase">Danger / Critical</span>
                           <Badge variant="danger">Token Expired</Badge>
                         </div>
                         <div className="bg-bg-base border border-border-dim p-3 rounded text-center space-y-2">
-                          <span className="text-[9px] font-mono opacity-50 block uppercase">Information</span>
+                          <span className="text-[11px] font-mono opacity-50 block uppercase">Information</span>
                           <Badge variant="info">Syncing Api</Badge>
                         </div>
                         <div className="bg-bg-base border border-border-dim p-3 rounded text-center space-y-2">
-                          <span className="text-[9px] font-mono opacity-50 block uppercase">AI / Reasoning</span>
+                          <span className="text-[11px] font-mono opacity-50 block uppercase">AI / Reasoning</span>
                           <Badge variant="ai">HAL Cog Engine</Badge>
                         </div>
                         <div className="bg-bg-base border border-border-dim p-3 rounded text-center space-y-2">
-                          <span className="text-[9px] font-mono opacity-50 block uppercase">Neutral</span>
+                          <span className="text-[11px] font-mono opacity-50 block uppercase">Neutral</span>
                           <Badge variant="neutral">Offline Cache</Badge>
                         </div>
                       </CardContent>
@@ -886,61 +886,61 @@ export default function HalBiblePanel({ initialDocId }: HalBiblePanelProps = {})
                         
                         <div className="space-y-2">
                           <div className="h-14 rounded bg-[#080808] border border-border-default flex items-end p-2">
-                            <span className="text-[9px] font-mono font-bold text-text-primary uppercase">#080808</span>
+                            <span className="text-[11px] font-mono font-bold text-text-primary uppercase">#080808</span>
                           </div>
                           <div>
                             <h4 className="text-[11px] font-mono uppercase font-bold text-text-primary">Base Canvas</h4>
-                            <p className="text-[10px] text-text-secondary">Default dark space</p>
+                            <p className="text-[11px] text-text-secondary">Default dark space</p>
                           </div>
                         </div>
 
                         <div className="space-y-2">
                           <div className="h-14 rounded bg-[#0f0f0f] border border-border-default flex items-end p-2">
-                            <span className="text-[9px] font-mono font-bold text-text-primary uppercase">#0F0F0F</span>
+                            <span className="text-[11px] font-mono font-bold text-text-primary uppercase">#0F0F0F</span>
                           </div>
                           <div>
                             <h4 className="text-[11px] font-mono uppercase font-bold text-text-primary">Raised Card</h4>
-                            <p className="text-[10px] text-text-secondary">Bento widgets canvas</p>
+                            <p className="text-[11px] text-text-secondary">Bento widgets canvas</p>
                           </div>
                         </div>
 
                         <div className="space-y-2">
                           <div className="h-14 rounded bg-accent flex items-end p-2">
-                            <span className="text-[9px] font-mono font-bold text-black uppercase">#C8F542</span>
+                            <span className="text-[11px] font-mono font-bold text-black uppercase">#C8F542</span>
                           </div>
                           <div>
                             <h4 className="text-[11px] font-mono uppercase font-bold text-text-primary">HAL Lime</h4>
-                            <p className="text-[10px] text-text-secondary">Primary call-to-action</p>
+                            <p className="text-[11px] text-text-secondary">Primary call-to-action</p>
                           </div>
                         </div>
 
                         <div className="space-y-2">
                           <div className="h-14 rounded bg-positive-dim text-positive border border-positive/35 flex items-end p-2">
-                            <span className="text-[9px] font-mono font-bold uppercase">#22C55E</span>
+                            <span className="text-[11px] font-mono font-bold uppercase">#22C55E</span>
                           </div>
                           <div>
                             <h4 className="text-[11px] font-mono uppercase font-bold text-text-primary">Healthy Green</h4>
-                            <p className="text-[10px] text-text-secondary">Connected & Synchronized</p>
+                            <p className="text-[11px] text-text-secondary">Connected & Synchronized</p>
                           </div>
                         </div>
 
                         <div className="space-y-2">
                           <div className="h-14 rounded bg-warning-dim text-warning border border-warning/35 flex items-end p-2">
-                            <span className="text-[9px] font-mono font-bold uppercase">#F59E0B</span>
+                            <span className="text-[11px] font-mono font-bold uppercase">#F59E0B</span>
                           </div>
                           <div>
                             <h4 className="text-[11px] font-mono uppercase font-bold text-text-primary">Amber Warning</h4>
-                            <p className="text-[10px] text-text-secondary">Approaching thresholds</p>
+                            <p className="text-[11px] text-text-secondary">Approaching thresholds</p>
                           </div>
                         </div>
 
                         <div className="space-y-2">
                           <div className="h-14 rounded bg-negative-dim text-negative border border-negative/35 flex items-end p-2">
-                            <span className="text-[9px] font-mono font-bold uppercase">#EF4444</span>
+                            <span className="text-[11px] font-mono font-bold uppercase">#EF4444</span>
                           </div>
                           <div>
                             <h4 className="text-[11px] font-mono uppercase font-bold text-text-primary">Critical Red</h4>
-                            <p className="text-[10px] text-text-secondary">Authentication disruptions</p>
+                            <p className="text-[11px] text-text-secondary">Authentication disruptions</p>
                           </div>
                         </div>
 
@@ -949,7 +949,7 @@ export default function HalBiblePanel({ initialDocId }: HalBiblePanelProps = {})
 
                     {/* TABLE PRIMITIVE DEMONSTRATION */}
                     <div className="space-y-2">
-                      <span className="text-[10px] font-mono tracking-widest text-text-secondary uppercase font-semibold">OPERATIONAL TABLE PREVIEW — NO LIVE RECORDS</span>
+                      <span className="text-[11px] font-mono tracking-wider text-text-secondary uppercase font-semibold">OPERATIONAL TABLE PREVIEW — NO LIVE RECORDS</span>
                       <Table>
                         <TableHeader>
                           <TableRow>
@@ -992,7 +992,7 @@ export default function HalBiblePanel({ initialDocId }: HalBiblePanelProps = {})
                     {/* INSTRUCTIONAL EMPTY STATES */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
                       <div className="space-y-2">
-                        <span className="text-[10px] font-mono tracking-widest text-text-secondary uppercase font-semibold font-bold">PEDAGOGICAL EMPTY STATES</span>
+                        <span className="text-[11px] font-mono tracking-wider text-text-secondary uppercase font-semibold font-bold">PEDAGOGICAL EMPTY STATES</span>
                         <EmptyState 
                           title="Location Cache Empty-State Preview"
                           whyEmpty="No location records are loaded in this UI preview. No database purge or cache operation has been performed."
@@ -1004,7 +1004,7 @@ export default function HalBiblePanel({ initialDocId }: HalBiblePanelProps = {})
                       </div>
 
                       <div className="space-y-2">
-                        <span className="text-[10px] font-mono tracking-widest text-text-secondary uppercase font-semibold font-bold">DATABASE SEARCH NO-RECORDS FOUND</span>
+                        <span className="text-[11px] font-mono tracking-wider text-text-secondary uppercase font-semibold font-bold">DATABASE SEARCH NO-RECORDS FOUND</span>
                         <Card className="p-0">
                           <Table>
                             <TableBody>
@@ -1109,16 +1109,16 @@ export default function HalBiblePanel({ initialDocId }: HalBiblePanelProps = {})
                       }
                     >
                       <div className="space-y-3">
-                        <span className="text-[10px] font-mono tracking-widest text-accent uppercase font-bold block">CONFIRM EXECUTIVE AUTHORIZATION</span>
+                        <span className="text-[11px] font-mono tracking-wider text-accent uppercase font-bold block">CONFIRM EXECUTIVE AUTHORIZATION</span>
                         <p className="text-xs text-text-secondary leading-relaxed font-sans">
                           You are about to synchronize ISAAC's direct marketing pitch templates with active lead registers. This operation accesses external Google Maps APIs and launches secure territory scans.
                         </p>
                         <div className="p-3 bg-bg-base border border-border-dim rounded space-y-1">
-                          <div className="flex justify-between items-center text-[10px] font-mono">
+                          <div className="flex justify-between items-center text-[11px] font-mono">
                             <span className="opacity-60 uppercase">TARGET CONTRACTOR:</span>
                             <span className="text-text-primary font-bold font-mono">ISAAC_ALBERTA_REPRESENTS</span>
                           </div>
-                          <div className="flex justify-between items-center text-[10px] font-mono">
+                          <div className="flex justify-between items-center text-[11px] font-mono">
                             <span className="opacity-60 uppercase">ENCRYPTION PROTOCOL:</span>
                             <span className="text-positive font-bold font-mono">AES-GCM-256</span>
                           </div>
@@ -1149,7 +1149,7 @@ export default function HalBiblePanel({ initialDocId }: HalBiblePanelProps = {})
                 <div className="p-4 bg-bg-overlay border border-border-dim rounded-sm flex items-start gap-3">
                   <Shield className="w-5 h-5 text-accent shrink-0 mt-0.5" />
                   <div className="space-y-1">
-                    <span className="text-[10px] font-mono text-accent font-bold uppercase block">
+                    <span className="text-[11px] font-mono text-accent font-bold uppercase block">
                       CANONICAL ARCHITECTURAL SPECIFICATION
                     </span>
                     <p className="text-xs text-text-secondary leading-relaxed font-sans">
@@ -1160,12 +1160,12 @@ export default function HalBiblePanel({ initialDocId }: HalBiblePanelProps = {})
 
                 {/* DETAILED SPECIFICATION WRITING FOR CORE ARCHITECTURES */}
                 <div className="space-y-4">
-                  <h3 className="text-xs font-mono tracking-widest text-text-secondary uppercase font-semibold">1. OVERVIEW & OBJECTIVE</h3>
+                  <h3 className="text-xs font-mono tracking-wider text-text-secondary uppercase font-semibold">1. OVERVIEW & OBJECTIVE</h3>
                   <p className="text-xs text-text-secondary leading-relaxed font-sans">
                     {activeDoc.description}
                   </p>
 
-                  <h3 className="text-xs font-mono tracking-widest text-text-secondary uppercase font-semibold pt-2">2. LIVE ARCHITECTURAL CODE MAPPING</h3>
+                  <h3 className="text-xs font-mono tracking-wider text-text-secondary uppercase font-semibold pt-2">2. LIVE ARCHITECTURAL CODE MAPPING</h3>
                   <div className="p-4 bg-bg-base border border-border-dim rounded font-mono text-xs text-text-secondary space-y-2">
                     <div className="flex justify-between items-center py-0.5 border-b border-border-dim/40">
                       <span className="opacity-50">CORE SOURCE FILE:</span>
@@ -1212,16 +1212,16 @@ export default function HalBiblePanel({ initialDocId }: HalBiblePanelProps = {})
                     </div>
                   </div>
 
-                  <h3 className="text-xs font-mono tracking-widest text-text-secondary uppercase font-semibold pt-2">3. OPERATING PRINCIPLES & DESK EQUIVALENT</h3>
+                  <h3 className="text-xs font-mono tracking-wider text-text-secondary uppercase font-semibold pt-2">3. OPERATING PRINCIPLES & DESK EQUIVALENT</h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs font-sans">
                     <div className="border border-border-dim p-3 rounded-sm bg-bg-base/40">
-                      <span className="text-[10px] font-mono text-accent block font-bold mb-1 uppercase tracking-wider">UPSTREAM TRIGGER SOURCES</span>
+                      <span className="text-[11px] font-mono text-accent block font-bold mb-1 uppercase tracking-wider">UPSTREAM TRIGGER SOURCES</span>
                       <p className="text-[11px] text-text-secondary leading-relaxed">
                         Designed to support database-backed records, map-provider data, and operator guidance. Storage encryption and live provider integrations are not verified in this deployment.
                       </p>
                     </div>
                     <div className="border border-border-dim p-3 rounded-sm bg-bg-base/40">
-                      <span className="text-[10px] font-mono text-accent block font-bold mb-1 uppercase tracking-wider">DOWNSTREAM OUTCOME EXECUTION</span>
+                      <span className="text-[11px] font-mono text-accent block font-bold mb-1 uppercase tracking-wider">DOWNSTREAM OUTCOME EXECUTION</span>
                       <p className="text-[11px] text-text-secondary leading-relaxed">
                         Designed to integrate with Document Studio, the SMS/Email Outbox, and territory audits; each integration must be verified in the deployed environment.
                       </p>
@@ -1229,7 +1229,7 @@ export default function HalBiblePanel({ initialDocId }: HalBiblePanelProps = {})
                   </div>
 
                   {/* Golden rule alignment check */}
-                  <div className="pt-4 border-t border-border-dim flex justify-between items-center text-[10px] font-mono text-text-secondary">
+                  <div className="pt-4 border-t border-border-dim flex justify-between items-center text-[11px] font-mono text-text-secondary">
                     <span>PHILOSOPHY COMPLIANCE:</span>
                     <div className="flex items-center gap-1 text-positive font-bold">
                       <CheckCircle2 className="w-3.5 h-3.5" />

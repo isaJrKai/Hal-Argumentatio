@@ -177,19 +177,21 @@ export const HalRoadmapPhase5View: React.FC = () => {
           <div className="flex items-center gap-2.5 shrink-0">
             <button
               onClick={handleSyncBrain}
-              disabled={isSyncingBrain}
-              className="px-3.5 py-2 rounded-lg bg-accent text-white hover:bg-accent/90 active:scale-98 transition-all text-xs font-semibold flex items-center gap-2 shadow-xs cursor-pointer disabled:opacity-50"
+              disabled
+              title="Not connected: layer-level runtime health instrumentation is not configured."
+              className="px-3.5 py-2 rounded-lg bg-bg-overlay text-text-tertiary border border-border-dim transition-all text-xs font-semibold flex items-center gap-2 cursor-not-allowed opacity-60"
             >
               <Cpu className={`w-3.5 h-3.5 ${isSyncingBrain ? 'animate-spin' : ''}`} />
-              <span>{isSyncingBrain ? 'Diagnosing...' : 'Audit Brain Alignment'}</span>
+              <span>Not connected</span>
             </button>
             <button
               onClick={handleFederateRegions}
-              disabled={isFederating}
-              className="px-3.5 py-2 rounded-lg bg-bg-overlay hover:bg-bg-subtle text-text-primary border border-border-dim hover:border-border-default transition-all text-xs font-medium flex items-center gap-2 cursor-pointer disabled:opacity-50"
+              disabled
+              title="Not connected: verified edge endpoints and health probes are not configured."
+              className="px-3.5 py-2 rounded-lg bg-bg-overlay text-text-tertiary border border-border-dim transition-all text-xs font-medium flex items-center gap-2 cursor-not-allowed opacity-60"
             >
               <Radio className={`w-3.5 h-3.5 text-accent ${isFederating ? 'animate-spin' : ''}`} />
-              <span>{isFederating ? 'Federating...' : 'Sync Edge Mesh'}</span>
+              <span>Not connected</span>
             </button>
           </div>
         </div>
@@ -510,11 +512,12 @@ export const HalRoadmapPhase5View: React.FC = () => {
               </div>
               <button
                 onClick={handleFederateRegions}
-                disabled={isFederating}
-                className="px-3.5 py-1.5 rounded-lg bg-accent text-white text-xs font-semibold flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                disabled
+                title="Not connected: verified edge endpoints and health probes are not configured."
+                className="px-3.5 py-1.5 rounded-lg bg-bg-overlay text-text-tertiary border border-border-dim text-xs font-semibold flex items-center gap-1.5 cursor-not-allowed opacity-60"
               >
                 <Radio className={`w-3.5 h-3.5 ${isFederating ? 'animate-spin' : ''}`} />
-                <span>{isFederating ? 'Polling Nodes...' : 'Synchronize Mesh'}</span>
+                <span>Not connected</span>
               </button>
             </div>
           </div>
@@ -572,11 +575,12 @@ export const HalRoadmapPhase5View: React.FC = () => {
               </div>
               <button
                 onClick={handlePropagateOntology}
-                disabled={isPropagating}
-                className="px-3.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                disabled
+                title="Not connected: measured, privacy-reviewed cross-industry source data is not configured."
+                className="px-3.5 py-1.5 rounded-lg bg-bg-overlay text-text-tertiary border border-border-dim text-xs font-semibold flex items-center gap-1.5 cursor-not-allowed opacity-60"
               >
                 <Zap className={`w-3.5 h-3.5 ${isPropagating ? 'animate-spin' : ''}`} />
-                <span>{isPropagating ? 'Propagating...' : 'Update Knowledge Priors'}</span>
+                <span>Not connected</span>
               </button>
             </div>
           </div>

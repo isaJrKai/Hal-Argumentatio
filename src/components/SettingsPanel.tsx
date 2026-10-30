@@ -46,7 +46,6 @@ interface SettingsPanelProps {
 
 export default function SettingsPanel({ 
   token, 
-  theme = 'dark',
   profilePhoto,
   companyLogo,
   onProfilePhotoUpdate,
@@ -143,9 +142,9 @@ export default function SettingsPanel({
     }
   };
 
-  const cardBg = theme === 'dark' ? 'bg-panel-dark border-border-dark text-text-primary' : 'bg-white border-gray-200 text-gray-900 shadow-sm';
-  const innerBg = theme === 'dark' ? 'bg-bg-dark' : 'bg-gray-50';
-  const borderCol = theme === 'dark' ? 'border-border-dark' : 'border-gray-200';
+  const cardBg = 'bg-bg-raised border-border-dim text-text-primary';
+  const innerBg = 'bg-bg-base';
+  const borderCol = 'border-border-dim';
 
   const handleSaveWorkspaceSettings = (e: React.FormEvent) => {
     e.preventDefault();
@@ -396,14 +395,14 @@ export default function SettingsPanel({
   return (
     <div className="space-y-6">
       {/* Tab Switcher: Settings & Keys vs About & Operating Manual */}
-      <div className="flex items-center justify-between border-b pb-3 border-inherit">
-        <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b pb-3 border-inherit">
+        <div className="flex flex-wrap items-center gap-2 min-w-0">
           <button
             type="button"
             onClick={() => setActiveSubTab('settings')}
-            className={`px-3.5 py-1.5 rounded-lg text-xs font-mono font-bold uppercase tracking-wider transition-all flex items-center gap-2 cursor-pointer ${
+            className={`px-3.5 py-1.5 rounded-lg text-xs font-mono font-bold uppercase tracking-wider transition-all flex flex-wrap items-center gap-2 cursor-pointer ${
               activeSubTab === 'settings'
-                ? 'bg-brand text-white shadow-xs'
+                ? 'bg-brand text-accent-contrast shadow-xs'
                 : 'text-text-secondary hover:text-text-primary hover:bg-bg-subtle'
             }`}
           >
@@ -413,9 +412,9 @@ export default function SettingsPanel({
           <button
             type="button"
             onClick={() => setActiveSubTab('about')}
-            className={`px-3.5 py-1.5 rounded-lg text-xs font-mono font-bold uppercase tracking-wider transition-all flex items-center gap-2 cursor-pointer ${
+            className={`px-3.5 py-1.5 rounded-lg text-xs font-mono font-bold uppercase tracking-wider transition-all flex flex-wrap items-center gap-2 cursor-pointer ${
               activeSubTab === 'about'
-                ? 'bg-brand text-white shadow-xs'
+                ? 'bg-brand text-accent-contrast shadow-xs'
                 : 'text-text-secondary hover:text-text-primary hover:bg-bg-subtle'
             }`}
           >
@@ -423,7 +422,7 @@ export default function SettingsPanel({
             <span>About & Operating Manual</span>
           </button>
         </div>
-        <div className="text-[10px] font-mono text-text-tertiary hidden sm:block">
+        <div className="text-[11px] font-mono text-text-tertiary hidden sm:block min-w-0 break-words text-right">
           {activeSubTab === 'about' ? 'HAL CONSTITUTION & ROADMAP' : 'ENTERPRISE SYSTEM CONFIGURATION'}
         </div>
       </div>
@@ -435,11 +434,11 @@ export default function SettingsPanel({
       ) : (
         <>
       {/* MULTI-INDUSTRY & WHITE-LABEL WORKSPACE MANAGER */}
-      <div className={`border rounded-lg p-6 space-y-6 ${cardBg}`}>
-        <div className="flex items-center gap-2 border-b pb-3 border-inherit">
+      <div className={`border rounded-lg p-6 space-y-6 min-w-0 ${cardBg}`}>
+        <div className="flex flex-wrap items-center gap-2 border-b pb-3 border-inherit">
           <Briefcase className="w-4 h-4 text-brand" />
           <span className="text-xs font-mono uppercase tracking-wider font-bold">White-Label Workspace Configurator</span>
-          <span className="ml-auto text-[9px] px-2 py-0.5 bg-brand/10 text-brand font-mono border border-brand/20 rounded font-semibold uppercase flex items-center gap-1">
+          <span className="ml-auto text-[11px] px-2 py-0.5 bg-brand/10 text-brand font-mono border border-brand/20 rounded font-semibold uppercase flex items-center gap-1">
             <Sparkles className="w-3 h-3" /> WHITE-LABEL READY
           </span>
         </div>
@@ -456,7 +455,7 @@ export default function SettingsPanel({
               <label className="text-[11px] font-bold text-text-primary uppercase tracking-wider">
                 TARGET SUB-NICHE
               </label>
-              <span className="text-[10px] text-brand">{activeNiche}</span>
+              <span className="text-[11px] text-brand">{activeNiche}</span>
             </div>
 
             <div className="flex gap-2">
@@ -484,7 +483,7 @@ export default function SettingsPanel({
               />
               <button
                 type="submit"
-                className="px-3 py-1.5 bg-bg-subtle hover:bg-brand hover:text-white border border-border-dim text-text-primary text-xs font-mono font-bold rounded-sm flex items-center gap-1 transition-colors cursor-pointer"
+                className="px-3 py-1.5 bg-bg-subtle hover:bg-brand hover:text-accent-contrast border border-border-dim text-text-primary text-xs font-mono font-bold rounded-sm flex items-center gap-1 transition-colors cursor-pointer"
               >
                 <Plus className="w-3.5 h-3.5" /> ADD
               </button>
@@ -497,7 +496,7 @@ export default function SettingsPanel({
               <label className="text-[11px] font-bold text-text-primary uppercase tracking-wider">
                 TARGET CITY / TERRITORY
               </label>
-              <span className="text-[10px] text-text-dim flex items-center gap-1">
+              <span className="text-[11px] text-text-dim flex items-center gap-1">
                 <Globe className="w-3 h-3" /> ACTIVE: {(activeCity || '').toUpperCase()}
               </span>
             </div>
@@ -530,7 +529,7 @@ export default function SettingsPanel({
               />
               <button
                 type="submit"
-                className="px-3 py-1.5 bg-bg-subtle hover:bg-brand hover:text-white border border-border-dim text-text-primary text-xs font-mono font-bold rounded-sm flex items-center gap-1 transition-colors cursor-pointer"
+                className="px-3 py-1.5 bg-bg-subtle hover:bg-brand hover:text-accent-contrast border border-border-dim text-text-primary text-xs font-mono font-bold rounded-sm flex items-center gap-1 transition-colors cursor-pointer"
               >
                 <Plus className="w-3.5 h-3.5" /> ADD
               </button>
@@ -547,7 +546,7 @@ export default function SettingsPanel({
                 WHITE-LABEL OPERATOR & AGENCY BRANDING
               </span>
             </div>
-            <span className="text-[10px] font-mono text-text-dim">
+            <span className="text-[11px] font-mono text-text-dim">
               Tailors pitch deck exports & audit headers
             </span>
           </div>
@@ -560,7 +559,7 @@ export default function SettingsPanel({
 
           <form onSubmit={handleSaveWorkspaceSettings} className="grid grid-cols-1 md:grid-cols-2 gap-4 font-mono text-xs">
             <div className="space-y-1">
-              <label className="text-[10px] text-text-secondary uppercase font-bold">
+              <label className="text-[11px] text-text-secondary uppercase font-bold">
                 Agency / Business Name
               </label>
               <input
@@ -574,7 +573,7 @@ export default function SettingsPanel({
             </div>
 
             <div className="space-y-1">
-              <label className="text-[10px] text-text-secondary uppercase font-bold">
+              <label className="text-[11px] text-text-secondary uppercase font-bold">
                 Operator / Representative Name
               </label>
               <input
@@ -588,9 +587,9 @@ export default function SettingsPanel({
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-[10px] text-text-secondary uppercase font-bold flex items-center justify-between">
+              <label className="text-[11px] text-text-secondary uppercase font-bold flex items-center justify-between">
                 <span>Brand Accent Color</span>
-                <span className="text-[9px] font-mono text-accent">Active Theme Accent</span>
+                <span className="text-[11px] font-mono text-accent">Active Theme Accent</span>
               </label>
               <div className="flex items-center gap-2">
                 <input
@@ -618,7 +617,7 @@ export default function SettingsPanel({
 
               {/* Quick Brand Accent Presets */}
               <div className="flex items-center gap-1.5 pt-1">
-                <span className="text-[9px] font-mono text-text-tertiary uppercase">Presets:</span>
+                <span className="text-[11px] font-mono text-text-tertiary uppercase">Presets:</span>
                 {[
                   { name: 'Volt Lime', color: '#c8f542' },
                   { name: 'Cyber Indigo', color: '#6366f1' },
@@ -643,7 +642,7 @@ export default function SettingsPanel({
             </div>
 
             <div className="space-y-1">
-              <label className="text-[10px] text-text-secondary uppercase font-bold">
+              <label className="text-[11px] text-text-secondary uppercase font-bold">
                 Agency Tagline
               </label>
               <input
@@ -656,7 +655,7 @@ export default function SettingsPanel({
             </div>
 
             <div className="space-y-1">
-              <label className="text-[10px] text-text-secondary uppercase font-bold">
+              <label className="text-[11px] text-text-secondary uppercase font-bold">
                 Meeting Booking Link (Cal.com / Calendly / Meet)
               </label>
               <input
@@ -669,7 +668,7 @@ export default function SettingsPanel({
             </div>
 
             <div className="space-y-1">
-              <label className="text-[10px] text-text-secondary uppercase font-bold">
+              <label className="text-[11px] text-text-secondary uppercase font-bold">
                 Public Contact / Phone Line
               </label>
               <input
@@ -682,7 +681,7 @@ export default function SettingsPanel({
             </div>
 
             <div className="space-y-1 md:col-span-2">
-              <label className="text-[10px] text-text-secondary uppercase font-bold">
+              <label className="text-[11px] text-text-secondary uppercase font-bold">
                 Default Stripe / Payment Checkout URL
               </label>
               <input
@@ -697,7 +696,7 @@ export default function SettingsPanel({
             <div className="md:col-span-2 pt-2 flex justify-end">
               <button
                 type="submit"
-                className="px-4 py-2 bg-brand hover:bg-brand-hover text-white text-xs font-mono font-bold rounded-sm transition-colors cursor-pointer flex items-center gap-2 shadow-sm"
+                className="px-4 py-2 bg-brand hover:bg-brand-hover text-accent-contrast text-xs font-mono font-bold rounded-sm transition-colors cursor-pointer flex items-center gap-2 shadow-sm"
               >
                 <Check className="w-3.5 h-3.5" /> SAVE WHITE-LABEL BRANDING
               </button>
@@ -707,11 +706,11 @@ export default function SettingsPanel({
       </div>
 
       {/* BRANDING & IDENTITY WORKSPACE (Pitch feature) */}
-      <div className={`border rounded-lg p-6 space-y-6 ${cardBg}`}>
-        <div className="flex items-center gap-2 border-b pb-3 border-inherit">
+      <div className={`border rounded-lg p-6 space-y-6 min-w-0 ${cardBg}`}>
+        <div className="flex flex-wrap items-center gap-2 border-b pb-3 border-inherit">
           <ImageIcon className="w-4 h-4 text-accent" />
           <span className="text-xs font-mono uppercase tracking-wider font-bold">Organizational Branding & Visual Identity</span>
-          <span className="ml-auto text-[9px] px-1.5 py-0.5 bg-accent/10 text-accent font-mono border border-accent/20 rounded font-semibold uppercase">PITCH DECK ASSET</span>
+          <span className="ml-auto text-[11px] px-1.5 py-0.5 bg-accent/10 text-accent font-mono border border-accent/20 rounded font-semibold uppercase">PITCH DECK ASSET</span>
         </div>
 
         <p className="text-xs text-inherit leading-relaxed max-w-2xl">
@@ -723,7 +722,7 @@ export default function SettingsPanel({
           <div className={`p-5 rounded border flex flex-col justify-between ${innerBg} ${borderCol}`}>
             <div className="space-y-3">
               <div className="flex items-center gap-2">
-                <User className="w-4 h-4 text-indigo-400" />
+                <User className="w-4 h-4 text-accent" />
                 <span className="text-xs font-mono font-bold uppercase tracking-wide text-inherit">Executive Profile Image</span>
               </div>
               <p className="text-[11px] text-inherit opacity-80 leading-normal">
@@ -737,25 +736,25 @@ export default function SettingsPanel({
                   <img 
                     src={profilePhoto} 
                     alt="Profile Preview" 
-                    className="w-16 h-16 rounded-full border border-indigo-500/30 object-cover shadow-lg"
+                    className="w-16 h-16 rounded-full border border-accent/30 object-cover shadow-lg"
                     referrerPolicy="no-referrer"
                   />
                   <button 
                     onClick={() => onProfilePhotoUpdate(null)}
-                    className="absolute -top-1 -right-1 p-1 bg-red-600 hover:bg-red-700 text-white rounded-full transition-colors shadow-md"
+                    className="absolute -top-1 -right-1 p-1 bg-negative hover:bg-negative/90 text-accent-contrast rounded-full transition-colors shadow-md"
                     title="Remove Photo"
                   >
                     <Trash2 className="w-3 h-3" />
                   </button>
                 </div>
               ) : (
-                <div className="w-16 h-16 rounded-full border border-dashed border-indigo-500/30 bg-indigo-500/5 flex flex-col items-center justify-center text-indigo-400 shrink-0">
+                <div className="w-16 h-16 rounded-full border border-dashed border-accent/30 bg-accent/5 flex flex-col items-center justify-center text-accent shrink-0">
                   <User className="w-6 h-6 stroke-[1.5]" />
                 </div>
               )}
 
               <div className="flex-1">
-                <label className="inline-flex items-center gap-2 px-3 h-8 bg-indigo-600 hover:bg-indigo-700 text-white font-mono text-[10px] font-bold uppercase tracking-wider rounded cursor-pointer transition-colors shadow-sm shadow-indigo-500/10">
+                <label className="inline-flex items-center gap-2 px-3 h-8 bg-accent hover:bg-accent/90 text-accent-contrast font-mono text-[11px] font-bold uppercase tracking-wider rounded cursor-pointer transition-colors shadow-sm ">
                   <Upload className="w-3 h-3" />
                   <span>Choose Photo</span>
                   <input 
@@ -765,7 +764,7 @@ export default function SettingsPanel({
                     className="hidden" 
                   />
                 </label>
-                <div className="text-[9px] mt-1.5 text-inherit opacity-60">PNG, JPG or WEBP. Max size 2MB.</div>
+                <div className="text-[11px] mt-1.5 text-inherit opacity-60">PNG, JPG or WEBP. Max size 2MB.</div>
               </div>
             </div>
           </div>
@@ -774,7 +773,7 @@ export default function SettingsPanel({
           <div className={`p-5 rounded border flex flex-col justify-between ${innerBg} ${borderCol}`}>
             <div className="space-y-3">
               <div className="flex items-center gap-2">
-                <Building className="w-4 h-4 text-emerald-400" />
+                <Building className="w-4 h-4 text-positive" />
                 <span className="text-xs font-mono font-bold uppercase tracking-wide text-inherit">Corporate Branding Logo</span>
               </div>
               <p className="text-[11px] text-inherit opacity-80 leading-normal">
@@ -788,25 +787,25 @@ export default function SettingsPanel({
                   <img 
                     src={companyLogo} 
                     alt="Company Preview" 
-                    className="w-16 h-16 rounded-lg border border-emerald-500/30 object-cover shadow-lg"
+                    className="w-16 h-16 rounded-lg border border-positive/30 object-cover shadow-lg"
                     referrerPolicy="no-referrer"
                   />
                   <button 
                     onClick={() => onCompanyLogoUpdate(null)}
-                    className="absolute -top-1 -right-1 p-1 bg-red-600 hover:bg-red-700 text-white rounded-full transition-colors shadow-md"
+                    className="absolute -top-1 -right-1 p-1 bg-negative hover:bg-negative/90 text-accent-contrast rounded-full transition-colors shadow-md"
                     title="Remove Logo"
                   >
                     <Trash2 className="w-3 h-3" />
                   </button>
                 </div>
               ) : (
-                <div className="w-16 h-16 rounded-lg border border-dashed border-emerald-500/30 bg-emerald-500/5 flex flex-col items-center justify-center text-emerald-400 shrink-0">
+                <div className="w-16 h-16 rounded-lg border border-dashed border-positive/30 bg-positive-dim flex flex-col items-center justify-center text-positive shrink-0">
                   <Building className="w-6 h-6 stroke-[1.5]" />
                 </div>
               )}
 
               <div className="flex-1">
-                <label className="inline-flex items-center gap-2 px-3 h-8 bg-emerald-600 hover:bg-emerald-700 text-white font-mono text-[10px] font-bold uppercase tracking-wider rounded cursor-pointer transition-colors shadow-sm shadow-emerald-500/10">
+                <label className="inline-flex items-center gap-2 px-3 h-8 bg-positive hover:bg-positive/90 text-accent-contrast font-mono text-[11px] font-bold uppercase tracking-wider rounded cursor-pointer transition-colors shadow-sm">
                   <Upload className="w-3 h-3" />
                   <span>Choose Logo</span>
                   <input 
@@ -816,7 +815,7 @@ export default function SettingsPanel({
                     className="hidden" 
                   />
                 </label>
-                <div className="text-[9px] mt-1.5 text-inherit opacity-60">Ideal format: Square icon or custom wordmark.</div>
+                <div className="text-[11px] mt-1.5 text-inherit opacity-60">Ideal format: Square icon or custom wordmark.</div>
               </div>
             </div>
           </div>
@@ -824,10 +823,10 @@ export default function SettingsPanel({
       </div>
 
       {/* DIRECT INTEGRATION GATEWAY: POSTGRESQL & JWT SECURITY */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 min-w-0">
         {/* PostgreSQL Database Section */}
         <div className={`border rounded-lg p-5 space-y-6 ${cardBg}`}>
-          <div className="flex items-center gap-2 border-b pb-3 border-inherit">
+          <div className="flex flex-wrap items-center gap-2 border-b pb-3 border-inherit">
             <Database className="w-4 h-4 text-accent" />
             <span className="text-xs font-mono uppercase tracking-wider font-bold">Neon PostgreSQL Database Link</span>
           </div>
@@ -844,7 +843,7 @@ export default function SettingsPanel({
 
           <form onSubmit={handleSavePostgres} className="space-y-4 text-xs font-sans">
             <div className="space-y-1">
-              <label className="block text-[10px] font-mono opacity-80 uppercase tracking-wider font-bold">PostgreSQL Connection URI</label>
+              <label className="block text-[11px] font-mono opacity-80 uppercase tracking-wider font-bold">PostgreSQL Connection URI</label>
               <textarea
                 rows={3}
                 required
@@ -877,9 +876,9 @@ export default function SettingsPanel({
                 type="button"
                 onClick={handleSyncToPostgres}
                 disabled={postgresSyncing}
-                className="bg-indigo-600/20 hover:bg-indigo-600/30 border border-indigo-500/40 text-indigo-300 py-2 px-4 rounded font-mono text-xs font-bold uppercase transition-colors tracking-wider flex items-center gap-2 cursor-pointer disabled:opacity-50"
+                className="bg-accent/20 hover:bg-accent/30 border border-accent/40 text-accent py-2 px-4 rounded font-mono text-xs font-bold uppercase transition-colors tracking-wider flex items-center gap-2 cursor-pointer disabled:opacity-50"
               >
-                <Database className={`w-3.5 h-3.5 text-indigo-400 ${postgresSyncing ? 'animate-bounce' : ''}`} />
+                <Database className={`w-3.5 h-3.5 text-accent ${postgresSyncing ? 'animate-bounce' : ''}`} />
                 {postgresSyncing ? 'Syncing to Neon...' : 'Sync Leads & Neural Weights'}
               </button>
             </div>
@@ -889,17 +888,17 @@ export default function SettingsPanel({
             <div className={`p-3 border text-xs rounded-sm font-mono leading-relaxed ${
               postgresStatus.connected 
                 ? 'bg-positive/10 border-positive/30 text-positive'
-                : 'bg-red-500/10 border-red-500/30 text-red-400'
+                : 'bg-negative-dim border-negative/30 text-negative'
             }`}>
               <div className="flex items-center justify-between font-bold">
                 <span>{postgresStatus.connected ? 'POSTGRESQL ONLINE' : 'CONNECTION TEST RESULT'}</span>
                 {postgresStatus.latencyMs !== undefined && (
-                  <span className="text-[10px] px-1.5 py-0.5 bg-bg-dark rounded border border-border-dim text-text-secondary">{postgresStatus.latencyMs}ms</span>
+                  <span className="text-[11px] px-1.5 py-0.5 bg-bg-dark rounded border border-border-dim text-text-secondary">{postgresStatus.latencyMs}ms</span>
                 )}
               </div>
               <div className="text-[11px] mt-1">{postgresStatus.message}</div>
               {postgresStatus.version && (
-                <div className="text-[10px] opacity-75 mt-0.5 truncate">{postgresStatus.version}</div>
+                <div className="text-[11px] opacity-75 mt-0.5 break-words">{postgresStatus.version}</div>
               )}
             </div>
           )}
@@ -909,7 +908,7 @@ export default function SettingsPanel({
 
         {/* Authentication Token Section */}
         <div className={`border rounded-lg p-5 space-y-6 ${cardBg}`}>
-          <div className="flex items-center gap-2 border-b pb-3 border-inherit">
+          <div className="flex flex-wrap items-center gap-2 border-b pb-3 border-inherit">
             <Lock className="w-4 h-4 text-accent" />
             <span className="text-xs font-mono uppercase tracking-wider font-bold">Your Active Session Token</span>
           </div>
@@ -920,13 +919,13 @@ export default function SettingsPanel({
 
           <div className="space-y-3 font-sans">
             <div className="space-y-1">
-              <label className="block text-[10px] font-mono opacity-80 uppercase tracking-wider font-bold">Bearer Authentication Token</label>
+              <label className="block text-[11px] font-mono opacity-80 uppercase tracking-wider font-bold">Bearer Authentication Token</label>
               <div className="relative">
                 <textarea
                   readOnly
                   rows={3}
                   value={token}
-                  className={`w-full border rounded p-2 pr-12 focus:outline-none text-inherit font-mono text-[10px] leading-relaxed break-all resize-none ${innerBg} ${borderCol}`}
+                  className={`w-full border rounded p-2 pr-12 focus:outline-none text-inherit font-mono text-[11px] leading-relaxed break-all resize-none ${innerBg} ${borderCol}`}
                 />
                 <button
                   type="button"
@@ -943,7 +942,7 @@ export default function SettingsPanel({
               </div>
             </div>
 
-            <div className="flex items-center gap-2 text-[10px] font-mono text-text-secondary mt-1">
+            <div className="flex items-center gap-2 text-[11px] font-mono text-text-secondary mt-1">
               <span className="w-1.5 h-1.5 rounded-full bg-positive animate-pulse" />
               <span>ACTIVE SESSION VALID</span>
             </div>
@@ -953,7 +952,7 @@ export default function SettingsPanel({
 
       {/* Connected Business Services & Third-Party API Credentials */}
       <div className={`border rounded-lg p-5 space-y-6 ${cardBg} mt-6`}>
-        <div className="flex items-center gap-2 border-b pb-3 border-inherit">
+        <div className="flex flex-wrap items-center gap-2 border-b pb-3 border-inherit">
           <Globe className="w-4 h-4 text-accent" />
           <span className="text-xs font-mono uppercase tracking-wider font-bold">Connected Business Services & Third-Party API Credentials</span>
         </div>
@@ -974,7 +973,7 @@ export default function SettingsPanel({
             <div className={`border p-3.5 rounded space-y-2 ${innerBg} ${borderCol}`}>
               <div className="flex justify-between items-center">
                 <span className="font-bold uppercase font-mono text-[11px] text-accent">Stripe Billing API</span>
-                <span className={`text-[9px] font-mono px-1.5 py-0.5 rounded font-bold uppercase ${connectorKeys.stripe ? 'bg-positive/20 text-positive' : 'bg-yellow-500/20 text-yellow-400'}`}>
+                <span className={`text-[11px] font-mono px-1.5 py-0.5 rounded font-bold uppercase ${connectorKeys.stripe ? 'bg-positive/20 text-positive' : 'bg-warning-dim text-warning'}`}>
                   {connectorKeys.stripe ? 'Active' : 'Unconfigured'}
                 </span>
               </div>
@@ -985,14 +984,14 @@ export default function SettingsPanel({
                 placeholder="sk_live_..."
                 className={`w-full border rounded p-2 focus:outline-none focus:border-accent text-inherit font-mono text-xs ${innerBg} ${borderCol}`}
               />
-              <span className="text-[10px] text-inherit opacity-60 block">Key: STRIPE_SECRET_KEY</span>
+              <span className="text-[11px] text-inherit opacity-60 block">Key: STRIPE_SECRET_KEY</span>
             </div>
 
             {/* Twilio */}
             <div className={`border p-3.5 rounded space-y-2 ${innerBg} ${borderCol}`}>
               <div className="flex justify-between items-center">
                 <span className="font-bold uppercase font-mono text-[11px] text-accent">Twilio SMS Gateway</span>
-                <span className={`text-[9px] font-mono px-1.5 py-0.5 rounded font-bold uppercase ${connectorKeys.twilio ? 'bg-positive/20 text-positive' : 'bg-yellow-500/20 text-yellow-400'}`}>
+                <span className={`text-[11px] font-mono px-1.5 py-0.5 rounded font-bold uppercase ${connectorKeys.twilio ? 'bg-positive/20 text-positive' : 'bg-warning-dim text-warning'}`}>
                   {connectorKeys.twilio ? 'Active' : 'Unconfigured'}
                 </span>
               </div>
@@ -1003,14 +1002,14 @@ export default function SettingsPanel({
                 placeholder="AC... (Auth Token)"
                 className={`w-full border rounded p-2 focus:outline-none focus:border-accent text-inherit font-mono text-xs ${innerBg} ${borderCol}`}
               />
-              <span className="text-[10px] text-inherit opacity-60 block">Key: TWILIO_AUTH_TOKEN</span>
+              <span className="text-[11px] text-inherit opacity-60 block">Key: TWILIO_AUTH_TOKEN</span>
             </div>
 
             {/* SendGrid */}
             <div className={`border p-3.5 rounded space-y-2 ${innerBg} ${borderCol}`}>
               <div className="flex justify-between items-center">
                 <span className="font-bold uppercase font-mono text-[11px] text-accent">SendGrid Mail API</span>
-                <span className={`text-[9px] font-mono px-1.5 py-0.5 rounded font-bold uppercase ${connectorKeys.sendgrid ? 'bg-positive/20 text-positive' : 'bg-yellow-500/20 text-yellow-400'}`}>
+                <span className={`text-[11px] font-mono px-1.5 py-0.5 rounded font-bold uppercase ${connectorKeys.sendgrid ? 'bg-positive/20 text-positive' : 'bg-warning-dim text-warning'}`}>
                   {connectorKeys.sendgrid ? 'Active' : 'Unconfigured'}
                 </span>
               </div>
@@ -1021,14 +1020,14 @@ export default function SettingsPanel({
                 placeholder="SG..."
                 className={`w-full border rounded p-2 focus:outline-none focus:border-accent text-inherit font-mono text-xs ${innerBg} ${borderCol}`}
               />
-              <span className="text-[10px] text-inherit opacity-60 block">Key: SENDGRID_API_KEY</span>
+              <span className="text-[11px] text-inherit opacity-60 block">Key: SENDGRID_API_KEY</span>
             </div>
 
             {/* Google Maps */}
             <div className={`border p-3.5 rounded space-y-2 ${innerBg} ${borderCol}`}>
               <div className="flex justify-between items-center">
                 <span className="font-bold uppercase font-mono text-[11px] text-accent">Google Maps Platform</span>
-                <span className={`text-[9px] font-mono px-1.5 py-0.5 rounded font-bold uppercase ${connectorKeys.googleMaps ? 'bg-positive/20 text-positive' : 'bg-yellow-500/20 text-yellow-400'}`}>
+                <span className={`text-[11px] font-mono px-1.5 py-0.5 rounded font-bold uppercase ${connectorKeys.googleMaps ? 'bg-positive/20 text-positive' : 'bg-warning-dim text-warning'}`}>
                   {connectorKeys.googleMaps ? 'Active' : 'Unconfigured'}
                 </span>
               </div>
@@ -1039,14 +1038,14 @@ export default function SettingsPanel({
                 placeholder="AIza..."
                 className={`w-full border rounded p-2 focus:outline-none focus:border-accent text-inherit font-mono text-xs ${innerBg} ${borderCol}`}
               />
-              <span className="text-[10px] text-inherit opacity-60 block">Key: VITE_GOOGLE_MAPS_API_KEY</span>
+              <span className="text-[11px] text-inherit opacity-60 block">Key: VITE_GOOGLE_MAPS_API_KEY</span>
             </div>
 
             {/* Google Ads */}
             <div className={`border p-3.5 rounded space-y-2 ${innerBg} ${borderCol}`}>
               <div className="flex justify-between items-center">
                 <span className="font-bold uppercase font-mono text-[11px] text-accent">Google Ads API</span>
-                <span className={`text-[9px] font-mono px-1.5 py-0.5 rounded font-bold uppercase ${connectorKeys.googleAds ? 'bg-positive/20 text-positive' : 'bg-yellow-500/20 text-yellow-400'}`}>
+                <span className={`text-[11px] font-mono px-1.5 py-0.5 rounded font-bold uppercase ${connectorKeys.googleAds ? 'bg-positive/20 text-positive' : 'bg-warning-dim text-warning'}`}>
                   {connectorKeys.googleAds ? 'Active' : 'Unconfigured'}
                 </span>
               </div>
@@ -1057,14 +1056,14 @@ export default function SettingsPanel({
                 placeholder="Developer Token / Client ID"
                 className={`w-full border rounded p-2 focus:outline-none focus:border-accent text-inherit font-mono text-xs ${innerBg} ${borderCol}`}
               />
-              <span className="text-[10px] text-inherit opacity-60 block">Key: GOOGLE_ADS_DEVELOPER_TOKEN</span>
+              <span className="text-[11px] text-inherit opacity-60 block">Key: GOOGLE_ADS_DEVELOPER_TOKEN</span>
             </div>
 
             {/* Meta Ads */}
             <div className={`border p-3.5 rounded space-y-2 ${innerBg} ${borderCol}`}>
               <div className="flex justify-between items-center">
                 <span className="font-bold uppercase font-mono text-[11px] text-accent">Meta Marketing API</span>
-                <span className={`text-[9px] font-mono px-1.5 py-0.5 rounded font-bold uppercase ${connectorKeys.metaAds ? 'bg-positive/20 text-positive' : 'bg-yellow-500/20 text-yellow-400'}`}>
+                <span className={`text-[11px] font-mono px-1.5 py-0.5 rounded font-bold uppercase ${connectorKeys.metaAds ? 'bg-positive/20 text-positive' : 'bg-warning-dim text-warning'}`}>
                   {connectorKeys.metaAds ? 'Active' : 'Unconfigured'}
                 </span>
               </div>
@@ -1075,14 +1074,14 @@ export default function SettingsPanel({
                 placeholder="EAAG..."
                 className={`w-full border rounded p-2 focus:outline-none focus:border-accent text-inherit font-mono text-xs ${innerBg} ${borderCol}`}
               />
-              <span className="text-[10px] text-inherit opacity-60 block">Key: META_SYSTEM_USER_TOKEN</span>
+              <span className="text-[11px] text-inherit opacity-60 block">Key: META_SYSTEM_USER_TOKEN</span>
             </div>
 
             {/* GA4 / Search Console */}
             <div className={`border p-3.5 rounded space-y-2 ${innerBg} ${borderCol}`}>
               <div className="flex justify-between items-center">
                 <span className="font-bold uppercase font-mono text-[11px] text-accent">GA4 & Search Console</span>
-                <span className={`text-[9px] font-mono px-1.5 py-0.5 rounded font-bold uppercase ${connectorKeys.ga4 ? 'bg-positive/20 text-positive' : 'bg-yellow-500/20 text-yellow-400'}`}>
+                <span className={`text-[11px] font-mono px-1.5 py-0.5 rounded font-bold uppercase ${connectorKeys.ga4 ? 'bg-positive/20 text-positive' : 'bg-warning-dim text-warning'}`}>
                   {connectorKeys.ga4 ? 'Active' : 'Unconfigured'}
                 </span>
               </div>
@@ -1093,14 +1092,14 @@ export default function SettingsPanel({
                 placeholder="Service Account JSON Token"
                 className={`w-full border rounded p-2 focus:outline-none focus:border-accent text-inherit font-mono text-xs ${innerBg} ${borderCol}`}
               />
-              <span className="text-[10px] text-inherit opacity-60 block">Key: GOOGLE_SERVICE_ACCOUNT</span>
+              <span className="text-[11px] text-inherit opacity-60 block">Key: GOOGLE_SERVICE_ACCOUNT</span>
             </div>
 
             {/* Slack Webhook */}
             <div className={`border p-3.5 rounded space-y-2 ${innerBg} ${borderCol}`}>
               <div className="flex justify-between items-center">
                 <span className="font-bold uppercase font-mono text-[11px] text-accent">Slack Operations Webhook</span>
-                <span className={`text-[9px] font-mono px-1.5 py-0.5 rounded font-bold uppercase ${connectorKeys.slack ? 'bg-positive/20 text-positive' : 'bg-yellow-500/20 text-yellow-400'}`}>
+                <span className={`text-[11px] font-mono px-1.5 py-0.5 rounded font-bold uppercase ${connectorKeys.slack ? 'bg-positive/20 text-positive' : 'bg-warning-dim text-warning'}`}>
                   {connectorKeys.slack ? 'Active' : 'Unconfigured'}
                 </span>
               </div>
@@ -1111,14 +1110,14 @@ export default function SettingsPanel({
                 placeholder="https://hooks.slack.com/services/..."
                 className={`w-full border rounded p-2 focus:outline-none focus:border-accent text-inherit font-mono text-xs ${innerBg} ${borderCol}`}
               />
-              <span className="text-[10px] text-inherit opacity-60 block">Key: SLACK_WEBHOOK_URL</span>
+              <span className="text-[11px] text-inherit opacity-60 block">Key: SLACK_WEBHOOK_URL</span>
             </div>
 
             {/* Google Drive */}
             <div className={`border p-3.5 rounded space-y-2 ${innerBg} ${borderCol}`}>
               <div className="flex justify-between items-center">
                 <span className="font-bold uppercase font-mono text-[11px] text-accent">Google Drive Asset Cloud</span>
-                <span className={`text-[9px] font-mono px-1.5 py-0.5 rounded font-bold uppercase ${connectorKeys.googleDrive ? 'bg-positive/20 text-positive' : 'bg-yellow-500/20 text-yellow-400'}`}>
+                <span className={`text-[11px] font-mono px-1.5 py-0.5 rounded font-bold uppercase ${connectorKeys.googleDrive ? 'bg-positive/20 text-positive' : 'bg-warning-dim text-warning'}`}>
                   {connectorKeys.googleDrive ? 'Active' : 'Unconfigured'}
                 </span>
               </div>
@@ -1129,14 +1128,14 @@ export default function SettingsPanel({
                 placeholder="OAuth Client ID / Secret"
                 className={`w-full border rounded p-2 focus:outline-none focus:border-accent text-inherit font-mono text-xs ${innerBg} ${borderCol}`}
               />
-              <span className="text-[10px] text-inherit opacity-60 block">Key: GOOGLE_DRIVE_CLIENT_ID</span>
+              <span className="text-[11px] text-inherit opacity-60 block">Key: GOOGLE_DRIVE_CLIENT_ID</span>
             </div>
 
             {/* LinkedIn */}
             <div className={`border p-3.5 rounded space-y-2 ${innerBg} ${borderCol}`}>
               <div className="flex justify-between items-center">
                 <span className="font-bold uppercase font-mono text-[11px] text-accent">LinkedIn Sales Integrator</span>
-                <span className={`text-[9px] font-mono px-1.5 py-0.5 rounded font-bold uppercase ${connectorKeys.linkedin ? 'bg-positive/20 text-positive' : 'bg-yellow-500/20 text-yellow-400'}`}>
+                <span className={`text-[11px] font-mono px-1.5 py-0.5 rounded font-bold uppercase ${connectorKeys.linkedin ? 'bg-positive/20 text-positive' : 'bg-warning-dim text-warning'}`}>
                   {connectorKeys.linkedin ? 'Active' : 'Unconfigured'}
                 </span>
               </div>
@@ -1147,14 +1146,14 @@ export default function SettingsPanel({
                 placeholder="AQV..."
                 className={`w-full border rounded p-2 focus:outline-none focus:border-accent text-inherit font-mono text-xs ${innerBg} ${borderCol}`}
               />
-              <span className="text-[10px] text-inherit opacity-60 block">Key: LINKEDIN_API_TOKEN</span>
+              <span className="text-[11px] text-inherit opacity-60 block">Key: LINKEDIN_API_TOKEN</span>
             </div>
 
             {/* Salesforce */}
             <div className={`border p-3.5 rounded space-y-2 ${innerBg} ${borderCol}`}>
               <div className="flex justify-between items-center">
                 <span className="font-bold uppercase font-mono text-[11px] text-accent">Salesforce CRM Bridge</span>
-                <span className={`text-[9px] font-mono px-1.5 py-0.5 rounded font-bold uppercase ${connectorKeys.salesforce ? 'bg-positive/20 text-positive' : 'bg-yellow-500/20 text-yellow-400'}`}>
+                <span className={`text-[11px] font-mono px-1.5 py-0.5 rounded font-bold uppercase ${connectorKeys.salesforce ? 'bg-positive/20 text-positive' : 'bg-warning-dim text-warning'}`}>
                   {connectorKeys.salesforce ? 'Active' : 'Unconfigured'}
                 </span>
               </div>
@@ -1165,14 +1164,14 @@ export default function SettingsPanel({
                 placeholder="3MVG9..."
                 className={`w-full border rounded p-2 focus:outline-none focus:border-accent text-inherit font-mono text-xs ${innerBg} ${borderCol}`}
               />
-              <span className="text-[10px] text-inherit opacity-60 block">Key: SALESFORCE_CONSUMER_KEY</span>
+              <span className="text-[11px] text-inherit opacity-60 block">Key: SALESFORCE_CONSUMER_KEY</span>
             </div>
 
             {/* HubSpot */}
             <div className={`border p-3.5 rounded space-y-2 ${innerBg} ${borderCol}`}>
               <div className="flex justify-between items-center">
                 <span className="font-bold uppercase font-mono text-[11px] text-accent">HubSpot Marketing Sync</span>
-                <span className={`text-[9px] font-mono px-1.5 py-0.5 rounded font-bold uppercase ${connectorKeys.hubspot ? 'bg-positive/20 text-positive' : 'bg-yellow-500/20 text-yellow-400'}`}>
+                <span className={`text-[11px] font-mono px-1.5 py-0.5 rounded font-bold uppercase ${connectorKeys.hubspot ? 'bg-positive/20 text-positive' : 'bg-warning-dim text-warning'}`}>
                   {connectorKeys.hubspot ? 'Active' : 'Unconfigured'}
                 </span>
               </div>
@@ -1183,14 +1182,14 @@ export default function SettingsPanel({
                 placeholder="pat-na1-..."
                 className={`w-full border rounded p-2 focus:outline-none focus:border-accent text-inherit font-mono text-xs ${innerBg} ${borderCol}`}
               />
-              <span className="text-[10px] text-inherit opacity-60 block">Key: HUBSPOT_ACCESS_TOKEN</span>
+              <span className="text-[11px] text-inherit opacity-60 block">Key: HUBSPOT_ACCESS_TOKEN</span>
             </div>
 
             {/* Mailchimp */}
             <div className={`border p-3.5 rounded space-y-2 ${innerBg} ${borderCol}`}>
               <div className="flex justify-between items-center">
                 <span className="font-bold uppercase font-mono text-[11px] text-accent">Mailchimp Newsletter API</span>
-                <span className={`text-[9px] font-mono px-1.5 py-0.5 rounded font-bold uppercase ${connectorKeys.mailchimp ? 'bg-positive/20 text-positive' : 'bg-yellow-500/20 text-yellow-400'}`}>
+                <span className={`text-[11px] font-mono px-1.5 py-0.5 rounded font-bold uppercase ${connectorKeys.mailchimp ? 'bg-positive/20 text-positive' : 'bg-warning-dim text-warning'}`}>
                   {connectorKeys.mailchimp ? 'Active' : 'Unconfigured'}
                 </span>
               </div>
@@ -1201,14 +1200,14 @@ export default function SettingsPanel({
                 placeholder="...-us20"
                 className={`w-full border rounded p-2 focus:outline-none focus:border-accent text-inherit font-mono text-xs ${innerBg} ${borderCol}`}
               />
-              <span className="text-[10px] text-inherit opacity-60 block">Key: MAILCHIMP_API_KEY</span>
+              <span className="text-[11px] text-inherit opacity-60 block">Key: MAILCHIMP_API_KEY</span>
             </div>
 
             {/* Notion */}
             <div className={`border p-3.5 rounded space-y-2 ${innerBg} ${borderCol}`}>
               <div className="flex justify-between items-center">
                 <span className="font-bold uppercase font-mono text-[11px] text-accent">Notion Workspace Sync</span>
-                <span className={`text-[9px] font-mono px-1.5 py-0.5 rounded font-bold uppercase ${connectorKeys.notion ? 'bg-positive/20 text-positive' : 'bg-yellow-500/20 text-yellow-400'}`}>
+                <span className={`text-[11px] font-mono px-1.5 py-0.5 rounded font-bold uppercase ${connectorKeys.notion ? 'bg-positive/20 text-positive' : 'bg-warning-dim text-warning'}`}>
                   {connectorKeys.notion ? 'Active' : 'Unconfigured'}
                 </span>
               </div>
@@ -1219,14 +1218,14 @@ export default function SettingsPanel({
                 placeholder="ntn_..."
                 className={`w-full border rounded p-2 focus:outline-none focus:border-accent text-inherit font-mono text-xs ${innerBg} ${borderCol}`}
               />
-              <span className="text-[10px] text-inherit opacity-60 block">Key: NOTION_INTEGRATION_SECRET</span>
+              <span className="text-[11px] text-inherit opacity-60 block">Key: NOTION_INTEGRATION_SECRET</span>
             </div>
           </div>
         </div>
 
         {/* Account Security Password Reset */}
         <div className={`border rounded-lg p-5 space-y-6 ${cardBg}`}>
-          <div className="flex items-center gap-2 border-b pb-3 border-inherit">
+          <div className="flex flex-wrap items-center gap-2 border-b pb-3 border-inherit">
             <Lock className="w-4 h-4 text-accent" />
             <span className="text-xs font-mono uppercase tracking-wider font-bold">Identity Security Reset</span>
           </div>
@@ -1235,7 +1234,7 @@ export default function SettingsPanel({
             Reset password to update identity security policies. Performing this update immediately invalidates all active sessions except your current authenticated window.
           </p>
 
-          <div className="p-4 border border-amber-500/30 bg-amber-500/5 rounded text-xs leading-relaxed">
+          <div className="p-4 border border-warning/30 bg-warning-dim rounded text-xs leading-relaxed">
             Password changes are unavailable in this deployment because a secure authenticated change-password flow has not been implemented. No password will be submitted from this screen.
           </div>
 
@@ -1253,17 +1252,17 @@ export default function SettingsPanel({
 
       {/* PUBLIC SHARE & REDDIT TESTING SHIELD */}
       <div className={`border rounded-lg p-5 mt-6 space-y-5 ${cardBg}`}>
-        <div className="flex items-center justify-between border-b pb-3 border-inherit">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b pb-3 border-inherit">
           <div className="flex items-center gap-2">
             <Globe className="w-4 h-4 text-brand" />
             <span className="text-xs font-mono uppercase tracking-wider font-bold">Public Link Controls</span>
           </div>
-          <span className={`text-[10px] font-mono px-2 py-0.5 rounded border uppercase font-bold ${
+          <span className={`text-[11px] font-mono px-2 py-0.5 rounded border uppercase font-bold ${
             publicLinkMode === 'safe_sandbox' 
-              ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
+              ? 'bg-positive-dim text-positive border-positive/30'
               : publicLinkMode === 'disabled'
-              ? 'bg-red-500/10 text-red-400 border-red-500/30'
-              : 'bg-amber-500/10 text-amber-400 border-amber-500/30'
+              ? 'bg-negative-dim text-negative border-negative/30'
+              : 'bg-warning-dim text-warning border-warning/30'
           }`}>
             {publicLinkMode === 'safe_sandbox' && '🟢 Safe Sandbox Active'}
             {publicLinkMode === 'disabled' && '🔴 Link Deactivated'}
@@ -1274,14 +1273,14 @@ export default function SettingsPanel({
         <p className="text-xs text-inherit opacity-85 leading-relaxed font-sans">
           Public-link controls are best-effort and must not be treated as an authentication boundary. A verified deployment URL is shown only when APP_URL is configured. Public demo access is disabled by default; do not share a link until deployment and access controls have been tested.
         </p>
-        {publicLinkError && <div role="alert" className="p-3 text-xs rounded border border-red-500/30 text-red-400">{publicLinkError}</div>}
+        {publicLinkError && <div role="alert" className="p-3 text-xs rounded border border-negative/30 text-negative">{publicLinkError}</div>}
         {/* Share Link Bar */}
         <div className={`border rounded p-3 flex items-center justify-between gap-3 ${innerBg} ${borderCol}`}>
           <div className="min-w-0 flex-1">
-            <div className="text-[10px] font-mono opacity-70 uppercase tracking-wider font-bold mb-1">
+            <div className="text-[11px] font-mono opacity-70 uppercase tracking-wider font-bold mb-1">
               Configured deployment URL
             </div>
-            <div className="text-xs font-mono text-brand truncate font-bold">
+            <div className="text-xs font-mono text-brand break-all whitespace-normal font-bold">
               {sharedUrl || 'No verified public URL configured'}
             </div>
           </div>
@@ -1292,14 +1291,14 @@ export default function SettingsPanel({
             className="px-3 py-1.5 rounded bg-brand/15 hover:bg-brand/25 border border-brand/40 text-brand text-xs font-mono font-bold transition-colors shrink-0 flex items-center gap-1.5 cursor-pointer"
             title={sharedUrl ? 'Copy configured public URL' : 'Configure APP_URL before sharing'}
           >
-            {copiedLink ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+            {copiedLink ? <Check className="w-3.5 h-3.5 text-positive" /> : <Copy className="w-3.5 h-3.5" />}
             <span>{copiedLink ? 'COPIED' : 'COPY LINK'}</span>
           </button>
         </div>
 
         {/* Mode Selector Buttons */}
         <div className="space-y-2">
-          <label className="block text-[10px] font-mono opacity-80 uppercase tracking-wider font-bold">
+          <label className="block text-[11px] font-mono opacity-80 uppercase tracking-wider font-bold">
             Public Traffic Control Mode
           </label>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
@@ -1309,14 +1308,14 @@ export default function SettingsPanel({
               onClick={() => handleUpdatePublicLinkMode('safe_sandbox')}
               className={`p-3 rounded border text-left transition-all cursor-pointer ${
                 publicLinkMode === 'safe_sandbox'
-                  ? 'border-emerald-500 bg-emerald-500/10 text-emerald-300 shadow-sm'
-                  : 'border-inherit hover:border-emerald-500/50 opacity-70 hover:opacity-100'
+                  ? 'border-positive bg-positive-dim text-positive shadow-sm'
+                  : 'border-inherit hover:border-positive/50 opacity-70 hover:opacity-100'
               }`}
             >
               <div className="text-xs font-mono font-bold flex items-center gap-1.5">
                 <span>🛡️ Safe Sandbox</span>
               </div>
-              <p className="text-[10px] opacity-75 mt-1 font-sans leading-normal">
+              <p className="text-[11px] opacity-75 mt-1 font-sans leading-normal">
                 Recommended for Reddit. Rate-limited, AI quota shield active, isolated data.
               </p>
             </button>
@@ -1327,14 +1326,14 @@ export default function SettingsPanel({
               onClick={() => handleUpdatePublicLinkMode('disabled')}
               className={`p-3 rounded border text-left transition-all cursor-pointer ${
                 publicLinkMode === 'disabled'
-                  ? 'border-red-500 bg-red-500/10 text-red-300 shadow-sm'
-                  : 'border-inherit hover:border-red-500/50 opacity-70 hover:opacity-100'
+                  ? 'border-negative bg-negative-dim text-negative shadow-sm'
+                  : 'border-inherit hover:border-negative/50 opacity-70 hover:opacity-100'
               }`}
             >
               <div className="text-xs font-mono font-bold flex items-center gap-1.5">
                 <span>🔒 Killswitch (Disabled)</span>
               </div>
-              <p className="text-[10px] opacity-75 mt-1 font-sans leading-normal">
+              <p className="text-[11px] opacity-75 mt-1 font-sans leading-normal">
                 Blocks all public shared traffic with an HTTP 403 Deactivated page.
               </p>
             </button>
@@ -1345,14 +1344,14 @@ export default function SettingsPanel({
               onClick={() => handleUpdatePublicLinkMode('open')}
               className={`p-3 rounded border text-left transition-all cursor-pointer ${
                 publicLinkMode === 'open'
-                  ? 'border-amber-500 bg-amber-500/10 text-amber-300 shadow-sm'
-                  : 'border-inherit hover:border-amber-500/50 opacity-70 hover:opacity-100'
+                  ? 'border-warning bg-warning-dim text-warning shadow-sm'
+                  : 'border-inherit hover:border-warning/50 opacity-70 hover:opacity-100'
               }`}
             >
               <div className="text-xs font-mono font-bold flex items-center gap-1.5">
                 <span>🌐 Open Unrestricted</span>
               </div>
-              <p className="text-[10px] opacity-75 mt-1 font-sans leading-normal">
+              <p className="text-[11px] opacity-75 mt-1 font-sans leading-normal">
                 Normal production routing without special public visitor rate limiters.
               </p>
             </button>
@@ -1360,21 +1359,21 @@ export default function SettingsPanel({
         </div>
 
         {/* Security Summary Pills */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-2 border-t border-inherit text-[10px] font-mono opacity-80">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-2 border-t border-inherit text-[11px] font-mono opacity-80">
           <div className="flex items-center gap-1.5">
-            <Check className="w-3 h-3 text-emerald-400" />
+            <Check className="w-3 h-3 text-positive" />
             <span>Rate limiting: in-process best effort</span>
           </div>
           <div className="flex items-center gap-1.5">
-            <Check className="w-3 h-3 text-emerald-400" />
+            <Check className="w-3 h-3 text-positive" />
             <span>AI throttling: best effort</span>
           </div>
           <div className="flex items-center gap-1.5">
-            <Check className="w-3 h-3 text-emerald-400" />
+            <Check className="w-3 h-3 text-positive" />
             <span>Encryption depends on configured key</span>
           </div>
           <div className="flex items-center gap-1.5">
-            <Check className="w-3 h-3 text-emerald-400" />
+            <Check className="w-3 h-3 text-positive" />
             <span>Public demo access disabled by default</span>
           </div>
         </div>
@@ -1382,8 +1381,8 @@ export default function SettingsPanel({
 
       {/* Campaign Reset & Territory Pivot */}
       <div className={`border rounded-lg p-5 mt-6 space-y-6 ${cardBg}`}>
-        <div className="flex items-center gap-2 border-b pb-3 border-inherit">
-          <RotateCcw className="w-4 h-4 text-red-500" />
+        <div className="flex flex-wrap items-center gap-2 border-b pb-3 border-inherit">
+          <RotateCcw className="w-4 h-4 text-negative" />
           <span className="text-xs font-mono uppercase tracking-wider font-bold">Campaign Reset & Territory Pivot</span>
         </div>
 
@@ -1400,8 +1399,8 @@ export default function SettingsPanel({
         )}
 
         {resetError && (
-          <div className="p-3 bg-red-950/30 border border-red-500/20 text-red-400 text-xs rounded-sm font-mono leading-relaxed font-bold uppercase tracking-wider flex items-center gap-2">
-            <AlertTriangle className="w-4 h-4 text-red-400 shrink-0" />
+          <div className="p-3 bg-negative-dim border border-negative/20 text-negative text-xs rounded-sm font-mono leading-relaxed font-bold uppercase tracking-wider flex items-center gap-2">
+            <AlertTriangle className="w-4 h-4 text-negative shrink-0" />
             {resetError}
           </div>
         )}
@@ -1409,7 +1408,7 @@ export default function SettingsPanel({
         <form onSubmit={handleCampaignReset} className="space-y-4 text-xs font-sans">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="space-y-1">
-              <label className="block text-[10px] font-mono opacity-80 uppercase tracking-wider font-bold">Target City / Region</label>
+              <label className="block text-[11px] font-mono opacity-80 uppercase tracking-wider font-bold">Target City / Region</label>
               <input
                 type="text"
                 required
@@ -1421,7 +1420,7 @@ export default function SettingsPanel({
             </div>
 
             <div className="space-y-1">
-              <label className="block text-[10px] font-mono opacity-80 uppercase tracking-wider font-bold">Industry Niche / Service Type</label>
+              <label className="block text-[11px] font-mono opacity-80 uppercase tracking-wider font-bold">Industry Niche / Service Type</label>
               <input
                 type="text"
                 required
@@ -1433,7 +1432,7 @@ export default function SettingsPanel({
             </div>
 
             <div className="space-y-1">
-              <label className="block text-[10px] font-mono opacity-80 uppercase tracking-wider font-bold">Ledger Inception Mode</label>
+              <label className="block text-[11px] font-mono opacity-80 uppercase tracking-wider font-bold">Ledger Inception Mode</label>
               <select
                 value={resetMode}
                 onChange={(e) => setResetMode(e.target.value as 'blank' | 'mock')}
@@ -1445,9 +1444,9 @@ export default function SettingsPanel({
             </div>
           </div>
 
-          <div className="p-4 bg-red-950/10 border border-red-500/20 rounded-md space-y-3">
-            <div className="flex gap-2 items-center text-red-400 font-mono text-[10px] uppercase font-bold tracking-wider">
-              <AlertTriangle className="w-4 h-4 text-red-400" />
+          <div className="p-4 bg-negative-dim border border-negative/20 rounded-md space-y-3">
+            <div className="flex gap-2 items-center text-negative font-mono text-[11px] uppercase font-bold tracking-wider">
+              <AlertTriangle className="w-4 h-4 text-negative" />
               <span>Critical Administrative Override Action</span>
             </div>
             <p className="text-[11px] opacity-75 leading-relaxed">
@@ -1455,8 +1454,8 @@ export default function SettingsPanel({
             </p>
 
             <div className="space-y-1 pt-1">
-              <label className="block text-[9px] font-mono uppercase tracking-wider font-bold opacity-80 text-inherit">
-                To confirm reset, type the target city name in ALL CAPS (<strong className="text-red-400">"{(resetCity || '').toUpperCase()}"</strong>):
+              <label className="block text-[11px] font-mono uppercase tracking-wider font-bold opacity-80 text-inherit">
+                To confirm reset, type the target city name in ALL CAPS (<strong className="text-negative">"{(resetCity || '').toUpperCase()}"</strong>):
               </label>
               <input
                 type="text"
@@ -1464,7 +1463,7 @@ export default function SettingsPanel({
                 value={resetConfirm}
                 onChange={(e) => setResetConfirm(e.target.value)}
                 placeholder={`Type "${(resetCity || '').toUpperCase()}"`}
-                className={`w-full border rounded p-2 focus:outline-none focus:border-red-500 text-inherit font-mono uppercase tracking-wider ${innerBg} border-red-500/30`}
+                className={`w-full border rounded p-2 focus:outline-none focus:border-negative text-inherit font-mono uppercase tracking-wider ${innerBg} border-negative/30`}
               />
             </div>
           </div>
@@ -1472,7 +1471,7 @@ export default function SettingsPanel({
           <button
             type="submit"
             disabled={resetLoading}
-            className={`bg-red-900/30 border border-red-500 text-red-200 hover:bg-red-800/40 py-2 px-5 rounded font-mono text-xs font-bold uppercase transition-colors tracking-wider shadow-sm flex items-center gap-2 ${
+            className={`bg-negative-dim border border-negative text-negative hover:bg-negative-dim py-2 px-5 rounded font-mono text-xs font-bold uppercase transition-colors tracking-wider shadow-sm flex items-center gap-2 ${
               resetLoading ? 'opacity-50 cursor-not-allowed' : ''
             }`}
           >
