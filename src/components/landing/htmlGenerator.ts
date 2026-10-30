@@ -877,12 +877,13 @@ export function generateLandingPageHtml(config: LandingPageConfig): string {
           })
         });
         
+        if (!res.ok) throw new Error('Request failed (' + res.status + ')');
         document.getElementById('contractor-dispatch-form').classList.add('hidden');
         document.getElementById('form-success').classList.remove('hidden');
       } catch (err) {
-        alert('Thank you! Dispatch request logged. A technician is contacting you immediately.');
-        document.getElementById('contractor-dispatch-form').classList.add('hidden');
-        document.getElementById('form-success').classList.remove('hidden');
+        btn.disabled = false;
+        btn.innerText = 'Try Again';
+        alert('Sorry, your request did not go through. Please call us directly at ${config.phone || ''}.');
       }
     }
   </script>
