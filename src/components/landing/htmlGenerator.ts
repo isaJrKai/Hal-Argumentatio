@@ -18,25 +18,21 @@ export function generateLandingPageHtml(config: LandingPageConfig): string {
   const secondaryColor = branding.secondaryColor || '#0f172a';
   const accentColor = branding.accentColor || '#f59e0b';
 
-  // Build JSON-LD LocalBusiness Schema
+  // Include only business details supplied by the contractor; do not invent hours or pricing.
+  const businessAddress = sections.footer?.address || '';
   const schemaJson = {
     "@context": "https://schema.org",
-    "@type": seo.schemaType || "HomeAndConstructionBusiness",
+    "@type": seo.schemaType || "LocalBusiness",
     "name": businessName,
-    "telephone": phone,
+    ...(phone ? { "telephone": phone } : {}),
     "url": typeof window !== 'undefined' ? `${window.location.origin}/landing/${id}` : `https://hal.ai/landing/${id}`,
-    "areaServed": sections.service_areas?.cities || [city],
+    "areaServed": city,
     "address": {
       "@type": "PostalAddress",
       "addressLocality": city,
-      "streetAddress": sections.footer?.address || city
-    },
-    "priceRange": "$$",
-    "openingHoursSpecification": {
-      "@type": "OpeningHoursSpecification",
-      "dayOfWeek": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"],
-      "opens": "00:00",
-      "closes": "23:59"
+      ...(businessAddress && !businessAddress.startsWith('Business address not provided')
+        ? { "streetAddress": businessAddress }
+        : {})
     }
   };
 
@@ -75,10 +71,10 @@ export function generateLandingPageHtml(config: LandingPageConfig): string {
       </div>
       <div class="flex items-center gap-3">
         <div class="hidden sm:block text-right">
-          <div class="text-[10px] uppercase font-bold text-amber-400 tracking-wider">⚡ 24/7 On-Duty Dispatch</div>
+          <div class="text-[10px] uppercase font-bold text-amber-400 tracking-wider">Contact the Business</div>
           <div class="text-sm font-black text-white">${phone}</div>
         </div>
-        <a href="tel:${cleanPhone}" class="bg-amber-500 hover:bg-amber-400 text-slate-950 font-extrabold px-4 py-2.5 rounded-xl text-xs sm:text-sm transition flex items-center gap-2 shadow-lg hover:shadow-amber-500/20">
+        <a href="${cleanPhone ? 'tel:' + cleanPhone : '#lead-form'}" class="bg-amber-500 hover:bg-amber-400 text-slate-950 font-extrabold px-4 py-2.5 rounded-xl text-xs sm:text-sm transition flex items-center gap-2 shadow-lg hover:shadow-amber-500/20">
           <span>📞</span>
           <span class="hidden sm:inline">${sections.header.ctaText}</span>
           <span class="sm:hidden">Call Now</span>
@@ -107,19 +103,15 @@ export function generateLandingPageHtml(config: LandingPageConfig): string {
           ${sections.hero.subheadline}
         </p>
 
-        <!-- Rapid Benefits Bar -->
-        <div class="grid grid-cols-2 sm:grid-cols-3 gap-3 pt-2 text-left">
+        <!-- Business Contact Details -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 text-left">
           <div class="p-3 rounded-xl bg-slate-800/50 border border-slate-700/60">
-            <div class="text-amber-400 font-bold text-xs sm:text-sm">⏱️ 30-Min Arrival</div>
-            <div class="text-[11px] text-slate-400 mt-0.5">${city} Priority Window</div>
+            <div class="text-amber-400 font-bold text-xs sm:text-sm">Service Area</div>
+            <div class="text-[11px] text-slate-400 mt-0.5">${city}</div>
           </div>
           <div class="p-3 rounded-xl bg-slate-800/50 border border-slate-700/60">
-            <div class="text-sky-400 font-bold text-xs sm:text-sm">🛡️ Licensed & Bonded</div>
-            <div class="text-[11px] text-slate-400 mt-0.5">$5M Liability Policy</div>
-          </div>
-          <div class="p-3 rounded-xl bg-slate-800/50 border border-slate-700/60 col-span-2 sm:col-span-1">
-            <div class="text-emerald-400 font-bold text-xs sm:text-sm">💵 Upfront Fixed Price</div>
-            <div class="text-[11px] text-slate-400 mt-0.5">Written Quote First</div>
+            <div class="text-sky-400 font-bold text-xs sm:text-sm">Contact</div>
+            <div class="text-[11px] text-slate-400 mt-0.5">${phone || 'Use the service request form'}</div>
           </div>
         </div>
       </div>
@@ -128,10 +120,10 @@ export function generateLandingPageHtml(config: LandingPageConfig): string {
       <div id="lead-form" class="lg:col-span-5">
         <div class="p-6 sm:p-7 rounded-2xl bg-slate-900/90 border border-slate-700/80 shadow-2xl relative backdrop-blur-md">
           <div class="absolute -top-3 right-6 bg-emerald-500 text-slate-950 font-black text-[10px] uppercase px-3 py-1 rounded-full shadow-md">
-            Fast Response Window
+            Service Request
           </div>
-          <h3 class="text-xl font-bold text-white mb-1">${sections.lead_form?.title || 'Request Priority Dispatch'}</h3>
-          <p class="text-xs text-slate-400 mb-5 leading-relaxed">${sections.lead_form?.subtitle || 'Enter your details below for instant technician contact.'}</p>
+          <h3 class="text-xl font-bold text-white mb-1">${sections.lead_form?.title || 'Contact the Business'}</h3>
+          <p class="text-xs text-slate-400 mb-5 leading-relaxed">${sections.lead_form?.subtitle || 'Share your contact details and a brief description of the work you need.'}</p>
 
           <form id="contractor-dispatch-form" onsubmit="handleFormSubmit(event)" class="space-y-3.5">
             <div>
@@ -157,7 +149,7 @@ export function generateLandingPageHtml(config: LandingPageConfig): string {
 
           <div id="form-success" class="hidden p-4 rounded-xl bg-emerald-950/80 border border-emerald-500 text-center space-y-2 mt-2">
             <div class="text-emerald-400 text-2xl font-bold">✓ Request Confirmed</div>
-            <p class="text-xs text-slate-200">Our on-duty dispatcher is routing a technician to your location. Expect a phone confirmation in under 60 seconds.</p>
+            <p class="text-xs text-slate-200">Your request was submitted. The business will contact you using the details you provided.</p>
           </div>
         </div>
       </div>
@@ -405,7 +397,7 @@ export function generateLandingPageHtml(config: LandingPageConfig): string {
   <!-- Footer -->
   <footer class="border-t border-slate-800/80 py-8 px-4 sm:px-6 mt-12 bg-slate-950 text-center space-y-2 text-xs text-slate-500">
     <p class="font-medium text-slate-400">${businessName} • ${licenseNumber}</p>
-    <p>${sections.footer.address || city} • 24/7 Dispatch Phone: <a href="tel:${cleanPhone}" class="text-amber-400 font-bold hover:underline">${phone}</a></p>
+    <p>${sections.footer.address || 'Business address not provided — add the verified address before publishing.'}${phone ? ` • Phone: <a href="tel:${cleanPhone}" class="text-amber-400 font-bold hover:underline">${phone}</a>` : ''}</p>
     <p class="text-[11px] text-slate-600">${sections.footer.copyright || '© 2026 All Rights Reserved.'}</p>
   </footer>\n`;
         }
@@ -500,9 +492,9 @@ export function generateLandingPageHtml(config: LandingPageConfig): string {
   <div class="fixed bottom-0 inset-x-0 bg-slate-950/95 backdrop-blur-md border-t border-amber-500/40 p-3 z-50 flex items-center justify-between gap-3 sm:hidden shadow-2xl">
     <div class="text-xs text-white truncate">
       <span class="text-amber-400 font-bold block">${sections.sticky_mobile_call.crewStatus}</span>
-      <span class="text-slate-400 text-[10.5px]">30-Min Arrival Window</span>
+      <span class="text-slate-400 text-[10.5px]">Service enquiries</span>
     </div>
-    <a href="tel:${cleanPhone}" class="bg-amber-500 hover:bg-amber-400 text-slate-950 font-black px-4 py-2.5 rounded-xl text-xs shrink-0 flex items-center gap-1.5 shadow-lg">
+    <a href="${cleanPhone ? 'tel:' + cleanPhone : '#lead-form'}" class="bg-amber-500 hover:bg-amber-400 text-slate-950 font-black px-4 py-2.5 rounded-xl text-xs shrink-0 flex items-center gap-1.5 shadow-lg">
       <span>${sections.sticky_mobile_call.buttonText || '📞 Call Now'}</span>
     </a>
   </div>\n`;
@@ -521,7 +513,7 @@ export function generateLandingPageHtml(config: LandingPageConfig): string {
   <title>${seo.metaTitle || `${businessName} - ${city}`}</title>
   <meta name="description" content="${seo.metaDescription || `Professional contractor services in ${city}. Call ${phone}.`}" />
   <meta property="og:title" content="${seo.metaTitle || businessName}" />
-  <meta property="og:description" content="${seo.metaDescription || `Serving ${city}. 24/7 priority emergency dispatch.`}" />
+  <meta property="og:description" content="${seo.metaDescription || `Contact ${businessName} in ${city} about local services.`}" />
   <meta property="og:type" content="website" />
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>

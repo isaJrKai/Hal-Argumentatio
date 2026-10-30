@@ -11,6 +11,7 @@ export interface ContractorGeneratorParams {
   city: string;
   businessName?: string;
   phone?: string;
+  address?: string;
   audience?: string;
   primaryGoal?: string;
   coreOffer?: string;
@@ -25,6 +26,7 @@ export async function generateContractorLandingPage(params: ContractorGeneratorP
     city, 
     businessName, 
     phone, 
+    address,
     audience, 
     primaryGoal, 
     coreOffer, 
@@ -41,6 +43,7 @@ export async function generateContractorLandingPage(params: ContractorGeneratorP
   if (businessName) baseTemplate.businessName = businessName;
   if (city) baseTemplate.city = city;
   if (phone) baseTemplate.phone = phone;
+  if (address) baseTemplate.sections.footer.address = address;
 
   // Set directional archetype branding/tone
   if (variantArchetype === 'emergency_dispatch') {
@@ -65,8 +68,9 @@ export async function generateContractorLandingPage(params: ContractorGeneratorP
 
   if (!apiKey) {
     // Graceful fallback if API key is not configured in environment
-    const html = generateLandingPageHtml(baseTemplate);
-    return { config: baseTemplate, html };
+    const safeConfig = applyVerifiedBusinessDetails(baseTemplate, { businessName, city, phone, address, trade });
+    const html = generateLandingPageHtml(safeConfig);
+    return { config: safeConfig, html };
   }
 
   try {
@@ -82,7 +86,7 @@ Strict rules:
    - CTA language is ACTION + OUTCOME (e.g. "Book Emergency Dispatch", "Request Flat-Rate Diagnostic").
 3. Facts only: Contractor phone: "${baseTemplate.phone}". City: "${city}". Business: "${baseTemplate.businessName}".
 4. Tone Archetype: ${variantArchetype}. Target Audience: ${audience || 'Local Homeowners'}. Core Offer: ${coreOffer || 'Fast dispatch, upfront pricing, zero hidden fees'}.
-5. Proof signals: ${proofAvailable || 'Master license, liability insurance, BBB A+ rating'}.
+5. Proof signals: ${proofAvailable || 'None supplied. Do not invent credentials, ratings, insurance, reviews, guarantees, response times, prices, or statistics.'}.
 
 Return ONLY a JSON object matching this schema:
 {
@@ -191,9 +195,73 @@ Return ONLY a JSON object matching this schema:
 
   // Mandatory Quality Gate: Pass all generated copy through the Anti-Slop Humanizer
   const { cleanedConfig } = applyHumanizerPass(baseTemplate);
+  const safeConfig = applyVerifiedBusinessDetails(cleanedConfig, { businessName, city, phone, address, trade });
 
-  const html = generateLandingPageHtml(cleanedConfig);
-  return { config: cleanedConfig, html };
+  const html = generateLandingPageHtml(safeConfig);
+  return { config: safeConfig, html };
+}
+
+function applyVerifiedBusinessDetails(
+  config: LandingPageConfig,
+  details: { businessName?: string; city?: string; phone?: string; address?: string; trade: TradeType }
+): LandingPageConfig {
+  const businessName = details.businessName?.trim() || 'Business Name';
+  const city = details.city?.trim() || 'Service Area';
+  const phone = details.phone?.trim() || '';
+  const address = details.address?.trim() || '';
+  const tradeLabel = details.trade.replace(/_/g, ' ').replace(/\b\w/g, letter => letter.toUpperCase());
+
+  config.businessName = businessName;
+  config.city = city;
+  config.phone = phone;
+  config.licenseNumber = '';
+  config.emergencyService = false;
+  config.dispatchWindow = '';
+  config.branding.logoText = businessName;
+  config.title = `${businessName} — ${tradeLabel} in ${city}`;
+
+  config.sections.announcement_bar.active = false;
+  config.sections.header.ctaText = phone ? `Call ${phone}` : 'Contact Us';
+  config.sections.hero.badgeText = `${tradeLabel} in ${city}`;
+  config.sections.hero.headline = `${tradeLabel} Services in ${city}`;
+  config.sections.hero.subheadline = `${businessName} provides ${tradeLabel.toLowerCase()} services in ${city}. Contact the business to discuss your requirements and confirm availability.`;
+  config.sections.lead_form.title = `Contact ${businessName}`;
+  config.sections.lead_form.subtitle = 'Share your contact details and a brief description of the work you need.';
+  config.sections.lead_form.buttonText = 'Send Service Request';
+  config.sections.lead_form.dispatchNote = 'The business will contact you to discuss your request.';
+  config.sections.trust_bar.active = false;
+  config.sections.bento_features = config.sections.bento_features
+    ? { ...config.sections.bento_features, active: false }
+    : undefined;
+  config.sections.seasonal_alert.active = false;
+  config.sections.before_after.active = false;
+  config.sections.reviews.active = false;
+  config.sections.service_areas.active = false;
+  config.sections.guarantee.active = false;
+  config.sections.online_booking.active = false;
+  config.sections.faq.active = false;
+  if (config.sections.pricing_packages) config.sections.pricing_packages.active = false;
+
+  config.sections.services.active = true;
+  config.sections.services.title = 'Services';
+  config.sections.services.subtitle = 'Contact the business to discuss the work you need.';
+  config.sections.services.items = [{
+    id: 'service-enquiry',
+    title: `${tradeLabel} Service Enquiries`,
+    description: 'Contact the business to discuss scope, availability, and pricing.',
+  }];
+
+  config.sections.footer.address = address || 'Business address not provided — add the verified address before publishing.';
+  config.sections.footer.copyright = `© ${new Date().getFullYear()} ${businessName}.`;
+  config.sections.sticky_mobile_call.active = Boolean(phone);
+  config.sections.sticky_mobile_call.crewStatus = `Contact ${businessName}`;
+  config.sections.sticky_mobile_call.buttonText = phone ? `Call ${phone}` : 'Contact Us';
+
+  config.seo.metaTitle = `${businessName} | ${tradeLabel} in ${city}`;
+  config.seo.metaDescription = `Contact ${businessName} in ${city} about ${tradeLabel.toLowerCase()} services.`;
+  config.seo.schemaType = 'LocalBusiness';
+
+  return config;
 }
 
 export interface SectionRegenerateParams {

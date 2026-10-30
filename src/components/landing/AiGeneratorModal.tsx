@@ -17,15 +17,16 @@ export const AiGeneratorModal: React.FC<AiGeneratorModalProps> = ({
 }) => {
   const [prompt, setPrompt] = useState('Emergency plumbing specialist in Austin handling burst pipes, slab leaks, drain backups, and water heaters');
   const [trade, setTrade] = useState<TradeType>('plumbing');
-  const [city, setCity] = useState('Austin, TX');
-  const [businessName, setBusinessName] = useState('Lone Star Precision Plumbing');
-  const [phone, setPhone] = useState('(512) 555-0144');
+  const [city, setCity] = useState('');
+  const [businessName, setBusinessName] = useState('');
+  const [phone, setPhone] = useState('');
+  const [address, setAddress] = useState('');
 
   // Rule 6: Interview before inventing fields
   const [primaryGoal, setPrimaryGoal] = useState('Emergency Dispatch / Fast Arrival');
   const [audience, setAudience] = useState('Local Residential Homeowners');
-  const [coreOffer, setCoreOffer] = useState('30-min arrival guarantee, $49 diagnostic waived with repair');
-  const [proofAvailable, setProofAvailable] = useState('Master Plumber Lic #38491, BBB A+ Rating, $5M Insured');
+  const [coreOffer, setCoreOffer] = useState('');
+  const [proofAvailable, setProofAvailable] = useState('');
   const [variantArchetype, setVariantArchetype] = useState<'emergency_dispatch' | 'master_craftsman' | 'flat_rate'>('emergency_dispatch');
 
   const [loading, setLoading] = useState(false);
@@ -34,6 +35,11 @@ export const AiGeneratorModal: React.FC<AiGeneratorModalProps> = ({
   if (!isOpen) return null;
 
   const handleGenerate = async () => {
+    if (!businessName.trim() || !phone.trim() || !city.trim() || !address.trim()) {
+      setError('Enter the real business name, phone, city, and street address before generating the page.');
+      return;
+    }
+
     setLoading(true);
     setError(null);
 
@@ -50,6 +56,7 @@ export const AiGeneratorModal: React.FC<AiGeneratorModalProps> = ({
           city,
           businessName,
           phone,
+          address,
           audience,
           primaryGoal,
           coreOffer,
@@ -272,6 +279,16 @@ export const AiGeneratorModal: React.FC<AiGeneratorModalProps> = ({
                 className="w-full px-3 py-2 rounded-lg bg-bg-base border border-border-dim text-text-primary focus:outline-none focus:border-amber-400"
               />
             </div>
+            <div className="sm:col-span-2">
+              <label className="block text-[11px] font-semibold text-text-secondary mb-1">Business Street Address</label>
+              <input
+                type="text"
+                value={address}
+                onChange={(e) => setAddress(e.target.value)}
+                placeholder="Enter the verified street address"
+                className="w-full px-3 py-2 rounded-lg bg-bg-base border border-border-dim text-text-primary focus:outline-none focus:border-amber-400"
+              />
+            </div>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -311,7 +328,7 @@ export const AiGeneratorModal: React.FC<AiGeneratorModalProps> = ({
                 type="text"
                 value={coreOffer}
                 onChange={(e) => setCoreOffer(e.target.value)}
-                placeholder="e.g. 30-min arrival guarantee, zero overtime rates"
+                placeholder="Optional: enter a confirmed offer; leave blank if none"
                 className="w-full px-3 py-2 rounded-lg bg-bg-base border border-border-dim text-text-primary focus:outline-none focus:border-amber-400"
               />
             </div>
@@ -324,7 +341,7 @@ export const AiGeneratorModal: React.FC<AiGeneratorModalProps> = ({
                 type="text"
                 value={proofAvailable}
                 onChange={(e) => setProofAvailable(e.target.value)}
-                placeholder="e.g. Master License #PRO-8812, BBB A+, $5M liability insurance"
+                placeholder="Optional: enter only verified credentials or proof you can substantiate"
                 className="w-full px-3 py-2 rounded-lg bg-bg-base border border-border-dim text-text-primary focus:outline-none focus:border-amber-400"
               />
             </div>
