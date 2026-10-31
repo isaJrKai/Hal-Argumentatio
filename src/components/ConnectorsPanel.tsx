@@ -43,7 +43,7 @@ export default function ConnectorsPanel() {
   const [isLoadingEvents, setIsLoadingEvents] = useState(false);
 
   // ─── EMAIL DISPATCH & PASSWORD RESET DELIVERY STATE ───────────────────────
-  const [resendApiKey, setResendApiKey] = useState(() => localStorage.getItem('hal_resend_api_key') || '');
+  const [resendApiKey, setResendApiKey] = useState('');
   const [isSavingEmailKey, setIsSavingEmailKey] = useState(false);
   const [testEmailAddress, setTestEmailAddress] = useState('admin@company.com');
   const [isSendingTestEmail, setIsSendingTestEmail] = useState(false);
@@ -54,12 +54,17 @@ export default function ConnectorsPanel() {
     emailDispatched?: boolean;
   } | null>(null);
 
+  useEffect(() => {
+    // Remove legacy browser-stored provider secret; credentials now live encrypted server-side.
+    localStorage.removeItem('hal_resend_api_key');
+  }, []);
+
   const handleSaveResendKey = async () => {
+    if (!resendApiKey.trim()) return;
     setIsSavingEmailKey(true);
     try {
-      localStorage.setItem('hal_resend_api_key', resendApiKey.trim());
       const token = localStorage.getItem('token') || localStorage.getItem('halbiz_auth_token') || '';
-      await fetch('/api/connectors/credentials', {
+      const res = await fetch('/api/connectors/credentials', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -67,6 +72,9 @@ export default function ConnectorsPanel() {
         },
         body: JSON.stringify({ service: 'resend', keyVal: resendApiKey.trim() })
       });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.error || 'Resend credential was not saved.');
+      setResendApiKey('');
       toast({
         variant: 'success',
         title: 'Email Dispatch API Key Saved',
