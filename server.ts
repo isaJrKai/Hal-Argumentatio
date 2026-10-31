@@ -4602,7 +4602,7 @@ app.post('/api/connectors/credentials', authenticate, (req, res) => {
   const allowedServices = new Set([
     'stripe', 'twilio', 'sendgrid', 'googleMaps', 'googleDrive', 'linkedin',
     'salesforce', 'hubspot', 'mailchimp', 'notion', 'googleAds', 'metaAds',
-    'ga4', 'quickbooks', 'slack'
+    'ga4', 'quickbooks', 'slack', 'resend'
   ]);
   if (typeof service !== 'string' || !allowedServices.has(service)) {
     return res.status(400).json({ error: 'A supported connector service is required.' });
