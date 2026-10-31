@@ -5331,7 +5331,7 @@ app.post('/api/autonomous/offline-objection', authenticate, (req, res) => {
 
 // ─── NEON POSTGRESQL CONNECTION & DATA SYNC ENDPOINTS ────────────────────────
 
-app.post('/api/system/postgres-connect', authenticate, async (req, res) => {
+app.post('/api/system/postgres-connect', authenticate, requireRole('admin'), async (req, res) => {
   const { databaseUrl } = req.body;
   if (!databaseUrl) {
     return res.status(400).json({ error: 'databaseUrl is required' });
@@ -5354,7 +5354,7 @@ app.post('/api/system/postgres-connect', authenticate, async (req, res) => {
   }
 });
 
-app.post('/api/system/postgres-sync', authenticate, async (req, res) => {
+app.post('/api/system/postgres-sync', authenticate, requireRole('admin'), async (req, res) => {
   const contractorId = (req as any).contractorId;
   
   try {
