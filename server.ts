@@ -8507,8 +8507,30 @@ async function startServer() {
 
     try {
       const savedSequences = db.getOutreachSequences(contractorId);
-      const availableSequences = savedSequences.length > 0 ? savedSequences : getDefaultCadenceSequences();
-      const targetSeq = availableSequences.find(sequence => sequence.id === sequenceId) || availableSequences[0];
+      const savedSequence = savedSequences.find(sequence => sequence.id === sequenceId);
+      const templates = getDefaultCadenceSequences();
+      const templateSequence = templates.find(sequence => sequence.id === sequenceId) || templates[0];
+      const targetSeq: any = savedSequence
+        ? {
+            id: savedSequence.id,
+            name: savedSequence.name,
+            niche: savedSequence.niche || 'general',
+            activeLeadsCount: null,
+            conversionRatePct: null,
+            templateOnly: false,
+            createdAt: savedSequence.createdAt,
+            steps: savedSequence.steps.map((step, index) => ({
+              id: `${savedSequence.id}_step_${index + 1}`,
+              stepNumber: index + 1,
+              dayOffset: step.day,
+              name: step.title,
+              channel: step.channel,
+              triggerCondition: step.purpose,
+              subject: step.title,
+              template: step.template
+            }))
+          }
+        : templateSequence;
       if (!targetSeq) return res.status(404).json({ success: false, error: 'No saved sequence or preview template is available.' });
 
       const scheduledSteps = calculateCadenceSchedule(new Date(), targetSeq.steps);
