@@ -39,6 +39,7 @@ import { generateContractorLandingPage, regenerateLandingSection } from './src/s
 import { generateLandingPageHtml } from './src/components/landing/htmlGenerator';
 import { validateCrmTransition } from './src/lib/crmStateMachine';
 import { buildFinancialSnapshotCore } from './src/lib/financialSnapshot';
+import { resolvePublishedLandingPageOwner } from './src/lib/landingPageOwnership';
 import { validateLoopGate } from './src/lib/loopGating';
 import { 
   auditCompetitorFootprint, 
@@ -1249,11 +1250,12 @@ app.post('/api/public/landing-leads', async (req, res) => {
       ))
       .limit(1);
 
-    if (!artifact || !['ready', 'deployed'].includes(artifact.status)) {
+    const pageOwnership = resolvePublishedLandingPageOwner(artifact);
+    if (!pageOwnership.valid) {
       return res.status(404).json({ error: 'This landing page is unavailable or has not been published.' });
     }
 
-    const targetContractorId = artifact.contractorId;
+    const targetContractorId = pageOwnership.contractorId;
     const [assignedContractor] = await pgDb
       .select({ id: contractors.id })
       .from(contractors)
@@ -1264,15 +1266,7 @@ app.post('/api/public/landing-leads', async (req, res) => {
       return res.status(404).json({ error: 'The business associated with this landing page could not be found.' });
     }
 
-    const artifactContent = artifact.content && typeof artifact.content === 'object'
-      ? artifact.content as Record<string, any>
-      : {};
-    const pageConfig = artifactContent.pageConfig && typeof artifactContent.pageConfig === 'object'
-      ? artifactContent.pageConfig as Record<string, any>
-      : {};
-    const pageCity = typeof pageConfig.city === 'string' && pageConfig.city.trim()
-      ? pageConfig.city.trim().slice(0, 120)
-      : 'Unspecified';
+    const pageCity = pageOwnership.city;
 
     const leadId = crypto.randomUUID();
     const phoneEncrypted = encrypt(normalizedPhone);
@@ -1286,7 +1280,7 @@ app.post('/api/public/landing-leads', async (req, res) => {
       emailEncrypted: null,
       phoneEncrypted,
       city: pageCity,
-      niche: typeof pageConfig.trade === 'string' ? pageConfig.trade.slice(0, 80) : 'Inbound Inquiry',
+      niche: pageOwnership.trade || 'Inbound Inquiry',
       source: 'landing_page',
       status: 'new',
       urgencyScore: null,
