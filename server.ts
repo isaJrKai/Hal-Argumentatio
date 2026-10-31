@@ -4627,11 +4627,12 @@ app.get('/api/connectors/health', authenticate, (req, res) => {
   const contractorId = (req as any).contractorId;
   try {
     const creds = db.getConnectorCredentials(contractorId);
-    
+
     const services = [
       { id: 'stripe', name: 'Stripe Billing API', category: 'billing' },
       { id: 'twilio', name: 'Twilio SMS Gateway', category: 'communication' },
       { id: 'sendgrid', name: 'SendGrid Mail API', category: 'communication' },
+      { id: 'resend', name: 'Resend Email API', category: 'communication' },
       { id: 'googleMaps', name: 'Google Maps Platform', category: 'local_business' },
       { id: 'googleDrive', name: 'Google Drive Asset Cloud', category: 'storage' },
       { id: 'linkedin', name: 'LinkedIn Sales Integrator', category: 'marketing' },
@@ -4642,37 +4643,35 @@ app.get('/api/connectors/health', authenticate, (req, res) => {
       { id: 'googleAds', name: 'Google Ads API', category: 'marketing' },
       { id: 'metaAds', name: 'Meta Marketing API', category: 'marketing' },
       { id: 'ga4', name: 'GA4 & Search Console', category: 'analytics' },
+      { id: 'quickbooks', name: 'QuickBooks Accounting API', category: 'finance' },
       { id: 'slack', name: 'Slack Operations Webhook', category: 'communication' }
     ];
 
-    const healthStatus = services.map(svc => {
-      const hasKey = Boolean(creds[svc.id] && creds[svc.id].trim().length > 0);
-      let status: 'connected' | 'not_connected' | 'error' = hasKey ? 'connected' : 'not_connected';
-      let health: 'excellent' | 'degraded' | 'critical' | 'none' = hasKey ? 'excellent' : 'none';
-      
-      if (!hasKey && ['stripe', 'googleMaps', 'twilio'].includes(svc.id)) {
-        health = 'critical';
-        status = 'error';
-      }
-
+    // A saved API key proves configuration only. It does not prove that the
+    // provider authenticated successfully or that a sync has completed.
+    const healthStatus = services.map(service => {
+      const hasKey = Boolean(creds[service.id] && creds[service.id].trim().length > 0);
       return {
-        ...svc,
-        status,
-        health,
-        configured: hasKey,
-        lastSync: hasKey ? new Date().toISOString() : undefined
+        ...service,
+        status: hasKey ? 'configured' : 'not_configured',
+        health: hasKey ? 'unverified' : 'none',
+        configured: hasKey
       };
     });
 
-    const failingOrMissing = healthStatus.filter(s => s.health === 'critical' || s.health === 'none' || s.status === 'error');
+    const configuredCount = healthStatus.filter(service => service.configured).length;
+    const unconfiguredCount = healthStatus.length - configuredCount;
 
     res.json({
       connectors: healthStatus,
       summary: {
         total: healthStatus.length,
-        connected: healthStatus.filter(s => s.status === 'connected').length,
-        failingOrMissingCount: failingOrMissing.length,
-        allHealthy: failingOrMissing.length === 0
+        configuredCount,
+        unverifiedCount: configuredCount,
+        unconfiguredCount,
+        failingOrMissingCount: unconfiguredCount,
+        verifiedCount: 0,
+        allHealthy: false
       }
     });
   } catch (err: any) {
