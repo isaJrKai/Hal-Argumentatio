@@ -5400,11 +5400,11 @@ app.post('/api/system/postgres-sync', authenticate, requireRole('admin'), async 
       for (const lead of localLeads) {
         await client.query(`
           INSERT INTO leads (
-            id, contractor_id, business_name, city, niche, owner_name, 
-            phone, email, website_url, review_count, review_score, 
-            predicted_monthly_lost_revenue_usd, status, performance_score, 
-            ssl_status, urgency_score, predicted_ltv, updated_at
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, CURRENT_TIMESTAMP)
+            id, contractor_id, business_name, city, niche, owner_name,
+            phone, email, phone_encrypted, email_encrypted, website_url,
+            review_count, review_score, predicted_monthly_lost_revenue_usd,
+            status, performance_score, ssl_status, urgency_score, predicted_ltv, updated_at
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, CURRENT_TIMESTAMP)
           ON CONFLICT (id) DO UPDATE SET
             status = EXCLUDED.status,
             urgency_score = EXCLUDED.urgency_score,
@@ -5417,17 +5417,19 @@ app.post('/api/system/postgres-sync', authenticate, requireRole('admin'), async 
           lead.city,
           (lead as any).niche || lead.serviceType || 'general',
           lead.ownerName || null,
-          (lead as any).phone || null,
-          (lead as any).email || null,
+          null,
+          null,
+          lead.phoneEncrypted || ((lead as any).phone ? encrypt((lead as any).phone) : null),
+          lead.emailEncrypted || ((lead as any).email ? encrypt((lead as any).email) : null),
           (lead as any).websiteUrl || null,
-          (lead as any).reviewCount || 0,
-          (lead as any).googleRating || 0,
-          lead.predictedLtvUsd ? Math.round(lead.predictedLtvUsd * 0.4) : 1800,
+          (lead as any).reviewCount ?? 0,
+          (lead as any).googleRating ?? 0,
+          (lead as any).predictedMonthlyLostRevenueUsd ?? null,
           lead.status,
-          (lead as any).performanceScore || 50,
-          (lead as any).sslStatus || 'secured',
-          lead.urgencyScore || 5.0,
-          lead.predictedLtvUsd || 5000
+          (lead as any).performanceScore ?? null,
+          (lead as any).sslStatus ?? null,
+          lead.urgencyScore ?? null,
+          lead.predictedLtvUsd ?? null
         ]);
         syncedLeads++;
       }
