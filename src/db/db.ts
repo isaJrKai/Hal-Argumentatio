@@ -247,9 +247,12 @@ export interface StructuredLedgerEntry {
     | 'territory_harvest_completed'
     | 'phase3_verification_audit'
     | 'phase3_sequence_triggered'
+    | 'phase3_sequence_previewed'
     | 'phase3_outbox_processed'
+    | 'phase3_outbox_inspected'
     | 'phase3_live_dispatch'
     | 'phase3_scheduler_executed'
+    | 'phase3_scheduler_configuration_checked'
     | 'phase4_verification_audit'
     | 'phase4_consensus_synthesized'
     | 'phase4_weights_recalibrated'
@@ -272,6 +275,7 @@ export interface StructuredLedgerEntry {
 
 export interface SchedulerJob {
   id: string;
+  contractorId?: string;
   job: string;
   status: 'pending' | 'running' | 'completed' | 'failed';
   startedAt?: string;
