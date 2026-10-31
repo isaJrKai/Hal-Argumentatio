@@ -8306,7 +8306,10 @@ async function startServer() {
   // 4. Phase 2 Territory Real Data Harvest & Seed Purge
   app.post('/api/roadmap/phase2/harvest-territory', authenticate, async (req, res) => {
     const contractorId = (req as any).contractorId;
-    const { city = 'Winnipeg', niche = 'Commercial HVAC', purgeMock = true } = req.body || {};
+    const { city, niche, purgeMock = false } = req.body || {};
+    if (typeof city !== 'string' || !city.trim() || typeof niche !== 'string' || !niche.trim()) {
+      return res.status(400).json({ error: 'City and contractor niche are required.' });
+    }
 
     try {
       // 1. Optionally purge static mock seed files
