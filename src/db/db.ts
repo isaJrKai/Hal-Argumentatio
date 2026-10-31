@@ -1544,8 +1544,9 @@ class Database {
   }
 
   // Scheduler Jobs
-  public getSchedulerJobs(): SchedulerJob[] {
-    return this.data.schedulerJobs;
+  public getSchedulerJobs(contractorId?: string): SchedulerJob[] {
+    const jobs = this.data.schedulerJobs || [];
+    return contractorId ? jobs.filter(job => job.contractorId === contractorId) : jobs;
   }
 
   public addSchedulerJob(job: Omit<SchedulerJob, 'id' | 'createdAt'>): SchedulerJob {
