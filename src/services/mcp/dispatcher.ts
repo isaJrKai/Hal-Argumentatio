@@ -1,4 +1,5 @@
 import { db as pgDb } from '../../db/index.ts';
+import { buildFinancialHealthReport } from '../../lib/financialHealth';
 import { 
   googleAdsDailyPerformance, 
   revenueRecords, 
@@ -185,54 +186,24 @@ export async function executeMcpTool(
           )
         );
 
-      const totalAdSpendUsd = adsRecords.reduce((acc, r) => acc + (Number(r.cost) || 0), 0);
-      const totalAttributedRevenueUsd = revRecords.reduce((acc, r) => acc + (Number(r.amountUsd) || 0), 0);
-      const totalLeads = allLeads.length;
-      const wonLeads = allLeads.filter(l => l.status === 'won').length;
-
-      const blendedRoas = totalAdSpendUsd > 0 ? Number((totalAttributedRevenueUsd / totalAdSpendUsd).toFixed(2)) : 0;
-      const costPerLeadUsd = totalLeads > 0 ? Number((totalAdSpendUsd / totalLeads).toFixed(2)) : 0;
-      const costPerAcquisitionUsd = wonLeads > 0 ? Number((totalAdSpendUsd / wonLeads).toFixed(2)) : 0;
-      const customerLifetimeValueUsd = wonLeads > 0 ? Number((totalAttributedRevenueUsd / wonLeads).toFixed(2)) : 2200;
-
-      const campaignMap: Record<string, { spend: number; leads: number; revenue: number; won: number }> = {};
-      for (const ad of adsRecords) {
-        if (!campaignMap[ad.campaignName]) {
-          campaignMap[ad.campaignName] = { spend: 0, leads: 0, revenue: 0, won: 0 };
-        }
-        campaignMap[ad.campaignName].spend += Number(ad.cost) || 0;
-        campaignMap[ad.campaignName].leads += Number(ad.conversions) || 0;
-      }
-
-      const campaignBreakdown = Object.entries(campaignMap).map(([campaignName, stats]) => ({
-        campaignId: campaignName.toLowerCase().replace(/\s+/g, '_'),
-        campaignName,
-        spend: Number(stats.spend.toFixed(2)),
-        revenue: Number(stats.revenue.toFixed(2)),
-        roas: stats.spend > 0 ? Number((stats.revenue / stats.spend).toFixed(2)) : 0,
-        leadsCount: stats.leads,
-        wonDealsCount: stats.won
-      }));
+      const financialReport = buildFinancialHealthReport(adsRecords, revRecords, allLeads);
 
       await pgDb.insert(auditLogs).values({
         id: auditId,
         contractorId,
         action: 'HERMES_MCP_FINANCIAL_HEALTH',
-        details: JSON.stringify({ timeframe: parsed.timeframe, blendedRoas, totalSpend: totalAdSpendUsd }),
+        details: JSON.stringify({
+          timeframe: parsed.timeframe,
+          totalAdSpendUsd: financialReport.totalAdSpendUsd,
+          googleAdsReportedRoas: financialReport.googleAdsReportedRoas,
+          dataQuality: financialReport.dataQuality
+        }),
         timestamp: new Date()
       });
 
       return {
         timeframe: parsed.timeframe,
-        totalAdSpendUsd,
-        totalAttributedRevenueUsd,
-        blendedRoas,
-        costPerLeadUsd,
-        costPerAcquisitionUsd,
-        customerLifetimeValueUsd,
-        paybackPeriodMonths: costPerAcquisitionUsd > 0 && customerLifetimeValueUsd > 0 ? Number(((costPerAcquisitionUsd / customerLifetimeValueUsd) * 12).toFixed(1)) : 1.5,
-        attributionHealthScore: 94.5,
-        campaignBreakdown
+        ...financialReport
       };
     }
 
