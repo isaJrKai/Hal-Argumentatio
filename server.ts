@@ -8312,8 +8312,10 @@ async function startServer() {
       // 1. Optionally purge static mock seed files
       let purgedCount = 0;
       if (purgeMock) {
-        await pgDb.delete(leads).where(and(eq(leads.contractorId, contractorId), like(leads.id, 'lead_seed_%')));
-        purgedCount = 1;
+        const deletedSeeds = await pgDb.delete(leads)
+          .where(and(eq(leads.contractorId, contractorId), like(leads.id, 'lead_seed_%')))
+          .returning({ id: leads.id });
+        purgedCount = deletedSeeds.length;
       }
 
       // 2. Harvest actual active businesses
@@ -8325,16 +8327,19 @@ async function startServer() {
         const id = crypto.randomUUID();
         const rawEmail = hl.email ? String(hl.email) : null;
         const rawPhone = hl.phone ? String(hl.phone) : null;
-        const emailEncrypted = rawEmail ? encrypt(rawEmail) : null;
-        const phoneEncrypted = rawPhone ? encrypt(rawPhone) : null;
+        const sourceVerified = hl.verificationStatus === 'VERIFIED' && !hl.isSynthetic;
+        const verifiedEmail = sourceVerified ? rawEmail : null;
+        const verifiedPhone = sourceVerified ? rawPhone : null;
+        const emailEncrypted = verifiedEmail ? encrypt(verifiedEmail) : null;
+        const phoneEncrypted = verifiedPhone ? encrypt(verifiedPhone) : null;
 
         const [addedLead] = await pgDb.insert(leads).values({
           id,
           contractorId,
           businessName: hl.businessName,
-          ownerName: hl.ownerName || 'General Manager',
-          email: rawEmail ? '[ENCRYPTED]' : '',
-          phone: rawPhone ? '[ENCRYPTED]' : '',
+          ownerName: sourceVerified ? (hl.ownerName || null) : null,
+          email: verifiedEmail ? '[ENCRYPTED]' : null,
+          phone: verifiedPhone ? '[ENCRYPTED]' : null,
           emailEncrypted,
           phoneEncrypted,
           isSynthetic: Boolean(hl.isSynthetic),
@@ -8343,13 +8348,13 @@ async function startServer() {
           niche: hl.serviceType || niche,
           source: 'harvested_intelligence',
           status: 'new',
-          urgencyScore: Math.round((hl.sentimentScore || 0.8) * 100),
-          predictedLtv: (hl as any).predictedLtvUsd ?? 0,
-          notes: hl.notes || `Harvested real business profile for ${city} ${niche}.`,
-          websiteUrl: hl.websiteUrl,
-          performanceScore: hl.performanceScore,
-          sslStatus: hl.sslStatus,
-          reviewCount: hl.reviewCount,
+          urgencyScore: null,
+          predictedLtv: null,
+          notes: hl.notes ? `AI-generated research note (not independently verified): ${hl.notes}` : 'AI-assisted discovery candidate; independently verified details are not available.',
+          websiteUrl: sourceVerified ? hl.websiteUrl : null,
+          performanceScore: null,
+          sslStatus: null,
+          reviewCount: null,
           verificationStatus: (hl as any).verificationStatus || (hl.isSynthetic ? 'FABRICATED_REJECTED' : 'UNVERIFIED_STAGING'),
           dnsVerified: (hl as any).dnsVerified !== undefined ? Boolean((hl as any).dnsVerified) : false,
         }).returning();
@@ -8391,7 +8396,11 @@ async function startServer() {
       res.json({
         success: true,
         harvestedCount: savedLeads.length,
+        verifiedCount: savedLeads.filter(lead => lead.verificationStatus === 'VERIFIED' && !lead.isSynthetic).length,
+        unverifiedCount: savedLeads.filter(lead => lead.verificationStatus !== 'VERIFIED' || lead.isSynthetic).length,
+        syntheticCount: savedLeads.filter(lead => lead.isSynthetic).length,
         purgedMock: Boolean(purgeMock),
+        purgedCount,
         block: harvestBlock,
         integrity: db.verifyLedgerIntegrity(contractorId)
       });
