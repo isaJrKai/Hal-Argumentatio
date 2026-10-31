@@ -4586,7 +4586,11 @@ app.get('/api/connectors/credentials', authenticate, (req, res) => {
   const contractorId = (req as any).contractorId;
   try {
     const creds = db.getConnectorCredentials(contractorId);
-    res.json(creds);
+    const configured = Object.fromEntries(
+      Object.entries(creds).map(([service, value]) => [service, Boolean(value)])
+    );
+    // Never send connector secrets back to the browser.
+    res.json({ configured });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
@@ -4594,20 +4598,28 @@ app.get('/api/connectors/credentials', authenticate, (req, res) => {
 
 app.post('/api/connectors/credentials', authenticate, (req, res) => {
   const contractorId = (req as any).contractorId;
-  const { service, keyVal } = req.body;
-  if (!service) {
-    return res.status(400).json({ error: 'Service name is required' });
+  const { service, keyVal } = req.body || {};
+  const allowedServices = new Set([
+    'stripe', 'twilio', 'sendgrid', 'googleMaps', 'googleDrive', 'linkedin',
+    'salesforce', 'hubspot', 'mailchimp', 'notion', 'googleAds', 'metaAds',
+    'ga4', 'quickbooks', 'slack'
+  ]);
+  if (typeof service !== 'string' || !allowedServices.has(service)) {
+    return res.status(400).json({ error: 'A supported connector service is required.' });
+  }
+  if (typeof keyVal !== 'string' || !keyVal.trim() || keyVal.length > 8192) {
+    return res.status(400).json({ error: 'A non-empty connector credential is required.' });
   }
   try {
-    db.saveConnectorCredential(contractorId, service, keyVal || '');
+    db.saveConnectorCredential(contractorId, service, keyVal.trim());
     db.addAuditLog({
       contractorId,
       action: 'CONNECTOR_KEY_UPDATED',
       details: `Updated API credentials for connector service: ${service}`
     });
-    res.json({ success: true, service });
+    res.json({ success: true, service, configured: true });
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: 'Unable to securely save connector credentials.' });
   }
 });
 
