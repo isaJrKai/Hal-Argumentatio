@@ -8730,17 +8730,24 @@ async function startServer() {
 
     try {
       const integrity = db.verifyLedgerIntegrity(contractorId);
-      const consensusHistory = getDefaultConsensusHistory();
-      const nodes = getDefaultNeuralGraphNodes();
-      
-      // Query real contractor campaigns and live Google Ads daily performance telemetry
+      // No persistent consensus-history or neural-node store is connected yet.
+      // Demo templates are returned separately and never used as verification evidence.
+      const consensusHistory: any[] = [];
+      const nodes: any[] = [];
+      const consensusTemplates = getDefaultConsensusHistory();
+      const neuralGraphTemplates = getDefaultNeuralGraphNodes();
+
       const contractorCampaigns = await pgDb.select().from(campaigns).where(eq(campaigns.contractorId, contractorId));
       const adRecords = await pgDb.select().from(googleAdsDailyPerformance).where(eq(googleAdsDailyPerformance.contractorId, contractorId));
-      
       const arbitrageResult = evaluateAutonomousStrategyArbitrage(contractorCampaigns, adRecords);
-      const arbitrageOpportunities = arbitrageResult.opportunities;
-      const verification = verifyPhase4Pillars(consensusHistory, nodes, arbitrageOpportunities);
+      const arbitrageOpportunities = arbitrageResult.opportunities.map(opportunity => ({
+        ...opportunity,
+        evidenceStatus: 'estimate_only',
+        executionEnabled: false
+      }));
 
+      // Estimates are useful for review, but do not count as closed-loop execution.
+      const verification = verifyPhase4Pillars(consensusHistory, nodes, []);
       res.json({
         success: true,
         phase: 4,
@@ -8751,12 +8758,15 @@ async function startServer() {
         active: verification.allPassed,
         verification,
         consensusHistory,
+        consensusTemplates,
         nodes,
+        neuralGraphTemplates,
         arbitrageOpportunities,
         arbitrageMetrics: {
+          classification: 'heuristic_estimate_only',
           summaries: arbitrageResult.summaries,
           totalReallocationPipelineUsd: arbitrageResult.totalReallocationPipelineUsd,
-          totalExpectedMonthlyLiftUsd: arbitrageResult.totalExpectedMonthlyLiftUsd,
+          totalEstimatedMonthlyLiftUsd: arbitrageResult.totalExpectedMonthlyLiftUsd,
           invariantsAudit: arbitrageResult.invariantsAudit
         },
         integrity
@@ -8768,39 +8778,38 @@ async function startServer() {
   });
 
   // 2. Cryptographic Ledger Verification for Phase 4
+  // 2. Cryptographic Ledger Verification for Phase 4
   app.post('/api/roadmap/phase4/verify', authenticate, async (req, res) => {
     const contractorId = (req as any).contractorId;
 
     try {
-      const consensusHistory = getDefaultConsensusHistory();
-      const nodes = getDefaultNeuralGraphNodes();
-      
       const contractorCampaigns = await pgDb.select().from(campaigns).where(eq(campaigns.contractorId, contractorId));
       const adRecords = await pgDb.select().from(googleAdsDailyPerformance).where(eq(googleAdsDailyPerformance.contractorId, contractorId));
-      
-      const arbitrageResult = evaluateAutonomousStrategyArbitrage(contractorCampaigns, adRecords);
-      const arbitrageOpportunities = arbitrageResult.opportunities;
-      const verification = verifyPhase4Pillars(consensusHistory, nodes, arbitrageOpportunities);
+      const estimateResult = evaluateAutonomousStrategyArbitrage(contractorCampaigns, adRecords);
 
-      // Record immutable cryptographic audit block on ledger
+      // Consensus history and calibrated neural nodes are not persisted. Estimated
+      // arbitrage suggestions are not treated as a verified closed-loop action.
+      const verification = verifyPhase4Pillars([], [], []);
       const auditBlock = db.recordLedgerEntry({
         contractorId,
         eventType: 'phase4_verification_audit',
         entityType: 'roadmap_phase',
         entityId: 'phase_4_multi_agent',
-        actor: 'HAL Multi-Agent Consensus Engine',
-        details: `Verified Phase 4 Invariants: Dual-Drive (${verification.pillar1.alignmentScore}% alignment), Neural Routing (${verification.pillar2.epochCount} epochs), Strategy Arbitrage (${verification.pillar3.arbitrageOpportunitiesCount} active). Score: ${verification.totalScore}/100.`,
+        actor: 'HAL Multi-Agent Verification Check',
+        details: 'Inspected available Phase 4 evidence. No persisted dual-engine consensus history or calibrated neural graph is connected; campaign arbitrage remains estimate-only.',
         metadata: {
           verification,
+          estimatedArbitrageOpportunityCount: estimateResult.opportunities.length,
           timestamp: new Date().toISOString()
         }
       });
 
       res.json({
         success: true,
-        verified: verification.allPassed,
+        verified: false,
         score: verification.totalScore,
         verification,
+        estimatedArbitrageOpportunityCount: estimateResult.opportunities.length,
         block: auditBlock,
         integrity: db.verifyLedgerIntegrity(contractorId)
       });
@@ -8811,74 +8820,15 @@ async function startServer() {
   });
 
   // 3. Parallel Dual-Drive Consensus Synthesis
-  app.post('/api/roadmap/phase4/run-consensus', authenticate, async (req, res) => {
-    const contractorId = (req as any).contractorId;
-    const { topic } = req.body || {};
-
-    try {
-      const targetTopic = topic || 'Outreach Angle & Commercial Pricing for Calgary Commercial Roofing';
-      
-      // Execute parallel evaluation perspectives
-      const geminiPerspective = `Target high-latency mobile booking page (LCP > 3.8s); position $2,750/mo commercial SLA with guaranteed 15-min inbound response time for ${targetTopic}.`;
-      const nemotronPerspective = `Enforce deterministic compliance; verify pricing sustains 3.8x minimum local ROAS threshold; ensure PII encryption for all captured leads for ${targetTopic}.`;
-
-      const alignment = calculateConsensusAlignment(geminiPerspective, nemotronPerspective, targetTopic);
-
-      const consensusResult: DualDriveConsensusResult = {
-        id: `cons_${Date.now()}`,
-        topic: targetTopic,
-        geminiEngine: {
-          model: 'gemini-2.5-flash',
-          focus: 'Market Positioning & Pain Points',
-          recommendation: geminiPerspective,
-          confidence: 0.95,
-          latencyMs: 310
-        },
-        nemotronEngine: {
-          model: 'nvidia/nemotron-3.5-lightning-30b-a3b',
-          focus: 'Deterministic Policy & Compliance Verification',
-          recommendation: nemotronPerspective,
-          confidence: 0.98,
-          latencyMs: 240
-        },
-        alignmentScore: alignment.alignmentScore,
-        arbitrationMethod: 'weighted_synthesis',
-        synthesizedAction: alignment.synthesizedText,
-        policyValidationPassed: alignment.passedPolicy,
-        verdict: alignment.verdict,
-        invariants: alignment.invariants,
-        contractVerification: alignment.contractVerification,
-        timestamp: new Date().toISOString()
-      };
-
-      // Record to immutable ledger
-      const auditBlock = db.recordLedgerEntry({
-        contractorId,
-        eventType: 'phase4_consensus_synthesized',
-        entityType: 'dual_drive_decision',
-        entityId: consensusResult.id,
-        actor: 'Dual-Drive Consensus Arbitrator',
-        details: `Synthesized Structured Contract Consensus on "${targetTopic}": [${alignment.verdict}] ${consensusResult.alignmentScore}% formal alignment between Gemini 2.5 and Nemotron.`,
-        metadata: {
-          consensusId: consensusResult.id,
-          alignmentScore: consensusResult.alignmentScore,
-          policyValidationPassed: consensusResult.policyValidationPassed,
-          verdict: alignment.verdict
-        }
-      });
-
-      res.json({
-        success: true,
-        consensusResult,
-        block: auditBlock,
-        integrity: db.verifyLedgerIntegrity(contractorId)
-      });
-    } catch (err: any) {
-      console.error('[Roadmap Phase 4 Run Consensus Error]', err);
-      res.status(500).json({ success: false, error: err.message });
-    }
+  // 3. Parallel Dual-Drive Consensus Synthesis
+  app.post('/api/roadmap/phase4/run-consensus', authenticate, async (_req, res) => {
+    return res.status(503).json({
+      success: false,
+      error: 'Dual-engine consensus is unavailable: no live Gemini/NVIDIA provider adapters and persisted consensus store are configured. No synthetic consensus result was generated.'
+    });
   });
 
+  // 4. Bayesian Weight Recalibration
   // 4. Bayesian Weight Recalibration
   app.post('/api/roadmap/phase4/recalibrate-weights', authenticate, async (_req, res) => {
     return res.status(409).json({
@@ -8888,99 +8838,14 @@ async function startServer() {
   });
 
   // 5. Strategy & Spend Arbitrage Execution (Closed-Loop Database Reallocation)
-  app.post('/api/roadmap/phase4/execute-arbitrage', authenticate, async (req, res) => {
-    const contractorId = (req as any).contractorId;
-    const { arbitrageId } = req.body || {};
-
-    try {
-      // Fetch live contractor campaigns and ad performance records
-      const contractorCampaigns = await pgDb.select().from(campaigns).where(eq(campaigns.contractorId, contractorId));
-      const adRecords = await pgDb.select().from(googleAdsDailyPerformance).where(eq(googleAdsDailyPerformance.contractorId, contractorId));
-      
-      const evalResult = evaluateAutonomousStrategyArbitrage(contractorCampaigns, adRecords);
-      const target = evalResult.opportunities.find(o => o.id === arbitrageId) || evalResult.opportunities[0];
-
-      if (!target) {
-        return res.status(404).json({ success: false, error: 'No actionable arbitrage opportunity found' });
-      }
-
-      // Execute actual budget adjustment in the database
-      if (target.sourceCampaignId) {
-        const sourceMatch = contractorCampaigns.find(c => c.id === target.sourceCampaignId);
-        if (sourceMatch) {
-          const updatedSourceBudget = Math.max(0, (sourceMatch.budgetUsd || 1500) - target.proposedReallocationUsd);
-          await pgDb.update(campaigns).set({ budgetUsd: updatedSourceBudget }).where(eq(campaigns.id, target.sourceCampaignId));
-        }
-      }
-
-      if (target.targetCampaignId) {
-        const targetMatch = contractorCampaigns.find(c => c.id === target.targetCampaignId);
-        if (targetMatch) {
-          const updatedTargetBudget = (targetMatch.budgetUsd || 1500) + target.proposedReallocationUsd;
-          await pgDb.update(campaigns).set({ budgetUsd: updatedTargetBudget }).where(eq(campaigns.id, target.targetCampaignId));
-        }
-      } else {
-        // Insert new target channel campaign if shifting into a new channel
-        const newCampId = `camp_${crypto.randomUUID().substring(0, 8)}`;
-        await pgDb.insert(campaigns).values({
-          id: newCampId,
-          contractorId,
-          name: target.targetChannel,
-          status: 'active',
-          budgetUsd: target.proposedReallocationUsd,
-          createdAt: new Date()
-        });
-      }
-
-      // Record live revenue experiment in PostgreSQL
-      const expId = `exp_${crypto.randomUUID().substring(0, 8)}`;
-      await pgDb.insert(revenueExperiments).values({
-        id: expId,
-        contractorId,
-        hypothesis: target.rationale,
-        variable: `Capital Shift: ${target.sourceChannel} -> ${target.targetChannel}`,
-        baseline: `Source ROAS: ${target.currentSourceRoas}x`,
-        expectedOutcome: `Target ROAS: ${target.projectedTargetRoas}x, Net Lift: +$${target.expectedNetMonthlyLiftUsd}/mo`,
-        pipelineImpact: target.expectedNetMonthlyLiftUsd,
-        revenueImpact: target.expectedNetMonthlyLiftUsd,
-        status: 'active',
-        startDate: new Date()
-      });
-
-      // Immutable cryptographic audit block on ledger
-      const auditBlock = db.recordLedgerEntry({
-        contractorId,
-        eventType: 'phase4_arbitrage_executed',
-        entityType: 'spend_arbitrage_action',
-        entityId: target.id,
-        actor: 'HAL Strategy Arbitrageur',
-        details: `Executed closed-loop spend shift of $${target.proposedReallocationUsd.toLocaleString()} from ${target.sourceChannel} to ${target.targetChannel}. Expected Net Lift: +$${target.expectedNetMonthlyLiftUsd.toLocaleString()}/mo. Logged to revenue experiments (ID: ${expId}).`,
-        metadata: {
-          arbitrageId: target.id,
-          sourceChannel: target.sourceChannel,
-          targetChannel: target.targetChannel,
-          sourceCampaignId: target.sourceCampaignId,
-          targetCampaignId: target.targetCampaignId,
-          amountShiftedUsd: target.proposedReallocationUsd,
-          expectedMonthlyLiftUsd: target.expectedNetMonthlyLiftUsd,
-          experimentId: expId,
-          guardrailCompliant: true
-        }
-      });
-
-      res.json({
-        success: true,
-        executedArbitrage: { ...target, status: 'executed' },
-        experimentId: expId,
-        block: auditBlock,
-        integrity: db.verifyLedgerIntegrity(contractorId)
-      });
-    } catch (err: any) {
-      console.error('[Roadmap Phase 4 Execute Arbitrage Error]', err);
-      res.status(500).json({ success: false, error: err.message });
-    }
+  app.post('/api/roadmap/phase4/execute-arbitrage', authenticate, async (_req, res) => {
+    return res.status(409).json({
+      success: false,
+      error: 'Live budget reallocation is disabled. Current arbitrage outputs are estimates only; verified ad-account synchronization, currency validation, and an auditable approval workflow are required before any campaign budget can change.'
+    });
   });
 
+  // 6. Strategy & Spend Arbitrage Dynamic Parameter Evaluation
   // 6. Strategy & Spend Arbitrage Dynamic Parameter Evaluation
   app.all('/api/roadmap/phase4/arbitrage/evaluate', authenticate, async (req, res) => {
     const contractorId = (req as any).contractorId;
