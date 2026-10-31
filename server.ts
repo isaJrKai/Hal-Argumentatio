@@ -1300,6 +1300,11 @@ app.post('/api/public/landing-leads', async (req, res) => {
     try {
       db.addLead({
         ...leadValues,
+        // db.addLead encrypts a supplied plaintext phone; pass undefined here
+        // so it preserves the already-encrypted value rather than encrypting
+        // the database display placeholder "[ENCRYPTED]".
+        phone: undefined,
+        phoneEncrypted,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
       } as any);
