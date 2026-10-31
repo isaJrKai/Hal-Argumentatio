@@ -330,8 +330,8 @@ export const HalRoadmapPhase4View: React.FC = () => {
           }`}
         >
           <TrendingUp className="w-3.5 h-3.5" />
-          <span>Strategy & Spend Arbitrage</span>
-          <span className="px-1.5 py-0.2 rounded-full text-[10px] font-mono bg-emerald-500/15 text-emerald-500">
+          <span>Strategy & Spend Estimates</span>
+          <span className="px-1.5 py-0.2 rounded-full text-[10px] font-mono bg-emerald-500/15 text-warning">
             {arbitrageList.length}
           </span>
         </button>
@@ -690,10 +690,10 @@ export const HalRoadmapPhase4View: React.FC = () => {
               <div>
                 <h3 className="text-sm font-bold text-text-primary flex items-center gap-1.5">
                   <TrendingUp className="w-4 h-4 text-emerald-500" />
-                  Closed-Loop Capital & Strategy Reallocation
+                  Campaign Performance Estimates (Review Only)
                 </h3>
                 <p className="text-xs text-text-secondary mt-1">
-                  HAL compares multi-channel marketing telemetry and executes capital transfers from low-yield vectors to alpha performers, enforced under strict statutory guardrails.
+                  HAL derives heuristic opportunities from stored campaign and ad-performance records. These are estimates only; no provider sync or campaign-budget changes occur.
                 </p>
               </div>
               <div className="flex items-center gap-4">
@@ -706,7 +706,7 @@ export const HalRoadmapPhase4View: React.FC = () => {
                   <span>Re-Evaluate Telemetry</span>
                 </button>
                 <div className="text-right">
-                  <div className="text-[10px] font-mono text-text-tertiary uppercase tracking-wider">Total Projected Monthly Lift</div>
+                  <div className="text-[10px] font-mono text-text-tertiary uppercase tracking-wider">Modelled Monthly Lift (Estimate)</div>
                   <div className="text-base font-bold font-mono text-emerald-500">
                     +${arbitrageList.reduce((acc, item) => acc + (item.expectedNetMonthlyLiftUsd || 0), 0).toLocaleString()} / mo
                   </div>
@@ -719,21 +719,21 @@ export const HalRoadmapPhase4View: React.FC = () => {
               <div className="flex items-center gap-2">
                 <ShieldCheck className="w-4 h-4 text-emerald-500 shrink-0" />
                 <div>
-                  <div className="font-bold text-text-primary text-[11px]">30% Capital Shift Cap</div>
+                  <div className="font-bold text-text-primary text-[11px]">Default 30% Shift Constraint</div>
                   <div className="text-[10px] text-text-tertiary font-mono">Max 30% source budget shift</div>
                 </div>
               </div>
               <div className="flex items-center gap-2">
                 <ShieldCheck className="w-4 h-4 text-emerald-500 shrink-0" />
                 <div>
-                  <div className="font-bold text-text-primary text-[11px]">1.25x ROAS Hurdle</div>
+                  <div className="font-bold text-text-primary text-[11px]">Default 1.25x ROAS Constraint</div>
                   <div className="text-[10px] text-text-tertiary font-mono">Target ROAS must exceed 1.25x source</div>
                 </div>
               </div>
               <div className="flex items-center gap-2">
                 <ShieldCheck className="w-4 h-4 text-emerald-500 shrink-0" />
                 <div>
-                  <div className="font-bold text-text-primary text-[11px]">$500 Liquidity Floor</div>
+                  <div className="font-bold text-text-primary text-[11px]">Default $500 Source Budget Constraint</div>
                   <div className="text-[10px] text-text-tertiary font-mono">Preserves source baseline ops</div>
                 </div>
               </div>
@@ -742,7 +742,7 @@ export const HalRoadmapPhase4View: React.FC = () => {
 
           {/* Arbitrage Opportunities Table */}
           <div className="space-y-4">
-            {arbitrageList.length === 0 && <div className="p-5 rounded-xl border border-border-dim text-sm text-text-secondary">No verified arbitrage opportunities are available. Connect measured campaign performance before evaluating budget shifts.</div>}
+            {arbitrageList.length === 0 && <div className="p-5 rounded-xl border border-border-dim text-sm text-text-secondary">No campaign estimates are available. Connect measured campaign performance before evaluating any budget changes.</div>}
             {arbitrageList.map((item) => (
               <div key={item.id} className="p-5 rounded-xl bg-bg-raised border border-border-dim space-y-3">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
@@ -753,7 +753,7 @@ export const HalRoadmapPhase4View: React.FC = () => {
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-500/15 text-emerald-600 dark:text-emerald-400">
-                      +{Math.round((item.projectedTargetRoas - item.currentSourceRoas) * 10) / 10}x ROAS Delta
+                      Estimated ROAS Delta: +{Math.round((item.projectedTargetRoas - item.currentSourceRoas) * 10) / 10}x
                     </span>
                     <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold ${
                       item.status === 'executed' ? 'bg-blue-500/15 text-blue-500' : 'bg-amber-500/15 text-amber-500'
@@ -770,21 +770,21 @@ export const HalRoadmapPhase4View: React.FC = () => {
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2 border-t border-border-dim text-[11px] font-mono">
                   <div className="flex items-center gap-4 text-text-tertiary">
                     <span>Reallocation: <strong className="text-text-primary">${item.proposedReallocationUsd.toLocaleString()}</strong></span>
-                    <span>Expected Lift: <strong className="text-emerald-500">+${item.expectedNetMonthlyLiftUsd.toLocaleString()}/mo</strong></span>
+                    <span>Estimated Lift: <strong className="text-text-primary">+${item.expectedNetMonthlyLiftUsd.toLocaleString()}/mo</strong></span>
                     <span>Risk Rating: <strong className="text-blue-500">{item.riskRating}</strong></span>
                     <span className="text-[10px] text-emerald-500 flex items-center gap-1">
-                      <CheckCircle2 className="w-3 h-3" /> Guardrail check status: {item.guardrailCompliant ? 'passed for this record' : 'not passed'}
+                      <CheckCircle2 className="w-3 h-3" /> Heuristic guardrail calculation: {item.guardrailCompliant ? 'passed (estimate only)' : 'not passed'}
                     </span>
                   </div>
 
                   {item.status !== 'executed' ? (
                     <button
-                      onClick={() => handleExecuteArbitrage(item.id)}
-                      disabled={isArbitrating}
+                      onClick={() => setActionNotice('Budget changes are disabled. These campaign outputs are estimates only and require verified ad-account sync and an approval workflow.')}
+                      disabled={true}
                       className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold flex items-center gap-1.5 cursor-pointer disabled:opacity-50 transition-colors"
                     >
                       <Zap className="w-3.5 h-3.5" />
-                      <span>Execute Capital Shift</span>
+                      <span>Execution disabled · estimate only</span>
                     </button>
                   ) : (
                     <span className="text-emerald-500 font-semibold flex items-center gap-1">
