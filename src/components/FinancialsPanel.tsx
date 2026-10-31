@@ -302,7 +302,7 @@ export default function FinancialsPanel({ token }: FinancialsPanelProps) {
                   </div>
 
                   <div className="flex justify-between text-[10px] text-text-dim">
-                    <span>{tierItem.count} Client{tierItem.count === 1 ? '' : 's'}</span>
+                    <span>{tierItem.count} Retainer{tierItem.count === 1 ? '' : 's'}</span>
                     <span>{tierRevenuePct}% of Total MRR</span>
                   </div>
                 </div>
