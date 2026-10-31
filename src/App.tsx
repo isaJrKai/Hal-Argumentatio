@@ -59,7 +59,7 @@ const HalOpsPanel = lazy(() => import('./components/HalOpsPanel'));
 const SettingsPanel = lazy(() => import('./components/SettingsPanel'));
 const MissionsPanel = lazy(() => import('./components/MissionsPanel'));
 const SkillsPanel = lazy(() => import('./components/SkillsPanel'));
-import CommandPalette from './components/CommandPalette';
+const CommandPalette = lazy(() => import('./components/CommandPalette'));
 const HalBiblePanel = lazy(() => import('./components/HalBiblePanel'));
 const GoogleDrivePanel = lazy(() => import('./components/GoogleDrivePanel'));
 const ConnectorsPanel = lazy(() => import('./components/ConnectorsPanel'));
@@ -67,9 +67,9 @@ const NeuralPanel = lazy(() => import('./components/NeuralPanel'));
 const DebriefModule = lazy(() => import('./components/DebriefModule'));
 const SystemHealthPanel = lazy(() => import('./components/SystemHealthPanel'));
 const MapPanel = lazy(() => import('./components/MapPanel'));
-import PublicAuditPage from './components/PublicAuditPage';
+const PublicAuditPage = lazy(() => import('./components/PublicAuditPage'));
 const DeliveryHub = lazy(() => import('./components/DeliveryHub'));
-import PublicPortalPage from './components/PublicPortalPage';
+const PublicPortalPage = lazy(() => import('./components/PublicPortalPage'));
 const FinancialsPanel = lazy(() => import('./components/FinancialsPanel'));
 const RevenueIntelligenceView = lazy(() => import('./components/RevenueIntelligenceView'));
 const HalLoopOperationsView = lazy(() => import('./components/HalLoopOperationsView'));
@@ -686,14 +686,16 @@ export default function App() {
 
   if (publicAuditId) {
     return (
-      <PublicAuditPage 
-        auditId={publicAuditId} 
-        onNavigateToLogin={() => {
-          window.history.pushState(null, '', window.location.pathname);
-          window.location.hash = '';
-          setPublicAuditId(null);
-        }}
-      />
+      <Suspense fallback={<div className="min-h-screen flex items-center justify-center text-xs font-mono text-text-tertiary">Loading shared audit…</div>}>
+        <PublicAuditPage 
+          auditId={publicAuditId} 
+          onNavigateToLogin={() => {
+            window.history.pushState(null, '', window.location.pathname);
+            window.location.hash = '';
+            setPublicAuditId(null);
+          }}
+        />
+      </Suspense>
     );
   }
 
@@ -706,14 +708,16 @@ export default function App() {
 
   if (publicPortalToken) {
     return (
-      <PublicPortalPage 
-        token={publicPortalToken} 
-        onNavigateToLogin={() => {
-          window.history.pushState(null, '', window.location.pathname);
-          window.location.hash = '';
-          setPublicPortalToken(null);
-        }}
-      />
+      <Suspense fallback={<div className="min-h-screen flex items-center justify-center text-xs font-mono text-text-tertiary">Loading client portal…</div>}>
+        <PublicPortalPage 
+          token={publicPortalToken} 
+          onNavigateToLogin={() => {
+            window.history.pushState(null, '', window.location.pathname);
+            window.location.hash = '';
+            setPublicPortalToken(null);
+          }}
+        />
+      </Suspense>
     );
   }
 
@@ -829,15 +833,19 @@ export default function App() {
       </AnimatePresence>
 
       {/* COMMAND PALETTE */}
-      <CommandPalette
-        isOpen={isCommandPaletteOpen}
-        onClose={() => setIsCommandPaletteOpen(false)}
-        leads={leads}
-        onNavigate={(tabId) => setActiveTab(tabId)}
-        onRunSkill={(skillId) => {
-          setActiveTab('skills');
-        }}
-      />
+      {isCommandPaletteOpen && (
+        <Suspense fallback={null}>
+          <CommandPalette
+            isOpen={isCommandPaletteOpen}
+            onClose={() => setIsCommandPaletteOpen(false)}
+            leads={leads}
+            onNavigate={(tabId) => setActiveTab(tabId)}
+            onRunSkill={(skillId) => {
+              setActiveTab('skills');
+            }}
+          />
+        </Suspense>
+      )}
 
       {/* MOBILE NAV DRAWER */}
       <AnimatePresence>
