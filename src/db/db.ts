@@ -1317,7 +1317,35 @@ class Database {
     if (!this.data.connectorCredentials) {
       this.data.connectorCredentials = {};
     }
-    return this.data.connectorCredentials[contractorId] || {};
+    if (!this.data.connectorCredentials[contractorId]) {
+      this.data.connectorCredentials[contractorId] = {};
+    }
+
+    const stored = this.data.connectorCredentials[contractorId];
+    const decrypted: Record<string, string> = {};
+    let migratedLegacyPlaintext = false;
+
+    for (const [service, storedValue] of Object.entries(stored)) {
+      if (typeof storedValue !== 'string' || !storedValue) continue;
+
+      const looksEncrypted = /^[a-f0-9]{24}:[a-f0-9]*:[a-f0-9]{32}$/i.test(storedValue);
+      if (looksEncrypted) {
+        const value = decrypt(storedValue);
+        if (value) decrypted[service] = value;
+        // If ciphertext cannot be decrypted, fail closed and do not expose it.
+        continue;
+      }
+
+      // Migrate legacy plaintext credentials to AES-256-GCM before returning
+      // them to the server-side integration layer.
+      const encryptedValue = encrypt(storedValue);
+      stored[service] = encryptedValue;
+      decrypted[service] = storedValue;
+      migratedLegacyPlaintext = true;
+    }
+
+    if (migratedLegacyPlaintext) this.save();
+    return decrypted;
   }
 
   public saveConnectorCredential(contractorId: string, service: string, keyVal: string) {
@@ -1327,7 +1355,7 @@ class Database {
     if (!this.data.connectorCredentials[contractorId]) {
       this.data.connectorCredentials[contractorId] = {};
     }
-    this.data.connectorCredentials[contractorId][service] = keyVal;
+    this.data.connectorCredentials[contractorId][service] = keyVal ? encrypt(keyVal) : '';
     this.save();
   }
 
