@@ -4,15 +4,15 @@ import { buildFinancialSnapshotCore } from '../../src/lib/financialSnapshot';
 describe('financial snapshot truthfulness', () => {
   it('calculates contract MRR and annualized run-rate from active projects only', () => {
     const snapshot = buildFinancialSnapshotCore([
-      { status: 'active', monthlyRetainerUsd: 1200, packageTier: 'Growth' },
-      { status: 'in_progress', monthlyRetainerUsd: '800', packageTier: 'Growth' },
+      { status: 'active', monthlyRetainerUsd: 1200, packageTier: 'Growth', leadId: 'lead-shared' },
+      { status: 'in_progress', monthlyRetainerUsd: '800', packageTier: 'Growth', leadId: 'lead-shared' },
       { status: 'completed', monthlyRetainerUsd: 5000, packageTier: 'Enterprise' },
       { status: 'cancelled', monthlyRetainerUsd: 700, packageTier: 'Dominance' }
     ]);
 
     expect(snapshot.currentMrrUsd).toBe(2000);
     expect(snapshot.arrUsd).toBe(24000);
-    expect(snapshot.activeClientCount).toBe(2);
+    expect(snapshot.activeClientCount).toBe(1);
     expect(snapshot.tierDistribution.find(item => item.tier === 'Growth')).toEqual({
       tier: 'Growth',
       count: 2,
