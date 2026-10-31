@@ -244,7 +244,13 @@ export const HalRoadmapPhase1: React.FC<{ initialPhase?: number }> = ({ initialP
               </span>
               <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 flex items-center gap-1">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                {selectedPhase === 1 ? 'PHASE 1 ACTIVE & VERIFIED' : selectedPhase === 2 ? 'PHASE 2 ACTIVE & 100% VERIFIED' : selectedPhase === 3 ? 'PHASE 3 ACTIVE & 100% VERIFIED' : selectedPhase === 4 ? 'PHASE 4 ACTIVE & 100% VERIFIED' : selectedPhase === 5 ? 'PHASE 5 ACTIVE & 100% VERIFIED' : 'FUTURE PHASE'}
+                {(() => {
+                  const selected = roadmapPhases.find(item => item.phase === selectedPhase);
+                  if (!selected) return 'ROADMAP STATUS LOADING';
+                  if (selected.status === 'verified_complete') return `PHASE ${selectedPhase} VERIFIED COMPLETE`;
+                  if (selected.status === 'verification_required') return `PHASE ${selectedPhase} REQUIRES VERIFICATION`;
+                  return `PHASE ${selectedPhase} NOT VERIFIED`;
+                })()}
               </span>
             </div>
             <h2 className="text-lg font-bold font-display text-text-primary tracking-tight">
