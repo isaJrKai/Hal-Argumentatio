@@ -307,6 +307,11 @@ export default function SettingsPanel({
   const [connectorConfigured, setConnectorConfigured] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
+    // Remove any legacy browser-stored database URI; production credentials belong in server env.
+    localStorage.removeItem('halbiz_postgres_url');
+  }, []);
+
+  useEffect(() => {
     const fetchCreds = async (retry = 1) => {
       try {
         const token = localStorage.getItem('halbiz_auth_token') || localStorage.getItem('token') || '';
