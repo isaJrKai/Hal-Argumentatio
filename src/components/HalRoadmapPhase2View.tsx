@@ -37,7 +37,7 @@ interface Phase2StatusResponse {
       details: string;
       metrics: {
         totalLeads: number;
-        realHarvestedCount: number;
+        nonSeedRecordCount: number;
         mockCount: number;
         encryptedCount: number;
         plaintextLeakCheck: string;
@@ -50,7 +50,7 @@ interface Phase2StatusResponse {
       details: string;
       metrics: {
         quadrantCount: number;
-        avgLatencyMins: number;
+        avgLatencyMins: number | null;
         quadrants: SpatialQuadrantSummary[];
       };
     };
@@ -60,15 +60,14 @@ interface Phase2StatusResponse {
       status: string;
       details: string;
       metrics: {
-        sampleAuditId: string;
         competitorsSampled: number;
-        saturationLevel: string;
-        actionStepsGenerated: number;
+        status: string;
       };
     };
   };
   quadrants: SpatialQuadrantSummary[];
-  competitorAuditSample: CompetitorAuditReport;
+  competitorAuditSample: CompetitorAuditReport | null;
+  competitorAuditStatus: { status: string; message: string };
   recentIntelligenceEvents: any[];
   integrity: {
     valid: boolean;
@@ -87,17 +86,17 @@ export const HalRoadmapPhase2View: React.FC = () => {
   const [verificationResult, setVerificationResult] = useState<any | null>(null);
 
   // Competitor Audit State
-  const [auditCity, setAuditCity] = useState('Calgary');
-  const [auditNiche, setAuditNiche] = useState('commercial roofing');
-  const [auditCompetitors, setAuditCompetitors] = useState('Epic Roofing Ltd, Superior Shield Roofing');
+  const [auditCity, setAuditCity] = useState('');
+  const [auditNiche, setAuditNiche] = useState('');
+  const [auditCompetitors, setAuditCompetitors] = useState('');
   const [isAuditingCompetitors, setIsAuditingCompetitors] = useState(false);
   const [activeAuditReport, setActiveAuditReport] = useState<CompetitorAuditReport | null>(null);
   const [auditLedgerBlock, setAuditLedgerBlock] = useState<any | null>(null);
 
   // Territory Harvest State
-  const [harvestCity, setHarvestCity] = useState('Winnipeg');
-  const [harvestNiche, setHarvestNiche] = useState('Commercial HVAC');
-  const [purgeMockSeeds, setPurgeMockSeeds] = useState(true);
+  const [harvestCity, setHarvestCity] = useState('');
+  const [harvestNiche, setHarvestNiche] = useState('');
+  const [purgeMockSeeds, setPurgeMockSeeds] = useState(false);
   const [isHarvesting, setIsHarvesting] = useState(false);
   const [harvestResult, setHarvestResult] = useState<any | null>(null);
 
@@ -220,7 +219,7 @@ export const HalRoadmapPhase2View: React.FC = () => {
               <span className="text-xs font-mono font-bold tracking-widest text-accent uppercase">
                 HAL Master Plan — Architecture Roadmap
               </span>
-              <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 flex items-center gap-1">
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-warning-dim text-warning border border-warning/30 flex items-center gap-1">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
                 {statusData?.phase2Verified ? 'PHASE 2 VERIFIED' : 'PHASE 2 NOT VERIFIED'}
               </span>
@@ -367,7 +366,7 @@ export const HalRoadmapPhase2View: React.FC = () => {
           }`}
         >
           <ShieldCheck className="w-3.5 h-3.5" />
-          <span>Pillar 1: Territory Harvester ({p1?.metrics.realHarvestedCount || 0})</span>
+          <span>Pillar 1: Territory Candidates ({p1?.metrics.nonSeedRecordCount ?? 0})</span>
         </button>
         <button
           onClick={() => setActiveTab('geo')}
@@ -402,7 +401,7 @@ export const HalRoadmapPhase2View: React.FC = () => {
               <div className="w-9 h-9 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 flex items-center justify-center">
                 <Globe className="w-5 h-5" />
               </div>
-              <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-500/15 text-emerald-600 dark:text-emerald-400">
+              <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-warning-dim text-warning">
                 {p1?.status || 'NOT VERIFIED'}
               </span>
             </div>
@@ -414,8 +413,8 @@ export const HalRoadmapPhase2View: React.FC = () => {
             </div>
             <div className="p-3 rounded-lg bg-bg-base border border-border-dim font-mono text-xs space-y-2">
               <div className="flex items-center justify-between gap-2 text-text-secondary">
-                <span className="shrink-0">Real Operating Leads:</span>
-                <span className="font-bold text-text-primary text-right">{p1?.metrics.realHarvestedCount || 0}</span>
+                <span className="shrink-0">Non-seed records:</span>
+                <span className="font-bold text-text-primary text-right">{p1?.metrics.nonSeedRecordCount ?? 0}</span>
               </div>
               <div className="flex items-center justify-between gap-2 text-text-secondary">
                 <span className="shrink-0">PII Encrypted Records:</span>
@@ -428,7 +427,7 @@ export const HalRoadmapPhase2View: React.FC = () => {
                     ? 'bg-red-500/10 text-red-500 border border-red-500/20'
                     : 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20'
                 }`}>
-                  {p1?.metrics.plaintextLeakCheck === 'PASSED_ZERO_LEAKAGE' ? 'PASSED (0 LEAK)' : (p1?.metrics.plaintextLeakCheck || 'PASSED')}
+                  {p1?.metrics.plaintextLeakCheck === 'PASSED_ZERO_LEAKAGE' ? 'PASSED (0 LEAK)' : (p1?.metrics.plaintextLeakCheck || 'NOT CHECKED')}
                 </span>
               </div>
             </div>
@@ -447,28 +446,28 @@ export const HalRoadmapPhase2View: React.FC = () => {
               <div className="w-9 h-9 rounded-lg bg-accent/10 text-accent border border-accent/20 flex items-center justify-center">
                 <Compass className="w-5 h-5" />
               </div>
-              <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-500/15 text-emerald-600 dark:text-emerald-400">
+              <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-warning-dim text-warning">
                 {p2?.status || 'NOT VERIFIED'}
               </span>
             </div>
             <div>
               <h3 className="font-bold text-text-primary text-sm">Pillar 2: Live Geo Ranking & Latency</h3>
               <p className="text-xs text-text-secondary mt-1 leading-relaxed">
-                Spatial quadrant clustering across North, South, East, West, and Central hubs. Calculates dynamic dispatch latency in minutes and density congestion ratings.
+                Candidate spatial groupings from available lead locations. Trusted routing and geocoding are not configured, so dispatch latency and congestion are not measured.
               </p>
             </div>
             <div className="p-3 rounded-lg bg-bg-base border border-border-dim font-mono text-xs space-y-2">
               <div className="flex items-center justify-between gap-2 text-text-secondary">
-                <span className="shrink-0">Active Quadrants:</span>
-                <span className="font-bold text-text-primary text-right">{statusData?.quadrants.length || 5}</span>
+                <span className="shrink-0">Candidate quadrants:</span>
+                <span className="font-bold text-text-primary text-right">{statusData?.quadrants?.length ?? 0}</span>
               </div>
               <div className="flex items-center justify-between gap-2 text-text-secondary">
-                <span className="shrink-0">Avg Dispatch Latency:</span>
-                <span className="font-bold text-accent text-right">{p2?.metrics.avgLatencyMins || 19.8} mins</span>
+                <span className="shrink-0">Route-time latency:</span>
+                <span className="font-bold text-accent text-right">{p2?.metrics.avgLatencyMins == null ? 'Not available' : `${p2.metrics.avgLatencyMins} mins`}</span>
               </div>
               <div className="flex items-center justify-between gap-2 text-text-secondary">
-                <span className="shrink-0">Territory Radius:</span>
-                <span className="font-bold text-text-primary text-right">15.0 km</span>
+                <span className="shrink-0">Service radius:</span>
+                <span className="font-bold text-text-primary text-right">Not configured</span>
               </div>
             </div>
             <button
@@ -486,28 +485,28 @@ export const HalRoadmapPhase2View: React.FC = () => {
               <div className="w-9 h-9 rounded-lg bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 flex items-center justify-center">
                 <Target className="w-5 h-5" />
               </div>
-              <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-500/15 text-emerald-600 dark:text-emerald-400">
+              <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-warning-dim text-warning">
                 {p3?.status || 'NOT VERIFIED'}
               </span>
             </div>
             <div>
               <h3 className="font-bold text-text-primary text-sm">Pillar 3: Competitor Digital Footprint</h3>
               <p className="text-xs text-text-secondary mt-1 leading-relaxed">
-                Audits localized Google Maps 3-Pack competitors, analyzes Core Web Vitals speed deficits, and drafts a 4-step tactical penetration plan.
+                Competitor audit remains unavailable until a verified search/maps data source is configured. No competitor rankings, reviews, speed scores, or market saturation are fabricated.
               </p>
             </div>
             <div className="p-3 rounded-lg bg-bg-base border border-border-dim font-mono text-xs space-y-2">
               <div className="flex items-center justify-between gap-2 text-text-secondary">
                 <span className="shrink-0">Top Competitors Tracked:</span>
-                <span className="font-bold text-text-primary text-right">{activeAuditReport?.competitors.length || 4}</span>
+                <span className="font-bold text-text-primary text-right">{activeAuditReport?.competitors.length ?? p3?.metrics.competitorsSampled ?? 0}</span>
               </div>
               <div className="flex items-center justify-between gap-2 text-text-secondary">
                 <span className="shrink-0">Avg Competitor Speed:</span>
-                <span className="font-bold text-amber-500 text-right">{activeAuditReport?.marketAverages.avgMobileSpeed || 45}/100</span>
+                <span className="font-bold text-amber-500 text-right">{activeAuditReport?.marketAverages.avgMobileSpeed == null ? 'Not available' : `${activeAuditReport.marketAverages.avgMobileSpeed}/100`}</span>
               </div>
               <div className="flex items-center justify-between gap-2 text-text-secondary">
                 <span className="shrink-0">Market Saturation:</span>
-                <span className="font-bold text-indigo-400 text-right">{activeAuditReport?.saturationLevel || 'MEDIUM-HIGH'}</span>
+                <span className="font-bold text-indigo-400 text-right">{activeAuditReport?.saturationLevel || 'Not available'}</span>
               </div>
             </div>
             <button
@@ -527,13 +526,13 @@ export const HalRoadmapPhase2View: React.FC = () => {
           <div className="p-5 rounded-xl bg-bg-raised border border-border-dim space-y-4">
             <div className="flex items-center justify-between border-b border-border-dim pb-3">
               <div>
-                <h3 className="font-bold text-text-primary text-sm">Territory Real Data Harvester & Seed Purge</h3>
+                <h3 className="font-bold text-text-primary text-sm">Territory Candidate Discovery & Optional Seed Cleanup</h3>
                 <p className="text-xs text-text-secondary mt-0.5">
-                  Replaces mock seed datasets with live, operational business profiles. Enforces AES-GCM-256 PII encryption.
+                  Finds business discovery candidates. Contact details are retained only when independently verified; unverified source claims are not treated as facts.
                 </p>
               </div>
               <span className="px-2.5 py-1 rounded-full text-[10px] font-mono font-bold bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30">
-                AES-GCM-256 ACTIVE
+                CONTACT VAULT ENCRYPTION
               </span>
             </div>
 
@@ -545,7 +544,7 @@ export const HalRoadmapPhase2View: React.FC = () => {
                   value={harvestCity}
                   onChange={(e) => setHarvestCity(e.target.value)}
                   className="w-full px-3 py-2 text-xs bg-bg-base border border-border-dim rounded-lg text-text-primary"
-                  placeholder="e.g. Winnipeg, Calgary, Edmonton"
+                  placeholder="Enter a city"
                 />
               </div>
               <div>
@@ -555,7 +554,7 @@ export const HalRoadmapPhase2View: React.FC = () => {
                   value={harvestNiche}
                   onChange={(e) => setHarvestNiche(e.target.value)}
                   className="w-full px-3 py-2 text-xs bg-bg-base border border-border-dim rounded-lg text-text-primary"
-                  placeholder="e.g. Commercial HVAC, Roofing, Plumbing"
+                  placeholder="Enter a contractor niche"
                 />
               </div>
               <div className="flex items-end gap-2">
@@ -583,10 +582,10 @@ export const HalRoadmapPhase2View: React.FC = () => {
               <div className="p-3.5 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-xs space-y-1">
                 <div className="font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5">
                   <Check className="w-4 h-4" />
-                  <span>Harvest Complete: Sourced {harvestResult.harvestedCount} Real Business Records!</span>
+                  <span>Discovery complete: {harvestResult.harvestedCount} candidates processed.</span>
                 </div>
                 <div className="text-[11px] text-text-secondary">
-                  Mock seeds purged: {harvestResult.purgedMock ? 'YES' : 'NO'}. Ledger block ID: {harvestResult.block?.id}.
+                  Independently verified: {harvestResult.verifiedCount ?? 0}. Unverified staging: {harvestResult.unverifiedCount ?? 0}. Synthetic: {harvestResult.syntheticCount ?? 0}. Mock seeds removed: {harvestResult.purgedCount ?? 0}. Ledger block ID: {harvestResult.block?.id || 'not recorded'}.
                 </div>
               </div>
             )}
@@ -602,11 +601,11 @@ export const HalRoadmapPhase2View: React.FC = () => {
               <div>
                 <h3 className="font-bold text-text-primary text-sm">Spatial Quadrants & Dispatch Latency Model</h3>
                 <p className="text-xs text-text-secondary mt-0.5">
-                  Territory segmented into 5 operational zones to balance technician travel distance, response speed, and customer density.
+                  Candidate spatial groupings use the location fields currently available. No travel-time or service-radius estimate is made without a trusted routing provider.
                 </p>
               </div>
               <span className="text-[10px] font-mono text-text-secondary">
-                Average Travel Speed: 42 km/h
+                Route-time provider: Not configured
               </span>
             </div>
 
