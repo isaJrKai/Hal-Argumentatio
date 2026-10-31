@@ -26,8 +26,9 @@ export interface CadenceSequence {
   niche: string;
   description: string;
   steps: SequenceStep[];
-  activeLeadsCount: number;
-  conversionRatePct: number;
+  activeLeadsCount: number | null;
+  conversionRatePct: number | null;
+  templateOnly?: boolean;
   createdAt: string;
 }
 
