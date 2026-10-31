@@ -189,8 +189,8 @@ export const HalRoadmapPhase4View: React.FC = () => {
                 <Bot className="w-3 h-3 text-accent" />
                 PHASE 4: MULTI-AGENT INTELLIGENCE
               </span>
-              <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 flex items-center gap-1">
-                <CheckCircle2 className="w-3 h-3 text-emerald-500" />
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-warning-dim text-warning border border-warning/30 flex items-center gap-1">
+                <AlertCircle className="w-3 h-3 text-warning" />
                 RUNTIME STATUS UNVERIFIED
               </span>
             </div>
@@ -205,7 +205,7 @@ export const HalRoadmapPhase4View: React.FC = () => {
           <div className="flex items-center gap-2.5 shrink-0">
             <button
               onClick={handleRunConsensus}
-              disabled={isExecutingConsensus}
+              disabled={true}
               className="px-3.5 py-2 rounded-lg bg-accent text-white hover:bg-accent/90 active:scale-98 transition-all text-xs font-semibold flex items-center gap-2 shadow-xs cursor-pointer disabled:opacity-50"
             >
               <RefreshCw className={`w-3.5 h-3.5 ${isExecutingConsensus ? 'animate-spin' : ''}`} />
@@ -345,7 +345,7 @@ export const HalRoadmapPhase4View: React.FC = () => {
             <div className="p-5 rounded-xl bg-bg-raised border border-border-dim space-y-3">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-mono font-bold text-accent uppercase">PILLAR 1</span>
-                <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-500/15 text-emerald-500 border border-emerald-500/30">
+                <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-warning-dim text-warning border border-warning/30">
                   NOT VERIFIED
                 </span>
               </div>
@@ -356,7 +356,7 @@ export const HalRoadmapPhase4View: React.FC = () => {
               <div className="p-3 rounded-lg bg-bg-base border border-border-dim text-[11px] space-y-1 font-mono">
                 <div className="text-text-tertiary">Engine A: provider not verified</div>
                 <div className="text-text-tertiary">Engine B: provider not verified</div>
-                <div className="text-emerald-500 font-semibold">Alignment: Not measured</div>
+                <div className="text-text-secondary font-semibold">Alignment: Not measured</div>
               </div>
             </div>
 
@@ -375,7 +375,7 @@ export const HalRoadmapPhase4View: React.FC = () => {
               <div className="p-3 rounded-lg bg-bg-base border border-border-dim text-[11px] space-y-1 font-mono">
                 <div className="text-text-tertiary">Calibration epoch: Not available</div>
                 <div className="text-text-tertiary">Urgency weights: Not calibrated from measured outcomes</div>
-                <div className="text-emerald-500 font-semibold">Policy autonomy: Not verified</div>
+                <div className="text-text-secondary font-semibold">Policy autonomy: Not verified</div>
               </div>
             </div>
 
@@ -394,7 +394,7 @@ export const HalRoadmapPhase4View: React.FC = () => {
               <div className="p-3 rounded-lg bg-bg-base border border-border-dim text-[11px] space-y-1 font-mono">
                 <div className="text-text-tertiary">Evaluated opportunities: None verified</div>
                 <div className="text-text-tertiary">Guardrail policy: Not verified in this deployment</div>
-                <div className="text-emerald-500 font-semibold">Expected lift: Not estimated</div>
+                <div className="text-text-secondary font-semibold">Expected lift: Not estimated</div>
               </div>
             </div>
           </div>
@@ -408,7 +408,7 @@ export const HalRoadmapPhase4View: React.FC = () => {
                   Cryptographic Ledger Audit Record
                 </span>
                 <span className="text-[10px] font-mono text-text-tertiary">
-                  Block #{auditBlock.sequenceNumber || '48'}
+                  Block #{auditBlock.sequenceNumber ?? 'Not assigned'}
                 </span>
               </div>
               <div className="p-3 rounded-lg bg-bg-base border border-border-dim font-mono text-[11px] space-y-1 overflow-x-auto">
@@ -434,7 +434,7 @@ export const HalRoadmapPhase4View: React.FC = () => {
                   Dual-Drive Cognitive Arbitration Sandbox
                 </h3>
                 <p className="text-xs text-text-secondary">
-                  Specify a business decision to run parallel inference through Google Gemini 2.5 and NVIDIA Nemotron 70B.
+                  No live Gemini/NVIDIA inference adapters or persisted consensus store are connected. This panel is not currently able to generate a real consensus.
                 </p>
               </div>
               <button
@@ -443,7 +443,7 @@ export const HalRoadmapPhase4View: React.FC = () => {
                 className="px-4 py-2 rounded-lg bg-accent text-white hover:bg-accent/90 transition-all text-xs font-semibold flex items-center gap-2 cursor-pointer disabled:opacity-50"
               >
                 <RefreshCw className={`w-3.5 h-3.5 ${isExecutingConsensus ? 'animate-spin' : ''}`} />
-                <span>{isExecutingConsensus ? 'Synthesizing...' : 'Execute Parallel Synthesis'}</span>
+                <span>{isExecutingConsensus ? 'Checking...' : 'Unavailable · no live providers'}</span>
               </button>
             </div>
 
@@ -460,7 +460,7 @@ export const HalRoadmapPhase4View: React.FC = () => {
 
           {/* Consensus Records */}
           <div className="space-y-4">
-            {consensusList.length === 0 && <div className="p-5 rounded-xl border border-border-dim text-sm text-text-secondary">No verified consensus records are stored yet. Generate a consensus to create a real record.</div>}
+            {consensusList.length === 0 && <div className="p-5 rounded-xl border border-border-dim text-sm text-text-secondary">No verified consensus records are stored. Live model providers are not configured; HAL will not create synthetic consensus results.</div>}
             {consensusList.map((cons) => (
               <div key={cons.id} className="p-5 rounded-xl bg-bg-raised border border-border-dim space-y-4 shadow-xs">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-border-dim pb-3">
