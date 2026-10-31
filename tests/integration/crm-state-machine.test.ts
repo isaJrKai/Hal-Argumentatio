@@ -1,8 +1,13 @@
 import { describe, it, expect } from 'vitest';
-import { validateCrmTransition, ALLOWED_CRM_TRANSITIONS } from '../../src/lib/crmStateMachine';
+import {
+  validateCrmTransition,
+  ALLOWED_CRM_TRANSITIONS,
+  canonicalizeStage,
+  isKnownCrmStage
+} from '../../src/lib/crmStateMachine';
 
-describe('Integration: CRM State Machine & Lifecycle Verification', () => {
-  describe('Legal Lifecycle Progression', () => {
+describe('CRM state machine and lifecycle verification', () => {
+  describe('legal lifecycle progression', () => {
     it('permits canonical forward stage progression', () => {
       expect(validateCrmTransition('new', 'contacted').valid).toBe(true);
       expect(validateCrmTransition('contacted', 'qualified').valid).toBe(true);
@@ -13,40 +18,70 @@ describe('Integration: CRM State Machine & Lifecycle Verification', () => {
     });
 
     it('permits early loss transitions from intermediate stages', () => {
-      expect(validateCrmTransition('new', 'closed_lost').valid).toBe(true);
-      expect(validateCrmTransition('contacted', 'closed_lost').valid).toBe(true);
-      expect(validateCrmTransition('qualified', 'closed_lost').valid).toBe(true);
-      expect(validateCrmTransition('sal', 'closed_lost').valid).toBe(true);
-      expect(validateCrmTransition('proposal', 'closed_lost').valid).toBe(true);
+      for (const stage of ['new', 'contacted', 'qualified', 'sal', 'proposal']) {
+        expect(validateCrmTransition(stage, 'closed_lost').valid).toBe(true);
+      }
     });
 
-    it('permits idempotent transitions (same stage to same stage)', () => {
+    it('permits idempotent transitions', () => {
       expect(validateCrmTransition('qualified', 'qualified').valid).toBe(true);
       expect(validateCrmTransition('new', 'new').valid).toBe(true);
     });
   });
 
-  describe('Illegal Lifecycle Progression Enforcement', () => {
-    it('strictly rejects jumping directly from closed_lost to customer or proposal', () => {
+  describe('legacy stage normalization', () => {
+    it.each([
+      ['converted', 'closed_won'],
+      ['won', 'closed_won'],
+      ['customer', 'closed_won'],
+      ['dead', 'closed_lost'],
+      ['lost', 'closed_lost'],
+      ['appointment', 'proposal'],
+      ['booked', 'proposal'],
+      ['opportunity', 'proposal'],
+      ['estimate', 'proposal']
+    ])('normalizes %s to %s', (legacy, canonical) => {
+      expect(canonicalizeStage(legacy)).toBe(canonical);
+      expect(isKnownCrmStage(legacy)).toBe(true);
+    });
+
+    it('allows valid transitions from legacy aliases', () => {
+      expect(validateCrmTransition('customer', 'retained').valid).toBe(true);
+      expect(validateCrmTransition('dead', 'reactivated').valid).toBe(true);
+      expect(validateCrmTransition('booked', 'customer').valid).toBe(true);
+    });
+  });
+
+  describe('illegal lifecycle progression enforcement', () => {
+    it('rejects jumping directly from closed_lost to customer or proposal', () => {
       const lostToCustomer = validateCrmTransition('closed_lost', 'customer');
       expect(lostToCustomer.valid).toBe(false);
       expect(lostToCustomer.reason).toContain('Illegal CRM pipeline transition');
-
-      const lostToProposal = validateCrmTransition('closed_lost', 'proposal');
-      expect(lostToProposal.valid).toBe(false);
+      expect(validateCrmTransition('closed_lost', 'proposal').valid).toBe(false);
     });
 
-    it('strictly rejects jumping directly from new to customer', () => {
+    it('rejects jumping directly from new to customer', () => {
       const directJump = validateCrmTransition('new', 'customer');
       expect(directJump.valid).toBe(false);
       expect(directJump.reason).toContain('Illegal CRM pipeline transition');
     });
 
-    it('permits reactivation workflow from closed_lost', () => {
-      // closed_lost can transition to reactivated
+    it('permits the reactivation workflow', () => {
       expect(validateCrmTransition('closed_lost', 'reactivated').valid).toBe(true);
-      // reactivated can then transition to contacted
       expect(validateCrmTransition('reactivated', 'contacted').valid).toBe(true);
+    });
+
+    it('fails closed for unknown current and target stages', () => {
+      expect(validateCrmTransition('mystery_stage', 'qualified').valid).toBe(false);
+      expect(validateCrmTransition('new', 'mystery_stage').valid).toBe(false);
+      expect(validateCrmTransition('legacy-custom', 'legacy-custom').valid).toBe(true);
+      expect(validateCrmTransition('new', '').valid).toBe(false);
+    });
+
+    it('exposes only canonical transition keys', () => {
+      expect(Object.keys(ALLOWED_CRM_TRANSITIONS)).not.toContain('converted');
+      expect(Object.keys(ALLOWED_CRM_TRANSITIONS)).not.toContain('customer');
+      expect(Object.keys(ALLOWED_CRM_TRANSITIONS)).toContain('closed_won');
     });
   });
 });
