@@ -38,9 +38,9 @@ describe('financial snapshot truthfulness', () => {
 
   it('handles missing, invalid, and negative retainer values without creating revenue', () => {
     const snapshot = buildFinancialSnapshotCore([
-      { status: 'active', monthlyRetainerUsd: null, packageTier: 'Growth' },
-      { status: 'active', monthlyRetainerUsd: 'not-a-number', packageTier: 'Enterprise' },
-      { status: 'active', monthlyRetainerUsd: -500, packageTier: 'Other Tier' }
+      { id: 'project-null', status: 'active', monthlyRetainerUsd: null, packageTier: 'Growth' },
+      { id: 'project-invalid', status: 'active', monthlyRetainerUsd: 'not-a-number', packageTier: 'Enterprise' },
+      { id: 'project-negative', status: 'active', monthlyRetainerUsd: -500, packageTier: 'Other Tier' }
     ]);
 
     expect(snapshot.currentMrrUsd).toBe(0);
