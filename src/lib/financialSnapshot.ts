@@ -1,4 +1,6 @@
 export interface FinancialProjectLike {
+  id?: string | null;
+  leadId?: string | null;
   status?: string | null;
   monthlyRetainerUsd?: number | string | null;
   packageTier?: string | null;
@@ -60,7 +62,7 @@ export function buildFinancialSnapshotCore(projects: readonly FinancialProjectLi
     currentMrrUsd,
     // This is an annualized contract run-rate, not recognized or collected revenue.
     arrUsd: currentMrrUsd * 12,
-    activeClientCount: activeProjects.length,
+    activeClientCount: new Set(activeProjects.map(project => project.leadId || project.id).filter(Boolean)).size,
     averageContractLengthMonths: null,
     averageLtvUsd: null,
     blendedCacUsd: null,
