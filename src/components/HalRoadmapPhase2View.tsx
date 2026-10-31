@@ -98,6 +98,7 @@ export const HalRoadmapPhase2View: React.FC = () => {
   const [harvestNiche, setHarvestNiche] = useState('');
   const [purgeMockSeeds, setPurgeMockSeeds] = useState(false);
   const [isHarvesting, setIsHarvesting] = useState(false);
+  const [harvestError, setHarvestError] = useState<string | null>(null);
   const [harvestResult, setHarvestResult] = useState<any | null>(null);
 
   const fetchPhase2Status = async () => {
@@ -178,6 +179,11 @@ export const HalRoadmapPhase2View: React.FC = () => {
   };
 
   const handleRunHarvest = async () => {
+    if (!harvestCity.trim() || !harvestNiche.trim()) {
+      setHarvestError('Enter both a city and a contractor niche before starting discovery.');
+      return;
+    }
+    setHarvestError(null);
     try {
       setIsHarvesting(true);
       const token = localStorage.getItem('token') || localStorage.getItem('halbiz_auth_token');
@@ -220,7 +226,7 @@ export const HalRoadmapPhase2View: React.FC = () => {
                 HAL Master Plan — Architecture Roadmap
               </span>
               <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-warning-dim text-warning border border-warning/30 flex items-center gap-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                <span className="w-1.5 h-1.5 rounded-full bg-warning" />
                 {statusData?.phase2Verified ? 'PHASE 2 VERIFIED' : 'PHASE 2 NOT VERIFIED'}
               </span>
             </div>
@@ -309,11 +315,11 @@ export const HalRoadmapPhase2View: React.FC = () => {
 
       {/* ─── LIVE VERIFICATION BANNER (When Run) ─── */}
       {verificationResult && (
-        <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-text-primary space-y-3">
+        <div className={`p-4 rounded-xl ${verificationResult.verified ? 'bg-emerald-500/10 border-emerald-500/30' : 'bg-warning-dim border-warning/30'} border text-text-primary space-y-3`}>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <ShieldCheck className="w-5 h-5 text-emerald-500 shrink-0" />
-              <span className="text-xs font-mono font-bold uppercase text-emerald-600 dark:text-emerald-400">
+              <ShieldCheck className={`w-5 h-5 shrink-0 ${verificationResult.verified ? 'text-emerald-500' : 'text-warning'}`} />
+              <span className="text-xs font-mono font-bold uppercase text-text-primary">
                 {verificationResult.verified ? 'Phase 2 verification passed' : 'Phase 2 checks completed · one or more pillars remain unverified'}
               </span>
             </div>
@@ -423,9 +429,11 @@ export const HalRoadmapPhase2View: React.FC = () => {
               <div className="flex items-center justify-between gap-2 text-text-secondary">
                 <span className="shrink-0">Plaintext Leak Check:</span>
                 <span className={`font-bold px-1.5 py-0.5 rounded text-[11px] text-right ${
-                  p1?.metrics.plaintextLeakCheck?.includes('FAIL')
-                    ? 'bg-red-500/10 text-red-500 border border-red-500/20'
-                    : 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20'
+                  p1?.metrics.plaintextLeakCheck === 'PASSED_ZERO_LEAKAGE'
+                    ? 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20'
+                    : p1?.metrics.plaintextLeakCheck?.startsWith('FAILED')
+                      ? 'bg-red-500/10 text-red-500 border border-red-500/20'
+                      : 'bg-bg-overlay text-text-secondary border border-border-dim'
                 }`}>
                   {p1?.metrics.plaintextLeakCheck === 'PASSED_ZERO_LEAKAGE' ? 'PASSED (0 LEAK)' : (p1?.metrics.plaintextLeakCheck || 'NOT CHECKED')}
                 </span>
@@ -531,8 +539,8 @@ export const HalRoadmapPhase2View: React.FC = () => {
                   Finds business discovery candidates. Contact details are retained only when independently verified; unverified source claims are not treated as facts.
                 </p>
               </div>
-              <span className="px-2.5 py-1 rounded-full text-[10px] font-mono font-bold bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30">
-                CONTACT VAULT ENCRYPTION
+              <span className="px-2.5 py-1 rounded-full text-[10px] font-mono font-bold bg-bg-overlay text-text-secondary border border-border-dim">
+                PII ENCRYPTION AVAILABLE
               </span>
             </div>
 
@@ -578,9 +586,10 @@ export const HalRoadmapPhase2View: React.FC = () => {
               </div>
             </div>
 
+            {harvestError && <div className="text-xs text-warning" role="alert">{harvestError}</div>}
             {harvestResult && (
-              <div className="p-3.5 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-xs space-y-1">
-                <div className="font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5">
+              <div className="p-3.5 rounded-lg bg-warning-dim border border-warning/30 text-xs space-y-1">
+                <div className="font-bold text-warning flex items-center gap-1.5">
                   <Check className="w-4 h-4" />
                   <span>Discovery complete: {harvestResult.harvestedCount} candidates processed.</span>
                 </div>
