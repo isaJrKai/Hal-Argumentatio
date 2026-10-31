@@ -227,10 +227,7 @@ export default function SettingsPanel({
   };
 
   // Postgres and token copy states
-  const [copiedToken, setCopiedToken] = useState(false);
-  const [postgresUrl, setPostgresUrl] = useState(() => {
-    return localStorage.getItem('halbiz_postgres_url') || '';
-  });
+  const [postgresUrl, setPostgresUrl] = useState('');
   const [postgresSuccess, setPostgresSuccess] = useState<string | null>(null);
   const [postgresTesting, setPostgresTesting] = useState(false);
   const [postgresSyncing, setPostgresSyncing] = useState(false);
@@ -281,15 +278,8 @@ export default function SettingsPanel({
     }
   };
 
-  const handleCopyToken = () => {
-    navigator.clipboard.writeText(token);
-    setCopiedToken(true);
-    setTimeout(() => setCopiedToken(false), 2000);
-  };
-
   const handleSavePostgres = async (e: React.FormEvent) => {
     e.preventDefault();
-    localStorage.setItem('halbiz_postgres_url', postgresUrl);
     setPostgresSuccess('Neon PostgreSQL database link configured. Validating connection...');
     await handleTestPostgres();
     setTimeout(() => setPostgresSuccess(null), 5000);
@@ -843,7 +833,8 @@ export default function SettingsPanel({
 
           <form onSubmit={handleSavePostgres} className="space-y-4 text-xs font-sans">
             <div className="space-y-1">
-              <label className="block text-[11px] font-mono opacity-80 uppercase tracking-wider font-bold">PostgreSQL Connection URI</label>
+              <label className="block text-[11px] font-mono opacity-80 uppercase tracking-wider font-bold">PostgreSQL Connection URI (admin only)</label>
+              <p className="text-[11px] text-text-secondary">Used only for this settings session; it is not saved in browser storage. Configure DATABASE_URL in the server environment for persistent production connections.</p>
               <textarea
                 rows={3}
                 required
@@ -906,47 +897,15 @@ export default function SettingsPanel({
 
         </div>
 
-        {/* Authentication Token Section */}
-        <div className={`border rounded-lg p-5 space-y-6 ${cardBg}`}>
-          <div className="flex flex-wrap items-center gap-2 border-b pb-3 border-inherit">
+        {/* Session credentials are intentionally not exposed in the settings UI. */}
+        <div className={`border rounded-lg p-5 space-y-3 ${cardBg}`}>
+          <div className="flex items-center gap-2 border-b pb-3 border-inherit">
             <Lock className="w-4 h-4 text-accent" />
-            <span className="text-xs font-mono uppercase tracking-wider font-bold">Your Active Session Token</span>
+            <span className="text-xs font-mono uppercase tracking-wider font-bold">Session security</span>
           </div>
-
           <p className="text-xs text-inherit opacity-80 leading-relaxed font-sans">
-            Your personal, 30-day cryptographically signed JSON Web Token (JWT). You can copy this token to authenticate external tools, Zapier/Make webhooks, curl commands, or mobile scripts by passing it as a <code className="font-mono text-[10px] bg-bg-base px-1.5 py-0.5 rounded border border-border-dim">Bearer &lt;token&gt;</code> header.
+            Your active session is managed securely by HAL. Session credentials are not displayed or made copyable in this settings screen.
           </p>
-
-          <div className="space-y-3 font-sans">
-            <div className="space-y-1">
-              <label className="block text-[11px] font-mono opacity-80 uppercase tracking-wider font-bold">Bearer Authentication Token</label>
-              <div className="relative">
-                <textarea
-                  readOnly
-                  rows={3}
-                  value={token}
-                  className={`w-full border rounded p-2 pr-12 focus:outline-none text-inherit font-mono text-[11px] leading-relaxed break-all resize-none ${innerBg} ${borderCol}`}
-                />
-                <button
-                  type="button"
-                  onClick={handleCopyToken}
-                  className="absolute right-2 top-2 p-1.5 bg-card border border-border-dim rounded hover:border-accent hover:text-accent transition-all"
-                  title="Copy Token"
-                >
-                  {copiedToken ? (
-                    <Check className="w-4 h-4 text-accent" />
-                  ) : (
-                    <Copy className="w-4 h-4" />
-                  )}
-                </button>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2 text-[11px] font-mono text-text-secondary mt-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-positive animate-pulse" />
-              <span>ACTIVE SESSION VALID</span>
-            </div>
-          </div>
         </div>
       </div>
 
