@@ -8365,7 +8365,7 @@ async function startServer() {
           leadId: addedLead.id,
           eventType: 'LeadCreated',
           newStage: 'new',
-          notes: 'Harvested real-world business profile with active Website & Reputation Intelligence.'
+          notes: `AI-assisted discovery candidate; verification status: ${(hl as any).verificationStatus || 'UNVERIFIED_STAGING'}.`
         });
 
         // Record in cryptographic ledger
@@ -8375,7 +8375,7 @@ async function startServer() {
           entityType: 'lead',
           entityId: addedLead.id,
           actor: 'HAL Territory Intelligence Harvester',
-          details: `Harvested business profile: ${addedLead.businessName} (${addedLead.city})`,
+          details: `Recorded discovery candidate: ${addedLead.businessName} (${addedLead.city}); verification status: ${addedLead.verificationStatus || 'UNVERIFIED_STAGING'}.`,
           metadata: { city: addedLead.city, niche: addedLead.niche, source: 'harvested_intelligence' }
         });
 
@@ -8389,7 +8389,7 @@ async function startServer() {
         entityType: 'territory_intel',
         entityId: 'harvest_' + Date.now(),
         actor: 'HAL Territory Intelligence Harvester',
-        details: `Harvested ${savedLeads.length} live business profiles in ${city} (${niche}) with active SEO and Speed metrics`,
+        details: `Processed ${savedLeads.length} discovery candidates in ${city} (${niche}); verified: ${savedLeads.filter(lead => lead.verificationStatus === 'VERIFIED' && !lead.isSynthetic).length}; unverified: ${savedLeads.filter(lead => lead.verificationStatus !== 'VERIFIED' || lead.isSynthetic).length}.`,
         metadata: { city, niche, harvestedCount: savedLeads.length, purgedMockSeeds: purgeMock }
       });
 
