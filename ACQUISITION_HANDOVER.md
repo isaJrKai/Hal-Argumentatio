@@ -9,11 +9,11 @@ This document serves as the formal technical handover and operational runbook fo
 HAL is delivered as a 100% complete, unencumbered, full-stack software asset. All proprietary source code, database architectures, machine learning orchestration layers, front-end design systems, and automated test harnesses are transferred in full to the buyer.
 
 ### Inventory of Delivered Intellectual Property:
-1. **Core Application Engine:** Full TypeScript codebase (~60,000+ lines of production-grade code).
+1. **Core Application Engine:** Full TypeScript codebase (60,000+ lines of TypeScript).
 2. **Frontend Client:** React 19 single-page application with responsive Tailwind CSS v4 styling, interactive Canvas/D3 neural visualizations, and full mobile optimization.
 3. **Backend Service Layer:** Node.js / Express RESTful API server with multi-tenant authentication, webhook handlers, and Server-Sent Events.
 4. **Data & Persistence Layer:** Drizzle ORM schemas supporting PostgreSQL, Neon DB, and an automated zero-config in-memory persistence fallback.
-5. **Cryptographic Suite:** Military-grade AES-256-GCM field-level PII encryption, PBKDF2/bcrypt salted password hashing, and SHA-256 tamper-evident audit ledger.
+5. **Cryptographic Suite:** AES-256-GCM field-level PII encryption, PBKDF2/bcrypt salted password hashing, and SHA-256 tamper-evident audit ledger.
 6. **AI Orchestration Framework:** Multi-provider LLM integrations (Google Gemini, Hugging Face, OpenRouter) and Model Context Protocol (MCP) server.
 7. **Six Integrated Product Studios:**
    - *Territory Harvester & Lead Finder:* Real-time website performance audits, SSL checks, and sentiment scoring.
@@ -163,7 +163,7 @@ Duration:   ~12s
 
 ## 6. Commercial Asset Assignment & Closing
 
-Upon receipt of the agreed purchase price ($5,000 USD):
+Upon receipt of the agreed purchase price ($3,000 USD):
 1. **GitHub Repository Transfer:** Full administrative ownership of the GitHub repository `https://github.com/isaJrKai/Hal-Argumentatio` will be transferred to the buyer's GitHub username/organization.
 2. **Proprietary Rights Transfer:** The seller relinquishes all copyright, commercial rights, trademarks, and claims to HAL, granting the buyer 100% exclusive, perpetual, worldwide ownership.
 3. **Warranty & Maintenance:** The software is delivered as-is with all 132 passing tests verified green at time of delivery. Post-handover hosting, operational maintenance, and third-party API costs are the responsibility of the acquiring party.
