@@ -1,6 +1,6 @@
 # HAL — Enterprise AI Business Operating Intelligence Platform
 
-HAL (Human Argumentation Layer) is an enterprise-grade, full-stack AI Business Operating Intelligence System. It consolidates lead harvesting, technical SEO auditing, high-conversion landing page generation, multi-channel outreach (WhatsApp, Email, SMS, Calendar), client intelligence graphs, and an immutable cryptographic audit ledger into a unified, turnkey software platform.
+HAL (Human Argumentation Layer) is a full-stack AI Business Operating Intelligence System. It consolidates lead harvesting, technical SEO auditing, high-conversion landing page generation, multi-channel outreach (WhatsApp, Email, SMS, Calendar), client intelligence graphs, and an immutable cryptographic audit ledger into a unified, turnkey software platform.
 
 HAL is built for operators, agencies, and enterprise consultancies seeking an autonomous decision engine with human-in-the-loop governance.
 
@@ -18,7 +18,7 @@ HAL is built for operators, agencies, and enterprise consultancies seeking an au
 | **AI Integration Engine** | Google Gemini (`gemini-2.5-flash`, `gemini-1.5-pro`), Hugging Face, OpenRouter, and Model Context Protocol (MCP) |
 | **Test Coverage** | **132/132 Automated Tests Passing (100% Green)** across 24 test suites |
 | **Security Audit** | **0 Known Vulnerabilities** in production and full dependency trees |
-| **Codebase Volume** | 60,000+ Lines of Production-Grade TypeScript |
+| **Codebase Volume** | 60,000+ lines of TypeScript |
 
 ---
 
@@ -27,7 +27,7 @@ HAL is built for operators, agencies, and enterprise consultancies seeking an au
 ### 1. Territory Harvester & Prospect Finder
 - **Real-World Intelligence:** Gathers live prospect data across geographies and niches.
 - **Automated Technical Audits:** Evaluates prospect websites for mobile load latency, SSL certificates, technical SEO hygiene, and public sentiment.
-- **Military-Grade Data Protection:** All prospect contact details and PII are encrypted at rest using AES-256-GCM before storage.
+- **Encrypted PII at Rest:** All prospect contact details and PII are encrypted at rest using AES-256-GCM before storage.
 
 ### 2. B2B Landing Page & Website Studio
 - **Instant Client Production:** Generates responsive, high-converting agency and client websites directly from lead intelligence.

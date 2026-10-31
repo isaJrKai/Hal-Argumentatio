@@ -24,7 +24,7 @@ Seller is the sole owner and author of the proprietary software known as **HAL (
 ---
 
 ### 2. Purchase Price & Payment Terms
-1. **Total Purchase Price:** The total agreed purchase price for 100% full transfer of ownership is **$5,000.00 USD** (or agreed equivalent in local currency).
+1. **Total Purchase Price:** The total agreed purchase price for 100% full transfer of ownership is **$3,000.00 USD** (or agreed equivalent in local currency).
 2. **Form of Payment:** Payment shall be made via wire transfer, direct bank transfer, or escrow service.
 3. **Condition Precedent:** Full repository administrative transfer, secret handovers, and intellectual property conveyance are strictly contingent upon Seller’s receipt of cleared, irreversible funds.
 
