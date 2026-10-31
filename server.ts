@@ -5407,8 +5407,13 @@ app.post('/api/system/postgres-sync', authenticate, requireRole('admin'), async 
           ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, CURRENT_TIMESTAMP)
           ON CONFLICT (id) DO UPDATE SET
             status = EXCLUDED.status,
+            phone = NULL,
+            email = NULL,
+            phone_encrypted = EXCLUDED.phone_encrypted,
+            email_encrypted = EXCLUDED.email_encrypted,
             urgency_score = EXCLUDED.urgency_score,
             predicted_monthly_lost_revenue_usd = EXCLUDED.predicted_monthly_lost_revenue_usd,
+            predicted_ltv = EXCLUDED.predicted_ltv,
             updated_at = CURRENT_TIMESTAMP;
         `, [
           lead.id,
