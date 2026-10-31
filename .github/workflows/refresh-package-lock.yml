@@ -7,6 +7,7 @@ on:
     paths:
       - package.json
       - package-lock.json
+      - .github/workflows/refresh-package-lock.yml
 
 permissions:
   contents: write
@@ -31,6 +32,9 @@ jobs:
 
       - name: Regenerate npm lockfile from package.json
         run: npm install --package-lock-only --ignore-scripts --no-audit --no-fund
+
+      - name: Apply non-breaking dependency security updates
+        run: npm audit fix --package-lock-only --ignore-scripts --no-fund
 
       - name: Install exactly from regenerated lockfile
         run: npm ci
