@@ -1129,7 +1129,7 @@ export default function OverviewPanel({
             </div>
 
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 my-3">
-              {(connectorHealth?.connectors || []).slice(0, 6).map((c: any) => {
+              {connectorHealth?.connectors?.length ? connectorHealth.connectors.slice(0, 6).map((c: any) => {
                 const isHealthy = c.health === 'excellent' || c.status === 'connected';
                 const isConfigured = Boolean(c.configured);
                 const displayName = (c.name || '')
@@ -1167,7 +1167,11 @@ export default function OverviewPanel({
                     </div>
                   </div>
                 );
-              })}
+              }) : (
+                <div className="col-span-full py-6 text-center text-xs text-text-tertiary">
+                  {connectorHealth ? 'No connector configuration has been recorded yet.' : 'Integration configuration status could not be loaded.'}
+                </div>
+              )}
             </div>
           </div>
 
