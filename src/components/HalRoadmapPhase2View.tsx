@@ -659,6 +659,21 @@ export const HalRoadmapPhase2View: React.FC = () => {
         </div>
       )}
 
+      {activeTab === 'competitors' && !activeAuditReport && (
+        <div className="p-6 rounded-xl bg-bg-raised border border-border-dim space-y-3">
+          <div className="flex items-center gap-2">
+            <Target className="w-5 h-5 text-warning" />
+            <h3 className="text-sm font-bold text-text-primary">Competitor audit source unavailable</h3>
+          </div>
+          <p className="text-xs text-text-secondary leading-relaxed">
+            {statusData?.competitorAuditStatus?.message || 'A verified search/maps provider is not configured. HAL will not fabricate competitor names, ratings, reviews, rankings, speed scores, or market saturation.'}
+          </p>
+          <div className="text-[11px] font-mono text-text-tertiary">
+            Status: {statusData?.competitorAuditStatus?.status || 'SOURCE_NOT_VERIFIED'}
+          </div>
+        </div>
+      )}
+
       {/* ─── TAB 4: COMPETITOR DIGITAL FOOTPRINT AUDITS ─── */}
       {activeTab === 'competitors' && activeAuditReport && (
         <div className="space-y-5">
