@@ -8424,17 +8424,17 @@ async function startServer() {
     try {
       const integrity = db.verifyLedgerIntegrity(contractorId);
       const sequences = db.getOutreachSequences(contractorId);
-      const activeSequences = sequences.length > 0 ? sequences : getDefaultCadenceSequences();
+      const sequenceTemplates = getDefaultCadenceSequences();
       const outbox = await pgDb.select().from(conversionOutbox).where(eq(conversionOutbox.contractorId, contractorId));
-      const jobs = await pgDb.select().from(schedulerJobs).orderBy(desc(schedulerJobs.createdAt));
-      const schedulerRules = getDefaultSchedulerRules();
+      const jobs = db.getSchedulerJobs(contractorId);
+      const schedulerTemplates = getDefaultSchedulerRules();
 
-      const verification = verifyPhase3Pillars(activeSequences, outbox, jobs);
+      const verification = verifyPhase3Pillars(sequences, outbox, jobs);
       const ledgerEntries = db.getStructuredLedger(contractorId, 20);
-      const recentAutomationEvents = ledgerEntries.filter(e => 
-        e.eventType.startsWith('phase3_') || 
-        e.eventType.includes('sequence') || 
-        e.eventType.includes('outbox') || 
+      const recentAutomationEvents = ledgerEntries.filter(e =>
+        e.eventType.startsWith('phase3_') ||
+        e.eventType.includes('sequence') ||
+        e.eventType.includes('outbox') ||
         e.eventType.includes('scheduler')
       );
 
@@ -8444,9 +8444,12 @@ async function startServer() {
         currentRoadmapPhase: 3,
         phase3Verified: verification.allPassed,
         verification,
-        sequences: activeSequences,
+        sequences,
+        sequenceTemplates,
         outboxRecords: outbox,
-        schedulerRules,
+        schedulerRules: [],
+        schedulerTemplates,
+        schedulerJobs: jobs,
         recentAutomationEvents,
         integrity
       });
@@ -8462,19 +8465,17 @@ async function startServer() {
 
     try {
       const sequences = db.getOutreachSequences(contractorId);
-      const activeSequences = sequences.length > 0 ? sequences : getDefaultCadenceSequences();
       const outbox = await pgDb.select().from(conversionOutbox).where(eq(conversionOutbox.contractorId, contractorId));
-      const jobs = await pgDb.select().from(schedulerJobs);
-      const verification = verifyPhase3Pillars(activeSequences, outbox, jobs);
+      const jobs = db.getSchedulerJobs(contractorId);
+      const verification = verifyPhase3Pillars(sequences, outbox, jobs);
 
-      // Record verification block in the tamper-evident structured ledger
       const auditBlock = db.recordLedgerEntry({
         contractorId,
         eventType: 'phase3_verification_audit',
         entityType: 'roadmap_milestone',
         entityId: 'p3_verify_' + Date.now(),
         actor: 'HAL Roadmap Phase 3 Auditor',
-        details: 'Executed cryptographic verification across Phase 3: Outreach Sequencer, Webhook Outbox, and Scheduled Triggers',
+        details: 'Inspected persisted outreach sequences, tenant-scoped outbox records, and tenant-scoped scheduler jobs. No external delivery or scheduled trigger is assumed.',
         metadata: {
           pillar1: verification.pillar1.status,
           pillar2: verification.pillar2.status,
@@ -8499,24 +8500,25 @@ async function startServer() {
     }
   });
 
-  // 3. Phase 3 Trigger Cadence Sequence
+  // 3. Phase 3 Cadence Schedule Preview (does not enroll or send)
   app.post('/api/roadmap/phase3/trigger-sequence', authenticate, async (req, res) => {
     const contractorId = (req as any).contractorId;
     const { sequenceId, businessName, ownerName, city, niche } = req.body || {};
 
     try {
-      const sequences = getDefaultCadenceSequences();
-      const targetSeq = sequences.find(s => s.id === sequenceId) || sequences[0];
-      const scheduledSteps = calculateCadenceSchedule(new Date(), targetSeq.steps);
+      const savedSequences = db.getOutreachSequences(contractorId);
+      const availableSequences = savedSequences.length > 0 ? savedSequences : getDefaultCadenceSequences();
+      const targetSeq = availableSequences.find(sequence => sequence.id === sequenceId) || availableSequences[0];
+      if (!targetSeq) return res.status(404).json({ success: false, error: 'No saved sequence or preview template is available.' });
 
-      // Record sequence activation in structured ledger
+      const scheduledSteps = calculateCadenceSchedule(new Date(), targetSeq.steps);
       const auditBlock = db.recordLedgerEntry({
         contractorId,
-        eventType: 'phase3_sequence_triggered',
-        entityType: 'cadence_sequence',
+        eventType: 'phase3_sequence_previewed',
+        entityType: 'cadence_sequence_preview',
         entityId: targetSeq.id + '_' + Date.now(),
-        actor: 'HAL Cadence Orchestrator',
-        details: `Enrolled ${businessName || 'Target Prospect'} (${city || 'Local'}) into 4-step sequence: ${targetSeq.name}`,
+        actor: 'HAL Cadence Preview',
+        details: `Generated a schedule preview for ${businessName || 'Target Prospect'} (${city || 'Local'}); no enrollment, persistence, or outreach occurred.`,
         metadata: {
           sequenceId: targetSeq.id,
           businessName,
@@ -8524,175 +8526,146 @@ async function startServer() {
           city,
           niche,
           stepCount: scheduledSteps.length,
-          triggeredAt: new Date().toISOString()
+          mode: 'preview_only',
+          previewedAt: new Date().toISOString()
         }
       });
 
       res.json({
         success: true,
-        enrolled: true,
+        mode: 'preview_only',
+        enrolled: false,
+        persisted: false,
+        dispatchAttempted: false,
+        message: 'Schedule preview generated only. No sequence was enrolled, no job was persisted, and no message was sent.',
         sequence: targetSeq,
         scheduledSteps,
         block: auditBlock,
         integrity: db.verifyLedgerIntegrity(contractorId)
       });
     } catch (err: any) {
-      console.error('[Roadmap Phase 3 Trigger Sequence Error]', err);
+      console.error('[Roadmap Phase 3 Sequence Preview Error]', err);
       res.status(500).json({ success: false, error: err.message });
     }
   });
 
-  // 4. Phase 3 Process Webhook Conversion Outbox
+  // 4. Phase 3 Inspect Webhook Conversion Outbox (does not dispatch)
   app.post('/api/roadmap/phase3/process-outbox', authenticate, async (req, res) => {
     const contractorId = (req as any).contractorId;
 
     try {
-      // Find or generate active outbox records for verification
-      const existingOutbox = await pgDb.select().from(conversionOutbox).where(eq(conversionOutbox.contractorId, contractorId));
-      let processedRecords = existingOutbox;
+      const existingOutbox = await pgDb.select().from(conversionOutbox)
+        .where(eq(conversionOutbox.contractorId, contractorId));
+      const queuedCount = existingOutbox.filter(record =>
+        ['pending', 'queued', 'retrying'].includes(String(record.status).toLowerCase())
+      ).length;
 
-      if (processedRecords.length === 0) {
-        // Create an initial verified outbox item
-        const id = 'outbox_' + crypto.randomUUID();
-        const [newItem] = await pgDb.insert(conversionOutbox).values({
-          id,
-          contractorId,
-          leadId: 'lead_harvest_01',
-          leadEventId: 'evt_conv_01',
-          conversionAction: 'Qualified Lead Inbound',
-          gclid: 'Cj0KCQjw_dummy_gclid_austin_hvac_2026',
-          conversionTime: new Date(),
-          conversionValue: 12500,
-          currency: 'USD',
-          status: 'succeeded',
-          attempts: 1,
-          idempotencyKey: 'idemp_' + id,
-          uploadedAt: new Date()
-        }).returning();
-        processedRecords = [newItem];
-      }
-
-      // Record outbox drainage in structured ledger
       const auditBlock = db.recordLedgerEntry({
         contractorId,
-        eventType: 'phase3_outbox_processed',
+        eventType: 'phase3_outbox_inspected',
         entityType: 'conversion_outbox',
-        entityId: 'outbox_batch_' + Date.now(),
-        actor: 'HAL Webhook Outbox Worker',
-        details: `Drained outbox: ${processedRecords.length} records processed with HMAC-SHA256 signature verification and exponential backoff retry policies.`,
+        entityId: 'outbox_inspection_' + Date.now(),
+        actor: 'HAL Outbox Inspector',
+        details: `Inspected ${existingOutbox.length} tenant-scoped outbox records. No external provider upload was attempted.`,
         metadata: {
-          processedCount: processedRecords.length,
-          succeededCount: processedRecords.filter(r => r.status === 'succeeded').length,
-          timestamp: new Date().toISOString()
+          recordCount: existingOutbox.length,
+          queuedCount,
+          providerDeliveryVerifiedCount: 0,
+          inspectedAt: new Date().toISOString()
         }
       });
 
       res.json({
         success: true,
-        processedCount: processedRecords.length,
-        succeededCount: processedRecords.length,
-        records: processedRecords,
+        processedCount: 0,
+        queuedCount,
+        existingRecordCount: existingOutbox.length,
+        providerDeliveryVerifiedCount: 0,
+        message: 'Inspection only. No verified conversion-upload adapter is configured; no records were sent or marked successful.',
+        records: existingOutbox,
         block: auditBlock,
         integrity: db.verifyLedgerIntegrity(contractorId)
       });
     } catch (err: any) {
-      console.error('[Roadmap Phase 3 Process Outbox Error]', err);
+      console.error('[Roadmap Phase 3 Outbox Inspection Error]', err);
       res.status(500).json({ success: false, error: err.message });
     }
   });
 
-  // 5. Phase 3 Autonomous Scheduled Trigger Scan
+  // 5. Phase 3 Scheduler Configuration Check (no triggers are executed)
   app.post('/api/roadmap/phase3/run-scheduler', authenticate, async (req, res) => {
     const contractorId = (req as any).contractorId;
 
     try {
-      const rules = getDefaultSchedulerRules();
-      
-      // Execute background job audit record
+      const templates = getDefaultSchedulerRules();
+      const configuredRules: any[] = [];
+      const now = new Date().toISOString();
       const jobRecord = db.addSchedulerJob({
-        job: 'phase3_autonomous_calendar_cadence_scan',
+        contractorId,
+        job: 'phase3_scheduler_configuration_check',
         status: 'completed',
-        startedAt: new Date(Date.now() - 500).toISOString(),
-        completedAt: new Date().toISOString(),
-        result: `Scanned ${rules.length} autonomous scheduler rules. Calendar booking hooks and cadence timers synchronized.`
+        startedAt: now,
+        completedAt: now,
+        result: 'No persisted scheduler rules are configured; no calendar or outreach triggers were executed.'
       });
 
-      // Record in structured ledger
       const auditBlock = db.recordLedgerEntry({
         contractorId,
-        eventType: 'phase3_scheduler_executed',
+        eventType: 'phase3_scheduler_configuration_checked',
         entityType: 'scheduler_system',
         entityId: jobRecord.id,
-        actor: 'HAL Background Cron Engine',
-        details: `Executed autonomous scheduler scan: ${rules.length} trigger rules evaluated with 0 anomalies.`,
+        actor: 'HAL Scheduler Configuration Check',
+        details: 'Checked scheduler configuration. Templates are available, but no persisted rules or background trigger execution were found.',
         metadata: {
-          rulesEvaluated: rules.length,
+          configuredRulesCount: configuredRules.length,
+          availableTemplatesCount: templates.length,
+          triggersExecuted: 0,
           jobId: jobRecord.id,
-          status: 'SUCCESS'
+          status: 'NO_RULES_CONFIGURED'
         }
       });
 
       res.json({
         success: true,
-        jobsRun: rules.length,
+        configuredRulesCount: configuredRules.length,
+        availableTemplatesCount: templates.length,
+        jobsRun: 0,
+        triggersExecuted: 0,
+        message: 'No persisted scheduler rules are configured. No jobs or external triggers were executed.',
         jobRecord,
         block: auditBlock,
         integrity: db.verifyLedgerIntegrity(contractorId)
       });
     } catch (err: any) {
-      console.error('[Roadmap Phase 3 Run Scheduler Error]', err);
+      console.error('[Roadmap Phase 3 Scheduler Configuration Error]', err);
       res.status(500).json({ success: false, error: err.message });
     }
   });
 
-  // 6. Phase 3 Live Outbox Delivery Bridge - Status & Queue
+  // 6. Phase 3 Outbox and Provider Configuration Status
   app.get('/api/roadmap/phase3/outbox-queue', authenticate, async (req, res) => {
     const contractorId = (req as any).contractorId;
 
     try {
-      const records = await pgDb.select().from(conversionOutbox).where(eq(conversionOutbox.contractorId, contractorId)).limit(50);
-      const filteredLogs = dispatchLogs.filter(l => l.contractorId === contractorId).slice(-50).reverse();
-      const ledgerHistory = db.getStructuredLedger(contractorId, 20).filter(e => 
-        e.eventType === 'phase3_live_dispatch' || 
-        e.eventType === 'phase3_outbox_processed' || 
-        e.entityType === 'conversion_outbox'
+      const records = await pgDb.select().from(conversionOutbox)
+        .where(eq(conversionOutbox.contractorId, contractorId)).limit(50);
+      const filteredLogs = dispatchLogs.filter(log => log.contractorId === contractorId).slice(-50).reverse();
+      const ledgerHistory = db.getStructuredLedger(contractorId, 20).filter(entry =>
+        entry.eventType === 'phase3_live_dispatch' ||
+        entry.eventType === 'phase3_outbox_inspected' ||
+        entry.entityType === 'conversion_outbox'
       );
+      const credentials = db.getConnectorCredentials(contractorId);
 
       const gateways = [
-        {
-          id: 'smtp_sendgrid',
-          name: 'SMTP / SendGrid Gateway',
-          type: 'email',
-          status: process.env.SENDGRID_API_KEY ? 'active_live' : 'active_sandbox',
-          mode: process.env.SENDGRID_API_KEY ? 'Production Live' : 'Authenticated Sandbox Gateway',
-          latencyMs: 42,
-          encryption: 'TLS 1.3 / Port 587',
-          deliverability: '99.4%',
-          lastHeartbeat: new Date().toISOString()
-        },
-        {
-          id: 'twilio_sms',
-          name: 'Twilio SMS / WhatsApp Gateway',
-          type: 'sms',
-          status: process.env.TWILIO_ACCOUNT_SID ? 'active_live' : 'active_sandbox',
-          mode: process.env.TWILIO_ACCOUNT_SID ? 'Production Live' : 'Carrier Handover Sandbox',
-          latencyMs: 38,
-          encryption: 'REST API / E.164 Clean Format',
-          deliverability: '99.1%',
-          lastHeartbeat: new Date().toISOString()
-        },
-        {
-          id: 'webhook_ingest',
-          name: 'HMAC Webhook Ingest / Outbox',
-          type: 'webhook',
-          status: 'active_live',
-          mode: 'Production Live Engine',
-          latencyMs: 18,
-          encryption: 'HMAC-SHA256 Signed / Backoff Retry (5x)',
-          deliverability: '100%',
-          lastHeartbeat: new Date().toISOString()
-        }
+        { id: 'resend_email', name: 'Resend Email API', type: 'email', configured: Boolean(credentials.resend), status: credentials.resend ? 'configured_unverified' : 'not_configured', mode: credentials.resend ? 'Credential saved; provider not verified' : 'No credential configured', latencyMs: null, encryption: 'HTTPS API', deliverability: null, lastHeartbeat: null },
+        { id: 'sendgrid_email', name: 'SendGrid Email API', type: 'email', configured: Boolean(credentials.sendgrid || process.env.SENDGRID_API_KEY), status: (credentials.sendgrid || process.env.SENDGRID_API_KEY) ? 'configured_unverified' : 'not_configured', mode: (credentials.sendgrid || process.env.SENDGRID_API_KEY) ? 'Credential present; provider not verified' : 'No credential configured', latencyMs: null, encryption: 'HTTPS API', deliverability: null, lastHeartbeat: null },
+        { id: 'twilio_sms', name: 'Twilio SMS / WhatsApp API', type: 'sms', configured: Boolean(credentials.twilio || process.env.TWILIO_ACCOUNT_SID), status: (credentials.twilio || process.env.TWILIO_ACCOUNT_SID) ? 'configured_unverified' : 'not_configured', mode: (credentials.twilio || process.env.TWILIO_ACCOUNT_SID) ? 'Credential present; provider not verified' : 'No credential configured', latencyMs: null, encryption: 'HTTPS API', deliverability: null, lastHeartbeat: null },
+        { id: 'google_ads_conversion', name: 'Google Ads Conversion Upload', type: 'conversion', configured: Boolean(credentials.googleAds), status: credentials.googleAds ? 'configured_unverified' : 'not_configured', mode: credentials.googleAds ? 'Credential present; upload not verified' : 'No credential configured', latencyMs: null, encryption: 'HTTPS API', deliverability: null, lastHeartbeat: null },
+        { id: 'webhook_ingest', name: 'Inbound CRM Webhook Verification', type: 'webhook', configured: Boolean(process.env.CRM_WEBHOOK_SECRET), status: process.env.CRM_WEBHOOK_SECRET ? 'configured_unverified' : 'not_configured', mode: process.env.CRM_WEBHOOK_SECRET ? 'Inbound signature secret configured; delivery not verified' : 'No webhook secret configured', latencyMs: null, encryption: 'HMAC-SHA256 verification path', deliverability: null, lastHeartbeat: null }
       ];
+      const configuredGatewaysCount = gateways.filter(gateway => gateway.configured).length;
+      const integrity = db.verifyLedgerIntegrity(contractorId);
 
       res.json({
         success: true,
@@ -8701,10 +8674,14 @@ async function startServer() {
         recentDispatches: filteredLogs,
         ledgerHistory,
         stats: {
-          totalDispatched: filteredLogs.length + records.length,
-          deliveredRate: '99.2%',
-          activeGatewaysCount: 3,
-          cryptographicProofVerified: true
+          totalDispatched: 0,
+          totalOutboxRecords: records.length,
+          queuedCount: records.filter(record => ['pending', 'queued', 'retrying'].includes(String(record.status).toLowerCase())).length,
+          deliveryVerifiedCount: 0,
+          deliveredRate: null,
+          configuredGatewaysCount,
+          activeGatewaysCount: 0,
+          cryptographicProofVerified: integrity.valid
         }
       });
     } catch (err: any) {
