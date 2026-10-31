@@ -136,7 +136,7 @@ export default function FinancialsPanel({ token }: FinancialsPanelProps) {
         {/* ANNUAL RUN RATE */}
         <div className="p-4 bg-bg-raised border border-border-dim rounded-sm space-y-2">
           <div className="flex items-center justify-between text-text-dim text-[10px] font-mono uppercase font-bold">
-            <span>Annual Run-Rate (ARR)</span>
+            <span>Annualized Contract Run-Rate</span>
             <Activity className="w-3.5 h-3.5 text-brand" />
           </div>
           <div className="text-2xl font-bold text-text-primary">
@@ -277,7 +277,7 @@ export default function FinancialsPanel({ token }: FinancialsPanelProps) {
               <span>Retainer Tier Allocation</span>
             </h3>
             <span className="text-[10px] font-mono text-text-dim mt-0.5 block">
-              Package distribution across active accounts
+              Package distribution across active retainers
             </span>
           </div>
 
