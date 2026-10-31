@@ -153,6 +153,7 @@ export interface Lesson {
 
 export interface SchedulerJob {
   id: string;
+  contractorId?: string;
   job: string;
   status: 'pending' | 'running' | 'completed' | 'failed';
   startedAt?: string;
