@@ -34,7 +34,7 @@ jobs:
         run: npm install --package-lock-only --ignore-scripts --no-audit --no-fund
 
       - name: Apply non-breaking dependency security updates
-        run: npm audit fix --package-lock-only --ignore-scripts --no-fund
+        run: npm audit fix --package-lock-only --ignore-scripts --no-fund || echo "Some advisories remain; the production audit step enforces the high/critical release gate."
 
       - name: Install exactly from regenerated lockfile
         run: npm ci
