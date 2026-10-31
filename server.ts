@@ -37,7 +37,7 @@ import { buildHalMcpServer } from './src/services/mcp/halMcpServer';
 import { HERMES_LAB_CATALOG, executeHermesLabTool, chatWithHermesAgent, LabToolType } from './src/services/hermesLab';
 import { generateContractorLandingPage, regenerateLandingSection } from './src/services/landingGenerator';
 import { generateLandingPageHtml } from './src/components/landing/htmlGenerator';
-import { validateCrmTransition } from './src/lib/crmStateMachine';
+import { validateCrmTransition, isKnownCrmStage } from './src/lib/crmStateMachine';
 import { buildFinancialSnapshotCore } from './src/lib/financialSnapshot';
 import { resolvePublishedLandingPageOwner } from './src/lib/landingPageOwnership';
 import { validateLoopGate } from './src/lib/loopGating';
@@ -7876,18 +7876,56 @@ async function startServer() {
       const ledger = db.getStructuredLedger(contractorId, 10);
       const integrity = db.verifyLedgerIntegrity(contractorId);
       const allLeads = await pgDb.select().from(leads).where(eq(leads.contractorId, contractorId));
-      
+
       const stageCounts = {
         new: allLeads.filter(l => l.status === 'new').length,
         contacted: allLeads.filter(l => l.status === 'contacted').length,
-        converted: allLeads.filter(l => l.status === 'converted').length,
-        dead: allLeads.filter(l => l.status === 'dead').length,
+        converted: allLeads.filter(l => ['converted', 'closed_won', 'customer', 'won'].includes(l.status)).length,
+        dead: allLeads.filter(l => ['dead', 'lost', 'closed_lost'].includes(l.status)).length,
         total: allLeads.length
       };
 
-      const encryptedCount = allLeads.filter(l => !!l.phoneEncrypted || !!l.emailEncrypted).length;
-      const allRevenues = db.getRevenues(contractorId);
-      const totalRevenue = allRevenues.reduce((sum, r) => sum + (r.amountUsd || 0), 0);
+      const encryptedCount = allLeads.filter(l => Boolean(l.phoneEncrypted || l.emailEncrypted)).length;
+      const plaintextContactCount = allLeads.filter(l =>
+        Boolean((l.phone && l.phone !== '[ENCRYPTED]') || (l.email && l.email !== '[ENCRYPTED]'))
+      ).length;
+
+      const testSecret = 'hal_phase1_status_probe_' + crypto.randomUUID();
+      const cipherOne = encrypt(testSecret);
+      const cipherTwo = encrypt(testSecret);
+      const vaultCryptoVerified =
+        cipherOne.split(':')[0] !== cipherTwo.split(':')[0] &&
+        decrypt(cipherOne) === testSecret &&
+        decrypt(cipherOne.slice(0, -4) + '0000') === '';
+      const vaultVerified = plaintextContactCount === 0 && vaultCryptoVerified;
+
+      const pipelineStagesKnown = allLeads.every(lead => isKnownCrmStage(lead.status));
+      const transitionGateVerified =
+        validateCrmTransition('new', 'contacted').valid &&
+        !validateCrmTransition('unknown_stage', 'contacted').valid;
+      const pipelineVerified = pipelineStagesKnown && transitionGateVerified;
+      const phaseOnePillars = [
+        { name: 'Structured Cryptographic Ledger', verified: integrity.valid, detail: integrity.auditMessage },
+        {
+          name: 'AES-GCM-256 PII Cryptographic Vault',
+          verified: vaultVerified,
+          detail: `${encryptedCount} leads have encrypted contact fields; ${plaintextContactCount} plaintext contact rows detected.`
+        },
+        {
+          name: 'Deterministic Lead → CRM Pipeline',
+          verified: pipelineVerified,
+          detail: `${allLeads.length} leads inspected; ${pipelineStagesKnown ? 'all stages recognized' : 'unknown stages detected'}; transition gate ${transitionGateVerified ? 'passed' : 'failed'}.`
+        }
+      ];
+      const phaseOneVerifiedCount = phaseOnePillars.filter(pillar => pillar.verified).length;
+      const phaseOneComplete = phaseOneVerifiedCount === phaseOnePillars.length;
+      const phaseOneProgress = Math.round((phaseOneVerifiedCount / phaseOnePillars.length) * 100);
+
+      const notVerifiedPillars = (names: string[]) => names.map(name => ({
+        name,
+        verified: false,
+        detail: 'Not independently verified against live runtime evidence in this deployment.'
+      }));
 
       const roadmapPhases = [
         {
@@ -7895,83 +7933,66 @@ async function startServer() {
           id: 'foundation',
           name: 'Foundation',
           subtitle: 'Structured ledger, secure storage, and basic pipeline',
-          status: 'verified_complete',
-          progress: 100,
-          active: false,
+          status: phaseOneComplete ? 'verified_complete' : 'verification_required',
+          progress: phaseOneProgress,
+          active: !phaseOneComplete,
           docs: ['01 - Vision', '02 - Philosophy', '03 - Design Language', '04 - Design System', '05 - Architecture', '06 - UX Principles'],
-          pillars: [
-            { name: 'Structured Cryptographic Ledger', verified: integrity.valid, detail: `${integrity.totalEntries} sequenced blocks` },
-            { name: 'AES-GCM-256 PII Cryptographic Vault', verified: true, detail: `${encryptedCount} encrypted records` },
-            { name: 'Deterministic Lead -> CRM Pipeline', verified: true, detail: `${stageCounts.total} pipeline entities` }
-          ]
+          pillars: phaseOnePillars
         },
         {
           phase: 2,
           id: 'intelligence',
           name: 'Intelligence',
-          subtitle: 'Automated local harvesting, geo scoring, reputation scraping',
-          status: 'verified_complete',
-          progress: 100,
+          subtitle: 'Territory research, geo scoring, and reputation analysis',
+          status: 'not_verified',
+          progress: 0,
           active: false,
           docs: ['07 - Competitive Scoring', '08 - Geo Intelligence', '09 - Synthetic Scraping', '10 - Reputation Engine'],
-          pillars: [
-            { name: 'Local Territory Harvesting', verified: true, detail: 'Winnipeg / Calgary / Edmonton (Real data Sourced)' },
-            { name: 'Live Geo Ranking & Latency Scoring', verified: true, detail: 'Spatial quadrant clustering & latency routing' },
-            { name: 'Competitor Digital Footprint Audits', verified: true, detail: 'Real-time search, Maps grounding & gap matrix' }
-          ]
+          pillars: notVerifiedPillars(['Local Territory Harvesting', 'Live Geo Ranking & Latency Scoring', 'Competitor Digital Footprint Audits'])
         },
         {
           phase: 3,
           id: 'automation',
           name: 'Automation',
-          subtitle: 'Campaign triggers, cadence scheduling, durable outbox dispatch',
-          status: 'verified_complete',
-          progress: 100,
-          active: true,
+          subtitle: 'Campaign triggers, cadence scheduling, and delivery',
+          status: 'not_verified',
+          progress: 0,
+          active: false,
           docs: ['11 - Campaign Automation', '12 - Sequence Cadences', '13 - Outbox Delivery Engine'],
-          pillars: [
-            { name: 'Durable Multi-Step Outreach Sequencer', verified: true, detail: '4-step Hermes hooks (Active)' },
-            { name: 'Webhook Event Dispatcher & Outbox', verified: true, detail: 'Exponential backoff & HMAC-SHA256 signing' },
-            { name: 'Automated Calendar & Call Triggers', verified: true, detail: 'Autonomous scheduled cron scans' }
-          ]
+          pillars: notVerifiedPillars(['Multi-Step Outreach Sequencer', 'Webhook Event Dispatcher & Outbox', 'Calendar and Call Triggers'])
         },
         {
           phase: 4,
           id: 'multi_agent',
           name: 'Multi-Agent',
-          subtitle: 'Distributed autonomous optimization (Nemotron + Gemini consensus)',
-          status: 'verified_complete',
-          progress: 100,
-          active: true,
+          subtitle: 'Model orchestration, consensus, and optimization',
+          status: 'not_verified',
+          progress: 0,
+          active: false,
           docs: ['14 - Dual-Drive Consensus', '15 - Neural Graph Routing', '16 - Self-Calibration'],
-          pillars: [
-            { name: 'Parallel Engine Consensus (Dual-Drive)', verified: true, detail: 'Gemini 2.5 + Nemotron 70B (96% Alignment)' },
-            { name: 'Adaptive Autonomous Weights', verified: true, detail: 'Bayesian recalibration loop (Active Epoch #14)' },
-            { name: 'Autonomous Strategy Arbitrage', verified: true, detail: 'Closed-loop spend reallocation (+$9,615/mo lift)' }
-          ]
+          pillars: notVerifiedPillars(['Parallel Model Consensus', 'Adaptive Calibration', 'Strategy Arbitrage'])
         },
         {
           phase: 5,
           id: 'expansion',
           name: 'Expansion',
-          subtitle: 'Global enterprise deployment & multi-territory business brain',
-          status: 'verified_complete',
-          progress: 100,
-          active: true,
+          subtitle: 'Multi-organization, edge integrations, and knowledge transfer',
+          status: 'not_verified',
+          progress: 0,
+          active: false,
           docs: ['17 - Multi-Tenant Isolation', '18 - Enterprise SLA & Auditing', '19 - Global Market Brain'],
-          pillars: [
-            { name: 'Hierarchical Multi-Org Management', verified: true, detail: 'Enterprise tenant isolation (SHA-256 vault keys)' },
-            { name: 'Decentralized Edge Federation', verified: true, detail: 'Multi-region failover (<25ms latency)' },
-            { name: 'Cross-Industry Knowledge Transfer', verified: true, detail: 'Generalized business ontology (Zero-PII priors)' }
-          ]
+          pillars: notVerifiedPillars(['Hierarchical Multi-Org Management', 'Edge Federation', 'Cross-Industry Knowledge Transfer'])
         }
       ];
+
+      const allRevenues = db.getRevenues(contractorId);
+      const totalRevenue = allRevenues.reduce((sum, revenue) => sum + (revenue.amountUsd || 0), 0);
 
       res.json({
         success: true,
         phase: 'Phase 1: Foundation',
         currentRoadmapPhase: 1,
-        foundationVerified: integrity.valid,
+        foundationVerified: phaseOneComplete,
         roadmapPhases,
         pillars: {
           ledger: {
@@ -7984,17 +8005,18 @@ async function startServer() {
           },
           storage: {
             name: 'AES-GCM-256 Cryptographic PII Vault',
-            status: 'ACTIVE',
+            status: vaultVerified ? 'ACTIVE' : 'DEGRADED',
             algorithm: 'AES-256-GCM',
             ivLengthBytes: 12,
             tagLengthBytes: 16,
             encryptedLeadsCount: encryptedCount,
-            keyDerivation: '32-Byte Secret SHA-256 Derivation',
-            plaintextLeakCheck: 'PASSED_ZERO_LEAKAGE'
+            plaintextContactCount,
+            keyDerivation: 'LEAD_ENCRYPTION_KEY_B64 via SHA-256 derivation',
+            plaintextLeakCheck: plaintextContactCount === 0 ? 'NO_PLAINTEXT_CONTACT_FIELDS_FOUND' : 'PLAINTEXT_CONTACT_FIELDS_FOUND'
           },
           pipeline: {
             name: 'Basic Pipeline Engine',
-            status: 'OPERATIONAL',
+            status: pipelineVerified ? 'OPERATIONAL' : 'DEGRADED',
             stageCounts,
             totalRevenue,
             revenueRecordsCount: allRevenues.length
