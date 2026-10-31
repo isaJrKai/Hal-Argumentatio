@@ -127,9 +127,9 @@ export default function FinancialsPanel({ token }: FinancialsPanelProps) {
           <div className="text-2xl font-bold text-text-primary">
             ${data.currentMrrUsd.toLocaleString()}
           </div>
-          <div className="flex items-center gap-1 text-[10px] font-mono text-positive font-bold">
-            <ArrowUpRight className="w-3 h-3" />
-            <span>Annualized from active retainers</span>
+          <div className="flex items-center gap-1 text-[10px] font-mono text-text-secondary font-bold">
+            <Activity className="w-3 h-3" />
+            <span>Contract run-rate from active retainers</span>
           </div>
         </div>
 
@@ -156,8 +156,8 @@ export default function FinancialsPanel({ token }: FinancialsPanelProps) {
           <div className="text-2xl font-bold text-brand">
             {data.ltvToCacRatio == null ? '—' : `${data.ltvToCacRatio}x`}
           </div>
-          <div className="text-[10px] font-mono text-positive font-bold flex items-center gap-1">
-            <CheckCircle2 className="w-3 h-3" />
+          <div className="text-[10px] font-mono text-text-secondary font-bold flex items-center gap-1">
+            <Activity className="w-3 h-3" />
             <span>{ltvCacStatus}{data.blendedCacUsd == null ? ' · CAC unavailable' : ` (CAC: ${data.blendedCacUsd.toLocaleString()})`}</span>
           </div>
         </div>
@@ -251,7 +251,7 @@ export default function FinancialsPanel({ token }: FinancialsPanelProps) {
               <div className="text-sm font-bold text-text-primary mt-0.5">
                 {selectedProjection == null ? 'Forecast unavailable' : `Target MRR at ${forecastHorizon === '12m' ? 'Month 12' : 'Month 6'}:`}{' '}
                 <span className="text-brand">
-                  ${selectedProjection == null ? '—' : selectedProjection.toLocaleString()}
+                  {selectedProjection == null ? '—' : `${selectedProjection.toLocaleString()}`}
                 </span>
               </div>
               <p className="text-[11px] text-text-dim mt-0.5 font-sans">
