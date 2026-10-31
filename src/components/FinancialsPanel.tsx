@@ -102,7 +102,7 @@ export default function FinancialsPanel({ token }: FinancialsPanelProps) {
           </div>
           <h2 className="text-xl font-bold tracking-tight text-text-primary mt-1">Financial Intelligence & Retainers</h2>
           <p className="text-xs text-text-secondary max-w-2xl mt-0.5">
-            Real-time MRR/ARR capitalization, LTV-to-CAC health ratios, churn analytics, and multi-tier retainer cohort projections.
+            Contract-based MRR and annualized run-rate from active client retainers. Unit economics and forecasts appear when supporting historical data is available.
           </p>
         </div>
 
@@ -187,7 +187,7 @@ export default function FinancialsPanel({ token }: FinancialsPanelProps) {
             <div>
               <h3 className="text-sm font-mono font-bold text-text-primary uppercase tracking-wider flex items-center gap-2">
                 <BarChart3 className="w-4 h-4 text-brand" />
-                <span>Monthly Recurring Growth & Forecast Engine</span>
+                <span>MRR History & Forecast Readiness</span>
               </h3>
               <span className="text-[10px] font-mono text-text-dim mt-0.5 block">
                 Historical monthly billings vs 12% compounding client pipeline model
@@ -247,11 +247,11 @@ export default function FinancialsPanel({ token }: FinancialsPanelProps) {
           {/* PROJECTION BENCHMARK CALLOUT */}
           <div className="p-4 bg-bg-dark border border-border-dim rounded-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4 font-mono">
             <div>
-              <span className="text-[10px] text-brand uppercase font-bold block">Compounding Pipeline Projection</span>
+              <span className="text-[10px] text-brand uppercase font-bold block">Forecast Readiness</span>
               <div className="text-sm font-bold text-text-primary mt-0.5">
                 {selectedProjection == null ? 'Forecast unavailable' : `Target MRR at ${forecastHorizon === '12m' ? 'Month 12' : 'Month 6'}:`}{' '}
                 <span className="text-brand">
-                  ${(forecastHorizon === '12m' ? data.projectedMrr12Months : data.projectedMrr6Months).toLocaleString()}
+                  ${selectedProjection == null ? '—' : selectedProjection.toLocaleString()}
                 </span>
               </div>
               <p className="text-[11px] text-text-dim mt-0.5 font-sans">
