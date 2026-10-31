@@ -38,6 +38,7 @@ import { HERMES_LAB_CATALOG, executeHermesLabTool, chatWithHermesAgent, LabToolT
 import { generateContractorLandingPage, regenerateLandingSection } from './src/services/landingGenerator';
 import { generateLandingPageHtml } from './src/components/landing/htmlGenerator';
 import { validateCrmTransition } from './src/lib/crmStateMachine';
+import { buildFinancialSnapshotCore } from './src/lib/financialSnapshot';
 import { validateLoopGate } from './src/lib/loopGating';
 import { 
   auditCompetitorFootprint, 
@@ -4701,102 +4702,35 @@ app.get('/api/financials/overview', authenticate, async (req, res) => {
   const contractorId = (req as any).contractorId;
   try {
     let projects: any[] = [];
-    let allLeads: any[] = [];
-    let allCampaigns: any[] = [];
     try {
-      projects = await pgDb.select().from(clientProjects).where(eq(clientProjects.contractorId, contractorId)) || [];
-      allLeads = await pgDb.select().from(leads).where(eq(leads.contractorId, contractorId)) || [];
-      allCampaigns = await pgDb.select().from(campaigns).where(eq(campaigns.contractorId, contractorId)) || [];
+      projects = await pgDb
+        .select()
+        .from(clientProjects)
+        .where(eq(clientProjects.contractorId, contractorId)) || [];
     } catch (pgErr) {
       projects = db.getClientProjects(contractorId) || [];
-      allLeads = db.getLeads(contractorId) || [];
-      allCampaigns = db.getCampaigns(contractorId) || [];
     }
 
-    const safeProjects = Array.isArray(projects) ? projects : [];
-    const safeLeads = Array.isArray(allLeads) ? allLeads : [];
-    const safeCampaigns = Array.isArray(allCampaigns) ? allCampaigns : [];
-
-    const activeProjects = safeProjects.filter(p => p && p.status !== 'completed');
-    const currentMrrUsd = activeProjects.reduce((sum, p) => sum + (Number(p?.monthlyRetainerUsd) || 0), 0);
-    const arrUsd = currentMrrUsd * 12;
-    const activeClientCount = activeProjects.length;
-    const totalCampaignSpend = safeCampaigns.reduce((sum, c) => sum + (Number(c?.budgetUsd) || 0), 0);
-    const convertedCount = Math.max(1, safeLeads.filter(l => l && l.status === 'converted').length);
-    const blendedCacUsd = Math.round(totalCampaignSpend / convertedCount) || 350;
-
-    const averageContractLengthMonths = 10;
-    const averageMonthlyRetainer = activeClientCount > 0 ? currentMrrUsd / activeClientCount : 2400;
-    const averageLtvUsd = Math.round(averageMonthlyRetainer * averageContractLengthMonths);
-    const ltvToCacRatio = Number((averageLtvUsd / Math.max(1, blendedCacUsd)).toFixed(1));
-    const churnRatePercent = 2.4;
-
-    const projectedGrowthRateMonthly = 0.12; // 12% MoM
-    const projectedMrr6Months = Math.round(currentMrrUsd * Math.pow(1 + projectedGrowthRateMonthly, 6));
-    const projectedMrr12Months = Math.round(currentMrrUsd * Math.pow(1 + projectedGrowthRateMonthly, 12));
-
-    // Generate 6-month historical MRR
-    const monthNames = ['Oct', 'Nov', 'Dec', 'Jan', 'Feb', 'Mar'];
-    const baseMrr = Math.max(1200, Math.round(currentMrrUsd * 0.45));
-    const mrrHistory = monthNames.map((m, idx) => {
-      const factor = (idx + 1) / monthNames.length;
-      const computedMrr = Math.round(baseMrr + (currentMrrUsd - baseMrr) * factor);
-      return {
-        month: m,
-        mrr: computedMrr,
-        clients: Math.max(1, Math.round(activeClientCount * factor)),
-        newRevenue: Math.round(computedMrr * 0.25),
-        churnedRevenue: Math.round(computedMrr * 0.03)
-      };
-    });
-
-    // Package distribution
-    const tierDistribution = [
-      {
-        tier: 'Growth' as const,
-        count: safeProjects.filter(p => p && p.packageTier === 'Growth').length,
-        totalRevenue: safeProjects.filter(p => p && p.packageTier === 'Growth').reduce((s, p) => s + (Number(p?.monthlyRetainerUsd) || 0), 0)
-      },
-      {
-        tier: 'Dominance' as const,
-        count: safeProjects.filter(p => p && p.packageTier === 'Dominance').length,
-        totalRevenue: safeProjects.filter(p => p && p.packageTier === 'Dominance').reduce((s, p) => s + (Number(p?.monthlyRetainerUsd) || 0), 0)
-      },
-      {
-        tier: 'Enterprise' as const,
-        count: safeProjects.filter(p => p && p.packageTier === 'Enterprise').length,
-        totalRevenue: safeProjects.filter(p => p && p.packageTier === 'Enterprise').reduce((s, p) => s + (Number(p?.monthlyRetainerUsd) || 0), 0)
-      }
-    ];
-
+    const snapshot = buildFinancialSnapshotCore(Array.isArray(projects) ? projects : []);
     res.json({
       success: true,
-      currentMrrUsd,
-      arrUsd,
-      activeClientCount,
-      averageContractLengthMonths,
-      averageLtvUsd,
-      blendedCacUsd,
-      ltvToCacRatio,
-      churnRatePercent,
-      cashRunwayMonths: 18.5,
-      projectedMrr6Months,
-      projectedMrr12Months,
-      mrrHistory,
-      tierDistribution,
-      timesFmForecast: {
-        model: 'TimesFM 2.5 Zero-Shot Foundation Model',
-        demandIndex: 1.28,
-        predictedPeakMonth: 'May',
-        seasonalAdMultiplier: 1.35,
-        confidenceScore: 94.2
+      ...snapshot,
+      dataQuality: {
+        currentMrr: 'Calculated from active client-project monthly retainers.',
+        arr: 'Annualized contract run-rate (current MRR multiplied by 12); not collected revenue.',
+        unavailable: [
+          'CAC requires verified acquisition spend and attributed new customers.',
+          'LTV and average contract length require historical contract-duration data.',
+          'Churn requires a dated customer cohort and churn-event history.',
+          'Cash runway requires verified cash balance and operating burn.',
+          'MRR history and projections require dated financial snapshots or a validated forecasting model.'
+        ]
       }
     });
   } catch (err: any) {
     res.status(500).json({ success: false, error: err.message || 'Failed to fetch financial metrics' });
   }
 });
-
 
 
 // ─── NEURAL NETWORK TOPOLOGY API ──────────────────────────────────────────────
