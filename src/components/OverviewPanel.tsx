@@ -1118,12 +1118,12 @@ export default function OverviewPanel({
                   <h3 className="text-sm font-semibold tracking-tight text-text-primary">Connected Business Apps</h3>
                 </div>
                 <p className="text-xs text-text-tertiary mt-0.5">
-                  Live payment, communications, and operations integrations
+                  Provider credentials and verified connection status
                 </p>
               </div>
               <span className="px-2.5 py-1 rounded-md text-xs font-sans font-medium bg-warning-dim text-warning">
                 {connectorHealth?.summary
-                  ? `${connectorHealth.summary.configuredCount} Configured · ${connectorHealth.summary.unconfiguredCount} Need Setup`
+                  ? `${connectorHealth.summary.configuredCount} Configured · unverified · ${connectorHealth.summary.unconfiguredCount} Need Setup`
                   : 'Integration status unavailable'}
               </span>
             </div>
