@@ -46,8 +46,8 @@ https://github.com/isaJrKai/Hal-Argumentatio/actions/runs/41251080923
 Verified in that run:
 - `npm ci`: passed.
 - Type-check and automated tests: passed.
-- 27 test files passed.
-- 152 tests passed.
+- 28 test files passed.
+- 157 tests passed.
 - Production build: passed.
 - Production dependency audit: passed release gate with 0 high/critical advisories.
 
