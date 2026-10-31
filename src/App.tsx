@@ -772,7 +772,7 @@ export default function App() {
   ];
 
   const unreadNotificationsCount = notifications.length;
-  const contractorFirstName = contractor?.name ? contractor.name.split(' ')[0] : 'Isaac';
+  const contractorFirstName = contractor?.name ? contractor.name.split(' ')[0] : 'Operator';
 
   const isDark = theme === 'dark';
   const baseBg = 'bg-bg-base text-text-primary';

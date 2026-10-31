@@ -330,27 +330,27 @@ export const DocumentStudioPanel: React.FC<{ token?: string | null }> = () => {
   };
 
   return (
-    <div className={`flex flex-col h-full bg-slate-950 text-slate-100 ${isFullScreen ? 'fixed inset-0 z-50' : 'relative'}`}>
+    <div className={`flex flex-col h-full bg-bg-base text-text-primary ${isFullScreen ? 'fixed inset-0 z-50' : 'relative'}`}>
       {/* Top Application Bar with Template Selector & Actions */}
-      <div className="h-12 bg-slate-900 border-b border-slate-800 px-4 flex items-center justify-between select-none">
+      <div className="h-12 bg-bg-raised border-b border-border-dim px-4 flex items-center justify-between select-none">
         <div className="flex items-center space-x-3">
           <div className="flex items-center space-x-2">
-            <FileText className="w-5 h-5 text-blue-500" />
-            <span className="font-bold text-sm tracking-tight text-white">Document Design Studio</span>
-            <span className="text-[11px] px-2 py-0.5 rounded bg-blue-500/20 text-blue-400 font-mono border border-blue-500/30">
+            <FileText className="w-5 h-5 text-accent" />
+            <span className="font-bold text-sm tracking-tight text-text-primary">Document Design Studio</span>
+            <span className="text-[11px] px-2 py-0.5 rounded bg-accent/15 text-accent font-mono border border-accent/30">
               Word-Class Ribbon Suite
             </span>
           </div>
 
-          <div className="h-4 w-px bg-slate-800 mx-2" />
+          <div className="h-4 w-px bg-border-dim mx-2" />
 
           {/* Template Quick Switcher */}
           <div className="flex items-center space-x-1.5">
-            <FolderOpen className="w-3.5 h-3.5 text-slate-400" />
+            <FolderOpen className="w-3.5 h-3.5 text-text-secondary" />
             <select
               value={selectedTemplateId}
               onChange={(e) => handleSelectTemplate(e.target.value)}
-              className="bg-slate-950 border border-slate-700 rounded px-2.5 py-1 text-xs text-slate-200 outline-none hover:border-slate-500 transition-colors"
+              className="bg-bg-base border border-border-dim rounded px-2.5 py-1 text-xs text-text-primary outline-none hover:border-accent transition-colors"
             >
               {DOCUMENT_TEMPLATES.map(t => (
                 <option key={t.id} value={t.id}>{t.title}</option>
@@ -363,7 +363,7 @@ export const DocumentStudioPanel: React.FC<{ token?: string | null }> = () => {
         <div className="flex items-center space-x-2">
           <button
             onClick={handleCopyHtml}
-            className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded text-xs flex items-center space-x-1"
+            className="p-1.5 text-text-secondary hover:text-text-primary hover:bg-bg-subtle rounded text-xs flex items-center space-x-1"
             title="Copy Raw Document HTML"
           >
             <Copy className="w-3.5 h-3.5" />
@@ -372,7 +372,7 @@ export const DocumentStudioPanel: React.FC<{ token?: string | null }> = () => {
 
           <button
             onClick={() => window.print()}
-            className="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white font-medium rounded text-xs flex items-center space-x-1.5 shadow transition-colors"
+            className="px-3 py-1.5 bg-accent hover:bg-accent/80 text-black font-semibold rounded text-xs flex items-center space-x-1.5 shadow transition-colors"
             title="Print or Export to PDF"
           >
             <Printer className="w-3.5 h-3.5" />
@@ -381,7 +381,7 @@ export const DocumentStudioPanel: React.FC<{ token?: string | null }> = () => {
 
           <button
             onClick={() => setIsFullScreen(!isFullScreen)}
-            className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded"
+            className="p-1.5 text-text-secondary hover:text-text-primary hover:bg-bg-subtle rounded"
             title={isFullScreen ? "Exit Fullscreen" : "Fullscreen View"}
           >
             {isFullScreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}

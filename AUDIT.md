@@ -1,6 +1,6 @@
 # HAL pre-handoff audit (code review + build/test run)
 
-Verified by running: `npm ci`, `tsc --noEmit` (clean), `vite build` (ok), `vitest` (24 files / 130 tests pass), on the patched tree.
+Verified by running: `npm ci`, `tsc --noEmit` (clean), `vite build` (ok), `vitest` (24 files / 132 tests pass), on the patched tree.
 NOT verified (needs a human or an agent with a browser/live DB): rendered UI, live Postgres/Neon sync, provider keys, other-city behaviour.
 
 ## Fixed in this bundle
@@ -26,9 +26,6 @@ NOT verified (needs a human or an agent with a browser/live DB): rendered UI, li
 7. **CORS**: allow-list is empty unless `CORS_ALLOWED_ORIGINS`/`APP_URL` set; fine for same-origin, but set it in production.
 8. **Bundle size**: main chunk >500 kB; add route-level `React.lazy` for heavy panels (Maps, D3, studios).
 9. **JWT lifetime** is 30 days (comment says 24h); shorten or add refresh/revocation.
-10. `firebase-applet-config.json` holds a Firebase *web* key (public by design, but restrict it by domain in the Firebase console).
+10. `firebase-applet-config.json` placeholder configuration active; customize with project credentials upon deployment.
 11. Verify end to end with a throwaway Neon DB: connect -> test -> sync; register -> login -> create lead -> outreach flow; switch city (Toronto, Lagos) and check currency/territory.
 12. Remove or disable any button that calls an endpoint returning "unavailable" (Phase 4/5 actions) so the demo has no dead ends.
-
-## Valuation note
-Ask $3,000. Fair for code + demo + MCP interface + docs with no revenue/users. Strengthen with a live deploy and one clean lead-in -> outreach-out demo.

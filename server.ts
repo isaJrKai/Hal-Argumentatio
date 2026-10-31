@@ -632,7 +632,7 @@ app.all('/api/auth/auto-login', async (req, res) => {
     try {
       const candidates = await pgDb.select().from(contractors).where(
         or(
-          eq(contractors.email, 'kaisoisaac@gmail.com'),
+          eq(contractors.email, 'admin@company.com'),
           eq(contractors.email, 'admin@kaislead.com'),
           eq(contractors.role, 'admin')
         )
@@ -643,14 +643,14 @@ app.all('/api/auth/auto-login', async (req, res) => {
     } catch (_) {}
 
     if (!contractor) {
-      const localCon = db.getContractorByEmail('kaisoisaac@gmail.com') || 
+      const localCon = db.getContractorByEmail('admin@company.com') || 
                        db.getContractorByEmail('admin@kaislead.com') || 
                        db.getContractors()[0];
       if (localCon) {
         contractor = {
           id: localCon.id,
           email: localCon.email,
-          companyName: localCon.name || 'Isaac',
+          companyName: localCon.name || 'Operator',
           role: 'admin'
         };
       }
@@ -674,7 +674,7 @@ app.all('/api/auth/auto-login', async (req, res) => {
       contractor: {
         id: contractor.id,
         email: contractor.email,
-        name: contractor.companyName || 'Isaac (Administrator)',
+        name: contractor.companyName || 'Operator (Administrator)',
         role,
         marketId: 'market_default'
       }
@@ -1036,6 +1036,17 @@ app.get('/landing/:id', async (req, res) => {
   try {
     const [artifact] = await pgDb.select().from(hermesLabArtifacts).where(eq(hermesLabArtifacts.id, id));
     if (!artifact) {
+      try {
+        const { TRADE_TEMPLATES } = await import('./src/components/landing/templates');
+        const { generateLandingPageHtml } = await import('./src/components/landing/htmlGenerator');
+        const matched = Object.values(TRADE_TEMPLATES).find(t => t.id === id || t.trade === id) || (TRADE_TEMPLATES as any)[id] || TRADE_TEMPLATES.plumbing;
+        if (matched) {
+          const generated = generateLandingPageHtml(matched);
+          res.setHeader('Content-Type', 'text/html; charset=utf-8');
+          return res.send(generated);
+        }
+      } catch (_) {}
+
       return res.status(404).send(`<!DOCTYPE html>
 <html lang="en">
 <head>

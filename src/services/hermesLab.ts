@@ -270,9 +270,9 @@ export async function executeHermesLabTool(
   const contractorService = contractorRecord?.serviceType || 'HVAC & Home Services';
 
   const systemInstruction = `You are Nous Research Hermes Agent operating inside the HAL Cognitive Lab.
-You are a master human designer, frontend engineer, and direct-response architect following the Emil Kowalski UI/UX philosophy and strict anti-AI design principles.
+You are a master human designer, frontend engineer, and direct-response architect following tactile product engineering and strict anti-AI design principles.
 
-[THE EMIL KOWALSKI & HUMAN-MADE DESIGN CONSTITUTION]
+[TACTILE DIRECT-RESPONSE & HUMAN-MADE DESIGN CONSTITUTION]
 1. HIGHEST-PRIORITY BANNED AI CLICHÉS (NEVER OUTPUT THESE):
    - ❌ NO purple + black + radial glowing orbs + liquid glassmorphism + harsh/neon gradients.
    - ❌ NO generic Inter/Geist/Space Grotesk defaults without intentional typographic character.
@@ -465,7 +465,7 @@ function generateDeterministicLabFallback(
 
     return {
       title: `${company} - Editorial Field Diagnostic & Service Spec Sheet`,
-      summary: `Emil Kowalski-inspired human-crafted landing page with tactile typography (Instrument Serif + Instrument Sans + JetBrains Mono), interactive symptom diagnostic selector, itemized price ledger, and master license registry for ${city}.`,
+      summary: `Human-crafted landing page with tactile typography (Instrument Serif + Instrument Sans + JetBrains Mono), interactive symptom diagnostic selector, itemized price ledger, and master license registry for ${city}.`,
       structuredData: { company, city, niche, phone },
       renderedOutput: `<!DOCTYPE html>
 <html lang="en" class="scroll-smooth">
@@ -651,7 +651,7 @@ function generateDeterministicLabFallback(
 
     </section>
 
-    <!-- Interactive Section: Symptom & Diagnostic Spec Selector (Emil Kowalski Micro-Detail) -->
+    <!-- Interactive Section: Symptom & Diagnostic Spec Selector (Tactile Micro-Detail) -->
     <section id="diagnostic-selector" class="border border-paper-border bg-paper-50 rounded-lg p-6 sm:p-8 space-y-6">
       <div class="flex flex-col sm:flex-row sm:items-end justify-between gap-4 border-b border-paper-border pb-4">
         <div>
@@ -908,7 +908,7 @@ We built a lightweight 1-tap dispatch landing page specifically for ${biz} that 
 Would you be open to seeing the 60-second video walkthrough showing where your competitors are capturing these calls?
 
 Best regards,
-Kaiso Operating Systems • ${loc} Regional Division`;
+Direct Response Systems • ${loc} Regional Division`;
 
     const step2Subject = `Benchmark data: ${loc} ${niche} mobile conversion rates`;
     const step2Body = `Hi ${owner},
@@ -922,7 +922,7 @@ Here is the direct preview link to your white-label audit report and speed patch
 Would Thursday at 10:30 AM or 2:00 PM work for a quick 5-minute debrief?
 
 Best,
-Kaiso Operating Systems`;
+Direct Response Systems`;
 
     const step3Subject = `Permission to close file on ${biz} (${loc})`;
     const step3Body = `Hi ${owner},
@@ -934,13 +934,13 @@ I will archive your ${loc} territory diagnostic file for now. If you ever want t
 Wishing ${biz} a high-volume season ahead.
 
 Warm regards,
-Kaiso Operating Systems`;
+Direct Response Systems`;
 
     return {
       title: `3-Touch High-Converting Outreach Sequence - ${biz}`,
       summary: `High-intent outreach sequence tailored for ${biz} in ${loc} targeting Core Web Vitals deficiency (${perf}/100) and SEO recovery (${seo}/100).`,
       structuredData: {
-        framework: 'KAISO Empirical Value Sequence (Speed Audit ➔ Local Map Pack ➔ Permission Breakaway)',
+        framework: 'Targeted Local Value Sequence (Speed Audit ➔ Local Map Pack ➔ Permission Breakaway)',
         businessName: biz,
         ownerName: owner,
         city: loc,
@@ -1037,10 +1037,10 @@ export async function chatWithHermesAgent(
   }
 
   const systemInstruction = `You are Nous Research Hermes Agent Operating inside the Hermes Intelligence Lab for ${contractorName} (${contractorCity}, specializing in ${contractorService}).
-You are a master human designer, frontend engineer, and direct-response strategist following the Emil Kowalski UI/UX philosophy and strict anti-AI design standards.
+You are a master human designer, frontend engineer, and direct-response strategist following tactile design craft and strict anti-AI design standards.
 The user is talking directly to you in the Brand & Taste Studio to customize, personalize, redesign, or polish their assets.
 
-[EMIL KOWALSKI & ANTI-AI DESIGN LAWS FOR ASSET CRAFTING]
+[TACTILE DESIGN & ANTI-AI CRAFT LAWS FOR ASSET CRAFTING]
 1. BANNED AI CLICHÉS:
    - ❌ NO purple/neon gradients, radial glowing orbs, liquid glass, or floating cards on pitch black.
    - ❌ NO generic Inter/Geist defaults — pair expressive editorial serifs (Instrument Serif, Newsreader, Fraunces) with tactile workhorse sans/mono (Instrument Sans, IBM Plex, JetBrains Mono).

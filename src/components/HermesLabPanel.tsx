@@ -1192,8 +1192,8 @@ export default function HermesLabPanel({ token }: { token: string | null }) {
                     <div>
                       <div className="flex items-center gap-2">
                         <h3 className="text-sm font-bold text-text-primary">{activeArtifact.title}</h3>
-                        <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20">
-                          Emil Kowalski UI/UX Standard
+                        <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-accent/10 text-accent border border-accent/20">
+                          Direct Response Standard
                         </span>
                       </div>
                       <p className="text-xs text-text-secondary mt-0.5">{activeArtifact.content?.summary}</p>

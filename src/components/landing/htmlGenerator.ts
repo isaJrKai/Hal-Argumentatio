@@ -533,7 +533,7 @@ export function generateLandingPageHtml(config: LandingPageConfig): string {
     }
   </script>
   <style>
-    /* Emil Kowalski Motion Bar: purposeful transforms, zero layout thrashing */
+    /* Tactile Motion Bar: purposeful transforms, zero layout thrashing */
     * {
       -webkit-font-smoothing: antialiased;
       text-rendering: optimizeLegibility;

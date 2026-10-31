@@ -84,7 +84,7 @@ export const QualityGatePanel: React.FC<QualityGatePanelProps> = ({ config, onCh
                 </span>
               </div>
               <p className="text-sm text-text-secondary mt-1 max-w-2xl">
-                Enforcing the 8 Core Rules: Single primary goal, above-the-fold contract, anti-slop copy linter, token design purity, WCAG AA contrast, and Emil Kowalski motion bar.
+                Enforcing the 8 Core Rules: Single primary goal, above-the-fold contract, anti-slop copy linter, token design purity, WCAG AA contrast, and tactile motion performance.
               </p>
             </div>
           </div>

@@ -45,7 +45,7 @@ export default function ConnectorsPanel() {
   // ─── EMAIL DISPATCH & PASSWORD RESET DELIVERY STATE ───────────────────────
   const [resendApiKey, setResendApiKey] = useState(() => localStorage.getItem('hal_resend_api_key') || '');
   const [isSavingEmailKey, setIsSavingEmailKey] = useState(false);
-  const [testEmailAddress, setTestEmailAddress] = useState('kaisoisaac@gmail.com');
+  const [testEmailAddress, setTestEmailAddress] = useState('admin@company.com');
   const [isSendingTestEmail, setIsSendingTestEmail] = useState(false);
   const [testEmailResult, setTestEmailResult] = useState<{
     success: boolean;

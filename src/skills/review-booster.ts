@@ -71,7 +71,7 @@ Structure the output as follows:
 - **Gratitude Framing**: Reminds them of the exact value delivered (${servicePerformed}) and uses personal accountability rather than automated system wording.
 
 ### OUTREACH TEMPLATE (SMS Medium)
-"Hi ${clientName}, this is Isaac. Hope your ${servicePerformed} is running perfectly. If you have 20 seconds, would you mind leaving us an honest rating on Google? It helps local homeowners find us. Click here: [INSERT_GOOGLE_REVIEW_LINK] - Thank you!"
+"Hi ${clientName}, this is our service team. Hope your ${servicePerformed} is running perfectly. If you have 20 seconds, would you mind leaving us an honest rating on Google? It helps local homeowners find us. Click here: [INSERT_GOOGLE_REVIEW_LINK] - Thank you!"
 
 ### CONVERSION BEST PRACTICES
 1. **Timing Priority**: Dispatch the message within 2 hours of completing the job. Feedback response rates drop by 65% after 24 hours.
@@ -97,7 +97,7 @@ You can leave your feedback in just one click here:
 Thank you for your business and partnership.
 
 Best regards,
-Isaac"
+Our Service Team"
 
 ### CONVERSION BEST PRACTICES
 1. **Remove Form Obstacles**: Keep the review link completely isolated on its own line for maximum layout visual hierarchy.

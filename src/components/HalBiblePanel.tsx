@@ -29,7 +29,8 @@ import {
   Grid,
   BellRing,
   Maximize2,
-  Loader2
+  Loader2,
+  Download
 } from 'lucide-react';
 import { Button } from './ui/Button';
 import { Badge } from './ui/Badge';
@@ -221,6 +222,30 @@ export default function HalBiblePanel({ initialDocId }: HalBiblePanelProps = {})
     });
   };
 
+  const handleDownloadManual = () => {
+    const markdownContent = `# HAL ENTERPRISE OPERATING MANUAL
+**Canonical Specifications & Architecture Blueprint**
+*Exported: ${new Date().toLocaleDateString()} | Master Completion: ${stats.percent}%*
+
+---
+
+${documents.map(d => `## Section ${d.number}: ${d.title}
+**Phase:** ${d.phase.toUpperCase()} | **Status:** ${d.status.toUpperCase()}
+
+${d.description}
+`).join('\n---\n\n')}
+`;
+    const blob = new Blob([markdownContent], { type: 'text/markdown;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `HAL_Operating_Manual_${new Date().toISOString().slice(0, 10)}.md`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <div className="space-y-6 select-none pb-12 animate-fade-in text-text-primary">
       
@@ -234,23 +259,35 @@ export default function HalBiblePanel({ initialDocId }: HalBiblePanelProps = {})
           </ProseText>
         </div>
 
-        {/* Master Completion Badge */}
-        <div className="flex items-center gap-4 bg-bg-base border border-border-dim p-3 rounded-sm shrink-0">
-          <div className="space-y-0.5">
-            <span className="text-[11px] font-mono text-text-secondary uppercase block">Master Spec Completion</span>
-            <div className="flex items-center gap-2">
-              <div className="w-24 h-1.5 bg-bg-subtle rounded-full overflow-hidden border border-border-dim/55">
-                <div 
-                  className="h-full bg-accent transition-all duration-500" 
-                  style={{ width: `${stats.percent}%` }}
-                />
+        {/* Master Completion Badge & Download Action */}
+        <div className="flex flex-wrap items-center gap-3 shrink-0">
+          <button
+            type="button"
+            onClick={handleDownloadManual}
+            className="flex items-center gap-2 px-3.5 py-2 bg-accent hover:bg-accent/80 text-black rounded font-mono text-xs font-bold transition shadow-sm cursor-pointer"
+            title="Download full operating manual in Markdown"
+          >
+            <Download className="w-3.5 h-3.5" />
+            <span>Download Manual (.md)</span>
+          </button>
+
+          <div className="flex items-center gap-4 bg-bg-base border border-border-dim p-3 rounded-sm">
+            <div className="space-y-0.5">
+              <span className="text-[11px] font-mono text-text-secondary uppercase block">Master Spec Completion</span>
+              <div className="flex items-center gap-2">
+                <div className="w-24 h-1.5 bg-bg-subtle rounded-full overflow-hidden border border-border-dim/55">
+                  <div 
+                    className="h-full bg-accent transition-all duration-500" 
+                    style={{ width: `${stats.percent}%` }}
+                  />
+                </div>
+                <span className="text-xs font-mono font-bold text-accent">{stats.percent}%</span>
               </div>
-              <span className="text-xs font-mono font-bold text-accent">{stats.percent}%</span>
             </div>
-          </div>
-          <div className="border-l border-border-dim pl-3 text-right">
-            <span className="text-[11px] font-mono text-text-secondary uppercase block">Status</span>
-            <span className="text-xs font-mono font-bold text-positive-dim text-positive">CANONICAL</span>
+            <div className="border-l border-border-dim pl-3 text-right">
+              <span className="text-[11px] font-mono text-text-secondary uppercase block">Status</span>
+              <span className="text-xs font-mono font-bold text-positive-dim text-positive">CANONICAL</span>
+            </div>
           </div>
         </div>
       </div>
@@ -839,7 +876,7 @@ export default function HalBiblePanel({ initialDocId }: HalBiblePanelProps = {})
                         subtitle="BADGES DECORATE STATUS WITH STRICT COLOR DISCIPLINE" 
                         action={<Grid className="w-4 h-4 text-[#c8f542]" />} 
                       />
-                      <CardContent className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-7 gap-3">
+                      <CardContent className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
                         <div className="bg-bg-base border border-border-dim p-3 rounded text-center space-y-2">
                           <span className="text-[11px] font-mono opacity-50 block uppercase">New / Fresh</span>
                           <Badge variant="new">Prospect New</Badge>
@@ -882,7 +919,7 @@ export default function HalBiblePanel({ initialDocId }: HalBiblePanelProps = {})
                         subtitle="COLOR IS DESIGNATED FOR EMOTION AND MEANING" 
                         action={<Palette className="w-4 h-4 text-purple-400" />} 
                       />
-                      <CardContent className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-6 gap-4">
+                      <CardContent className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-6 gap-3">
                         
                         <div className="space-y-2">
                           <div className="h-14 rounded bg-[#080808] border border-border-default flex items-end p-2">
@@ -1111,12 +1148,12 @@ export default function HalBiblePanel({ initialDocId }: HalBiblePanelProps = {})
                       <div className="space-y-3">
                         <span className="text-[11px] font-mono tracking-wider text-accent uppercase font-bold block">CONFIRM EXECUTIVE AUTHORIZATION</span>
                         <p className="text-xs text-text-secondary leading-relaxed font-sans">
-                          You are about to synchronize ISAAC's direct marketing pitch templates with active lead registers. This operation accesses external Google Maps APIs and launches secure territory scans.
+                          You are about to synchronize active direct marketing pitch templates with active lead registers. This operation accesses external Google Maps APIs and launches secure territory scans.
                         </p>
                         <div className="p-3 bg-bg-base border border-border-dim rounded space-y-1">
                           <div className="flex justify-between items-center text-[11px] font-mono">
                             <span className="opacity-60 uppercase">TARGET CONTRACTOR:</span>
-                            <span className="text-text-primary font-bold font-mono">ISAAC_ALBERTA_REPRESENTS</span>
+                            <span className="text-text-primary font-bold font-mono">REGIONAL_OPERATOR_DIRECT</span>
                           </div>
                           <div className="flex justify-between items-center text-[11px] font-mono">
                             <span className="opacity-60 uppercase">ENCRYPTION PROTOCOL:</span>

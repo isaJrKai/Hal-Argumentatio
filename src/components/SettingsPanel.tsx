@@ -832,7 +832,7 @@ export default function SettingsPanel({
           </div>
 
           <p className="text-xs text-inherit opacity-80 leading-relaxed font-sans">
-            Your relational PostgreSQL connection string is mapped below. This syncs with your **Connectors Hub** and enables active telemetry audits, leads migration workflows, and database transaction monitoring.
+            Connects HAL directly to your external Neon or PostgreSQL relational database. Clicking <strong className="text-text-primary">Test Connection</strong> performs an immediate live latency ping, while <strong className="text-text-primary">Sync Leads &amp; Neural Weights</strong> runs real SQL migrations to persist your local leads, win/loss records, and Bayesian model weights into the cloud.
           </p>
 
           {postgresSuccess && (
@@ -914,7 +914,7 @@ export default function SettingsPanel({
           </div>
 
           <p className="text-xs text-inherit opacity-80 leading-relaxed font-sans">
-            To query the backend APIs, authenticate command-line tasks, or link third-party services, copy your currently logged-in JWT authentication token below.
+            Your personal, 30-day cryptographically signed JSON Web Token (JWT). You can copy this token to authenticate external tools, Zapier/Make webhooks, curl commands, or mobile scripts by passing it as a <code className="font-mono text-[10px] bg-bg-base px-1.5 py-0.5 rounded border border-border-dim">Bearer &lt;token&gt;</code> header.
           </p>
 
           <div className="space-y-3 font-sans">

@@ -171,7 +171,7 @@ export const GitHubDeployModal: React.FC<GitHubDeployModalProps> = ({ isOpen, on
             <input
               type="text"
               required
-              placeholder="e.g. https://github.com/kaisoisaac/hal-os.git"
+              placeholder="e.g. https://github.com/organization/hal-os.git"
               value={repoUrl}
               onChange={(e) => setRepoUrl(e.target.value)}
               className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-white placeholder-slate-500 font-mono text-xs focus:outline-none focus:border-amber-400 transition"

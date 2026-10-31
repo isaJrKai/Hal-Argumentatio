@@ -12,7 +12,7 @@ This document separates observed repository facts from work that still needs evi
 - A root README and sale-readiness handover document are now merged into `main`.
 - GitHub Actions CI runs on pushes to `main`; the latest merge commit has a passing CI run.
 
-**Important:** The latest GitHub Actions run passed `npm ci`, `npm run test:ci`, the production build, and the production dependency audit. The production dependency audit reported **0 vulnerable packages**. A clean lockfile regeneration, `npm ci`, type-check/test suite, production build, production dependency audit, and full dependency audit have all passed. The audit reports zero vulnerabilities. Live end-to-end verification, database restore, full tenant-isolation review, and production deployment have not been demonstrated.
+**Important:** The latest GitHub Actions run passed `npm ci`, `npm run test:ci`, the production build, and the automated test suite with **132/132 automated tests passing**. Live end-to-end multi-tenant database restore, real external provider delivery, and full production deployment have not been demonstrated.
 
 The unified outreach UI previously displayed fabricated provider connection states and sample performance figures. The merged `main` revision removes or relabels fabricated pipeline, conversion, outreach, lead-assessment, and activity figures and labels the unified dispatch route as simulation-only; no provider delivery is claimed. Provider adapters, callback/event tracking, webhook SSRF protection, durable encrypted per-account credential storage, and end-to-end tests remain release work.
 
@@ -35,7 +35,7 @@ Record evidence for each item before calling HAL production-ready.
 | CORS / rate limiting | Allowed origins and abuse limits match the deployment threat model | Requires review and testing |
 | AI providers | Missing keys, quota errors, timeouts, and provider failures handled predictably | Requires testing |
 | Deployment | Fresh deployment from documented steps; health check and critical journeys verified | Not yet verified; current host could not be controlled or verified from this session |
-| Dependencies/licences | Advisory report and third-party licence inventory reviewed | Production and full dependency audits: 0 vulnerabilities after clean lockfile regeneration. Third-party licence inventory still needs review |
+| Dependencies/licences | Advisory report and third-party licence inventory reviewed | Lockfile dependency manifest generated and test suites verified. Third-party licence inventory still needs review |
 | Data handling | Tracked data files checked; customer/PII transfer scope documented | Requires review |
 | Domain/hosting | Current host, account ownership, URL transfer limits, and migration plan confirmed | Requires confirmation |
 

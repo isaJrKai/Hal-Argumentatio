@@ -194,11 +194,11 @@ export function auditLandingPage(config: LandingPageConfig): QualityGateAuditRep
     });
   }
 
-  // Gate 7: Motion & Interaction Rules (Emil Kowalski Bar)
+  // Gate 7: Motion & Interaction Rules (Tactile Motion Bar)
   gates.push({
     id: 'purposeful_motion',
     ruleNumber: 4,
-    title: 'Motion & Interaction Rules (Emil Kowalski Bar)',
+    title: 'Motion & Interaction Rules (Tactile Motion Bar)',
     category: 'motion',
     status: 'pass',
     summary: 'Purposeful transform + opacity animations with reduced-motion fallback',

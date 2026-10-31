@@ -256,13 +256,13 @@ export const UnifiedCommunicationsHub: React.FC<UnifiedCommunicationsHubProps> =
         <div className="p-4 rounded-xl bg-bg-raised border border-border-dim flex flex-col justify-between space-y-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <span className="p-1.5 rounded-lg bg-emerald-500/10 text-emerald-400">
+              <span className="p-1.5 rounded-lg bg-emerald-500/15 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
                 <WhatsAppIcon className="w-4 h-4" />
               </span>
               <span className="text-xs font-bold text-text-primary">WhatsApp Business</span>
             </div>
-            <span className="inline-flex items-center gap-1 text-[11px] text-emerald-400 font-mono">
-              <span className={bridges?.whatsapp.enabled ? "w-2 h-2 rounded-full bg-amber-400" : "w-2 h-2 rounded-full bg-slate-500"}></span>
+            <span className="inline-flex items-center gap-1 text-[11px] text-emerald-600 dark:text-emerald-400 font-mono">
+              <span className={bridges?.whatsapp.enabled ? "w-2 h-2 rounded-full bg-amber-500" : "w-2 h-2 rounded-full bg-slate-500"}></span>
               <span>{bridges?.whatsapp.status === 'configured_unverified' ? 'Configured · unverified' : 'Not configured'}</span>
             </span>
           </div>
@@ -280,13 +280,13 @@ export const UnifiedCommunicationsHub: React.FC<UnifiedCommunicationsHubProps> =
         <div className="p-4 rounded-xl bg-bg-raised border border-border-dim flex flex-col justify-between space-y-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <span className="p-1.5 rounded-lg bg-sky-500/10 text-sky-400">
+              <span className="p-1.5 rounded-lg bg-sky-500/15 dark:bg-sky-500/10 text-sky-600 dark:text-sky-400">
                 <Mail className="w-4 h-4" />
               </span>
               <span className="text-xs font-bold text-text-primary">Email Sequences</span>
             </div>
-            <span className="inline-flex items-center gap-1 text-[11px] text-sky-400 font-mono">
-              <span className={bridges?.email.enabled ? "w-2 h-2 rounded-full bg-amber-400" : "w-2 h-2 rounded-full bg-slate-500"}></span>
+            <span className="inline-flex items-center gap-1 text-[11px] text-sky-600 dark:text-sky-400 font-mono">
+              <span className={bridges?.email.enabled ? "w-2 h-2 rounded-full bg-amber-500" : "w-2 h-2 rounded-full bg-slate-500"}></span>
               <span>{bridges?.email.status === 'configured_unverified' ? 'Configured · unverified' : 'Not configured'}</span>
             </span>
           </div>
@@ -304,13 +304,13 @@ export const UnifiedCommunicationsHub: React.FC<UnifiedCommunicationsHubProps> =
         <div className="p-4 rounded-xl bg-bg-raised border border-border-dim flex flex-col justify-between space-y-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <span className="p-1.5 rounded-lg bg-amber-500/10 text-amber-400">
+              <span className="p-1.5 rounded-lg bg-amber-500/15 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400">
                 <Phone className="w-4 h-4" />
               </span>
               <span className="text-xs font-bold text-text-primary">Twilio SMS / Voice</span>
             </div>
-            <span className="inline-flex items-center gap-1 text-[11px] text-amber-400 font-mono">
-              <span className={bridges?.sms.enabled ? "w-2 h-2 rounded-full bg-amber-400" : "w-2 h-2 rounded-full bg-slate-500"}></span>
+            <span className="inline-flex items-center gap-1 text-[11px] text-amber-600 dark:text-amber-400 font-mono">
+              <span className={bridges?.sms.enabled ? "w-2 h-2 rounded-full bg-amber-500" : "w-2 h-2 rounded-full bg-slate-500"}></span>
               <span>{bridges?.sms.status === 'configured_unverified' ? 'Configured · unverified' : 'Not configured'}</span>
             </span>
           </div>
@@ -328,13 +328,13 @@ export const UnifiedCommunicationsHub: React.FC<UnifiedCommunicationsHubProps> =
         <div className="p-4 rounded-xl bg-bg-raised border border-border-dim flex flex-col justify-between space-y-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <span className="p-1.5 rounded-lg bg-purple-500/10 text-purple-400">
+              <span className="p-1.5 rounded-lg bg-purple-500/15 dark:bg-purple-500/10 text-purple-600 dark:text-purple-400">
                 <Calendar className="w-4 h-4" />
               </span>
               <span className="text-xs font-bold text-text-primary">Calendar Booking</span>
             </div>
-            <span className="inline-flex items-center gap-1 text-[11px] text-purple-400 font-mono">
-              <span className={bridges?.calendar.enabled ? "w-2 h-2 rounded-full bg-amber-400" : "w-2 h-2 rounded-full bg-slate-500"}></span>
+            <span className="inline-flex items-center gap-1 text-[11px] text-purple-600 dark:text-purple-400 font-mono">
+              <span className={bridges?.calendar.enabled ? "w-2 h-2 rounded-full bg-amber-500" : "w-2 h-2 rounded-full bg-slate-500"}></span>
               <span>{bridges?.calendar.status === 'configured_unverified' ? 'Configured · unverified' : 'Not configured'}</span>
             </span>
           </div>
@@ -359,7 +359,7 @@ export const UnifiedCommunicationsHub: React.FC<UnifiedCommunicationsHubProps> =
               <h3 className="text-sm font-bold text-text-primary">Harvested Prospect Directory</h3>
               <p className="text-[11px] text-text-secondary">Select prospect for individualized outreach</p>
             </div>
-            <span className="text-xs font-mono font-bold text-amber-400 tabular-nums">
+            <span className="text-xs font-mono font-bold text-amber-600 dark:text-amber-400 tabular-nums">
               {filteredLeads.length} leads
             </span>
           </div>
@@ -399,7 +399,7 @@ export const UnifiedCommunicationsHub: React.FC<UnifiedCommunicationsHubProps> =
                       <div className="flex items-center gap-1.5">
                         <h4 className="text-xs font-bold text-text-primary truncate">{ld.businessName}</h4>
                         {ld.status === 'contacted' && (
-                          <span className="text-[10px] text-emerald-400 font-semibold shrink-0">✓ Contacted</span>
+                          <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold shrink-0">✓ Contacted</span>
                         )}
                       </div>
                       <div className="flex items-center gap-2 text-[11px] text-text-secondary mt-0.5">
@@ -409,10 +409,10 @@ export const UnifiedCommunicationsHub: React.FC<UnifiedCommunicationsHubProps> =
                       </div>
                     </div>
                     <div className="text-right shrink-0">
-                      <div className="text-xs font-mono font-bold text-amber-400 tabular-nums">
+                      <div className="text-xs font-mono font-bold text-amber-600 dark:text-amber-400 tabular-nums">
                         {ld.urgencyScore ? `${ld.urgencyScore}/10` : 'Urgent'}
                       </div>
-                      <span className="text-[10px] text-text-tertiary block">KAISO Score</span>
+                      <span className="text-[10px] text-text-tertiary block">Territory Score</span>
                     </div>
                   </div>
                 );
@@ -450,7 +450,7 @@ export const UnifiedCommunicationsHub: React.FC<UnifiedCommunicationsHubProps> =
                 type="button"
                 onClick={() => setActiveChannel('sms')}
                 className={`px-3 py-1.5 rounded-lg font-bold transition flex items-center gap-1.5 cursor-pointer ${
-                  activeChannel === 'sms' ? 'bg-amber-500 text-accent-contrast shadow' : 'text-text-secondary hover:text-text-primary'
+                  activeChannel === 'sms' ? 'bg-amber-600 text-white shadow' : 'text-text-secondary hover:text-text-primary'
                 }`}
               >
                 <Phone className="w-3.5 h-3.5" />
@@ -460,7 +460,7 @@ export const UnifiedCommunicationsHub: React.FC<UnifiedCommunicationsHubProps> =
                 type="button"
                 onClick={() => setActiveChannel('calendar')}
                 className={`px-3 py-1.5 rounded-lg font-bold transition flex items-center gap-1.5 cursor-pointer ${
-                  activeChannel === 'calendar' ? 'bg-purple-600 text-text-primary shadow' : 'text-text-secondary hover:text-text-primary'
+                  activeChannel === 'calendar' ? 'bg-purple-600 text-white shadow' : 'text-text-secondary hover:text-text-primary'
                 }`}
               >
                 <Calendar className="w-3.5 h-3.5" />

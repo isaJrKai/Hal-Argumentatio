@@ -32,7 +32,7 @@ HALBiz is an autonomous Business Operating Intelligence Platform designed for tr
 Key Areas for Your Architectural & Spatial Optimization:
 1. CANVAS DENSITY & AUTO-CAD MULTI-DOCKING:
    - Audit the center canvas layouts across Mission Control, Leads Data Explorer, Campaigns, and the Hermes Agent Lab.
-   - Propose an AutoCAD / Bloomberg-grade docked split-screen workspace where operators can browse 140+ prospect records on the left while simultaneously drafting KAISO cold outreach sequences or tweaking Bayesian prior weights on the right.
+   - Propose an AutoCAD / Bloomberg-grade docked split-screen workspace where operators can browse 140+ prospect records on the left while simultaneously drafting direct cold outreach sequences or tweaking Bayesian prior weights on the right.
 
 2. OMNI-CHANNEL CONTRACTOR COMMS HUB:
    - Detail the architecture for a unified VoIP + SMS Missed-Call Auto-Recovery engine into Zone 4 (Contextual Inspector).

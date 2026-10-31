@@ -68,7 +68,7 @@ INPUT CONSTANTS:
 YOUR PLAN MUST STRICTLY INCORPORATE AND EXPAND UPON THESE CORE PRINCIPLES:
 1. **Verification Before Inclusion (Non-Negotiable)**: Define the rigorous verification workflow to guarantee zero guessed or fabricated emails/phones. Explain how to document verification dates and live sources.
 2. **Deep Enrichment and Signal Tracking**: Detail how the signals (${enrichmentSignals}) raise the list value above cheap web scrapes, enabling high-value tiering.
-3. **KAISO Multi-Tier Lead Scoring**: Apply a precise Tier A/B/C tiering model for this niche and geography to save buyers hours of sorting.
+3. **Territory Multi-Tier Lead Scoring**: Apply a precise Tier A/B/C tiering model for this niche and geography to save buyers hours of sorting.
 4. **Data Privacy and Maintenance Cadence**: Detail guidelines for respecting CAN-SPAM, GDPR, or CASL (since it is Canada-based if New Brunswick), and how the update frequency (${pricingStrategy}) protects client outreach reputation.
 5. **A Sample Enriched List Table**: Present a mock-up of 3 sample records for "${niche}" in "${geography}" based on real directories, showing exactly how verified data, source URLs, and enrichment signals must be structured in the final delivery sheet.
 
@@ -100,7 +100,7 @@ Standard scraping yields low-value sheets. The premium value is in our enriched 
 - **Reputation Profile**: Reviews count and average score to gauge their market dominance or digital marketing neglect.
 - **Site Performance**: Speed score to identify candidates needing technical SEO support.
 
-### 3. KAISO MULTI-TIER LEAD SCORING FOR ${geography.toUpperCase()}
+### 3. TERRITORY MULTI-TIER LEAD SCORING FOR ${geography.toUpperCase()}
 We separate the list into actionable, value-based tiers:
 - **Tier A (High-Budget, High-Value)**: Established businesses with >25 Google reviews, active website, running paid ads, and dedicated marketing contacts.
 - **Tier B (Mid-Market Opportunities)**: Functional websites, 5-25 reviews, not running ads, obvious website speed or schema gaps.

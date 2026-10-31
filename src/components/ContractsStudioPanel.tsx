@@ -301,7 +301,7 @@ export const ContractsStudioPanel: React.FC<{ token: string | null }> = () => {
             {/* SIGNATURES */}
             <div className="pt-8 border-t border-border-dim grid grid-cols-2 gap-8 text-xs print:border-black">
               <div className="space-y-4">
-                <p className="font-bold text-text-primary print:text-black">For {workspaceConfig.businessName || 'Kaiso Operating Group'}:</p>
+                <p className="font-bold text-text-primary print:text-black">For {workspaceConfig.businessName || 'Agency Operations Group'}:</p>
                 <div className="h-12 border-b border-border-default print:border-black" />
                 <p className="text-text-tertiary font-mono text-[10px] print:text-gray-500">Authorized Signature / Date</p>
               </div>

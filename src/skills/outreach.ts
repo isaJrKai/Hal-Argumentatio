@@ -112,7 +112,7 @@ I’ve compiled a quick 2-minute video showing where this leak is happening and 
 
 Best,
 
-Isaac (Kaiso)
+Territory Director
 HAL Intelligence Operating Systems
 
 ### OBJECTION HANDLING MATRIX

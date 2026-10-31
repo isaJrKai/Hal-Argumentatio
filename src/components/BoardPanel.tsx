@@ -84,7 +84,7 @@ export default function BoardPanel({ leads, token, onRefresh }: BoardPanelProps)
             performanceScore: lead.performanceScore || 50,
             seoScore: lead.seoScore || 65,
             sslStatus: lead.sslStatus || 'valid',
-            framework: 'KAISO'
+            framework: 'Direct Outreach'
           },
           promptOverride: `Draft a high-conversion cold pitch for ${lead.businessName} in ${lead.city} referencing their digital footprint.`
         })

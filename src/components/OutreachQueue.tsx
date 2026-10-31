@@ -93,9 +93,9 @@ export default function OutreachQueue({ leads, token, onRefresh }: OutreachQueue
             websiteUrl: '{{websiteUrl}}',
             operatorName: workspaceConfig.operatorName,
             agencyName: workspaceConfig.agencyName,
-            framework: 'KAISO'
+            framework: 'Direct Outreach'
           },
-          promptOverride: `Draft a high-conversion KAISO cold outreach script for ${activeNiche} contractors in ${activeCity}. Focus on identifying digital leakage, load speed deficits, and positioning ${workspaceConfig.agencyName} as specialized local growth engineers.`
+          promptOverride: `Draft a high-conversion direct cold outreach script for ${activeNiche} contractors in ${activeCity}. Focus on identifying digital leakage, load speed deficits, and positioning ${workspaceConfig.agencyName} as specialized local growth engineers.`
         })
       });
 
@@ -110,7 +110,7 @@ export default function OutreachQueue({ leads, token, onRefresh }: OutreachQueue
 
         setTemplateSubject(newSubject);
         setTemplateBody(newBody);
-        showToast('Hermes drafted a personalized KAISO cold sequence', 'success');
+        showToast('Hermes drafted a personalized direct outreach sequence', 'success');
         onRefresh();
       } else {
         showToast('Failed to synthesize script with Hermes', 'error');
@@ -149,9 +149,9 @@ export default function OutreachQueue({ leads, token, onRefresh }: OutreachQueue
             reviewCount: lead.reviewCount || 18,
             operatorName: workspaceConfig.operatorName,
             agencyName: workspaceConfig.agencyName,
-            framework: 'KAISO'
+            framework: 'Direct Outreach'
           },
-          promptOverride: `Generate a sharp KAISO framework pitch for ${lead.businessName} (${lead.serviceType} in ${lead.city}). Cite their technical speed score (${lead.performanceScore || 52}/100) and provide a concise, non-pushy message.`
+          promptOverride: `Generate a sharp direct response pitch for ${lead.businessName} (${lead.serviceType} in ${lead.city}). Cite their technical speed score (${lead.performanceScore || 52}/100) and provide a concise, non-pushy message.`
         })
       });
 
@@ -172,7 +172,7 @@ export default function OutreachQueue({ leads, token, onRefresh }: OutreachQueue
           setSelectedLeadIds(prev => [...prev, lead.id]);
         }
 
-        showToast(`Hermes synthesized custom KAISO pitch for ${lead.businessName}`, 'success');
+        showToast(`Hermes synthesized custom direct outreach pitch for ${lead.businessName}`, 'success');
         onRefresh();
       } else {
         showToast('Hermes failed to synthesize lead pitch', 'error');
@@ -351,7 +351,7 @@ export default function OutreachQueue({ leads, token, onRefresh }: OutreachQueue
                 onClick={handleDraftGlobalWithHermes}
                 disabled={isDraftingGlobal}
                 className="px-2 py-0.5 bg-brand/10 hover:bg-brand/20 border border-brand/40 text-[9.5px] font-mono font-bold text-brand rounded uppercase flex items-center gap-1 transition-all cursor-pointer"
-                title="Synthesize KAISO cold pitch with Hermes"
+                title="Synthesize direct cold pitch with Hermes"
               >
                 <Sparkles className={`w-3 h-3 ${isDraftingGlobal ? 'animate-spin' : ''}`} />
                 <span>{isDraftingGlobal ? 'Synthesizing...' : 'Draft with Hermes'}</span>
@@ -547,7 +547,7 @@ export default function OutreachQueue({ leads, token, onRefresh }: OutreachQueue
                                 onClick={() => handleDraftLeadWithHermes(lead)}
                                 disabled={draftingLeadId === lead.id}
                                 className="px-2 py-1 bg-brand/10 hover:bg-brand/20 border border-brand/40 text-[10px] text-brand rounded-sm font-bold uppercase transition-colors flex items-center gap-1 cursor-pointer"
-                                title="Synthesize custom KAISO outreach script with Hermes"
+                                title="Synthesize custom direct outreach script with Hermes"
                               >
                                 <Sparkles className={`w-3 h-3 ${draftingLeadId === lead.id ? 'animate-spin' : ''}`} />
                                 <span>{draftingLeadId === lead.id ? 'Drafting...' : 'Draft'}</span>
