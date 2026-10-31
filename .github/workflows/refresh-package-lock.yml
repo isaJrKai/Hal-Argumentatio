@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - fix/hal-sale-readiness
+    paths:
+      - package.json
+      - package-lock.json
 
 permissions:
   contents: write
