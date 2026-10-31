@@ -190,7 +190,7 @@ export default function FinancialsPanel({ token }: FinancialsPanelProps) {
                 <span>MRR History & Forecast Readiness</span>
               </h3>
               <span className="text-[10px] font-mono text-text-dim mt-0.5 block">
-                Historical monthly billings vs 12% compounding client pipeline model
+                Dated MRR snapshots and validated forecast inputs will appear when recorded data is available.
               </span>
             </div>
 
