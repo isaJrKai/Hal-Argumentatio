@@ -522,8 +522,8 @@ export const HalRoadmapPhase3View: React.FC = () => {
               </p>
               <div className="pt-2 border-t border-border-dim/60 space-y-1.5 text-[11px] font-mono text-text-secondary">
                 <div className="flex justify-between">
-                  <span>ACTIVE CADENCES:</span>
-                  <strong className="text-text-primary">{sequences.length}</strong>
+                  <span>SAVED SEQUENCES:</span>
+                  <strong className="text-text-primary">{savedSequences.length}</strong>
                 </div>
                 <div className="flex justify-between">
                   <span>AVERAGE CONVERSION:</span>
@@ -883,7 +883,7 @@ export const HalRoadmapPhase3View: React.FC = () => {
                     DELIVERY NOT VERIFIED
                   </span>
                 </div>
-                <h3 className="text-sm font-bold text-text-primary">Live Outbox Delivery Bridge</h3>
+                <h3 className="text-sm font-bold text-text-primary">Provider Configuration & Delivery Status</h3>
                 <p className="text-xs text-text-secondary mt-0.5">
                   Saved credentials are shown as configured but unverified. Outbound delivery is disabled until provider adapters and webhook handling are tested.
                 </p>
@@ -1115,6 +1115,12 @@ export const HalRoadmapPhase3View: React.FC = () => {
               </div>
             </div>
 
+            {liveDispatchError && (
+              <div className="p-3 rounded-lg bg-warning-dim border border-warning/30 text-xs text-warning" role="alert">
+                {liveDispatchError}
+              </div>
+            )}
+
             {/* Live Transmission Cryptographic Receipt */}
             {liveDispatchError && <div className="p-3 rounded-lg bg-warning-dim border border-warning/30 text-xs text-warning" role="alert">{liveDispatchError}</div>}
             {liveDispatchResult && (
@@ -1122,10 +1128,10 @@ export const HalRoadmapPhase3View: React.FC = () => {
                 <div className="flex items-center justify-between border-b border-emerald-500/20 pb-2">
                   <div className="flex items-center gap-2 text-emerald-600 dark:text-emerald-400 font-bold">
                     <CheckCircle2 className="w-4 h-4" />
-                    <span>CARRIER DISPATCH CONFIRMED — {liveDispatchResult.deliveryStatus}</span>
+                    <span>PROVIDER ACCEPTED REQUEST — {liveDispatchResult.deliveryStatus || 'status pending'}</span>
                   </div>
                   <span className="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-500 text-[10px] font-bold">
-                    LATENCY: {liveDispatchResult.latencyMs}ms
+                    Provider latency: {typeof liveDispatchResult.latencyMs === 'number' ? `${liveDispatchResult.latencyMs}ms` : 'not measured'}
                   </span>
                 </div>
 
