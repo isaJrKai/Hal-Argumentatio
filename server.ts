@@ -1220,64 +1220,85 @@ app.post('/api/landing-pages/save', authenticate, async (req, res) => {
 });
 
 app.post('/api/public/landing-leads', async (req, res) => {
-  const { contractorId, landingPageId, name, phone, serviceDetails, city } = req.body;
+  const { landingPageId, name, phone, serviceDetails } = req.body || {};
 
-  if (!phone || !name) {
-    return res.status(400).json({ error: 'Name and phone are required for this service request' });
+  const normalizedName = typeof name === 'string' ? name.trim() : '';
+  const normalizedPhone = typeof phone === 'string' ? phone.trim() : '';
+  const normalizedDetails = typeof serviceDetails === 'string' ? serviceDetails.trim() : '';
+
+  if (!normalizedName || !normalizedPhone) {
+    return res.status(400).json({ error: 'Name and phone are required for this service request.' });
   }
-  if (!contractorId || typeof contractorId !== 'string') {
-    return res.status(400).json({ error: 'This landing page is missing its contractor assignment. Please contact the business directly.' });
+  if (normalizedName.length > 120 || normalizedPhone.length > 40 || normalizedDetails.length > 2000) {
+    return res.status(400).json({ error: 'One or more fields exceed the permitted length.' });
+  }
+  if (typeof landingPageId !== 'string' || !landingPageId.trim() || landingPageId.length > 128) {
+    return res.status(400).json({ error: 'A valid published landing page is required.' });
   }
 
   try {
+    // Tenant ownership is derived from the saved landing-page artifact.
+    // Never trust a contractorId supplied by an anonymous browser request.
+    const [artifact] = await pgDb
+      .select()
+      .from(hermesLabArtifacts)
+      .where(and(
+        eq(hermesLabArtifacts.id, landingPageId.trim()),
+        eq(hermesLabArtifacts.toolId, 'landing_page')
+      ))
+      .limit(1);
+
+    if (!artifact || !['ready', 'deployed'].includes(artifact.status)) {
+      return res.status(404).json({ error: 'This landing page is unavailable or has not been published.' });
+    }
+
+    const targetContractorId = artifact.contractorId;
     const [assignedContractor] = await pgDb
       .select({ id: contractors.id })
       .from(contractors)
-      .where(eq(contractors.id, contractorId))
+      .where(eq(contractors.id, targetContractorId))
       .limit(1);
+
     if (!assignedContractor) {
-      return res.status(404).json({ error: 'The assigned business could not be found.' });
+      return res.status(404).json({ error: 'The business associated with this landing page could not be found.' });
     }
-    const targetContractorId = assignedContractor.id;
+
+    const artifactContent = artifact.content && typeof artifact.content === 'object'
+      ? artifact.content as Record<string, any>
+      : {};
+    const pageConfig = artifactContent.pageConfig && typeof artifactContent.pageConfig === 'object'
+      ? artifactContent.pageConfig as Record<string, any>
+      : {};
+    const pageCity = typeof pageConfig.city === 'string' && pageConfig.city.trim()
+      ? pageConfig.city.trim().slice(0, 120)
+      : 'Unspecified';
 
     const leadId = crypto.randomUUID();
-    const phoneEncrypted = encrypt(String(phone));
-
-    await pgDb.insert(leads).values({
+    const phoneEncrypted = encrypt(normalizedPhone);
+    const leadValues = {
       id: leadId,
       contractorId: targetContractorId,
-      businessName: `${name} (Homeowner Inbound)`,
-      ownerName: name,
+      businessName: `${normalizedName} (Landing Page Inquiry)`,
+      ownerName: normalizedName,
       email: null,
       phone: '[ENCRYPTED]',
       emailEncrypted: null,
       phoneEncrypted,
-      city: city || 'Local Territory',
-      niche: 'Emergency Inbound',
+      city: pageCity,
+      niche: typeof pageConfig.trade === 'string' ? pageConfig.trade.slice(0, 80) : 'Inbound Inquiry',
       source: 'landing_page',
       status: 'new',
-      urgencyScore: 9.8,
-      predictedLtv: 450.0,
-      notes: `Landing Page: ${landingPageId || 'direct'} | Details: ${serviceDetails || 'Emergency dispatch requested'}`
-    });
+      urgencyScore: null,
+      predictedLtv: null,
+      predictedMonthlyLostRevenueUsd: null,
+      notes: `Landing Page: ${landingPageId.trim()} | Details: ${normalizedDetails || 'No additional details supplied'}`
+    };
+
+    await pgDb.insert(leads).values(leadValues);
 
     try {
       db.addLead({
-        id: leadId,
-        contractorId: targetContractorId,
-        businessName: `${name} (Homeowner Inbound)`,
-        ownerName: name,
-        email: null,
-        phone: '[ENCRYPTED]',
-        emailEncrypted: null,
-        phoneEncrypted,
-        city: city || 'Local Territory',
-        niche: 'Emergency Inbound',
-        source: 'landing_page',
-        status: 'new',
-        urgencyScore: 9.8,
-        predictedLtv: 450.0,
-        notes: `Landing Page: ${landingPageId || 'direct'} | Details: ${serviceDetails || 'Emergency dispatch requested'}`,
+        ...leadValues,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
       } as any);
@@ -1290,11 +1311,11 @@ app.post('/api/public/landing-leads', async (req, res) => {
         entityType: 'lead',
         entityId: leadId,
         actor: 'LandingPageLeadIngest',
-        details: `Homeowner ${name} submitted priority emergency dispatch request via Landing Page ${landingPageId || 'direct'}.`,
+        details: `A visitor submitted an inquiry through landing page ${landingPageId.trim()}.`,
         metadata: {
-          landingPageId,
-          serviceDetails: serviceDetails || '',
-          city: city || ''
+          landingPageId: landingPageId.trim(),
+          serviceDetails: normalizedDetails,
+          city: pageCity
         }
       });
     } catch (_) {}
@@ -1303,19 +1324,19 @@ app.post('/api/public/landing-leads', async (req, res) => {
       broadcastNotification(
         targetContractorId,
         'lead_captured',
-        '⚡ New Priority Homeowner Inbound!',
-        `${name} (${phone}) requested urgent dispatch: ${serviceDetails || 'Service consultation'}`
+        'New landing-page inquiry',
+        `${normalizedName} submitted a service inquiry. Contact details are stored in the lead record.`
       );
     } catch (_) {}
 
-    res.json({
+    return res.status(201).json({
       success: true,
       leadId,
-      message: 'Priority dispatch request confirmed. Our dispatch team is contacting you immediately.'
+      message: 'Your request has been received. The business will contact you using the details you provided.'
     });
   } catch (err: any) {
     console.error('[Public Landing Lead Ingest Error]', err);
-    res.status(500).json({ error: 'Failed to process dispatch request' });
+    return res.status(500).json({ error: 'Failed to process your request. Please try again or contact the business directly.' });
   }
 });
 
