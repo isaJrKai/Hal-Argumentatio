@@ -64,7 +64,7 @@ They were not force-upgraded across a potentially breaking major-version boundar
 - No production database migration or live data repair was run.
 - No production deployment was performed.
 - Historical customer contract duration, churn cohorts, cash balance, operating burn, and campaign-to-won-customer attribution are not yet represented sufficiently to calculate LTV, churn, runway, payback, or a validated forecast.
-- The browser bundle remains a performance investigation item; the build currently reports a main JS bundle around 3 MB before gzip.
+- Workspace panels, public pages, and the command palette are lazy-loaded. In the first verified split build, the main entry chunk was 593.78 kB (173.23 kB gzip), with large tools such as Google Drive and the map module emitted as separate chunks. The entry chunk still exceeds Vite's 500 kB warning threshold, so further shared-dependency splitting remains an optimization item.
 
 ## Release rule
 
