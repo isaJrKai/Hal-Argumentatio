@@ -222,14 +222,14 @@ export const HalRoadmapPhase2View: React.FC = () => {
               </span>
               <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 flex items-center gap-1">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                PHASE 2 ACTIVE & 100% VERIFIED
+                {statusData?.phase2Verified ? 'PHASE 2 VERIFIED' : 'PHASE 2 NOT VERIFIED'}
               </span>
             </div>
             <h2 className="text-lg font-bold font-display text-text-primary tracking-tight">
               Phase 2: Intelligence (Local Harvesting, Geo Scoring & Competitor Audits)
             </h2>
             <p className="text-xs text-text-secondary leading-relaxed max-w-3xl">
-              Purges mock seed data, harvests actual business operations with encrypted PII, clusters spatial dispatch quadrants, and executes grounded Google 3-Pack competitor footprint audits.
+              Verification is evidence-gated. Stored records, geo-data availability, and competitor-source availability are shown below; no live-source or latency claims are made without provider evidence.
             </p>
           </div>
 
@@ -256,14 +256,14 @@ export const HalRoadmapPhase2View: React.FC = () => {
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           <div className="p-3 rounded-lg bg-bg-base border border-border-dim space-y-1">
             <div className="text-[10px] font-mono text-text-tertiary uppercase flex items-center justify-between">
-              <span>Real Harvested Leads</span>
+              <span>Non-seed Lead Records</span>
               <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" />
             </div>
             <div className="text-lg font-bold font-display text-text-primary">
-              {p1?.metrics.realHarvestedCount || 0}
+              {p1?.metrics.nonSeedRecordCount ?? '—'}
             </div>
             <div className="text-[10.5px] text-text-secondary">
-              Zero plaintext leaks ({p1?.metrics.encryptedCount || 0} encrypted)
+              PII check: {p1?.metrics.plaintextLeakCheck || 'not verified'} · {p1?.metrics.encryptedCount || 0} encrypted
             </div>
           </div>
 
@@ -273,10 +273,10 @@ export const HalRoadmapPhase2View: React.FC = () => {
               <Compass className="w-3.5 h-3.5 text-accent" />
             </div>
             <div className="text-lg font-bold font-display text-text-primary">
-              5 Quadrants
+              {p2?.metrics.quadrantCount ?? '—'} Candidate Quadrants
             </div>
             <div className="text-[10.5px] text-text-secondary">
-              Avg dispatch: {p2?.metrics.avgLatencyMins || 19.8} mins
+              Route-time latency: {p2?.metrics.avgLatencyMins == null ? 'Not available' : `${p2.metrics.avgLatencyMins} mins`}
             </div>
           </div>
 
@@ -286,10 +286,10 @@ export const HalRoadmapPhase2View: React.FC = () => {
               <Gauge className="w-3.5 h-3.5 text-indigo-400" />
             </div>
             <div className="text-lg font-bold font-display text-text-primary">
-              100% Grounded
+              {statusData?.competitorAuditStatus?.status === 'VERIFIED' ? 'Verified source available' : 'Not verified'}
             </div>
             <div className="text-[10.5px] text-text-secondary">
-              Google 3-Pack gap matrix active
+              {statusData?.competitorAuditStatus?.message || 'Competitor source not verified'}
             </div>
           </div>
 
@@ -299,7 +299,7 @@ export const HalRoadmapPhase2View: React.FC = () => {
               <Hash className="w-3.5 h-3.5 text-emerald-500" />
             </div>
             <div className="text-lg font-bold font-display text-emerald-600 dark:text-emerald-400">
-              {statusData?.integrity.valid ? 'UNBROKEN' : 'VALID'}
+              {statusData?.integrity?.valid ? 'UNBROKEN' : 'DEGRADED'}
             </div>
             <div className="text-[10.5px] text-text-secondary">
               {statusData?.integrity.totalEntries || 0} sequenced blocks
@@ -315,7 +315,7 @@ export const HalRoadmapPhase2View: React.FC = () => {
             <div className="flex items-center gap-2">
               <ShieldCheck className="w-5 h-5 text-emerald-500 shrink-0" />
               <span className="text-xs font-mono font-bold uppercase text-emerald-600 dark:text-emerald-400">
-                Phase 2 Intelligence Verification Complete (All 3 Pillars Passed)
+                {verificationResult.verified ? 'Phase 2 verification passed' : 'Phase 2 checks completed · one or more pillars remain unverified'}
               </span>
             </div>
             <button 
@@ -378,7 +378,7 @@ export const HalRoadmapPhase2View: React.FC = () => {
           }`}
         >
           <Compass className="w-3.5 h-3.5" />
-          <span>Pillar 2: Spatial Geo Quadrants (5 Zones)</span>
+          <span>Pillar 2: Spatial Geo Quadrants ({p2?.metrics.quadrantCount ?? '—'} candidates)</span>
         </button>
         <button
           onClick={() => setActiveTab('competitors')}
@@ -403,13 +403,13 @@ export const HalRoadmapPhase2View: React.FC = () => {
                 <Globe className="w-5 h-5" />
               </div>
               <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-500/15 text-emerald-600 dark:text-emerald-400">
-                VERIFIED
+                {p1?.status || 'NOT VERIFIED'}
               </span>
             </div>
             <div>
               <h3 className="font-bold text-text-primary text-sm">Pillar 1: Local Territory Harvesting</h3>
               <p className="text-xs text-text-secondary mt-1 leading-relaxed">
-                Purges static mock seeds and ingests actual operating businesses with verified SSL status, mobile Core Web Vitals, and AES-GCM-256 encrypted PII.
+                Inspects stored lead records and PII fields. Non-seed records are not automatically treated as live-harvested businesses; source provenance remains unverified.
               </p>
             </div>
             <div className="p-3 rounded-lg bg-bg-base border border-border-dim font-mono text-xs space-y-2">
@@ -448,7 +448,7 @@ export const HalRoadmapPhase2View: React.FC = () => {
                 <Compass className="w-5 h-5" />
               </div>
               <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-500/15 text-emerald-600 dark:text-emerald-400">
-                VERIFIED
+                {p2?.status || 'NOT VERIFIED'}
               </span>
             </div>
             <div>
@@ -487,7 +487,7 @@ export const HalRoadmapPhase2View: React.FC = () => {
                 <Target className="w-5 h-5" />
               </div>
               <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-500/15 text-emerald-600 dark:text-emerald-400">
-                VERIFIED
+                {p3?.status || 'NOT VERIFIED'}
               </span>
             </div>
             <div>
