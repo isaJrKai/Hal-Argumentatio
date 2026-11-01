@@ -970,6 +970,9 @@ app.post('/api/public/audit/:id/book', async (req, res) => {
 
 // ─── OUTREACH & DELIVERY STATUS WEBHOOK (Twilio, SendGrid, Resend Callbacks) ─
 app.post('/api/public/webhooks/delivery', async (req, res) => {
+  if (process.env.NODE_ENV !== 'development' && process.env.NODE_ENV !== 'test') {
+    return res.status(410).json({ error: 'Delivery status webhooks are disabled until provider-specific signature validation and replay protection are configured.' });
+  }
   const provider = (req.query.provider as string || req.body.provider || 'generic') as any;
   const rawStatus = req.body.status || req.body.event || req.body.MessageStatus || req.body.type || '';
   const leadId = req.body.leadId || req.body.custom_args?.leadId || req.body.metadata?.leadId;
