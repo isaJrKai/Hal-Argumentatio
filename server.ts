@@ -4118,17 +4118,14 @@ app.get('/api/outreach/bridges/status', authenticate, (req, res) => {
         status: cfg.whatsapp.enabled ? 'configured_unverified' : 'not_configured'
       },
       email: {
-        enabled: cfg.email.enabled,
-        provider: cfg.email.provider,
-        senderEmail: cfg.email.senderEmail,
-        senderName: cfg.email.senderName,
-        smtpHost: cfg.email.smtpHost,
-        smtpPort: cfg.email.smtpPort,
-        smtpUser: cfg.email.smtpUser,
-        apiKey: cfg.email.apiKey ? '••••••••' : undefined,
+        enabled: Boolean(process.env.RESEND_API_KEY && process.env.HAL_SENDER_EMAIL),
+        provider: 'resend',
+        senderEmail: process.env.HAL_SENDER_EMAIL || '',
+        senderName: process.env.HAL_SENDER_NAME || 'HAL',
         deliveredCount: emailDelivered,
+        submittedCount: userLogs.filter(l => l.channel === 'email' && l.status === 'submitted').length,
         openRate: null,
-        status: cfg.email.enabled ? 'configured_unverified' : 'not_configured'
+        status: process.env.RESEND_API_KEY && process.env.HAL_SENDER_EMAIL ? 'configured_unverified' : 'not_configured'
       },
       sms: {
         enabled: cfg.sms.enabled,
