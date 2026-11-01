@@ -509,8 +509,9 @@ export default function NeuralPanel() {
       else if (node.type === 'loss') color = '#ef4444';
       else if (node.type === 'niche') color = '#eab308';
       else if (node.type === 'lead') color = '#3b82f6';
+      else if (node.type === 'forecast') color = '#22d3ee';
 
-      if (influenceRef.current && node.type !== 'core' && node.type !== 'niche') {
+      if (influenceRef.current && node.type !== 'core' && node.type !== 'niche' && node.type !== 'forecast') {
          color = 'rgba(255,255,255,0.3)';
       }
 
