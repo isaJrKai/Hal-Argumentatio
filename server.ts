@@ -71,6 +71,7 @@ import {
   verifyPhase5Pillars
 } from './src/lib/phase5-enterprise';
 import { executeBrainSynchronizedForecast } from './src/lib/brainForecastBridge';
+import { matchesTerritoryContext } from './src/lib/forecastData';
 import {
   verifyLeadGrounding,
   enforceFailClosedOutreachGate,
@@ -4825,13 +4826,12 @@ app.get('/api/neural/network', authenticate, async (req, res) => {
       dbInstance.select().from(winLossRecords).where(eq(winLossRecords.contractorId, contractorId)).limit(500),
       dbInstance.select().from(leads).where(eq(leads.contractorId, contractorId)).limit(1000)
     ]);
-    const cityKey = targetCity.toLocaleLowerCase();
-    const nicheKey = targetNiche.toLocaleLowerCase();
-    const matchesTerritory = (city: unknown, niche: unknown) =>
-      String(city || '').toLocaleLowerCase().includes(cityKey)
-      && String(niche || '').toLocaleLowerCase().includes(nicheKey);
-    const winLoss = allWinLoss.filter(record => matchesTerritory(record.city, record.niche));
-    const recentLeads = allLeads.filter(lead => matchesTerritory(lead.city, lead.niche));
+    const winLoss = allWinLoss.filter(record =>
+      matchesTerritoryContext(record.city, record.niche, targetCity, targetNiche)
+    );
+    const recentLeads = allLeads.filter(lead =>
+      matchesTerritoryContext(lead.city, lead.niche, targetCity, targetNiche)
+    );
 
     const nodes: any[] = [
       { id: 'core_bayes', label: 'Outcome Analysis', type: 'core', group: 1, size: 22 },
