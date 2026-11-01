@@ -17,11 +17,13 @@ The service downloads the public Google TimesFM 2.5 PyTorch checkpoint from Hugg
 
 The configured 1,024-point context is in the upstream standard tier: target a CPU host with 16 GB RAM, or a supported GPU with 4–8 GB VRAM. The upstream guide lists 4–8 GB system RAM for a smaller 512-point context. The service uses a single-series batch size to limit memory use. Persist `/opt/huggingface` (as in the Docker volume example) so restarts do not repeatedly download the roughly 1 GB checkpoint/cache.
 
-## Required HAL application environment
+## Optional on-demand HTTP inference mode
 
 - `TIMESFM_SERVICE_URL`: base URL of the deployed service, e.g. `https://your-private-service.example`.
 - `TIMESFM_API_KEY`: the same random secret (at least 32 characters) configured in the inference service.
 - `HF_TOKEN` (optional): Hugging Face read token only if anonymous checkpoint downloads are rate-limited. Never use it as `TIMESFM_API_KEY`.
+
+These two HAL environment variables are needed only for on-demand HTTP inference. HAL can instead use the scheduled batch path below without paying for a continuously running model server.
 
 Do not expose the service publicly without HTTPS and the bearer token. Keep the
 service private where the hosting platform supports private networking.
@@ -46,7 +48,9 @@ The service deliberately uses the TimesFM 2.5 checkpoint, not TimesFM 3.0. The u
 ## Free development/testing runner: GitHub Actions
 
 HAL can generate periodic TimesFM forecasts without operating a continuously
-running inference server. The workflow at
+running inference server. When no private HTTP endpoint is configured, HAL's
+forecast API reads the latest successful, fresh, tenant- and territory-scoped
+batch results from the existing `forecasts` table. The workflow at
 `.github/workflows/timesfm-batch.yml` runs the official TimesFM 2.5 PyTorch
 checkpoint on a GitHub-hosted runner, reads each contractor's own Google Ads
 history, and writes the median forecast plus q10/q90 bounds into the existing
@@ -77,8 +81,9 @@ workflow logs.
   time limits. A failed run does not delete or overwrite the last successful
   forecasts.
 - Forecasts are refreshed on the schedule, not immediately on dashboard
-  interaction. HAL should show the forecast generation timestamp and retain
-  the last successful result when a later run fails.
+  interaction. HAL reads only a fresh complete snapshot (up to 24 hours old)
+  and shows its generation timestamp. A later failed run does not delete or
+  overwrite the last successful forecasts.
 - The `confidence_score` field is set to zero because a calibrated confidence
   score has not been established. q10/q90 values are stored separately in
   `assumptions`; they are model quantile bounds, not a guarantee.
