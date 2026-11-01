@@ -1,6 +1,5 @@
 import { getDrizzleDb } from './src/db/postgres';
 import express from 'express';
-import { getRequestAIProvider, runWithAIProvider } from './src/lib/aiRequestContext';
 import path from 'path';
 import fs from 'fs';
 import crypto from 'crypto';
@@ -99,15 +98,7 @@ app.use(express.json({
   }
 }));
 
-// Keep client-selected AI preference request-scoped. Never mutate process.env
-// from a request: concurrent tenants could otherwise change one another's model.
-app.use((req, res, next) => {
-  const activeAiHeader = req.headers['x-active-ai'];
-  if (activeAiHeader === 'gemini' || activeAiHeader === 'nemotron') {
-    return runWithAIProvider(activeAiHeader, () => next());
-  }
-  next();
-});
+
 
 // Allow browser origins explicitly; same-origin requests do not require CORS.
 const configuredCorsOrigins = (process.env.CORS_ALLOWED_ORIGINS || process.env.APP_URL || '')
@@ -4977,7 +4968,7 @@ app.get('/api/neural/network', authenticate, async (req, res) => {
 app.get('/api/ai/engine-status', authenticate, async (req, res) => {
   const geminiKeySet = !!process.env.GEMINI_API_KEY;
   const nvidiaKeySet = !!process.env.NVIDIA_API_KEY;
-  const requestedPreference = getRequestAIProvider() || process.env.HAL_ACTIVE_AI;
+  const requestedPreference = process.env.HAL_ACTIVE_AI;
   const activeAiPreference =
     requestedPreference === 'dual' && geminiKeySet && nvidiaKeySet ? 'dual' :
     requestedPreference === 'nemotron' && nvidiaKeySet ? 'nemotron' :
