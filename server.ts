@@ -9023,11 +9023,48 @@ async function startServer() {
   });
 
   // POST /api/roadmap/phase5/sync-brain
-  app.post('/api/roadmap/phase5/sync-brain', authenticate, async (_req, res) => {
-    return res.status(409).json({
-      success: false,
-      error: 'Runtime brain synchronization cannot be reported until layer-level health instrumentation exists.'
-    });
+  // This is an evidence-based system check, not a claim that all 11 cognitive
+  // layers are synchronized. It reports only tenant-scoped facts we can verify.
+  app.post('/api/roadmap/phase5/sync-brain', authenticate, async (req, res) => {
+    const contractorId = (req as any).contractorId;
+    try {
+      const tenantLeads = await pgDb.select().from(leads).where(eq(leads.contractorId, contractorId));
+      const ledger = db.verifyLedgerIntegrity(contractorId);
+      const diagnostics = {
+        checkedAt: new Date().toISOString(),
+        database: { status: 'reachable', tenantLeadCount: tenantLeads.length },
+        ledger: { status: ledger.valid ? 'valid' : 'invalid', valid: ledger.valid },
+        providers: {
+          geminiKeyConfigured: Boolean(process.env.GEMINI_API_KEY),
+          nemotronKeyConfigured: Boolean(process.env.NVIDIA_NEMOTRON_API_KEY),
+          connectivityVerified: false
+        },
+        runtime: {
+          uptimeSeconds: Math.floor(process.uptime()),
+          memoryUsedBytes: process.memoryUsage().heapUsed,
+          nodeVersion: process.version
+        },
+        brainSynchronization: {
+          status: 'not_verified',
+          verifiedLayers: 0,
+          totalLayers: 11,
+          reason: 'Layer-level runtime instrumentation and persistent synchronization evidence are not implemented.'
+        }
+      };
+      const block = db.recordLedgerEntry({
+        contractorId,
+        eventType: 'phase5_runtime_diagnostic',
+        entityType: 'roadmap_milestone',
+        entityId: 'phase5_system_diagnostics',
+        actor: 'HAL System Diagnostics',
+        details: `Tenant-scoped system diagnostic completed. Database reachable; ledger ${ledger.valid ? 'valid' : 'invalid'}; AI provider connectivity not tested; 11-layer synchronization remains unverified.`,
+        metadata: diagnostics
+      });
+      return res.json({ success: true, diagnostics, brainLayers: [], block });
+    } catch (err: any) {
+      console.error('[Roadmap Phase 5 Diagnostics Error]', err);
+      return res.status(500).json({ success: false, error: 'System diagnostics failed. No synchronization status was recorded.' });
+    }
   });
 
   // POST /api/roadmap/phase5/federate-regions
