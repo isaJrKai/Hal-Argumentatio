@@ -341,10 +341,12 @@ export default function CommandPalette({
   const leadCommands = leads.map(lead => {
     const serviceType = lead.serviceType || (lead as any).niche || 'Contracting';
     const status = lead.status || 'new';
+    const urgency = typeof lead.urgencyScore === 'number' && Number.isFinite(lead.urgencyScore) ? `${lead.urgencyScore}/10` : 'Not measured';
+    const speed = typeof lead.performanceScore === 'number' && Number.isFinite(lead.performanceScore) ? `${lead.performanceScore}/100` : 'Not measured';
     return {
       id: lead.id,
       label: `${lead.businessName || 'Business'} (${lead.city || 'Territory'})`,
-      description: `${serviceType.toUpperCase()} • Status: ${status.toUpperCase()} • Urgency: ${lead.urgencyScore || 7.5}/10 • Speed: ${lead.performanceScore || 50}/100`,
+      description: `${serviceType.toUpperCase()} • Status: ${status.toUpperCase()} • Urgency: ${urgency} • Speed: ${speed}`,
       icon: User,
       type: 'lead',
       leadData: lead,
