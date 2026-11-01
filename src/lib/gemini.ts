@@ -495,7 +495,7 @@ IMPORTANT: Output ONLY a valid JSON array of objects with the keys above inside 
           isSynthetic: false,
           sourceType: 'live_harvest' as const
         }));
-        return await groundHarvestedBusinesses(mapped);
+        return await groundHarvestedBusinesses(mapped, 'ai_discovery_unverified');
       }
     } catch (err) {
       console.error("[Prospect Finder] NVIDIA Nemotron business harvesting fallback failed:", err);
