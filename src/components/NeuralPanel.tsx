@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Network, Database, TrendingUp, Shield, RefreshCw, Brain, Focus, Fingerprint, Code2, Scissors, CheckCircle, XCircle, ZoomIn, ZoomOut, Maximize, Activity, Clock } from 'lucide-react';
 import * as d3 from 'd3';
+import { useBusinessContext } from '../context/BusinessContext';
 
-export default function NeuralPanel({ activeCity, activeNiche }: { activeCity: string; activeNiche: string }) {
+export default function NeuralPanel() {
+  const { activeCity, activeNiche } = useBusinessContext();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   
