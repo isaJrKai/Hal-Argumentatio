@@ -41,3 +41,53 @@ service private where the hosting platform supports private networking.
   observed baseline and must not be described as a model-generated CPL forecast.
 
 The service deliberately uses the TimesFM 2.5 checkpoint, not TimesFM 3.0. The upstream project states that pretrained weights through 2.5 remain Apache-2.0, while TimesFM 3.0's default pretrained weights are under a non-commercial, non-production license. Do not switch model IDs for this commercial product without reviewing the applicable license first.
+
+
+## Free development/testing runner: GitHub Actions
+
+HAL can generate periodic TimesFM forecasts without operating a continuously
+running inference server. The workflow at
+`.github/workflows/timesfm-batch.yml` runs the official TimesFM 2.5 PyTorch
+checkpoint on a GitHub-hosted runner, reads each contractor's own Google Ads
+history, and writes the median forecast plus q10/q90 bounds into the existing
+`forecasts` table. It is a scheduled batch job, not a live HTTP inference API.
+
+### Required setup
+
+1. In the GitHub repository, open **Settings → Secrets and variables → Actions**.
+2. Add repository secret `HAL_FORECAST_DATABASE_URL` containing a PostgreSQL
+   connection string for a dedicated least-privilege database role.
+3. Grant that role only the permissions needed to read `contractors` and
+   `google_ads_daily_performance`, and insert/update rows in `forecasts`.
+   Do not use a database owner or admin credential.
+4. Run **Actions → HAL TimesFM scheduled forecasts → Run workflow** manually
+   to test. Scheduled runs execute from `main` every six hours after this
+   workflow is merged into the default branch.
+
+The workflow does not print connection strings, customer records, or model
+inputs. Do not enable verbose SQL logging or add personal/customer fields to
+workflow logs.
+
+### Resource and product limitations
+
+- The GitHub-hosted runner has finite memory. The initial batch configuration
+  caps context at 256 weekly points and processes one contractor at a time.
+  This is a conservative test configuration, not an accuracy guarantee.
+- The job may fail if the runner cannot load the model within its memory or
+  time limits. A failed run does not delete or overwrite the last successful
+  forecasts.
+- Forecasts are refreshed on the schedule, not immediately on dashboard
+  interaction. HAL should show the forecast generation timestamp and retain
+  the last successful result when a later run fails.
+- The `confidence_score` field is set to zero because a calibrated confidence
+  score has not been established. q10/q90 values are stored separately in
+  `assumptions`; they are model quantile bounds, not a guarantee.
+- This free workflow is suitable for development, demonstration, and limited
+  trial operation. It is not a paid-service SLA or guaranteed always-on
+  inference endpoint. A buyer can later deploy the same TimesFM 2.5 service
+  on appropriately sized paid compute for on-demand inference.
+
+The workflow requires the GitHub Actions repository secret above. No secret
+is included in source control. Do not enable or run it against production
+customer data until the dedicated database role and access policy have been
+reviewed.
