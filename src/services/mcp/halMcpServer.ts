@@ -90,7 +90,7 @@ export function sanitizeProspect(lead: any) {
     predictedMonthlyLostRevenueUsd: null,
     status: lead.status,
     source: lead.source,
-    sourceType: lead.externalSource || lead.externalCrmId ? (lead.sourceType || 'unknown') : 'unknown',
+    sourceType: lead.externalSource || lead.externalCrmId ? (lead.externalSource || lead.sourceType || 'unknown') : lead.sourceType === 'ai_discovery_unverified' ? 'ai_discovery_unverified' : lead.sourceType === 'live_harvest' && lead.verificationStatus === 'VERIFIED' && lead.groundingEvidence ? 'live_harvest' : 'unknown',
     verificationStatus: lead.verificationStatus || 'UNVERIFIED_STAGING',
     dnsVerified: Boolean(lead.dnsVerified),
     performanceScore: null,
