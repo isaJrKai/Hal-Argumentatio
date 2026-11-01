@@ -32,8 +32,10 @@ export default function NeuralPanel() {
   const scrubRef = useRef(100);
   const influenceRef = useRef(false);
   const drawRef = useRef<() => void>(() => {});
+  const networkRequestIdRef = useRef(0);
 
   const fetchNetwork = async () => {
+    const requestId = ++networkRequestIdRef.current;
     setIsSyncing(true);
     setNetworkError(null);
     try {
@@ -44,12 +46,19 @@ export default function NeuralPanel() {
       });
       if (!res.ok) {
         if (res.status === 401) {
-          console.warn('Neural network sync deferred: authentication token invalid or expired.');
+          if (requestId === networkRequestIdRef.current) {
+            setNetworkError('Your session has expired. Sign in again to load neural data.');
+            setNetworkData({ nodes: [], links: [], telemetry: null, events: [] });
+            setLearningMetrics(null);
+            nodesRef.current = [];
+            linksRef.current = [];
+          }
           return;
         }
         throw new Error(`Failed to fetch network (${res.status})`);
       }
       const data = await res.json();
+      if (requestId !== networkRequestIdRef.current) return;
       
       if (data.error) throw new Error(data.error);
       if (!Array.isArray(data.nodes) || !Array.isArray(data.links) || !data.telemetry) {
@@ -75,16 +84,18 @@ export default function NeuralPanel() {
         initSimulation(data.nodes, data.links);
       }
     } catch (e: any) {
-      setNetworkError(e?.message || 'Neural topology unavailable');
-      setNetworkData({ nodes: [], links: [], telemetry: null, events: [] });
-      setLearningMetrics(null);
-      nodesRef.current = [];
-      linksRef.current = [];
-      if (simulationRef.current) simulationRef.current.stop();
-      drawRef.current();
-      console.warn('Network visualization sync paused:', e);
+      if (requestId === networkRequestIdRef.current) {
+        setNetworkError(e?.message || 'Neural topology unavailable');
+        setNetworkData({ nodes: [], links: [], telemetry: null, events: [] });
+        setLearningMetrics(null);
+        nodesRef.current = [];
+        linksRef.current = [];
+        if (simulationRef.current) simulationRef.current.stop();
+        drawRef.current();
+        console.warn('Network visualization sync paused:', e);
+      }
     } finally {
-      setIsSyncing(false);
+      if (requestId === networkRequestIdRef.current) setIsSyncing(false);
     }
   };
 
