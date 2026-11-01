@@ -237,7 +237,7 @@ export default function OverviewPanel({
             niche: activeNiche, 
             horizonWeeks: 12, 
             applyGuardrails: false,
-            targetCAC: workspaceConfig.targetCAC 
+            targetCAC: workspaceConfig.targetCACConfigured ? workspaceConfig.targetCAC : undefined 
           })
         });
         if (!res.ok) {
