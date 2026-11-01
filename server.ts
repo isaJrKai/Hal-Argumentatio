@@ -2454,12 +2454,17 @@ app.put('/api/leads/:id', authenticate, async (req, res) => {
 
     const { updatedLead: updated, statusChanged } = transactionResult;
     if (statusChanged) {
-      broadcastNotification(
-        contractorId,
-        'info',
-        'Commercial Stage Shifted',
-        `Lead "${updated.businessName}" moved to "${newStatus.toUpperCase()}".`
-      );
+      try {
+        broadcastNotification(
+          contractorId,
+          'info',
+          'Commercial Stage Shifted',
+          `Lead "${updated.businessName}" moved to "${newStatus.toUpperCase()}".`
+        );
+      } catch (notificationError) {
+        // A notification failure must not turn a committed CRM update into an apparent API failure.
+        console.error('CRM stage notification failed after successful commit:', notificationError);
+      }
     }
 
     const decryptedUpdated = {
