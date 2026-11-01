@@ -216,7 +216,7 @@ export default function DeliveryHub({ token, leads = [] }: DeliveryHubProps) {
             <span className="w-1 h-1 rounded-full bg-text-tertiary" />
             <span className="text-[10px] font-mono text-text-secondary">CLIENT ONBOARDING & PROJECT DELIVERY HUB</span>
           </div>
-          <h2 className="text-xl font-bold tracking-tight text-text-primary mt-1">Client Delivery & Performance Hub</h2>
+          <h2 className="text-xl font-bold tracking-tight text-text-primary mt-1">Client Delivery Hub</h2>
           <p className="text-xs text-text-secondary max-w-2xl mt-0.5">
             Track client project milestones, manually record asset intake, and share client progress portals.
           </p>
@@ -357,7 +357,7 @@ export default function DeliveryHub({ token, leads = [] }: DeliveryHubProps) {
                       title="Copy public client review link"
                     >
                       {copiedLink ? <Check className="w-3 h-3 text-positive" /> : <Copy className="w-3 h-3 text-brand" />}
-                      <span>{copiedLink ? 'Copied Link!' : 'Client Live Portal Link'}</span>
+                      <span>{copiedLink ? 'Copied Link!' : 'Client Portal Link'}</span>
                     </button>
                   </div>
                 </div>
