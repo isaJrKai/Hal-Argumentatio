@@ -4853,6 +4853,7 @@ app.get('/api/neural/network', authenticate, async (req, res) => {
       { source: 'core_bayes', target: 'core_niche', value: 2 }
     ];
 
+    const nicheKey = targetNiche.toLocaleLowerCase();
     const nicheNodeId = `niche_${nicheKey.replace(/[^a-z0-9_-]/g, '_')}`;
     nodes.push({
       id: nicheNodeId,
