@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { filterGoogleAdsTerritoryRecords } from '../../src/lib/brainForecastBridge';
+import { filterGoogleAdsTerritoryRecords } from '../../src/lib/forecastData';
 import { validateTimesFmForecast } from '../../src/lib/timesfmClient';
 
 const records = [
