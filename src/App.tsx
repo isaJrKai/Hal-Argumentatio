@@ -341,7 +341,7 @@ export default function App() {
       const urlStr = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
 
       // Auto-inject or repair Authorization header for /api requests if not an auth endpoint
-      if (urlStr && urlStr.startsWith('/api') && !urlStr.startsWith('/api/auth/')) {
+      if (!reviewMode && urlStr && urlStr.startsWith('/api') && !urlStr.startsWith('/api/auth/')) {
         const storedToken = localStorage.getItem('halbiz_auth_token') || localStorage.getItem('token');
         if (storedToken) {
           const headers = new Headers(modifiedInit.headers || {});
@@ -382,7 +382,7 @@ export default function App() {
       }
 
       // Gracefully handle genuinely expired authentication tokens across /api calls
-      if (response.status === 401 && urlStr && urlStr.startsWith('/api') && !urlStr.startsWith('/api/auth/')) {
+      if (!reviewMode && response.status === 401 && urlStr && urlStr.startsWith('/api') && !urlStr.startsWith('/api/auth/')) {
         const hasStoredSession = localStorage.getItem('halbiz_auth_token') || localStorage.getItem('token');
         if (hasStoredSession) {
           console.warn('Session token expired or invalid; resetting authentication state.');
