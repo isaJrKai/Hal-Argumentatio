@@ -13,11 +13,11 @@ HAL is built for operators, agencies, and enterprise consultancies seeking an au
 | **Asset Type** | Turnkey Full-Stack Software Platform / Complete Intellectual Property |
 | **Frontend Architecture** | React 19, TypeScript, Vite, Tailwind CSS v4, Lucide Icons, Responsive Mobile/Desktop |
 | **Backend Architecture** | Node.js, Express, TypeScript, RESTful API, Server-Sent Events |
-| **Database & Persistence** | PostgreSQL, Neon DB, Drizzle ORM, with zero-config in-memory ledger fallback |
+| **Database & Persistence** | Neon/PostgreSQL via Drizzle for supported domains; legacy `data/db.json` persistence remains in use for other domains. These stores are not yet consolidated. A PostgreSQL failure is reported explicitly rather than treated as an empty dataset or silently replaced with stale local data. |
 | **Cryptographic Security** | AES-256-GCM field-level PII encryption, SHA-256 immutable audit ledger, PBKDF2/bcrypt salted password hashing |
 | **AI Integration Engine** | Google Gemini (`gemini-2.5-flash`, `gemini-1.5-pro`), Hugging Face, OpenRouter, and Model Context Protocol (MCP) |
-| **Test Coverage** | **132/132 Automated Tests Passing (100% Green)** across 24 test suites |
-| **Security Audit** | **0 Known Vulnerabilities** in production and full dependency trees |
+| **Test Coverage** | Latest verified PR #14 CI: **173 tests across 33 test files passed**, with TypeScript and production build checks green. |
+| **Security Audit** | Latest PR #14 CI production dependency audit passed; two moderate development/transitive dependency advisories remain documented. |
 | **Codebase Volume** | 60,000+ lines of TypeScript |
 
 ---
@@ -85,7 +85,7 @@ HAL is built for operators, agencies, and enterprise consultancies seeking an au
 ### Prerequisites
 - Node.js 20 or higher
 - npm 10 or higher
-- (Optional) PostgreSQL database (system automatically uses resilient local persistence if no database URL is provided)
+- A configured Neon/PostgreSQL database for database-backed features. Other legacy domains still use the local JSON store; configure and verify each persistence domain separately.
 
 ### Installation & Launch
 
@@ -110,7 +110,7 @@ npm run dev
 ### Verification & Testing
 
 ```bash
-# Run the complete test suite (132 tests across 24 suites)
+# Run the complete test suite
 npm test
 
 # Run production build compilation
@@ -122,14 +122,11 @@ npm run lint
 
 ---
 
-## Deployment Options
+## Publishing and Deployment
 
-HAL is container-ready and can be deployed in minutes to any standard cloud infrastructure:
-- **Docker / Cloud Run:** Use standard Node 20 alpine container.
-- **Render / Railway / Fly.io:** Direct deployment using `npm run build` and `npm start`.
-- **Vercel / Netlify:** SPA client deployment pointing API routes to the Node.js backend.
+The current HAL publishing workflow is the existing Google AI Studio sync/publish setup. Do not assume a successful GitHub CI run means the live application has been published or verified. After an approved change is synchronized and published through that workflow, verify the live application separately.
 
-For complete turnkey deployment instructions, environment variables, and intellectual property transfer details, refer to `ACQUISITION_HANDOVER.md`.
+No alternative hosting target is designated by this repository documentation.
 
 ---
 
