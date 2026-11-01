@@ -20,7 +20,7 @@ import {
   Recommendation
 } from './src/db/db';
 import { db as pgDb } from './src/db/index.ts';
-import { contractors, auditLogs, leads, leadEvents, revenueRecords, campaigns, winLossRecords, performanceSnapshots, recommendations, forecasts, learningInsights, chatMessages, missions, clientProjects, outreachSequences, apiKeys, notifications, schedulerJobs, leadAttribution, conversionOutbox, googleAdsDailyPerformance, revenueExperiments, revenueRecommendations, revenueRecommendationEvents, revenueSimulations, revenueOutcomes, halLoops, halLoopEvents, hermesLabArtifacts, hermesDiagnosticIncidents, hermesLabMessages } from './src/db/schema.ts';
+import { contractors, auditLogs, leads, leadEvents, revenueRecords, campaigns, winLossRecords, performanceSnapshots, recommendations, forecasts, learningInsights, chatMessages, missions, clientProjects, outreachSequences, apiKeys, notifications, schedulerJobs, leadAttribution, conversionOutbox, googleAdsDailyPerformance, revenueExperiments, revenueRecommendations, revenueRecommendationEvents, revenueSimulations, revenueOutcomes, communicationsOutbox, communicationsDeliveryEvents, halLoops, halLoopEvents, hermesLabArtifacts, hermesDiagnosticIncidents, hermesLabMessages } from './src/db/schema.ts';
 import { eq, inArray, desc, and, or, like, sql, gte, lte } from 'drizzle-orm';
 import { 
   generateLearningFromOutcome, 
@@ -4277,7 +4277,8 @@ app.post('/api/outreach/dispatch', authenticate, async (req, res) => {
     subject,
     message,
     variables,
-    mode
+    mode,
+    idempotencyKey: requestedIdempotencyKey
   } = req.body || {};
 
   if (!channel || !recipient || !message) {
@@ -4381,6 +4382,46 @@ app.post('/api/outreach/dispatch', authenticate, async (req, res) => {
       limit.count += 1;
     }
 
+    const idempotencyKey = String(requestedIdempotencyKey || req.headers['idempotency-key'] || crypto.randomUUID()).trim();
+    if (!idempotencyKey || idempotencyKey.length > 200) {
+      return res.status(400).json({ success: false, code: 'INVALID_IDEMPOTENCY_KEY', error: 'Idempotency key must be 1-200 characters.' });
+    }
+    const [existingDispatch] = await pgDb.select().from(communicationsOutbox).where(
+      and(eq(communicationsOutbox.contractorId, contractorId), eq(communicationsOutbox.idempotencyKey, idempotencyKey))
+    ).limit(1);
+    if (existingDispatch) {
+      return res.status(existingDispatch.status === 'submitted' || existingDispatch.status === 'delivered' ? 200 : 409).json({
+        success: existingDispatch.status === 'submitted' || existingDispatch.status === 'delivered',
+        duplicate: true,
+        dispatchId: existingDispatch.id,
+        providerMessageId: existingDispatch.providerMessageId,
+        status: existingDispatch.status,
+        deliveryConfirmed: existingDispatch.status === 'delivered',
+        error: existingDispatch.status === 'failed' ? existingDispatch.errorMessage : undefined
+      });
+    }
+    const outboxId = crypto.randomUUID();
+    try {
+      await pgDb.insert(communicationsOutbox).values({
+        id: outboxId,
+        contractorId,
+        leadId: String(leadId),
+        channel: 'email',
+        provider: 'resend',
+        recipientEncrypted: encrypt(verifiedRecipient),
+        subjectEncrypted: customizedSubject ? encrypt(customizedSubject) : null,
+        bodyEncrypted: encrypt(customizedMessage),
+        status: 'processing',
+        idempotencyKey,
+        attempts: 0,
+        lastAttemptAt: new Date(),
+        updatedAt: new Date()
+      });
+    } catch (queueError: any) {
+      console.error('[HAL Durable Outbox] Could not create dispatch record:', queueError?.message || queueError);
+      return res.status(503).json({ success: false, code: 'OUTBOX_UNAVAILABLE', error: 'Durable communications outbox is unavailable. No email was sent.' });
+    }
+
     try {
       const result = await sendResendEmail({
         to: String(recipient),
@@ -4388,8 +4429,18 @@ app.post('/api/outreach/dispatch', authenticate, async (req, res) => {
         text: customizedMessage
       });
       const submittedAt = new Date().toISOString();
+      await pgDb.update(communicationsOutbox).set({
+        status: 'submitted',
+        providerMessageId: result.providerMessageId,
+        attempts: 1,
+        submittedAt: new Date(submittedAt),
+        lastAttemptAt: new Date(submittedAt),
+        updatedAt: new Date(submittedAt),
+        errorCode: null,
+        errorMessage: null
+      }).where(and(eq(communicationsOutbox.id, outboxId), eq(communicationsOutbox.contractorId, contractorId)));
       const entry: DispatchLogEntry = {
-        id: 'dispatch_' + crypto.randomBytes(6).toString('hex'),
+        id: outboxId,
         contractorId,
         channel,
         recipient: String(recipient),
@@ -4428,6 +4479,7 @@ app.post('/api/outreach/dispatch', authenticate, async (req, res) => {
       return res.json({
         success: true,
         dispatchId: entry.id,
+        idempotencyKey,
         provider: result.provider,
         providerMessageId: result.providerMessageId,
         status: result.status,
@@ -4438,6 +4490,14 @@ app.post('/api/outreach/dispatch', authenticate, async (req, res) => {
         block: auditBlock
       });
     } catch (err: any) {
+      await pgDb.update(communicationsOutbox).set({
+        status: 'failed',
+        attempts: 1,
+        lastAttemptAt: new Date(),
+        updatedAt: new Date(),
+        errorCode: err instanceof EmailProviderConfigurationError ? 'PROVIDER_NOT_CONFIGURED' : err instanceof EmailProviderRequestError ? 'PROVIDER_REQUEST_FAILED' : 'PROVIDER_UNKNOWN_FAILURE',
+        errorMessage: String(err?.message || 'Provider request failed').slice(0, 500)
+      }).where(and(eq(communicationsOutbox.id, outboxId), eq(communicationsOutbox.contractorId, contractorId))).catch(() => undefined);
       if (err instanceof EmailProviderConfigurationError) {
         return res.status(503).json({
           success: false,
