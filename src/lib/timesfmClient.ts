@@ -73,6 +73,9 @@ export async function requestTimesFmForecast(
   if (!serviceUrl || !apiKey) {
     throw new Error('TimesFM service is not configured');
   }
+  if (apiKey.length < 32) {
+    throw new Error('TIMESFM_API_KEY must contain at least 32 characters');
+  }
   let parsedServiceUrl: URL;
   try {
     parsedServiceUrl = new URL(serviceUrl);
