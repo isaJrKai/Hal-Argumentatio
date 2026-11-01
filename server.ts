@@ -2360,45 +2360,48 @@ app.put('/api/leads/:id', authenticate, async (req, res) => {
     }
 
     const oldStatus = currentLead.status;
-    const newStatus = updates.status !== undefined ? updates.status : oldStatus;
+    if (updates.status !== undefined && (typeof updates.status !== 'string' || !updates.status.trim())) {
+      return res.status(400).json({ error: 'Status must be a non-empty string' });
+    }
+    const newStatus = updates.status !== undefined ? updates.status.trim() : oldStatus;
 
-    // Enforce CRM Pipeline Invariant Gate
-    if (updates.status !== undefined && updates.status !== oldStatus) {
-      const transitionCheck = validateCrmTransition(oldStatus, updates.status);
+    // Enforce CRM Pipeline Invariant Gate before opening the write transaction.
+    if (updates.status !== undefined && newStatus !== oldStatus) {
+      const transitionCheck = validateCrmTransition(oldStatus, newStatus);
       if (!transitionCheck.valid) {
         return res.status(409).json({
           error: transitionCheck.reason || 'Invalid CRM state transition',
           currentStage: oldStatus,
-          requestedStage: updates.status
+          requestedStage: newStatus
         });
       }
     }
 
-    const oldDealValue = currentLead.predictedLtv || 0;
-    const newDealValue = updates.dealValue !== undefined ? Number(updates.dealValue) : (updates.predictedLtv !== undefined ? Number(updates.predictedLtv) : oldDealValue);
+    const oldDealValue = Number(currentLead.predictedLtv || 0);
+    const suppliedDealValue = updates.dealValue !== undefined ? updates.dealValue : updates.predictedLtv;
+    const newDealValue = suppliedDealValue !== undefined ? Number(suppliedDealValue) : oldDealValue;
+    if (suppliedDealValue !== undefined && (!Number.isFinite(newDealValue) || newDealValue < 0)) {
+      return res.status(400).json({ error: 'Deal value must be a finite, non-negative number' });
+    }
+    if (updates.urgencyScore !== undefined &&
+        (!Number.isFinite(Number(updates.urgencyScore)) || Number(updates.urgencyScore) < 0)) {
+      return res.status(400).json({ error: 'Urgency score must be a finite, non-negative number' });
+    }
 
-    // Explicit field whitelisting - never permit client to overwrite id, contractorId, or createdAt
-    const safeUpdates: Record<string, any> = {
-      updatedAt: new Date()
-    };
+    // Explicit field whitelisting - never permit client to overwrite id, contractorId, or createdAt.
+    const safeUpdates: Record<string, any> = { updatedAt: new Date() };
     if (updates.businessName !== undefined) safeUpdates.businessName = String(updates.businessName);
     if (updates.ownerName !== undefined) safeUpdates.ownerName = String(updates.ownerName);
     if (updates.city !== undefined) safeUpdates.city = String(updates.city);
     if (updates.niche !== undefined) safeUpdates.niche = String(updates.niche);
     if (updates.notes !== undefined) safeUpdates.notes = String(updates.notes);
-    if (updates.status !== undefined) safeUpdates.status = String(updates.status);
-    if (updates.urgencyScore !== undefined && !isNaN(Number(updates.urgencyScore))) {
-      safeUpdates.urgencyScore = Number(updates.urgencyScore);
-    }
-    if (updates.dealValue !== undefined && !isNaN(Number(updates.dealValue))) {
-      safeUpdates.predictedLtv = Number(updates.dealValue);
-    } else if (updates.predictedLtv !== undefined && !isNaN(Number(updates.predictedLtv))) {
-      safeUpdates.predictedLtv = Number(updates.predictedLtv);
-    }
+    if (updates.status !== undefined) safeUpdates.status = newStatus;
+    if (updates.urgencyScore !== undefined) safeUpdates.urgencyScore = Number(updates.urgencyScore);
+    if (suppliedDealValue !== undefined) safeUpdates.predictedLtv = newDealValue;
     if (updates.websiteUrl !== undefined) safeUpdates.websiteUrl = String(updates.websiteUrl);
     if (updates.gmbListingUrl !== undefined) safeUpdates.gmbListingUrl = String(updates.gmbListingUrl);
 
-    // Cryptographic PII handling
+    // Cryptographic PII handling remains inside the existing field whitelist.
     if (updates.email !== undefined) {
       safeUpdates.emailEncrypted = updates.email ? encrypt(String(updates.email)) : null;
       safeUpdates.email = updates.email ? '[ENCRYPTED]' : null;
@@ -2408,55 +2411,72 @@ app.put('/api/leads/:id', authenticate, async (req, res) => {
       safeUpdates.phone = updates.phone ? '[ENCRYPTED]' : null;
     }
 
-    const [updated] = await pgDb.update(leads).set(safeUpdates)
-      .where(and(eq(leads.id, id), eq(leads.contractorId, contractorId)))
-      .returning();
+    // The lead row and its immutable audit event(s) must commit or roll back together.
+    const transactionResult = await pgDb.transaction(async (tx) => {
+      const [updatedLead] = await tx.update(leads).set(safeUpdates)
+        .where(and(eq(leads.id, id), eq(leads.contractorId, contractorId)))
+        .returning();
 
-    // 1. If status changed, record immutable lifecycle event
-    if (updates.status && updates.status !== oldStatus) {
-      let eventType = 'StatusUpdated';
-      const normalizedStatus = updates.status.toLowerCase();
-      if (normalizedStatus === 'qualified') eventType = 'Qualified';
-      else if (normalizedStatus === 'sal' || normalizedStatus === 'sales_accepted') eventType = 'SalesAccepted';
-      else if (normalizedStatus === 'appointment' || normalizedStatus === 'booked') eventType = 'AppointmentBooked';
-      else if (normalizedStatus === 'opportunity') eventType = 'OpportunityCreated';
-      else if (normalizedStatus === 'estimate') eventType = 'EstimateSent';
-      else if (normalizedStatus === 'won' || normalizedStatus === 'closed_won' || normalizedStatus === 'converted') eventType = 'ClosedWon';
-      else if (normalizedStatus === 'lost' || normalizedStatus === 'closed_lost' || normalizedStatus === 'dead') eventType = 'ClosedLost';
+      if (!updatedLead) {
+        throw new Error('Lead update affected no rows; the lead may have changed or been removed');
+      }
 
-      await pgDb.insert(leadEvents).values({
-        id: crypto.randomUUID(),
-        leadId: id,
-        eventType,
-        previousStage: oldStatus,
-        newStage: updates.status,
-        dealValue: newDealValue,
-        currency: 'USD',
-        notes: `Pipeline stage transitioned from "${oldStatus}" to "${updates.status}"`,
-        createdBy: 'crm_operator'
-      });
+      let statusChanged = false;
+      if (updates.status !== undefined && newStatus !== oldStatus) {
+        statusChanged = true;
+        let eventType = 'StatusUpdated';
+        const normalizedStatus = newStatus.toLowerCase();
+        if (normalizedStatus === 'qualified') eventType = 'Qualified';
+        else if (normalizedStatus === 'sal' || normalizedStatus === 'sales_accepted') eventType = 'SalesAccepted';
+        else if (normalizedStatus === 'appointment' || normalizedStatus === 'booked') eventType = 'AppointmentBooked';
+        else if (normalizedStatus === 'opportunity') eventType = 'OpportunityCreated';
+        else if (normalizedStatus === 'estimate') eventType = 'EstimateSent';
+        else if (normalizedStatus === 'won' || normalizedStatus === 'closed_won' || normalizedStatus === 'converted') eventType = 'ClosedWon';
+        else if (normalizedStatus === 'lost' || normalizedStatus === 'closed_lost' || normalizedStatus === 'dead') eventType = 'ClosedLost';
 
-      broadcastNotification(
-        contractorId,
-        'info',
-        'Commercial Stage Shifted',
-        `Lead "${updated.businessName}" moved to "${updates.status.toUpperCase()}".`
-      );
-    }
+        await tx.insert(leadEvents).values({
+          id: crypto.randomUUID(),
+          leadId: id,
+          eventType,
+          previousStage: oldStatus,
+          newStage: newStatus,
+          dealValue: newDealValue,
+          currency: 'USD',
+          notes: `Pipeline stage transitioned from "${oldStatus}" to "${newStatus}"`,
+          createdBy: 'crm_operator'
+        });
+      }
 
-    // 2. If deal value changed independently, record RevenueUpdated
-    if (newDealValue !== oldDealValue && (!updates.status || updates.status === oldStatus)) {
-      await pgDb.insert(leadEvents).values({
-        id: crypto.randomUUID(),
-        leadId: id,
-        eventType: 'RevenueUpdated',
-        previousStage: oldStatus,
-        newStage: newStatus,
-        dealValue: newDealValue,
-        currency: 'USD',
-        notes: `Deal value adjusted from $${oldDealValue} to $${newDealValue}`,
-        createdBy: 'crm_operator'
-      });
+      if (suppliedDealValue !== undefined && newDealValue !== oldDealValue && !statusChanged) {
+        await tx.insert(leadEvents).values({
+          id: crypto.randomUUID(),
+          leadId: id,
+          eventType: 'RevenueUpdated',
+          previousStage: oldStatus,
+          newStage: newStatus,
+          dealValue: newDealValue,
+          currency: 'USD',
+          notes: `Deal value adjusted from $${oldDealValue} to $${newDealValue}`,
+          createdBy: 'crm_operator'
+        });
+      }
+
+      return { updatedLead, statusChanged };
+    });
+
+    const { updatedLead: updated, statusChanged } = transactionResult;
+    if (statusChanged) {
+      try {
+        broadcastNotification(
+          contractorId,
+          'info',
+          'Commercial Stage Shifted',
+          `Lead "${updated.businessName}" moved to "${newStatus.toUpperCase()}".`
+        );
+      } catch (notificationError) {
+        // A notification failure must not turn a committed CRM update into an apparent API failure.
+        console.error('CRM stage notification failed after successful commit:', notificationError);
+      }
     }
 
     const decryptedUpdated = {
