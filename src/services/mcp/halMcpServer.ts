@@ -71,7 +71,7 @@ export async function getEffectiveContractorId(): Promise<string> {
 }
 
 // Strips sensitive fields and decrypts PII safely
-function sanitizeProspect(lead: any) {
+export function sanitizeProspect(lead: any) {
   const email = lead.emailEncrypted ? (decrypt(lead.emailEncrypted) || lead.email) : lead.email;
   const phone = lead.phoneEncrypted ? (decrypt(lead.phoneEncrypted) || lead.phone) : lead.phone;
 
