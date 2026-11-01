@@ -82,7 +82,7 @@ export async function generateContractorLandingPage(params: ContractorGeneratorP
     const ai = new GoogleGenAI({ apiKey });
     const systemPrompt = `You are HAL's master direct-response landing page copywriter enforcing the non-negotiable Landing Page Builder Rules.
 Strict rules:
-1. One primary conversion goal: ${primaryGoal || 'Emergency dispatch / fast quote'}. Competing primary CTAs are banned.
+1. One primary conversion goal: ${primaryGoal || 'Request a quote or assessment'}. Competing primary CTAs are banned.
 2. Anti-Slop Enforced:
    - Lead directly with the point. Zero throat-clearing openings ("In today's fast-paced world", "Here's the thing").
    - NO binary contrast theater ("It's not X. It's Y."). State the claim directly.
@@ -98,30 +98,11 @@ Return ONLY a JSON object matching this schema:
   "title": "string",
   "headline": "string",
   "subheadline": "string",
-  "badgeText": "string",
-  "seasonalTag": "string",
-  "seasonalTitle": "string",
-  "seasonalDescription": "string",
-  "seasonalBullets": ["string", "string", "string"],
   "services": [
-    { "id": "s1", "title": "string", "description": "string", "priceEstimate": "string", "badge": "string" },
-    { "id": "s2", "title": "string", "description": "string", "priceEstimate": "string", "badge": "string" },
-    { "id": "s3", "title": "string", "description": "string", "priceEstimate": "string", "badge": "string" }
+    { "id": "s1", "title": "string", "description": "string" },
+    { "id": "s2", "title": "string", "description": "string" },
+    { "id": "s3", "title": "string", "description": "string" }
   ],
-  "beforeAfter": {
-    "title": "string",
-    "location": "string",
-    "challenge": "string",
-    "solution": "string"
-  },
-  "reviews": [
-    { "id": "r1", "name": "string", "location": "string", "date": "string", "stars": 5, "text": "string" },
-    { "id": "r2", "name": "string", "location": "string", "date": "string", "stars": 5, "text": "string" },
-    { "id": "r3", "name": "string", "location": "string", "date": "string", "stars": 5, "text": "string" }
-  ],
-  "neighborhoods": ["string", "string", "string", "string", "string", "string"],
-  "guaranteeTitle": "string",
-  "guaranteeDescription": "string",
   "metaTitle": "string",
   "metaDescription": "string"
 }`;
