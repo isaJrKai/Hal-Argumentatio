@@ -3841,6 +3841,7 @@ app.post('/api/webhooks/resend', async (req, res) => {
   );
   if (!validSignature) return res.status(401).json({ error: 'Invalid signature or expired Resend webhook timestamp.' });
 
+  try {
     const event = JSON.parse(rawBody.toString('utf8'));
     const eventType = String(event.type || 'unknown');
     const providerMessageId = String(event.data?.email_id || event.data?.id || '');
@@ -3873,7 +3874,6 @@ app.post('/api/webhooks/resend', async (req, res) => {
       const nextStatus = statusByEvent[eventType];
       if (nextStatus) {
         const currentRank: Record<string, number> = { queued: 0, processing: 1, submitted: 2, sent: 3, delayed: 3, delivered: 4, opened: 5, clicked: 6, bounced: 7, complained: 8, failed: 9 };
-        const nextRank: Record<string, number> = { sent: 3, delayed: 3, delivered: 4, opened: 5, clicked: 6, bounced: 7, complained: 8 };
         const current = outbox.status;
         const shouldUpdate = (currentRank[nextStatus] || 0) >= (currentRank[current] || 0);
         if (shouldUpdate) {
