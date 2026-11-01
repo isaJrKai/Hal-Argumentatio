@@ -316,11 +316,9 @@ export async function evaluateAndEnforceBudgetGuardrails(
             throttleMultiplier: 0.75
           },
           impactScore: 0,
-          confidenceScore: 94.0,
-          expectedImpact: `Preserves CAC below target of $${targetCac}`,
-          status: 'executed',
-          executedAt: new Date(),
-          executedBy: 'HAL Brain Autonomous Guardrail'
+          confidenceScore: null,
+          expectedImpact: 'Scenario recommendation only; outcome and savings have not been measured.',
+          status: 'proposed'
         });
 
         // Insert system notification
@@ -423,10 +421,10 @@ export async function executeBrainSynchronizedForecast(
     throw new Error('Forecast unavailable: this tenant has no measured Google Ads history with recorded conversions for the selected territory. No sample campaign data was substituted.');
   }
 
-  // Step 2: Live weather reading with verified seasonal fallback
+  // Step 2: Read live weather when available; unavailable remains unavailable.
   const weatherTrigger = await fetchTerritoryWeatherTrigger(city, niche);
 
-  // Step 3: Run TimesFM Synthesis Engine (Layer 8: Skills & Layer 9: Tools)
+  // Step 3: Run an explicitly labelled heuristic scenario; this is not the TimesFM foundation model.
   const forecastCurve: BrainForecastCurvePoint[] = [];
   const baseDemand = Math.round(52 + (adsBaseline.empiricalConversionRate * 180));
   const baseCpl = adsBaseline.empiricalCpl || 42.50;
