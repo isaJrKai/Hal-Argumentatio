@@ -187,11 +187,18 @@ export default function OverviewPanel({
   const convertedLeads = leads.filter(l => l.status === 'converted');
   const conversionRate = totalLeads > 0 ? (convertedLeads.length / totalLeads) * 100 : 0;
   
-  const totalRevenueVal = revenues.reduce((sum, r) => sum + r.amountUsd, 0);
+  const now = new Date();
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
+  const nextMonthStart = new Date(now.getFullYear(), now.getMonth() + 1, 1).getTime();
+  const monthToDateRevenue = revenues.reduce((sum, revenue) => {
+    const timestamp = new Date((revenue as Revenue & { createdAt?: string }).createdAt || revenue.recordedAt || '').getTime();
+    return Number.isFinite(timestamp) && timestamp >= monthStart && timestamp < nextMonthStart ? sum + Number(revenue.amountUsd || 0) : sum;
+  }, 0);
+  const totalRevenueVal = revenues.reduce((sum, r) => sum + Number(r.amountUsd || 0), 0);
   const activeCampaignsCount = campaigns.filter(c => c.status === 'active').length;
 
-  // Display authentic verified metrics without mock inflation
-  const displayRevenueVal = totalRevenueVal;
+  // Recorded revenue dated within the current local calendar month.
+  const displayRevenueVal = monthToDateRevenue;
   const displayNewLeadsVal = untouchedLeads;
   const displayAvgDealVal = convertedLeads.length > 0 
     ? Math.round(totalRevenueVal / convertedLeads.length) 
@@ -438,7 +445,7 @@ export default function OverviewPanel({
               <div className="flex items-baseline justify-between gap-2">
                 <div className="text-xl font-mono tracking-tight font-semibold text-text-primary">{formatCurrency(displayRevenueVal)}</div>
               </div>
-              <div className="text-xs text-text-tertiary flex items-center gap-1">Active ledger</div>
+              <div className="text-xs text-text-tertiary flex items-center gap-1">Recorded this calendar month</div>
             </div>
 
             <div 
@@ -909,7 +916,7 @@ export default function OverviewPanel({
               Weighted Pipeline Value
             </span>
             <span className="font-mono font-bold text-accent whitespace-nowrap text-xs sm:text-sm">
-              ${(displayRevenueVal * 3.1).toLocaleString(undefined, { maximumFractionDigits: 0 })}
+              Unavailable — pipeline valuation not configured
             </span>
           </div>
         </section>
