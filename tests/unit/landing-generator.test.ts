@@ -58,7 +58,7 @@ describe('contractor landing page factual normalization', () => {
 
     const config = applyVerifiedBusinessDetails(template, businessDetails, true);
 
-    expect(config.title).toBe('Dry Basement Co — sump pump Services in Toronto');
+    expect(config.title).toBe('Dry Basement Co — Sump Pump Services in Toronto');
     expect(config.sections.hero.headline).toBe('Keep Toronto basements dry with a properly sized sump pump');
     expect(config.sections.hero.subheadline).toContain('property and drainage');
     expect(config.sections.services.items[0].title).toBe('Sump pump installation');
