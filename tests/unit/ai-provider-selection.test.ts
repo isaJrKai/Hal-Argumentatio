@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { getActiveAI } from '../../src/services/nemotron';
+import { getRequestAIProvider, runWithAIProvider } from '../../src/lib/aiRequestContext';
 
 const original = {
   active: process.env.HAL_ACTIVE_AI,
