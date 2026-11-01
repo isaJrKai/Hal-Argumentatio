@@ -7,6 +7,7 @@ import { isIP } from 'node:net';
 import { execSync } from 'child_process';
 import { createServer as createViteServer } from 'vite';
 import { sendResendEmail, EmailProviderConfigurationError, EmailProviderRequestError } from './src/services/communications/resendEmail';
+import { verifySvixWebhookSignature } from './src/lib/resendWebhook';
 import { 
   db, 
   encrypt, 
@@ -3833,22 +3834,12 @@ app.post('/api/webhooks/resend', async (req, res) => {
   if (!rawBody || !svixId || !svixTimestamp || !svixSignature) {
     return res.status(401).json({ error: 'Missing signed Resend webhook headers or raw payload.' });
   }
-  const timestampSeconds = Number(svixTimestamp);
-  if (!Number.isFinite(timestampSeconds) || Math.abs(Date.now() / 1000 - timestampSeconds) > 300) {
-    return res.status(401).json({ error: 'Webhook timestamp is outside the accepted five-minute replay window.' });
-  }
-
-  try {
-    const secretBytes = Buffer.from(webhookSecret.slice('whsec_'.length), 'base64');
-    const signedContent = svixId + '.' + svixTimestamp + '.' + rawBody.toString('utf8');
-    const expected = crypto.createHmac('sha256', secretBytes).update(signedContent).digest('base64');
-    const validSignature = svixSignature.split(' ').some(part => {
-      if (!part.startsWith('v1,')) return false;
-      const supplied = Buffer.from(part.slice(3));
-      const expectedBytes = Buffer.from(expected);
-      return supplied.length === expectedBytes.length && crypto.timingSafeEqual(supplied, expectedBytes);
-    });
-    if (!validSignature) return res.status(401).json({ error: 'Invalid Resend webhook signature.' });
+  const validSignature = verifySvixWebhookSignature(
+    rawBody,
+    { id: svixId, timestamp: svixTimestamp, signature: svixSignature },
+    webhookSecret
+  );
+  if (!validSignature) return res.status(401).json({ error: 'Invalid signature or expired Resend webhook timestamp.' });
 
     const event = JSON.parse(rawBody.toString('utf8'));
     const eventType = String(event.type || 'unknown');
