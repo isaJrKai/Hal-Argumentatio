@@ -27,6 +27,25 @@ interface ChatMessage {
   createdAt?: string;
 }
 
+
+
+// Render the common inline Markdown HAL emits (bold, italic and inline code)
+// as React elements instead of exposing literal Markdown markers to operators.
+function renderInlineMarkdown(value: string): React.ReactNode[] {
+  return value.split(/(\\*\\*[^*]+\\*\\*|\\*[^*]+\\*|\x60[^\x60]+\x60)/g).map((part, index) => {
+    if (part.startsWith('**') && part.endsWith('**')) {
+      return <strong key={index}>{part.slice(2, -2)}</strong>;
+    }
+    if (part.startsWith('*') && part.endsWith('*')) {
+      return <em key={index}>{part.slice(1, -1)}</em>;
+    }
+    if (part.startsWith('\x60') && part.endsWith('\x60')) {
+      return <code key={index} className="px-1 py-0.5 rounded bg-bg-subtle font-mono">{part.slice(1, -1)}</code>;
+    }
+    return <React.Fragment key={index}>{part}</React.Fragment>;
+  });
+}
+
 interface ChatBotPanelProps {
   token: string | null;
 }
@@ -154,16 +173,38 @@ What niche or city would you like to inspect first?`;
   };
 
   const handleClearHistory = async () => {
-    if (!window.confirm('Clear all conversation memory with HAL?')) return;
+    if (!window.confirm('Permanently delete all saved chat messages in this workspace?')) return;
     try {
-      await fetch('/api/intelligence/chat/history', {
+      const res = await fetch('/api/intelligence/chat/history', {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${authToken}` }
       });
+      if (!res.ok) throw new Error(`Unable to clear chat history (HTTP ${res.status})`);
       setMessages([]);
-      showToast({ title: 'Memory Cleared', message: 'Chat history reset.', type: 'info' });
-    } catch (e) {
+      showToast({ title: 'Chat history deleted', message: 'Saved messages were removed from this workspace.', type: 'info' });
+    } catch (e: any) {
       console.error(e);
+      showToast({ title: 'Could not delete chat history', message: e?.message || 'Please try again.', type: 'error' });
+    }
+  };
+
+  const handleDeleteMessage = async (message: ChatMessage) => {
+    if (!message.id || message.id.startsWith('temp_') || message.id.startsWith('fallback_')) {
+      showToast({ title: 'Message not saved', message: 'This temporary message is not stored in chat history.', type: 'info' });
+      return;
+    }
+    if (!window.confirm('Delete this message from saved chat history?')) return;
+    try {
+      const res = await fetch(`/api/intelligence/chat/message/${encodeURIComponent(message.id)}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${authToken}` }
+      });
+      if (!res.ok) throw new Error(`Unable to delete message (HTTP ${res.status})`);
+      setMessages(previous => previous.filter(item => item.id !== message.id));
+      showToast({ title: 'Message deleted', message: 'The saved message was removed.', type: 'success' });
+    } catch (e: any) {
+      console.error(e);
+      showToast({ title: 'Could not delete message', message: e?.message || 'Please try again.', type: 'error' });
     }
   };
 
@@ -284,18 +325,28 @@ What niche or city would you like to inspect first?`;
                   <div className="flex items-center justify-between gap-2 pb-1 border-b border-black/10 dark:border-white/10 text-[10px] opacity-75 font-mono">
                     <span>{isUser ? 'Operator' : 'HAL Intelligence Core'}</span>
                     <div className="flex items-center gap-1.5">
-                      <button 
+                      <button
                         onClick={() => handleCopy(msg.text, msg.id)}
                         className="hover:opacity-100 transition-opacity cursor-pointer p-0.5"
                         title="Copy message"
                       >
                         {copiedId === msg.id ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
                       </button>
+                      <button
+                        onClick={() => handleDeleteMessage(msg)}
+                        className="hover:opacity-100 transition-opacity cursor-pointer p-0.5 hover:text-rose-400"
+                        title="Delete saved message"
+                        aria-label="Delete saved message"
+                      >
+                        <Trash2 className="w-3 h-3" />
+                      </button>
                     </div>
                   </div>
 
                   <div className="whitespace-pre-wrap font-sans text-xs">
-                    {msg.text}
+                    {msg.text.split('\\n').map((line, lineIndex) => (
+                      <div key={lineIndex} className="min-h-[1em]">{renderInlineMarkdown(line)}</div>
+                    ))}
                   </div>
 
                   {msg.sources && msg.sources.length > 0 && (
