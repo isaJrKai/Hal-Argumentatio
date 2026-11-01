@@ -919,8 +919,14 @@ export default function SettingsPanel({
         </div>
       </div>
 
+      <details className={`border rounded-lg ${cardBg} mt-6`}>
+        <summary className="cursor-pointer list-none p-5 flex flex-wrap items-center justify-between gap-3">
+          <span className="font-mono text-xs font-bold uppercase tracking-wider">Advanced · Connected services and API credentials</span>
+          <span className="text-[11px] text-text-secondary">Encrypted integration settings · expand to manage</span>
+        </summary>
+        <div className="px-5 pb-5">
       {/* Connected Business Services & Third-Party API Credentials */}
-      <div className={`border rounded-lg p-5 space-y-6 ${cardBg} mt-6`}>
+      <div className={`border rounded-lg p-5 space-y-6 ${cardBg} mt-2`}>
         <div className="flex flex-wrap items-center gap-2 border-b pb-3 border-inherit">
           <Globe className="w-4 h-4 text-accent" />
           <span className="text-xs font-mono uppercase tracking-wider font-bold">Connected Business Services & Third-Party API Credentials</span>
@@ -1205,6 +1211,7 @@ export default function SettingsPanel({
             </div>
           </div>
         </div>
+      </details>
 
         {/* Account Security Password Reset */}
         <div className={`border rounded-lg p-5 space-y-6 ${cardBg}`}>
