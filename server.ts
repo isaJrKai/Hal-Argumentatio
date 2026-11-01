@@ -2055,11 +2055,7 @@ app.post('/api/webhooks/test-inbound', authenticate, async (req, res) => {
       });
     }
 
-    if (!targetLead) {
-      // Pick first lead or create one
-      targetLead = db.getLeads(contractorId)[0];
-    }
-
+    // Do not attach a simulated inbound message to an unrelated lead when no match exists.
     if (targetLead) {
       const newStatus = (targetLead.status === 'new' ? 'contacted' : targetLead.status) as 'new' | 'contacted' | 'converted' | 'dead';
       const updatedNotes = `${targetLead.notes || ''}\n[Simulated ${isWhatsApp ? 'WhatsApp' : 'SMS'} - ${now.slice(0, 16)}]: ${body}`.trim();
@@ -2086,7 +2082,9 @@ app.post('/api/webhooks/test-inbound', authenticate, async (req, res) => {
       from,
       body,
       leadMatched: targetLead ? { id: targetLead.id, name: targetLead.businessName, status: 'responded' } : null,
-      message: `Inbound ${channelName} webhook successfully processed and alerted to operator.`
+      message: targetLead
+        ? `Simulated inbound ${channelName} event attached to the matched lead and operator alerted.`
+        : `Simulated inbound ${channelName} event alerted to the operator; no existing lead matched and no lead was created.`
     });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
