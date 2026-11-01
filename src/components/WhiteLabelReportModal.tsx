@@ -12,7 +12,7 @@ import {
   Globe, 
   Zap, 
   Award, 
-  CheckCircle2, 
+  Circle, 
   Calendar,
   User,
   Phone,
@@ -284,7 +284,7 @@ export default function WhiteLabelReportModal({ lead, isOpen, onClose }: WhiteLa
             </div>
           </div>
 
-          {/* INDUSTRY SPECIFIC AUDIT FOCUS CHECKLIST */}
+          {/* INDUSTRY REVIEW AREAS */}
           <div className="space-y-3">
             <h3 className="text-xs font-mono font-bold text-text-primary uppercase tracking-wider flex items-center gap-2">
               <Award className="w-3.5 h-3.5 text-brand" />
@@ -293,7 +293,7 @@ export default function WhiteLabelReportModal({ lead, isOpen, onClose }: WhiteLa
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3 font-mono text-xs">
               <div className="p-3 bg-bg-subtle border border-border-dim rounded-sm flex items-start gap-2.5">
-                <CheckCircle2 className="w-4 h-4 text-brand shrink-0 mt-0.5" />
+                <Circle className="w-4 h-4 text-text-tertiary shrink-0 mt-0.5" />
                 <div>
                   <span className="font-bold text-text-primary block">{activeIndustry.auditFocus.key1}</span>
                   <span className="text-[10px] text-text-secondary">Core speed & mobile usability benchmark for {activeNiche}.</span>
@@ -333,7 +333,7 @@ export default function WhiteLabelReportModal({ lead, isOpen, onClose }: WhiteLa
               <span>STRATEGIC ACQUISITION ANGLE & VALUE PROPOSITION</span>
             </h4>
             <p className="text-xs text-text-primary leading-relaxed">
-              "{lead?.notes || activeIndustry.outreachAngle}"
+              "{lead?.notes || `General industry context (not a lead-specific finding): ${activeIndustry.outreachAngle}`}"
             </p>
             {lead?.outreachStrategy && (
               <div className="pt-2 border-t border-brand/20 text-[11px] text-text-secondary">
