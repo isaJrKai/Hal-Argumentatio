@@ -1,12 +1,15 @@
 name: HAL TimesFM scheduled forecasts
 
-on:
+"on":
   workflow_dispatch:
+  push:
+    branches: [main]
   schedule:
     - cron: "17 */6 * * *"
 
 permissions:
   contents: read
+  actions: write
 
 concurrency:
   group: hal-timesfm-batch
@@ -14,11 +17,12 @@ concurrency:
 
 jobs:
   forecast:
+    if: ${{ github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' }}
     runs-on: ubuntu-latest
     timeout-minutes: 45
     env:
       DATABASE_URL: ${{ secrets.HAL_FORECAST_DATABASE_URL }}
-      HF_HOME: ${{ runner.temp }}/huggingface
+      HF_HOME: ${{ github.workspace }}/.cache/huggingface
       TIMESFM_BATCH_HORIZON: "12"
       TIMESFM_BATCH_MAX_CONTEXT: "256"
       HF_HUB_DISABLE_TELEMETRY: "1"
@@ -35,7 +39,7 @@ jobs:
       - name: Cache TimesFM checkpoint
         uses: actions/cache@v4
         with:
-          path: ${{ env.HF_HOME }}
+          path: ${{ github.workspace }}/.cache/huggingface
           key: timesfm-2.5-200m-pytorch-${{ runner.os }}-v1
       - name: Validate optional database configuration
         id: database
