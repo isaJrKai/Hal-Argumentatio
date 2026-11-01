@@ -3324,7 +3324,7 @@ app.post('/api/missions', authenticate, async (req, res) => {
       {
         id: crypto.randomBytes(8).toString('hex'),
         title: 'Territory Intelligence Harvest',
-        description: 'Retrieves 4 real-world active service businesses using Gemini.',
+        description: 'Searches for prospect records using available web grounding; unverified AI discoveries remain in staging.',
         status: 'running',
         updatedAt: new Date().toISOString()
       },
@@ -3348,7 +3348,7 @@ app.post('/api/missions', authenticate, async (req, res) => {
       id: missionId,
       contractorId,
       title: `Territory Conquest: ${city} (${niche.toUpperCase()})`,
-      description: `Automated sequence to discover active ${niche} services in ${city}, audit speed/SEO, and draft bespoke outreach sheets.`,
+      description: `Searches for ${niche} prospect records in ${city}, collects DNS/HTTP/TLS evidence, and creates draft-only outreach. PageSpeed/SEO are not measured and no messages are sent.`,
       status: 'running',
       city,
       niche,
@@ -3374,7 +3374,7 @@ app.post('/api/missions', authenticate, async (req, res) => {
         const createdLeads: any[] = [];
         
         steps[0].status = 'completed';
-        (steps[0] as any).result = `Successfully discovered and profiled ${harvested.length} active service companies.`;
+        (steps[0] as any).result = `Returned ${harvested.length} prospect records. Source and verification status are preserved; no SEO, review, or performance scores are inferred.`;
         steps[0].updatedAt = new Date().toISOString();
         
         await pgDb.update(missions).set({ steps, updatedAt: new Date() }).where(and(eq(missions.id, mission.id), eq(missions.contractorId, contractorId)));
