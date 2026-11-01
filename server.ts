@@ -4810,160 +4810,106 @@ app.delete('/api/neural/network/prune/:id', authenticate, async (req, res) => {
 app.get('/api/neural/network', authenticate, async (req, res) => {
   try {
     const contractorId = (req as any).contractorId;
-    
-    // Fetch live data from PostgreSQL DB
-    
-    const dbInstance = getDrizzleDb();
-    if (!dbInstance) throw new Error('Database not initialized');
-    const insights = await dbInstance.select().from(learningInsights).orderBy(desc(learningInsights.createdAt)).limit(50);
-    const winLoss = await dbInstance.select().from(winLossRecords).where(eq(winLossRecords.contractorId, contractorId)).limit(30);
-    const recentLeads = await dbInstance.select().from(leads).where(eq(leads.contractorId, contractorId)).limit(300);
-    
-    // Get autonomous state memory
-    const autoState = autonomousLearning.getState();
-
-    const nodes: any[] = [];
-    const links: any[] = [];
-
-    // 1. Core Subsystems
-    const cores = [
-      { id: 'core_bayes', label: 'Bayesian Base', type: 'core', group: 1, size: 25 },
-      { id: 'core_objection', label: 'Objection Graph', type: 'core', group: 2, size: 20 },
-      { id: 'core_niche', label: 'Niche Calibration', type: 'core', group: 3, size: 20 },
-      { id: 'core_timesfm', label: 'TimesFM Prediction', type: 'core', group: 4, size: 22 }
-    ];
-    nodes.push(...cores);
-
-    // Link cores together
-    links.push({ source: 'core_bayes', target: 'core_objection', value: 5 });
-    links.push({ source: 'core_bayes', target: 'core_niche', value: 8 });
-    links.push({ source: 'core_bayes', target: 'core_timesfm', value: 4 });
-
-    // 1b. TimesFM Prediction Layer Active Foundation Nodes
-    const timesFmNodes = [
-      { id: 'tfm_horizon_30d', label: '30D Demand Horizon', type: 'prediction', group: 4, size: 14, detail: 'TimesFM Zero-Shot 30-Day Contract Volume Projection (+18.4% forecast)' },
-      { id: 'tfm_seasonal_peak', label: 'May Seasonal Peak', type: 'prediction', group: 4, size: 16, detail: '1.35x Seasonal Ad Multiplier & Elasticity Factor' },
-      { id: 'tfm_cpl_elasticity', label: 'CPL Elasticity Horizon', type: 'prediction', group: 4, size: 13, detail: 'Dynamic bid adjustment based on weather rainfall events' },
-      { id: 'tfm_mrr_projection', label: '12M MRR Trajectory', type: 'prediction', group: 4, size: 15, detail: '$138.4k Projected ARR Run-Rate Confidence (94.2%)' }
-    ];
-    nodes.push(...timesFmNodes);
-    timesFmNodes.forEach(tNode => {
-      links.push({ source: 'core_timesfm', target: tNode.id, value: 4 });
-    });
-
-    // 2. Niche Nodes from Autonomous Learning state
-    if (autoState.nicheMap) {
-      Object.keys(autoState.nicheMap).forEach(nicheKey => {
-        const niche = autoState.nicheMap[nicheKey];
-        const nodeId = 'niche_' + nicheKey;
-        nodes.push({
-          id: nodeId,
-          label: nicheKey.toUpperCase(),
-          type: 'niche',
-          group: 3,
-          size: 10 + (niche.confidenceScore * 10),
-          confidence: niche.confidenceScore
-        });
-        links.push({ source: 'core_niche', target: nodeId, value: niche.confidenceScore * 10 });
-      });
+    const targetCity = typeof req.query.city === 'string' ? req.query.city.trim() : '';
+    const targetNiche = typeof req.query.niche === 'string' ? req.query.niche.trim() : '';
+    if (!targetCity || !targetNiche) {
+      return res.status(400).json({ error: 'city and niche are required for a territory-scoped neural graph' });
     }
 
-    // 3. Learning Insights (The "Lessons Learnt")
-    // "one lesson learnt equals one node to another"
-    insights.forEach((insight, idx) => {
-      const nodeId = 'insight_' + insight.id;
-      
-      // Deterministic hash based on ID so state persists visibly across reloads
-      let hash = 0;
-      for (let i = 0; i < insight.id.length; i++) {
-        hash = Math.imul(31, hash) + insight.id.charCodeAt(i) | 0;
+    const dbInstance = getDrizzleDb();
+    if (!dbInstance) throw new Error('Database not initialized');
+
+    // The graph is constructed only from this contractor's matching territory
+    // and trade. Global in-memory learning state and unscoped insights are excluded.
+    const [allWinLoss, allLeads] = await Promise.all([
+      dbInstance.select().from(winLossRecords).where(eq(winLossRecords.contractorId, contractorId)).limit(500),
+      dbInstance.select().from(leads).where(eq(leads.contractorId, contractorId)).limit(1000)
+    ]);
+    const cityKey = targetCity.toLocaleLowerCase();
+    const nicheKey = targetNiche.toLocaleLowerCase();
+    const matchesTerritory = (city: unknown, niche: unknown) =>
+      String(city || '').toLocaleLowerCase().includes(cityKey)
+      && String(niche || '').toLocaleLowerCase().includes(nicheKey);
+    const winLoss = allWinLoss.filter(record => matchesTerritory(record.city, record.niche));
+    const recentLeads = allLeads.filter(lead => matchesTerritory(lead.city, lead.niche));
+
+    const nodes: any[] = [
+      { id: 'core_bayes', label: 'Outcome Analysis', type: 'core', group: 1, size: 22 },
+      { id: 'core_objection', label: 'Lead Signals', type: 'core', group: 2, size: 20 },
+      { id: 'core_niche', label: targetNiche, type: 'core', group: 3, size: 20 },
+      {
+        id: 'core_timesfm',
+        label: 'TimesFM 2.5 Adapter',
+        type: 'core',
+        group: 4,
+        size: 20,
+        detail: process.env.TIMESFM_SERVICE_URL && process.env.TIMESFM_API_KEY
+          ? 'Inference endpoint configured. A live model response is verified only when a forecast request succeeds.'
+          : 'Inference service is not configured. No TimesFM prediction is attached to this graph.'
       }
-      const rand1 = Math.abs(Math.sin(hash));
-      const rand2 = Math.abs(Math.sin(hash + 1));
-      
-      // High confidence = strong node, low confidence = weak/broken node
-      const isWeak = insight.confidenceShift < 0.05 && rand1 > 0.5; 
-      
+    ];
+    const links: any[] = [
+      { source: 'core_bayes', target: 'core_objection', value: 3 },
+      { source: 'core_bayes', target: 'core_niche', value: 2 }
+    ];
+
+    const nicheNodeId = `niche_${nicheKey.replace(/[^a-z0-9_-]/g, '_')}`;
+    nodes.push({
+      id: nicheNodeId,
+      label: targetNiche.toUpperCase(),
+      type: 'niche',
+      group: 3,
+      size: 10 + Math.min(12, recentLeads.length + winLoss.length),
+      detail: `${recentLeads.length} matching leads and ${winLoss.length} matching outcomes in ${targetCity}`
+    });
+    links.push({ source: 'core_niche', target: nicheNodeId, value: Math.max(1, winLoss.length) });
+
+    // Actual, tenant-scoped learning outcomes only. No fabricated forecasts,
+    // random cross-links, global confidence scores, or placeholder revenue nodes.
+    winLoss.forEach(record => {
+      const nodeId = 'outcome_' + record.id;
       nodes.push({
         id: nodeId,
-        label: insight.metric || 'Insight',
-        detail: insight.lesson,
-        type: isWeak ? 'decaying' : 'insight',
-        group: 5,
-        size: isWeak ? 4 : 8 + (insight.confidenceShift * 50),
-        createdAt: insight.createdAt
+        label: record.outcome === 'won' ? 'WIN' : 'LOSS',
+        detail: [record.businessName, record.primaryReason, record.keyLesson].filter(Boolean).join(' · '),
+        type: record.outcome === 'won' ? 'win' : 'loss',
+        group: 6,
+        size: 7,
+        createdAt: record.closedAt
       });
-      
-      // Connect to a core or niche
-      // Try to map metric to a niche, else connect to core bayes
-      const targetCore = insight.metric.toLowerCase().includes('cpl') ? 'core_timesfm' : 'core_bayes';
-      
-      // Broken node means the link is weak or non-existent
-      if (!isWeak) {
-        links.push({ source: nodeId, target: targetCore, value: 2 + insight.confidenceShift * 20 });
-        
-        // Also connect to a random niche to simulate cross-wiring if high confidence
-        if (insight.confidenceShift > 0.1 && autoState.nicheMap) {
-           const niches = Object.keys(autoState.nicheMap);
-           if (niches.length > 0) {
-             const randIndex = Math.floor(rand2 * niches.length);
-             const randNiche = niches[randIndex];
-             links.push({ source: nodeId, target: 'niche_' + randNiche, value: 1 });
-           }
-        }
+      links.push({ source: nodeId, target: nicheNodeId, value: record.outcome === 'won' ? 5 : 2 });
+    });
+
+    recentLeads.forEach(lead => {
+      const nodeId = 'lead_' + lead.id;
+      nodes.push({
+        id: nodeId,
+        label: lead.businessName || 'Lead',
+        detail: `${lead.niche} in ${lead.city}`,
+        type: 'lead',
+        group: 7,
+        size: 4,
+        status: lead.status,
+        createdAt: lead.createdAt
+      });
+      links.push({ source: nodeId, target: nicheNodeId, value: 1 });
+    });
+
+    res.json({
+      nodes,
+      links,
+      telemetry: {
+        source: 'TENANT_SCOPED_POSTGRES',
+        selectedCity: targetCity,
+        selectedNiche: targetNiche,
+        matchedLeadCount: recentLeads.length,
+        matchedOutcomeCount: winLoss.length,
+        totalOutcomesDigested: winLoss.length,
+        globalLearningStateIncluded: false,
+        timesfmServiceConfigured: Boolean(process.env.TIMESFM_SERVICE_URL && process.env.TIMESFM_API_KEY),
+        timesfmInferenceVerified: false
       }
     });
-
-    // 4. Win/Loss Events (Recent real-world outcomes)
-    winLoss.forEach(record => {
-       const nodeId = 'outcome_' + record.id;
-       nodes.push({
-         id: nodeId,
-         label: record.outcome === 'won' ? 'WIN' : 'LOSS',
-         detail: record.businessName,
-         type: record.outcome === 'won' ? 'win' : 'loss',
-         group: 6,
-         size: 6
-       });
-       
-       // Connect outcome to its niche
-       if (record.niche) {
-         const nicheId = 'niche_' + record.niche.toLowerCase();
-         // If niche node exists
-         if (nodes.find(n => n.id === nicheId)) {
-            links.push({ source: nodeId, target: nicheId, value: record.outcome === 'won' ? 5 : 1 });
-         } else {
-            links.push({ source: nodeId, target: 'core_bayes', value: 2 });
-         }
-       }
-    });
-
-    
-    // 5. Raw Leads (The "cells")
-    recentLeads.forEach(lead => {
-       const nodeId = 'lead_' + lead.id;
-       nodes.push({
-         id: nodeId,
-         label: lead.businessName || 'Target',
-         detail: lead.niche + ' in ' + lead.city,
-         type: 'lead',
-         group: 7,
-         size: 3,
-         status: lead.status,
-         createdAt: lead.createdAt
-       });
-       
-       if (lead.niche) {
-         const nicheId = 'niche_' + lead.niche.toLowerCase();
-         if (nodes.find(n => n.id === nicheId)) {
-           links.push({ source: nodeId, target: nicheId, value: 0.5 });
-         } else {
-           links.push({ source: nodeId, target: 'core_objection', value: 0.5 });
-         }
-       }
-    });
-
-    res.json({ nodes, links, telemetry: autoState });
   } catch (err: any) {
     console.error('Failed to fetch neural network:', err);
     res.status(500).json({ error: err.message });
