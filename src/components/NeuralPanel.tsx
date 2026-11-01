@@ -75,7 +75,7 @@ export default function NeuralPanel() {
 
       // Attach only a successfully executed TimesFM forecast to the visible graph.
       // A configured endpoint alone is never represented as a verified prediction.
-      if (data.telemetry?.timesfmServiceConfigured) {
+      if (data.telemetry) {
         try {
           const forecastResponse = await fetch('/api/ai/test-timesfm', {
             method: 'POST',
