@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Archive, Bot, ChevronLeft, ChevronRight, Copy, FolderPlus, Globe, MessageSquare, MoreHorizontal, Plus, RefreshCw, Send, Sparkles, Trash2, X } from 'lucide-react';
+import { Archive, Bot, ChevronLeft, ChevronRight, Copy, FolderPlus, Globe, MessageSquare, Plus, Send, Sparkles, Trash2 } from 'lucide-react';
 import { useBusinessContext } from '../context/BusinessContext';
 import { useToast } from '../context/ToastContext';
 
@@ -58,9 +58,9 @@ export const ChatBotPanel: React.FC<Props> = ({ token }) => {
   useEffect(() => {
     if (!authToken) return;
     refreshWorkspace().then(rows => {
-      if (!activeConversationId && rows.length) setActiveConversationId(rows.find(c => !c.archivedAt)?.id || rows[0].id);
+      if (rows.length) setActiveConversationId(current => current || rows.find(c => !c.archivedAt)?.id || rows[0].id);
     }).catch(error => showToast({ title: 'Chat workspace unavailable', message: error.message, type: 'error' }));
-  }, [authToken, refreshWorkspace]);
+  }, [authToken, refreshWorkspace, showToast]);
 
   const loadConversation = useCallback(async (id: string) => {
     setActiveConversationId(id);
@@ -110,8 +110,9 @@ export const ChatBotPanel: React.FC<Props> = ({ token }) => {
       await api(`/api/intelligence/chat/conversations/${conversation.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ archived: !conversation.archivedAt }) });
       await refreshWorkspace();
       if (!conversation.archivedAt && activeConversationId === conversation.id) {
-        const next = conversations.find(c => c.id !== conversation.id && !c.archivedAt);
+        const next = conversations.find(c => c.id !== conversation.id && !c.archivedAt && c.projectId === conversation.projectId);
         setActiveConversationId(next?.id || null);
+        if (!next) setMessages([]);
       }
     } catch (error: any) { showToast({ title: 'Could not update chat', message: error.message, type: 'error' }); }
   };
@@ -173,12 +174,12 @@ export const ChatBotPanel: React.FC<Props> = ({ token }) => {
         <div className="px-3 pb-2 flex items-center justify-between"><span className="text-[10px] uppercase tracking-wider font-semibold text-text-tertiary">Projects</span><button onClick={createProject} title="Create project" className="p-1.5 rounded hover:bg-bg-subtle"><FolderPlus className="w-4 h-4"/></button></div>
         <div className="px-2 space-y-1 overflow-y-auto max-h-[38%]">
           <button onClick={() => setActiveProjectId(null)} className={`w-full text-left px-2.5 py-2 rounded-lg text-xs ${!activeProjectId ? 'bg-bg-subtle text-text-primary' : 'text-text-secondary hover:bg-bg-subtle'}`}>All chats</button>
-          {projects.filter(p => !p.archivedAt).map(project => <button key={project.id} onClick={() => setActiveProjectId(project.id)} className={`w-full text-left px-2.5 py-2 rounded-lg text-xs truncate ${activeProjectId === project.id ? 'bg-cyan-500/10 text-cyan-500' : 'text-text-secondary hover:bg-bg-subtle'}`}><span className="mr-2 text-cyan-500">▦</span>{project.name}</button>)}
+          {projects.filter(p => !p.archivedAt).map(project => <button key={project.id} onClick={() => { setActiveProjectId(project.id); const next = conversations.find(c => c.projectId === project.id && !c.archivedAt); if (next) loadConversation(next.id); else { setActiveConversationId(null); setMessages([]); } }} className={`w-full text-left px-2.5 py-2 rounded-lg text-xs truncate ${activeProjectId === project.id ? 'bg-cyan-500/10 text-cyan-500' : 'text-text-secondary hover:bg-bg-subtle'}`}><span className="mr-2 text-cyan-500">▦</span>{project.name}</button>)}
         </div>
         <div className="mt-4 px-3 pb-2 flex items-center justify-between"><span className="text-[10px] uppercase tracking-wider font-semibold text-text-tertiary">{showArchived ? 'Archived chats' : 'Recent chats'}</span><button onClick={() => setShowArchived(!showArchived)} className="text-[10px] text-cyan-500 hover:underline">{showArchived ? 'Recent' : 'Archived'}</button></div>
         <div className="flex-1 min-h-0 overflow-y-auto px-2 pb-3 space-y-1">
           {visibleConversations.map(conversation => <div key={conversation.id} className={`group flex items-center gap-1 rounded-lg ${activeConversationId === conversation.id ? 'bg-bg-subtle' : 'hover:bg-bg-subtle'}`}>
-            <button onClick={() => loadConversation(conversation.id)} className="flex-1 min-w-0 text-left px-2.5 py-2 text-xs truncate text-text-secondary"><MessageSquare className="w-3 h-3 inline mr-2 opacity-60"/>{conversation.title}</button>
+            <button onClick={() => { setActiveProjectId(conversation.projectId || null); loadConversation(conversation.id); }} className="flex-1 min-w-0 text-left px-2.5 py-2 text-xs truncate text-text-secondary"><MessageSquare className="w-3 h-3 inline mr-2 opacity-60"/>{conversation.title}</button>
             <button onClick={() => archiveConversation(conversation)} title={conversation.archivedAt ? 'Restore chat' : 'Archive chat'} className="p-1.5 opacity-0 group-hover:opacity-100 text-text-tertiary hover:text-cyan-500"><Archive className="w-3 h-3"/></button>
             <button onClick={() => deleteConversation(conversation)} title="Delete chat" className="p-1.5 mr-1 opacity-0 group-hover:opacity-100 text-text-tertiary hover:text-rose-500"><Trash2 className="w-3 h-3"/></button>
           </div>)}
