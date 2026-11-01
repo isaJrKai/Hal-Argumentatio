@@ -559,7 +559,7 @@ export default function NeuralPanel() {
       <header className="px-6 py-5 border-b border-border-dim bg-bg-raised shrink-0 flex items-center justify-between">
         <div className="flex items-center gap-4">
           <div className="p-2.5 rounded-lg bg-accent/10 border border-accent/20">
-            <Brain className="w-6 h-6 text-accent animate-pulse" />
+            <Brain className="w-6 h-6 text-accent" />
           </div>
           <div>
             <h1 className="text-xl font-bold text-text-primary tracking-tight flex items-center gap-2">
@@ -661,15 +661,15 @@ export default function NeuralPanel() {
           {/* Bottom Event Log & Timeline */}
           <div className="h-28 shrink-0 bg-bg-raised border-t border-border-dim z-20 pointer-events-auto flex flex-row items-center justify-between gap-6 p-4 relative">
             
-            {/* Matrix Event Log (Bottom Left) */}
+            {/* Recent Territory Outcomes (Bottom Left) */}
             <div className="flex-1 max-w-xl bg-bg-overlay border border-border-dim rounded-lg p-3 shadow-sm hover:bg-bg-base transition-colors h-full flex flex-col justify-center">
               <h4 className="text-[10px] font-mono font-bold text-text-secondary uppercase mb-2 flex items-center gap-1.5"><Code2 className="w-3.5 h-3.5 text-text-tertiary" /> Matrix Event Log</h4>
               <div className="font-mono text-[9px] text-accent/90 space-y-1 h-10 overflow-hidden leading-relaxed">
                 {(networkData.nodes || [])
-                  .filter(n => n.type === 'insight' || n.type === 'decaying')
+                  .filter(n => n.type === 'win' || n.type === 'loss')
                   .slice(0, 2)
                   .map((node, i) => (
-                  <p key={i} className="truncate">{">"} {node.type === 'decaying' ? '[BROKEN]' : '[FORMED]'} {node.detail}</p>
+                  <p key={i} className="truncate">{">"} {node.type === 'win' ? '[WON]' : '[LOST]'} {node.detail}</p>
                 ))}
               </div>
             </div>
