@@ -257,52 +257,16 @@ export async function executeMcpTool(
     }
 
     case 'hal_run_what_if_simulation': {
+      // Fail closed rather than persisting fabricated baseline spend, conversion
+      // value, ROAS, or confidence. A valid simulation needs measured campaign
+      // data and an explicit, tested marginal-response assumption.
       const parsed = validateRunWhatIfSimulationInput(rawParams || {});
-      const shiftAmount = parsed.parameters.shiftAmount || 1000;
-      
-      const projectedSpend = 5000 + shiftAmount;
-      const projectedRevenue = 22000 + (shiftAmount * 4.2);
-      const projectedRoas = Number((projectedRevenue / projectedSpend).toFixed(2));
-      const baselineRoas = 4.4;
-      const roasDelta = Number((projectedRoas - baselineRoas).toFixed(2));
-      const revenueDelta = Number((projectedRevenue - 22000).toFixed(2));
-      const confidenceScore = 84;
-      const assumptions = `Simulated ${parsed.scenarioType} shifting $${shiftAmount} to high-performing campaigns with 4.2x expected marginal ROAS.`;
-
-      const simId = crypto.randomUUID();
-      await pgDb.insert(revenueSimulations).values({
-        id: simId,
-        contractorId,
-        scenarioType: parsed.scenarioType,
-        baselineData: { totalSpend: 5000, totalRevenue: 22000, roas: 4.4, cpl: 45, cac: 380, campaigns: {} },
-        scenarioParameters: parsed.parameters,
-        projectedResult: { projectedSpend, projectedRevenue, roas: projectedRoas, cpl: 42, cac: 360 },
-        delta: { roasDelta, revenueDelta, percentageChange: 12 },
-        confidenceScore,
-        assumptions,
-        createdBy: 'hermes_agent',
-        createdAt: new Date()
-      });
-
-      await pgDb.insert(auditLogs).values({
-        id: auditId,
-        contractorId,
-        action: 'HERMES_MCP_SIMULATION_RUN',
-        details: JSON.stringify({ scenarioType: parsed.scenarioType, simulationId: simId }),
-        timestamp: new Date()
-      });
-
       return {
-        simulationId: simId,
+        status: 'unavailable',
         scenarioType: parsed.scenarioType,
-        projectedSpendUsd: projectedSpend,
-        projectedRevenueUsd: projectedRevenue,
-        projectedRoas,
-        baselineRoas,
-        roasDeltaPct: 12,
-        netRevenueDeltaUsd: revenueDelta,
-        confidenceScore,
-        assumptions
+        message: 'Budget simulation is unavailable until measured campaign-specific performance and a validated marginal-response model are connected. No simulation was stored and no budget was changed.',
+        simulationStored: false,
+        executionEnabled: false
       };
     }
 
