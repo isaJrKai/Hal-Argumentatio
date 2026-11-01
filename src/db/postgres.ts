@@ -121,6 +121,7 @@ export async function bootstrapPostgresTables(poolInstance?: Pool): Promise<void
         source_type TEXT,
         verification_status TEXT DEFAULT 'UNVERIFIED_STAGING' NOT NULL,
         dns_verified BOOLEAN DEFAULT false NOT NULL,
+        grounding_evidence JSONB,
         external_crm_id TEXT,
         external_source TEXT,
         website_url TEXT,
@@ -595,6 +596,7 @@ export async function bootstrapPostgresTables(poolInstance?: Pool): Promise<void
       ALTER TABLE leads ADD COLUMN IF NOT EXISTS notes TEXT;
       ALTER TABLE leads ADD COLUMN IF NOT EXISTS verification_status TEXT DEFAULT 'UNVERIFIED_STAGING';
       ALTER TABLE leads ADD COLUMN IF NOT EXISTS dns_verified BOOLEAN DEFAULT false;
+      ALTER TABLE leads ADD COLUMN IF NOT EXISTS grounding_evidence JSONB;
 
       ALTER TABLE leads ALTER COLUMN source_type DROP DEFAULT;
       ALTER TABLE leads ALTER COLUMN source_type DROP NOT NULL;
