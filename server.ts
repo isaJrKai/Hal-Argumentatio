@@ -3327,10 +3327,14 @@ app.delete('/api/intelligence/chat/history', authenticate, async (req, res) => {
 
 app.post('/api/intelligence/chat', authenticate, async (req, res) => {
   const contractorId = resolveChatContractorId(req);
-  const { message, enableGrounding, activeAi } = req.body;
+  const { message, enableGrounding, activeAi, conversationId } = req.body;
+  if (typeof message !== 'string' || !message.trim()) return res.status(400).json({ error: 'A message is required.' });
+  if (typeof conversationId !== 'string' || !conversationId) return res.status(400).json({ error: 'A conversation must be selected.' });
   try {
-    // 1. Fetch current chat history to supply to askHalBot as context
-    const currentHistory = await pgDb.select().from(chatMessages).where(eq(chatMessages.contractorId, contractorId)).orderBy(chatMessages.createdAt);
+    const [conversation] = await pgDb.select().from(chatConversations).where(and(eq(chatConversations.id, conversationId), eq(chatConversations.contractorId, contractorId))).limit(1);
+    if (!conversation) return res.status(404).json({ error: 'Conversation not found.' });
+    // Conversation context is isolated: only messages from this chat are sent to HAL.
+    const currentHistory = await pgDb.select().from(chatMessages).where(and(eq(chatMessages.contractorId, contractorId), eq(chatMessages.conversationId, conversationId))).orderBy(chatMessages.createdAt);
     
     // Format history for Google GenAI / Nemotron expectation
     const formattedHistory = currentHistory.map(m => ({
@@ -3344,6 +3348,8 @@ app.post('/api/intelligence/chat', authenticate, async (req, res) => {
     const [userMsg] = await pgDb.insert(chatMessages).values({
       id: 'msg_' + crypto.randomBytes(8).toString('hex'),
       contractorId,
+      conversationId,
+      projectId: conversation.projectId,
       role: 'user',
       text: message,
       enableGrounding: !!enableGrounding,
@@ -3359,6 +3365,8 @@ app.post('/api/intelligence/chat', authenticate, async (req, res) => {
     const [modelMsg] = await pgDb.insert(chatMessages).values({
       id: 'msg_' + crypto.randomBytes(8).toString('hex'),
       contractorId,
+      conversationId,
+      projectId: conversation.projectId,
       role: 'model',
       text: result.text,
       enableGrounding: !!enableGrounding,
@@ -3366,6 +3374,13 @@ app.post('/api/intelligence/chat', authenticate, async (req, res) => {
       timestamp: replyDate,
       createdAt: replyDate,
     }).returning();
+
+    if (conversation.title === 'New chat') {
+      const title = message.trim().replace(/\\s+/g, ' ').slice(0, 64);
+      await pgDb.update(chatConversations).set({ title, updatedAt: replyDate }).where(and(eq(chatConversations.id, conversationId), eq(chatConversations.contractorId, contractorId)));
+    } else {
+      await pgDb.update(chatConversations).set({ updatedAt: replyDate }).where(and(eq(chatConversations.id, conversationId), eq(chatConversations.contractorId, contractorId)));
+    }
 
     res.json({ 
       reply: result.text, 
