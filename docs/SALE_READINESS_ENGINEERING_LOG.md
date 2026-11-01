@@ -101,3 +101,13 @@ Keep this branch as a draft for independent review. Do not merge or deploy until
 - Dispatch history remains process-memory based; the structured audit ledger is not a substitute for a transactional outbox.
 - SMS/Twilio and WhatsApp Cloud API live sending, retries, idempotency, and inbound delivery/reply reconciliation remain outstanding.
 - The current in-process email rate limit is a safety guard, not a distributed or durable abuse-control system.
+
+
+### Neon migration safety follow-on (2026-11-01)
+- Changed the admin Neon sync endpoint to preview by default. The preview reports local record counts, existing Neon counts, and the number of missing lead and win/loss IDs; it does not write rows.
+- Commit mode now requires an explicit `confirm: true` after preview.
+- The Settings action now runs preview first and asks for confirmation before the commit request.
+- Lead and win/loss syncs use `ON CONFLICT DO NOTHING`; existing Neon records are never updated from the legacy JSON store.
+- Lead sync writes contact data only to encrypted columns, marks imported leads `UNVERIFIED_STAGING`, and leaves unmeasured SEO, review, SSL, performance, urgency, LTV, and lost-revenue metrics null.
+- Learned weights are inserted only when the global record is absent; existing Neon weights are not overwritten.
+- Inserts are idempotent, so a partial additive sync can be safely previewed and retried. A live Neon preview/commit has not been run in this environment.
