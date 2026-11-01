@@ -216,30 +216,37 @@ export function generateLandingPageHtml(config: LandingPageConfig): string {
       case 'services':
         if (sections.services?.active && sections.services.items?.length > 0) {
           renderedSections += `
-  <!-- Services Grid -->
+  <!-- Services: responsive bento composition -->
   <section class="max-w-6xl mx-auto px-4 sm:px-6 py-12">
-    <div class="text-center max-w-2xl mx-auto mb-8 space-y-2">
-      <h2 class="text-2xl sm:text-3xl font-black text-white">${sections.services.title}</h2>
-      <p class="text-xs sm:text-sm text-slate-400">${sections.services.subtitle}</p>
+    <div class="max-w-2xl mb-8 space-y-2">
+      <p class="text-xs font-bold uppercase tracking-[0.18em] text-amber-400">What We Do</p>
+      <h2 class="text-2xl sm:text-4xl font-black text-white tracking-tight">${sections.services.title}</h2>
+      <p class="text-sm sm:text-base text-slate-400 leading-relaxed">${sections.services.subtitle}</p>
     </div>
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
-      ${sections.services.items.map(s => `
-        <div class="p-5 sm:p-6 rounded-2xl bg-slate-900/60 border border-slate-800 hover:border-sky-500/50 transition flex flex-col justify-between space-y-4">
-          <div class="space-y-2">
-            ${s.badge ? `<span class="inline-block px-2.5 py-0.5 rounded-full bg-sky-500/20 text-sky-400 text-[10px] font-bold uppercase">${s.badge}</span>` : ''}
-            <h4 class="text-base font-bold text-white">${s.title}</h4>
-            <p class="text-xs text-slate-400 leading-relaxed">${s.description}</p>
+    <div class="grid grid-cols-1 md:grid-cols-6 gap-4">
+      ${sections.services.items.map((s, index) => {
+        const spanClass = sections.services.items.length === 1
+          ? 'md:col-span-6'
+          : sections.services.items.length === 3
+            ? (index === 0 ? 'md:col-span-4 min-h-64' : index === 1 ? 'md:col-span-2 min-h-64' : 'md:col-span-6')
+            : 'md:col-span-3';
+        return `
+        <article class="${spanClass} p-6 sm:p-7 rounded-2xl bg-slate-900/60 border border-slate-800 hover:border-slate-600 transition flex flex-col justify-between gap-6">
+          <div class="max-w-2xl space-y-3">
+            <span class="text-[10px] font-bold uppercase tracking-[0.16em] text-amber-400">Service</span>
+            <h3 class="text-lg sm:text-xl font-bold text-white tracking-tight">${s.title}</h3>
+            <p class="text-sm text-slate-400 leading-relaxed">${s.description}</p>
           </div>
-          <div class="pt-3 border-t border-slate-800/80 flex items-center justify-between">
-            <span class="text-sm font-bold text-amber-400">${s.priceEstimate || 'Discuss Scope'}</span>
-            <a href="#lead-form" class="text-xs text-sky-400 hover:text-sky-300 font-bold flex items-center gap-1">
-              Select ➔
+          <div class="pt-4 border-t border-slate-800/80 flex items-center justify-between gap-4">
+            <span class="text-sm font-semibold text-slate-300">${s.priceEstimate || 'Discuss Scope'}</span>
+            <a href="#lead-form" class="text-xs text-amber-400 hover:text-amber-300 font-bold flex items-center gap-1">
+              Request details <span aria-hidden="true">→</span>
             </a>
           </div>
-        </div>
-      `).join('')}
+        </article>`;
+      }).join('')}
     </div>
-  </section>\n`;
+  </section>\\n`;
         }
         break;
 
