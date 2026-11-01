@@ -3333,13 +3333,18 @@ app.post('/api/intelligence/chat', authenticate, async (req, res) => {
   try {
     const [conversation] = await pgDb.select().from(chatConversations).where(and(eq(chatConversations.id, conversationId), eq(chatConversations.contractorId, contractorId))).limit(1);
     if (!conversation) return res.status(404).json({ error: 'Conversation not found.' });
-    // Conversation context is isolated: only messages from this chat are sent to HAL.
-    const currentHistory = await pgDb.select().from(chatMessages).where(and(eq(chatMessages.contractorId, contractorId), eq(chatMessages.conversationId, conversationId))).orderBy(chatMessages.createdAt);
-    
-    // Format history for Google GenAI / Nemotron expectation
-    const formattedHistory = currentHistory.map(m => ({
+    // Keep conversation history separate by default. Within a project, include a bounded
+    // window of that project's recent messages so HAL can carry context across its chats.
+    const contextRows = conversation.projectId
+      ? await pgDb.select().from(chatMessages)
+          .where(and(eq(chatMessages.contractorId, contractorId), eq(chatMessages.projectId, conversation.projectId)))
+          .orderBy(desc(chatMessages.createdAt)).limit(30)
+      : await pgDb.select().from(chatMessages)
+          .where(and(eq(chatMessages.contractorId, contractorId), eq(chatMessages.conversationId, conversationId)))
+          .orderBy(desc(chatMessages.createdAt)).limit(30);
+    const formattedHistory = contextRows.reverse().map(m => ({
       role: m.role as 'user' | 'model',
-      parts: [{ text: m.text }]
+      parts: [{ text: m.conversationId === conversationId ? m.text : `[Earlier conversation in this project] ${m.text}` }]
     }));
 
     // 2. Add the User's message to the persistent database
