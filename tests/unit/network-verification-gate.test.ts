@@ -24,6 +24,13 @@ describe('fail-closed outreach grounding gate', () => {
     })).toThrow(FailClosedOutreachError);
   });
 
+  it('blocks AI-discovered leads until independent verification is recorded', () => {
+    expect(() => enforceFailClosedOutreachGate({
+      ...verifiedLead,
+      sourceType: 'ai_discovery_unverified',
+    })).toThrow(FailClosedOutreachError);
+  });
+
   it('blocks synthetic leads even if other verification fields look valid', () => {
     expect(() => enforceFailClosedOutreachGate({
       ...verifiedLead,
