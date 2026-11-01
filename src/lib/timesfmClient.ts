@@ -29,7 +29,7 @@ export function validateTimesFmForecast(
     typeof result.model !== 'string' ||
     typeof result.version !== 'string' ||
     typeof result.backend !== 'string' ||
-    !Number.isInteger(result.input_points) || Number(result.input_points) < 8 ||
+    !Number.isInteger(result.input_points) || Number(result.input_points) < 8 || Number(result.input_points) > 1024 ||
     result.horizon !== expectedHorizon ||
     !Array.isArray(result.forecast) ||
     result.forecast.length !== expectedHorizon
@@ -76,6 +76,10 @@ export async function requestTimesFmForecast(
   if (series.length < 8 || series.some((value) => !Number.isFinite(value) || value < 0)) {
     throw new Error('TimesFM requires at least 8 finite, non-negative historical observations');
   }
+  const contextSeries = series.slice(-1024);
+  if (new Set(contextSeries).size <= 1) {
+    throw new Error('TimesFM requires variation in the historical observations');
+  }
   if (!Number.isInteger(horizon) || horizon < 1 || horizon > 52) {
     throw new Error('TimesFM horizon must be between 1 and 52');
   }
@@ -89,7 +93,7 @@ export async function requestTimesFmForecast(
         'Content-Type': 'application/json',
         Authorization: `Bearer ${apiKey}`
       },
-      body: JSON.stringify({ series, horizon, frequency: 'weekly' }),
+      body: JSON.stringify({ series: contextSeries, horizon, frequency: 'weekly' }),
       signal: controller.signal
     });
 
