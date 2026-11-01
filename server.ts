@@ -3746,7 +3746,7 @@ interface DispatchLogEntry {
   recipient: string;
   leadId?: string;
   leadBusinessName?: string;
-  status: 'delivered' | 'failed' | 'queued' | 'simulated';
+  status: 'delivered' | 'failed' | 'queued' | 'submitted' | 'simulated';
   mode: 'live' | 'simulation';
   providerId?: string;
   error?: string;
@@ -3767,8 +3767,17 @@ app.get('/api/dispatch/status', authenticate, (_req, res) => {
       status: signingConfigured ? 'configured_unverified' : 'not_configured'
     },
     messaging: {
-      status: 'simulation_only',
-      mode: 'simulation'
+      status: process.env.RESEND_API_KEY && process.env.HAL_SENDER_EMAIL
+        ? 'email_configured_unverified_other_channels_unavailable'
+        : 'simulation_only',
+      mode: process.env.RESEND_API_KEY && process.env.HAL_SENDER_EMAIL
+        ? 'email_live_available_other_channels_simulation_only'
+        : 'simulation',
+      channels: {
+        email: process.env.RESEND_API_KEY && process.env.HAL_SENDER_EMAIL ? 'configured_unverified' : 'not_configured',
+        sms: 'not_configured',
+        whatsapp: 'not_configured'
+      }
     }
   });
 });
@@ -4250,6 +4259,7 @@ app.post('/api/outreach/dispatch', authenticate, async (req, res) => {
         leadBusinessName: leadBusinessName || 'Direct Recipient',
         status: 'submitted',
         mode: 'live',
+        providerId: result.providerMessageId,
         timestamp: submittedAt,
         subject: customizedSubject,
         preview: customizedMessage.slice(0, 100)
