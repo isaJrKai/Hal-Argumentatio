@@ -25,7 +25,7 @@ export function generateLandingPageHtml(config: LandingPageConfig): string {
     "@type": seo.schemaType || "LocalBusiness",
     "name": businessName,
     ...(phone ? { "telephone": phone } : {}),
-    "url": typeof window !== 'undefined' ? `${window.location.origin}/landing/${id}` : `https://hal.ai/landing/${id}`,
+    // Hosting URL is unknown at generation time; omit rather than invent a canonical URL.
     "areaServed": city,
     "address": {
       "@type": "PostalAddress",
