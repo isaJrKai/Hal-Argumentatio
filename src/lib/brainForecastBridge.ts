@@ -92,18 +92,32 @@ export interface BrainSynchronizedForecastResult {
  */
 export async function ingestAndCalibrateGoogleAds(
   contractorId: string,
-  _targetNiche: string = 'roofing',
-  _targetCity: string = 'Calgary'
+  targetNiche: string = 'roofing',
+  targetCity: string = 'Calgary'
 ): Promise<GoogleAdsBaseline> {
   try {
-    let records = await pgDb
+    const contractorRecords = await pgDb
       .select()
       .from(googleAdsDailyPerformance)
       .where(eq(googleAdsDailyPerformance.contractorId, contractorId))
       .orderBy(desc(googleAdsDailyPerformance.date));
 
-    // Do not fall back to another contractor's campaign records. Missing tenant
-    // data is unavailable evidence, not permission to use shared performance data.
+    // Territory and trade are part of the model input. Unscoped rows are excluded
+    // rather than allowing a city/niche selector to produce the same global series.
+    const cityNeedle = targetCity.trim().toLocaleLowerCase();
+    const nicheNeedle = targetNiche.trim().toLocaleLowerCase();
+    const records = contractorRecords.filter((record) => {
+      const geo = String(record.geo || '').trim().toLocaleLowerCase();
+      const tradeText = [record.campaignName, record.keyword, record.searchTerm]
+        .filter(Boolean)
+        .join(' ')
+        .toLocaleLowerCase();
+      return Boolean(geo && tradeText)
+        && geo.includes(cityNeedle)
+        && tradeText.includes(nicheNeedle);
+    });
+
+    // Do not fall back to another contractor's or territory's campaign records.
     if (records.length === 0) {
       return {
         recordsCount: 0,
