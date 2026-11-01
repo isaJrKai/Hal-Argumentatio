@@ -890,6 +890,36 @@ app.get('/api/events', (req, res) => {
   });
 });
 
+// Apply a small, independent IP budget to anonymous write endpoints. Use the
+// direct socket address unless a trusted proxy policy is explicitly configured.
+const anonymousWriteRate = new Map<string, { count: number; resetAt: number }>();
+const limitAnonymousWrites: express.RequestHandler = (req, res, next) => {
+  const now = Date.now();
+  const address = req.socket.remoteAddress || 'unknown';
+  const key = `${req.baseUrl || ''}${req.path}:${address}`;
+  let entry = anonymousWriteRate.get(key);
+  if (!entry || now >= entry.resetAt) {
+    entry = { count: 0, resetAt: now + 60_000 };
+    anonymousWriteRate.set(key, entry);
+  }
+  entry.count += 1;
+  if (entry.count > 12) {
+    res.setHeader('Retry-After', String(Math.max(1, Math.ceil((entry.resetAt - now) / 1000))));
+    return res.status(429).json({ success: false, error: 'Too many requests. Please wait before trying again.' });
+  }
+  // Bound map growth during long-running public deployments.
+  if (anonymousWriteRate.size > 5000) {
+    for (const [entryKey, value] of anonymousWriteRate) {
+      if (now >= value.resetAt) anonymousWriteRate.delete(entryKey);
+    }
+  }
+  next();
+};
+
+app.use('/api/public/audit', limitAnonymousWrites);
+app.use('/api/public/landing-leads', limitAnonymousWrites);
+app.use('/api/public/webhooks/delivery', limitAnonymousWrites);
+
 // ─── PUBLIC CLIENT AUDIT PAGE ENDPOINTS (Zero Login Required) ──────────────
 
 app.get('/api/public/audit/:id', async (req, res) => {
@@ -926,8 +956,22 @@ app.get('/api/public/audit/:id', async (req, res) => {
 
 app.post('/api/public/audit/:id/book', async (req, res) => {
   const { id } = req.params;
-  const { contactName, contactEmail, contactPhone, preferredTime, message } = req.body;
-  
+  const body = req.body && typeof req.body === 'object' ? req.body : {};
+  const contactName = typeof body.contactName === 'string' ? body.contactName.trim() : '';
+  const contactEmail = typeof body.contactEmail === 'string' ? body.contactEmail.trim() : '';
+  const contactPhone = typeof body.contactPhone === 'string' ? body.contactPhone.trim() : '';
+  const preferredTime = typeof body.preferredTime === 'string' ? body.preferredTime.trim() : '';
+  const message = typeof body.message === 'string' ? body.message.trim() : '';
+
+  if (!id || id.length > 128 ||
+      contactName.length > 120 || contactEmail.length > 254 ||
+      contactPhone.length > 40 || preferredTime.length > 120 || message.length > 2000) {
+    return res.status(400).json({ success: false, error: 'Invalid request fields or field length.' });
+  }
+  if (!contactName || (!contactEmail && !contactPhone)) {
+    return res.status(400).json({ success: false, error: 'Name and at least one contact method are required.' });
+  }
+
   try {
     const [lead] = await pgDb.select().from(leads).where(eq(leads.id, id));
     if (!lead) {
