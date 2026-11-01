@@ -39,6 +39,12 @@ export function getCrmBoardStage(status: string | null | undefined): CrmStage | 
   return isKnownCrmStage(normalized) ? normalized as CrmStage : null;
 }
 
+/** Return every next stage the CRM state machine permits from this stage. */
+export function getAllowedCrmBoardStages(status: string | null | undefined): CrmStage[] {
+  const current = getCrmBoardStage(status);
+  return current ? [...(ALLOWED_CRM_TRANSITIONS[current] || [])] : [];
+}
+
 /** Return only a transition permitted by the CRM state machine. */
 export function getAdjacentCrmBoardStage(
   status: string | null | undefined,
