@@ -29,6 +29,8 @@ export function validateTimesFmForecast(
     typeof result.model !== 'string' ||
     typeof result.version !== 'string' ||
     typeof result.backend !== 'string' ||
+    !Number.isInteger(result.input_points) || Number(result.input_points) < 8 ||
+    result.horizon !== expectedHorizon ||
     !Array.isArray(result.forecast) ||
     result.forecast.length !== expectedHorizon
   ) {
