@@ -5108,7 +5108,7 @@ app.post('/api/ai/test-timesfm', authenticate, async (req, res) => {
     db.addAuditLog({
       contractorId,
       action: 'TIMESFM_BRAIN_SYNCHRONIZED_INFERENCE',
-      details: `TimesFM 2.5 demand inference used ${result.googleAdsBaseline.weeklyDemandSeries.length} weekly observations for ${targetNiche} in ${targetCity}. Weather was context only; CAC guardrails ${result.budgetGuardrails.maxAllowableCpl === null ? 'were not evaluated' : 'were evaluated as advisory only'}. No ad budget was changed.`
+      details: `TimesFM 2.5 demand inference used ${result.googleAdsBaseline.weeklyObservations ?? 0} weekly observations for ${targetNiche} in ${targetCity}. Weather was context only; CAC guardrails ${result.budgetGuardrails.maxAllowableCpl === null ? 'were not evaluated' : 'were evaluated as advisory only'}. No ad budget was changed.`
     });
 
     res.json(result);
