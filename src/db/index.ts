@@ -30,6 +30,13 @@ export const createPool = () => {
           connectionTimeoutMillis: 15000,
         });
       } else {
+        if (process.env.NODE_ENV === 'production') {
+          throw new Error(
+            'Database configuration is missing. Set DATABASE_URL, NEON_DATABASE_URL, or SQL_HOST/SQL_USER/SQL_PASSWORD/SQL_DB_NAME before starting HAL in production.'
+          );
+        }
+        // Local development/test fallback only. Production must never silently
+        // connect to an empty localhost database and appear to have lost data.
         global._postgresPool = new Pool({
           host: 'localhost',
           user: 'postgres',
