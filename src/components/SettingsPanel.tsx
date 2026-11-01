@@ -1211,6 +1211,7 @@ export default function SettingsPanel({
             </div>
           </div>
         </div>
+        </div>
       </details>
 
         {/* Account Security Password Reset */}
