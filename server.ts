@@ -6,6 +6,7 @@ import crypto from 'crypto';
 import { isIP } from 'node:net';
 import { execSync } from 'child_process';
 import { createServer as createViteServer } from 'vite';
+import { sendResendEmail, EmailProviderConfigurationError, EmailProviderRequestError } from './src/services/communications/resendEmail';
 import { 
   db, 
   encrypt, 
@@ -4216,12 +4217,6 @@ app.post('/api/outreach/dispatch', authenticate, async (req, res) => {
   if (!['whatsapp', 'email', 'sms'].includes(channel)) {
     return res.status(400).json({ error: 'Unsupported channel. Use whatsapp, email, or sms.' });
   }
-  if (mode !== 'simulation') {
-    return res.status(501).json({
-      error: 'Live delivery is not implemented for this endpoint. Use simulation mode; no provider has been contacted.'
-    });
-  }
-
   let customizedMessage = String(message);
   let customizedSubject = typeof subject === 'string' ? subject : '';
   if (variables && typeof variables === 'object' && !Array.isArray(variables)) {
@@ -4231,6 +4226,102 @@ app.post('/api/outreach/dispatch', authenticate, async (req, res) => {
       customizedMessage = customizedMessage.replace(rx, String(val));
       if (customizedSubject) customizedSubject = customizedSubject.replace(rx, String(val));
     }
+  }
+
+  if (mode === 'live') {
+    if (channel !== 'email') {
+      return res.status(501).json({
+        success: false,
+        code: 'CHANNEL_NOT_IMPLEMENTED',
+        error: `Live ${channel} delivery is not implemented. No provider was contacted.`
+      });
+    }
+
+    try {
+      const result = await sendResendEmail({
+        to: String(recipient),
+        subject: customizedSubject,
+        text: customizedMessage
+      });
+      const submittedAt = new Date().toISOString();
+      const entry: DispatchLogEntry = {
+        id: 'dispatch_' + crypto.randomBytes(6).toString('hex'),
+        contractorId,
+        channel,
+        recipient: String(recipient),
+        leadId,
+        leadBusinessName: leadBusinessName || 'Direct Recipient',
+        status: 'submitted',
+        mode: 'live',
+        timestamp: submittedAt,
+        subject: customizedSubject,
+        preview: customizedMessage.slice(0, 100)
+      };
+      dispatchLogs.push(entry);
+      const auditBlock = db.recordLedgerEntry({
+        contractorId,
+        eventType: 'phase3_live_dispatch',
+        entityType: 'outreach_email',
+        entityId: entry.id,
+        actor: 'HAL Resend Adapter',
+        details: 'Email accepted by Resend API. This is provider submission, not recipient delivery confirmation.',
+        metadata: {
+          channel: 'email',
+          provider: result.provider,
+          providerMessageId: result.providerMessageId,
+          leadId: leadId || null,
+          status: result.status,
+          deliveryConfirmed: false
+        }
+      });
+      broadcastNotification(
+        contractorId,
+        'info',
+        'Email submitted to Resend',
+        `Resend accepted an email request for ${String(recipient)}. Delivery is not yet confirmed.`
+      );
+      return res.json({
+        success: true,
+        dispatchId: entry.id,
+        provider: result.provider,
+        providerMessageId: result.providerMessageId,
+        status: result.status,
+        mode: 'live',
+        providerContacted: true,
+        deliveryConfirmed: false,
+        timestamp: submittedAt,
+        block: auditBlock
+      });
+    } catch (err: any) {
+      if (err instanceof EmailProviderConfigurationError) {
+        return res.status(503).json({
+          success: false,
+          code: 'EMAIL_PROVIDER_NOT_CONFIGURED',
+          error: err.message
+        });
+      }
+      if (err instanceof EmailProviderRequestError) {
+        return res.status(502).json({
+          success: false,
+          code: 'EMAIL_PROVIDER_REQUEST_FAILED',
+          error: err.message
+        });
+      }
+      console.error('[HAL Email Dispatch] Unexpected provider adapter error:', err?.message || err);
+      return res.status(502).json({
+        success: false,
+        code: 'EMAIL_PROVIDER_UNKNOWN_FAILURE',
+        error: 'Email provider request failed. Delivery status is unknown.'
+      });
+    }
+  }
+
+  if (mode !== 'simulation') {
+    return res.status(400).json({
+      success: false,
+      code: 'INVALID_DISPATCH_MODE',
+      error: 'Set mode to simulation or live.'
+    });
   }
 
   const now = new Date().toISOString();
