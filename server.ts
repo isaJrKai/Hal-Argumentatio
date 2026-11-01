@@ -3211,7 +3211,8 @@ app.get('/api/intelligence/chat/history', authenticate, async (req, res) => {
 app.delete('/api/intelligence/chat/history', authenticate, async (req, res) => {
   const contractorId = resolveChatContractorId(req);
   try {
-    await pgDb.delete(chatMessages).where(eq(chatMessages.contractorId, contractorId));
+    const targetIds = getTargetContractorIds(contractorId);
+    await pgDb.delete(chatMessages).where(inArray(chatMessages.contractorId, targetIds));
     res.json({ message: 'Chat history cleared successfully.' });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
