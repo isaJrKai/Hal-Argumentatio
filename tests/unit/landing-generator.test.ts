@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { applyVerifiedBusinessDetails } from '../../src/services/landingGenerator';
 import { TRADE_TEMPLATES } from '../../src/components/landing/templates';
+import { generateLandingPageHtml } from '../../src/components/landing/htmlGenerator';
 
 const clonePlumbingTemplate = () =>
   JSON.parse(JSON.stringify(TRADE_TEMPLATES.plumbing));
@@ -81,6 +82,24 @@ describe('contractor landing page factual normalization', () => {
     expect(config.sections.services.items[0].title).toBe('Sump pump installation');
     expect(config.sections.reviews.active).toBe(false);
     expect(config.sections.service_areas.active).toBe(false);
+  });
+
+  it('renders only approved illustrative hero photography and omits a fabricated canonical URL', () => {
+    const config = JSON.parse(JSON.stringify(TRADE_TEMPLATES.roofing));
+    const html = generateLandingPageHtml(config);
+
+    expect(html).toContain('https://images.unsplash.com/photo-1632759145351-1d592919f522');
+    expect(html).toContain('Illustrative image');
+    expect(html).not.toContain('https://hal.ai/landing/');
+  });
+
+  it('rejects non-HTTPS or non-approved hero image hosts', () => {
+    const config = JSON.parse(JSON.stringify(TRADE_TEMPLATES.roofing));
+    config.sections.hero.heroImageUrl = 'javascript:alert(1)';
+    const html = generateLandingPageHtml(config);
+
+    expect(html).not.toContain('javascript:alert(1)');
+    expect(html).not.toContain('<img src="javascript:');
   });
 
 });
