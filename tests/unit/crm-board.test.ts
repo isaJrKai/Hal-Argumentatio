@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { getAdjacentCrmBoardStage, getCrmBoardStage, CRM_BOARD_STAGES } from '../../src/lib/crmBoard';
+import { getAdjacentCrmBoardStage, getAllowedCrmBoardStages, getCrmBoardStage, CRM_BOARD_STAGES } from '../../src/lib/crmBoard';
 
 describe('CRM board stages', () => {
   it('includes every canonical CRM stage', () => {
@@ -26,5 +26,7 @@ describe('CRM board stages', () => {
     expect(getAdjacentCrmBoardStage('proposal', 'backward')).toBe('contacted');
     expect(getAdjacentCrmBoardStage('new', 'backward')).toBeNull();
     expect(getAdjacentCrmBoardStage('mystery-stage', 'forward')).toBeNull();
+    expect(getAllowedCrmBoardStages('proposal')).toEqual(['closed_won', 'closed_lost', 'contacted']);
+    expect(getAllowedCrmBoardStages('mystery-stage')).toEqual([]);
   });
 });
