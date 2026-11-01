@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { filterGoogleAdsTerritoryRecords } from '../../src/lib/forecastData';
+import { filterGoogleAdsTerritoryRecords, matchesTerritoryContext } from '../../src/lib/forecastData';
 import { validateTimesFmForecast } from '../../src/lib/timesfmClient';
 
 const records = [
@@ -20,6 +20,12 @@ describe('TimesFM input and forecast invariants', () => {
   it('changes the selected historical series when the trade changes', () => {
     expect(filterGoogleAdsTerritoryRecords(records, 'plumbing', 'Calgary').map(x => x.id))
       .toEqual(['calgary-plumbing']);
+  });
+
+  it('uses the selected territory for neural graph records', () => {
+    expect(matchesTerritoryContext('Kampala Central', 'Roofing', 'Kampala', 'roofing')).toBe(true);
+    expect(matchesTerritoryContext('Kampala Central', 'Plumbing', 'Kampala', 'roofing')).toBe(false);
+    expect(matchesTerritoryContext('Entebbe', 'Roofing', 'Kampala', 'roofing')).toBe(false);
   });
 
   it('fails closed for missing territory metadata', () => {
