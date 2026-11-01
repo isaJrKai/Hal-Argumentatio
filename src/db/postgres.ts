@@ -361,6 +361,46 @@ export async function bootstrapPostgresTables(poolInstance?: Pool): Promise<void
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
       );
 
+      CREATE TABLE IF NOT EXISTS communications_outbox (
+        id TEXT PRIMARY KEY,
+        contractor_id TEXT NOT NULL,
+        lead_id TEXT NOT NULL,
+        channel TEXT NOT NULL,
+        provider TEXT NOT NULL,
+        recipient_encrypted TEXT NOT NULL,
+        subject_encrypted TEXT,
+        body_encrypted TEXT NOT NULL,
+        status TEXT DEFAULT 'queued' NOT NULL,
+        provider_message_id TEXT UNIQUE,
+        idempotency_key TEXT NOT NULL UNIQUE,
+        attempts INTEGER DEFAULT 0 NOT NULL,
+        last_attempt_at TIMESTAMP,
+        submitted_at TIMESTAMP,
+        delivered_at TIMESTAMP,
+        bounced_at TIMESTAMP,
+        error_code TEXT,
+        error_message TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
+      );
+
+      CREATE TABLE IF NOT EXISTS communications_delivery_events (
+        id TEXT PRIMARY KEY,
+        outbox_id TEXT,
+        provider TEXT NOT NULL,
+        provider_message_id TEXT,
+        event_type TEXT NOT NULL,
+        payload JSONB NOT NULL,
+        received_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
+      );
+
+      CREATE INDEX IF NOT EXISTS communications_outbox_tenant_created_idx
+        ON communications_outbox (contractor_id, created_at DESC);
+      CREATE INDEX IF NOT EXISTS communications_outbox_status_idx
+        ON communications_outbox (status, updated_at);
+      CREATE INDEX IF NOT EXISTS communications_delivery_provider_message_idx
+        ON communications_delivery_events (provider, provider_message_id);
+
       CREATE TABLE IF NOT EXISTS conversion_outbox (
         id TEXT PRIMARY KEY,
         contractor_id TEXT NOT NULL,
