@@ -83,17 +83,18 @@ def warm_model():
 @app.get("/health")
 def health():
     return {
-        "status": "ready" if _model is not None else "unavailable",
+        "status": "ready" if _model is not None and len(API_KEY) >= 32 else "unavailable",
         "model": MODEL_ID,
         "model_loaded": _model is not None,
+        "api_key_configured": len(API_KEY) >= 32,
         "error": _model_error,
     }
 
 
 @app.post("/forecast")
 def forecast(request: ForecastRequest, authorization: str | None = Header(default=None)):
-    if not API_KEY:
-        raise HTTPException(status_code=503, detail="TIMESFM_API_KEY is not configured")
+    if len(API_KEY) < 32:
+        raise HTTPException(status_code=503, detail="TIMESFM_API_KEY must be configured with at least 32 characters")
     if authorization != f"Bearer {API_KEY}":
         raise HTTPException(status_code=401, detail="Unauthorized")
 
