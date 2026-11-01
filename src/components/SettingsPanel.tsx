@@ -227,10 +227,7 @@ export default function SettingsPanel({
   };
 
   // Postgres and token copy states
-  const [copiedToken, setCopiedToken] = useState(false);
-  const [postgresUrl, setPostgresUrl] = useState(() => {
-    return localStorage.getItem('halbiz_postgres_url') || '';
-  });
+  const [postgresUrl, setPostgresUrl] = useState('');
   const [postgresSuccess, setPostgresSuccess] = useState<string | null>(null);
   const [postgresTesting, setPostgresTesting] = useState(false);
   const [postgresSyncing, setPostgresSyncing] = useState(false);
@@ -281,15 +278,8 @@ export default function SettingsPanel({
     }
   };
 
-  const handleCopyToken = () => {
-    navigator.clipboard.writeText(token);
-    setCopiedToken(true);
-    setTimeout(() => setCopiedToken(false), 2000);
-  };
-
   const handleSavePostgres = async (e: React.FormEvent) => {
     e.preventDefault();
-    localStorage.setItem('halbiz_postgres_url', postgresUrl);
     setPostgresSuccess('Neon PostgreSQL database link configured. Validating connection...');
     await handleTestPostgres();
     setTimeout(() => setPostgresSuccess(null), 5000);
@@ -314,6 +304,12 @@ export default function SettingsPanel({
     slack: ''
   });
   const [connectorKeySuccess, setConnectorKeySuccess] = useState<string | null>(null);
+  const [connectorConfigured, setConnectorConfigured] = useState<Record<string, boolean>>({});
+
+  useEffect(() => {
+    // Remove any legacy browser-stored database URI; production credentials belong in server env.
+    localStorage.removeItem('halbiz_postgres_url');
+  }, []);
 
   useEffect(() => {
     const fetchCreds = async (retry = 1) => {
@@ -325,7 +321,7 @@ export default function SettingsPanel({
         if (res.ok) {
           const data = await res.json();
           if (data && typeof data === 'object' && !data.error) {
-            setConnectorKeys(prev => ({ ...prev, ...data }));
+            setConnectorConfigured(data.configured && typeof data.configured === 'object' ? data.configured : {});
           }
         } else if (retry > 0) {
           setTimeout(() => fetchCreds(retry - 1), 600);
@@ -342,24 +338,28 @@ export default function SettingsPanel({
   }, []);
 
   const handleSaveConnectorKey = async (service: string, keyVal: string) => {
-    const updated = { ...connectorKeys, [service]: keyVal };
-    setConnectorKeys(updated);
-    
+    const value = keyVal.trim();
+    if (!value) return;
+
     try {
-      await fetch('/api/connectors/credentials', {
+      const res = await fetch('/api/connectors/credentials', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('halbiz_auth_token') || localStorage.getItem('token')}`
+          'Authorization': `Bearer ${token || localStorage.getItem('halbiz_auth_token') || localStorage.getItem('token') || ''}`
         },
-        body: JSON.stringify({ service, keyVal })
+        body: JSON.stringify({ service, keyVal: value })
       });
-      setConnectorKeySuccess(`Successfully saved API credentials for ${(service || '').toUpperCase()} to backend database.`);
-    } catch (err) {
-      console.error('Failed to save connector key to backend', err);
-      setConnectorKeySuccess(`Updated ${(service || '').toUpperCase()} locally (backend sync failed).`);
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.error || 'Credential was not saved.');
+
+      setConnectorConfigured(prev => ({ ...prev, [service]: true }));
+      setConnectorKeys(prev => ({ ...prev, [service]: '' }));
+      setConnectorKeySuccess(`${service.toUpperCase()} credential saved securely. The secret is not returned to the browser.`);
+    } catch (err: any) {
+      setConnectorKeySuccess(`Could not save ${service.toUpperCase()} credential: ${err.message || 'request failed'}`);
     }
-    setTimeout(() => setConnectorKeySuccess(null), 4000);
+    setTimeout(() => setConnectorKeySuccess(null), 5000);
   };
 
   // Password reset state
@@ -824,6 +824,9 @@ export default function SettingsPanel({
 
       {/* DIRECT INTEGRATION GATEWAY: POSTGRESQL & JWT SECURITY */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 min-w-0">
+        <details className={`border rounded-lg ${cardBg}`}>
+          <summary className="cursor-pointer list-none p-5 font-mono text-xs font-bold uppercase tracking-wider">Advanced · PostgreSQL connection and sync</summary>
+          <div className="px-5 pb-5">
         {/* PostgreSQL Database Section */}
         <div className={`border rounded-lg p-5 space-y-6 ${cardBg}`}>
           <div className="flex flex-wrap items-center gap-2 border-b pb-3 border-inherit">
@@ -843,7 +846,8 @@ export default function SettingsPanel({
 
           <form onSubmit={handleSavePostgres} className="space-y-4 text-xs font-sans">
             <div className="space-y-1">
-              <label className="block text-[11px] font-mono opacity-80 uppercase tracking-wider font-bold">PostgreSQL Connection URI</label>
+              <label className="block text-[11px] font-mono opacity-80 uppercase tracking-wider font-bold">PostgreSQL Connection URI (admin only)</label>
+              <p className="text-[11px] text-text-secondary">Used only for this settings session; it is not saved in browser storage. Configure DATABASE_URL in the server environment for persistent production connections.</p>
               <textarea
                 rows={3}
                 required
@@ -902,56 +906,30 @@ export default function SettingsPanel({
               )}
             </div>
           )}
-
-
         </div>
+          </div>
+        </details>
 
-        {/* Authentication Token Section */}
-        <div className={`border rounded-lg p-5 space-y-6 ${cardBg}`}>
-          <div className="flex flex-wrap items-center gap-2 border-b pb-3 border-inherit">
+        {/* Session credentials are intentionally not exposed in the settings UI. */}
+        <div className={`border rounded-lg p-5 space-y-3 ${cardBg}`}>
+          <div className="flex items-center gap-2 border-b pb-3 border-inherit">
             <Lock className="w-4 h-4 text-accent" />
-            <span className="text-xs font-mono uppercase tracking-wider font-bold">Your Active Session Token</span>
+            <span className="text-xs font-mono uppercase tracking-wider font-bold">Session security</span>
           </div>
-
           <p className="text-xs text-inherit opacity-80 leading-relaxed font-sans">
-            Your personal, 30-day cryptographically signed JSON Web Token (JWT). You can copy this token to authenticate external tools, Zapier/Make webhooks, curl commands, or mobile scripts by passing it as a <code className="font-mono text-[10px] bg-bg-base px-1.5 py-0.5 rounded border border-border-dim">Bearer &lt;token&gt;</code> header.
+            Your active session is managed securely by HAL. Session credentials are not displayed or made copyable in this settings screen.
           </p>
-
-          <div className="space-y-3 font-sans">
-            <div className="space-y-1">
-              <label className="block text-[11px] font-mono opacity-80 uppercase tracking-wider font-bold">Bearer Authentication Token</label>
-              <div className="relative">
-                <textarea
-                  readOnly
-                  rows={3}
-                  value={token}
-                  className={`w-full border rounded p-2 pr-12 focus:outline-none text-inherit font-mono text-[11px] leading-relaxed break-all resize-none ${innerBg} ${borderCol}`}
-                />
-                <button
-                  type="button"
-                  onClick={handleCopyToken}
-                  className="absolute right-2 top-2 p-1.5 bg-card border border-border-dim rounded hover:border-accent hover:text-accent transition-all"
-                  title="Copy Token"
-                >
-                  {copiedToken ? (
-                    <Check className="w-4 h-4 text-accent" />
-                  ) : (
-                    <Copy className="w-4 h-4" />
-                  )}
-                </button>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2 text-[11px] font-mono text-text-secondary mt-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-positive animate-pulse" />
-              <span>ACTIVE SESSION VALID</span>
-            </div>
-          </div>
         </div>
       </div>
 
+      <details className={`border rounded-lg ${cardBg} mt-6`}>
+        <summary className="cursor-pointer list-none p-5 flex flex-wrap items-center justify-between gap-3">
+          <span className="font-mono text-xs font-bold uppercase tracking-wider">Advanced · Connected services and API credentials</span>
+          <span className="text-[11px] text-text-secondary">Encrypted integration settings · expand to manage</span>
+        </summary>
+        <div className="px-5 pb-5">
       {/* Connected Business Services & Third-Party API Credentials */}
-      <div className={`border rounded-lg p-5 space-y-6 ${cardBg} mt-6`}>
+      <div className={`border rounded-lg p-5 space-y-6 ${cardBg} mt-2`}>
         <div className="flex flex-wrap items-center gap-2 border-b pb-3 border-inherit">
           <Globe className="w-4 h-4 text-accent" />
           <span className="text-xs font-mono uppercase tracking-wider font-bold">Connected Business Services & Third-Party API Credentials</span>
@@ -974,13 +952,14 @@ export default function SettingsPanel({
               <div className="flex justify-between items-center">
                 <span className="font-bold uppercase font-mono text-[11px] text-accent">Stripe Billing API</span>
                 <span className={`text-[11px] font-mono px-1.5 py-0.5 rounded font-bold uppercase ${connectorKeys.stripe ? 'bg-positive/20 text-positive' : 'bg-warning-dim text-warning'}`}>
-                  {connectorKeys.stripe ? 'Active' : 'Unconfigured'}
+                  {connectorConfigured.stripe || connectorKeys.stripe ? 'Configured' : 'Unconfigured'}
                 </span>
               </div>
               <input
                 type="password"
                 value={connectorKeys.stripe}
-                onChange={(e) => handleSaveConnectorKey('stripe', e.target.value)}
+                onChange={(e) => setConnectorKeys(prev => ({ ...prev, stripe: e.target.value }))}
+                onBlur={() => handleSaveConnectorKey('stripe', connectorKeys.stripe)}
                 placeholder="sk_live_..."
                 className={`w-full border rounded p-2 focus:outline-none focus:border-accent text-inherit font-mono text-xs ${innerBg} ${borderCol}`}
               />
@@ -992,13 +971,14 @@ export default function SettingsPanel({
               <div className="flex justify-between items-center">
                 <span className="font-bold uppercase font-mono text-[11px] text-accent">Twilio SMS Gateway</span>
                 <span className={`text-[11px] font-mono px-1.5 py-0.5 rounded font-bold uppercase ${connectorKeys.twilio ? 'bg-positive/20 text-positive' : 'bg-warning-dim text-warning'}`}>
-                  {connectorKeys.twilio ? 'Active' : 'Unconfigured'}
+                  {connectorConfigured.twilio || connectorKeys.twilio ? 'Configured' : 'Unconfigured'}
                 </span>
               </div>
               <input
                 type="password"
                 value={connectorKeys.twilio}
-                onChange={(e) => handleSaveConnectorKey('twilio', e.target.value)}
+                onChange={(e) => setConnectorKeys(prev => ({ ...prev, twilio: e.target.value }))}
+                onBlur={() => handleSaveConnectorKey('twilio', connectorKeys.twilio)}
                 placeholder="AC... (Auth Token)"
                 className={`w-full border rounded p-2 focus:outline-none focus:border-accent text-inherit font-mono text-xs ${innerBg} ${borderCol}`}
               />
@@ -1010,13 +990,14 @@ export default function SettingsPanel({
               <div className="flex justify-between items-center">
                 <span className="font-bold uppercase font-mono text-[11px] text-accent">SendGrid Mail API</span>
                 <span className={`text-[11px] font-mono px-1.5 py-0.5 rounded font-bold uppercase ${connectorKeys.sendgrid ? 'bg-positive/20 text-positive' : 'bg-warning-dim text-warning'}`}>
-                  {connectorKeys.sendgrid ? 'Active' : 'Unconfigured'}
+                  {connectorConfigured.sendgrid || connectorKeys.sendgrid ? 'Configured' : 'Unconfigured'}
                 </span>
               </div>
               <input
                 type="password"
                 value={connectorKeys.sendgrid}
-                onChange={(e) => handleSaveConnectorKey('sendgrid', e.target.value)}
+                onChange={(e) => setConnectorKeys(prev => ({ ...prev, sendgrid: e.target.value }))}
+                onBlur={() => handleSaveConnectorKey('sendgrid', connectorKeys.sendgrid)}
                 placeholder="SG..."
                 className={`w-full border rounded p-2 focus:outline-none focus:border-accent text-inherit font-mono text-xs ${innerBg} ${borderCol}`}
               />
@@ -1028,13 +1009,14 @@ export default function SettingsPanel({
               <div className="flex justify-between items-center">
                 <span className="font-bold uppercase font-mono text-[11px] text-accent">Google Maps Platform</span>
                 <span className={`text-[11px] font-mono px-1.5 py-0.5 rounded font-bold uppercase ${connectorKeys.googleMaps ? 'bg-positive/20 text-positive' : 'bg-warning-dim text-warning'}`}>
-                  {connectorKeys.googleMaps ? 'Active' : 'Unconfigured'}
+                  {connectorConfigured.googleMaps || connectorKeys.googleMaps ? 'Configured' : 'Unconfigured'}
                 </span>
               </div>
               <input
                 type="password"
                 value={connectorKeys.googleMaps}
-                onChange={(e) => handleSaveConnectorKey('googleMaps', e.target.value)}
+                onChange={(e) => setConnectorKeys(prev => ({ ...prev, googleMaps: e.target.value }))}
+                onBlur={() => handleSaveConnectorKey('googleMaps', connectorKeys.googleMaps)}
                 placeholder="AIza..."
                 className={`w-full border rounded p-2 focus:outline-none focus:border-accent text-inherit font-mono text-xs ${innerBg} ${borderCol}`}
               />
@@ -1046,13 +1028,14 @@ export default function SettingsPanel({
               <div className="flex justify-between items-center">
                 <span className="font-bold uppercase font-mono text-[11px] text-accent">Google Ads API</span>
                 <span className={`text-[11px] font-mono px-1.5 py-0.5 rounded font-bold uppercase ${connectorKeys.googleAds ? 'bg-positive/20 text-positive' : 'bg-warning-dim text-warning'}`}>
-                  {connectorKeys.googleAds ? 'Active' : 'Unconfigured'}
+                  {connectorConfigured.googleAds || connectorKeys.googleAds ? 'Configured' : 'Unconfigured'}
                 </span>
               </div>
               <input
                 type="password"
                 value={connectorKeys.googleAds}
-                onChange={(e) => handleSaveConnectorKey('googleAds', e.target.value)}
+                onChange={(e) => setConnectorKeys(prev => ({ ...prev, googleAds: e.target.value }))}
+                onBlur={() => handleSaveConnectorKey('googleAds', connectorKeys.googleAds)}
                 placeholder="Developer Token / Client ID"
                 className={`w-full border rounded p-2 focus:outline-none focus:border-accent text-inherit font-mono text-xs ${innerBg} ${borderCol}`}
               />
@@ -1064,13 +1047,14 @@ export default function SettingsPanel({
               <div className="flex justify-between items-center">
                 <span className="font-bold uppercase font-mono text-[11px] text-accent">Meta Marketing API</span>
                 <span className={`text-[11px] font-mono px-1.5 py-0.5 rounded font-bold uppercase ${connectorKeys.metaAds ? 'bg-positive/20 text-positive' : 'bg-warning-dim text-warning'}`}>
-                  {connectorKeys.metaAds ? 'Active' : 'Unconfigured'}
+                  {connectorConfigured.metaAds || connectorKeys.metaAds ? 'Configured' : 'Unconfigured'}
                 </span>
               </div>
               <input
                 type="password"
                 value={connectorKeys.metaAds}
-                onChange={(e) => handleSaveConnectorKey('metaAds', e.target.value)}
+                onChange={(e) => setConnectorKeys(prev => ({ ...prev, metaAds: e.target.value }))}
+                onBlur={() => handleSaveConnectorKey('metaAds', connectorKeys.metaAds)}
                 placeholder="EAAG..."
                 className={`w-full border rounded p-2 focus:outline-none focus:border-accent text-inherit font-mono text-xs ${innerBg} ${borderCol}`}
               />
@@ -1082,13 +1066,14 @@ export default function SettingsPanel({
               <div className="flex justify-between items-center">
                 <span className="font-bold uppercase font-mono text-[11px] text-accent">GA4 & Search Console</span>
                 <span className={`text-[11px] font-mono px-1.5 py-0.5 rounded font-bold uppercase ${connectorKeys.ga4 ? 'bg-positive/20 text-positive' : 'bg-warning-dim text-warning'}`}>
-                  {connectorKeys.ga4 ? 'Active' : 'Unconfigured'}
+                  {connectorConfigured.ga4 || connectorKeys.ga4 ? 'Configured' : 'Unconfigured'}
                 </span>
               </div>
               <input
                 type="password"
                 value={connectorKeys.ga4}
-                onChange={(e) => handleSaveConnectorKey('ga4', e.target.value)}
+                onChange={(e) => setConnectorKeys(prev => ({ ...prev, ga4: e.target.value }))}
+                onBlur={() => handleSaveConnectorKey('ga4', connectorKeys.ga4)}
                 placeholder="Service Account JSON Token"
                 className={`w-full border rounded p-2 focus:outline-none focus:border-accent text-inherit font-mono text-xs ${innerBg} ${borderCol}`}
               />
@@ -1100,13 +1085,14 @@ export default function SettingsPanel({
               <div className="flex justify-between items-center">
                 <span className="font-bold uppercase font-mono text-[11px] text-accent">Slack Operations Webhook</span>
                 <span className={`text-[11px] font-mono px-1.5 py-0.5 rounded font-bold uppercase ${connectorKeys.slack ? 'bg-positive/20 text-positive' : 'bg-warning-dim text-warning'}`}>
-                  {connectorKeys.slack ? 'Active' : 'Unconfigured'}
+                  {connectorConfigured.slack || connectorKeys.slack ? 'Configured' : 'Unconfigured'}
                 </span>
               </div>
               <input
                 type="password"
                 value={connectorKeys.slack}
-                onChange={(e) => handleSaveConnectorKey('slack', e.target.value)}
+                onChange={(e) => setConnectorKeys(prev => ({ ...prev, slack: e.target.value }))}
+                onBlur={() => handleSaveConnectorKey('slack', connectorKeys.slack)}
                 placeholder="https://hooks.slack.com/services/..."
                 className={`w-full border rounded p-2 focus:outline-none focus:border-accent text-inherit font-mono text-xs ${innerBg} ${borderCol}`}
               />
@@ -1118,13 +1104,14 @@ export default function SettingsPanel({
               <div className="flex justify-between items-center">
                 <span className="font-bold uppercase font-mono text-[11px] text-accent">Google Drive Asset Cloud</span>
                 <span className={`text-[11px] font-mono px-1.5 py-0.5 rounded font-bold uppercase ${connectorKeys.googleDrive ? 'bg-positive/20 text-positive' : 'bg-warning-dim text-warning'}`}>
-                  {connectorKeys.googleDrive ? 'Active' : 'Unconfigured'}
+                  {connectorConfigured.googleDrive || connectorKeys.googleDrive ? 'Configured' : 'Unconfigured'}
                 </span>
               </div>
               <input
                 type="password"
                 value={connectorKeys.googleDrive}
-                onChange={(e) => handleSaveConnectorKey('googleDrive', e.target.value)}
+                onChange={(e) => setConnectorKeys(prev => ({ ...prev, googleDrive: e.target.value }))}
+                onBlur={() => handleSaveConnectorKey('googleDrive', connectorKeys.googleDrive)}
                 placeholder="OAuth Client ID / Secret"
                 className={`w-full border rounded p-2 focus:outline-none focus:border-accent text-inherit font-mono text-xs ${innerBg} ${borderCol}`}
               />
@@ -1136,13 +1123,14 @@ export default function SettingsPanel({
               <div className="flex justify-between items-center">
                 <span className="font-bold uppercase font-mono text-[11px] text-accent">LinkedIn Sales Integrator</span>
                 <span className={`text-[11px] font-mono px-1.5 py-0.5 rounded font-bold uppercase ${connectorKeys.linkedin ? 'bg-positive/20 text-positive' : 'bg-warning-dim text-warning'}`}>
-                  {connectorKeys.linkedin ? 'Active' : 'Unconfigured'}
+                  {connectorConfigured.linkedin || connectorKeys.linkedin ? 'Configured' : 'Unconfigured'}
                 </span>
               </div>
               <input
                 type="password"
                 value={connectorKeys.linkedin}
-                onChange={(e) => handleSaveConnectorKey('linkedin', e.target.value)}
+                onChange={(e) => setConnectorKeys(prev => ({ ...prev, linkedin: e.target.value }))}
+                onBlur={() => handleSaveConnectorKey('linkedin', connectorKeys.linkedin)}
                 placeholder="AQV..."
                 className={`w-full border rounded p-2 focus:outline-none focus:border-accent text-inherit font-mono text-xs ${innerBg} ${borderCol}`}
               />
@@ -1154,13 +1142,14 @@ export default function SettingsPanel({
               <div className="flex justify-between items-center">
                 <span className="font-bold uppercase font-mono text-[11px] text-accent">Salesforce CRM Bridge</span>
                 <span className={`text-[11px] font-mono px-1.5 py-0.5 rounded font-bold uppercase ${connectorKeys.salesforce ? 'bg-positive/20 text-positive' : 'bg-warning-dim text-warning'}`}>
-                  {connectorKeys.salesforce ? 'Active' : 'Unconfigured'}
+                  {connectorConfigured.salesforce || connectorKeys.salesforce ? 'Configured' : 'Unconfigured'}
                 </span>
               </div>
               <input
                 type="password"
                 value={connectorKeys.salesforce}
-                onChange={(e) => handleSaveConnectorKey('salesforce', e.target.value)}
+                onChange={(e) => setConnectorKeys(prev => ({ ...prev, salesforce: e.target.value }))}
+                onBlur={() => handleSaveConnectorKey('salesforce', connectorKeys.salesforce)}
                 placeholder="3MVG9..."
                 className={`w-full border rounded p-2 focus:outline-none focus:border-accent text-inherit font-mono text-xs ${innerBg} ${borderCol}`}
               />
@@ -1172,13 +1161,14 @@ export default function SettingsPanel({
               <div className="flex justify-between items-center">
                 <span className="font-bold uppercase font-mono text-[11px] text-accent">HubSpot Marketing Sync</span>
                 <span className={`text-[11px] font-mono px-1.5 py-0.5 rounded font-bold uppercase ${connectorKeys.hubspot ? 'bg-positive/20 text-positive' : 'bg-warning-dim text-warning'}`}>
-                  {connectorKeys.hubspot ? 'Active' : 'Unconfigured'}
+                  {connectorConfigured.hubspot || connectorKeys.hubspot ? 'Configured' : 'Unconfigured'}
                 </span>
               </div>
               <input
                 type="password"
                 value={connectorKeys.hubspot}
-                onChange={(e) => handleSaveConnectorKey('hubspot', e.target.value)}
+                onChange={(e) => setConnectorKeys(prev => ({ ...prev, hubspot: e.target.value }))}
+                onBlur={() => handleSaveConnectorKey('hubspot', connectorKeys.hubspot)}
                 placeholder="pat-na1-..."
                 className={`w-full border rounded p-2 focus:outline-none focus:border-accent text-inherit font-mono text-xs ${innerBg} ${borderCol}`}
               />
@@ -1190,13 +1180,14 @@ export default function SettingsPanel({
               <div className="flex justify-between items-center">
                 <span className="font-bold uppercase font-mono text-[11px] text-accent">Mailchimp Newsletter API</span>
                 <span className={`text-[11px] font-mono px-1.5 py-0.5 rounded font-bold uppercase ${connectorKeys.mailchimp ? 'bg-positive/20 text-positive' : 'bg-warning-dim text-warning'}`}>
-                  {connectorKeys.mailchimp ? 'Active' : 'Unconfigured'}
+                  {connectorConfigured.mailchimp || connectorKeys.mailchimp ? 'Configured' : 'Unconfigured'}
                 </span>
               </div>
               <input
                 type="password"
                 value={connectorKeys.mailchimp}
-                onChange={(e) => handleSaveConnectorKey('mailchimp', e.target.value)}
+                onChange={(e) => setConnectorKeys(prev => ({ ...prev, mailchimp: e.target.value }))}
+                onBlur={() => handleSaveConnectorKey('mailchimp', connectorKeys.mailchimp)}
                 placeholder="...-us20"
                 className={`w-full border rounded p-2 focus:outline-none focus:border-accent text-inherit font-mono text-xs ${innerBg} ${borderCol}`}
               />
@@ -1208,13 +1199,14 @@ export default function SettingsPanel({
               <div className="flex justify-between items-center">
                 <span className="font-bold uppercase font-mono text-[11px] text-accent">Notion Workspace Sync</span>
                 <span className={`text-[11px] font-mono px-1.5 py-0.5 rounded font-bold uppercase ${connectorKeys.notion ? 'bg-positive/20 text-positive' : 'bg-warning-dim text-warning'}`}>
-                  {connectorKeys.notion ? 'Active' : 'Unconfigured'}
+                  {connectorConfigured.notion || connectorKeys.notion ? 'Configured' : 'Unconfigured'}
                 </span>
               </div>
               <input
                 type="password"
                 value={connectorKeys.notion}
-                onChange={(e) => handleSaveConnectorKey('notion', e.target.value)}
+                onChange={(e) => setConnectorKeys(prev => ({ ...prev, notion: e.target.value }))}
+                onBlur={() => handleSaveConnectorKey('notion', connectorKeys.notion)}
                 placeholder="ntn_..."
                 className={`w-full border rounded p-2 focus:outline-none focus:border-accent text-inherit font-mono text-xs ${innerBg} ${borderCol}`}
               />
@@ -1222,6 +1214,8 @@ export default function SettingsPanel({
             </div>
           </div>
         </div>
+        </div>
+      </details>
 
         {/* Account Security Password Reset */}
         <div className={`border rounded-lg p-5 space-y-6 ${cardBg}`}>

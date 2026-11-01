@@ -86,7 +86,7 @@ export interface BrainSynchronizedForecastResult {
 /**
  * 1. Live Google Ads Ingestion Pipeline (Layer 5: Knowledge)
  * Ingests real historical records from `google_ads_daily_performance` for the contractor.
- * If no records exist, auto-seeds realistic 30-day baseline performance for the territory.
+ * Missing contractor-specific records are reported as unavailable; no cross-tenant or synthetic baseline is used.
  */
 export async function ingestAndCalibrateGoogleAds(
   contractorId: string,
@@ -100,15 +100,8 @@ export async function ingestAndCalibrateGoogleAds(
       .where(eq(googleAdsDailyPerformance.contractorId, contractorId))
       .orderBy(desc(googleAdsDailyPerformance.date));
 
-    // Fall back to baseline records in table if contractor-specific records are not yet linked
-    if (records.length === 0) {
-      records = await pgDb
-        .select()
-        .from(googleAdsDailyPerformance)
-        .orderBy(desc(googleAdsDailyPerformance.date))
-        .limit(30);
-    }
-
+    // Do not fall back to another contractor's campaign records. Missing tenant
+    // data is unavailable evidence, not permission to use shared performance data.
     if (records.length === 0) {
       return {
         recordsCount: 0,

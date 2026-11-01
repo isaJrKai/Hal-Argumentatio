@@ -37,7 +37,9 @@ import { buildHalMcpServer } from './src/services/mcp/halMcpServer';
 import { HERMES_LAB_CATALOG, executeHermesLabTool, chatWithHermesAgent, LabToolType } from './src/services/hermesLab';
 import { generateContractorLandingPage, regenerateLandingSection } from './src/services/landingGenerator';
 import { generateLandingPageHtml } from './src/components/landing/htmlGenerator';
-import { validateCrmTransition } from './src/lib/crmStateMachine';
+import { validateCrmTransition, isKnownCrmStage } from './src/lib/crmStateMachine';
+import { buildFinancialSnapshotCore } from './src/lib/financialSnapshot';
+import { resolvePublishedLandingPageOwner } from './src/lib/landingPageOwnership';
 import { validateLoopGate } from './src/lib/loopGating';
 import { 
   auditCompetitorFootprint, 
@@ -97,14 +99,30 @@ app.use(express.json({
 }));
 
 // Allow browser origins explicitly; same-origin requests do not require CORS.
+const configuredCorsOrigins = (process.env.CORS_ALLOWED_ORIGINS || process.env.APP_URL || '')
+  .split(',')
+  .map(value => value.trim())
+  .filter(Boolean);
 const corsAllowedOrigins = new Set(
-  (process.env.CORS_ALLOWED_ORIGINS || process.env.APP_URL || '')
-    .split(',')
+  configuredCorsOrigins
     .map(value => {
-      try { return new URL(value.trim()).origin; } catch { return ''; }
+      try {
+        const parsed = new URL(value);
+        if (parsed.protocol !== 'https:' && parsed.hostname !== 'localhost' && parsed.hostname !== '127.0.0.1') {
+          console.warn(`[CORS] Ignoring non-HTTPS browser origin: ${parsed.origin}`);
+          return '';
+        }
+        return parsed.origin;
+      } catch {
+        console.warn('[CORS] Ignoring invalid CORS_ALLOWED_ORIGINS entry.');
+        return '';
+      }
     })
     .filter(Boolean)
 );
+if (process.env.NODE_ENV === 'production' && corsAllowedOrigins.size === 0) {
+  console.warn('[CORS] No browser origins configured. Set CORS_ALLOWED_ORIGINS to a comma-separated list of exact HTTPS origins.');
+}
 
 app.use((req, res, next) => {
   const origin = req.headers.origin;
@@ -888,6 +906,36 @@ app.get('/api/events', (req, res) => {
   });
 });
 
+// Apply a small, independent IP budget to anonymous write endpoints. Use the
+// direct socket address unless a trusted proxy policy is explicitly configured.
+const anonymousWriteRate = new Map<string, { count: number; resetAt: number }>();
+const limitAnonymousWrites: express.RequestHandler = (req, res, next) => {
+  const now = Date.now();
+  const address = req.socket.remoteAddress || 'unknown';
+  const key = `${req.baseUrl || ''}${req.path}:${address}`;
+  let entry = anonymousWriteRate.get(key);
+  if (!entry || now >= entry.resetAt) {
+    entry = { count: 0, resetAt: now + 60_000 };
+    anonymousWriteRate.set(key, entry);
+  }
+  entry.count += 1;
+  if (entry.count > 12) {
+    res.setHeader('Retry-After', String(Math.max(1, Math.ceil((entry.resetAt - now) / 1000))));
+    return res.status(429).json({ success: false, error: 'Too many requests. Please wait before trying again.' });
+  }
+  // Bound map growth during long-running public deployments.
+  if (anonymousWriteRate.size > 5000) {
+    for (const [entryKey, value] of anonymousWriteRate) {
+      if (now >= value.resetAt) anonymousWriteRate.delete(entryKey);
+    }
+  }
+  next();
+};
+
+app.use('/api/public/audit', limitAnonymousWrites);
+app.use('/api/public/landing-leads', limitAnonymousWrites);
+app.use('/api/public/webhooks/delivery', limitAnonymousWrites);
+
 // ─── PUBLIC CLIENT AUDIT PAGE ENDPOINTS (Zero Login Required) ──────────────
 
 app.get('/api/public/audit/:id', async (req, res) => {
@@ -924,8 +972,22 @@ app.get('/api/public/audit/:id', async (req, res) => {
 
 app.post('/api/public/audit/:id/book', async (req, res) => {
   const { id } = req.params;
-  const { contactName, contactEmail, contactPhone, preferredTime, message } = req.body;
-  
+  const body = req.body && typeof req.body === 'object' ? req.body : {};
+  const contactName = typeof body.contactName === 'string' ? body.contactName.trim() : '';
+  const contactEmail = typeof body.contactEmail === 'string' ? body.contactEmail.trim() : '';
+  const contactPhone = typeof body.contactPhone === 'string' ? body.contactPhone.trim() : '';
+  const preferredTime = typeof body.preferredTime === 'string' ? body.preferredTime.trim() : '';
+  const message = typeof body.message === 'string' ? body.message.trim() : '';
+
+  if (!id || id.length > 128 ||
+      contactName.length > 120 || contactEmail.length > 254 ||
+      contactPhone.length > 40 || preferredTime.length > 120 || message.length > 2000) {
+    return res.status(400).json({ success: false, error: 'Invalid request fields or field length.' });
+  }
+  if (!contactName || (!contactEmail && !contactPhone)) {
+    return res.status(400).json({ success: false, error: 'Name and at least one contact method are required.' });
+  }
+
   try {
     const [lead] = await pgDb.select().from(leads).where(eq(leads.id, id));
     if (!lead) {
@@ -968,6 +1030,9 @@ app.post('/api/public/audit/:id/book', async (req, res) => {
 
 // ─── OUTREACH & DELIVERY STATUS WEBHOOK (Twilio, SendGrid, Resend Callbacks) ─
 app.post('/api/public/webhooks/delivery', async (req, res) => {
+  if (process.env.NODE_ENV !== 'development' && process.env.NODE_ENV !== 'test') {
+    return res.status(410).json({ error: 'Delivery status webhooks are disabled until provider-specific signature validation and replay protection are configured.' });
+  }
   const provider = (req.query.provider as string || req.body.provider || 'generic') as any;
   const rawStatus = req.body.status || req.body.event || req.body.MessageStatus || req.body.type || '';
   const leadId = req.body.leadId || req.body.custom_args?.leadId || req.body.metadata?.leadId;
@@ -1220,64 +1285,83 @@ app.post('/api/landing-pages/save', authenticate, async (req, res) => {
 });
 
 app.post('/api/public/landing-leads', async (req, res) => {
-  const { contractorId, landingPageId, name, phone, serviceDetails, city } = req.body;
+  const { landingPageId, name, phone, serviceDetails } = req.body || {};
 
-  if (!phone || !name) {
-    return res.status(400).json({ error: 'Name and phone are required for this service request' });
+  const normalizedName = typeof name === 'string' ? name.trim() : '';
+  const normalizedPhone = typeof phone === 'string' ? phone.trim() : '';
+  const normalizedDetails = typeof serviceDetails === 'string' ? serviceDetails.trim() : '';
+
+  if (!normalizedName || !normalizedPhone) {
+    return res.status(400).json({ error: 'Name and phone are required for this service request.' });
   }
-  if (!contractorId || typeof contractorId !== 'string') {
-    return res.status(400).json({ error: 'This landing page is missing its contractor assignment. Please contact the business directly.' });
+  if (normalizedName.length > 120 || normalizedPhone.length > 40 || normalizedDetails.length > 2000) {
+    return res.status(400).json({ error: 'One or more fields exceed the permitted length.' });
+  }
+  if (typeof landingPageId !== 'string' || !landingPageId.trim() || landingPageId.length > 128) {
+    return res.status(400).json({ error: 'A valid published landing page is required.' });
   }
 
   try {
+    // Tenant ownership is derived from the saved landing-page artifact.
+    // Never trust a contractorId supplied by an anonymous browser request.
+    const [artifact] = await pgDb
+      .select()
+      .from(hermesLabArtifacts)
+      .where(and(
+        eq(hermesLabArtifacts.id, landingPageId.trim()),
+        eq(hermesLabArtifacts.toolId, 'landing_page')
+      ))
+      .limit(1);
+
+    const pageOwnership = resolvePublishedLandingPageOwner(artifact);
+    if (!pageOwnership.valid) {
+      return res.status(404).json({ error: 'This landing page is unavailable or has not been published.' });
+    }
+
+    const targetContractorId = pageOwnership.contractorId;
     const [assignedContractor] = await pgDb
       .select({ id: contractors.id })
       .from(contractors)
-      .where(eq(contractors.id, contractorId))
+      .where(eq(contractors.id, targetContractorId))
       .limit(1);
+
     if (!assignedContractor) {
-      return res.status(404).json({ error: 'The assigned business could not be found.' });
+      return res.status(404).json({ error: 'The business associated with this landing page could not be found.' });
     }
-    const targetContractorId = assignedContractor.id;
+
+    const pageCity = pageOwnership.city;
 
     const leadId = crypto.randomUUID();
-    const phoneEncrypted = encrypt(String(phone));
-
-    await pgDb.insert(leads).values({
+    const phoneEncrypted = encrypt(normalizedPhone);
+    const leadValues = {
       id: leadId,
       contractorId: targetContractorId,
-      businessName: `${name} (Homeowner Inbound)`,
-      ownerName: name,
+      businessName: `${normalizedName} (Landing Page Inquiry)`,
+      ownerName: normalizedName,
       email: null,
       phone: '[ENCRYPTED]',
       emailEncrypted: null,
       phoneEncrypted,
-      city: city || 'Local Territory',
-      niche: 'Emergency Inbound',
+      city: pageCity,
+      niche: pageOwnership.trade || 'Inbound Inquiry',
       source: 'landing_page',
       status: 'new',
-      urgencyScore: 9.8,
-      predictedLtv: 450.0,
-      notes: `Landing Page: ${landingPageId || 'direct'} | Details: ${serviceDetails || 'Emergency dispatch requested'}`
-    });
+      urgencyScore: null,
+      predictedLtv: null,
+      predictedMonthlyLostRevenueUsd: null,
+      notes: `Landing Page: ${landingPageId.trim()} | Details: ${normalizedDetails || 'No additional details supplied'}`
+    };
+
+    await pgDb.insert(leads).values(leadValues);
 
     try {
       db.addLead({
-        id: leadId,
-        contractorId: targetContractorId,
-        businessName: `${name} (Homeowner Inbound)`,
-        ownerName: name,
-        email: null,
-        phone: '[ENCRYPTED]',
-        emailEncrypted: null,
+        ...leadValues,
+        // db.addLead encrypts a supplied plaintext phone; pass undefined here
+        // so it preserves the already-encrypted value rather than encrypting
+        // the database display placeholder "[ENCRYPTED]".
+        phone: undefined,
         phoneEncrypted,
-        city: city || 'Local Territory',
-        niche: 'Emergency Inbound',
-        source: 'landing_page',
-        status: 'new',
-        urgencyScore: 9.8,
-        predictedLtv: 450.0,
-        notes: `Landing Page: ${landingPageId || 'direct'} | Details: ${serviceDetails || 'Emergency dispatch requested'}`,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
       } as any);
@@ -1290,11 +1374,11 @@ app.post('/api/public/landing-leads', async (req, res) => {
         entityType: 'lead',
         entityId: leadId,
         actor: 'LandingPageLeadIngest',
-        details: `Homeowner ${name} submitted priority emergency dispatch request via Landing Page ${landingPageId || 'direct'}.`,
+        details: `A visitor submitted an inquiry through landing page ${landingPageId.trim()}.`,
         metadata: {
-          landingPageId,
-          serviceDetails: serviceDetails || '',
-          city: city || ''
+          landingPageId: landingPageId.trim(),
+          serviceDetails: normalizedDetails,
+          city: pageCity
         }
       });
     } catch (_) {}
@@ -1303,19 +1387,19 @@ app.post('/api/public/landing-leads', async (req, res) => {
       broadcastNotification(
         targetContractorId,
         'lead_captured',
-        '⚡ New Priority Homeowner Inbound!',
-        `${name} (${phone}) requested urgent dispatch: ${serviceDetails || 'Service consultation'}`
+        'New landing-page inquiry',
+        `${normalizedName} submitted a service inquiry. Contact details are stored in the lead record.`
       );
     } catch (_) {}
 
-    res.json({
+    return res.status(201).json({
       success: true,
       leadId,
-      message: 'Priority dispatch request confirmed. Our dispatch team is contacting you immediately.'
+      message: 'Your request has been received. The business will contact you using the details you provided.'
     });
   } catch (err: any) {
     console.error('[Public Landing Lead Ingest Error]', err);
-    res.status(500).json({ error: 'Failed to process dispatch request' });
+    return res.status(500).json({ error: 'Failed to process your request. Please try again or contact the business directly.' });
   }
 });
 
@@ -1947,42 +2031,23 @@ app.all(['/api/webhooks/twilio', '/api/webhooks/whatsapp'], async (req, res) => 
 
     console.log(`[Inbound Webhook Received] Channel: ${isWhatsApp ? 'WhatsApp' : 'SMS'} | From: ${cleanFrom} | Body: "${rawBody}"`);
 
-    // Match against existing leads in local DB & PostgreSQL
+    // Only update a lead when the sender can be matched unambiguously.
+    // Never assign an unmatched sender to the first contractor or invent business data.
     const allLeads = db.getLeads() || [];
-    let matchedLead = allLeads.find(l => {
+    const matchedCandidates = allLeads.filter(l => {
       const p = (l.phone || '').replace(/\D/g, '');
-      return p.length >= 7 && (p.endsWith(fromDigits) || fromDigits.endsWith(p));
+      return p.length >= 7 && fromDigits.length >= 7 && (p === fromDigits);
     });
 
+    if (matchedCandidates.length !== 1) {
+      return res.status(404).type('text/xml').send('<?xml version="1.0" encoding="UTF-8"?><Response></Response>');
+    }
+
+    let matchedLead = matchedCandidates[0];
+    const targetContractorId = matchedLead.contractorId;
     const now = new Date().toISOString();
-    let targetContractorId = matchedLead ? matchedLead.contractorId : 'demo_contractor';
 
-    if (!matchedLead) {
-      // Find first contractor to assign inbound lead
-      const contractorsList = db.getContractors();
-      if (contractorsList.length > 0) {
-        targetContractorId = contractorsList[0].id;
-      }
-
-      // Create new authentic inbound lead
-      const newLeadId = 'lead_inbound_' + crypto.randomBytes(6).toString('hex');
-      const senderTitle = profileName ? `${profileName} (${cleanFrom})` : `Inbound Prospect (${cleanFrom})`;
-      matchedLead = db.addLead({
-        contractorId: targetContractorId,
-        businessName: senderTitle,
-        ownerName: profileName || 'Inbound Prospect',
-        phone: cleanFrom,
-        email: `inbound_${fromDigits || 'lead'}@contractor-inbound.ca`,
-        city: 'Calgary',
-        serviceType: 'Commercial Roofing & Exterior',
-        source: isWhatsApp ? 'whatsapp_inbound' : 'sms_inbound',
-        status: 'contacted',
-        urgencyScore: 9.2,
-        predictedLtvUsd: 8500,
-        notes: `[Inbound ${isWhatsApp ? 'WhatsApp' : 'SMS'} - ${now.slice(0, 16)}]: ${rawBody}`
-      });
-    } else {
-      // Advance lead status to 'contacted' if it was new
+    // Advance lead status to 'contacted' if it was new
       const newStatus = (matchedLead.status === 'new' ? 'contacted' : matchedLead.status) as 'new' | 'contacted' | 'converted' | 'dead';
       const updatedNotes = `${matchedLead.notes || ''}\n[Inbound ${isWhatsApp ? 'WhatsApp' : 'SMS'} - ${now.slice(0, 16)}]: ${rawBody}`.trim();
       
@@ -1991,7 +2056,6 @@ app.all(['/api/webhooks/twilio', '/api/webhooks/whatsapp'], async (req, res) => 
         notes: updatedNotes
       });
       matchedLead.status = newStatus;
-    }
 
     // Commit cryptographic ledger audit entry
     try {
@@ -2052,11 +2116,7 @@ app.post('/api/webhooks/test-inbound', authenticate, async (req, res) => {
       });
     }
 
-    if (!targetLead) {
-      // Pick first lead or create one
-      targetLead = db.getLeads(contractorId)[0];
-    }
-
+    // Do not attach a simulated inbound message to an unrelated lead when no match exists.
     if (targetLead) {
       const newStatus = (targetLead.status === 'new' ? 'contacted' : targetLead.status) as 'new' | 'contacted' | 'converted' | 'dead';
       const updatedNotes = `${targetLead.notes || ''}\n[Simulated ${isWhatsApp ? 'WhatsApp' : 'SMS'} - ${now.slice(0, 16)}]: ${body}`.trim();
@@ -2083,7 +2143,9 @@ app.post('/api/webhooks/test-inbound', authenticate, async (req, res) => {
       from,
       body,
       leadMatched: targetLead ? { id: targetLead.id, name: targetLead.businessName, status: 'responded' } : null,
-      message: `Inbound ${channelName} webhook successfully processed and alerted to operator.`
+      message: targetLead
+        ? `Simulated inbound ${channelName} event attached to the matched lead and operator alerted.`
+        : `Simulated inbound ${channelName} event alerted to the operator; no existing lead matched and no lead was created.`
     });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -4564,7 +4626,11 @@ app.get('/api/connectors/credentials', authenticate, (req, res) => {
   const contractorId = (req as any).contractorId;
   try {
     const creds = db.getConnectorCredentials(contractorId);
-    res.json(creds);
+    const configured = Object.fromEntries(
+      Object.entries(creds).map(([service, value]) => [service, Boolean(value)])
+    );
+    // Never send connector secrets back to the browser.
+    res.json({ configured });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
@@ -4572,20 +4638,28 @@ app.get('/api/connectors/credentials', authenticate, (req, res) => {
 
 app.post('/api/connectors/credentials', authenticate, (req, res) => {
   const contractorId = (req as any).contractorId;
-  const { service, keyVal } = req.body;
-  if (!service) {
-    return res.status(400).json({ error: 'Service name is required' });
+  const { service, keyVal } = req.body || {};
+  const allowedServices = new Set([
+    'stripe', 'twilio', 'sendgrid', 'googleMaps', 'googleDrive', 'linkedin',
+    'salesforce', 'hubspot', 'mailchimp', 'notion', 'googleAds', 'metaAds',
+    'ga4', 'quickbooks', 'slack', 'resend'
+  ]);
+  if (typeof service !== 'string' || !allowedServices.has(service)) {
+    return res.status(400).json({ error: 'A supported connector service is required.' });
+  }
+  if (typeof keyVal !== 'string' || !keyVal.trim() || keyVal.length > 8192) {
+    return res.status(400).json({ error: 'A non-empty connector credential is required.' });
   }
   try {
-    db.saveConnectorCredential(contractorId, service, keyVal || '');
+    db.saveConnectorCredential(contractorId, service, keyVal.trim());
     db.addAuditLog({
       contractorId,
       action: 'CONNECTOR_KEY_UPDATED',
       details: `Updated API credentials for connector service: ${service}`
     });
-    res.json({ success: true, service });
+    res.json({ success: true, service, configured: true });
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: 'Unable to securely save connector credentials.' });
   }
 });
 
@@ -4593,11 +4667,12 @@ app.get('/api/connectors/health', authenticate, (req, res) => {
   const contractorId = (req as any).contractorId;
   try {
     const creds = db.getConnectorCredentials(contractorId);
-    
+
     const services = [
       { id: 'stripe', name: 'Stripe Billing API', category: 'billing' },
       { id: 'twilio', name: 'Twilio SMS Gateway', category: 'communication' },
       { id: 'sendgrid', name: 'SendGrid Mail API', category: 'communication' },
+      { id: 'resend', name: 'Resend Email API', category: 'communication' },
       { id: 'googleMaps', name: 'Google Maps Platform', category: 'local_business' },
       { id: 'googleDrive', name: 'Google Drive Asset Cloud', category: 'storage' },
       { id: 'linkedin', name: 'LinkedIn Sales Integrator', category: 'marketing' },
@@ -4608,37 +4683,35 @@ app.get('/api/connectors/health', authenticate, (req, res) => {
       { id: 'googleAds', name: 'Google Ads API', category: 'marketing' },
       { id: 'metaAds', name: 'Meta Marketing API', category: 'marketing' },
       { id: 'ga4', name: 'GA4 & Search Console', category: 'analytics' },
+      { id: 'quickbooks', name: 'QuickBooks Accounting API', category: 'finance' },
       { id: 'slack', name: 'Slack Operations Webhook', category: 'communication' }
     ];
 
-    const healthStatus = services.map(svc => {
-      const hasKey = Boolean(creds[svc.id] && creds[svc.id].trim().length > 0);
-      let status: 'connected' | 'not_connected' | 'error' = hasKey ? 'connected' : 'not_connected';
-      let health: 'excellent' | 'degraded' | 'critical' | 'none' = hasKey ? 'excellent' : 'none';
-      
-      if (!hasKey && ['stripe', 'googleMaps', 'twilio'].includes(svc.id)) {
-        health = 'critical';
-        status = 'error';
-      }
-
+    // A saved API key proves configuration only. It does not prove that the
+    // provider authenticated successfully or that a sync has completed.
+    const healthStatus = services.map(service => {
+      const hasKey = Boolean(creds[service.id] && creds[service.id].trim().length > 0);
       return {
-        ...svc,
-        status,
-        health,
-        configured: hasKey,
-        lastSync: hasKey ? new Date().toISOString() : undefined
+        ...service,
+        status: hasKey ? 'configured' : 'not_configured',
+        health: hasKey ? 'unverified' : 'none',
+        configured: hasKey
       };
     });
 
-    const failingOrMissing = healthStatus.filter(s => s.health === 'critical' || s.health === 'none' || s.status === 'error');
+    const configuredCount = healthStatus.filter(service => service.configured).length;
+    const unconfiguredCount = healthStatus.length - configuredCount;
 
     res.json({
       connectors: healthStatus,
       summary: {
         total: healthStatus.length,
-        connected: healthStatus.filter(s => s.status === 'connected').length,
-        failingOrMissingCount: failingOrMissing.length,
-        allHealthy: failingOrMissing.length === 0
+        configuredCount,
+        unverifiedCount: configuredCount,
+        unconfiguredCount,
+        failingOrMissingCount: unconfiguredCount,
+        verifiedCount: 0,
+        allHealthy: false
       }
     });
   } catch (err: any) {
@@ -4680,102 +4753,35 @@ app.get('/api/financials/overview', authenticate, async (req, res) => {
   const contractorId = (req as any).contractorId;
   try {
     let projects: any[] = [];
-    let allLeads: any[] = [];
-    let allCampaigns: any[] = [];
     try {
-      projects = await pgDb.select().from(clientProjects).where(eq(clientProjects.contractorId, contractorId)) || [];
-      allLeads = await pgDb.select().from(leads).where(eq(leads.contractorId, contractorId)) || [];
-      allCampaigns = await pgDb.select().from(campaigns).where(eq(campaigns.contractorId, contractorId)) || [];
+      projects = await pgDb
+        .select()
+        .from(clientProjects)
+        .where(eq(clientProjects.contractorId, contractorId)) || [];
     } catch (pgErr) {
       projects = db.getClientProjects(contractorId) || [];
-      allLeads = db.getLeads(contractorId) || [];
-      allCampaigns = db.getCampaigns(contractorId) || [];
     }
 
-    const safeProjects = Array.isArray(projects) ? projects : [];
-    const safeLeads = Array.isArray(allLeads) ? allLeads : [];
-    const safeCampaigns = Array.isArray(allCampaigns) ? allCampaigns : [];
-
-    const activeProjects = safeProjects.filter(p => p && p.status !== 'completed');
-    const currentMrrUsd = activeProjects.reduce((sum, p) => sum + (Number(p?.monthlyRetainerUsd) || 0), 0);
-    const arrUsd = currentMrrUsd * 12;
-    const activeClientCount = activeProjects.length;
-    const totalCampaignSpend = safeCampaigns.reduce((sum, c) => sum + (Number(c?.budgetUsd) || 0), 0);
-    const convertedCount = Math.max(1, safeLeads.filter(l => l && l.status === 'converted').length);
-    const blendedCacUsd = Math.round(totalCampaignSpend / convertedCount) || 350;
-
-    const averageContractLengthMonths = 10;
-    const averageMonthlyRetainer = activeClientCount > 0 ? currentMrrUsd / activeClientCount : 2400;
-    const averageLtvUsd = Math.round(averageMonthlyRetainer * averageContractLengthMonths);
-    const ltvToCacRatio = Number((averageLtvUsd / Math.max(1, blendedCacUsd)).toFixed(1));
-    const churnRatePercent = 2.4;
-
-    const projectedGrowthRateMonthly = 0.12; // 12% MoM
-    const projectedMrr6Months = Math.round(currentMrrUsd * Math.pow(1 + projectedGrowthRateMonthly, 6));
-    const projectedMrr12Months = Math.round(currentMrrUsd * Math.pow(1 + projectedGrowthRateMonthly, 12));
-
-    // Generate 6-month historical MRR
-    const monthNames = ['Oct', 'Nov', 'Dec', 'Jan', 'Feb', 'Mar'];
-    const baseMrr = Math.max(1200, Math.round(currentMrrUsd * 0.45));
-    const mrrHistory = monthNames.map((m, idx) => {
-      const factor = (idx + 1) / monthNames.length;
-      const computedMrr = Math.round(baseMrr + (currentMrrUsd - baseMrr) * factor);
-      return {
-        month: m,
-        mrr: computedMrr,
-        clients: Math.max(1, Math.round(activeClientCount * factor)),
-        newRevenue: Math.round(computedMrr * 0.25),
-        churnedRevenue: Math.round(computedMrr * 0.03)
-      };
-    });
-
-    // Package distribution
-    const tierDistribution = [
-      {
-        tier: 'Growth' as const,
-        count: safeProjects.filter(p => p && p.packageTier === 'Growth').length,
-        totalRevenue: safeProjects.filter(p => p && p.packageTier === 'Growth').reduce((s, p) => s + (Number(p?.monthlyRetainerUsd) || 0), 0)
-      },
-      {
-        tier: 'Dominance' as const,
-        count: safeProjects.filter(p => p && p.packageTier === 'Dominance').length,
-        totalRevenue: safeProjects.filter(p => p && p.packageTier === 'Dominance').reduce((s, p) => s + (Number(p?.monthlyRetainerUsd) || 0), 0)
-      },
-      {
-        tier: 'Enterprise' as const,
-        count: safeProjects.filter(p => p && p.packageTier === 'Enterprise').length,
-        totalRevenue: safeProjects.filter(p => p && p.packageTier === 'Enterprise').reduce((s, p) => s + (Number(p?.monthlyRetainerUsd) || 0), 0)
-      }
-    ];
-
+    const snapshot = buildFinancialSnapshotCore(Array.isArray(projects) ? projects : []);
     res.json({
       success: true,
-      currentMrrUsd,
-      arrUsd,
-      activeClientCount,
-      averageContractLengthMonths,
-      averageLtvUsd,
-      blendedCacUsd,
-      ltvToCacRatio,
-      churnRatePercent,
-      cashRunwayMonths: 18.5,
-      projectedMrr6Months,
-      projectedMrr12Months,
-      mrrHistory,
-      tierDistribution,
-      timesFmForecast: {
-        model: 'TimesFM 2.5 Zero-Shot Foundation Model',
-        demandIndex: 1.28,
-        predictedPeakMonth: 'May',
-        seasonalAdMultiplier: 1.35,
-        confidenceScore: 94.2
+      ...snapshot,
+      dataQuality: {
+        currentMrr: 'Calculated from active client-project monthly retainers.',
+        arr: 'Annualized contract run-rate (current MRR multiplied by 12); not collected revenue.',
+        unavailable: [
+          'CAC requires verified acquisition spend and attributed new customers.',
+          'LTV and average contract length require historical contract-duration data.',
+          'Churn requires a dated customer cohort and churn-event history.',
+          'Cash runway requires verified cash balance and operating burn.',
+          'MRR history and projections require dated financial snapshots or a validated forecasting model.'
+        ]
       }
     });
   } catch (err: any) {
     res.status(500).json({ success: false, error: err.message || 'Failed to fetch financial metrics' });
   }
 });
-
 
 
 // ─── NEURAL NETWORK TOPOLOGY API ──────────────────────────────────────────────
@@ -5376,7 +5382,7 @@ app.post('/api/autonomous/offline-objection', authenticate, (req, res) => {
 
 // ─── NEON POSTGRESQL CONNECTION & DATA SYNC ENDPOINTS ────────────────────────
 
-app.post('/api/system/postgres-connect', authenticate, async (req, res) => {
+app.post('/api/system/postgres-connect', authenticate, requireRole('admin'), async (req, res) => {
   const { databaseUrl } = req.body;
   if (!databaseUrl) {
     return res.status(400).json({ error: 'databaseUrl is required' });
@@ -5399,7 +5405,7 @@ app.post('/api/system/postgres-connect', authenticate, async (req, res) => {
   }
 });
 
-app.post('/api/system/postgres-sync', authenticate, async (req, res) => {
+app.post('/api/system/postgres-sync', authenticate, requireRole('admin'), async (req, res) => {
   const contractorId = (req as any).contractorId;
   
   try {
@@ -5429,15 +5435,20 @@ app.post('/api/system/postgres-sync', authenticate, async (req, res) => {
       for (const lead of localLeads) {
         await client.query(`
           INSERT INTO leads (
-            id, contractor_id, business_name, city, niche, owner_name, 
-            phone, email, website_url, review_count, review_score, 
-            predicted_monthly_lost_revenue_usd, status, performance_score, 
-            ssl_status, urgency_score, predicted_ltv, updated_at
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, CURRENT_TIMESTAMP)
+            id, contractor_id, business_name, city, niche, owner_name,
+            phone, email, phone_encrypted, email_encrypted, website_url,
+            review_count, review_score, predicted_monthly_lost_revenue_usd,
+            status, performance_score, ssl_status, urgency_score, predicted_ltv, updated_at
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, CURRENT_TIMESTAMP)
           ON CONFLICT (id) DO UPDATE SET
             status = EXCLUDED.status,
+            phone = NULL,
+            email = NULL,
+            phone_encrypted = EXCLUDED.phone_encrypted,
+            email_encrypted = EXCLUDED.email_encrypted,
             urgency_score = EXCLUDED.urgency_score,
             predicted_monthly_lost_revenue_usd = EXCLUDED.predicted_monthly_lost_revenue_usd,
+            predicted_ltv = EXCLUDED.predicted_ltv,
             updated_at = CURRENT_TIMESTAMP;
         `, [
           lead.id,
@@ -5446,17 +5457,19 @@ app.post('/api/system/postgres-sync', authenticate, async (req, res) => {
           lead.city,
           (lead as any).niche || lead.serviceType || 'general',
           lead.ownerName || null,
-          (lead as any).phone || null,
-          (lead as any).email || null,
+          null,
+          null,
+          lead.phoneEncrypted || ((lead as any).phone ? encrypt((lead as any).phone) : null),
+          lead.emailEncrypted || ((lead as any).email ? encrypt((lead as any).email) : null),
           (lead as any).websiteUrl || null,
-          (lead as any).reviewCount || 0,
-          (lead as any).googleRating || 0,
-          lead.predictedLtvUsd ? Math.round(lead.predictedLtvUsd * 0.4) : 1800,
+          (lead as any).reviewCount ?? 0,
+          (lead as any).googleRating ?? 0,
+          (lead as any).predictedMonthlyLostRevenueUsd ?? null,
           lead.status,
-          (lead as any).performanceScore || 50,
-          (lead as any).sslStatus || 'secured',
-          lead.urgencyScore || 5.0,
-          lead.predictedLtvUsd || 5000
+          (lead as any).performanceScore ?? null,
+          (lead as any).sslStatus ?? null,
+          lead.urgencyScore ?? null,
+          lead.predictedLtvUsd ?? null
         ]);
         syncedLeads++;
       }
@@ -7904,18 +7917,56 @@ async function startServer() {
       const ledger = db.getStructuredLedger(contractorId, 10);
       const integrity = db.verifyLedgerIntegrity(contractorId);
       const allLeads = await pgDb.select().from(leads).where(eq(leads.contractorId, contractorId));
-      
+
       const stageCounts = {
         new: allLeads.filter(l => l.status === 'new').length,
         contacted: allLeads.filter(l => l.status === 'contacted').length,
-        converted: allLeads.filter(l => l.status === 'converted').length,
-        dead: allLeads.filter(l => l.status === 'dead').length,
+        converted: allLeads.filter(l => ['converted', 'closed_won', 'customer', 'won'].includes(l.status)).length,
+        dead: allLeads.filter(l => ['dead', 'lost', 'closed_lost'].includes(l.status)).length,
         total: allLeads.length
       };
 
-      const encryptedCount = allLeads.filter(l => !!l.phoneEncrypted || !!l.emailEncrypted).length;
-      const allRevenues = db.getRevenues(contractorId);
-      const totalRevenue = allRevenues.reduce((sum, r) => sum + (r.amountUsd || 0), 0);
+      const encryptedCount = allLeads.filter(l => Boolean(l.phoneEncrypted || l.emailEncrypted)).length;
+      const plaintextContactCount = allLeads.filter(l =>
+        Boolean((l.phone && l.phone !== '[ENCRYPTED]') || (l.email && l.email !== '[ENCRYPTED]'))
+      ).length;
+
+      const testSecret = 'hal_phase1_status_probe_' + crypto.randomUUID();
+      const cipherOne = encrypt(testSecret);
+      const cipherTwo = encrypt(testSecret);
+      const vaultCryptoVerified =
+        cipherOne.split(':')[0] !== cipherTwo.split(':')[0] &&
+        decrypt(cipherOne) === testSecret &&
+        decrypt(cipherOne.slice(0, -4) + '0000') === '';
+      const vaultVerified = plaintextContactCount === 0 && vaultCryptoVerified;
+
+      const pipelineStagesKnown = allLeads.every(lead => isKnownCrmStage(lead.status));
+      const transitionGateVerified =
+        validateCrmTransition('new', 'contacted').valid &&
+        !validateCrmTransition('unknown_stage', 'contacted').valid;
+      const pipelineVerified = pipelineStagesKnown && transitionGateVerified;
+      const phaseOnePillars = [
+        { name: 'Structured Cryptographic Ledger', verified: integrity.valid, detail: integrity.auditMessage },
+        {
+          name: 'AES-GCM-256 PII Cryptographic Vault',
+          verified: vaultVerified,
+          detail: `${encryptedCount} leads have encrypted contact fields; ${plaintextContactCount} plaintext contact rows detected.`
+        },
+        {
+          name: 'Deterministic Lead → CRM Pipeline',
+          verified: pipelineVerified,
+          detail: `${allLeads.length} leads inspected; ${pipelineStagesKnown ? 'all stages recognized' : 'unknown stages detected'}; transition gate ${transitionGateVerified ? 'passed' : 'failed'}.`
+        }
+      ];
+      const phaseOneVerifiedCount = phaseOnePillars.filter(pillar => pillar.verified).length;
+      const phaseOneComplete = phaseOneVerifiedCount === phaseOnePillars.length;
+      const phaseOneProgress = Math.round((phaseOneVerifiedCount / phaseOnePillars.length) * 100);
+
+      const notVerifiedPillars = (names: string[]) => names.map(name => ({
+        name,
+        verified: false,
+        detail: 'Not independently verified against live runtime evidence in this deployment.'
+      }));
 
       const roadmapPhases = [
         {
@@ -7923,83 +7974,66 @@ async function startServer() {
           id: 'foundation',
           name: 'Foundation',
           subtitle: 'Structured ledger, secure storage, and basic pipeline',
-          status: 'verified_complete',
-          progress: 100,
-          active: false,
+          status: phaseOneComplete ? 'verified_complete' : 'verification_required',
+          progress: phaseOneProgress,
+          active: !phaseOneComplete,
           docs: ['01 - Vision', '02 - Philosophy', '03 - Design Language', '04 - Design System', '05 - Architecture', '06 - UX Principles'],
-          pillars: [
-            { name: 'Structured Cryptographic Ledger', verified: integrity.valid, detail: `${integrity.totalEntries} sequenced blocks` },
-            { name: 'AES-GCM-256 PII Cryptographic Vault', verified: true, detail: `${encryptedCount} encrypted records` },
-            { name: 'Deterministic Lead -> CRM Pipeline', verified: true, detail: `${stageCounts.total} pipeline entities` }
-          ]
+          pillars: phaseOnePillars
         },
         {
           phase: 2,
           id: 'intelligence',
           name: 'Intelligence',
-          subtitle: 'Automated local harvesting, geo scoring, reputation scraping',
-          status: 'verified_complete',
-          progress: 100,
+          subtitle: 'Territory research, geo scoring, and reputation analysis',
+          status: 'not_verified',
+          progress: 0,
           active: false,
           docs: ['07 - Competitive Scoring', '08 - Geo Intelligence', '09 - Synthetic Scraping', '10 - Reputation Engine'],
-          pillars: [
-            { name: 'Local Territory Harvesting', verified: true, detail: 'Winnipeg / Calgary / Edmonton (Real data Sourced)' },
-            { name: 'Live Geo Ranking & Latency Scoring', verified: true, detail: 'Spatial quadrant clustering & latency routing' },
-            { name: 'Competitor Digital Footprint Audits', verified: true, detail: 'Real-time search, Maps grounding & gap matrix' }
-          ]
+          pillars: notVerifiedPillars(['Local Territory Harvesting', 'Live Geo Ranking & Latency Scoring', 'Competitor Digital Footprint Audits'])
         },
         {
           phase: 3,
           id: 'automation',
           name: 'Automation',
-          subtitle: 'Campaign triggers, cadence scheduling, durable outbox dispatch',
-          status: 'verified_complete',
-          progress: 100,
-          active: true,
+          subtitle: 'Campaign triggers, cadence scheduling, and delivery',
+          status: 'not_verified',
+          progress: 0,
+          active: false,
           docs: ['11 - Campaign Automation', '12 - Sequence Cadences', '13 - Outbox Delivery Engine'],
-          pillars: [
-            { name: 'Durable Multi-Step Outreach Sequencer', verified: true, detail: '4-step Hermes hooks (Active)' },
-            { name: 'Webhook Event Dispatcher & Outbox', verified: true, detail: 'Exponential backoff & HMAC-SHA256 signing' },
-            { name: 'Automated Calendar & Call Triggers', verified: true, detail: 'Autonomous scheduled cron scans' }
-          ]
+          pillars: notVerifiedPillars(['Multi-Step Outreach Sequencer', 'Webhook Event Dispatcher & Outbox', 'Calendar and Call Triggers'])
         },
         {
           phase: 4,
           id: 'multi_agent',
           name: 'Multi-Agent',
-          subtitle: 'Distributed autonomous optimization (Nemotron + Gemini consensus)',
-          status: 'verified_complete',
-          progress: 100,
-          active: true,
+          subtitle: 'Model orchestration, consensus, and optimization',
+          status: 'not_verified',
+          progress: 0,
+          active: false,
           docs: ['14 - Dual-Drive Consensus', '15 - Neural Graph Routing', '16 - Self-Calibration'],
-          pillars: [
-            { name: 'Parallel Engine Consensus (Dual-Drive)', verified: true, detail: 'Gemini 2.5 + Nemotron 70B (96% Alignment)' },
-            { name: 'Adaptive Autonomous Weights', verified: true, detail: 'Bayesian recalibration loop (Active Epoch #14)' },
-            { name: 'Autonomous Strategy Arbitrage', verified: true, detail: 'Closed-loop spend reallocation (+$9,615/mo lift)' }
-          ]
+          pillars: notVerifiedPillars(['Parallel Model Consensus', 'Adaptive Calibration', 'Strategy Arbitrage'])
         },
         {
           phase: 5,
           id: 'expansion',
           name: 'Expansion',
-          subtitle: 'Global enterprise deployment & multi-territory business brain',
-          status: 'verified_complete',
-          progress: 100,
-          active: true,
+          subtitle: 'Multi-organization, edge integrations, and knowledge transfer',
+          status: 'not_verified',
+          progress: 0,
+          active: false,
           docs: ['17 - Multi-Tenant Isolation', '18 - Enterprise SLA & Auditing', '19 - Global Market Brain'],
-          pillars: [
-            { name: 'Hierarchical Multi-Org Management', verified: true, detail: 'Enterprise tenant isolation (SHA-256 vault keys)' },
-            { name: 'Decentralized Edge Federation', verified: true, detail: 'Multi-region failover (<25ms latency)' },
-            { name: 'Cross-Industry Knowledge Transfer', verified: true, detail: 'Generalized business ontology (Zero-PII priors)' }
-          ]
+          pillars: notVerifiedPillars(['Hierarchical Multi-Org Management', 'Edge Federation', 'Cross-Industry Knowledge Transfer'])
         }
       ];
+
+      const allRevenues = db.getRevenues(contractorId);
+      const totalRevenue = allRevenues.reduce((sum, revenue) => sum + (revenue.amountUsd || 0), 0);
 
       res.json({
         success: true,
         phase: 'Phase 1: Foundation',
         currentRoadmapPhase: 1,
-        foundationVerified: integrity.valid,
+        foundationVerified: phaseOneComplete,
         roadmapPhases,
         pillars: {
           ledger: {
@@ -8012,17 +8046,18 @@ async function startServer() {
           },
           storage: {
             name: 'AES-GCM-256 Cryptographic PII Vault',
-            status: 'ACTIVE',
+            status: vaultVerified ? 'ACTIVE' : 'DEGRADED',
             algorithm: 'AES-256-GCM',
             ivLengthBytes: 12,
             tagLengthBytes: 16,
             encryptedLeadsCount: encryptedCount,
-            keyDerivation: '32-Byte Secret SHA-256 Derivation',
-            plaintextLeakCheck: 'PASSED_ZERO_LEAKAGE'
+            plaintextContactCount,
+            keyDerivation: 'LEAD_ENCRYPTION_KEY_B64 via SHA-256 derivation',
+            plaintextLeakCheck: plaintextContactCount === 0 ? 'NO_PLAINTEXT_CONTACT_FIELDS_FOUND' : 'PLAINTEXT_CONTACT_FIELDS_FOUND'
           },
           pipeline: {
             name: 'Basic Pipeline Engine',
-            status: 'OPERATIONAL',
+            status: pipelineVerified ? 'OPERATIONAL' : 'DEGRADED',
             stageCounts,
             totalRevenue,
             revenueRecordsCount: allRevenues.length
@@ -8312,14 +8347,19 @@ async function startServer() {
   // 4. Phase 2 Territory Real Data Harvest & Seed Purge
   app.post('/api/roadmap/phase2/harvest-territory', authenticate, async (req, res) => {
     const contractorId = (req as any).contractorId;
-    const { city = 'Winnipeg', niche = 'Commercial HVAC', purgeMock = true } = req.body || {};
+    const { city, niche, purgeMock = false } = req.body || {};
+    if (typeof city !== 'string' || !city.trim() || typeof niche !== 'string' || !niche.trim()) {
+      return res.status(400).json({ error: 'City and contractor niche are required.' });
+    }
 
     try {
       // 1. Optionally purge static mock seed files
       let purgedCount = 0;
       if (purgeMock) {
-        await pgDb.delete(leads).where(and(eq(leads.contractorId, contractorId), like(leads.id, 'lead_seed_%')));
-        purgedCount = 1;
+        const deletedSeeds = await pgDb.delete(leads)
+          .where(and(eq(leads.contractorId, contractorId), like(leads.id, 'lead_seed_%')))
+          .returning({ id: leads.id });
+        purgedCount = deletedSeeds.length;
       }
 
       // 2. Harvest actual active businesses
@@ -8331,16 +8371,19 @@ async function startServer() {
         const id = crypto.randomUUID();
         const rawEmail = hl.email ? String(hl.email) : null;
         const rawPhone = hl.phone ? String(hl.phone) : null;
-        const emailEncrypted = rawEmail ? encrypt(rawEmail) : null;
-        const phoneEncrypted = rawPhone ? encrypt(rawPhone) : null;
+        const sourceVerified = hl.verificationStatus === 'VERIFIED' && !hl.isSynthetic;
+        const verifiedEmail = sourceVerified ? rawEmail : null;
+        const verifiedPhone = sourceVerified ? rawPhone : null;
+        const emailEncrypted = verifiedEmail ? encrypt(verifiedEmail) : null;
+        const phoneEncrypted = verifiedPhone ? encrypt(verifiedPhone) : null;
 
         const [addedLead] = await pgDb.insert(leads).values({
           id,
           contractorId,
           businessName: hl.businessName,
-          ownerName: hl.ownerName || 'General Manager',
-          email: rawEmail ? '[ENCRYPTED]' : '',
-          phone: rawPhone ? '[ENCRYPTED]' : '',
+          ownerName: sourceVerified ? (hl.ownerName || null) : null,
+          email: verifiedEmail ? '[ENCRYPTED]' : null,
+          phone: verifiedPhone ? '[ENCRYPTED]' : null,
           emailEncrypted,
           phoneEncrypted,
           isSynthetic: Boolean(hl.isSynthetic),
@@ -8349,13 +8392,13 @@ async function startServer() {
           niche: hl.serviceType || niche,
           source: 'harvested_intelligence',
           status: 'new',
-          urgencyScore: Math.round((hl.sentimentScore || 0.8) * 100),
-          predictedLtv: (hl as any).predictedLtvUsd ?? 0,
-          notes: hl.notes || `Harvested real business profile for ${city} ${niche}.`,
-          websiteUrl: hl.websiteUrl,
-          performanceScore: hl.performanceScore,
-          sslStatus: hl.sslStatus,
-          reviewCount: hl.reviewCount,
+          urgencyScore: null,
+          predictedLtv: null,
+          notes: hl.notes ? `AI-generated research note (not independently verified): ${hl.notes}` : 'AI-assisted discovery candidate; independently verified details are not available.',
+          websiteUrl: sourceVerified ? hl.websiteUrl : null,
+          performanceScore: null,
+          sslStatus: null,
+          reviewCount: null,
           verificationStatus: (hl as any).verificationStatus || (hl.isSynthetic ? 'FABRICATED_REJECTED' : 'UNVERIFIED_STAGING'),
           dnsVerified: (hl as any).dnsVerified !== undefined ? Boolean((hl as any).dnsVerified) : false,
         }).returning();
@@ -8366,7 +8409,7 @@ async function startServer() {
           leadId: addedLead.id,
           eventType: 'LeadCreated',
           newStage: 'new',
-          notes: 'Harvested real-world business profile with active Website & Reputation Intelligence.'
+          notes: `AI-assisted discovery candidate; verification status: ${(hl as any).verificationStatus || 'UNVERIFIED_STAGING'}.`
         });
 
         // Record in cryptographic ledger
@@ -8376,7 +8419,7 @@ async function startServer() {
           entityType: 'lead',
           entityId: addedLead.id,
           actor: 'HAL Territory Intelligence Harvester',
-          details: `Harvested business profile: ${addedLead.businessName} (${addedLead.city})`,
+          details: `Recorded discovery candidate: ${addedLead.businessName} (${addedLead.city}); verification status: ${addedLead.verificationStatus || 'UNVERIFIED_STAGING'}.`,
           metadata: { city: addedLead.city, niche: addedLead.niche, source: 'harvested_intelligence' }
         });
 
@@ -8390,14 +8433,18 @@ async function startServer() {
         entityType: 'territory_intel',
         entityId: 'harvest_' + Date.now(),
         actor: 'HAL Territory Intelligence Harvester',
-        details: `Harvested ${savedLeads.length} live business profiles in ${city} (${niche}) with active SEO and Speed metrics`,
+        details: `Processed ${savedLeads.length} discovery candidates in ${city} (${niche}); verified: ${savedLeads.filter(lead => lead.verificationStatus === 'VERIFIED' && !lead.isSynthetic).length}; unverified: ${savedLeads.filter(lead => lead.verificationStatus !== 'VERIFIED' || lead.isSynthetic).length}.`,
         metadata: { city, niche, harvestedCount: savedLeads.length, purgedMockSeeds: purgeMock }
       });
 
       res.json({
         success: true,
         harvestedCount: savedLeads.length,
+        verifiedCount: savedLeads.filter(lead => lead.verificationStatus === 'VERIFIED' && !lead.isSynthetic).length,
+        unverifiedCount: savedLeads.filter(lead => lead.verificationStatus !== 'VERIFIED' || lead.isSynthetic).length,
+        syntheticCount: savedLeads.filter(lead => lead.isSynthetic).length,
         purgedMock: Boolean(purgeMock),
+        purgedCount,
         block: harvestBlock,
         integrity: db.verifyLedgerIntegrity(contractorId)
       });
@@ -8418,17 +8465,17 @@ async function startServer() {
     try {
       const integrity = db.verifyLedgerIntegrity(contractorId);
       const sequences = db.getOutreachSequences(contractorId);
-      const activeSequences = sequences.length > 0 ? sequences : getDefaultCadenceSequences();
+      const sequenceTemplates = getDefaultCadenceSequences();
       const outbox = await pgDb.select().from(conversionOutbox).where(eq(conversionOutbox.contractorId, contractorId));
-      const jobs = await pgDb.select().from(schedulerJobs).orderBy(desc(schedulerJobs.createdAt));
-      const schedulerRules = getDefaultSchedulerRules();
+      const jobs = db.getSchedulerJobs(contractorId);
+      const schedulerTemplates = getDefaultSchedulerRules();
 
-      const verification = verifyPhase3Pillars(activeSequences, outbox, jobs);
+      const verification = verifyPhase3Pillars(sequences, outbox, jobs);
       const ledgerEntries = db.getStructuredLedger(contractorId, 20);
-      const recentAutomationEvents = ledgerEntries.filter(e => 
-        e.eventType.startsWith('phase3_') || 
-        e.eventType.includes('sequence') || 
-        e.eventType.includes('outbox') || 
+      const recentAutomationEvents = ledgerEntries.filter(e =>
+        e.eventType.startsWith('phase3_') ||
+        e.eventType.includes('sequence') ||
+        e.eventType.includes('outbox') ||
         e.eventType.includes('scheduler')
       );
 
@@ -8438,9 +8485,12 @@ async function startServer() {
         currentRoadmapPhase: 3,
         phase3Verified: verification.allPassed,
         verification,
-        sequences: activeSequences,
+        sequences,
+        sequenceTemplates,
         outboxRecords: outbox,
-        schedulerRules,
+        schedulerRules: [],
+        schedulerTemplates,
+        schedulerJobs: jobs,
         recentAutomationEvents,
         integrity
       });
@@ -8456,19 +8506,17 @@ async function startServer() {
 
     try {
       const sequences = db.getOutreachSequences(contractorId);
-      const activeSequences = sequences.length > 0 ? sequences : getDefaultCadenceSequences();
       const outbox = await pgDb.select().from(conversionOutbox).where(eq(conversionOutbox.contractorId, contractorId));
-      const jobs = await pgDb.select().from(schedulerJobs);
-      const verification = verifyPhase3Pillars(activeSequences, outbox, jobs);
+      const jobs = db.getSchedulerJobs(contractorId);
+      const verification = verifyPhase3Pillars(sequences, outbox, jobs);
 
-      // Record verification block in the tamper-evident structured ledger
       const auditBlock = db.recordLedgerEntry({
         contractorId,
         eventType: 'phase3_verification_audit',
         entityType: 'roadmap_milestone',
         entityId: 'p3_verify_' + Date.now(),
         actor: 'HAL Roadmap Phase 3 Auditor',
-        details: 'Executed cryptographic verification across Phase 3: Outreach Sequencer, Webhook Outbox, and Scheduled Triggers',
+        details: 'Inspected persisted outreach sequences, tenant-scoped outbox records, and tenant-scoped scheduler jobs. No external delivery or scheduled trigger is assumed.',
         metadata: {
           pillar1: verification.pillar1.status,
           pillar2: verification.pillar2.status,
@@ -8493,24 +8541,47 @@ async function startServer() {
     }
   });
 
-  // 3. Phase 3 Trigger Cadence Sequence
+  // 3. Phase 3 Cadence Schedule Preview (does not enroll or send)
   app.post('/api/roadmap/phase3/trigger-sequence', authenticate, async (req, res) => {
     const contractorId = (req as any).contractorId;
     const { sequenceId, businessName, ownerName, city, niche } = req.body || {};
 
     try {
-      const sequences = getDefaultCadenceSequences();
-      const targetSeq = sequences.find(s => s.id === sequenceId) || sequences[0];
-      const scheduledSteps = calculateCadenceSchedule(new Date(), targetSeq.steps);
+      const savedSequences = db.getOutreachSequences(contractorId);
+      const savedSequence = savedSequences.find(sequence => sequence.id === sequenceId);
+      const templates = getDefaultCadenceSequences();
+      const templateSequence = templates.find(sequence => sequence.id === sequenceId) || templates[0];
+      const targetSeq: any = savedSequence
+        ? {
+            id: savedSequence.id,
+            name: savedSequence.name,
+            niche: savedSequence.niche || 'general',
+            activeLeadsCount: null,
+            conversionRatePct: null,
+            templateOnly: false,
+            createdAt: savedSequence.createdAt,
+            steps: savedSequence.steps.map((step, index) => ({
+              id: `${savedSequence.id}_step_${index + 1}`,
+              stepNumber: index + 1,
+              dayOffset: step.day,
+              name: step.title,
+              channel: step.channel,
+              triggerCondition: step.purpose,
+              subject: step.title,
+              template: step.template
+            }))
+          }
+        : templateSequence;
+      if (!targetSeq) return res.status(404).json({ success: false, error: 'No saved sequence or preview template is available.' });
 
-      // Record sequence activation in structured ledger
+      const scheduledSteps = calculateCadenceSchedule(new Date(), targetSeq.steps);
       const auditBlock = db.recordLedgerEntry({
         contractorId,
-        eventType: 'phase3_sequence_triggered',
-        entityType: 'cadence_sequence',
+        eventType: 'phase3_sequence_previewed',
+        entityType: 'cadence_sequence_preview',
         entityId: targetSeq.id + '_' + Date.now(),
-        actor: 'HAL Cadence Orchestrator',
-        details: `Enrolled ${businessName || 'Target Prospect'} (${city || 'Local'}) into 4-step sequence: ${targetSeq.name}`,
+        actor: 'HAL Cadence Preview',
+        details: `Generated a schedule preview for ${businessName || 'Target Prospect'} (${city || 'Local'}); no enrollment, persistence, or outreach occurred.`,
         metadata: {
           sequenceId: targetSeq.id,
           businessName,
@@ -8518,175 +8589,146 @@ async function startServer() {
           city,
           niche,
           stepCount: scheduledSteps.length,
-          triggeredAt: new Date().toISOString()
+          mode: 'preview_only',
+          previewedAt: new Date().toISOString()
         }
       });
 
       res.json({
         success: true,
-        enrolled: true,
+        mode: 'preview_only',
+        enrolled: false,
+        persisted: false,
+        dispatchAttempted: false,
+        message: 'Schedule preview generated only. No sequence was enrolled, no job was persisted, and no message was sent.',
         sequence: targetSeq,
         scheduledSteps,
         block: auditBlock,
         integrity: db.verifyLedgerIntegrity(contractorId)
       });
     } catch (err: any) {
-      console.error('[Roadmap Phase 3 Trigger Sequence Error]', err);
+      console.error('[Roadmap Phase 3 Sequence Preview Error]', err);
       res.status(500).json({ success: false, error: err.message });
     }
   });
 
-  // 4. Phase 3 Process Webhook Conversion Outbox
+  // 4. Phase 3 Inspect Webhook Conversion Outbox (does not dispatch)
   app.post('/api/roadmap/phase3/process-outbox', authenticate, async (req, res) => {
     const contractorId = (req as any).contractorId;
 
     try {
-      // Find or generate active outbox records for verification
-      const existingOutbox = await pgDb.select().from(conversionOutbox).where(eq(conversionOutbox.contractorId, contractorId));
-      let processedRecords = existingOutbox;
+      const existingOutbox = await pgDb.select().from(conversionOutbox)
+        .where(eq(conversionOutbox.contractorId, contractorId));
+      const queuedCount = existingOutbox.filter(record =>
+        ['pending', 'queued', 'retrying'].includes(String(record.status).toLowerCase())
+      ).length;
 
-      if (processedRecords.length === 0) {
-        // Create an initial verified outbox item
-        const id = 'outbox_' + crypto.randomUUID();
-        const [newItem] = await pgDb.insert(conversionOutbox).values({
-          id,
-          contractorId,
-          leadId: 'lead_harvest_01',
-          leadEventId: 'evt_conv_01',
-          conversionAction: 'Qualified Lead Inbound',
-          gclid: 'Cj0KCQjw_dummy_gclid_austin_hvac_2026',
-          conversionTime: new Date(),
-          conversionValue: 12500,
-          currency: 'USD',
-          status: 'succeeded',
-          attempts: 1,
-          idempotencyKey: 'idemp_' + id,
-          uploadedAt: new Date()
-        }).returning();
-        processedRecords = [newItem];
-      }
-
-      // Record outbox drainage in structured ledger
       const auditBlock = db.recordLedgerEntry({
         contractorId,
-        eventType: 'phase3_outbox_processed',
+        eventType: 'phase3_outbox_inspected',
         entityType: 'conversion_outbox',
-        entityId: 'outbox_batch_' + Date.now(),
-        actor: 'HAL Webhook Outbox Worker',
-        details: `Drained outbox: ${processedRecords.length} records processed with HMAC-SHA256 signature verification and exponential backoff retry policies.`,
+        entityId: 'outbox_inspection_' + Date.now(),
+        actor: 'HAL Outbox Inspector',
+        details: `Inspected ${existingOutbox.length} tenant-scoped outbox records. No external provider upload was attempted.`,
         metadata: {
-          processedCount: processedRecords.length,
-          succeededCount: processedRecords.filter(r => r.status === 'succeeded').length,
-          timestamp: new Date().toISOString()
+          recordCount: existingOutbox.length,
+          queuedCount,
+          providerDeliveryVerifiedCount: 0,
+          inspectedAt: new Date().toISOString()
         }
       });
 
       res.json({
         success: true,
-        processedCount: processedRecords.length,
-        succeededCount: processedRecords.length,
-        records: processedRecords,
+        processedCount: 0,
+        queuedCount,
+        existingRecordCount: existingOutbox.length,
+        providerDeliveryVerifiedCount: 0,
+        message: 'Inspection only. No verified conversion-upload adapter is configured; no records were sent or marked successful.',
+        records: existingOutbox,
         block: auditBlock,
         integrity: db.verifyLedgerIntegrity(contractorId)
       });
     } catch (err: any) {
-      console.error('[Roadmap Phase 3 Process Outbox Error]', err);
+      console.error('[Roadmap Phase 3 Outbox Inspection Error]', err);
       res.status(500).json({ success: false, error: err.message });
     }
   });
 
-  // 5. Phase 3 Autonomous Scheduled Trigger Scan
+  // 5. Phase 3 Scheduler Configuration Check (no triggers are executed)
   app.post('/api/roadmap/phase3/run-scheduler', authenticate, async (req, res) => {
     const contractorId = (req as any).contractorId;
 
     try {
-      const rules = getDefaultSchedulerRules();
-      
-      // Execute background job audit record
+      const templates = getDefaultSchedulerRules();
+      const configuredRules: any[] = [];
+      const now = new Date().toISOString();
       const jobRecord = db.addSchedulerJob({
-        job: 'phase3_autonomous_calendar_cadence_scan',
+        contractorId,
+        job: 'phase3_scheduler_configuration_check',
         status: 'completed',
-        startedAt: new Date(Date.now() - 500).toISOString(),
-        completedAt: new Date().toISOString(),
-        result: `Scanned ${rules.length} autonomous scheduler rules. Calendar booking hooks and cadence timers synchronized.`
+        startedAt: now,
+        completedAt: now,
+        result: 'No persisted scheduler rules are configured; no calendar or outreach triggers were executed.'
       });
 
-      // Record in structured ledger
       const auditBlock = db.recordLedgerEntry({
         contractorId,
-        eventType: 'phase3_scheduler_executed',
+        eventType: 'phase3_scheduler_configuration_checked',
         entityType: 'scheduler_system',
         entityId: jobRecord.id,
-        actor: 'HAL Background Cron Engine',
-        details: `Executed autonomous scheduler scan: ${rules.length} trigger rules evaluated with 0 anomalies.`,
+        actor: 'HAL Scheduler Configuration Check',
+        details: 'Checked scheduler configuration. Templates are available, but no persisted rules or background trigger execution were found.',
         metadata: {
-          rulesEvaluated: rules.length,
+          configuredRulesCount: configuredRules.length,
+          availableTemplatesCount: templates.length,
+          triggersExecuted: 0,
           jobId: jobRecord.id,
-          status: 'SUCCESS'
+          status: 'NO_RULES_CONFIGURED'
         }
       });
 
       res.json({
         success: true,
-        jobsRun: rules.length,
+        configuredRulesCount: configuredRules.length,
+        availableTemplatesCount: templates.length,
+        jobsRun: 0,
+        triggersExecuted: 0,
+        message: 'No persisted scheduler rules are configured. No jobs or external triggers were executed.',
         jobRecord,
         block: auditBlock,
         integrity: db.verifyLedgerIntegrity(contractorId)
       });
     } catch (err: any) {
-      console.error('[Roadmap Phase 3 Run Scheduler Error]', err);
+      console.error('[Roadmap Phase 3 Scheduler Configuration Error]', err);
       res.status(500).json({ success: false, error: err.message });
     }
   });
 
-  // 6. Phase 3 Live Outbox Delivery Bridge - Status & Queue
+  // 6. Phase 3 Outbox and Provider Configuration Status
   app.get('/api/roadmap/phase3/outbox-queue', authenticate, async (req, res) => {
     const contractorId = (req as any).contractorId;
 
     try {
-      const records = await pgDb.select().from(conversionOutbox).where(eq(conversionOutbox.contractorId, contractorId)).limit(50);
-      const filteredLogs = dispatchLogs.filter(l => l.contractorId === contractorId).slice(-50).reverse();
-      const ledgerHistory = db.getStructuredLedger(contractorId, 20).filter(e => 
-        e.eventType === 'phase3_live_dispatch' || 
-        e.eventType === 'phase3_outbox_processed' || 
-        e.entityType === 'conversion_outbox'
+      const records = await pgDb.select().from(conversionOutbox)
+        .where(eq(conversionOutbox.contractorId, contractorId)).limit(50);
+      const filteredLogs = dispatchLogs.filter(log => log.contractorId === contractorId).slice(-50).reverse();
+      const ledgerHistory = db.getStructuredLedger(contractorId, 20).filter(entry =>
+        entry.eventType === 'phase3_live_dispatch' ||
+        entry.eventType === 'phase3_outbox_inspected' ||
+        entry.entityType === 'conversion_outbox'
       );
+      const credentials = db.getConnectorCredentials(contractorId);
 
       const gateways = [
-        {
-          id: 'smtp_sendgrid',
-          name: 'SMTP / SendGrid Gateway',
-          type: 'email',
-          status: process.env.SENDGRID_API_KEY ? 'active_live' : 'active_sandbox',
-          mode: process.env.SENDGRID_API_KEY ? 'Production Live' : 'Authenticated Sandbox Gateway',
-          latencyMs: 42,
-          encryption: 'TLS 1.3 / Port 587',
-          deliverability: '99.4%',
-          lastHeartbeat: new Date().toISOString()
-        },
-        {
-          id: 'twilio_sms',
-          name: 'Twilio SMS / WhatsApp Gateway',
-          type: 'sms',
-          status: process.env.TWILIO_ACCOUNT_SID ? 'active_live' : 'active_sandbox',
-          mode: process.env.TWILIO_ACCOUNT_SID ? 'Production Live' : 'Carrier Handover Sandbox',
-          latencyMs: 38,
-          encryption: 'REST API / E.164 Clean Format',
-          deliverability: '99.1%',
-          lastHeartbeat: new Date().toISOString()
-        },
-        {
-          id: 'webhook_ingest',
-          name: 'HMAC Webhook Ingest / Outbox',
-          type: 'webhook',
-          status: 'active_live',
-          mode: 'Production Live Engine',
-          latencyMs: 18,
-          encryption: 'HMAC-SHA256 Signed / Backoff Retry (5x)',
-          deliverability: '100%',
-          lastHeartbeat: new Date().toISOString()
-        }
+        { id: 'resend_email', name: 'Resend Email API', type: 'email', configured: Boolean(credentials.resend), status: credentials.resend ? 'configured_unverified' : 'not_configured', mode: credentials.resend ? 'Credential saved; provider not verified' : 'No credential configured', latencyMs: null, encryption: 'HTTPS API', deliverability: null, lastHeartbeat: null },
+        { id: 'sendgrid_email', name: 'SendGrid Email API', type: 'email', configured: Boolean(credentials.sendgrid || process.env.SENDGRID_API_KEY), status: (credentials.sendgrid || process.env.SENDGRID_API_KEY) ? 'configured_unverified' : 'not_configured', mode: (credentials.sendgrid || process.env.SENDGRID_API_KEY) ? 'Credential present; provider not verified' : 'No credential configured', latencyMs: null, encryption: 'HTTPS API', deliverability: null, lastHeartbeat: null },
+        { id: 'twilio_sms', name: 'Twilio SMS / WhatsApp API', type: 'sms', configured: Boolean(credentials.twilio || process.env.TWILIO_ACCOUNT_SID), status: (credentials.twilio || process.env.TWILIO_ACCOUNT_SID) ? 'configured_unverified' : 'not_configured', mode: (credentials.twilio || process.env.TWILIO_ACCOUNT_SID) ? 'Credential present; provider not verified' : 'No credential configured', latencyMs: null, encryption: 'HTTPS API', deliverability: null, lastHeartbeat: null },
+        { id: 'google_ads_conversion', name: 'Google Ads Conversion Upload', type: 'conversion', configured: Boolean(credentials.googleAds), status: credentials.googleAds ? 'configured_unverified' : 'not_configured', mode: credentials.googleAds ? 'Credential present; upload not verified' : 'No credential configured', latencyMs: null, encryption: 'HTTPS API', deliverability: null, lastHeartbeat: null },
+        { id: 'webhook_ingest', name: 'Inbound CRM Webhook Verification', type: 'webhook', configured: Boolean(process.env.CRM_WEBHOOK_SECRET), status: process.env.CRM_WEBHOOK_SECRET ? 'configured_unverified' : 'not_configured', mode: process.env.CRM_WEBHOOK_SECRET ? 'Inbound signature secret configured; delivery not verified' : 'No webhook secret configured', latencyMs: null, encryption: 'HMAC-SHA256 verification path', deliverability: null, lastHeartbeat: null }
       ];
+      const configuredGatewaysCount = gateways.filter(gateway => gateway.configured).length;
+      const integrity = db.verifyLedgerIntegrity(contractorId);
 
       res.json({
         success: true,
@@ -8695,10 +8737,14 @@ async function startServer() {
         recentDispatches: filteredLogs,
         ledgerHistory,
         stats: {
-          totalDispatched: filteredLogs.length + records.length,
-          deliveredRate: '99.2%',
-          activeGatewaysCount: 3,
-          cryptographicProofVerified: true
+          totalDispatched: 0,
+          totalOutboxRecords: records.length,
+          queuedCount: records.filter(record => ['pending', 'queued', 'retrying'].includes(String(record.status).toLowerCase())).length,
+          deliveryVerifiedCount: 0,
+          deliveredRate: null,
+          configuredGatewaysCount,
+          activeGatewaysCount: 0,
+          cryptographicProofVerified: integrity.valid
         }
       });
     } catch (err: any) {
@@ -8725,17 +8771,24 @@ async function startServer() {
 
     try {
       const integrity = db.verifyLedgerIntegrity(contractorId);
-      const consensusHistory = getDefaultConsensusHistory();
-      const nodes = getDefaultNeuralGraphNodes();
-      
-      // Query real contractor campaigns and live Google Ads daily performance telemetry
+      // No persistent consensus-history or neural-node store is connected yet.
+      // Demo templates are returned separately and never used as verification evidence.
+      const consensusHistory: any[] = [];
+      const nodes: any[] = [];
+      const consensusTemplates = getDefaultConsensusHistory();
+      const neuralGraphTemplates = getDefaultNeuralGraphNodes();
+
       const contractorCampaigns = await pgDb.select().from(campaigns).where(eq(campaigns.contractorId, contractorId));
       const adRecords = await pgDb.select().from(googleAdsDailyPerformance).where(eq(googleAdsDailyPerformance.contractorId, contractorId));
-      
       const arbitrageResult = evaluateAutonomousStrategyArbitrage(contractorCampaigns, adRecords);
-      const arbitrageOpportunities = arbitrageResult.opportunities;
-      const verification = verifyPhase4Pillars(consensusHistory, nodes, arbitrageOpportunities);
+      const arbitrageOpportunities = arbitrageResult.opportunities.map(opportunity => ({
+        ...opportunity,
+        evidenceStatus: 'estimate_only',
+        executionEnabled: false
+      }));
 
+      // Estimates are useful for review, but do not count as closed-loop execution.
+      const verification = verifyPhase4Pillars(consensusHistory, nodes, []);
       res.json({
         success: true,
         phase: 4,
@@ -8746,12 +8799,15 @@ async function startServer() {
         active: verification.allPassed,
         verification,
         consensusHistory,
+        consensusTemplates,
         nodes,
+        neuralGraphTemplates,
         arbitrageOpportunities,
         arbitrageMetrics: {
+          classification: 'heuristic_estimate_only',
           summaries: arbitrageResult.summaries,
           totalReallocationPipelineUsd: arbitrageResult.totalReallocationPipelineUsd,
-          totalExpectedMonthlyLiftUsd: arbitrageResult.totalExpectedMonthlyLiftUsd,
+          totalEstimatedMonthlyLiftUsd: arbitrageResult.totalExpectedMonthlyLiftUsd,
           invariantsAudit: arbitrageResult.invariantsAudit
         },
         integrity
@@ -8763,39 +8819,38 @@ async function startServer() {
   });
 
   // 2. Cryptographic Ledger Verification for Phase 4
+  // 2. Cryptographic Ledger Verification for Phase 4
   app.post('/api/roadmap/phase4/verify', authenticate, async (req, res) => {
     const contractorId = (req as any).contractorId;
 
     try {
-      const consensusHistory = getDefaultConsensusHistory();
-      const nodes = getDefaultNeuralGraphNodes();
-      
       const contractorCampaigns = await pgDb.select().from(campaigns).where(eq(campaigns.contractorId, contractorId));
       const adRecords = await pgDb.select().from(googleAdsDailyPerformance).where(eq(googleAdsDailyPerformance.contractorId, contractorId));
-      
-      const arbitrageResult = evaluateAutonomousStrategyArbitrage(contractorCampaigns, adRecords);
-      const arbitrageOpportunities = arbitrageResult.opportunities;
-      const verification = verifyPhase4Pillars(consensusHistory, nodes, arbitrageOpportunities);
+      const estimateResult = evaluateAutonomousStrategyArbitrage(contractorCampaigns, adRecords);
 
-      // Record immutable cryptographic audit block on ledger
+      // Consensus history and calibrated neural nodes are not persisted. Estimated
+      // arbitrage suggestions are not treated as a verified closed-loop action.
+      const verification = verifyPhase4Pillars([], [], []);
       const auditBlock = db.recordLedgerEntry({
         contractorId,
         eventType: 'phase4_verification_audit',
         entityType: 'roadmap_phase',
         entityId: 'phase_4_multi_agent',
-        actor: 'HAL Multi-Agent Consensus Engine',
-        details: `Verified Phase 4 Invariants: Dual-Drive (${verification.pillar1.alignmentScore}% alignment), Neural Routing (${verification.pillar2.epochCount} epochs), Strategy Arbitrage (${verification.pillar3.arbitrageOpportunitiesCount} active). Score: ${verification.totalScore}/100.`,
+        actor: 'HAL Multi-Agent Verification Check',
+        details: 'Inspected available Phase 4 evidence. No persisted dual-engine consensus history or calibrated neural graph is connected; campaign arbitrage remains estimate-only.',
         metadata: {
           verification,
+          estimatedArbitrageOpportunityCount: estimateResult.opportunities.length,
           timestamp: new Date().toISOString()
         }
       });
 
       res.json({
         success: true,
-        verified: verification.allPassed,
+        verified: false,
         score: verification.totalScore,
         verification,
+        estimatedArbitrageOpportunityCount: estimateResult.opportunities.length,
         block: auditBlock,
         integrity: db.verifyLedgerIntegrity(contractorId)
       });
@@ -8806,74 +8861,15 @@ async function startServer() {
   });
 
   // 3. Parallel Dual-Drive Consensus Synthesis
-  app.post('/api/roadmap/phase4/run-consensus', authenticate, async (req, res) => {
-    const contractorId = (req as any).contractorId;
-    const { topic } = req.body || {};
-
-    try {
-      const targetTopic = topic || 'Outreach Angle & Commercial Pricing for Calgary Commercial Roofing';
-      
-      // Execute parallel evaluation perspectives
-      const geminiPerspective = `Target high-latency mobile booking page (LCP > 3.8s); position $2,750/mo commercial SLA with guaranteed 15-min inbound response time for ${targetTopic}.`;
-      const nemotronPerspective = `Enforce deterministic compliance; verify pricing sustains 3.8x minimum local ROAS threshold; ensure PII encryption for all captured leads for ${targetTopic}.`;
-
-      const alignment = calculateConsensusAlignment(geminiPerspective, nemotronPerspective, targetTopic);
-
-      const consensusResult: DualDriveConsensusResult = {
-        id: `cons_${Date.now()}`,
-        topic: targetTopic,
-        geminiEngine: {
-          model: 'gemini-2.5-flash',
-          focus: 'Market Positioning & Pain Points',
-          recommendation: geminiPerspective,
-          confidence: 0.95,
-          latencyMs: 310
-        },
-        nemotronEngine: {
-          model: 'nvidia/nemotron-3.5-lightning-30b-a3b',
-          focus: 'Deterministic Policy & Compliance Verification',
-          recommendation: nemotronPerspective,
-          confidence: 0.98,
-          latencyMs: 240
-        },
-        alignmentScore: alignment.alignmentScore,
-        arbitrationMethod: 'weighted_synthesis',
-        synthesizedAction: alignment.synthesizedText,
-        policyValidationPassed: alignment.passedPolicy,
-        verdict: alignment.verdict,
-        invariants: alignment.invariants,
-        contractVerification: alignment.contractVerification,
-        timestamp: new Date().toISOString()
-      };
-
-      // Record to immutable ledger
-      const auditBlock = db.recordLedgerEntry({
-        contractorId,
-        eventType: 'phase4_consensus_synthesized',
-        entityType: 'dual_drive_decision',
-        entityId: consensusResult.id,
-        actor: 'Dual-Drive Consensus Arbitrator',
-        details: `Synthesized Structured Contract Consensus on "${targetTopic}": [${alignment.verdict}] ${consensusResult.alignmentScore}% formal alignment between Gemini 2.5 and Nemotron.`,
-        metadata: {
-          consensusId: consensusResult.id,
-          alignmentScore: consensusResult.alignmentScore,
-          policyValidationPassed: consensusResult.policyValidationPassed,
-          verdict: alignment.verdict
-        }
-      });
-
-      res.json({
-        success: true,
-        consensusResult,
-        block: auditBlock,
-        integrity: db.verifyLedgerIntegrity(contractorId)
-      });
-    } catch (err: any) {
-      console.error('[Roadmap Phase 4 Run Consensus Error]', err);
-      res.status(500).json({ success: false, error: err.message });
-    }
+  // 3. Parallel Dual-Drive Consensus Synthesis
+  app.post('/api/roadmap/phase4/run-consensus', authenticate, async (_req, res) => {
+    return res.status(503).json({
+      success: false,
+      error: 'Dual-engine consensus is unavailable: no live Gemini/NVIDIA provider adapters and persisted consensus store are configured. No synthetic consensus result was generated.'
+    });
   });
 
+  // 4. Bayesian Weight Recalibration
   // 4. Bayesian Weight Recalibration
   app.post('/api/roadmap/phase4/recalibrate-weights', authenticate, async (_req, res) => {
     return res.status(409).json({
@@ -8883,99 +8879,14 @@ async function startServer() {
   });
 
   // 5. Strategy & Spend Arbitrage Execution (Closed-Loop Database Reallocation)
-  app.post('/api/roadmap/phase4/execute-arbitrage', authenticate, async (req, res) => {
-    const contractorId = (req as any).contractorId;
-    const { arbitrageId } = req.body || {};
-
-    try {
-      // Fetch live contractor campaigns and ad performance records
-      const contractorCampaigns = await pgDb.select().from(campaigns).where(eq(campaigns.contractorId, contractorId));
-      const adRecords = await pgDb.select().from(googleAdsDailyPerformance).where(eq(googleAdsDailyPerformance.contractorId, contractorId));
-      
-      const evalResult = evaluateAutonomousStrategyArbitrage(contractorCampaigns, adRecords);
-      const target = evalResult.opportunities.find(o => o.id === arbitrageId) || evalResult.opportunities[0];
-
-      if (!target) {
-        return res.status(404).json({ success: false, error: 'No actionable arbitrage opportunity found' });
-      }
-
-      // Execute actual budget adjustment in the database
-      if (target.sourceCampaignId) {
-        const sourceMatch = contractorCampaigns.find(c => c.id === target.sourceCampaignId);
-        if (sourceMatch) {
-          const updatedSourceBudget = Math.max(0, (sourceMatch.budgetUsd || 1500) - target.proposedReallocationUsd);
-          await pgDb.update(campaigns).set({ budgetUsd: updatedSourceBudget }).where(eq(campaigns.id, target.sourceCampaignId));
-        }
-      }
-
-      if (target.targetCampaignId) {
-        const targetMatch = contractorCampaigns.find(c => c.id === target.targetCampaignId);
-        if (targetMatch) {
-          const updatedTargetBudget = (targetMatch.budgetUsd || 1500) + target.proposedReallocationUsd;
-          await pgDb.update(campaigns).set({ budgetUsd: updatedTargetBudget }).where(eq(campaigns.id, target.targetCampaignId));
-        }
-      } else {
-        // Insert new target channel campaign if shifting into a new channel
-        const newCampId = `camp_${crypto.randomUUID().substring(0, 8)}`;
-        await pgDb.insert(campaigns).values({
-          id: newCampId,
-          contractorId,
-          name: target.targetChannel,
-          status: 'active',
-          budgetUsd: target.proposedReallocationUsd,
-          createdAt: new Date()
-        });
-      }
-
-      // Record live revenue experiment in PostgreSQL
-      const expId = `exp_${crypto.randomUUID().substring(0, 8)}`;
-      await pgDb.insert(revenueExperiments).values({
-        id: expId,
-        contractorId,
-        hypothesis: target.rationale,
-        variable: `Capital Shift: ${target.sourceChannel} -> ${target.targetChannel}`,
-        baseline: `Source ROAS: ${target.currentSourceRoas}x`,
-        expectedOutcome: `Target ROAS: ${target.projectedTargetRoas}x, Net Lift: +$${target.expectedNetMonthlyLiftUsd}/mo`,
-        pipelineImpact: target.expectedNetMonthlyLiftUsd,
-        revenueImpact: target.expectedNetMonthlyLiftUsd,
-        status: 'active',
-        startDate: new Date()
-      });
-
-      // Immutable cryptographic audit block on ledger
-      const auditBlock = db.recordLedgerEntry({
-        contractorId,
-        eventType: 'phase4_arbitrage_executed',
-        entityType: 'spend_arbitrage_action',
-        entityId: target.id,
-        actor: 'HAL Strategy Arbitrageur',
-        details: `Executed closed-loop spend shift of $${target.proposedReallocationUsd.toLocaleString()} from ${target.sourceChannel} to ${target.targetChannel}. Expected Net Lift: +$${target.expectedNetMonthlyLiftUsd.toLocaleString()}/mo. Logged to revenue experiments (ID: ${expId}).`,
-        metadata: {
-          arbitrageId: target.id,
-          sourceChannel: target.sourceChannel,
-          targetChannel: target.targetChannel,
-          sourceCampaignId: target.sourceCampaignId,
-          targetCampaignId: target.targetCampaignId,
-          amountShiftedUsd: target.proposedReallocationUsd,
-          expectedMonthlyLiftUsd: target.expectedNetMonthlyLiftUsd,
-          experimentId: expId,
-          guardrailCompliant: true
-        }
-      });
-
-      res.json({
-        success: true,
-        executedArbitrage: { ...target, status: 'executed' },
-        experimentId: expId,
-        block: auditBlock,
-        integrity: db.verifyLedgerIntegrity(contractorId)
-      });
-    } catch (err: any) {
-      console.error('[Roadmap Phase 4 Execute Arbitrage Error]', err);
-      res.status(500).json({ success: false, error: err.message });
-    }
+  app.post('/api/roadmap/phase4/execute-arbitrage', authenticate, async (_req, res) => {
+    return res.status(409).json({
+      success: false,
+      error: 'Live budget reallocation is disabled. Current arbitrage outputs are estimates only; verified ad-account synchronization, currency validation, and an auditable approval workflow are required before any campaign budget can change.'
+    });
   });
 
+  // 6. Strategy & Spend Arbitrage Dynamic Parameter Evaluation
   // 6. Strategy & Spend Arbitrage Dynamic Parameter Evaluation
   app.all('/api/roadmap/phase4/arbitrage/evaluate', authenticate, async (req, res) => {
     const contractorId = (req as any).contractorId;
@@ -9088,7 +8999,7 @@ async function startServer() {
         entityType: 'roadmap_milestone',
         entityId: 'phase5_enterprise_brain_sync',
         actor: 'HAL Enterprise Verifier',
-        details: `Verified Phase 5 Global Enterprise & 11-Layer Brain Architecture. Score: ${verificationResult.totalScore}/100. 11/11 layers locked in phase with Instrument vs. Workflow paradigm.`,
+        details: `Phase 5 evidence check completed; verification status: ${verificationResult.allPassed ? 'verified' : 'not verified'}. Score: ${verificationResult.totalScore}/100. No connected organization records, edge health telemetry, persisted ontologies, or layer-level runtime instrumentation were available unless explicitly reported by the verification result.`,
         metadata: {
           verificationResult,
           pillar1Status: verificationResult.pillar1.status,
@@ -9100,6 +9011,7 @@ async function startServer() {
 
       res.json({
         success: true,
+        verified: verificationResult.allPassed,
         verificationResult,
         block: auditBlock,
         integrity: db.verifyLedgerIntegrity(contractorId)
@@ -9111,11 +9023,48 @@ async function startServer() {
   });
 
   // POST /api/roadmap/phase5/sync-brain
-  app.post('/api/roadmap/phase5/sync-brain', authenticate, async (_req, res) => {
-    return res.status(409).json({
-      success: false,
-      error: 'Runtime brain synchronization cannot be reported until layer-level health instrumentation exists.'
-    });
+  // This is an evidence-based system check, not a claim that all 11 cognitive
+  // layers are synchronized. It reports only tenant-scoped facts we can verify.
+  app.post('/api/roadmap/phase5/sync-brain', authenticate, async (req, res) => {
+    const contractorId = (req as any).contractorId;
+    try {
+      const tenantLeads = await pgDb.select().from(leads).where(eq(leads.contractorId, contractorId));
+      const ledger = db.verifyLedgerIntegrity(contractorId);
+      const diagnostics = {
+        checkedAt: new Date().toISOString(),
+        database: { status: 'reachable', tenantLeadCount: tenantLeads.length },
+        ledger: { status: ledger.valid ? 'valid' : 'invalid', valid: ledger.valid },
+        providers: {
+          geminiKeyConfigured: Boolean(process.env.GEMINI_API_KEY),
+          nemotronKeyConfigured: Boolean(process.env.NVIDIA_NEMOTRON_API_KEY),
+          connectivityVerified: false
+        },
+        runtime: {
+          uptimeSeconds: Math.floor(process.uptime()),
+          memoryUsedBytes: process.memoryUsage().heapUsed,
+          nodeVersion: process.version
+        },
+        brainSynchronization: {
+          status: 'not_verified',
+          verifiedLayers: 0,
+          totalLayers: 11,
+          reason: 'Layer-level runtime instrumentation and persistent synchronization evidence are not implemented.'
+        }
+      };
+      const block = db.recordLedgerEntry({
+        contractorId,
+        eventType: 'phase5_runtime_diagnostic',
+        entityType: 'roadmap_milestone',
+        entityId: 'phase5_system_diagnostics',
+        actor: 'HAL System Diagnostics',
+        details: `Tenant-scoped system diagnostic completed. Database reachable; ledger ${ledger.valid ? 'valid' : 'invalid'}; AI provider connectivity not tested; 11-layer synchronization remains unverified.`,
+        metadata: diagnostics
+      });
+      return res.json({ success: true, diagnostics, brainLayers: [], block });
+    } catch (err: any) {
+      console.error('[Roadmap Phase 5 Diagnostics Error]', err);
+      return res.status(500).json({ success: false, error: 'System diagnostics failed. No synchronization status was recorded.' });
+    }
   });
 
   // POST /api/roadmap/phase5/federate-regions

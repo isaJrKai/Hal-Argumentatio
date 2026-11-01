@@ -5,7 +5,11 @@ export type TradeType =
   | 'electrical' 
   | 'landscaping' 
   | 'renovation' 
-  | 'general';
+  | 'general'
+  | 'sump_pump'
+  | 'waterproofing'
+  | 'flood_restoration'
+  | 'emergency_dispatch';
 
 export type ColorPreset = 
   | 'paper_ink'

@@ -22,7 +22,7 @@ export function getJwtSecret(): string {
 export function signToken(
   payload: { contractorId: string; email: string; role: 'admin' | 'user' },
   secretOverride?: string,
-  expiresInSeconds: number = 30 * 24 * 3600
+  expiresInSeconds: number = 24 * 3600
 ): string {
   const secret = secretOverride || getJwtSecret();
   const header = Buffer.from(JSON.stringify({ alg: 'HS256', typ: 'JWT' })).toString('base64url');

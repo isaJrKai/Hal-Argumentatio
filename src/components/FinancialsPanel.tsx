@@ -84,6 +84,8 @@ export default function FinancialsPanel({ token }: FinancialsPanelProps) {
   }
 
   const maxMrr = Math.max(...(data.mrrHistory || []).map(m => m.mrr), 1);
+  const selectedProjection = forecastHorizon === '12m' ? data.projectedMrr12Months : data.projectedMrr6Months;
+  const ltvCacStatus = data.ltvToCacRatio == null ? 'Insufficient data' : data.ltvToCacRatio >= 3 ? 'Healthy' : data.ltvToCacRatio >= 1 ? 'Needs review' : 'Below 1.0x';
 
   return (
     <div className="space-y-6">
@@ -100,7 +102,7 @@ export default function FinancialsPanel({ token }: FinancialsPanelProps) {
           </div>
           <h2 className="text-xl font-bold tracking-tight text-text-primary mt-1">Financial Intelligence & Retainers</h2>
           <p className="text-xs text-text-secondary max-w-2xl mt-0.5">
-            Real-time MRR/ARR capitalization, LTV-to-CAC health ratios, churn analytics, and multi-tier retainer cohort projections.
+            Contract-based MRR and annualized run-rate from active client retainers. Unit economics and forecasts appear when supporting historical data is available.
           </p>
         </div>
 
@@ -125,16 +127,16 @@ export default function FinancialsPanel({ token }: FinancialsPanelProps) {
           <div className="text-2xl font-bold text-text-primary">
             ${data.currentMrrUsd.toLocaleString()}
           </div>
-          <div className="flex items-center gap-1 text-[10px] font-mono text-positive font-bold">
-            <ArrowUpRight className="w-3 h-3" />
-            <span>+14.2% MoM Expansion</span>
+          <div className="flex items-center gap-1 text-[10px] font-mono text-text-secondary font-bold">
+            <Activity className="w-3 h-3" />
+            <span>Contract run-rate from active retainers</span>
           </div>
         </div>
 
         {/* ANNUAL RUN RATE */}
         <div className="p-4 bg-bg-raised border border-border-dim rounded-sm space-y-2">
           <div className="flex items-center justify-between text-text-dim text-[10px] font-mono uppercase font-bold">
-            <span>Annual Run-Rate (ARR)</span>
+            <span>Annualized Contract Run-Rate</span>
             <Activity className="w-3.5 h-3.5 text-brand" />
           </div>
           <div className="text-2xl font-bold text-text-primary">
@@ -152,11 +154,11 @@ export default function FinancialsPanel({ token }: FinancialsPanelProps) {
             <ShieldCheck className="w-3.5 h-3.5 text-brand" />
           </div>
           <div className="text-2xl font-bold text-brand">
-            {data.ltvToCacRatio}x
+            {data.ltvToCacRatio == null ? '—' : `${data.ltvToCacRatio}x`}
           </div>
-          <div className="text-[10px] font-mono text-positive font-bold flex items-center gap-1">
-            <CheckCircle2 className="w-3 h-3" />
-            <span>Healthy (CAC: ${data.blendedCacUsd})</span>
+          <div className="text-[10px] font-mono text-text-secondary font-bold flex items-center gap-1">
+            <Activity className="w-3 h-3" />
+            <span>{ltvCacStatus}{data.blendedCacUsd == null ? ' · CAC unavailable' : ` (CAC: ${data.blendedCacUsd.toLocaleString()})`}</span>
           </div>
         </div>
 
@@ -167,10 +169,10 @@ export default function FinancialsPanel({ token }: FinancialsPanelProps) {
             <Award className="w-3.5 h-3.5 text-brand" />
           </div>
           <div className="text-2xl font-bold text-text-primary">
-            ${data.averageLtvUsd.toLocaleString()}
+            {data.averageLtvUsd == null ? '—' : `${data.averageLtvUsd.toLocaleString()}`}
           </div>
           <div className="text-[10px] font-mono text-text-secondary">
-            {data.averageContractLengthMonths} mo avg retention • {data.churnRatePercent}% churn
+            {data.averageContractLengthMonths == null || data.churnRatePercent == null ? 'Contract duration and churn history unavailable' : `${data.averageContractLengthMonths} mo avg retention • ${data.churnRatePercent}% churn`}
           </div>
         </div>
 
@@ -185,10 +187,10 @@ export default function FinancialsPanel({ token }: FinancialsPanelProps) {
             <div>
               <h3 className="text-sm font-mono font-bold text-text-primary uppercase tracking-wider flex items-center gap-2">
                 <BarChart3 className="w-4 h-4 text-brand" />
-                <span>Monthly Recurring Growth & Forecast Engine</span>
+                <span>MRR History & Forecast Readiness</span>
               </h3>
               <span className="text-[10px] font-mono text-text-dim mt-0.5 block">
-                Historical monthly billings vs 12% compounding client pipeline model
+                Dated MRR snapshots and validated forecast inputs will appear when recorded data is available.
               </span>
             </div>
 
@@ -216,11 +218,13 @@ export default function FinancialsPanel({ token }: FinancialsPanelProps) {
           {/* HISTORICAL BAR CHART */}
           <div className="space-y-2 pt-2">
             <span className="text-[10px] font-mono text-text-dim uppercase font-bold block">
-              6-Month Historical Billings Trajectory
+              Historical MRR snapshots
             </span>
 
             <div className="h-40 flex items-end justify-between gap-3 pt-6 px-2 border-b border-border-dim/60 pb-2">
-              {data.mrrHistory.map((item) => {
+              {data.mrrHistory.length === 0 ? (
+                <div className="w-full py-12 text-center text-xs text-text-dim">Historical MRR snapshots are not available yet.</div>
+              ) : data.mrrHistory.map((item) => {
                 const heightPct = Math.round((item.mrr / maxMrr) * 100);
                 return (
                   <div key={item.month} className="flex-1 flex flex-col items-center gap-2 h-full justify-end group">
@@ -243,22 +247,22 @@ export default function FinancialsPanel({ token }: FinancialsPanelProps) {
           {/* PROJECTION BENCHMARK CALLOUT */}
           <div className="p-4 bg-bg-dark border border-border-dim rounded-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4 font-mono">
             <div>
-              <span className="text-[10px] text-brand uppercase font-bold block">Compounding Pipeline Projection</span>
+              <span className="text-[10px] text-brand uppercase font-bold block">Forecast Readiness</span>
               <div className="text-sm font-bold text-text-primary mt-0.5">
-                Target MRR at {forecastHorizon === '12m' ? 'Month 12' : 'Month 6'}:{' '}
+                {selectedProjection == null ? 'Forecast unavailable' : `Target MRR at ${forecastHorizon === '12m' ? 'Month 12' : 'Month 6'}:`}{' '}
                 <span className="text-brand">
-                  ${(forecastHorizon === '12m' ? data.projectedMrr12Months : data.projectedMrr6Months).toLocaleString()}
+                  {selectedProjection == null ? '—' : `${selectedProjection.toLocaleString()}`}
                 </span>
               </div>
               <p className="text-[11px] text-text-dim mt-0.5 font-sans">
-                Based on active lead conversion rates, $2,400 target ACV, and {data.churnRatePercent}% monthly churn tolerance.
+                A forecast will appear when HAL has verified dated revenue, conversion, and churn history.
               </p>
             </div>
 
             <div className="shrink-0 text-right">
               <span className="text-[10px] text-text-dim uppercase block font-bold">Annualized Target</span>
               <span className="text-lg font-bold text-positive">
-                ${((forecastHorizon === '12m' ? data.projectedMrr12Months : data.projectedMrr6Months) * 12).toLocaleString()}
+                {selectedProjection == null ? '—' : `${(selectedProjection * 12).toLocaleString()}`}
               </span>
             </div>
           </div>
@@ -273,7 +277,7 @@ export default function FinancialsPanel({ token }: FinancialsPanelProps) {
               <span>Retainer Tier Allocation</span>
             </h3>
             <span className="text-[10px] font-mono text-text-dim mt-0.5 block">
-              Package distribution across active accounts
+              Package distribution across active retainers
             </span>
           </div>
 
@@ -298,7 +302,7 @@ export default function FinancialsPanel({ token }: FinancialsPanelProps) {
                   </div>
 
                   <div className="flex justify-between text-[10px] text-text-dim">
-                    <span>{tierItem.count} Client{tierItem.count === 1 ? '' : 's'}</span>
+                    <span>{tierItem.count} Retainer{tierItem.count === 1 ? '' : 's'}</span>
                     <span>{tierRevenuePct}% of Total MRR</span>
                   </div>
                 </div>
@@ -311,15 +315,15 @@ export default function FinancialsPanel({ token }: FinancialsPanelProps) {
             <span className="text-[10px] text-text-dim uppercase font-bold block">Cohort Unit Economics</span>
             <div className="flex justify-between text-[11px] py-1 border-b border-border-dim/40">
               <span className="text-text-secondary">Blended CAC:</span>
-              <span className="text-text-primary font-bold">${data.blendedCacUsd}</span>
+              <span className="text-text-primary font-bold">{data.blendedCacUsd == null ? '—' : `${data.blendedCacUsd.toLocaleString()}`}</span>
             </div>
             <div className="flex justify-between text-[11px] py-1 border-b border-border-dim/40">
               <span className="text-text-secondary">Payback Period:</span>
-              <span className="text-positive font-bold">1.4 Months</span>
+              <span className="text-text-primary font-bold">—</span>
             </div>
             <div className="flex justify-between text-[11px] py-1">
               <span className="text-text-secondary">Operating Runway:</span>
-              <span className="text-brand font-bold">{data.cashRunwayMonths} Months</span>
+              <span className="text-text-primary font-bold">{data.cashRunwayMonths == null ? '—' : `${data.cashRunwayMonths} Months`}</span>
             </div>
           </div>
 

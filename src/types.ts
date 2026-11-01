@@ -153,6 +153,7 @@ export interface Lesson {
 
 export interface SchedulerJob {
   id: string;
+  contractorId?: string;
   job: string;
   status: 'pending' | 'running' | 'completed' | 'failed';
   startedAt?: string;
@@ -324,16 +325,16 @@ export interface FinancialSnapshot {
   currentMrrUsd: number;
   arrUsd: number;
   activeClientCount: number;
-  averageContractLengthMonths: number;
-  averageLtvUsd: number;
-  blendedCacUsd: number;
-  ltvToCacRatio: number;
-  churnRatePercent: number;
-  cashRunwayMonths: number;
-  projectedMrr6Months: number;
-  projectedMrr12Months: number;
+  averageContractLengthMonths: number | null;
+  averageLtvUsd: number | null;
+  blendedCacUsd: number | null;
+  ltvToCacRatio: number | null;
+  churnRatePercent: number | null;
+  cashRunwayMonths: number | null;
+  projectedMrr6Months: number | null;
+  projectedMrr12Months: number | null;
   mrrHistory: { month: string; mrr: number; clients: number; newRevenue: number; churnedRevenue: number }[];
-  tierDistribution: { tier: 'Growth' | 'Dominance' | 'Enterprise'; count: number; totalRevenue: number }[];
+  tierDistribution: { tier: string; count: number; totalRevenue: number }[];
 }
 
 

@@ -1196,17 +1196,17 @@ ${d.description}
                 </div>
 
                 {/* DETAILED SPECIFICATION WRITING FOR CORE ARCHITECTURES */}
-                <div className="space-y-4">
-                  <h3 className="text-xs font-mono tracking-wider text-text-secondary uppercase font-semibold">1. OVERVIEW & OBJECTIVE</h3>
-                  <p className="text-xs text-text-secondary leading-relaxed font-sans">
+                <div className="space-y-5 min-w-0 break-words">
+                  <h3 className="text-sm font-mono tracking-wider text-text-secondary uppercase font-semibold">1. OVERVIEW & OBJECTIVE</h3>
+                  <p className="text-sm text-text-secondary leading-7 font-sans max-w-prose break-words">
                     {activeDoc.description}
                   </p>
 
-                  <h3 className="text-xs font-mono tracking-wider text-text-secondary uppercase font-semibold pt-2">2. LIVE ARCHITECTURAL CODE MAPPING</h3>
-                  <div className="p-4 bg-bg-base border border-border-dim rounded font-mono text-xs text-text-secondary space-y-2">
-                    <div className="flex justify-between items-center py-0.5 border-b border-border-dim/40">
+                  <h3 className="text-sm font-mono tracking-wider text-text-secondary uppercase font-semibold pt-2">2. LIVE ARCHITECTURAL CODE MAPPING</h3>
+                  <div className="p-4 bg-bg-base border border-border-dim rounded font-mono text-xs text-text-secondary space-y-3 min-w-0">
+                    <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-1.5 py-2 border-b border-border-dim/40 min-w-0 break-words">
                       <span className="opacity-50">CORE SOURCE FILE:</span>
-                      <span className="text-accent font-semibold">
+                      <span className="text-accent font-semibold min-w-0 break-all sm:text-right">
                         {activeDoc.id === '07' ? 'src/db/db.ts (AES-256 Vault)' :
                          activeDoc.id === '08' ? 'src/lib/realDataHarvest.ts' :
                          activeDoc.id === '09' ? 'src/skills/*.ts (SEO & Speed)' :
@@ -1229,7 +1229,7 @@ ${d.description}
                     </div>
                     <div className="flex justify-between items-center py-0.5 border-b border-border-dim/40">
                       <span className="opacity-50">CANONICAL DIRECTIVE:</span>
-                      <span className="text-text-primary">
+                      <span className="text-text-primary min-w-0 break-words sm:text-right">
                         {activeDoc.id === '07' ? 'Zero plaintext PII at rest; Merkle-root block validation' :
                          activeDoc.id === '08' ? 'Live territory data only; zero synthetic hallucinations' :
                          activeDoc.id === '10' ? 'Dual-Drive Consensus: Gemini 2.5 + Nemotron 70B' :
@@ -1240,7 +1240,7 @@ ${d.description}
                          'Decoupled Single-Responsibility Engine'}
                       </span>
                     </div>
-                    <div className="flex justify-between items-center py-0.5">
+                    <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-1.5 py-2 min-w-0 break-words">
                       <span className="opacity-50">STABILITY RANKING:</span>
                       <span className="text-text-secondary uppercase font-bold flex items-center gap-1">
                         <CheckCircle2 className="w-3.5 h-3.5 text-positive" />
@@ -1249,11 +1249,11 @@ ${d.description}
                     </div>
                   </div>
 
-                  <h3 className="text-xs font-mono tracking-wider text-text-secondary uppercase font-semibold pt-2">3. OPERATING PRINCIPLES & DESK EQUIVALENT</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs font-sans">
+                  <h3 className="text-sm font-mono tracking-wider text-text-secondary uppercase font-semibold pt-2">3. OPERATING PRINCIPLES & DESK EQUIVALENT</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm font-sans">
                     <div className="border border-border-dim p-3 rounded-sm bg-bg-base/40">
                       <span className="text-[11px] font-mono text-accent block font-bold mb-1 uppercase tracking-wider">UPSTREAM TRIGGER SOURCES</span>
-                      <p className="text-[11px] text-text-secondary leading-relaxed">
+                      <p className="text-sm text-text-secondary leading-7 break-words">
                         Designed to support database-backed records, map-provider data, and operator guidance. Storage encryption and live provider integrations are not verified in this deployment.
                       </p>
                     </div>
@@ -1266,7 +1266,7 @@ ${d.description}
                   </div>
 
                   {/* Golden rule alignment check */}
-                  <div className="pt-4 border-t border-border-dim flex justify-between items-center text-[11px] font-mono text-text-secondary">
+                  <div className="pt-4 border-t border-border-dim flex flex-col sm:flex-row sm:justify-between sm:items-start gap-2 text-xs font-mono text-text-secondary min-w-0">
                     <span>PHILOSOPHY COMPLIANCE:</span>
                     <div className="flex items-center gap-1 text-positive font-bold">
                       <CheckCircle2 className="w-3.5 h-3.5" />

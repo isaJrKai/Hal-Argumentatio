@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { lazy, Suspense, useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   Users, 
@@ -50,46 +50,46 @@ import {
 } from 'lucide-react';
 
 import AuthPage from './components/AuthPage';
-import OverviewPanel from './components/OverviewPanel';
-import LeadsPanel from './components/LeadsPanel';
-import BoardPanel from './components/BoardPanel';
-import CampaignsPanel from './components/CampaignsPanel';
-import IntelligencePanel from './components/IntelligencePanel';
-import HalOpsPanel from './components/HalOpsPanel';
-import SettingsPanel from './components/SettingsPanel';
-import MissionsPanel from './components/MissionsPanel';
-import SkillsPanel from './components/SkillsPanel';
-import CommandPalette from './components/CommandPalette';
-import HalBiblePanel from './components/HalBiblePanel';
-import GoogleDrivePanel from './components/GoogleDrivePanel';
-import ConnectorsPanel from './components/ConnectorsPanel';
-import NeuralPanel from './components/NeuralPanel';
-import DebriefModule from './components/DebriefModule';
-import SystemHealthPanel from './components/SystemHealthPanel';
-import MapPanel from './components/MapPanel';
-import PublicAuditPage from './components/PublicAuditPage';
-import DeliveryHub from './components/DeliveryHub';
-import PublicPortalPage from './components/PublicPortalPage';
-import FinancialsPanel from './components/FinancialsPanel';
-import RevenueIntelligenceView from './components/RevenueIntelligenceView';
-import HalLoopOperationsView from './components/HalLoopOperationsView';
-import HermesLabPanel from './components/HermesLabPanel';
-import { BlueprintViewerPanel } from './components/BlueprintViewerPanel';
+const OverviewPanel = lazy(() => import('./components/OverviewPanel'));
+const LeadsPanel = lazy(() => import('./components/LeadsPanel'));
+const BoardPanel = lazy(() => import('./components/BoardPanel'));
+const CampaignsPanel = lazy(() => import('./components/CampaignsPanel'));
+const IntelligencePanel = lazy(() => import('./components/IntelligencePanel'));
+const HalOpsPanel = lazy(() => import('./components/HalOpsPanel'));
+const SettingsPanel = lazy(() => import('./components/SettingsPanel'));
+const MissionsPanel = lazy(() => import('./components/MissionsPanel'));
+const SkillsPanel = lazy(() => import('./components/SkillsPanel'));
+const CommandPalette = lazy(() => import('./components/CommandPalette'));
+const HalBiblePanel = lazy(() => import('./components/HalBiblePanel'));
+const GoogleDrivePanel = lazy(() => import('./components/GoogleDrivePanel'));
+const ConnectorsPanel = lazy(() => import('./components/ConnectorsPanel'));
+const NeuralPanel = lazy(() => import('./components/NeuralPanel'));
+const DebriefModule = lazy(() => import('./components/DebriefModule'));
+const SystemHealthPanel = lazy(() => import('./components/SystemHealthPanel'));
+const MapPanel = lazy(() => import('./components/MapPanel'));
+const PublicAuditPage = lazy(() => import('./components/PublicAuditPage'));
+const DeliveryHub = lazy(() => import('./components/DeliveryHub'));
+const PublicPortalPage = lazy(() => import('./components/PublicPortalPage'));
+const FinancialsPanel = lazy(() => import('./components/FinancialsPanel'));
+const RevenueIntelligenceView = lazy(() => import('./components/RevenueIntelligenceView'));
+const HalLoopOperationsView = lazy(() => import('./components/HalLoopOperationsView'));
+const HermesLabPanel = lazy(() => import('./components/HermesLabPanel'));
+const BlueprintViewerPanel = lazy(() => import('./components/BlueprintViewerPanel').then(module => ({ default: module.BlueprintViewerPanel })));
 import { ErrorBoundary } from './components/ErrorBoundary';
 
 // 4-Zone Workstation Shell & Tools
 import { InspectorProvider } from './context/InspectorContext';
 import { TopTelemetryBar } from './components/TopTelemetryBar';
 import { RightInspector } from './components/RightInspector';
-import { EmailDesignerPanel } from './components/EmailDesignerPanel';
-import { LandingPageStudioPanel } from './components/LandingPageStudioPanel';
-import { FormBuilderPanel } from './components/FormBuilderPanel';
-import { ContractsStudioPanel } from './components/ContractsStudioPanel';
-import { WhiteLabelReportsStudioPanel } from './components/WhiteLabelReportsStudioPanel';
-import { DocumentStudioPanel } from './components/DocumentStudioPanel';
-import CalculatorsSection from './components/CalculatorsSection';
-import { ChatBotPanel } from './components/ChatBotPanel';
-import { UnifiedCommunicationsHub } from './components/UnifiedCommunicationsHub';
+const EmailDesignerPanel = lazy(() => import('./components/EmailDesignerPanel').then(module => ({ default: module.EmailDesignerPanel })));
+const LandingPageStudioPanel = lazy(() => import('./components/LandingPageStudioPanel').then(module => ({ default: module.LandingPageStudioPanel })));
+const FormBuilderPanel = lazy(() => import('./components/FormBuilderPanel').then(module => ({ default: module.FormBuilderPanel })));
+const ContractsStudioPanel = lazy(() => import('./components/ContractsStudioPanel').then(module => ({ default: module.ContractsStudioPanel })));
+const WhiteLabelReportsStudioPanel = lazy(() => import('./components/WhiteLabelReportsStudioPanel').then(module => ({ default: module.WhiteLabelReportsStudioPanel })));
+const DocumentStudioPanel = lazy(() => import('./components/DocumentStudioPanel').then(module => ({ default: module.DocumentStudioPanel })));
+const CalculatorsSection = lazy(() => import('./components/CalculatorsSection'));
+const ChatBotPanel = lazy(() => import('./components/ChatBotPanel').then(module => ({ default: module.ChatBotPanel })));
+const UnifiedCommunicationsHub = lazy(() => import('./components/UnifiedCommunicationsHub').then(module => ({ default: module.UnifiedCommunicationsHub })));
 
 import { useBusinessContext } from './context/BusinessContext';
 
@@ -686,14 +686,16 @@ export default function App() {
 
   if (publicAuditId) {
     return (
-      <PublicAuditPage 
-        auditId={publicAuditId} 
-        onNavigateToLogin={() => {
-          window.history.pushState(null, '', window.location.pathname);
-          window.location.hash = '';
-          setPublicAuditId(null);
-        }}
-      />
+      <Suspense fallback={<div className="min-h-screen flex items-center justify-center text-xs font-mono text-text-tertiary">Loading shared audit…</div>}>
+        <PublicAuditPage 
+          auditId={publicAuditId} 
+          onNavigateToLogin={() => {
+            window.history.pushState(null, '', window.location.pathname);
+            window.location.hash = '';
+            setPublicAuditId(null);
+          }}
+        />
+      </Suspense>
     );
   }
 
@@ -706,14 +708,16 @@ export default function App() {
 
   if (publicPortalToken) {
     return (
-      <PublicPortalPage 
-        token={publicPortalToken} 
-        onNavigateToLogin={() => {
-          window.history.pushState(null, '', window.location.pathname);
-          window.location.hash = '';
-          setPublicPortalToken(null);
-        }}
-      />
+      <Suspense fallback={<div className="min-h-screen flex items-center justify-center text-xs font-mono text-text-tertiary">Loading client portal…</div>}>
+        <PublicPortalPage 
+          token={publicPortalToken} 
+          onNavigateToLogin={() => {
+            window.history.pushState(null, '', window.location.pathname);
+            window.location.hash = '';
+            setPublicPortalToken(null);
+          }}
+        />
+      </Suspense>
     );
   }
 
@@ -829,15 +833,19 @@ export default function App() {
       </AnimatePresence>
 
       {/* COMMAND PALETTE */}
-      <CommandPalette
-        isOpen={isCommandPaletteOpen}
-        onClose={() => setIsCommandPaletteOpen(false)}
-        leads={leads}
-        onNavigate={(tabId) => setActiveTab(tabId)}
-        onRunSkill={(skillId) => {
-          setActiveTab('skills');
-        }}
-      />
+      {isCommandPaletteOpen && (
+        <Suspense fallback={null}>
+          <CommandPalette
+            isOpen={isCommandPaletteOpen}
+            onClose={() => setIsCommandPaletteOpen(false)}
+            leads={leads}
+            onNavigate={(tabId) => setActiveTab(tabId)}
+            onRunSkill={(skillId) => {
+              setActiveTab('skills');
+            }}
+          />
+        </Suspense>
+      )}
 
       {/* MOBILE NAV DRAWER */}
       <AnimatePresence>
@@ -1020,6 +1028,11 @@ export default function App() {
                   className="panel h-full"
                 >
                   <ErrorBoundary>
+                    <Suspense fallback={
+                      <div className="h-full min-h-[240px] flex items-center justify-center text-xs font-mono text-text-tertiary">
+                        Loading workspace module…
+                      </div>
+                    }>
                     {activeTab === 'overview' && (
                     <OverviewPanel 
                       leads={leads}
@@ -1213,6 +1226,7 @@ export default function App() {
                   {activeTab === 'calculators' && (
                     <CalculatorsSection />
                   )}
+                    </Suspense>
                   </ErrorBoundary>
                 </motion.div>
               </AnimatePresence>

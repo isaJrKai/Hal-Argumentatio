@@ -26,8 +26,9 @@ export interface CadenceSequence {
   niche: string;
   description: string;
   steps: SequenceStep[];
-  activeLeadsCount: number;
-  conversionRatePct: number;
+  activeLeadsCount: number | null;
+  conversionRatePct: number | null;
+  templateOnly?: boolean;
   createdAt: string;
 }
 
@@ -303,7 +304,7 @@ export function verifyPhase3Pillars(
   const retryingCount = outboxRecords.filter(r => r.status === 'retrying' || r.status === 'pending').length;
 
   // Test HMAC-SHA256 signature generation and verify roundtrip
-  const testSecret = 'hal_phase3_webhook_secret_key_2026';
+  const testSecret = crypto.randomBytes(32).toString('hex');
   const testPayload = { test: 'phase3_verification', timestamp: Date.now() };
   const signature = signWebhookPayload(testSecret, testPayload);
   const reSignature = signWebhookPayload(testSecret, testPayload);

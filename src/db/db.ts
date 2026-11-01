@@ -247,14 +247,18 @@ export interface StructuredLedgerEntry {
     | 'territory_harvest_completed'
     | 'phase3_verification_audit'
     | 'phase3_sequence_triggered'
+    | 'phase3_sequence_previewed'
     | 'phase3_outbox_processed'
+    | 'phase3_outbox_inspected'
     | 'phase3_live_dispatch'
     | 'phase3_scheduler_executed'
+    | 'phase3_scheduler_configuration_checked'
     | 'phase4_verification_audit'
     | 'phase4_consensus_synthesized'
     | 'phase4_weights_recalibrated'
     | 'phase4_arbitrage_executed'
     | 'phase5_verification_audit'
+    | 'phase5_runtime_diagnostic'
     | 'phase5_brain_synced'
     | 'phase5_regions_federated'
     | 'phase5_ontology_propagated'
@@ -272,6 +276,7 @@ export interface StructuredLedgerEntry {
 
 export interface SchedulerJob {
   id: string;
+  contractorId?: string;
   job: string;
   status: 'pending' | 'running' | 'completed' | 'failed';
   startedAt?: string;
@@ -1317,7 +1322,35 @@ class Database {
     if (!this.data.connectorCredentials) {
       this.data.connectorCredentials = {};
     }
-    return this.data.connectorCredentials[contractorId] || {};
+    if (!this.data.connectorCredentials[contractorId]) {
+      this.data.connectorCredentials[contractorId] = {};
+    }
+
+    const stored = this.data.connectorCredentials[contractorId];
+    const decrypted: Record<string, string> = {};
+    let migratedLegacyPlaintext = false;
+
+    for (const [service, storedValue] of Object.entries(stored)) {
+      if (typeof storedValue !== 'string' || !storedValue) continue;
+
+      const looksEncrypted = /^[a-f0-9]{24}:[a-f0-9]*:[a-f0-9]{32}$/i.test(storedValue);
+      if (looksEncrypted) {
+        const value = decrypt(storedValue);
+        if (value) decrypted[service] = value;
+        // If ciphertext cannot be decrypted, fail closed and do not expose it.
+        continue;
+      }
+
+      // Migrate legacy plaintext credentials to AES-256-GCM before returning
+      // them to the server-side integration layer.
+      const encryptedValue = encrypt(storedValue);
+      stored[service] = encryptedValue;
+      decrypted[service] = storedValue;
+      migratedLegacyPlaintext = true;
+    }
+
+    if (migratedLegacyPlaintext) this.save();
+    return decrypted;
   }
 
   public saveConnectorCredential(contractorId: string, service: string, keyVal: string) {
@@ -1327,7 +1360,7 @@ class Database {
     if (!this.data.connectorCredentials[contractorId]) {
       this.data.connectorCredentials[contractorId] = {};
     }
-    this.data.connectorCredentials[contractorId][service] = keyVal;
+    this.data.connectorCredentials[contractorId][service] = keyVal ? encrypt(keyVal) : '';
     this.save();
   }
 
@@ -1516,8 +1549,9 @@ class Database {
   }
 
   // Scheduler Jobs
-  public getSchedulerJobs(): SchedulerJob[] {
-    return this.data.schedulerJobs;
+  public getSchedulerJobs(contractorId?: string): SchedulerJob[] {
+    const jobs = this.data.schedulerJobs || [];
+    return contractorId ? jobs.filter(job => job.contractorId === contractorId) : jobs;
   }
 
   public addSchedulerJob(job: Omit<SchedulerJob, 'id' | 'createdAt'>): SchedulerJob {
@@ -1687,43 +1721,10 @@ class Database {
 
   // ─── OUTREACH SEQUENCE METHODS ───────────────────────────────────────
   public getOutreachSequences(contractorId: string): OutreachSequenceDb[] {
-    if (!this.data.outreachSequences || this.data.outreachSequences.length === 0) {
-      // Initialize with default high-converting sequences
-      this.data.outreachSequences = [
-        {
-          id: 'seq_default_conquest',
-          contractorId,
-          name: 'Territory Conquest 3-Touch Audit Cadence',
-          niche: 'All Niches',
-          steps: [
-            {
-              day: 1,
-              channel: 'email',
-              title: 'Executive Speed & SEO Audit Reveal',
-              purpose: 'Deliver value upfront by presenting concrete vulnerabilities without pitching.',
-              template: 'Hi {{ownerName}},\n\nI ran an automated performance diagnostic on {{businessName}} in {{city}} and noticed mobile load speed is currently scoring {{performanceScore}}/100, which typically leaks 20-30% of high-intent search traffic to local competitors.\n\nI put together a complete 1-page breakdown showing exactly where the bottlenecks are. Would you like me to send over the PDF report?\n\nBest regards,\nTerritory Intelligence Team'
-            },
-            {
-              day: 3,
-              channel: 'sms',
-              title: 'Quick Follow-up SMS with Value Metric',
-              purpose: 'Casual, low-friction text message referencing potential recovered deal revenue.',
-              template: 'Hey {{ownerName}}, quick check-in from HAL Territory Ops regarding {{businessName}}. We calculated that resolving your SSL and mobile speed flags could recover an est. ${{predictedLtv}} in new job bookings this quarter. Let me know if you want the checklist!'
-            },
-            {
-              day: 7,
-              channel: 'call',
-              title: 'Objection-Proof Closing Call Script',
-              purpose: 'Direct phone conversation positioning yourself as the territory authority.',
-              template: 'Script: "Hi {{ownerName}}, this is calling regarding the digital footprint audit we ran for {{businessName}} in {{city}}. I wanted to see if you had 3 minutes to review the 2 high-priority fixes before we publish our quarterly {{serviceType}} industry benchmark report."'
-            }
-          ],
-          createdAt: new Date().toISOString()
-        }
-      ];
-      this.save();
-    }
-    return this.data.outreachSequences.filter(s => s.contractorId === contractorId);
+    if (!this.data.outreachSequences) this.data.outreachSequences = [];
+    // Only explicitly saved tenant sequences are returned. Default templates
+    // are separate and must never be mistaken for persisted workflows.
+    return this.data.outreachSequences.filter(sequence => sequence.contractorId === contractorId);
   }
 
   public saveOutreachSequence(contractorId: string, seq: Omit<OutreachSequenceDb, 'contractorId'>): OutreachSequenceDb {
@@ -1747,83 +1748,10 @@ class Database {
   // ─── PHASE 4: CLIENT ONBOARDING & PROJECT DELIVERY ─────────────────────────
 
   public getClientProjects(contractorId: string): ClientProjectDb[] {
-    if (!this.data.clientProjects) {
-      this.data.clientProjects = [];
-    }
-
-    // Auto-seed an initial representative project if empty
-    if (this.data.clientProjects.filter(p => p.contractorId === contractorId).length === 0) {
-      const convertedLeads = this.getLeads(contractorId).filter(l => l.status === 'converted');
-      const baseLead = convertedLeads[0] || this.getLeads(contractorId)[0];
-
-      if (baseLead) {
-        this.data.clientProjects.push({
-          id: 'proj_' + crypto.randomBytes(6).toString('hex'),
-          contractorId,
-          leadId: baseLead.id,
-          clientName: baseLead.ownerName || 'David Miller',
-          businessName: baseLead.businessName,
-          city: baseLead.city,
-          serviceType: baseLead.serviceType,
-          packageTier: 'Dominance',
-          monthlyRetainerUsd: 2400,
-          startDate: new Date(Date.now() - 14 * 86400000).toISOString().split('T')[0],
-          status: 'active_delivery',
-          initialAuditScore: 48,
-          currentScore: 84,
-          targetScore: 95,
-          portalAccessToken: crypto.randomBytes(12).toString('hex'),
-          createdAt: new Date(Date.now() - 14 * 86400000).toISOString(),
-          updatedAt: new Date().toISOString(),
-          notes: 'Client authorized complete technical infrastructure acceleration and geo-rank pack setup.',
-          assets: [
-            { id: 'ast_1', name: 'High-Res Vector Brand Logo', category: 'logo', status: 'verified', uploadedAt: new Date(Date.now() - 12 * 86400000).toISOString() },
-            { id: 'ast_2', name: 'DNS & Domain Control Registrar Access', category: 'domain_access', status: 'verified', uploadedAt: new Date(Date.now() - 11 * 86400000).toISOString() },
-            { id: 'ast_3', name: 'Google Business Profile Manager Delegation', category: 'analytics_access', status: 'verified', uploadedAt: new Date(Date.now() - 10 * 86400000).toISOString() },
-            { id: 'ast_4', name: 'Jobsite Before & After High-Res Photography', category: 'photos', status: 'received', uploadedAt: new Date(Date.now() - 5 * 86400000).toISOString() }
-          ],
-          milestones: [
-            {
-              id: 'ms_1',
-              title: 'Onboarding & Asset Verification',
-              description: 'Intake domain registrar credentials, brand guidelines, and target geo-service territory zones.',
-              status: 'completed',
-              completedAt: new Date(Date.now() - 10 * 86400000).toISOString(),
-              deliverablesProof: 'All assets intake forms validated. Primary domain authorized.'
-            },
-            {
-              id: 'ms_2',
-              title: 'TLS 1.3 SSL & Core Web Vitals Acceleration',
-              description: 'Hardened security certificates, compressed asset payloads, and achieved sub-1.2s mobile load speeds.',
-              status: 'completed',
-              completedAt: new Date(Date.now() - 4 * 86400000).toISOString(),
-              deliverablesProof: 'Mobile PageSpeed improved from 48/100 to 84/100. SSL Grade A+.'
-            },
-            {
-              id: 'ms_3',
-              title: 'Local Geo-SEO Schema & Google Map Pack Push',
-              description: 'Injected JSON-LD LocalBusiness schema, synchronized 40+ directory citations, and updated service areas.',
-              status: 'in_progress'
-            },
-            {
-              id: 'ms_4',
-              title: 'Autonomous Lead Funnel & SMS Notification Flow',
-              description: 'Configured high-converting click-to-call mobile lead magnet and instant dispatcher notifications.',
-              status: 'pending'
-            },
-            {
-              id: 'ms_5',
-              title: 'Monthly Executive ROI Review & Proof of Work Delivery',
-              description: 'Generate white-label performance PDF with before-and-after conversion comparisons and ranking metrics.',
-              status: 'pending'
-            }
-          ]
-        });
-        this.save();
-      }
-    }
-
-    return this.data.clientProjects.filter(p => p.contractorId === contractorId);
+    if (!this.data.clientProjects) this.data.clientProjects = [];
+    // Never manufacture a client, retainer, delivery score, asset, or milestone
+    // when a tenant has no persisted client projects.
+    return this.data.clientProjects.filter(project => project.contractorId === contractorId);
   }
 
   public createClientProject(contractorId: string, project: Omit<ClientProjectDb, 'contractorId'>): ClientProjectDb {

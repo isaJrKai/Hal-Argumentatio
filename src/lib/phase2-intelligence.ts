@@ -109,7 +109,9 @@ export function verifyPhase2Pillars(
   // Zero plaintext leak validation
   let hasPlaintextLeak = false;
   for (const lead of leadsList) {
-    if (lead.phone && !lead.phone.includes('[ENCRYPTED]') && lead.phone.length > 4 && !lead.phoneEncrypted) {
+    const plaintextPhone = Boolean(lead.phone && lead.phone !== '[ENCRYPTED]' && lead.phone.length > 4);
+    const plaintextEmail = Boolean(lead.email && lead.email !== '[ENCRYPTED]' && lead.email.length > 4);
+    if (plaintextPhone || plaintextEmail) {
       hasPlaintextLeak = true;
       break;
     }
@@ -140,7 +142,7 @@ export function verifyPhase2Pillars(
         nonSeedRecordCount,
         mockCount,
         encryptedCount,
-        plaintextLeakCheck: hasPlaintextLeak ? 'FAILED_LEAK_DETECTED' : 'PASSED_ZERO_LEAKAGE'
+        plaintextLeakCheck: totalLeads === 0 ? 'NOT_ENOUGH_DATA' : hasPlaintextLeak ? 'FAILED_LEAK_DETECTED' : 'PASSED_ZERO_LEAKAGE'
       }
     },
     pillar2: {

@@ -46,8 +46,11 @@ interface Phase3StatusResponse {
   phase3Verified: boolean;
   verification: Phase3VerificationReport;
   sequences: CadenceSequence[];
+  sequenceTemplates: CadenceSequence[];
   outboxRecords: any[];
   schedulerRules: ScheduledTriggerRule[];
+  schedulerTemplates: ScheduledTriggerRule[];
+  schedulerJobs: any[];
   recentAutomationEvents: any[];
   integrity: {
     valid: boolean;
@@ -81,11 +84,12 @@ export const HalRoadmapPhase3View: React.FC = () => {
   const [testWebhookSecret, setTestWebhookSecret] = useState('');
   const [copiedSignature, setCopiedSignature] = useState(false);
 
-  // Live Outbox Delivery Bridge State
+  // Provider Configuration & Delivery Status State
   const [outboxQueueData, setOutboxQueueData] = useState<any | null>(null);
   const [isLoadingQueue, setIsLoadingQueue] = useState(false);
   const [isDispatchingLive, setIsDispatchingLive] = useState(false);
   const [liveDispatchResult, setLiveDispatchResult] = useState<any | null>(null);
+  const [liveDispatchError, setLiveDispatchError] = useState<string | null>(null);
   const [liveChannel, setLiveChannel] = useState<'email' | 'sms' | 'webhook'>('email');
   const [liveRecipient, setLiveRecipient] = useState('');
   const [liveSubject, setLiveSubject] = useState('');
@@ -136,14 +140,19 @@ export const HalRoadmapPhase3View: React.FC = () => {
           priority: livePriority
         })
       });
-      if (res.ok) {
-        const data = await res.json();
-        setLiveDispatchResult(data);
-        await fetchOutboxQueue();
-        await fetchPhase3Status();
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        setLiveDispatchError(data.error || 'Live delivery is disabled; no message was sent.');
+        setLiveDispatchResult(null);
+        return;
       }
-    } catch (err) {
-      console.error('Live dispatch failed:', err);
+      setLiveDispatchError(null);
+      setLiveDispatchResult(data);
+      await fetchOutboxQueue();
+      await fetchPhase3Status();
+    } catch (err: any) {
+      setLiveDispatchError(err.message || 'Live delivery could not be checked.');
+      console.error('Delivery availability failed:', err);
     } finally {
       setIsDispatchingLive(false);
     }
@@ -285,9 +294,14 @@ export const HalRoadmapPhase3View: React.FC = () => {
     }
   };
 
-  const sequences = statusData?.sequences ?? [];
+  const savedSequences = statusData?.sequences ?? [];
+  const sequenceTemplates = statusData?.sequenceTemplates ?? [];
+  const sequences = savedSequences.length > 0 ? savedSequences : sequenceTemplates;
+  const usingSequenceTemplates = savedSequences.length === 0 && sequenceTemplates.length > 0;
   const currentSequence = sequences.find(s => s.id === selectedSequenceId) || sequences[0];
   const schedulerRules = statusData?.schedulerRules ?? [];
+  const schedulerTemplates = statusData?.schedulerTemplates ?? [];
+  const schedulerJobs = statusData?.schedulerJobs ?? [];
   const computedSchedule = currentSequence ? calculateCadenceSchedule(new Date(), currentSequence.steps) : [];
 
   const backoffCalc = calculateExponentialBackoff(testBackoffAttempt);
@@ -313,16 +327,16 @@ export const HalRoadmapPhase3View: React.FC = () => {
               <span className="text-xs font-mono font-bold tracking-widest text-accent uppercase">
                 HAL Master Plan — Architecture Roadmap
               </span>
-              <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 flex items-center gap-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+              <span className={`px-2 py-0.5 rounded-full text-[10px] font-mono font-bold border flex items-center gap-1 ${statusData?.phase3Verified ? 'bg-emerald-500/15 text-emerald-600 border-emerald-500/30' : 'bg-warning-dim text-warning border-warning/30'}`}>
+                <span className={`w-1.5 h-1.5 rounded-full ${statusData?.phase3Verified ? 'bg-emerald-500' : 'bg-warning'}`} />
                 {statusData?.phase3Verified ? 'PHASE 3 VERIFIED' : 'PHASE 3 NOT VERIFIED'}
               </span>
             </div>
             <h2 className="text-lg font-bold font-display text-text-primary tracking-tight">
-              Phase 3: Automation Engine (Multi-Step Sequencer, Webhook Outbox & Event Dispatch)
+              Phase 3: Cadence Templates, Outbox Inspection & Scheduler Configuration
             </h2>
             <p className="text-xs text-text-secondary leading-relaxed max-w-3xl">
-              Durable 4-step outreach cadence hooks, HMAC-SHA256 signed webhook outbox with exponential backoff retry queues, and autonomous background calendar sync triggers.
+              Cadence templates and configuration checks are available. Provider delivery, durable outbox processing, and autonomous scheduler execution are not enabled or verified in this deployment.
             </p>
           </div>
 
@@ -350,23 +364,23 @@ export const HalRoadmapPhase3View: React.FC = () => {
           <div className="p-3 rounded-lg bg-bg-base border border-border-dim space-y-1">
             <div className="flex items-center justify-between">
               <span className="text-[10px] font-mono font-bold text-text-tertiary uppercase">Pillar 1: Sequencer</span>
-              <span className="w-2 h-2 rounded-full bg-emerald-500" />
+              <span className={`w-2 h-2 rounded-full ${p1?.verified ? 'bg-emerald-500' : 'bg-warning'}`} />
             </div>
             <div className="text-sm font-bold text-text-primary">
-              {sequences.length} Active Cadences
+              {savedSequences.length} Saved Sequences
             </div>
             <div className="text-[10px] text-text-secondary">
-              {sequences.reduce((sum, s) => sum + s.steps.length, 0)} multi-touch steps
+              {sequences.reduce((sum, s) => sum + s.steps.length, 0)} {usingSequenceTemplates ? 'template steps (not active)' : 'saved sequence steps'}
             </div>
           </div>
 
           <div className="p-3 rounded-lg bg-bg-base border border-border-dim space-y-1">
             <div className="flex items-center justify-between">
               <span className="text-[10px] font-mono font-bold text-text-tertiary uppercase">Pillar 2: Outbox</span>
-              <span className="w-2 h-2 rounded-full bg-emerald-500" />
+              <span className={`w-2 h-2 rounded-full ${p2?.verified ? 'bg-emerald-500' : 'bg-warning'}`} />
             </div>
             <div className="text-sm font-bold text-text-primary">
-              {p2?.verified ? 'Helper Check Passed' : 'Not Verified'}
+              {p2?.verified ? 'Verified' : 'Not verified'}
             </div>
             <div className="text-[10px] text-text-secondary">
               2^n Exponential Backoff
@@ -376,13 +390,13 @@ export const HalRoadmapPhase3View: React.FC = () => {
           <div className="p-3 rounded-lg bg-bg-base border border-border-dim space-y-1">
             <div className="flex items-center justify-between">
               <span className="text-[10px] font-mono font-bold text-text-tertiary uppercase">Pillar 3: Triggers</span>
-              <span className="w-2 h-2 rounded-full bg-emerald-500" />
+              <span className={`w-2 h-2 rounded-full ${p3?.verified ? 'bg-emerald-500' : 'bg-warning'}`} />
             </div>
             <div className="text-sm font-bold text-text-primary">
-              {schedulerRules.filter(r => r.status === 'active').length} Scheduled Jobs
+              {schedulerJobs.length} Recorded Scheduler Checks
             </div>
             <div className="text-[10px] text-text-secondary">
-              Autonomous calendar sync
+              No active scheduler rules configured
             </div>
           </div>
 
@@ -464,7 +478,7 @@ export const HalRoadmapPhase3View: React.FC = () => {
           }`}
         >
           <Radio className="w-3.5 h-3.5 text-emerald-400" />
-          <span>Live Outbox Delivery Bridge</span>
+          <span>Provider Configuration & Delivery Status</span>
           <span className="px-1.5 py-0.2 rounded text-[9px] font-mono bg-emerald-500/20 text-emerald-300 font-bold">
             LIVE
           </span>
@@ -508,8 +522,8 @@ export const HalRoadmapPhase3View: React.FC = () => {
               </p>
               <div className="pt-2 border-t border-border-dim/60 space-y-1.5 text-[11px] font-mono text-text-secondary">
                 <div className="flex justify-between">
-                  <span>ACTIVE CADENCES:</span>
-                  <strong className="text-text-primary">{sequences.length}</strong>
+                  <span>SAVED SEQUENCES:</span>
+                  <strong className="text-text-primary">{savedSequences.length}</strong>
                 </div>
                 <div className="flex justify-between">
                   <span>AVERAGE CONVERSION:</span>
@@ -622,8 +636,8 @@ export const HalRoadmapPhase3View: React.FC = () => {
           <div className="p-5 rounded-xl bg-bg-raised border border-border-dim space-y-4">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 border-b border-border-dim pb-3">
               <div>
-                <h3 className="text-sm font-bold text-text-primary">4-Step Hermes Multi-Touch Cadence</h3>
-                <p className="text-xs text-text-secondary mt-0.5">Configured step timelines with automated token substitution.</p>
+                <h3 className="text-sm font-bold text-text-primary">Cadence Template Preview</h3>
+                <p className="text-xs text-text-secondary mt-0.5">Preview a saved sequence or an example template. Previewing does not enroll a lead or send messages.</p>
               </div>
 
               <div className="flex items-center gap-2">
@@ -731,13 +745,13 @@ export const HalRoadmapPhase3View: React.FC = () => {
                   className="px-4 py-2 rounded-lg bg-accent text-white hover:bg-accent/90 transition-all text-xs font-semibold flex items-center gap-2 cursor-pointer disabled:opacity-50 shadow-xs"
                 >
                   <Play className={`w-3.5 h-3.5 ${isTriggeringSequence ? 'animate-spin' : ''}`} />
-                  <span>{isTriggeringSequence ? 'Triggering Cadence...' : 'Execute Automated Cadence Trigger'}</span>
+                  <span>{isTriggeringSequence ? 'Generating Preview...' : 'Preview Cadence Schedule'}</span>
                 </button>
 
                 {sequenceTriggerResult && (
                   <span className="text-xs font-mono text-emerald-500 font-semibold flex items-center gap-1.5">
                     <CheckCheck className="w-4 h-4" />
-                    Enrolled {targetBusinessName} into Step 1. Scheduled {sequenceTriggerResult.scheduledSteps?.length ?? 0} touchpoints.
+                    Preview generated for {targetBusinessName}. {sequenceTriggerResult.scheduledSteps?.length ?? 0} touchpoints mapped; no enrollment or message sent.
                   </span>
                 )}
               </div>
@@ -752,8 +766,8 @@ export const HalRoadmapPhase3View: React.FC = () => {
           <div className="p-5 rounded-xl bg-bg-raised border border-border-dim space-y-4">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 border-b border-border-dim pb-3">
               <div>
-                <h3 className="text-sm font-bold text-text-primary">Durable Conversion Outbox Engine</h3>
-                <p className="text-xs text-text-secondary mt-0.5">Exponential backoff curves, signature verification, and delivery tracking.</p>
+                <h3 className="text-sm font-bold text-text-primary">Conversion Outbox Inspection</h3>
+                <p className="text-xs text-text-secondary mt-0.5">Backoff and signature helpers can be previewed below. This action only inspects queued records; it does not upload conversions or send messages.</p>
               </div>
 
               <button
@@ -762,7 +776,7 @@ export const HalRoadmapPhase3View: React.FC = () => {
                 className="px-3.5 py-2 rounded-lg bg-accent text-white hover:bg-accent/90 transition-all text-xs font-semibold flex items-center gap-2 cursor-pointer disabled:opacity-50 shadow-xs"
               >
                 <RefreshCw className={`w-3.5 h-3.5 ${isProcessingOutbox ? 'animate-spin' : ''}`} />
-                <span>{isProcessingOutbox ? 'Draining Outbox...' : 'Process Outbox Queue'}</span>
+                <span>{isProcessingOutbox ? 'Inspecting Outbox...' : 'Inspect Outbox Queue'}</span>
               </button>
             </div>
 
@@ -842,12 +856,12 @@ export const HalRoadmapPhase3View: React.FC = () => {
 
             {/* Outbox Process Toast */}
             {outboxProcessResult && (
-              <div className="p-3 rounded bg-emerald-500/10 border border-emerald-500/30 text-xs text-emerald-600 dark:text-emerald-400 flex items-center justify-between font-mono">
+              <div className="p-3 rounded bg-warning-dim border border-warning/30 text-xs text-text-primary flex items-center justify-between font-mono">
                 <div className="flex items-center gap-2">
-                  <CheckCircle2 className="w-4 h-4 shrink-0" />
-                  <span>Processed {outboxProcessResult.processedCount || 1} records. {outboxProcessResult.succeededCount || 1} uploaded to Google Ads with verified GCLID.</span>
+                  <AlertCircle className="w-4 h-4 shrink-0 text-warning" />
+                  <span>{outboxProcessResult.message} Existing records: {outboxProcessResult.existingRecordCount ?? 0}; queued: {outboxProcessResult.queuedCount ?? 0}; provider uploads verified: {outboxProcessResult.providerDeliveryVerifiedCount ?? 0}.</span>
                 </div>
-                <span className="text-[10px] text-text-tertiary">LATENCY: 42ms</span>
+                <span className="text-[10px] text-text-tertiary">No provider latency measured</span>
               </div>
             )}
           </div>
@@ -864,14 +878,14 @@ export const HalRoadmapPhase3View: React.FC = () => {
                   <span className="text-xs font-mono font-bold tracking-wider text-accent uppercase">
                     Phase 3 Operational Instrument
                   </span>
-                  <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-emerald-500/15 text-emerald-500 border border-emerald-500/30 flex items-center gap-1">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                    LIVE PROTOCOL BRIDGE
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-warning-dim text-warning border border-warning/30 flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-warning" />
+                    DELIVERY NOT VERIFIED
                   </span>
                 </div>
-                <h3 className="text-sm font-bold text-text-primary">Live Outbox Delivery Bridge</h3>
+                <h3 className="text-sm font-bold text-text-primary">Provider Configuration & Delivery Status</h3>
                 <p className="text-xs text-text-secondary mt-0.5">
-                  Direct live carrier dispatch across SMTP/SendGrid, Twilio SMS/WhatsApp, and HMAC-SHA256 authenticated webhooks with cryptographic ledger anchoring.
+                  Saved credentials are shown as configured but unverified. Outbound delivery is disabled until provider adapters and webhook handling are tested.
                 </p>
               </div>
 
@@ -899,7 +913,7 @@ export const HalRoadmapPhase3View: React.FC = () => {
                       <span className="text-xs font-bold text-text-primary">{gw.name}</span>
                     </div>
                     <span className="px-1.5 py-0.5 rounded text-[9px] font-mono font-bold bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">
-                      ONLINE
+                      {gw.configured ? 'CONFIGURED · UNVERIFIED' : 'NOT CONFIGURED'}
                     </span>
                   </div>
 
@@ -910,7 +924,7 @@ export const HalRoadmapPhase3View: React.FC = () => {
                     </div>
                     <div>
                       <span className="text-text-tertiary block text-[9px]">DELIVERABILITY</span>
-                      <span className="text-emerald-500 font-bold">{gw.deliverability}</span>
+                      <span className="text-text-secondary">{gw.deliverability ?? 'Not measured'}</span>
                     </div>
                   </div>
                 </div>
@@ -922,7 +936,7 @@ export const HalRoadmapPhase3View: React.FC = () => {
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-2 border-b border-border-dim pb-3">
                 <div className="flex items-center gap-2">
                   <Terminal className="w-4 h-4 text-accent" />
-                  <span className="text-xs font-bold text-text-primary">Interactive Dispatch Desk Instrument</span>
+                  <span className="text-xs font-bold text-text-primary">Dispatch Preview (No Message Sent)</span>
                   <span className="text-[10px] text-text-secondary font-mono">
                     (Constrain tools, not behavior)
                   </span>
@@ -1096,21 +1110,28 @@ export const HalRoadmapPhase3View: React.FC = () => {
                   className="px-5 py-2.5 rounded-lg bg-accent text-white hover:bg-accent/90 transition-all text-xs font-bold flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 shadow-md"
                 >
                   <Send className={`w-3.5 h-3.5 ${isDispatchingLive ? 'animate-spin' : ''}`} />
-                  <span>{isDispatchingLive ? 'Transmitting via Carrier Gateway...' : `Dispatch Live ${liveChannel.toUpperCase()} Now`}</span>
+                  <span>{isDispatchingLive ? 'Transmitting via Carrier Gateway...' : `Check ${liveChannel.toUpperCase()} Delivery Availability`}</span>
                 </button>
               </div>
             </div>
 
+            {liveDispatchError && (
+              <div className="p-3 rounded-lg bg-warning-dim border border-warning/30 text-xs text-warning" role="alert">
+                {liveDispatchError}
+              </div>
+            )}
+
             {/* Live Transmission Cryptographic Receipt */}
+            {liveDispatchError && <div className="p-3 rounded-lg bg-warning-dim border border-warning/30 text-xs text-warning" role="alert">{liveDispatchError}</div>}
             {liveDispatchResult && (
               <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/30 space-y-3 font-mono text-xs">
                 <div className="flex items-center justify-between border-b border-emerald-500/20 pb-2">
                   <div className="flex items-center gap-2 text-emerald-600 dark:text-emerald-400 font-bold">
                     <CheckCircle2 className="w-4 h-4" />
-                    <span>CARRIER DISPATCH CONFIRMED — {liveDispatchResult.deliveryStatus}</span>
+                    <span>PROVIDER ACCEPTED REQUEST — {liveDispatchResult.deliveryStatus || 'status pending'}</span>
                   </div>
                   <span className="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-500 text-[10px] font-bold">
-                    LATENCY: {liveDispatchResult.latencyMs}ms
+                    Provider latency: {typeof liveDispatchResult.latencyMs === 'number' ? `${liveDispatchResult.latencyMs}ms` : 'not measured'}
                   </span>
                 </div>
 
@@ -1149,7 +1170,7 @@ export const HalRoadmapPhase3View: React.FC = () => {
               <div className="flex items-center justify-between">
                 <span className="text-xs font-bold text-text-primary">Outbox Delivery Ledger & Audit History</span>
                 <span className="text-[10px] font-mono text-text-tertiary">
-                  Total Dispatched: {outboxQueueData?.stats?.totalDispatched || 12} • Deliverability: 99.2%
+                  Dispatch attempts: {outboxQueueData?.stats?.totalDispatched ?? 0} • Delivery verified: {outboxQueueData?.stats?.deliveryVerifiedCount ?? 0}
                 </span>
               </div>
 
@@ -1181,12 +1202,12 @@ export const HalRoadmapPhase3View: React.FC = () => {
                           <td className="p-2.5 text-text-secondary max-w-xs truncate">{item.subject || item.preview}</td>
                           <td className="p-2.5">
                             <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">
-                              DELIVERED
+                              {item.mode === 'simulation' ? 'SIMULATED' : (item.status || 'UNVERIFIED').toUpperCase()}
                             </span>
                           </td>
                           <td className="p-2.5 text-text-secondary">{typeof item.latencyMs === 'number' ? `${item.latencyMs}ms` : 'Not measured'}</td>
                           <td className="p-2.5 text-text-tertiary text-[10px]">
-                            {new Date(item.timestamp).toLocaleTimeString()}
+                            {item.timestamp ? new Date(item.timestamp).toLocaleTimeString() : 'Not recorded'}
                           </td>
                         </tr>
                       ))}
@@ -1205,8 +1226,8 @@ export const HalRoadmapPhase3View: React.FC = () => {
           <div className="p-5 rounded-xl bg-bg-raised border border-border-dim space-y-4">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 border-b border-border-dim pb-3">
               <div>
-                <h3 className="text-sm font-bold text-text-primary">Autonomous Background Triggers</h3>
-                <p className="text-xs text-text-secondary mt-0.5">Recurring cron workers for calendar scanning, cadence progression, and outbox delivery.</p>
+                <h3 className="text-sm font-bold text-text-primary">Scheduler Configuration</h3>
+                <p className="text-xs text-text-secondary mt-0.5">Templates are available, but no persisted scheduler rules or background trigger worker is configured.</p>
               </div>
 
               <button
@@ -1215,12 +1236,24 @@ export const HalRoadmapPhase3View: React.FC = () => {
                 className="px-3.5 py-2 rounded-lg bg-accent text-white hover:bg-accent/90 transition-all text-xs font-semibold flex items-center gap-2 cursor-pointer disabled:opacity-50 shadow-xs"
               >
                 <Play className={`w-3.5 h-3.5 ${isRunningScheduler ? 'animate-spin' : ''}`} />
-                <span>{isRunningScheduler ? 'Running Triggers...' : 'Run Scheduled Scan Now'}</span>
+                <span>{isRunningScheduler ? 'Checking Configuration...' : 'Check Scheduler Configuration'}</span>
               </button>
             </div>
 
-            {/* Scheduler Rules Table */}
+            {/* Inactive Scheduler Templates */}
             <div className="space-y-3">
+              {schedulerRules.length === 0 && (
+                <div className="p-4 rounded-lg bg-bg-base border border-border-dim space-y-2">
+                  <div className="text-xs font-semibold text-text-primary">No active scheduler rules</div>
+                  <p className="text-[11px] text-text-secondary">No background triggers are configured. The following are templates only:</p>
+                  {schedulerTemplates.map(template => (
+                    <div key={template.id} className="flex flex-wrap items-center justify-between gap-2 text-[11px] border-t border-border-dim pt-2">
+                      <span className="text-text-primary">{template.name}</span>
+                      <span className="text-text-tertiary">{template.cronExpression} · inactive template</span>
+                    </div>
+                  ))}
+                </div>
+              )}
               {schedulerRules.map((rule) => (
                 <div key={rule.id} className="p-3.5 rounded-lg bg-bg-base border border-border-dim flex flex-col md:flex-row md:items-center justify-between gap-3 text-xs">
                   <div className="space-y-1">
@@ -1250,14 +1283,14 @@ export const HalRoadmapPhase3View: React.FC = () => {
               ))}
             </div>
 
-            {/* Scheduler Run Result */}
+            {/* Scheduler Configuration Check Result */}
             {schedulerRunResult && (
-              <div className="p-3 rounded bg-emerald-500/10 border border-emerald-500/30 text-xs text-emerald-600 dark:text-emerald-400 flex items-center justify-between font-mono">
+              <div className="p-3 rounded bg-warning-dim border border-warning/30 text-xs text-text-primary flex items-center justify-between font-mono">
                 <div className="flex items-center gap-2">
-                  <CheckCircle2 className="w-4 h-4 shrink-0" />
-                  <span>Scheduled scan executed: {schedulerRunResult.jobsRun || 4} triggers verified. 0 anomalies detected.</span>
+                  <AlertCircle className="w-4 h-4 shrink-0 text-warning" />
+                  <span>{schedulerRunResult.message} Templates available: {schedulerRunResult.availableTemplatesCount ?? 0}; configured rules: {schedulerRunResult.configuredRulesCount ?? 0}; triggers executed: {schedulerRunResult.triggersExecuted ?? 0}.</span>
                 </div>
-                <span className="text-[10px] text-emerald-500 font-bold">ALL TIMERS SYNCED</span>
+                <span className="text-[10px] text-warning font-bold">NO TRIGGERS EXECUTED</span>
               </div>
             )}
           </div>

@@ -1118,26 +1118,20 @@ export default function OverviewPanel({
                   <h3 className="text-sm font-semibold tracking-tight text-text-primary">Connected Business Apps</h3>
                 </div>
                 <p className="text-xs text-text-tertiary mt-0.5">
-                  Live payment, communications, and operations integrations
+                  Provider credentials and verified connection status
                 </p>
               </div>
-              <span className={`px-2.5 py-1 rounded-md text-xs font-sans font-medium ${
-                connectorHealth?.summary?.allHealthy ? 'bg-positive-dim text-positive' : 'bg-warning-dim text-warning'
-              }`}>
-                {connectorHealth?.summary?.allHealthy ? 'Operational' : `${connectorHealth?.summary?.failingOrMissingCount || 0} Need Setup`}
+              <span className="px-2.5 py-1 rounded-md text-xs font-sans font-medium bg-warning-dim text-warning">
+                {connectorHealth?.summary
+                  ? `${connectorHealth.summary.configuredCount} Configured · unverified · ${connectorHealth.summary.unconfiguredCount} Need Setup`
+                  : 'Integration status unavailable'}
               </span>
             </div>
 
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 my-3">
-              {(connectorHealth?.connectors || [
-                { id: 'stripe', name: 'Stripe Invoicing', health: 'excellent' },
-                { id: 'twilio', name: 'Twilio SMS', health: 'critical' },
-                { id: 'sendgrid', name: 'SendGrid Email', health: 'excellent' },
-                { id: 'googleMaps', name: 'Google Maps', health: 'excellent' },
-                { id: 'googleDrive', name: 'Google Drive', health: 'none' },
-                { id: 'linkedin', name: 'LinkedIn Outreach', health: 'none' }
-              ]).slice(0, 6).map((c: any) => {
+              {connectorHealth?.connectors?.length ? connectorHealth.connectors.slice(0, 6).map((c: any) => {
                 const isHealthy = c.health === 'excellent' || c.status === 'connected';
+                const isConfigured = Boolean(c.configured);
                 const displayName = (c.name || '')
                   .replace(' Billing API', '')
                   .replace(' SMS Gateway', '')
@@ -1161,11 +1155,11 @@ export default function OverviewPanel({
                   >
                     <div className="flex items-center justify-between gap-1 mb-2">
                       <span className="text-xs font-semibold text-text-primary truncate">{displayName}</span>
-                      <span className={`w-2 h-2 rounded-full shrink-0 ${isHealthy ? 'bg-positive' : 'bg-text-tertiary/60'}`} />
+                      <span className={`w-2 h-2 rounded-full shrink-0 ${isHealthy ? 'bg-positive' : isConfigured ? 'bg-warning' : 'bg-text-tertiary/60'}`} />
                     </div>
                     <div className="flex items-center justify-between text-[10px] font-sans pt-1 border-t border-border-dim/40">
                       <span className={isHealthy ? 'text-positive font-medium' : 'text-text-tertiary'}>
-                        {isHealthy ? 'Connected' : 'Setup required'}
+                        {isHealthy ? 'Connected' : isConfigured ? 'Configured · unverified' : 'Not configured'}
                       </span>
                       <span className="text-accent group-hover:underline text-[9.5px] font-semibold flex items-center">
                         Configure ➔
@@ -1173,7 +1167,11 @@ export default function OverviewPanel({
                     </div>
                   </div>
                 );
-              })}
+              }) : (
+                <div className="col-span-full py-6 text-center text-xs text-text-tertiary">
+                  {connectorHealth ? 'No connector configuration has been recorded yet.' : 'Integration configuration status could not be loaded.'}
+                </div>
+              )}
             </div>
           </div>
 
