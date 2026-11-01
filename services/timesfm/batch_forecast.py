@@ -124,6 +124,9 @@ def main() -> None:
 
             batch_rows = []
             last_week = weeks[-1][0]
+            today_utc = datetime.now(timezone.utc).date()
+            next_monday = today_utc - timedelta(days=today_utc.weekday()) + timedelta(days=7)
+            first_forecast_week = max(last_week + timedelta(days=7), next_monday)
             total_cost = sum(float(row["cost"] or 0) for row in scoped)
             total_conversions = sum(float(row["conversions"] or 0) for row in scoped)
             observed_cpl = total_cost / total_conversions if total_conversions > 0 else 0.0
