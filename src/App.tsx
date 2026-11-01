@@ -1175,7 +1175,7 @@ export default function App() {
                   )}
 
                   {(activeTab === 'neural' || activeTab === 'synaptic') && (
-                    <NeuralPanel activeCity={activeCity} activeNiche={activeNiche} />
+                    <NeuralPanel />
                   )}
 
                   {activeTab === 'debrief' && (
