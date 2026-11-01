@@ -62,7 +62,7 @@ def make_model():
 
 
 def main() -> None:
-    if not 1 <= HORIZON <= 52 or MAX_CONTEXT < 8:
+    if not 1 <= HORIZON <= 52 or not 8 <= MAX_CONTEXT <= 16384:
         raise ValueError("Invalid TimesFM batch horizon/context configuration")
 
     model = make_model()
@@ -180,7 +180,7 @@ def main() -> None:
 
     print(f"TimesFM batch complete: {generated} forecast points saved; {skipped} contractor-territories skipped.")
     if generated == 0:
-        raise SystemExit("No forecasts were generated; check history and territory coverage.")
+        print("No contractor-territories had enough eligible history yet; no forecasts were changed.")
 
 
 if __name__ == "__main__":
