@@ -33,7 +33,7 @@ export async function generateContractorLandingPage(params: ContractorGeneratorP
     primaryGoal, 
     coreOffer, 
     proofAvailable,
-    variantArchetype = 'emergency_dispatch'
+    variantArchetype = 'master_craftsman'
   } = params;
   const apiKey = process.env.GEMINI_API_KEY;
 
