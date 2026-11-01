@@ -5607,10 +5607,11 @@ app.post('/api/system/postgres-sync', authenticate, requireRole('admin'), async 
         const leadInsert = await client.query(`
           INSERT INTO leads (
             id, contractor_id, business_name, city, niche, owner_name,
+            is_synthetic, source_type, verification_status, dns_verified, source,
             phone, email, phone_encrypted, email_encrypted, website_url,
             review_count, review_score, predicted_monthly_lost_revenue_usd,
             status, performance_score, ssl_status, urgency_score, predicted_ltv, updated_at
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, CURRENT_TIMESTAMP)
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, CURRENT_TIMESTAMP)
           ON CONFLICT (id) DO NOTHING;
         `, [
           lead.id,
@@ -5619,6 +5620,13 @@ app.post('/api/system/postgres-sync', authenticate, requireRole('admin'), async 
           lead.city,
           (lead as any).niche || lead.serviceType || 'general',
           lead.ownerName || null,
+          Boolean((lead as any).isSynthetic),
+          (lead as any).externalSource || (lead as any).externalCrmId
+            ? ((lead as any).externalSource || (lead as any).sourceType || 'unknown')
+            : ((lead as any).sourceType === 'manual' ? 'manual' : null),
+          'UNVERIFIED_STAGING',
+          false,
+          lead.source || 'manual',
           null,
           null,
           lead.phoneEncrypted || ((lead as any).phone ? encrypt((lead as any).phone) : null),
@@ -5626,7 +5634,7 @@ app.post('/api/system/postgres-sync', authenticate, requireRole('admin'), async 
           (lead as any).websiteUrl || null,
           null,
           null,
-          (lead as any).predictedMonthlyLostRevenueUsd ?? null,
+          null,
           lead.status,
           null,
           null,
