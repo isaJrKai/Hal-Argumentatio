@@ -145,6 +145,7 @@ export const UnifiedCommunicationsHub: React.FC<UnifiedCommunicationsHubProps> =
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Idempotency-Key': idempotencyKey,
           ...(token ? { Authorization: `Bearer ${token}` } : {})
         },
         body: JSON.stringify({
@@ -193,6 +194,7 @@ export const UnifiedCommunicationsHub: React.FC<UnifiedCommunicationsHubProps> =
     }
 
     setIsDispatching(true);
+    const idempotencyKey = crypto.randomUUID();
     try {
       const res = await fetch('/api/outreach/dispatch', {
         method: 'POST',
@@ -208,6 +210,7 @@ export const UnifiedCommunicationsHub: React.FC<UnifiedCommunicationsHubProps> =
           subject: subject.trim() || undefined,
           message: message.trim(),
           mode: dispatchMode,
+          idempotencyKey,
           variables: {
             businessName: selectedLead.businessName,
             ownerName: selectedLead.ownerName || 'Owner',
