@@ -35,6 +35,8 @@ export const ChatBotPanel: React.FC<Props> = ({ token }) => {
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const endRef = useRef<HTMLDivElement>(null);
   const historyRequestRef = useRef(0);
+  const activeConversationIdRef = useRef<string | null>(activeConversationId);
+  activeConversationIdRef.current = activeConversationId;
 
   const api = useCallback(async (url: string, init: RequestInit = {}) => {
     const response = await fetch(url, { ...init, headers: { Authorization: `Bearer ${authToken}`, ...(init.headers || {}) } });
@@ -82,6 +84,14 @@ export const ChatBotPanel: React.FC<Props> = ({ token }) => {
     if (activeConversationId) loadConversation(activeConversationId);
     else { historyRequestRef.current += 1; setMessages([]); }
   }, [activeConversationId, loadConversation]);
+
+  // Keep the project filter/header aligned when a conversation is selected
+  // indirectly (initial load, delete fallback, or restore), not only on row clicks.
+  useEffect(() => {
+    if (!activeConversationId) return;
+    const selected = conversations.find(conversation => conversation.id === activeConversationId);
+    if (selected) setActiveProjectId(selected.projectId || null);
+  }, [activeConversationId, conversations]);
 
   useEffect(() => { endRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages, loading]);
 
@@ -152,7 +162,11 @@ export const ChatBotPanel: React.FC<Props> = ({ token }) => {
     try {
       await api('/api/intelligence/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message, enableGrounding: grounding, activeAi: 'dual', conversationId }) });
       const rows = await api(`/api/intelligence/chat/history?conversationId=${encodeURIComponent(conversationId)}`);
-      setMessages(Array.isArray(rows) ? rows : []);
+      // A slow response from a chat the user has since left must not replace
+      // the currently visible conversation's messages.
+      if (activeConversationIdRef.current === conversationId) {
+        setMessages(Array.isArray(rows) ? rows : []);
+      }
       await refreshWorkspace();
     } catch (error: any) {
       setMessages(prev => prev.filter(m => m.id !== tempId));
