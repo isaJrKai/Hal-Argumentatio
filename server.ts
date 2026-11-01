@@ -3756,6 +3756,7 @@ interface DispatchLogEntry {
 }
 
 const dispatchLogs: DispatchLogEntry[] = [];
+const liveEmailDispatchLimits = new Map<string, { count: number; resetAt: number }>();
 
 app.get('/api/dispatch/status', authenticate, (_req, res) => {
   const signingConfigured = Boolean(process.env.HAL_WEBHOOK_SIGNING_SECRET && process.env.HAL_WEBHOOK_SIGNING_SECRET.length >= 32);
@@ -4241,6 +4242,31 @@ app.post('/api/outreach/dispatch', authenticate, async (req, res) => {
         code: 'CHANNEL_NOT_IMPLEMENTED',
         error: `Live ${channel} delivery is not implemented. No provider was contacted.`
       });
+    }
+    if (!process.env.RESEND_API_KEY || !process.env.HAL_SENDER_EMAIL) {
+      return res.status(503).json({
+        success: false,
+        code: 'EMAIL_PROVIDER_NOT_CONFIGURED',
+        error: 'Resend is not configured. Set RESEND_API_KEY and HAL_SENDER_EMAIL on the server.'
+      });
+    }
+    const rateNow = Date.now();
+    for (const [key, value] of liveEmailDispatchLimits) {
+      if (value.resetAt <= rateNow) liveEmailDispatchLimits.delete(key);
+    }
+    const limit = liveEmailDispatchLimits.get(contractorId);
+    if (limit && limit.resetAt > rateNow && limit.count >= 5) {
+      return res.status(429).json({
+        success: false,
+        code: 'LIVE_EMAIL_RATE_LIMITED',
+        error: 'Live email limit reached. Try again after the current 10-minute window.',
+        retryAfterSeconds: Math.ceil((limit.resetAt - rateNow) / 1000)
+      });
+    }
+    if (!limit || limit.resetAt <= rateNow) {
+      liveEmailDispatchLimits.set(contractorId, { count: 1, resetAt: rateNow + 10 * 60 * 1000 });
+    } else {
+      limit.count += 1;
     }
 
     try {
