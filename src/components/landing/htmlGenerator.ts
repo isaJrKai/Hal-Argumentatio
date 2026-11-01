@@ -231,7 +231,7 @@ export function generateLandingPageHtml(config: LandingPageConfig): string {
             <p class="text-xs text-slate-400 leading-relaxed">${s.description}</p>
           </div>
           <div class="pt-3 border-t border-slate-800/80 flex items-center justify-between">
-            <span class="text-sm font-bold text-amber-400">${s.priceEstimate || 'Upfront Quote'}</span>
+            <span class="text-sm font-bold text-amber-400">${s.priceEstimate || 'Discuss Scope'}</span>
             <a href="#lead-form" class="text-xs text-sky-400 hover:text-sky-300 font-bold flex items-center gap-1">
               Select ➔
             </a>
