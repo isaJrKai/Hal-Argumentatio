@@ -249,7 +249,7 @@ export default function OverviewPanel({
           const formatted = data.forecastCurve.map((c: any) => ({
             day: c.week.replace('W+', 'W'),
             demand: c.predictedDemandIndex,
-            cpl: c.projectedCplUsd,
+            observedCpl: c.observedCplUsd,
             isBreach: c.isBreachingCplLimit,
             weatherSurge: c.weatherSurgeFactor
           }));
