@@ -22,6 +22,12 @@ jobs:
           cache: npm
       - name: Install locked dependencies
         run: npm ci
+      - name: Set up Python for inference service syntax check
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Check TimesFM service Python syntax
+        run: python -m py_compile services/timesfm/app.py services/timesfm/batch_forecast.py
       - name: Type-check and run automated tests
         run: npm run test:ci
       - name: Build production artifacts

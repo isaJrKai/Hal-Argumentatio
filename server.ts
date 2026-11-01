@@ -5400,6 +5400,7 @@ app.get('/api/neural/network', authenticate, async (req, res) => {
     const contractorId = (req as any).contractorId;
     const cityFilter = String(req.query.city || '').trim();
     const nicheFilter = String(req.query.niche || '').trim().toLowerCase();
+    const timesfmConfigured = Boolean(process.env.TIMESFM_SERVICE_URL && (process.env.TIMESFM_API_KEY || '').length >= 32);
     const dbInstance = getDrizzleDb();
     if (!dbInstance) throw new Error('Neon/PostgreSQL is unavailable');
 
@@ -5428,7 +5429,16 @@ app.get('/api/neural/network', authenticate, async (req, res) => {
       { id: 'core_leads', label: 'Lead Pipeline', type: 'core', group: 1, size: 22, detail: scopedLeads.length + ' tenant leads in the selected territory and niche.' },
       { id: 'core_outcomes', label: 'Recorded Outcomes', type: 'core', group: 2, size: 22, detail: scopedOutcomes.length + ' recorded win/loss outcomes in this scope.' },
       { id: 'core_ads', label: 'Google Ads Observations', type: 'core', group: 3, size: 22, detail: scopedAds.length + ' tenant-owned Google Ads performance records matched this scope.' },
-      { id: 'core_timesfm', label: 'TimesFM Adapter', type: 'unavailable', group: 4, size: 18, detail: 'Not configured: this deployment has no verified TimesFM inference endpoint or model weights. No TimesFM predictions or learned weights are being fabricated.' }
+      {
+        id: 'core_timesfm',
+        label: 'TimesFM 2.5 Adapter',
+        type: 'core',
+        group: 4,
+        size: 18,
+        detail: timesfmConfigured
+          ? 'Inference endpoint configured. A live model response is verified only when a forecast request succeeds.'
+          : 'Private HTTP inference is not configured. A fresh scheduled TimesFM batch forecast can still be used when available.'
+      }
     ];
     const links: any[] = [];
     const addLink = (source: string, target: string, value: number) => {
@@ -5526,7 +5536,9 @@ app.get('/api/neural/network', authenticate, async (req, res) => {
       totalLinks: links.length,
       lastActivityAt: lastActivity.length ? new Date(Math.max(...lastActivity)).toISOString() : null,
       learningStatus: scopedOutcomes.length ? 'Recorded outcomes available; model calibration is not yet validated.' : 'No recorded outcomes in this scope; no learning confidence is claimed.',
-      timesFmStatus: 'NOT_CONFIGURED'
+      timesFmStatus: timesfmConfigured ? 'HTTP_CONFIGURED_UNVERIFIED' : 'SCHEDULED_BATCH_SUPPORTED',
+      timesfmServiceConfigured: timesfmConfigured,
+      timesfmInferenceVerified: false
     };
     const events = [
       ...scopedOutcomes.slice(0, 5).map(record => ({ id: 'event_' + record.id, label: (record.outcome || 'outcome').toUpperCase() + ': ' + record.businessName, at: record.closedAt })),
@@ -5545,6 +5557,7 @@ app.get('/api/neural/network', authenticate, async (req, res) => {
 app.get('/api/ai/engine-status', authenticate, async (req, res) => {
   const geminiKeySet = !!process.env.GEMINI_API_KEY;
   const nvidiaKeySet = !!process.env.NVIDIA_API_KEY;
+  const timesfmConfigured = Boolean(process.env.TIMESFM_SERVICE_URL && (process.env.TIMESFM_API_KEY || '').length >= 32);
   const requestedPreference = process.env.HAL_ACTIVE_AI;
   const activeAiPreference =
     requestedPreference === 'dual' && geminiKeySet && nvidiaKeySet ? 'dual' :
@@ -5596,14 +5609,15 @@ app.get('/api/ai/engine-status', authenticate, async (req, res) => {
       },
       timesfm: {
         name: 'TimesFM Demand Prediction Engine',
-        model: null,
-        configured: false,
-        status: 'not_configured',
-        health: 'not connected',
-        role: 'No TimesFM provider or verified time-series inference integration is configured.',
-        capabilities: [],
-        forecastHorizon: null,
-        confidenceInterval: null,
+        model: 'google/timesfm-2.5-200m-pytorch',
+        configured: timesfmConfigured,
+        status: timesfmConfigured ? 'configured_unverified' : 'batch_capable',
+        health: timesfmConfigured ? 'not_verified' : 'awaiting_scheduled_batch',
+        role: 'Tenant-scoped weekly conversion-demand forecasting from historical Google Ads observations via private HTTP inference or scheduled batch',
+        capabilities: ['TimesFM 2.5 Inference', 'Scheduled Batch Forecasts', 'Median Forecast', 'q10/q90 Quantile Bands'],
+        batchModeAvailable: true,
+        forecastHorizon: '1–52 weeks, subject to available history',
+        confidenceInterval: 'Not measured as a percentage; quantile bounds are returned by the model',
         lastInference: null
       },
       autonomous_offline: {
@@ -5714,11 +5728,11 @@ app.post('/api/ai/simulate-outreach', authenticate, async (req, res) => {
   }
 });
 
-app.post('/api/forecast/scenario', authenticate, async (req, res) => {
+app.post(['/api/ai/test-timesfm', '/api/forecast/scenario'], authenticate, async (req, res) => {
   const contractorId = (req as any).contractorId;
-  const { city, niche, horizonWeeks, applyGuardrails, targetCac, targetCAC } = req.body;
-  const targetCity = city || 'Calgary';
-  const targetNiche = niche || 'roofing';
+  const { city, niche, horizonWeeks, applyGuardrails, targetCac, targetCAC } = req.body || {};
+  const targetCity = typeof city === 'string' && city.trim() ? city.trim() : 'Calgary';
+  const targetNiche = typeof niche === 'string' && niche.trim() ? niche.trim() : 'roofing';
   const weeks = Number(horizonWeeks) || 12;
   const resolvedTargetCac = Number(targetCac || targetCAC) || undefined;
 
@@ -5727,21 +5741,29 @@ app.post('/api/forecast/scenario', authenticate, async (req, res) => {
       city: targetCity,
       niche: targetNiche,
       horizonWeeks: weeks,
-      applyGuardrails: applyGuardrails ?? true,
+      applyGuardrails: applyGuardrails === true,
       targetCac: resolvedTargetCac
     });
 
     db.addAuditLog({
       contractorId,
-      action: 'HAL_HEURISTIC_FORECAST_SCENARIO',
-      details: `A heuristic scenario used tenant-owned Google Ads history for ${targetNiche} in ${targetCity}. It is not TimesFM and does not change ad budgets.`
+      action: 'TIMESFM_BRAIN_SYNCHRONIZED_INFERENCE',
+      details: `TimesFM 2.5 demand inference used ${result.googleAdsBaseline.weeklyObservations ?? 0} weekly observations for ${targetNiche} in ${targetCity}. Weather was context only; CAC guardrails ${result.budgetGuardrails.maxAllowableCpl === null ? 'were not evaluated' : 'were evaluated as advisory only'}. No ad budget was changed.`
     });
 
-    res.json(result);
+    return res.json(result);
   } catch (err: any) {
     console.error('TimesFM Brain execution error:', err);
-    const unavailable = String(err?.message || '').includes('Forecast unavailable');
-    res.status(unavailable ? 409 : 500).json({ error: err.message });
+    const message = String(err?.message || 'Forecast unavailable');
+    const status = message.includes('Forecast unavailable') ? 409
+      : message.includes('TimesFM') ? 503
+      : 500;
+    return res.status(status).json({
+      success: false,
+      error: status === 503
+        ? 'TimesFM inference is currently unavailable. No substitute forecast was generated.'
+        : message
+    });
   }
 });
 

@@ -1,0 +1,54 @@
+name: HAL TimesFM scheduled forecasts
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 */6 * * *"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: hal-timesfm-batch
+  cancel-in-progress: false
+
+jobs:
+  forecast:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      DATABASE_URL: ${{ secrets.HAL_FORECAST_DATABASE_URL }}
+      HF_HOME: ${{ runner.temp }}/huggingface
+      TIMESFM_BATCH_HORIZON: "12"
+      TIMESFM_BATCH_MAX_CONTEXT: "256"
+      HF_HUB_DISABLE_TELEMETRY: "1"
+      TOKENIZERS_PARALLELISM: "false"
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: services/timesfm/requirements-batch.txt
+      - name: Cache TimesFM checkpoint
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.HF_HOME }}
+          key: timesfm-2.5-200m-pytorch-${{ runner.os }}-v1
+      - name: Validate optional database configuration
+        id: database
+        run: |
+          if [ -z "$DATABASE_URL" ]; then
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::HAL_FORECAST_DATABASE_URL is not configured; scheduled TimesFM batch is safely skipped."
+          else
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Install TimesFM batch dependencies
+        if: steps.database.outputs.configured == 'true'
+        run: pip install -r services/timesfm/requirements-batch.txt
+      - name: Run tenant-scoped TimesFM forecasts
+        if: steps.database.outputs.configured == 'true'
+        run: python services/timesfm/batch_forecast.py

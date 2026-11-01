@@ -5,10 +5,13 @@ import {
   revenueRecommendations, 
   notifications, 
   auditLogs,
-  contractors
+  contractors,
+  forecasts
 } from '../db/schema';
 import { eq, desc } from 'drizzle-orm';
 import crypto from 'crypto';
+import { requestTimesFmForecast, TimesFmForecastResponse } from './timesfmClient';
+import { buildWeeklyDemandSeries, filterGoogleAdsTerritoryRecords } from './forecastData';
 
 export interface GoogleAdsBaseline {
   recordsCount: number;
@@ -21,6 +24,8 @@ export interface GoogleAdsBaseline {
   empiricalConversionRate: number;
   source: 'LIVE_POSTGRES_TABLE' | 'UNAVAILABLE';
   daysSampled: number;
+  weeklyDemandSeries: number[];
+  weeklyObservations?: number;
 }
 
 export interface WeatherTriggerSignal {
@@ -38,11 +43,11 @@ export interface WeatherTriggerSignal {
 }
 
 export interface GuardrailEvaluationResult {
-  targetCac: number;
-  maxAllowableCpl: number;
+  targetCac: number | null;
+  maxAllowableCpl: number | null;
   breachDetected: boolean;
   breachWeeks: string[];
-  highestProjectedCpl: number;
+  highestObservedCpl: number;
   suggestedAction: 'SCALE_UP' | 'MAINTAIN' | 'THROTTLE_BUDGET' | 'RESTRICT_BID_CEILING';
   budgetMultiplierRecommended: number;
   actionsExecuted: string[];
@@ -56,7 +61,7 @@ export interface BrainForecastCurvePoint {
   weatherSurgeFactor: number;
   lowerBound: number;
   upperBound: number;
-  projectedCplUsd: number;
+  observedCplUsd: number;
   isBreachingCplLimit: boolean;
 }
 
@@ -90,28 +95,22 @@ export interface BrainSynchronizedForecastResult {
  */
 export async function ingestAndCalibrateGoogleAds(
   contractorId: string,
-  _targetNiche: string = 'roofing',
-  _targetCity: string = 'Calgary'
+  targetNiche: string = 'roofing',
+  targetCity: string = 'Calgary'
 ): Promise<GoogleAdsBaseline> {
   try {
-    let records = await pgDb
+    const contractorRecords = await pgDb
       .select()
       .from(googleAdsDailyPerformance)
       .where(eq(googleAdsDailyPerformance.contractorId, contractorId))
       .orderBy(desc(googleAdsDailyPerformance.date));
 
-    // A city/niche change must change the evidence set, not merely the chart label.
-    const cityKey = _targetCity.trim().toLowerCase();
-    const nicheKey = _targetNiche.trim().toLowerCase();
-    if (cityKey) {
-      records = records.filter(record => String(record.geo || '').trim().toLowerCase().includes(cityKey));
-    }
-    if (nicheKey) {
-      records = records.filter(record => String(record.campaignName || '').trim().toLowerCase().includes(nicheKey));
-    }
+    // Territory and trade are part of the model input. Unscoped rows are excluded
+    // rather than allowing a city/niche selector to produce the same global series.
+    const records = filterGoogleAdsTerritoryRecords(contractorRecords, targetNiche, targetCity);
 
-    // A forecast requires actual tenant-owned records and at least one recorded conversion.
-    if (records.length === 0 || records.reduce((sum, record) => sum + Number(record.conversions || 0), 0) <= 0) {
+    // Do not fall back to another contractor's or territory's campaign records.
+    if (records.length === 0) {
       return {
         recordsCount: 0,
         totalCost: 0,
@@ -122,7 +121,8 @@ export async function ingestAndCalibrateGoogleAds(
         empiricalCtr: 0,
         empiricalConversionRate: 0,
         source: 'UNAVAILABLE',
-        daysSampled: 0
+        daysSampled: 0,
+        weeklyDemandSeries: []
       };
     }
 
@@ -130,6 +130,8 @@ export async function ingestAndCalibrateGoogleAds(
     const totalClicks = records.reduce((acc, r) => acc + Number(r.clicks || 0), 0);
     const totalImpressions = records.reduce((acc, r) => acc + Number(r.impressions || 0), 0);
     const totalConversions = records.reduce((acc, r) => acc + Number(r.conversions || 0), 0);
+
+    const weeklyDemandSeries = buildWeeklyDemandSeries(records);
 
     return {
       recordsCount: records.length,
@@ -141,7 +143,8 @@ export async function ingestAndCalibrateGoogleAds(
       empiricalCtr: totalImpressions > 0 ? parseFloat((totalClicks / totalImpressions).toFixed(4)) : 0,
       empiricalConversionRate: totalClicks > 0 ? parseFloat((totalConversions / totalClicks).toFixed(4)) : 0,
       source: 'LIVE_POSTGRES_TABLE',
-      daysSampled: new Set(records.map(r => String(r.date))).size
+      daysSampled: new Set(records.map(r => String(r.date))).size,
+      weeklyDemandSeries
     };
   } catch (err: any) {
     console.warn('Google Ads baseline unavailable:', err.message);
@@ -155,7 +158,8 @@ export async function ingestAndCalibrateGoogleAds(
       empiricalCtr: 0,
       empiricalConversionRate: 0,
       source: 'UNAVAILABLE',
-      daysSampled: 0
+      daysSampled: 0,
+      weeklyDemandSeries: []
     };
   }
 }
@@ -271,7 +275,7 @@ export async function fetchTerritoryWeatherTrigger(
 
 /**
  * 3. Budget Guardrail Recommendations (Layer 2: Goals & Layer 10: Execution)
- * Evaluates a heuristic scenario against a configured target CAC. It does not change ad budgets.
+ * Compares the trailing observed CPL with a configured target CAC. It does not change ad budgets.
  */
 export async function evaluateAndEnforceBudgetGuardrails(
   contractorId: string,
@@ -282,22 +286,17 @@ export async function evaluateAndEnforceBudgetGuardrails(
   // Allowable CPL is typically ~30-35% of target CAC for home services
   const maxAllowableCpl = Math.round(targetCac * 0.35);
   
-  const breachWeeks: string[] = [];
-  let highestProjectedCpl = 0;
-
+  const observedCpl = forecastCurve.length
+    ? Math.max(...forecastCurve.map(point => point.observedCplUsd))
+    : 0;
+  const breachDetected = observedCpl > maxAllowableCpl;
+  const breachWeeks: string[] = breachDetected ? ['CURRENT_BASELINE'] : [];
+  const highestObservedCpl = observedCpl;
   for (const point of forecastCurve) {
-    if (point.projectedCplUsd > highestProjectedCpl) {
-      highestProjectedCpl = point.projectedCplUsd;
-    }
-    if (point.projectedCplUsd > maxAllowableCpl) {
-      breachWeeks.push(point.week);
-      point.isBreachingCplLimit = true;
-    } else {
-      point.isBreachingCplLimit = false;
-    }
+    // CPL is a trailing observed baseline, not a weekly TimesFM forecast.
+    point.isBreachingCplLimit = false;
   }
 
-  const breachDetected = breachWeeks.length > 0;
   let suggestedAction: GuardrailEvaluationResult['suggestedAction'] = 'MAINTAIN';
   let budgetMultiplierRecommended = 1.0;
   const actionsExecuted: string[] = [];
@@ -317,17 +316,17 @@ export async function evaluateAndEnforceBudgetGuardrails(
           contractorId,
           category: 'budget',
           title: `Budget Guardrail Recommendation: CPL Ceiling Breach in ${breachWeeks.join(', ')}`,
-          rationale: `The heuristic scenario estimates CPL (${highestProjectedCpl}) above the configured target CAC ceiling (${targetCac}). This is a recommendation for human review; no ad budget was changed.`,
+          rationale: `The trailing observed CPL baseline (${highestObservedCpl}) is above the configured target CAC ceiling (${targetCac}). Human review is required; no future CPL prediction or financial impact estimate is available.`,
           citationData: {
             breachWeeks,
-            highestProjectedCpl,
+            highestObservedCpl,
             maxAllowableCpl,
             targetCac,
             throttleMultiplier: 0.75
           },
           impactScore: 0,
-          confidenceScore: null,
-          expectedImpact: 'Scenario recommendation only; outcome and savings have not been measured.',
+          confidenceScore: 0,
+          expectedImpact: 'No impact estimate is available until a human approves a change and outcomes are measured.',
           status: 'proposed'
         });
 
@@ -335,8 +334,8 @@ export async function evaluateAndEnforceBudgetGuardrails(
         await pgDb.insert(notifications).values({
           id: crypto.randomUUID(),
           contractorId,
-          title: 'Budget Guardrail Recommendation',
-          message: `The HAL heuristic scenario estimates CPL may reach ${highestProjectedCpl} in ${breachWeeks.join(', ')}, above the configured ceiling of ${maxAllowableCpl}. Human review is required; no campaign budget was changed.`,
+          title: 'Budget guardrail recommendation needs review',
+          message: `Trailing observed CPL is ${highestObservedCpl}, above your ${maxAllowableCpl} limit. HAL has not changed campaign spend.`,
           type: 'warning',
           read: false,
           createdAt: new Date()
@@ -346,20 +345,17 @@ export async function evaluateAndEnforceBudgetGuardrails(
         await pgDb.insert(auditLogs).values({
           id: crypto.randomUUID(),
           contractorId,
-          action: 'HAL_BUDGET_GUARDRAIL_RECOMMENDED',
-          details: `A heuristic CPL scenario breach was recorded for contractor ${contractorId}. A recommendation was created for human review; no campaign budget was changed.`
+          action: 'HAL_BUDGET_GUARDRAIL_RECOMMENDATION_CREATED',
+          details: `A human-review budget recommendation was recorded for contractor ${contractorId}; no spend change was made.`
         });
       } catch (err: any) {
-        console.warn('Error applying automated budget guardrail changes:', err.message);
+        console.warn('Error recording budget guardrail recommendation:', err.message);
       }
     }
   } else {
-    // If no breach, check if high-demand weather surge justifies scaling budget
-    const avgDemand = forecastCurve.reduce((acc, p) => acc + p.predictedDemandIndex, 0) / (forecastCurve.length || 1);
-    if (avgDemand > 75) {
-      suggestedAction = 'SCALE_UP';
-      budgetMultiplierRecommended = 1.35;
-    }
+    // Demand forecasts alone are not enough evidence to recommend scaling spend.
+    suggestedAction = 'MAINTAIN';
+    budgetMultiplierRecommended = 1.0;
   }
 
   return {
@@ -367,7 +363,7 @@ export async function evaluateAndEnforceBudgetGuardrails(
     maxAllowableCpl,
     breachDetected,
     breachWeeks,
-    highestProjectedCpl,
+    highestObservedCpl,
     suggestedAction,
     budgetMultiplierRecommended,
     actionsExecuted,
@@ -378,8 +374,109 @@ export async function evaluateAndEnforceBudgetGuardrails(
 /**
  * 4. Brain-Synchronized Orchestrator
  * Executes the complete 11-Layer Brain synchronization loop:
- * Ingests real Google Ads -> applies Open-Meteo Weather Surge -> generates TimesFM forward curve -> enforces Budget Guardrails.
+ * Ingests tenant-scoped Google Ads -> runs TimesFM demand inference -> compares trailing CPL to a human-reviewed CAC guardrail.
  */
+interface ScheduledTimesFmForecast {
+  response: TimesFmForecastResponse;
+  generatedAt: string;
+  historicalMean: number;
+  recordsCount: number;
+  daysSampled: number;
+  totalCost: number;
+  totalConversions: number;
+  empiricalCpl: number;
+}
+
+/**
+ * Reads the last successful scheduled TimesFM batch result for this tenant and
+ * territory. The batch workflow writes only model outputs and non-PII provenance
+ * metadata to the existing forecasts table. Stale or incomplete snapshots fail closed.
+ */
+async function loadScheduledTimesFmForecast(
+  contractorId: string,
+  city: string,
+  niche: string,
+  horizonWeeks: number
+): Promise<ScheduledTimesFmForecast | null> {
+  const rows = await pgDb
+    .select()
+    .from(forecasts)
+    .where(eq(forecasts.contractorId, contractorId))
+    .orderBy(desc(forecasts.targetDate))
+    .limit(2000);
+
+  const now = Date.now();
+  const cityNeedle = city.trim().toLowerCase();
+  const nicheNeedle = niche.trim().toLowerCase();
+  const candidates = rows.flatMap((row) => {
+    if (row.metric !== 'conversions' || row.modelVersion !== 'timesfm-2.5-batch-v1') return [];
+    const targetDate = new Date(row.targetDate as any);
+    if (!Number.isFinite(targetDate.getTime()) || targetDate.getTime() <= now) return [];
+    let metadata: any;
+    try {
+      metadata = typeof row.assumptions === 'string' ? JSON.parse(row.assumptions) : row.assumptions;
+    } catch {
+      return [];
+    }
+    if (!metadata || typeof metadata !== 'object') return [];
+    const storedCity = String(metadata.territory_city || '').trim().toLowerCase();
+    const storedNiche = String(metadata.territory_trade || '').trim().toLowerCase();
+    const cityMatches = Boolean(storedCity && cityNeedle)
+      && (storedCity.includes(cityNeedle) || cityNeedle.includes(storedCity));
+    const nicheMatches = Boolean(storedNiche && nicheNeedle)
+      && (storedNiche.includes(nicheNeedle) || nicheNeedle.includes(storedNiche));
+    if (!cityMatches || !nicheMatches) return [];
+
+    const generatedAt = String(metadata.generated_at || '');
+    const generatedMs = Date.parse(generatedAt);
+    if (!Number.isFinite(generatedMs) || generatedMs > now || now - generatedMs > 24 * 60 * 60 * 1000) return [];
+
+    const point = Number(row.predicted);
+    const lower = Number(metadata.lower);
+    const upper = Number(metadata.upper);
+    if (![point, lower, upper].every(Number.isFinite) || lower < 0 || lower > point || point > upper) return [];
+    return [{ row, metadata, generatedAt, generatedMs, targetDate, point, lower, upper }];
+  });
+
+  if (!candidates.length) return null;
+  const latestGeneratedMs = Math.max(...candidates.map(item => item.generatedMs));
+  const snapshot = candidates
+    .filter(item => item.generatedMs === latestGeneratedMs)
+    .sort((a, b) => a.targetDate.getTime() - b.targetDate.getTime())
+    .slice(0, horizonWeeks);
+  if (snapshot.length < horizonWeeks) return null;
+
+  const firstMetadata = snapshot[0].metadata;
+  const inputWeeks = Number(firstMetadata.input_weeks);
+  const historicalMean = Number(firstMetadata.historical_mean);
+  if (!Number.isInteger(inputWeeks) || inputWeeks < 8 || inputWeeks > 1024
+    || !Number.isFinite(historicalMean) || historicalMean <= 0) return null;
+
+  return {
+    response: {
+      success: true,
+      model: 'google/timesfm-2.5-200m-pytorch',
+      version: '2.5',
+      backend: 'pytorch',
+      input_points: inputWeeks,
+      horizon: horizonWeeks,
+      forecast: snapshot.map((item, index) => ({
+        step: index + 1,
+        point: item.point,
+        lower: item.lower,
+        upper: item.upper
+      }))
+    },
+    generatedAt: snapshot[0].generatedAt,
+    historicalMean,
+    recordsCount: Number(firstMetadata.input_records) || 0,
+    daysSampled: Number(firstMetadata.input_days) || 0,
+    totalCost: Number(firstMetadata.input_total_cost) || 0,
+    totalConversions: Number(firstMetadata.input_total_conversions) || 0,
+    empiricalCpl: Number(firstMetadata.observed_cpl_usd) || 0
+  };
+}
+
 export async function executeBrainSynchronizedForecast(
   contractorId: string,
   options: {
@@ -394,9 +491,10 @@ export async function executeBrainSynchronizedForecast(
   const city = options.city || 'Calgary';
   const niche = options.niche || 'roofing';
   const horizonWeeks = options.horizonWeeks || 12;
-  const applyGuardrails = options.applyGuardrails ?? true;
+  const applyGuardrails = options.applyGuardrails ?? false;
 
-  // Retrieve contractor target CAC from options, account settings, or default operational benchmark ($145)
+  // Demand forecasting needs observed history. A configured target CAC is only
+  // required when the operator explicitly requests budget guardrail evaluation.
   let targetCac: number | null = null;
   if (options.targetCac && Number.isFinite(options.targetCac) && options.targetCac > 0) {
     targetCac = Number(options.targetCac);
@@ -411,77 +509,97 @@ export async function executeBrainSynchronizedForecast(
         .from(contractors)
         .where(eq(contractors.id, contractorId))
         .limit(1);
-      if (contractor && (contractor as any).targetCAC && Number((contractor as any).targetCAC) > 0) {
-        targetCac = Number((contractor as any).targetCAC);
-      }
+      const configuredTarget = Number((contractor as any)?.targetCAC);
+      if (Number.isFinite(configuredTarget) && configuredTarget > 0) targetCac = configuredTarget;
     } catch {
-      // Non-fatal: proceed to benchmark fallback
+      // Fail closed below. A database read failure is not a valid benchmark.
     }
   }
-
-  if (targetCac === null || !Number.isFinite(targetCac) || targetCac <= 0) {
-    throw new Error('Forecast unavailable: configure a target CAC for this contractor before running budget guardrails. No benchmark CAC was substituted.');
+  if (!targetCac && applyGuardrails) {
+    throw new Error('Forecast unavailable: configure a valid target CAC before running budget guardrails.');
   }
-  const isDefaultBenchmark = false;
 
-  // Step 1: Ingest advertising history or calibrated live territory baseline
   const adsBaseline = await ingestAndCalibrateGoogleAds(contractorId, niche, city);
-  if (adsBaseline.source !== 'LIVE_POSTGRES_TABLE' || adsBaseline.recordsCount === 0 || adsBaseline.totalConversions <= 0) {
-    throw new Error('Forecast unavailable: this tenant has no measured Google Ads history with recorded conversions for the selected territory. No sample campaign data was substituted.');
+  if (adsBaseline.source !== 'LIVE_POSTGRES_TABLE' || adsBaseline.recordsCount === 0) {
+    throw new Error('Forecast unavailable: no tenant-scoped Google Ads history was found.');
+  }
+  if (adsBaseline.weeklyDemandSeries.length < 8) {
+    throw new Error('Forecast unavailable: at least 8 observed weekly conversion totals are required by TimesFM.');
+  }
+  if (!adsBaseline.weeklyDemandSeries.some(value => value > 0)) {
+    throw new Error('Forecast unavailable: historical conversion totals contain no positive observations.');
   }
 
-  // Step 2: Read live weather when available; unavailable remains unavailable.
-  const weatherTrigger = await fetchTerritoryWeatherTrigger(city, niche);
+  // Prefer on-demand inference when a private HTTPS service is configured. If it
+  // is not available, use only a fresh, tenant- and territory-scoped scheduled
+  // TimesFM 2.5 result. Neither path has a heuristic or mock forecast fallback.
+  let modelResult: TimesFmForecastResponse;
+  let scheduledSnapshot: ScheduledTimesFmForecast | null = null;
+  let inferenceMode: 'http' | 'scheduled_batch' = 'http';
+  let forecastTimestamp = new Date().toISOString();
+  const httpServiceConfigured = Boolean(process.env.TIMESFM_SERVICE_URL && process.env.TIMESFM_API_KEY);
 
-  // Step 3: Run an explicitly labelled heuristic scenario; this is not the TimesFM foundation model.
-  const forecastCurve: BrainForecastCurvePoint[] = [];
-  const baseDemand = Math.round(52 + (adsBaseline.empiricalConversionRate * 180));
-  const baseCpl = adsBaseline.empiricalCpl || 42.50;
-
-  for (let w = 1; w <= horizonWeeks; w++) {
-    // Seasonal oscillation
-    const seasonalFactor = Math.sin((w / 12) * Math.PI) * 18;
-    const noise = Math.sin(w * 13.7) * 3;
-    const baselineDemandIndex = Math.round(baseDemand + seasonalFactor + noise);
-
-    // Weather impact applies strongly to immediate weeks (W+1 to W+emergencyRepairWindowWeeks)
-    let weatherSurgeFactor = 1.0;
-    if (w <= weatherTrigger.emergencyRepairWindowWeeks) {
-      const decay = 1 - ((w - 1) / weatherTrigger.emergencyRepairWindowWeeks) * 0.4;
-      weatherSurgeFactor = 1 + ((weatherTrigger.demandSurgeMultiplier - 1) * decay);
-    } else {
-      weatherSurgeFactor = 1.05; // slight trailing residual
+  if (httpServiceConfigured) {
+    try {
+      modelResult = await requestTimesFmForecast(adsBaseline.weeklyDemandSeries, horizonWeeks);
+    } catch (inferenceError) {
+      scheduledSnapshot = await loadScheduledTimesFmForecast(contractorId, city, niche, horizonWeeks);
+      if (!scheduledSnapshot) throw inferenceError;
+      modelResult = scheduledSnapshot.response;
+      forecastTimestamp = scheduledSnapshot.generatedAt;
+      inferenceMode = 'scheduled_batch';
     }
-
-    const predictedDemandIndex = Math.min(100, Math.max(20, Math.round(baselineDemandIndex * weatherSurgeFactor)));
-    
-    // CPL dynamics: high demand increases search inventory; CPL softens with high conversion intent
-    // but seasonal peaks in generic categories push auction bids
-    const cplAdjustment = -(seasonalFactor * 0.35) + ((weatherSurgeFactor - 1) * 6.5) + (noise * 0.3);
-    const projectedCplUsd = parseFloat(Math.max(18, baseCpl + cplAdjustment).toFixed(2));
-    
-    const lowerBound = Math.max(15, Math.round(predictedDemandIndex * 0.88));
-    const upperBound = Math.min(100, Math.round(predictedDemandIndex * 1.14));
-
-    forecastCurve.push({
-      week: `W+${w}`,
-      predictedDemandIndex,
-      baselineDemandIndex,
-      weatherSurgeFactor: parseFloat(weatherSurgeFactor.toFixed(2)),
-      lowerBound,
-      upperBound,
-      projectedCplUsd,
-      isBreachingCplLimit: false
-    });
+  } else {
+    scheduledSnapshot = await loadScheduledTimesFmForecast(contractorId, city, niche, horizonWeeks);
+    if (!scheduledSnapshot) {
+      throw new Error('Forecast unavailable: configure the private TimesFM service or wait for a fresh scheduled TimesFM batch forecast for this territory.');
+    }
+    modelResult = scheduledSnapshot.response;
+    forecastTimestamp = scheduledSnapshot.generatedAt;
+    inferenceMode = 'scheduled_batch';
   }
 
-  // Step 4: Evaluate & Enforce Budget Guardrails (Layer 2: Goals & Layer 10: Execution)
-  const guardrails = await evaluateAndEnforceBudgetGuardrails(
-    contractorId,
-    forecastCurve,
-    targetCac,
-    applyGuardrails
-  );
+  const historicalMean = scheduledSnapshot?.historicalMean
+    ?? adsBaseline.weeklyDemandSeries.reduce((sum, value) => sum + value, 0) / adsBaseline.weeklyDemandSeries.length;
+  const observedCplBaseline = scheduledSnapshot?.empiricalCpl ?? adsBaseline.empiricalCpl;
+  if (!Number.isFinite(historicalMean) || historicalMean <= 0) {
+    throw new Error('Forecast unavailable: historical demand baseline is invalid.');
+  }
+
+  // Weather is displayed as live context only. It is not applied as an untrained
+  // multiplier or passed off as a learned TimesFM covariate.
+  const weatherTrigger = await fetchTerritoryWeatherTrigger(city, niche);
+  const forecastCurve: BrainForecastCurvePoint[] = modelResult.forecast.map((point) => {
+    const toIndex = (value: number) => Math.min(100, Math.max(0, Math.round((value / historicalMean) * 50)));
+    return {
+      week: `W+${point.step}`,
+      predictedDemandIndex: toIndex(point.point),
+      baselineDemandIndex: 50,
+      weatherSurgeFactor: 1,
+      lowerBound: toIndex(point.lower),
+      upperBound: Math.max(toIndex(point.point), toIndex(point.upper)),
+      // CPL is the observed trailing CPL, not a TimesFM prediction.
+      observedCplUsd: observedCplBaseline,
+      isBreachingCplLimit: false
+    };
+  });
+
+  // Step 4: Evaluate guardrails only when a real target CAC has been configured.
+  const observedCpl = forecastCurve.length
+    ? Math.max(...forecastCurve.map(point => point.observedCplUsd))
+    : 0;
+  const guardrails: GuardrailEvaluationResult = targetCac
+    ? await evaluateAndEnforceBudgetGuardrails(contractorId, forecastCurve, targetCac, applyGuardrails)
+    : {
+        targetCac: null,
+        maxAllowableCpl: null,
+        breachDetected: false,
+        breachWeeks: [],
+        highestObservedCpl: observedCpl,
+        suggestedAction: 'MAINTAIN',
+        budgetMultiplierRecommended: 1,
+        actionsExecuted: []
+      };
 
   // Identify peak demand week
   let peakWeek = 'W+1';
@@ -495,30 +613,39 @@ export async function executeBrainSynchronizedForecast(
 
   return {
     success: true,
-    engine: 'HAL heuristic scenario model (not TimesFM)',
+    engine: `Google TimesFM ${modelResult.version} (${modelResult.model}, ${modelResult.backend})${inferenceMode === 'scheduled_batch' ? ' — scheduled batch' : ''}`,
     brainLayerAlignments: {
-      layer2Goals: isDefaultBenchmark
-        ? `Target CAC Hurdle Rate calibrated to standard operational benchmark $${targetCac} (Max allowable CPL: $${guardrails.maxAllowableCpl}).`
-        : `Target CAC Hurdle Rate locked at $${targetCac} (Max allowable CPL: $${guardrails.maxAllowableCpl}).`,
-      layer5Knowledge: `Calibrated with ${adsBaseline.recordsCount} Google Ads daily performance records (${adsBaseline.source}). Trailing CPL: $${adsBaseline.empiricalCpl}.`,
-      layer6WorldModel: weatherTrigger.isLiveForecast
-        ? `${weatherTrigger.conditionTitle}. Weather is contextual evidence only; no demand multiplier is treated as measured.`
-        : `Weather unavailable for ${city}; no weather-driven adjustment was applied.`,
-      layer8Skills: `Hand-coded seasonal scenario heuristic with a ${horizonWeeks}-week horizon; not a TimesFM model.`,
-      layer10Execution: guardrails.breachDetected
-        ? `A budget guardrail recommendation is indicated: ${guardrails.suggestedAction}. No ad budget was automatically changed.`
-        : 'No guardrail breach was found in this heuristic scenario; profitability is not verified.',
-      layer11Learning: `Observed tenant conversion rate anchor: ${(adsBaseline.empiricalConversionRate * 100).toFixed(1)}%. This scenario does not update or train model weights.`
+      layer2Goals: `Contractor-configured target CAC: ${targetCac} (Max allowable CPL: ${guardrails.maxAllowableCpl}).`,
+      layer5Knowledge: `TimesFM input: ${adsBaseline.weeklyDemandSeries.length} observed weekly conversion totals from ${adsBaseline.recordsCount} tenant-scoped Google Ads records. Trailing observed CPL: ${adsBaseline.empiricalCpl}.`,
+      layer6WorldModel: `${weatherTrigger.conditionTitle}. Weather is contextual only; no demand multiplier is applied.`,
+      layer8Skills: `${inferenceMode === 'scheduled_batch' ? 'Using the last successful scheduled' : 'Executed'} Google TimesFM ${modelResult.version} inference for a ${horizonWeeks}-week horizon${inferenceMode === 'scheduled_batch' ? ` (generated ${forecastTimestamp})` : ''}. Demand bands use the model's q10/q50/q90 output. CPL remains the trailing observed baseline, not a model forecast.`,
+      layer10Execution: !targetCac
+        ? 'Budget guardrails were skipped because no target CAC is configured. No ad budget was changed.'
+        : guardrails.breachDetected
+          ? `A budget guardrail recommendation is indicated: ${guardrails.suggestedAction}. It is based on trailing observed CPL; no ad budget was changed.`
+          : 'No trailing-CPL guardrail breach was found. This is not a profitability certification.',
+      layer11Learning: `Model input is grounded in ${modelResult.input_points} weekly observations. No new learning or model fine-tuning is claimed by this inference.`
     },
     targetCity: city,
     targetNiche: niche,
     horizonWeeks,
-    googleAdsBaseline: adsBaseline,
+    googleAdsBaseline: {
+      ...adsBaseline,
+      ...(scheduledSnapshot ? {
+        recordsCount: scheduledSnapshot.recordsCount,
+        totalCost: Math.round(scheduledSnapshot.totalCost),
+        totalConversions: scheduledSnapshot.totalConversions,
+        empiricalCpl: scheduledSnapshot.empiricalCpl,
+        daysSampled: scheduledSnapshot.daysSampled
+      } : {}),
+      weeklyDemandSeries: [],
+      weeklyObservations: modelResult.input_points
+    },
     weatherTrigger,
     budgetGuardrails: guardrails,
     forecastCurve,
-    peakDemandWeek: `${peakWeek} (${weatherTrigger.hazardCategory === 'STABLE_SEASONAL' ? 'Seasonal Peak' : 'Weather Surge Window'})`,
+    peakDemandWeek: `${peakWeek} (TimesFM demand peak)`,
     recommendedCampaignBudgetMultiplier: guardrails.budgetMultiplierRecommended,
-    timestamp: new Date().toISOString()
+    timestamp: forecastTimestamp
   };
 }

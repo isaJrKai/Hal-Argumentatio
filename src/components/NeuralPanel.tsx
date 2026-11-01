@@ -8,18 +8,19 @@ export default function NeuralPanel() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   
-  const [activeSubsystem, setActiveSubsystem] = useState('core_leads');
+  const [activeSubsystem, setActiveSubsystem] = useState('core_bayes');
   const [isSyncing, setIsSyncing] = useState(false);
-  const [networkData, setNetworkData] = useState<{ nodes: any[], links: any[], telemetry: any, events: any[] }>({ nodes: [], links: [], telemetry: null, events: [] });
+  const [networkData, setNetworkData] = useState<{ nodes: any[], links: any[], telemetry: any }>({ nodes: [], links: [], telemetry: null });
   const [learningMetrics, setLearningMetrics] = useState<any>(null);
-  const [networkError, setNetworkError] = useState<string | null>(null);
   
   // New features state
+  const [isPruningMode, setIsPruningMode] = useState(false);
   const [showInfluence, setShowInfluence] = useState(false);
   const [timelineScrub, setTimelineScrub] = useState(100);
   
   const [hoveredNode, setHoveredNode] = useState<any>(null);
   const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 });
+  const [selectedPruneNode, setSelectedPruneNode] = useState<any>(null);
 
   const simulationRef = useRef<any>(null);
   const zoomRef = useRef<any>(null);
@@ -37,62 +38,127 @@ export default function NeuralPanel() {
   const fetchNetwork = async () => {
     const requestId = ++networkRequestIdRef.current;
     setIsSyncing(true);
-    setNetworkError(null);
     try {
       const authToken = localStorage.getItem('halbiz_auth_token') || localStorage.getItem('token') || '';
-      const query = new URLSearchParams({ city: activeCity || '', niche: activeNiche || '' });
-      const res = await fetch('/api/neural/network?' + query.toString(), {
+      const params = new URLSearchParams({ city: activeCity, niche: activeNiche });
+      const res = await fetch(`/api/neural/network?${params.toString()}`, {
         headers: authToken ? { 'Authorization': `Bearer ${authToken}` } : {}
       });
       if (!res.ok) {
         if (res.status === 401) {
           if (requestId === networkRequestIdRef.current) {
-            setNetworkError('Your session has expired. Sign in again to load neural data.');
-            setNetworkData({ nodes: [], links: [], telemetry: null, events: [] });
+            setNetworkData({ nodes: [], links: [], telemetry: null });
             setLearningMetrics(null);
-            nodesRef.current = [];
-            linksRef.current = [];
           }
-          return;
+          throw new Error('Session expired. Sign in again to load territory intelligence.');
         }
-        throw new Error(`Failed to fetch network (${res.status})`);
+        throw new Error(`Failed to fetch territory graph (${res.status})`);
       }
       const data = await res.json();
       if (requestId !== networkRequestIdRef.current) return;
-      
       if (data.error) throw new Error(data.error);
-      if (!Array.isArray(data.nodes) || !Array.isArray(data.links) || !data.telemetry) {
-        throw new Error('The server returned an incomplete topology payload.');
-      }
 
       setNetworkData({
-        nodes: data.nodes,
-        links: data.links,
-        telemetry: data.telemetry,
-        events: Array.isArray(data.events) ? data.events : []
+        nodes: Array.isArray(data.nodes) ? data.nodes : [],
+        links: Array.isArray(data.links) ? data.links : [],
+        telemetry: data.telemetry || null
       });
-      
       setLearningMetrics({
-        leadsInScope: Number(data.telemetry.leadsInScope || 0),
-        recordedOutcomes: Number(data.telemetry.recordedOutcomes || 0),
-        campaignNodes: Number(data.telemetry.campaignNodes || 0),
-        timesFmStatus: data.telemetry.timesFmStatus || 'UNKNOWN',
-        learningStatus: data.telemetry.learningStatus || 'Learning status unavailable'
+        epoch: null,
+        outcomesDigested: Number(data.telemetry?.matchedOutcomeCount ?? 0),
+        confidenceGlobal: null
       });
-      
-      if (data.nodes && data.links) {
+
+      if (Array.isArray(data.nodes) && Array.isArray(data.links)) {
         initSimulation(data.nodes, data.links);
       }
-    } catch (e: any) {
+
+      // Attach only a successfully executed TimesFM forecast to the visible graph.
+      // A configured endpoint alone is never represented as a verified prediction.
+      if (data.telemetry) {
+        try {
+          const forecastResponse = await fetch('/api/ai/test-timesfm', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              ...(authToken ? { 'Authorization': `Bearer ${authToken}` } : {})
+            },
+            body: JSON.stringify({
+              city: activeCity,
+              niche: activeNiche,
+              horizonWeeks: 12,
+              applyGuardrails: false
+            })
+          });
+          const forecastResult = forecastResponse.ok ? await forecastResponse.json() : null;
+          if (requestId !== networkRequestIdRef.current) return;
+
+          if (forecastResult?.success && Array.isArray(forecastResult.forecastCurve)) {
+            const forecastNodes = forecastResult.forecastCurve.map((point: any, index: number) => ({
+              id: `timesfm_forecast_${index + 1}`,
+              label: `${point.week}: ${point.predictedDemandIndex}`,
+              detail: `TimesFM 2.5 median demand index ${point.predictedDemandIndex}; q10–q90 range ${point.lowerBound}–${point.upperBound}. Model output, not observed demand.`,
+              type: 'forecast',
+              group: 8,
+              size: 6,
+              createdAt: forecastResult.timestamp,
+              forecast: {
+                median: point.predictedDemandIndex,
+                lower: point.lowerBound,
+                upper: point.upperBound
+              }
+            }));
+            const forecastLinks = forecastNodes.map((node: any) => ({
+              source: 'core_timesfm',
+              target: node.id,
+              value: 2
+            }));
+            const nextNodes = [...data.nodes, ...forecastNodes];
+            const nextLinks = [...data.links, ...forecastLinks];
+            setNetworkData({
+              nodes: nextNodes,
+              links: nextLinks,
+              telemetry: {
+                ...data.telemetry,
+                timesfmInferenceVerified: true,
+                timesfmInferenceAt: forecastResult.timestamp,
+                timesfmModel: forecastResult.engine,
+                timesfmForecastHorizonWeeks: forecastResult.horizonWeeks,
+                timesfmForecastNodeCount: forecastNodes.length
+              }
+            });
+            initSimulation(nextNodes, nextLinks);
+          } else {
+            setNetworkData((current: any) => ({
+              ...current,
+              telemetry: {
+                ...current.telemetry,
+                timesfmInferenceVerified: false,
+                timesfmInferenceStatus: forecastResponse.status === 409
+                  ? 'insufficient_or_unavailable_history'
+                  : 'inference_unavailable'
+              }
+            }));
+          }
+        } catch (forecastError) {
+          if (requestId === networkRequestIdRef.current) {
+            console.warn('TimesFM graph inference unavailable:', forecastError);
+            setNetworkData((current: any) => ({
+              ...current,
+              telemetry: {
+                ...current.telemetry,
+                timesfmInferenceVerified: false,
+                timesfmInferenceStatus: 'inference_unavailable'
+              }
+            }));
+          }
+        }
+      }
+    } catch (e) {
       if (requestId === networkRequestIdRef.current) {
-        setNetworkError(e?.message || 'Neural topology unavailable');
-        setNetworkData({ nodes: [], links: [], telemetry: null, events: [] });
+        console.warn('Territory graph sync paused:', e);
+        setNetworkData({ nodes: [], links: [], telemetry: null });
         setLearningMetrics(null);
-        nodesRef.current = [];
-        linksRef.current = [];
-        if (simulationRef.current) simulationRef.current.stop();
-        drawRef.current();
-        console.warn('Network visualization sync paused:', e);
       }
     } finally {
       if (requestId === networkRequestIdRef.current) setIsSyncing(false);
@@ -100,8 +166,11 @@ export default function NeuralPanel() {
   };
 
   useEffect(() => {
+    setNetworkData({ nodes: [], links: [], telemetry: null });
+    setLearningMetrics(null);
     fetchNetwork();
     return () => {
+      networkRequestIdRef.current += 1;
       if (simulationRef.current) simulationRef.current.stop();
     };
   }, [activeCity, activeNiche]);
@@ -237,7 +306,7 @@ export default function NeuralPanel() {
       if (closestNode) {
         setHoveredNode(closestNode);
         setTooltipPos({ x: mx, y: my });
-        canvas.style.cursor = 'pointer';
+        canvas.style.cursor = (isPruningMode && closestNode.type === 'decaying') ? 'crosshair' : 'pointer';
       } else {
         setHoveredNode(null);
         canvas.style.cursor = 'default';
@@ -266,7 +335,13 @@ export default function NeuralPanel() {
       }
       
       if (closestNode) {
-        setActiveSubsystem(closestNode.id);
+        if (isPruningMode && closestNode.type === 'decaying') {
+          setSelectedPruneNode(closestNode);
+        } else {
+          setActiveSubsystem(closestNode.id);
+        }
+      } else {
+         setSelectedPruneNode(null);
       }
     });
 
@@ -432,10 +507,11 @@ export default function NeuralPanel() {
       else if (node.type === 'decaying') color = '#ef4444';
       else if (node.type === 'win') color = '#10b981';
       else if (node.type === 'loss') color = '#ef4444';
-      else if (node.type === 'niche') color = '#8b5cf6';
+      else if (node.type === 'niche') color = '#eab308';
       else if (node.type === 'lead') color = '#3b82f6';
+      else if (node.type === 'forecast') color = '#22d3ee';
 
-      if (influenceRef.current && node.type !== 'core' && node.type !== 'niche') {
+      if (influenceRef.current && node.type !== 'core' && node.type !== 'niche' && node.type !== 'forecast') {
          color = 'rgba(255,255,255,0.3)';
       }
 
@@ -510,6 +586,38 @@ export default function NeuralPanel() {
     ctx.restore();
   };
 
+  const handlePruneNode = async () => {
+    if (!selectedPruneNode) return;
+    
+    // Call the backend to persist pruning
+    try {
+      await fetch(`/api/neural/network/prune/${selectedPruneNode.id}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('halbiz_auth_token') || localStorage.getItem('token')}`
+        }
+      });
+    } catch (e) {
+      console.error('Failed to prune node on backend', e);
+    }
+    
+    // Optimistic UI update
+    setNetworkData(prev => ({
+      ...prev,
+      nodes: prev.nodes.filter(n => n.id !== selectedPruneNode.id),
+      links: prev.links.filter(l => l.source.id !== selectedPruneNode.id && l.target.id !== selectedPruneNode.id)
+    }));
+    nodesRef.current = nodesRef.current.filter(n => n.id !== selectedPruneNode.id);
+    linksRef.current = linksRef.current.filter(l => l.source.id !== selectedPruneNode.id && l.target.id !== selectedPruneNode.id);
+    setSelectedPruneNode(null);
+    setHoveredNode(null);
+    if (simulationRef.current) {
+      simulationRef.current.nodes(nodesRef.current);
+      simulationRef.current.force('link').links(linksRef.current);
+      simulationRef.current.alpha(1).restart();
+    }
+  };
+
   const handleZoom = (factor: number) => {
     if (canvasRef.current && zoomRef.current) {
       d3.select(canvasRef.current).transition().duration(300).call(zoomRef.current.scaleBy, factor);
@@ -523,10 +631,10 @@ export default function NeuralPanel() {
   };
 
   const SUBSYSTEMS = [
-    { id: 'core_leads', label: 'Lead Pipeline', icon: Network, color: 'text-amber-500', bg: 'bg-amber-500/10' },
-    { id: 'core_outcomes', label: 'Recorded Outcomes', icon: Shield, color: 'text-amber-500', bg: 'bg-amber-500/10' },
-    { id: 'core_ads', label: 'Google Ads Observations', icon: Database, color: 'text-amber-500', bg: 'bg-amber-500/10' },
-    { id: 'core_timesfm', label: 'TimesFM Adapter', icon: TrendingUp, color: 'text-amber-500', bg: 'bg-amber-500/10' }
+    { id: 'core_bayes', label: 'Outcome Analysis', icon: Network, color: 'text-amber-500', bg: 'bg-amber-500/10' },
+    { id: 'core_objection', label: 'Lead Signals', icon: Shield, color: 'text-amber-500', bg: 'bg-amber-500/10' },
+    { id: 'core_niche', label: 'Niche Calibration', icon: Database, color: 'text-amber-500', bg: 'bg-amber-500/10' },
+    { id: 'core_timesfm', label: 'TimesFM 2.5 Adapter', icon: TrendingUp, color: 'text-amber-500', bg: 'bg-amber-500/10' }
   ];
 
   return (
@@ -534,22 +642,38 @@ export default function NeuralPanel() {
       <header className="px-6 py-5 border-b border-border-dim bg-bg-raised shrink-0 flex items-center justify-between">
         <div className="flex items-center gap-4">
           <div className="p-2.5 rounded-lg bg-accent/10 border border-accent/20">
-            <Brain className="w-6 h-6 text-accent animate-pulse" />
+            <Brain className="w-6 h-6 text-accent" />
           </div>
           <div>
             <h1 className="text-xl font-bold text-text-primary tracking-tight flex items-center gap-2">
-              Operational Intelligence Graph
-              <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold border uppercase ${networkError ? 'bg-red-500/10 text-red-400 border-red-500/20' : networkData.telemetry ? 'bg-green-500/10 text-green-400 border-green-500/20' : 'bg-amber-500/10 text-amber-400 border-amber-500/20'}`}>
-                {networkError ? 'Unavailable' : networkData.telemetry ? 'Live tenant data' : 'Loading'}
+              Territory Intelligence Graph
+              <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold border uppercase ${
+                networkData.telemetry ? 'bg-green-500/10 text-green-400 border-green-500/20'
+                  : isSyncing ? 'bg-amber-500/10 text-amber-400 border-amber-500/20'
+                  : 'bg-bg-base text-text-tertiary border-border-dim'
+              }`}>
+                {isSyncing ? 'Syncing' : networkData.telemetry ? 'Data synced' : 'Unavailable'}
               </span>
             </h1>
-            <p className="text-sm text-text-secondary mt-1">Tenant-scoped leads, recorded outcomes and campaign data · {activeCity || 'All cities'} / {activeNiche || 'All niches'}</p>
+            <p className="text-sm text-text-secondary mt-1">{activeNiche} · {activeCity} — tenant-scoped leads and recorded outcomes</p>
           </div>
         </div>
         <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 px-3 py-1.5 bg-bg-overlay border border-border-dim rounded-lg mr-2">
+            <Scissors className={`w-4 h-4 ${isPruningMode ? 'text-red-500' : 'text-text-tertiary'}`} />
+            <span className="text-xs font-medium text-text-secondary mr-2">Manual Pruning</span>
+            <button 
+              onClick={() => setIsPruningMode(!isPruningMode)}
+              disabled={!networkData.nodes.some(node => node.type === 'decaying')}
+              title={networkData.nodes.some(node => node.type === 'decaying') ? 'Toggle pruning for verified decaying nodes' : 'No verified decaying nodes are present in this territory'}
+              className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${isPruningMode ? 'bg-red-500' : 'bg-bg-raised border border-border-dim'}`}
+            >
+              <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${isPruningMode ? 'translate-x-4.5' : 'translate-x-1'}`} />
+            </button>
+          </div>
           <button onClick={fetchNetwork} className="flex items-center gap-2 px-4 py-2 bg-bg-overlay border border-border-dim hover:border-accent text-text-secondary hover:text-accent rounded-lg text-sm font-medium transition-colors">
             <RefreshCw className={`w-4 h-4 ${isSyncing ? 'animate-spin' : ''}`} />
-            Re-Calibrate
+            Refresh Graph
           </button>
         </div>
       </header>
@@ -557,28 +681,28 @@ export default function NeuralPanel() {
       <div className="flex-1 flex overflow-hidden">
         <div className="w-72 border-r border-border-dim bg-bg-overlay overflow-y-auto shrink-0 flex flex-col z-20 shadow-xl">
           <div className="p-4 border-b border-border-dim">
-            <h3 className="text-xs font-mono font-bold text-text-tertiary uppercase tracking-wider mb-3">Core Neural Hubs</h3>
+            <h3 className="text-xs font-mono font-bold text-text-tertiary uppercase tracking-wider mb-3">Core Systems</h3>
             <div className="space-y-2">
               {SUBSYSTEMS.map(sys => {
                 const nodeCount = (networkData.nodes || []).filter(n => 
-                  n.id === sys.id || (networkData.links || []).some(l => ((l.source?.id || l.source) === sys.id && (l.target?.id || l.target) === n.id) || ((l.target?.id || l.target) === sys.id && (l.source?.id || l.source) === n.id))
+                  n.id === sys.id || (networkData.links || []).some(l => ((typeof l.source === 'string' ? l.source : l.source.id) === sys.id && (typeof l.target === 'string' ? l.target : l.target.id) === n.id) || ((typeof l.target === 'string' ? l.target : l.target.id) === sys.id && (typeof l.source === 'string' ? l.source : l.source.id) === n.id))
                 ).length;
                 return (
                   <button key={sys.id} onClick={() => setActiveSubsystem(sys.id)} className={`w-full flex items-center gap-3 p-3 rounded-lg border transition-all text-left ${activeSubsystem === sys.id ? 'bg-bg-raised border-border-dim shadow-sm' : 'border-transparent hover:bg-bg-base text-text-secondary'}`}>
                     <div className={`p-1.5 rounded-md ${activeSubsystem === sys.id ? sys.bg : 'bg-bg-base'}`}><sys.icon className={`w-4 h-4 ${activeSubsystem === sys.id ? sys.color : 'text-text-tertiary'}`} /></div>
-                    <div><span className={`block text-sm font-bold ${activeSubsystem === sys.id ? 'text-text-primary' : ''}`}>{sys.label}</span><span className="block text-[10px] font-mono text-text-tertiary">{nodeCount} Synapses</span></div>
+                    <div><span className={`block text-sm font-bold ${activeSubsystem === sys.id ? 'text-text-primary' : ''}`}>{sys.label}</span><span className="block text-[10px] font-mono text-text-tertiary">{nodeCount} Connections</span></div>
                   </button>
                 );
               })}
             </div>
           </div>
           <div className="p-4 space-y-4">
-            <h3 className="text-xs font-mono font-bold text-text-tertiary uppercase tracking-wider">Measured Scope Telemetry</h3>
+            <h3 className="text-xs font-mono font-bold text-text-tertiary uppercase tracking-wider">Territory Data</h3>
             <div className="bg-bg-base border border-border-dim rounded-lg p-4 space-y-3">
-              <div className="flex justify-between items-center"><span className="text-[10px] font-mono text-text-secondary">Leads in scope</span><span className="text-xs font-mono font-bold text-text-primary">{learningMetrics?.leadsInScope ?? '—'}</span></div>
-              <div className="flex justify-between items-center"><span className="text-[10px] font-mono text-text-secondary">Recorded outcomes</span><span className="text-xs font-mono font-bold text-accent">{learningMetrics?.recordedOutcomes ?? '—'}</span></div>
-              <div className="flex justify-between items-center"><span className="text-[10px] font-mono text-text-secondary">Campaign nodes</span><span className="text-xs font-mono font-bold text-text-primary">{learningMetrics?.campaignNodes ?? '—'}</span></div>
-              <div className="flex justify-between items-center"><span className="text-[10px] font-mono text-text-secondary">TimesFM</span><span className="text-xs font-mono font-bold text-amber-400">{learningMetrics?.timesFmStatus || '—'}</span></div>
+              <div className="flex justify-between items-center"><span className="text-[10px] font-mono text-text-secondary" >Learning Epoch</span><span className="text-xs font-mono font-bold text-text-primary">{learningMetrics?.epoch ?? 'Not measured'}</span></div>
+              <div className="flex justify-between items-center"><span className="text-[10px] font-mono text-text-secondary" >Matched Outcomes</span><span className="text-xs font-mono font-bold text-accent">{learningMetrics?.outcomesDigested ?? '0'}</span></div>
+              <div className="flex justify-between items-center"><span className="text-[10px] font-mono text-text-secondary" >Model Confidence</span><span className="text-xs font-mono font-bold text-green-400">{learningMetrics?.confidenceGlobal == null ? 'Not measured' : `${Number(learningMetrics.confidenceGlobal).toFixed(1)}%`}</span></div>
+              <div className="flex justify-between items-center"><span className="text-[10px] font-mono text-text-secondary">Total Active Nodes</span><span className="text-xs font-mono font-bold text-text-primary">{(networkData.nodes || []).length}</span></div>
             </div>
           </div>
         </div>
@@ -602,7 +726,7 @@ export default function NeuralPanel() {
             {/* Overlays Left */}
             <div className="absolute top-4 left-4 z-10 space-y-3 pointer-events-none">
               <div className="px-3 py-1.5 bg-black/60 backdrop-blur-md border border-white/10 rounded text-[10px] font-mono text-white/70 uppercase flex items-center gap-2 w-fit">
-                <div className={`w-1.5 h-1.5 rounded-full ${networkError ? 'bg-red-500' : 'bg-green-500'}`}></div>{networkError ? 'Topology unavailable' : 'Tenant data topology'}
+                <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></div>Domain-Clustered Topology Active
               </div>
               
               <button 
@@ -614,17 +738,30 @@ export default function NeuralPanel() {
               </button>
             </div>
             
+            {networkData.telemetry
+              && Number(networkData.telemetry.matchedLeadCount || 0) === 0
+              && Number(networkData.telemetry.matchedOutcomeCount || 0) === 0 && (
+                <div className="absolute inset-x-6 top-6 z-10 mx-auto max-w-md rounded-lg border border-border-dim bg-bg-raised/95 px-4 py-3 text-center shadow-sm pointer-events-none">
+                  <p className="text-sm font-semibold text-text-primary">No territory evidence yet</p>
+                  <p className="mt-1 text-xs text-text-secondary">No matching leads or recorded outcomes for {activeNiche} in {activeCity}. The core systems shown are architecture, not learned connections.</p>
+                </div>
+              )}
             <canvas ref={canvasRef} className="absolute inset-0 outline-none block cursor-grab active:cursor-grabbing" style={{ filter: 'contrast(1.2) brightness(1.1)' }} />
           </div>
           
           {/* Bottom Event Log & Timeline */}
           <div className="h-28 shrink-0 bg-bg-raised border-t border-border-dim z-20 pointer-events-auto flex flex-row items-center justify-between gap-6 p-4 relative">
             
-            {/* Matrix Event Log (Bottom Left) */}
+            {/* Recent Territory Outcomes (Bottom Left) */}
             <div className="flex-1 max-w-xl bg-bg-overlay border border-border-dim rounded-lg p-3 shadow-sm hover:bg-bg-base transition-colors h-full flex flex-col justify-center">
               <h4 className="text-[10px] font-mono font-bold text-text-secondary uppercase mb-2 flex items-center gap-1.5"><Code2 className="w-3.5 h-3.5 text-text-tertiary" /> Matrix Event Log</h4>
               <div className="font-mono text-[9px] text-accent/90 space-y-1 h-10 overflow-hidden leading-relaxed">
-                {networkError ? <p className="truncate text-red-400">{networkError}</p> : networkData.events.length ? networkData.events.slice(0, 2).map((event: any) => <p key={event.id} className="truncate">{">"} {event.label}</p>) : <p className="truncate text-text-tertiary">No recorded activity in this territory and niche yet.</p>}
+                {(networkData.nodes || [])
+                  .filter(n => n.type === 'win' || n.type === 'loss' || n.type === 'forecast')
+                  .slice(0, 2)
+                  .map((node, i) => (
+                  <p key={i} className="truncate">{">"} {node.type === 'win' ? '[WON]' : node.type === 'loss' ? '[LOST]' : '[TIMESFM]'} {node.detail}</p>
+                ))}
               </div>
             </div>
 
@@ -632,9 +769,9 @@ export default function NeuralPanel() {
             <div className="flex-1 max-w-md bg-bg-overlay border border-border-dim p-3 rounded-lg shadow-sm hover:bg-bg-base transition-colors h-full flex flex-col justify-center">
                <div className="flex items-center justify-between mb-3">
                  <h4 className="text-[10px] font-mono font-bold text-text-secondary uppercase flex items-center gap-1.5">
-                   <Clock className="w-3.5 h-3.5 text-text-tertiary" /> Topology Visibility
+                   <Clock className="w-3.5 h-3.5 text-text-tertiary" /> Historical State
                  </h4>
-                 <span className="text-[10px] font-mono text-accent font-bold">{timelineScrub}% of nodes</span>
+                 <span className="text-[10px] font-mono text-accent font-bold">{timelineScrub}% Visible</span>
                </div>
                <input 
                   type="range" 
@@ -648,7 +785,7 @@ export default function NeuralPanel() {
           </div>
           
           {/* Dynamic Tooltip */}
-          {hoveredNode && (
+          {hoveredNode && !selectedPruneNode && (
              <div 
                className="absolute z-50 pointer-events-none bg-bg-raised border border-border-dim rounded-lg p-3 shadow-xl max-w-[250px]"
                style={{ left: tooltipPos.x + 15, top: Math.max(10, tooltipPos.y - 40) }}
@@ -673,11 +810,44 @@ export default function NeuralPanel() {
                       </span>
                     </div>
                   )}
+                  {isPruningMode && hoveredNode.type === 'decaying' && (
+                    <div className="mt-2 text-[10px] font-bold text-red-500 animate-pulse text-center">
+                       CLICK TO MANUAL PRUNE
+                    </div>
+                  )}
                </div>
              </div>
           )}
 
+          {/* Pruning Verification Modal Overlay */}
+          {selectedPruneNode && isPruningMode && (
+            <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+               <div className="bg-bg-raised border border-red-500/30 rounded-xl p-6 shadow-2xl max-w-sm w-full relative overflow-hidden">
+                  <div className="absolute top-0 left-0 w-full h-1 bg-red-500" />
+                  <Scissors className="w-8 h-8 text-red-500 mb-4" />
+                  <h3 className="text-lg font-bold text-text-primary mb-2">Verify Synapse Pruning</h3>
+                  <p className="text-sm text-text-secondary mb-4 leading-relaxed">
+                    This neural connection (<strong className="text-text-primary">{selectedPruneNode.label}</strong>) exhibits decaying confidence. 
+                    Do you authorize manual pruning to sever this policy from the active matrix?
+                  </p>
+                  
+                  <div className="bg-bg-overlay p-3 rounded-lg border border-border-dim mb-6 space-y-2 font-mono text-xs">
+                     <div className="flex justify-between"><span className="text-text-tertiary">ID:</span><span className="text-text-secondary">{selectedPruneNode.id}</span></div>
+                     <div className="flex justify-between"><span className="text-text-tertiary">Condition:</span><span className="text-red-400">Decaying / Deprecated</span></div>
+                     <div className="flex justify-between"><span className="text-text-tertiary">Detail:</span><span className="text-text-secondary truncate ml-4">{selectedPruneNode.detail}</span></div>
+                  </div>
 
+                  <div className="flex gap-3">
+                     <button onClick={handlePruneNode} className="flex-1 flex items-center justify-center gap-2 bg-red-500/10 hover:bg-red-500/20 text-red-500 border border-red-500/20 py-2 rounded-lg text-sm font-bold transition-colors">
+                        <CheckCircle className="w-4 h-4" /> Confirm Prune
+                     </button>
+                     <button onClick={() => setSelectedPruneNode(null)} className="flex-1 flex items-center justify-center gap-2 bg-bg-overlay hover:bg-bg-base text-text-secondary border border-border-dim py-2 rounded-lg text-sm font-bold transition-colors">
+                        <XCircle className="w-4 h-4" /> Cancel
+                     </button>
+                  </div>
+               </div>
+            </div>
+          )}
 
         </div>
       </div>
