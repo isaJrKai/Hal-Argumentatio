@@ -5437,7 +5437,7 @@ app.get('/api/neural/network', authenticate, async (req, res) => {
         size: 18,
         detail: timesfmConfigured
           ? 'Inference endpoint configured. A live model response is verified only when a forecast request succeeds.'
-          : 'Inference service is not configured. No TimesFM prediction is attached to this graph.'
+          : 'Private HTTP inference is not configured. A fresh scheduled TimesFM batch forecast can still be used when available.'
       }
     ];
     const links: any[] = [];
@@ -5536,7 +5536,7 @@ app.get('/api/neural/network', authenticate, async (req, res) => {
       totalLinks: links.length,
       lastActivityAt: lastActivity.length ? new Date(Math.max(...lastActivity)).toISOString() : null,
       learningStatus: scopedOutcomes.length ? 'Recorded outcomes available; model calibration is not yet validated.' : 'No recorded outcomes in this scope; no learning confidence is claimed.',
-      timesFmStatus: timesfmConfigured ? 'CONFIGURED_UNVERIFIED' : 'NOT_CONFIGURED',
+      timesFmStatus: timesfmConfigured ? 'HTTP_CONFIGURED_UNVERIFIED' : 'SCHEDULED_BATCH_SUPPORTED',
       timesfmServiceConfigured: timesfmConfigured,
       timesfmInferenceVerified: false
     };
@@ -5611,10 +5611,11 @@ app.get('/api/ai/engine-status', authenticate, async (req, res) => {
         name: 'TimesFM Demand Prediction Engine',
         model: 'google/timesfm-2.5-200m-pytorch',
         configured: timesfmConfigured,
-        status: timesfmConfigured ? 'configured_unverified' : 'not_configured',
-        health: 'not_verified',
-        role: 'Tenant-scoped weekly conversion-demand forecasting from historical Google Ads observations',
-        capabilities: ['TimesFM 2.5 Inference', 'Median Forecast', 'q10/q90 Quantile Bands'],
+        status: timesfmConfigured ? 'configured_unverified' : 'batch_capable',
+        health: timesfmConfigured ? 'not_verified' : 'awaiting_scheduled_batch',
+        role: 'Tenant-scoped weekly conversion-demand forecasting from historical Google Ads observations via private HTTP inference or scheduled batch',
+        capabilities: ['TimesFM 2.5 Inference', 'Scheduled Batch Forecasts', 'Median Forecast', 'q10/q90 Quantile Bands'],
+        batchModeAvailable: true,
         forecastHorizon: '1–52 weeks, subject to available history',
         confidenceInterval: 'Not measured as a percentage; quantile bounds are returned by the model',
         lastInference: null
