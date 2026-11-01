@@ -262,7 +262,6 @@ export default function OverviewPanel({
             demandUpper: c.upperBound,
             observedCpl: c.observedCplUsd,
             isBreach: c.isBreachingCplLimit,
-            weatherSurge: 1
           }));
           setForecastChartData(formatted);
         }
@@ -546,11 +545,11 @@ export default function OverviewPanel({
             </div>
 
             <div className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-bg-base border border-border-dim text-[10px] font-mono">
-              <CloudRain className={`w-3.5 h-3.5 shrink-0 ${forecastMetadata?.weatherTrigger?.hazardCategory !== 'STABLE_SEASONAL' ? 'text-warning' : 'text-info'}`} />
+              <CloudRain className={`w-3.5 h-3.5 shrink-0 ${forecastMetadata?.weatherTrigger?.isLiveForecast && forecastMetadata?.weatherTrigger?.hazardCategory !== 'STABLE_SEASONAL' ? 'text-warning' : 'text-info'}`} />
               <div className="truncate">
                 <span className="text-text-tertiary block text-[9px] uppercase font-sans">Live Weather Context</span>
                 <span className="text-text-primary font-semibold truncate">
-                  {forecastMetadata?.weatherTrigger 
+                  {forecastMetadata?.weatherTrigger?.isLiveForecast
                     ? `${forecastMetadata.weatherTrigger.hazardCategory.replaceAll('_', ' ')} signal · context only`
                     : 'No live weather reading'}
                 </span>
@@ -644,14 +643,7 @@ export default function OverviewPanel({
                             </span>
                           </div>
                         )}
-                        {item.weatherSurge && item.weatherSurge > 1.0 && (
-                          <div className="flex items-center justify-between text-[9.5px] pt-1 border-t border-border-dim/50 text-warning">
-                            <span className="flex items-center gap-1">
-                              <CloudRain className="w-2.5 h-2.5" /> Weather context:
-                            </span>
-                            <span className="font-bold">Context only</span>
-                          </div>
-                        )}
+
                       </div>
                     );
                   }}
