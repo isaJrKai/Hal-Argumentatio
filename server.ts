@@ -5604,7 +5604,7 @@ app.post('/api/system/postgres-sync', authenticate, requireRole('admin'), async 
 
       // Sync Leads
       for (const lead of localLeads) {
-        await client.query(`
+        const leadInsert = await client.query(`
           INSERT INTO leads (
             id, contractor_id, business_name, city, niche, owner_name,
             phone, email, phone_encrypted, email_encrypted, website_url,
@@ -5633,12 +5633,12 @@ app.post('/api/system/postgres-sync', authenticate, requireRole('admin'), async 
           null,
           null
         ]);
-        if (syncedLeads < leadsToInsert) syncedLeads++;
+        syncedLeads += leadInsert.rowCount || 0;
       }
 
       // Sync Win/Loss Records
       for (const record of localWinLoss) {
-        await client.query(`
+        const winLossInsert = await client.query(`
           INSERT INTO win_loss_records (
             id, contractor_id, lead_id, business_name, city, niche, outcome, closed_value_usd, primary_reason, key_lesson, outreach_channel_used, closed_at
           ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, CURRENT_TIMESTAMP)
@@ -5656,7 +5656,7 @@ app.post('/api/system/postgres-sync', authenticate, requireRole('admin'), async 
           record.keyLesson || '',
           record.outreachChannelUsed || 'Direct'
         ]);
-        if (syncedWinLoss < winLossToInsert) syncedWinLoss++;
+        syncedWinLoss += winLossInsert.rowCount || 0;
       }
 
       // Sync Learned Weights
