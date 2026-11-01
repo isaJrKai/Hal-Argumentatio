@@ -45,6 +45,7 @@
 - Added unit coverage for template availability and evidence-safety defaults.
 - Added a route-specific anonymous write rate limit to public audit booking, landing-page lead intake, and delivery webhook routes.
 - Added bounded field validation to public audit booking and require a name plus at least one contact method.
+- Moved third-party integration credential controls into a collapsed Advanced section so routine workspace settings are less cluttered; credential values remain encrypted and are not exposed in the UI.
 - These follow-on commits have not yet been verified by a fresh CI run. Do not treat them as release-ready until CI/type-check/build pass.
 
 ## Verification evidence
