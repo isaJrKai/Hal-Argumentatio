@@ -6277,12 +6277,14 @@ app.get('/api/revenue/intelligence', authenticate, async (req, res) => {
     let totalCustomers = contractorLeads.filter(l => l.status === 'customer' || l.status === 'closed_won').length;
     let totalRevenue = contractorRevenues.reduce((acc, r) => acc + r.amountUsd, 0);
 
-    const cpl = totalLeads > 0 ? totalSpend / totalLeads : 0;
-    const costPerQualified = totalQualified > 0 ? totalSpend / totalQualified : 0;
-    const costPerSal = totalSal > 0 ? totalSpend / totalSal : 0;
-    const costPerAppointment = totalAppointments > 0 ? totalSpend / totalAppointments : 0;
-    const cac = totalCustomers > 0 ? totalSpend / totalCustomers : 0;
-    const roas = totalSpend > 0 ? totalRevenue / totalSpend : 0;
+    const attributedLeadIds = new Set(contractorAttributions.map(a => a.leadId));
+    const attributedLeadCount = contractorLeads.filter(lead => attributedLeadIds.has(lead.id)).length;
+    const cpl = attributedLeadCount > 0 ? totalSpend / attributedLeadCount : null;
+    const costPerQualified = totalQualified > 0 && attributedLeadCount > 0 ? totalSpend / totalQualified : null;
+    const costPerSal = totalSal > 0 && attributedLeadCount > 0 ? totalSpend / totalSal : null;
+    const costPerAppointment = totalAppointments > 0 && attributedLeadCount > 0 ? totalSpend / totalAppointments : null;
+    const cac = totalCustomers > 0 && attributedLeadCount > 0 ? totalSpend / totalCustomers : null;
+    const roas = totalSpend > 0 ? totalRevenue / totalSpend : null;
 
     // Dimensional: By Campaign
     const campaignMap: Record<string, { spend: number; impressions: number; clicks: number; leads: number; qualified: number; sal: number; customers: number; revenue: number }> = {};
@@ -6300,15 +6302,20 @@ app.get('/api/revenue/intelligence', authenticate, async (req, res) => {
       const attr = contractorAttributions.find(a => a.leadId === lead.id);
       const campName = attr?.utmCampaign || 'Default Campaign';
       if (!campaignMap[campName]) {
-        campaignMap[campName] = { spend: 1200, impressions: 15000, clicks: 450, leads: 0, qualified: 0, sal: 0, customers: 0, revenue: 0 };
+        campaignMap[campName] = { spend: 0, impressions: 0, clicks: 0, leads: 0, qualified: 0, sal: 0, customers: 0, revenue: 0 };
       }
       campaignMap[campName].leads += 1;
       if (lead.status === 'qualified' || lead.status === 'sal' || lead.status === 'customer') campaignMap[campName].qualified += 1;
       if (lead.status === 'sal' || lead.status === 'customer') campaignMap[campName].sal += 1;
       if (lead.status === 'customer' || lead.status === 'closed_won') {
         campaignMap[campName].customers += 1;
-        campaignMap[campName].revenue += lead.predictedLtv || 8500;
       }
+    }
+
+    for (const revenue of contractorRevenues) {
+      const attribution = contractorAttributions.find(a => a.leadId === revenue.leadId);
+      const campaignName = attribution?.utmCampaign;
+      if (campaignName && campaignMap[campaignName]) campaignMap[campaignName].revenue += Number(revenue.amountUsd || 0);
     }
 
     const byCampaign = Object.entries(campaignMap).map(([name, data]) => ({
@@ -6344,13 +6351,20 @@ app.get('/api/revenue/intelligence', authenticate, async (req, res) => {
     }
     for (const lead of contractorLeads) {
       const geo = lead.city || 'National / Default';
-      if (!geoMap[geo]) geoMap[geo] = { spend: 5000, leads: 0, customers: 0, revenue: 0 };
+      if (!geoMap[geo]) geoMap[geo] = { spend: 0, leads: 0, customers: 0, revenue: 0 };
       geoMap[geo].leads += 1;
       if (lead.status === 'customer' || lead.status === 'closed_won') {
         geoMap[geo].customers += 1;
-        geoMap[geo].revenue += lead.predictedLtv || 8500;
       }
     }
+    for (const revenue of contractorRevenues) {
+      const revenueLead = contractorLeads.find(lead => lead.id === revenue.leadId);
+      if (!revenueLead) continue;
+      const geo = revenueLead.city || 'Unspecified';
+      if (!geoMap[geo]) geoMap[geo] = { spend: 0, leads: 0, customers: 0, revenue: 0 };
+      geoMap[geo].revenue += Number(revenue.amountUsd || 0);
+    }
+
     const byGeo = Object.entries(geoMap).map(([geo, data]) => ({
       geo,
       ...data,
@@ -6379,6 +6393,7 @@ app.get('/api/revenue/intelligence', authenticate, async (req, res) => {
         totalAppointments,
         totalOpportunities,
         totalCustomers,
+        totalAttributedLeads: attributedLeadCount,
         totalRevenue,
         cpl,
         costPerQualified,
