@@ -3329,6 +3329,21 @@ app.delete('/api/intelligence/chat/conversations/:id', authenticate, async (req,
   } catch (err: any) { res.status(500).json({ error: err.message }); }
 });
 
+app.delete('/api/intelligence/chat/messages/:id', authenticate, async (req, res) => {
+  const contractorId = resolveChatContractorId(req);
+  const messageId = String(req.params.id || '');
+  if (!messageId) return res.status(400).json({ error: 'Message ID is required.' });
+  try {
+    const [deleted] = await pgDb.delete(chatMessages)
+      .where(and(eq(chatMessages.id, messageId), eq(chatMessages.contractorId, contractorId)))
+      .returning({ id: chatMessages.id });
+    if (!deleted) return res.status(404).json({ error: 'Message not found.' });
+    res.json({ message: 'Message deleted successfully.' });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.get('/api/intelligence/chat/history', authenticate, async (req, res) => {
   const contractorId = resolveChatContractorId(req);
   const conversationId = String(req.query.conversationId || '');

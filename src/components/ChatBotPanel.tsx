@@ -181,6 +181,21 @@ export const ChatBotPanel: React.FC<Props> = ({ token }) => {
     window.setTimeout(() => setCopiedId(null), 1800);
   };
 
+  const deleteMessage = async (message: ChatMessage) => {
+    if (message.id.startsWith('pending-')) {
+      showToast({ title: 'Message not saved yet', message: 'Wait for the current response before deleting this message.', type: 'info' });
+      return;
+    }
+    if (!window.confirm('Permanently delete this message from the conversation?')) return;
+    try {
+      await api(`/api/intelligence/chat/messages/${encodeURIComponent(message.id)}`, { method: 'DELETE' });
+      setMessages(previous => previous.filter(item => item.id !== message.id));
+      showToast({ title: 'Message deleted', message: 'The server confirmed deletion.', type: 'success' });
+    } catch (error: any) {
+      showToast({ title: 'Could not delete message', message: error.message, type: 'error' });
+    }
+  };
+
   const projectName = projects.find(p => p.id === activeProjectId)?.name || 'All chats';
 
   return (
@@ -228,7 +243,10 @@ export const ChatBotPanel: React.FC<Props> = ({ token }) => {
               <div className={`max-w-[88%] sm:max-w-[78%] rounded-2xl px-4 py-3 text-sm leading-7 ${message.role === 'user' ? 'bg-blue-600 text-white rounded-br-md' : 'bg-bg-raised border border-border-dim text-text-primary rounded-bl-md'}`}>
                 <div className="whitespace-pre-wrap">{renderMessageText(message.text)}</div>
                 {message.sources?.length ? <div className="mt-3 pt-2 border-t border-border-dim text-xs space-y-1"><div className="font-semibold text-text-tertiary">Sources</div>{message.sources.map((source, index) => <a key={index} href={source.uri} target="_blank" rel="noreferrer" className="block text-cyan-500 hover:underline truncate">{source.title || source.uri}</a>)}</div> : null}
-                {message.role === 'model' && <div className="flex justify-end mt-2"><button onClick={() => copyMessage(message)} title="Copy response" className="text-text-tertiary hover:text-cyan-500">{copiedId === message.id ? 'Copied' : <Copy className="w-3.5 h-3.5"/>}</button></div>}
+                <div className="flex justify-end items-center gap-3 mt-2">
+                  {message.role === 'model' && <button onClick={() => copyMessage(message)} title="Copy response" aria-label="Copy response" className="text-text-tertiary hover:text-cyan-500">{copiedId === message.id ? 'Copied' : <Copy className="w-3.5 h-3.5"/>}</button>}
+                  <button onClick={() => deleteMessage(message)} title="Delete message" aria-label="Delete message" className="text-text-tertiary hover:text-rose-500"><Trash2 className="w-3.5 h-3.5"/></button>
+                </div>
               </div>
               {message.role === 'user' && <div className="w-7 h-7 shrink-0 rounded-lg bg-blue-600 text-white flex items-center justify-center text-[10px] font-semibold">You</div>}
             </article>)}
