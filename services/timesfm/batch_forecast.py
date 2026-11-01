@@ -84,7 +84,7 @@ def main() -> None:
 
             rows = conn.execute(
                 """
-                SELECT date, conversions, geo, campaign_name, keyword, search_term
+                SELECT date, conversions, cost, geo, campaign_name, keyword, search_term
                 FROM google_ads_daily_performance
                 WHERE contractor_id = %s
                 ORDER BY date ASC
@@ -124,6 +124,14 @@ def main() -> None:
 
             batch_rows = []
             last_week = weeks[-1][0]
+            total_cost = sum(float(row["cost"] or 0) for row in scoped)
+            total_conversions = sum(float(row["conversions"] or 0) for row in scoped)
+            observed_cpl = total_cost / total_conversions if total_conversions > 0 else 0.0
+            observed_days = {
+                row["date"].date() if isinstance(row["date"], datetime) else row["date"]
+                for row in scoped
+            }
+            historical_mean = float(np.mean(values))
             for index in range(HORIZON):
                 median = float(medians[index])
                 lower = float(quantile_rows[index, 1])
@@ -146,6 +154,12 @@ def main() -> None:
                     "territory_city": contractor["city"],
                     "territory_trade": contractor["service_type"],
                     "input_weeks": len(weeks),
+                    "input_records": len(scoped),
+                    "input_days": len(observed_days),
+                    "input_total_cost": total_cost,
+                    "input_total_conversions": total_conversions,
+                    "observed_cpl_usd": observed_cpl,
+                    "historical_mean": historical_mean,
                     "input_start_week": weeks[0][0].isoformat(),
                     "input_end_week": last_week.isoformat(),
                     "quantile_lower": 0.1,
