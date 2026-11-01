@@ -513,7 +513,7 @@ ${d.description}
                       "HAL does not exist to answer everything. HAL exists to understand what matters, reason about it, and help the operator move the business forward."
                     </blockquote>
                     <p className="text-[11px] text-text-secondary mt-2 font-mono">
-                      Every behavior must have intent: <span className="text-text-primary min-w-0 break-words sm:text-right">Evidence ➔ Interpretation ➔ Decision</span>. Never fabricate reality or manufacture certainty where evidence is absent.
+                      Every behavior must have intent: <span className="text-text-primary">Evidence ➔ Interpretation ➔ Decision</span>. Never fabricate reality or manufacture certainty where evidence is absent.
                     </p>
                   </div>
                 </div>
@@ -658,7 +658,7 @@ ${d.description}
                   <div className="bg-accent-dim/10 border border-accent/25 p-4 rounded-sm text-center">
                     <span className="text-[11px] font-mono text-accent uppercase font-bold block mb-1">THE GOLDEN RULE</span>
                     <p className="text-xs text-text-primary max-w-xl mx-auto leading-relaxed">
-                      Every new feature must answer: <span className="text-accent font-semibold min-w-0 break-all sm:text-right">"Does this help the user make better business decisions?"</span> If the answer is no, it does not belong in HAL.
+                      Every new feature must answer: <span className="text-accent font-semibold">"Does this help the user make better business decisions?"</span> If the answer is no, it does not belong in HAL.
                     </p>
                   </div>
                 </div>
@@ -1206,7 +1206,7 @@ ${d.description}
                   <div className="p-4 bg-bg-base border border-border-dim rounded font-mono text-xs text-text-secondary space-y-3 min-w-0">
                     <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-1.5 py-2 border-b border-border-dim/40 min-w-0 break-words">
                       <span className="opacity-50">CORE SOURCE FILE:</span>
-                      <span className="text-accent font-semibold">
+                      <span className="text-accent font-semibold min-w-0 break-all sm:text-right">
                         {activeDoc.id === '07' ? 'src/db/db.ts (AES-256 Vault)' :
                          activeDoc.id === '08' ? 'src/lib/realDataHarvest.ts' :
                          activeDoc.id === '09' ? 'src/skills/*.ts (SEO & Speed)' :
@@ -1229,7 +1229,7 @@ ${d.description}
                     </div>
                     <div className="flex justify-between items-center py-0.5 border-b border-border-dim/40">
                       <span className="opacity-50">CANONICAL DIRECTIVE:</span>
-                      <span className="text-text-primary">
+                      <span className="text-text-primary min-w-0 break-words sm:text-right">
                         {activeDoc.id === '07' ? 'Zero plaintext PII at rest; Merkle-root block validation' :
                          activeDoc.id === '08' ? 'Live territory data only; zero synthetic hallucinations' :
                          activeDoc.id === '10' ? 'Dual-Drive Consensus: Gemini 2.5 + Nemotron 70B' :
