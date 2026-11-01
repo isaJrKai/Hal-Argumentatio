@@ -853,7 +853,7 @@ export function generateLandingPageHtml(config: LandingPageConfig): string {
       if (!name || !phone || !details) return;
 
       btn.disabled = true;
-      btn.innerText = 'Routing Dispatch...';
+      btn.innerText = 'Sending request...';
 
       try {
         const res = await fetch('/api/public/landing-leads', {
