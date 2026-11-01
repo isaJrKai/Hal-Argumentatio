@@ -44,7 +44,7 @@ export interface GuardrailEvaluationResult {
   maxAllowableCpl: number;
   breachDetected: boolean;
   breachWeeks: string[];
-  highestProjectedCpl: number;
+  highestObservedCpl: number;
   suggestedAction: 'SCALE_UP' | 'MAINTAIN' | 'THROTTLE_BUDGET' | 'RESTRICT_BID_CEILING';
   budgetMultiplierRecommended: number;
   actionsExecuted: string[];
@@ -58,7 +58,7 @@ export interface BrainForecastCurvePoint {
   weatherSurgeFactor: number;
   lowerBound: number;
   upperBound: number;
-  projectedCplUsd: number;
+  observedCplUsd: number;
   isBreachingCplLimit: boolean;
 }
 
@@ -291,19 +291,15 @@ export async function evaluateAndEnforceBudgetGuardrails(
   // Allowable CPL is typically ~30-35% of target CAC for home services
   const maxAllowableCpl = Math.round(targetCac * 0.35);
   
-  const breachWeeks: string[] = [];
-  let highestProjectedCpl = 0;
-
+  const observedCpl = forecastCurve.length
+    ? Math.max(...forecastCurve.map(point => point.observedCplUsd))
+    : 0;
+  const breachDetected = observedCpl > maxAllowableCpl;
+  const breachWeeks: string[] = breachDetected ? ['CURRENT_BASELINE'] : [];
+  const highestObservedCpl = observedCpl;
   for (const point of forecastCurve) {
-    if (point.projectedCplUsd > highestProjectedCpl) {
-      highestProjectedCpl = point.projectedCplUsd;
-    }
-    if (point.projectedCplUsd > maxAllowableCpl) {
-      breachWeeks.push(point.week);
-      point.isBreachingCplLimit = true;
-    } else {
-      point.isBreachingCplLimit = false;
-    }
+    // CPL is a trailing observed baseline, not a weekly TimesFM forecast.
+    point.isBreachingCplLimit = false;
   }
 
   const breachDetected = breachWeeks.length > 0;
@@ -329,7 +325,7 @@ export async function evaluateAndEnforceBudgetGuardrails(
           rationale: `The heuristic scenario estimates CPL (${highestProjectedCpl}) above the configured target CAC ceiling (${targetCac}). This is a recommendation for human review; no ad budget was changed.`,
           citationData: {
             breachWeeks,
-            highestProjectedCpl,
+            highestObservedCpl,
             maxAllowableCpl,
             targetCac,
             throttleMultiplier: 0.75
@@ -373,7 +369,7 @@ export async function evaluateAndEnforceBudgetGuardrails(
     maxAllowableCpl,
     breachDetected,
     breachWeeks,
-    highestProjectedCpl,
+    highestObservedCpl,
     suggestedAction,
     budgetMultiplierRecommended,
     actionsExecuted,
@@ -384,7 +380,7 @@ export async function evaluateAndEnforceBudgetGuardrails(
 /**
  * 4. Brain-Synchronized Orchestrator
  * Executes the complete 11-Layer Brain synchronization loop:
- * Ingests real Google Ads -> applies Open-Meteo Weather Surge -> generates TimesFM forward curve -> enforces Budget Guardrails.
+ * Ingests tenant-scoped Google Ads -> runs TimesFM demand inference -> compares trailing CPL to a human-reviewed CAC guardrail.
  */
 export async function executeBrainSynchronizedForecast(
   contractorId: string,
@@ -460,7 +456,7 @@ export async function executeBrainSynchronizedForecast(
       lowerBound: toIndex(point.lower),
       upperBound: Math.max(toIndex(point.point), toIndex(point.upper)),
       // CPL is the observed trailing CPL, not a TimesFM prediction.
-      projectedCplUsd: adsBaseline.empiricalCpl,
+      observedCplUsd: adsBaseline.empiricalCpl,
       isBreachingCplLimit: false
     };
   });
