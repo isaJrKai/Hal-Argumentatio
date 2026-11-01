@@ -17,6 +17,16 @@ export function generateLandingPageHtml(config: LandingPageConfig): string {
   const primaryColor = branding.primaryColor || '#0284c7';
   const secondaryColor = branding.secondaryColor || '#0f172a';
   const accentColor = branding.accentColor || '#f59e0b';
+  const heroImageUrl = (() => {
+    try {
+      const candidate = new URL(sections.hero?.heroImageUrl || '');
+      return candidate.protocol === 'https:' && candidate.hostname === 'images.unsplash.com'
+        ? candidate.toString()
+        : '';
+    } catch {
+      return '';
+    }
+  })();
 
   // Include only business details supplied by the contractor; do not invent hours or pricing.
   const businessAddress = sections.footer?.address || '';
@@ -25,7 +35,7 @@ export function generateLandingPageHtml(config: LandingPageConfig): string {
     "@type": seo.schemaType || "LocalBusiness",
     "name": businessName,
     ...(phone ? { "telephone": phone } : {}),
-    "url": typeof window !== 'undefined' ? `${window.location.origin}/landing/${id}` : `https://hal.ai/landing/${id}`,
+    // Hosting URL is unknown at generation time; omit rather than invent a canonical URL.
     "areaServed": city,
     "address": {
       "@type": "PostalAddress",
@@ -77,7 +87,7 @@ export function generateLandingPageHtml(config: LandingPageConfig): string {
         <a href="${cleanPhone ? 'tel:' + cleanPhone : '#lead-form'}" class="bg-amber-500 hover:bg-amber-400 text-slate-950 font-extrabold px-4 py-2.5 rounded-xl text-xs sm:text-sm transition flex items-center gap-2 shadow-lg hover:shadow-amber-500/20">
           <span>📞</span>
           <span class="hidden sm:inline">${sections.header.ctaText}</span>
-          <span class="sm:hidden">Call Now</span>
+          <span class="sm:hidden">\${cleanPhone ? 'Call Now' : 'Request a Quote'}</span>
         </a>
       </div>
     </div>
@@ -114,6 +124,10 @@ export function generateLandingPageHtml(config: LandingPageConfig): string {
             <div class="text-[11px] text-slate-400 mt-0.5">${phone || 'Use the service request form'}</div>
           </div>
         </div>
+        ${heroImageUrl ? `<figure class="mt-6 relative overflow-hidden rounded-2xl border border-slate-700/70 bg-slate-900/40 shadow-xl">
+          <img src="${heroImageUrl}" alt="Illustrative trade photography" loading="eager" decoding="async" class="w-full h-52 sm:h-64 object-cover" />
+          <figcaption class="absolute bottom-3 left-3 px-2.5 py-1 rounded-full bg-slate-950/80 text-slate-200 text-[10px] tracking-wide">Illustrative image</figcaption>
+        </figure>` : ''}
       </div>
 
       <!-- Lead Capture Card (3-Field High Conversion) -->
@@ -202,30 +216,37 @@ export function generateLandingPageHtml(config: LandingPageConfig): string {
       case 'services':
         if (sections.services?.active && sections.services.items?.length > 0) {
           renderedSections += `
-  <!-- Services Grid -->
+  <!-- Services: responsive bento composition -->
   <section class="max-w-6xl mx-auto px-4 sm:px-6 py-12">
-    <div class="text-center max-w-2xl mx-auto mb-8 space-y-2">
-      <h2 class="text-2xl sm:text-3xl font-black text-white">${sections.services.title}</h2>
-      <p class="text-xs sm:text-sm text-slate-400">${sections.services.subtitle}</p>
+    <div class="max-w-2xl mb-8 space-y-2">
+      <p class="text-xs font-bold uppercase tracking-[0.18em] text-amber-400">What We Do</p>
+      <h2 class="text-2xl sm:text-4xl font-black text-white tracking-tight">${sections.services.title}</h2>
+      <p class="text-sm sm:text-base text-slate-400 leading-relaxed">${sections.services.subtitle}</p>
     </div>
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
-      ${sections.services.items.map(s => `
-        <div class="p-5 sm:p-6 rounded-2xl bg-slate-900/60 border border-slate-800 hover:border-sky-500/50 transition flex flex-col justify-between space-y-4">
-          <div class="space-y-2">
-            ${s.badge ? `<span class="inline-block px-2.5 py-0.5 rounded-full bg-sky-500/20 text-sky-400 text-[10px] font-bold uppercase">${s.badge}</span>` : ''}
-            <h4 class="text-base font-bold text-white">${s.title}</h4>
-            <p class="text-xs text-slate-400 leading-relaxed">${s.description}</p>
+    <div class="grid grid-cols-1 md:grid-cols-6 gap-4">
+      ${sections.services.items.map((s, index) => {
+        const spanClass = sections.services.items.length === 1
+          ? 'md:col-span-6'
+          : sections.services.items.length === 3
+            ? (index === 0 ? 'md:col-span-4 min-h-64' : index === 1 ? 'md:col-span-2 min-h-64' : 'md:col-span-6')
+            : 'md:col-span-3';
+        return `
+        <article class="${spanClass} p-6 sm:p-7 rounded-2xl bg-slate-900/60 border border-slate-800 hover:border-slate-600 transition flex flex-col justify-between gap-6">
+          <div class="max-w-2xl space-y-3">
+            <span class="text-[10px] font-bold uppercase tracking-[0.16em] text-amber-400">Service</span>
+            <h3 class="text-lg sm:text-xl font-bold text-white tracking-tight">${s.title}</h3>
+            <p class="text-sm text-slate-400 leading-relaxed">${s.description}</p>
           </div>
-          <div class="pt-3 border-t border-slate-800/80 flex items-center justify-between">
-            <span class="text-sm font-bold text-amber-400">${s.priceEstimate || 'Upfront Quote'}</span>
-            <a href="#lead-form" class="text-xs text-sky-400 hover:text-sky-300 font-bold flex items-center gap-1">
-              Select ➔
+          <div class="pt-4 border-t border-slate-800/80 flex items-center justify-between gap-4">
+            <span class="text-sm font-semibold text-slate-300">${s.priceEstimate || 'Discuss Scope'}</span>
+            <a href="#lead-form" class="text-xs text-amber-400 hover:text-amber-300 font-bold flex items-center gap-1">
+              Request details <span aria-hidden="true">→</span>
             </a>
           </div>
-        </div>
-      `).join('')}
+        </article>`;
+      }).join('')}
     </div>
-  </section>\n`;
+  </section>\\n`;
         }
         break;
 
@@ -853,7 +874,7 @@ export function generateLandingPageHtml(config: LandingPageConfig): string {
       if (!name || !phone || !details) return;
 
       btn.disabled = true;
-      btn.innerText = 'Routing Dispatch...';
+      btn.innerText = 'Sending request...';
 
       try {
         const res = await fetch('/api/public/landing-leads', {

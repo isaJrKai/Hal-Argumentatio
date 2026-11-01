@@ -28,6 +28,7 @@ export default function ${componentName}() {
   const [formData, setFormData] = useState({ name: '', phone: '', details: '' });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -47,10 +48,11 @@ export default function ${componentName}() {
           city: '${city}'
         })
       });
+      if (!res.ok) throw new Error('The request could not be sent. Please try again or contact the business directly.');
       setSubmitted(true);
+      setSubmitError(null);
     } catch (err) {
-      // Offline fallback
-      setSubmitted(true);
+      setSubmitError(err instanceof Error ? err.message : 'The request could not be sent. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
@@ -84,16 +86,16 @@ export default function ${componentName}() {
           </div>
           <div className="flex items-center gap-3">
             <div className="hidden sm:block text-right">
-              <div className="text-[10px] uppercase font-bold text-amber-400 tracking-wider">⚡ 24/7 Dispatch</div>
-              <div className="text-sm font-black text-white">${phone}</div>
+              <div className="text-[10px] uppercase font-bold text-amber-400 tracking-wider">Contact the Business</div>
+              <div className="text-sm font-black text-white">${phone || 'Use the quote form'}</div>
             </div>
             <a
-              href="tel:${phone.replace(/[^0-9+]/g, '')}"
+              href="${phone.replace(/[^0-9+]/g, '') ? 'tel:' + phone.replace(/[^0-9+]/g, '') : '#lead-form'}"
               className="bg-amber-500 hover:bg-amber-400 text-slate-950 font-extrabold px-4 py-2.5 rounded-xl text-xs sm:text-sm transition flex items-center gap-2 shadow-lg"
             >
               <span>📞</span>
               <span className="hidden sm:inline">${sections.header.ctaText}</span>
-              <span className="sm:hidden">Call Now</span>
+              <span className="sm:hidden">${phone ? 'Call Now' : 'Request a Quote'}</span>
             </a>
           </div>
         </div>
@@ -121,7 +123,7 @@ export default function ${componentName}() {
             <div id="lead-form" className="lg:col-span-5">
               <div className="p-6 sm:p-7 rounded-2xl bg-slate-900/90 border border-slate-700/80 shadow-2xl relative backdrop-blur-md">
                 <div className="absolute -top-3 right-6 bg-emerald-500 text-slate-950 font-black text-[10px] uppercase px-3 py-1 rounded-full shadow-md">
-                  Priority Dispatch
+                  Request a Quote
                 </div>
                 <h3 className="text-xl font-bold text-white mb-1">
                   ${sections.lead_form?.title || 'Request Priority Dispatch'}
@@ -134,11 +136,13 @@ export default function ${componentName}() {
                   <div className="p-4 rounded-xl bg-emerald-950/80 border border-emerald-500 text-center space-y-2">
                     <div className="text-emerald-400 text-xl font-bold">✓ Request Confirmed</div>
                     <p className="text-xs text-slate-200">
-                      Our on-duty dispatcher is routing a technician to your location in ${city}.
+                      The business has received your request and can follow up using the contact details provided.
                     </p>
                   </div>
                 ) : (
-                  <form onSubmit={handleSubmit} className="space-y-3.5">
+                  <>
+                    {submitError && <p role="alert" className="text-sm text-rose-400 mb-3">{submitError}</p>}
+                    <form onSubmit={handleSubmit} className="space-y-3.5">
                     <div>
                       <label className="block text-[11px] font-semibold text-slate-300 mb-1">Full Name *</label>
                       <input
@@ -151,7 +155,7 @@ export default function ${componentName}() {
                       />
                     </div>
                     <div>
-                      <label className="block text-[11px] font-semibold text-slate-300 mb-1">Phone (SMS ETA) *</label>
+                      <label className="block text-[11px] font-semibold text-slate-300 mb-1">Phone Number *</label>
                       <input
                         type="tel"
                         required
@@ -177,9 +181,10 @@ export default function ${componentName}() {
                       disabled={isSubmitting}
                       className="w-full py-3.5 px-4 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-sm transition shadow-lg cursor-pointer disabled:opacity-50"
                     >
-                      {isSubmitting ? 'Routing Dispatch...' : '${sections.lead_form?.buttonText || '⚡ Dispatch Technician Now'}'}
+                      {isSubmitting ? 'Sending Request...' : '${sections.lead_form?.buttonText || '⚡ Dispatch Technician Now'}'}
                     </button>
-                  </form>
+                    </form>
+                  </>
                 )}
               </div>
             </div>

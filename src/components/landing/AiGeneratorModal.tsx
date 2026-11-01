@@ -15,7 +15,7 @@ export const AiGeneratorModal: React.FC<AiGeneratorModalProps> = ({
   token,
   onGenerated
 }) => {
-  const [prompt, setPrompt] = useState('Emergency plumbing specialist in Austin handling burst pipes, slab leaks, drain backups, and water heaters');
+  const [prompt, setPrompt] = useState('');
   const [trade, setTrade] = useState<TradeType>('plumbing');
   const [city, setCity] = useState('');
   const [businessName, setBusinessName] = useState('');
@@ -23,11 +23,11 @@ export const AiGeneratorModal: React.FC<AiGeneratorModalProps> = ({
   const [address, setAddress] = useState('');
 
   // Rule 6: Interview before inventing fields
-  const [primaryGoal, setPrimaryGoal] = useState('Emergency Dispatch / Fast Arrival');
-  const [audience, setAudience] = useState('Local Residential Homeowners');
+  const [primaryGoal, setPrimaryGoal] = useState('Request a quote or assessment');
+  const [audience, setAudience] = useState('Local customers seeking the services described');
   const [coreOffer, setCoreOffer] = useState('');
   const [proofAvailable, setProofAvailable] = useState('');
-  const [variantArchetype, setVariantArchetype] = useState<'emergency_dispatch' | 'master_craftsman' | 'flat_rate'>('emergency_dispatch');
+  const [variantArchetype, setVariantArchetype] = useState<'emergency_dispatch' | 'master_craftsman' | 'flat_rate'>('master_craftsman');
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -35,8 +35,8 @@ export const AiGeneratorModal: React.FC<AiGeneratorModalProps> = ({
   if (!isOpen) return null;
 
   const handleGenerate = async () => {
-    if (!businessName.trim() || !phone.trim() || !city.trim() || !address.trim()) {
-      setError('Enter the real business name, phone, city, and street address before generating the page.');
+    if (!businessName.trim() || !city.trim() || !prompt.trim()) {
+      setError('Enter the real business name, city, and a description of the services the business actually provides. Phone and street address are optional.');
       return;
     }
 
@@ -122,7 +122,7 @@ export const AiGeneratorModal: React.FC<AiGeneratorModalProps> = ({
                 Landing Page Builder: Guided Intake Interview
               </h3>
               <p className="text-xs text-text-secondary">
-                Rule 6 Enforced: Structured interview before inventing, 3 distinct directional archetypes, zero AI slop.
+                Generate a page from the actual business brief. Unverified details are omitted.
               </p>
             </div>
           </div>
@@ -190,7 +190,7 @@ export const AiGeneratorModal: React.FC<AiGeneratorModalProps> = ({
                   <span>High-Urgency Dispatch</span>
                 </div>
                 <p className="text-[10.5px] leading-snug">
-                  Emergency amber, 30-min window badge, lead capture above fold, instant dialer.
+                  High-visibility contact-first layout for businesses that genuinely handle urgent work.
                 </p>
               </button>
 
@@ -208,7 +208,7 @@ export const AiGeneratorModal: React.FC<AiGeneratorModalProps> = ({
                   <span>Master Craftsman</span>
                 </div>
                 <p className="text-[10.5px] leading-snug">
-                  Trust navy, 10-year warranty badges, before/after project proof, BBB rating.
+                  Craftsmanship-led layout with space for verified credentials and genuine project proof.
                 </p>
               </button>
 
@@ -226,7 +226,7 @@ export const AiGeneratorModal: React.FC<AiGeneratorModalProps> = ({
                   <span>Modern Flat-Rate</span>
                 </div>
                 <p className="text-[10.5px] leading-snug">
-                  Clean modern slate, transparent price cards, zero surprise fees guarantee.
+                  Pricing-led layout. Add prices and terms only when the business has supplied them.
                 </p>
               </button>
             </div>
