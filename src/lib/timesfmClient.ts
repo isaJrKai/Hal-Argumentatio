@@ -73,6 +73,15 @@ export async function requestTimesFmForecast(
   if (!serviceUrl || !apiKey) {
     throw new Error('TimesFM service is not configured');
   }
+  let parsedServiceUrl: URL;
+  try {
+    parsedServiceUrl = new URL(serviceUrl);
+  } catch {
+    throw new Error('TimesFM service URL is invalid');
+  }
+  if (parsedServiceUrl.protocol !== 'https:' && !['localhost', '127.0.0.1'].includes(parsedServiceUrl.hostname)) {
+    throw new Error('TimesFM service must use HTTPS outside local development');
+  }
   if (series.length < 8 || series.some((value) => !Number.isFinite(value) || value < 0)) {
     throw new Error('TimesFM requires at least 8 finite, non-negative historical observations');
   }
