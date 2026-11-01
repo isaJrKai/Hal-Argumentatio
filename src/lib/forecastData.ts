@@ -56,7 +56,13 @@ export function buildWeeklyDemandSeries<T extends {
   }
 
   const weeks = [...buckets.entries()].sort(([a], [b]) => a.localeCompare(b));
-  if (weeks.length < 8 || weeks.some(([, bucket]) => bucket.observedDays.size < 5)) return [];
+  if (weeks.length < 8 || weeks.some(([weekKey, bucket]) => {
+    const days = [...bucket.observedDays].sort();
+    const weekStart = Date.parse(`${weekKey}T00:00:00.000Z`);
+    const firstOffset = (Date.parse(`${days[0]}T00:00:00.000Z`) - weekStart) / 86400000;
+    const lastOffset = (Date.parse(`${days[days.length - 1]}T00:00:00.000Z`) - weekStart) / 86400000;
+    return days.length < 5 || firstOffset > 1 || lastOffset < 4;
+  })) return [];
   for (let index = 1; index < weeks.length; index += 1) {
     const previous = Date.parse(`${weeks[index - 1][0]}T00:00:00.000Z`);
     const current = Date.parse(`${weeks[index][0]}T00:00:00.000Z`);
