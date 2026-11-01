@@ -45,6 +45,21 @@ describe('MCP prospect evidence truthfulness', () => {
     expect(prospect.sentimentScore).toBeNull();
   });
 
+  it('retains live-harvest provenance only with verified grounding evidence', () => {
+    const prospect = sanitizeProspect({
+      id: 'lead_grounded',
+      businessName: 'Grounded Contractor',
+      city: 'Toronto',
+      niche: 'Roofing',
+      status: 'new',
+      sourceType: 'live_harvest',
+      verificationStatus: 'VERIFIED',
+      groundingEvidence: { dnsResolved: true, phoneValid: true, verifiedAt: '2026-11-01T00:00:00.000Z' },
+    });
+
+    expect(prospect.sourceType).toBe('live_harvest');
+  });
+
   it('retains source type only when external provenance exists', () => {
     const prospect = sanitizeProspect({
       id: 'lead_external',
