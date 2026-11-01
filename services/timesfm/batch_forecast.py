@@ -73,7 +73,7 @@ def main() -> None:
     with psycopg.connect(DATABASE_URL, row_factory=dict_row, connect_timeout=20) as conn:
         contractors = conn.execute(
             """
-            SELECT c.id, c.service_type, territory.city
+            SELECT DISTINCT c.id, c.service_type, territory.city
             FROM contractors AS c
             CROSS JOIN LATERAL unnest(
                 CASE
