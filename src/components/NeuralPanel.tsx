@@ -72,6 +72,88 @@ export default function NeuralPanel() {
       if (Array.isArray(data.nodes) && Array.isArray(data.links)) {
         initSimulation(data.nodes, data.links);
       }
+
+      // Attach only a successfully executed TimesFM forecast to the visible graph.
+      // A configured endpoint alone is never represented as a verified prediction.
+      if (data.telemetry?.timesfmServiceConfigured) {
+        try {
+          const forecastResponse = await fetch('/api/ai/test-timesfm', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              ...(authToken ? { 'Authorization': `Bearer ${authToken}` } : {})
+            },
+            body: JSON.stringify({
+              city: activeCity,
+              niche: activeNiche,
+              horizonWeeks: 12,
+              applyGuardrails: false
+            })
+          });
+          const forecastResult = forecastResponse.ok ? await forecastResponse.json() : null;
+          if (requestId !== networkRequestIdRef.current) return;
+
+          if (forecastResult?.success && Array.isArray(forecastResult.forecastCurve)) {
+            const forecastNodes = forecastResult.forecastCurve.map((point: any, index: number) => ({
+              id: `timesfm_forecast_${index + 1}`,
+              label: `${point.week}: ${point.predictedDemandIndex}`,
+              detail: `TimesFM 2.5 median demand index ${point.predictedDemandIndex}; q10–q90 range ${point.lowerBound}–${point.upperBound}. Model output, not observed demand.`,
+              type: 'forecast',
+              group: 8,
+              size: 6,
+              createdAt: forecastResult.timestamp,
+              forecast: {
+                median: point.predictedDemandIndex,
+                lower: point.lowerBound,
+                upper: point.upperBound
+              }
+            }));
+            const forecastLinks = forecastNodes.map((node: any) => ({
+              source: 'core_timesfm',
+              target: node.id,
+              value: 2
+            }));
+            const nextNodes = [...data.nodes, ...forecastNodes];
+            const nextLinks = [...data.links, ...forecastLinks];
+            setNetworkData({
+              nodes: nextNodes,
+              links: nextLinks,
+              telemetry: {
+                ...data.telemetry,
+                timesfmInferenceVerified: true,
+                timesfmInferenceAt: forecastResult.timestamp,
+                timesfmModel: forecastResult.engine,
+                timesfmForecastHorizonWeeks: forecastResult.horizonWeeks,
+                timesfmForecastNodeCount: forecastNodes.length
+              }
+            });
+            initSimulation(nextNodes, nextLinks);
+          } else {
+            setNetworkData((current: any) => ({
+              ...current,
+              telemetry: {
+                ...current.telemetry,
+                timesfmInferenceVerified: false,
+                timesfmInferenceStatus: forecastResponse.status === 409
+                  ? 'insufficient_or_unavailable_history'
+                  : 'inference_unavailable'
+              }
+            }));
+          }
+        } catch (forecastError) {
+          if (requestId === networkRequestIdRef.current) {
+            console.warn('TimesFM graph inference unavailable:', forecastError);
+            setNetworkData((current: any) => ({
+              ...current,
+              telemetry: {
+                ...current.telemetry,
+                timesfmInferenceVerified: false,
+                timesfmInferenceStatus: 'inference_unavailable'
+              }
+            }));
+          }
+        }
+      }
     } catch (e) {
       if (requestId === networkRequestIdRef.current) {
         console.warn('Territory graph sync paused:', e);
@@ -674,10 +756,10 @@ export default function NeuralPanel() {
               <h4 className="text-[10px] font-mono font-bold text-text-secondary uppercase mb-2 flex items-center gap-1.5"><Code2 className="w-3.5 h-3.5 text-text-tertiary" /> Matrix Event Log</h4>
               <div className="font-mono text-[9px] text-accent/90 space-y-1 h-10 overflow-hidden leading-relaxed">
                 {(networkData.nodes || [])
-                  .filter(n => n.type === 'win' || n.type === 'loss')
+                  .filter(n => n.type === 'win' || n.type === 'loss' || n.type === 'forecast')
                   .slice(0, 2)
                   .map((node, i) => (
-                  <p key={i} className="truncate">{">"} {node.type === 'win' ? '[WON]' : '[LOST]'} {node.detail}</p>
+                  <p key={i} className="truncate">{">"} {node.type === 'win' ? '[WON]' : node.type === 'loss' ? '[LOST]' : '[TIMESFM]'} {node.detail}</p>
                 ))}
               </div>
             </div>
