@@ -5400,6 +5400,7 @@ app.get('/api/neural/network', authenticate, async (req, res) => {
     const contractorId = (req as any).contractorId;
     const cityFilter = String(req.query.city || '').trim();
     const nicheFilter = String(req.query.niche || '').trim().toLowerCase();
+    const timesfmConfigured = Boolean(process.env.TIMESFM_SERVICE_URL && (process.env.TIMESFM_API_KEY || '').length >= 32);
     const dbInstance = getDrizzleDb();
     if (!dbInstance) throw new Error('Neon/PostgreSQL is unavailable');
 
@@ -5428,7 +5429,16 @@ app.get('/api/neural/network', authenticate, async (req, res) => {
       { id: 'core_leads', label: 'Lead Pipeline', type: 'core', group: 1, size: 22, detail: scopedLeads.length + ' tenant leads in the selected territory and niche.' },
       { id: 'core_outcomes', label: 'Recorded Outcomes', type: 'core', group: 2, size: 22, detail: scopedOutcomes.length + ' recorded win/loss outcomes in this scope.' },
       { id: 'core_ads', label: 'Google Ads Observations', type: 'core', group: 3, size: 22, detail: scopedAds.length + ' tenant-owned Google Ads performance records matched this scope.' },
-      { id: 'core_timesfm', label: 'TimesFM Adapter', type: 'unavailable', group: 4, size: 18, detail: 'Not configured: this deployment has no verified TimesFM inference endpoint or model weights. No TimesFM predictions or learned weights are being fabricated.' }
+      {
+        id: 'core_timesfm',
+        label: 'TimesFM 2.5 Adapter',
+        type: 'core',
+        group: 4,
+        size: 18,
+        detail: timesfmConfigured
+          ? 'Inference endpoint configured. A live model response is verified only when a forecast request succeeds.'
+          : 'Inference service is not configured. No TimesFM prediction is attached to this graph.'
+      }
     ];
     const links: any[] = [];
     const addLink = (source: string, target: string, value: number) => {
@@ -5514,7 +5524,6 @@ app.get('/api/neural/network', authenticate, async (req, res) => {
       ...scopedOutcomes.map(record => record.closedAt),
       ...scopedAds.map(record => record.date)
     ].filter(Boolean).map(value => new Date(value as any).getTime()).filter(Number.isFinite);
-    const timesfmConfigured = Boolean(process.env.TIMESFM_SERVICE_URL && (process.env.TIMESFM_API_KEY || '').length >= 32);
     const telemetry = {
       scope: { city: cityFilter || null, niche: nicheFilter || null },
       leadsInScope: scopedLeads.length,
