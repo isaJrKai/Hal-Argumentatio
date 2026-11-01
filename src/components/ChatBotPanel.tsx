@@ -27,6 +27,13 @@ interface ChatMessage {
   createdAt?: string;
 }
 
+const renderMessageText = (text: string) => text.split(/(\\*\\*[^*]+\\*\\*|\\*[^*]+\\*|`[^`]+`)/g).map((part, index) => {
+  if (part.startsWith('**') && part.endsWith('**')) return <strong key={index}>{part.slice(2, -2)}</strong>;
+  if (part.startsWith('*') && part.endsWith('*')) return <em key={index}>{part.slice(1, -1)}</em>;
+  if (part.startsWith('`') && part.endsWith('`')) return <code key={index} className="px-1 py-0.5 rounded bg-black/10 dark:bg-white/10 font-mono">{part.slice(1, -1)}</code>;
+  return part;
+});
+
 interface ChatBotPanelProps {
   token: string | null;
 }
@@ -119,51 +126,37 @@ export const ChatBotPanel: React.FC<ChatBotPanelProps> = ({ token }) => {
           }
         ]);
       } else {
-        throw new Error('Chat API returned error');
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.error || `HAL chat request failed (${res.status}).`);
       }
     } catch (err: any) {
       console.error(err);
-      // Contextual local synthesis fallback
-      const qLower = query.toLowerCase();
-      let fallbackText = `I am here to guide your operations in ${regionalProfile.city} (${activeNiche}).`;
-      
-      if (qLower.includes('step by step') || qLower.includes('what to do') || qLower.includes('dont know') || qLower.includes("don't know") || qLower.includes('start')) {
-        fallbackText = `Here is your exact step-by-step operating roadmap to win contractor clients:
-
-1. **Select Territory & Niche**: Navigate to **Territory Radar** or **Mission Control** to set your focus (e.g. Sump Pump / Waterproofing or Custom Home Builders in ${regionalProfile.city}).
-2. **Harvest Real Leads**: Open the **Leads** tab and run a harvest. HAL checks website load speeds, SSL, and Google reviews.
-3. **Filter High-Deficit Prospects**: Look for businesses with speed scores under 40 or missing mobile click-to-call buttons. They're burning ad spend on bouncing visitors.
-4. **Deploy Speed Deficit Pitch**: In **Outreach Studio** or **Document Studio**, create a personalized deficit report showing how many calls they are losing.
-5. **Close on an Emergency Intake Pipeline**: Offer your sub-second intake landing page and instant SMS dispatch system for a setup fee + monthly retainer.
-
-What niche or city would you like to inspect first?`;
-      } else {
-        fallbackText = `HAL Intelligence: For "${query}", your active workspace is configured for ${regionalProfile.city} (${activeNiche}). You can audit contractor websites, package verified lead lists, or launch outreach campaigns from the navigation menu.`;
-      }
-
-      const fallbackReply: ChatMessage = {
-        id: 'fallback_' + Date.now(),
-        role: 'model',
-        text: fallbackText,
-        createdAt: new Date().toISOString()
-      };
-      setMessages(prev => [...prev, fallbackReply]);
+      showToast({ title: 'HAL could not respond', message: err?.message || 'Please retry. No generated answer was saved.', type: 'error' });
     } finally {
       setIsLoading(false);
     }
   };
 
   const handleClearHistory = async () => {
-    if (!window.confirm('Clear all conversation memory with HAL?')) return;
+    if (!window.confirm('Permanently delete all HAL chat messages in this workspace? This cannot be undone.')) return;
+    if (!authToken) {
+      showToast({ title: 'Sign in required', message: 'Sign in again before managing chat history.', type: 'error' });
+      return;
+    }
     try {
-      await fetch('/api/intelligence/chat/history', {
+      const response = await fetch('/api/intelligence/chat/history', {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${authToken}` }
       });
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        throw new Error(data.error || `Could not delete chat history (${response.status}).`);
+      }
       setMessages([]);
-      showToast({ title: 'Memory Cleared', message: 'Chat history reset.', type: 'info' });
-    } catch (e) {
+      showToast({ title: 'Chat history deleted', message: 'The server confirmed deletion.', type: 'success' });
+    } catch (e: any) {
       console.error(e);
+      showToast({ title: 'Deletion failed', message: e?.message || 'Chat history was not cleared.', type: 'error' });
     }
   };
 
@@ -295,7 +288,7 @@ What niche or city would you like to inspect first?`;
                   </div>
 
                   <div className="whitespace-pre-wrap font-sans text-xs">
-                    {msg.text}
+                    {renderMessageText(msg.text)}
                   </div>
 
                   {msg.sources && msg.sources.length > 0 && (
