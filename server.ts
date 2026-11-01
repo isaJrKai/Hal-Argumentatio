@@ -5108,7 +5108,7 @@ app.post('/api/ai/test-timesfm', authenticate, async (req, res) => {
     db.addAuditLog({
       contractorId,
       action: 'TIMESFM_BRAIN_SYNCHRONIZED_INFERENCE',
-      details: `TimesFM forward demand synthesis executed with Live Google Ads ingestion, Weather Triggers (${result.weatherTrigger.hazardCategory}), and Automated Budget Guardrails for ${targetNiche} in ${targetCity}.`
+      details: `TimesFM 2.5 demand inference used ${result.googleAdsBaseline.weeklyDemandSeries.length} weekly observations for ${targetNiche} in ${targetCity}. Weather was context only; CAC guardrails ${result.budgetGuardrails.maxAllowableCpl === null ? 'were not evaluated' : 'were evaluated as advisory only'}. No ad budget was changed.`
     });
 
     res.json(result);
