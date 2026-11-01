@@ -99,6 +99,16 @@ app.use(express.json({
   }
 }));
 
+// Keep client-selected AI preference request-scoped. Never mutate process.env
+// from a request: concurrent tenants could otherwise change one another's model.
+app.use((req, res, next) => {
+  const activeAiHeader = req.headers['x-active-ai'];
+  if (activeAiHeader === 'gemini' || activeAiHeader === 'nemotron') {
+    return runWithAIProvider(activeAiHeader, () => next());
+  }
+  next();
+});
+
 // Allow browser origins explicitly; same-origin requests do not require CORS.
 const configuredCorsOrigins = (process.env.CORS_ALLOWED_ORIGINS || process.env.APP_URL || '')
   .split(',')
@@ -297,15 +307,7 @@ app.get(['/sw.js', '/service-worker.js'], (req, res) => {
   `);
 });
 
-// Keep client-selected AI preference request-scoped. Never mutate process.env
-// from a request: concurrent tenants could otherwise change one another's model.
-app.use((req, res, next) => {
-  const activeAiHeader = req.headers['x-active-ai'];
-  if (activeAiHeader === 'gemini' || activeAiHeader === 'nemotron') {
-    return runWithAIProvider(activeAiHeader, () => next());
-  }
-  next();
-});
+
 
 // In-Memory Rate Limiter for Auth Routes
 // 5 failed attempts / 15 min per IP+email
