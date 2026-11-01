@@ -50,18 +50,18 @@
 - Hardened CORS configuration diagnostics: production now warns clearly when no browser origins are configured; malformed entries and non-HTTPS non-local origins are rejected rather than silently accepted. Exact production origin values still must be supplied in deployment environment settings.
 - Added a real Phase 5 system-check action: tenant-scoped database reachability and lead count, cryptographic ledger integrity, AI key-configuration flags, process uptime/memory/runtime version, and an audit-ledger record. The UI explicitly distinguishes configured keys from verified provider connectivity and does not claim the 11-layer brain is synchronized.
 - Corrected the JWT default session lifetime from 30 days to the documented 24 hours and added regression coverage for the default and explicit shorter expirations.
-- These follow-on commits have not yet been verified by a fresh CI run. Do not treat them as release-ready until CI/type-check/build pass.
+- Follow-on implementation verified by GitHub Actions run 266: TypeScript and automated tests passed, production build passed, and production dependency audit passed its release gate. This run covered 30 test files and 162 tests. Two moderate production dependency advisories remain; there are zero high/critical advisories.
 
 ## Verification evidence
 
-GitHub Actions run:
-https://github.com/isaJrKai/Hal-Argumentatio/actions/runs/41251478698
+Latest GitHub Actions run:
+https://github.com/isaJrKai/Hal-Argumentatio/actions/runs/41277553971
 
-Verified in that run:
+Verified in run 266:
 - `npm ci`: passed.
 - Type-check and automated tests: passed.
-- 28 test files passed.
-- 157 tests passed.
+- 30 test files passed.
+- 162 tests passed.
 - Production build: passed.
 - Production dependency audit: passed release gate with 0 high/critical advisories.
 
