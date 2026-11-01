@@ -5038,20 +5038,7 @@ app.post('/api/neural/network/layout', authenticate, async (req, res) => {
   res.json({ success: true, message: 'Layout sync received' });
 });
 
-app.delete('/api/neural/network/prune/:id', authenticate, async (req, res) => {
-  try {
-    const { id } = req.params;
-    const dbInstance = getDrizzleDb();
-    if (!dbInstance) throw new Error('Database not initialized');
-    
-    const insightId = id.replace('insight_', '');
-    await dbInstance.delete(learningInsights).where(eq(learningInsights.id, insightId));
-    
-    res.json({ success: true });
-  } catch (err: any) {
-    res.status(500).json({ error: err.message });
-  }
-});
+// Manual neural-weight pruning is disabled until learned weights are tenant-scoped and independently validated.
 
 app.get('/api/neural/network', authenticate, async (req, res) => {
   try {
