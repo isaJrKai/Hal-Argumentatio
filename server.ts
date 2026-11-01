@@ -39,6 +39,7 @@ import { generateContractorLandingPage, regenerateLandingSection } from './src/s
 import { generateLandingPageHtml } from './src/components/landing/htmlGenerator';
 import { validateCrmTransition, isKnownCrmStage } from './src/lib/crmStateMachine';
 import { buildFinancialSnapshotCore } from './src/lib/financialSnapshot';
+import { buildPasswordResetResponse } from './src/lib/passwordResetResponse';
 import { resolvePublishedLandingPageOwner } from './src/lib/landingPageOwnership';
 import { validateLoopGate } from './src/lib/loopGating';
 import { 
@@ -786,24 +787,11 @@ app.post('/api/auth/forgot-password', async (req, res) => {
         }
       }
 
-      return res.json({
-        success: true,
-        emailDispatched,
-        emailProviderConfigured: Boolean(resendApiKey),
-        resetUrl,
-        debugToken: rawToken,
-        message: emailDispatched
-          ? 'A secure password reset link has been dispatched to your email address. Please check your inbox.'
-          : 'Password reset link generated. Notice: An external email provider (Google Workspace / Gmail API or Resend) is required to deliver directly to inboxes.',
-        apiNotice: 'To enable automatic email delivery directly to client and administrator inboxes, configure your Google Workspace (Gmail API) or Resend API key in System Settings > Connectors.'
-      });
+      return res.json(buildPasswordResetResponse());
     }
 
     // Generic response if account doesn't exist (prevents email enumeration)
-    return res.json({
-      success: true,
-      message: 'If an account exists with this email address, a password reset link has been dispatched.'
-    });
+    return res.json(buildPasswordResetResponse());
   } catch (err: any) {
     return res.status(500).json({ error: 'Failed to process password reset request.' });
   }
