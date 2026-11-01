@@ -249,6 +249,8 @@ export default function OverviewPanel({
           const formatted = data.forecastCurve.map((c: any) => ({
             day: c.week.replace('W+', 'W'),
             demand: c.predictedDemandIndex,
+            demandLower: c.lowerBound,
+            demandUpper: c.upperBound,
             observedCpl: c.observedCplUsd,
             isBreach: c.isBreachingCplLimit,
             weatherSurge: c.weatherSurgeFactor
@@ -595,7 +597,7 @@ export default function OverviewPanel({
                   fontFamily="monospace" 
                   tickLine={false} 
                   axisLine={{ stroke: chartPalette.axisLine }} 
-                  domain={[40, 100]}
+                  domain={[0, 100]}
                   tickFormatter={(val) => `${val}`}
                   width={30}
                 />
@@ -616,6 +618,12 @@ export default function OverviewPanel({
                               Demand Index:
                             </span>
                             <span className="font-semibold" style={{ color: chartPalette.demand }}>{item.demand}/100</span>
+                          </div>
+                        )}
+                        {item.demandLower !== undefined && item.demandUpper !== undefined && (
+                          <div className="flex items-center justify-between text-[10px]">
+                            <span className="text-text-secondary">Model q10–q90 range:</span>
+                            <span className="font-semibold text-text-primary">{item.demandLower}–{item.demandUpper}</span>
                           </div>
                         )}
                         {item.observedCpl !== undefined && (
@@ -658,7 +666,7 @@ export default function OverviewPanel({
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-2.5 border-t border-border-dim/40 text-xs text-text-tertiary min-w-0">
             <div className="flex items-center gap-2 shrink-0">
               <span className="w-2.5 h-1 rounded-xs shrink-0" style={{ backgroundColor: chartPalette.demand }} />
-              <span className="font-medium text-text-secondary whitespace-nowrap">Demand Index (0–100)</span>
+              <span className="font-medium text-text-secondary whitespace-nowrap">Demand Index (relative to recent history; q10–q90 model range)</span>
             </div>
             <div className="min-w-0 flex items-center">
               <span className="text-text-tertiary text-xs truncate" title={forecastMetadata?.weatherTrigger?.strategicDirective || 'Standard seasonal baseline active.'}>
