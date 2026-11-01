@@ -765,3 +765,131 @@ export const TRADE_TEMPLATES: Record<string, LandingPageConfig> = {
     }
   }
 };
+
+
+// Specialist templates inherit the established layout, but replace sample-business
+// claims with owner-supplied fields. No reviews, credentials, prices, response times,
+// addresses, or service-area coverage are pre-populated as facts.
+const createSpecialistTemplate = (
+  key: string,
+  title: string,
+  trade: LandingPageConfig['trade'],
+  headline: string,
+  subheadline: string,
+  services: { title: string; description: string }[]
+): LandingPageConfig => {
+  const config = JSON.parse(JSON.stringify(TRADE_TEMPLATES.plumbing)) as LandingPageConfig;
+  config.id = `template-${key}`;
+  config.title = title;
+  config.trade = trade;
+  config.businessName = 'Your Business Name';
+  config.city = 'Your service area';
+  config.phone = '';
+  config.licenseNumber = 'Add verified licence or certification details, if applicable';
+  config.emergencyService = key === 'emergency-dispatch' || key === 'flood-restoration';
+  config.dispatchWindow = 'Set your actual availability before publishing';
+  config.branding.logoText = 'YOUR BUSINESS';
+  config.sections.announcement_bar.active = false;
+  config.sections.announcement_bar.text = '';
+  config.sections.announcement_bar.urgencyBadge = '';
+  config.sections.header.ctaText = 'Contact the business';
+  config.sections.hero.headline = headline;
+  config.sections.hero.subheadline = subheadline;
+  config.sections.hero.badgeText = 'Add verified credentials or proof before publishing';
+  config.sections.hero.heroImageUrl = undefined;
+  config.sections.lead_form.title = 'Request an assessment';
+  config.sections.lead_form.subtitle = 'Share your contact details and a short description of the work required.';
+  config.sections.lead_form.buttonText = 'Request a call back';
+  config.sections.lead_form.dispatchNote = 'Confirm service availability and any call-out fees directly with the business.';
+  config.sections.trust_bar.active = false;
+  config.sections.trust_bar.badges = [];
+  config.sections.bento_features = {
+    active: false, badge: '', title: '', subtitle: '', items: []
+  };
+  config.sections.pricing_packages = {
+    active: false, badge: '', title: '', subtitle: '', items: []
+  };
+  config.sections.seasonal_alert.active = false;
+  config.sections.services.title = 'Services';
+  config.sections.services.subtitle = 'Confirm the exact scope of work with the contractor.';
+  config.sections.services.items = services.map((service, index) => ({
+    id: `${key}-service-${index + 1}`,
+    title: service.title,
+    description: service.description,
+    icon: 'Wrench'
+  }));
+  config.sections.before_after.active = false;
+  config.sections.before_after.items = [];
+  config.sections.before_after.subtitle = 'Add genuine project photos with customer permission.';
+  config.sections.reviews.active = false;
+  config.sections.reviews.rating = 0;
+  config.sections.reviews.totalReviews = 0;
+  config.sections.reviews.items = [];
+  config.sections.reviews.subtitle = 'Add genuine customer reviews with permission.';
+  config.sections.service_areas.active = false;
+  config.sections.service_areas.cities = [];
+  config.sections.service_areas.subtitle = 'List only locations the business currently serves.';
+  config.sections.guarantee.active = false;
+  config.sections.guarantee.description = 'Add written service terms approved by the business.';
+  config.sections.online_booking.active = false;
+  config.sections.faq.title = 'Before you book';
+  config.sections.faq.items = [
+    { id: `${key}-faq-1`, question: 'What information should I provide?', answer: 'Describe the issue, the property location, and any relevant timing or access requirements.' },
+    { id: `${key}-faq-2`, question: 'How is pricing confirmed?', answer: 'Ask the business for a written estimate and confirmation of any inspection or call-out fees before work begins.' }
+  ];
+  config.sections.sticky_mobile_call.active = false;
+  config.sections.sticky_mobile_call.crewStatus = '';
+  config.sections.sticky_mobile_call.buttonText = 'Contact the business';
+  config.sections.footer.address = 'Add the business address or remove this field before publishing.';
+  config.sections.footer.copyright = '';
+  config.seo.metaTitle = title;
+  config.seo.metaDescription = subheadline;
+  config.seo.schemaType = 'GeneralContractor';
+  return config;
+};
+
+Object.assign(TRADE_TEMPLATES, {
+  sump_pump: createSpecialistTemplate(
+    'sump-pump', 'Sump Pump Installation & Repair', 'sump_pump',
+    'Sump pump installation, repair and maintenance',
+    'Help property owners protect basements and crawl spaces from unwanted groundwater. Add your actual service area, equipment options and availability.',
+    [
+      { title: 'Sump pump installation', description: 'Assess the site, recommend a suitable pump and confirm installation requirements.' },
+      { title: 'Pump repair and replacement', description: 'Inspect pump operation, identify faults and explain repair or replacement options.' },
+      { title: 'Battery backup systems', description: 'Discuss backup options and test arrangements for power interruptions.' },
+      { title: 'Routine inspection', description: 'Check the pit, float switch, discharge line and pump operation.' }
+    ]
+  ),
+  waterproofing: createSpecialistTemplate(
+    'waterproofing', 'Basement & Foundation Waterproofing', 'waterproofing',
+    'Foundation and basement waterproofing',
+    'Explain how your team assesses water entry, identifies likely causes and recommends an appropriate waterproofing approach.',
+    [
+      { title: 'Foundation inspection', description: 'Assess visible moisture entry points, drainage conditions and foundation concerns.' },
+      { title: 'Exterior waterproofing', description: 'Describe excavation, membrane and drainage options offered by the business.' },
+      { title: 'Interior water management', description: 'Explain interior drainage and collection options where suitable.' },
+      { title: 'Crack assessment', description: 'Inspect foundation cracks and explain appropriate repair options.' }
+    ]
+  ),
+  flood_restoration: createSpecialistTemplate(
+    'flood-restoration', 'Flood & Water Damage Restoration', 'flood_restoration',
+    'Water damage cleanup and property restoration',
+    'Describe your response process for water intrusion, drying, cleanup and repair. State your real operating hours and emergency availability before publishing.',
+    [
+      { title: 'Water extraction', description: 'Assess affected areas and explain available water removal services.' },
+      { title: 'Structural drying', description: 'Describe moisture assessment, drying equipment and monitoring procedures.' },
+      { title: 'Damage assessment', description: 'Document visible damage and explain the next steps for the property owner.' },
+      { title: 'Restoration coordination', description: 'Outline the repair and reinstatement work the business can provide.' }
+    ]
+  ),
+  emergency_dispatch: createSpecialistTemplate(
+    'emergency-dispatch', 'Emergency Contractor Dispatch', 'emergency_dispatch',
+    'Request urgent help from a local contractor',
+    'Give customers a clear way to describe the problem, share their location and request a call back. Publish only the trades, hours and response areas you can actually support.',
+    [
+      { title: 'Urgent service intake', description: 'Collect the issue, property location, contact details and urgency.' },
+      { title: 'Service triage', description: 'Confirm the type of contractor required and whether the request is within scope.' },
+      { title: 'Dispatch coordination', description: 'Confirm availability and any expected arrival window directly with the customer.' }
+    ]
+  )
+});
