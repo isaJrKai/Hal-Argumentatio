@@ -1,15 +1,18 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Network, Database, TrendingUp, Shield, RefreshCw, Brain, Focus, Fingerprint, Code2, Scissors, CheckCircle, XCircle, ZoomIn, ZoomOut, Maximize, Activity, Clock } from 'lucide-react';
 import * as d3 from 'd3';
+import { useBusinessContext } from '../context/BusinessContext';
 
 export default function NeuralPanel() {
+  const { activeCity, activeNiche } = useBusinessContext();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   
-  const [activeSubsystem, setActiveSubsystem] = useState('core_bayes');
+  const [activeSubsystem, setActiveSubsystem] = useState('core_leads');
   const [isSyncing, setIsSyncing] = useState(false);
-  const [networkData, setNetworkData] = useState<{ nodes: any[], links: any[], telemetry: any }>({ nodes: [], links: [], telemetry: null });
+  const [networkData, setNetworkData] = useState<{ nodes: any[], links: any[], telemetry: any, events: any[] }>({ nodes: [], links: [], telemetry: null, events: [] });
   const [learningMetrics, setLearningMetrics] = useState<any>(null);
+  const [networkError, setNetworkError] = useState<string | null>(null);
   
   // New features state
   const [isPruningMode, setIsPruningMode] = useState(false);
@@ -34,9 +37,11 @@ export default function NeuralPanel() {
 
   const fetchNetwork = async () => {
     setIsSyncing(true);
+    setNetworkError(null);
     try {
       const authToken = localStorage.getItem('halbiz_auth_token') || localStorage.getItem('token') || '';
-      const res = await fetch('/api/neural/network', {
+      const query = new URLSearchParams({ city: activeCity || '', niche: activeNiche || '' });
+      const res = await fetch('/api/neural/network?' + query.toString(), {
         headers: authToken ? { 'Authorization': `Bearer ${authToken}` } : {}
       });
       if (!res.ok) {
@@ -49,25 +54,36 @@ export default function NeuralPanel() {
       const data = await res.json();
       
       if (data.error) throw new Error(data.error);
+      if (!Array.isArray(data.nodes) || !Array.isArray(data.links) || !data.telemetry) {
+        throw new Error('The server returned an incomplete topology payload.');
+      }
 
       setNetworkData({
-        nodes: data.nodes || [],
-        links: data.links || [],
-        telemetry: data.telemetry || null
+        nodes: data.nodes,
+        links: data.links,
+        telemetry: data.telemetry,
+        events: Array.isArray(data.events) ? data.events : []
       });
       
       setLearningMetrics({
-        autonomyScore: data.telemetry?.autonomyReadinessScore ?? 0,
-        epoch: data.telemetry?.calibrationEpoch ?? 0,
-        outcomesDigested: data.telemetry?.totalOutcomesDigested || 1250,
-        activeWeights: ((data.nodes || []).length || 0) * 14 + 1024,
-        confidenceGlobal: (data.telemetry?.nicheMap?.general?.confidenceScore ?? 0) * 100
+        leadsInScope: Number(data.telemetry.leadsInScope || 0),
+        recordedOutcomes: Number(data.telemetry.recordedOutcomes || 0),
+        campaignNodes: Number(data.telemetry.campaignNodes || 0),
+        timesFmStatus: data.telemetry.timesFmStatus || 'UNKNOWN',
+        learningStatus: data.telemetry.learningStatus || 'Learning status unavailable'
       });
       
       if (data.nodes && data.links) {
         initSimulation(data.nodes, data.links);
       }
-    } catch (e) {
+    } catch (e: any) {
+      setNetworkError(e?.message || 'Neural topology unavailable');
+      setNetworkData({ nodes: [], links: [], telemetry: null, events: [] });
+      setLearningMetrics(null);
+      nodesRef.current = [];
+      linksRef.current = [];
+      if (simulationRef.current) simulationRef.current.stop();
+      drawRef.current();
       console.warn('Network visualization sync paused:', e);
     } finally {
       setIsSyncing(false);
@@ -79,7 +95,7 @@ export default function NeuralPanel() {
     return () => {
       if (simulationRef.current) simulationRef.current.stop();
     };
-  }, []);
+  }, [activeCity, activeNiche]);
 
   // Resize Observer to fix canvas stretch and bounds
   useEffect(() => {
@@ -536,10 +552,10 @@ export default function NeuralPanel() {
   };
 
   const SUBSYSTEMS = [
-    { id: 'core_bayes', label: 'Bayesian Base', icon: Network, color: 'text-amber-500', bg: 'bg-amber-500/10' },
-    { id: 'core_objection', label: 'Objection Graph', icon: Shield, color: 'text-amber-500', bg: 'bg-amber-500/10' },
-    { id: 'core_niche', label: 'Niche Calibration', icon: Database, color: 'text-amber-500', bg: 'bg-amber-500/10' },
-    { id: 'core_timesfm', label: 'TimesFM Prediction Layer', icon: TrendingUp, color: 'text-amber-500', bg: 'bg-amber-500/10' }
+    { id: 'core_leads', label: 'Lead Pipeline', icon: Network, color: 'text-amber-500', bg: 'bg-amber-500/10' },
+    { id: 'core_outcomes', label: 'Recorded Outcomes', icon: Shield, color: 'text-amber-500', bg: 'bg-amber-500/10' },
+    { id: 'core_ads', label: 'Google Ads Observations', icon: Database, color: 'text-amber-500', bg: 'bg-amber-500/10' },
+    { id: 'core_timesfm', label: 'TimesFM Adapter', icon: TrendingUp, color: 'text-amber-500', bg: 'bg-amber-500/10' }
   ];
 
   return (
@@ -551,12 +567,12 @@ export default function NeuralPanel() {
           </div>
           <div>
             <h1 className="text-xl font-bold text-text-primary tracking-tight flex items-center gap-2">
-              Neural Data Center
-              <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-green-500/10 text-green-400 border border-green-500/20 uppercase">
-                Active / Online
+              Operational Intelligence Graph
+              <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold border uppercase ${networkError ? 'bg-red-500/10 text-red-400 border-red-500/20' : networkData.telemetry ? 'bg-green-500/10 text-green-400 border-green-500/20' : 'bg-amber-500/10 text-amber-400 border-amber-500/20'}`}>
+                {networkError ? 'Unavailable' : networkData.telemetry ? 'Live tenant data' : 'Loading'}
               </span>
             </h1>
-            <p className="text-sm text-text-secondary mt-1">Deep Learning Core & Autonomous Policy Visualizer</p>
+            <p className="text-sm text-text-secondary mt-1">Tenant-scoped leads, recorded outcomes and campaign data · {activeCity || 'All cities'} / {activeNiche || 'All niches'}</p>
           </div>
         </div>
         <div className="flex items-center gap-3">
@@ -584,7 +600,7 @@ export default function NeuralPanel() {
             <div className="space-y-2">
               {SUBSYSTEMS.map(sys => {
                 const nodeCount = (networkData.nodes || []).filter(n => 
-                  n.id === sys.id || (networkData.links || []).some(l => (l.source.id === sys.id && l.target.id === n.id) || (l.target.id === sys.id && l.source.id === n.id))
+                  n.id === sys.id || (networkData.links || []).some(l => ((l.source?.id || l.source) === sys.id && (l.target?.id || l.target) === n.id) || ((l.target?.id || l.target) === sys.id && (l.source?.id || l.source) === n.id))
                 ).length;
                 return (
                   <button key={sys.id} onClick={() => setActiveSubsystem(sys.id)} className={`w-full flex items-center gap-3 p-3 rounded-lg border transition-all text-left ${activeSubsystem === sys.id ? 'bg-bg-raised border-border-dim shadow-sm' : 'border-transparent hover:bg-bg-base text-text-secondary'}`}>
@@ -596,12 +612,12 @@ export default function NeuralPanel() {
             </div>
           </div>
           <div className="p-4 space-y-4">
-            <h3 className="text-xs font-mono font-bold text-text-tertiary uppercase tracking-wider">Matrix Live Telemetry</h3>
+            <h3 className="text-xs font-mono font-bold text-text-tertiary uppercase tracking-wider">Measured Scope Telemetry</h3>
             <div className="bg-bg-base border border-border-dim rounded-lg p-4 space-y-3">
-              <div className="flex justify-between items-center"><span className="text-[10px] font-mono text-text-secondary">Epoch</span><span className="text-xs font-mono font-bold text-text-primary">{learningMetrics?.epoch || '---'}</span></div>
-              <div className="flex justify-between items-center"><span className="text-[10px] font-mono text-text-secondary">Digested Outcomes</span><span className="text-xs font-mono font-bold text-accent">{learningMetrics?.outcomesDigested || '---'}</span></div>
-              <div className="flex justify-between items-center"><span className="text-[10px] font-mono text-text-secondary">Global Confidence</span><span className="text-xs font-mono font-bold text-green-400">{Number(learningMetrics?.confidenceGlobal || 0).toFixed(1)}%</span></div>
-              <div className="flex justify-between items-center"><span className="text-[10px] font-mono text-text-secondary">Total Active Nodes</span><span className="text-xs font-mono font-bold text-text-primary">{(networkData.nodes || []).length}</span></div>
+              <div className="flex justify-between items-center"><span className="text-[10px] font-mono text-text-secondary">Leads in scope</span><span className="text-xs font-mono font-bold text-text-primary">{learningMetrics?.leadsInScope ?? '—'}</span></div>
+              <div className="flex justify-between items-center"><span className="text-[10px] font-mono text-text-secondary">Recorded outcomes</span><span className="text-xs font-mono font-bold text-accent">{learningMetrics?.recordedOutcomes ?? '—'}</span></div>
+              <div className="flex justify-between items-center"><span className="text-[10px] font-mono text-text-secondary">Campaign nodes</span><span className="text-xs font-mono font-bold text-text-primary">{learningMetrics?.campaignNodes ?? '—'}</span></div>
+              <div className="flex justify-between items-center"><span className="text-[10px] font-mono text-text-secondary">TimesFM</span><span className="text-xs font-mono font-bold text-amber-400">{learningMetrics?.timesFmStatus || '—'}</span></div>
             </div>
           </div>
         </div>
@@ -647,12 +663,7 @@ export default function NeuralPanel() {
             <div className="flex-1 max-w-xl bg-bg-overlay border border-border-dim rounded-lg p-3 shadow-sm hover:bg-bg-base transition-colors h-full flex flex-col justify-center">
               <h4 className="text-[10px] font-mono font-bold text-text-secondary uppercase mb-2 flex items-center gap-1.5"><Code2 className="w-3.5 h-3.5 text-text-tertiary" /> Matrix Event Log</h4>
               <div className="font-mono text-[9px] text-accent/90 space-y-1 h-10 overflow-hidden leading-relaxed">
-                {(networkData.nodes || [])
-                  .filter(n => n.type === 'insight' || n.type === 'decaying')
-                  .slice(0, 2)
-                  .map((node, i) => (
-                  <p key={i} className="truncate">{">"} {node.type === 'decaying' ? '[BROKEN]' : '[FORMED]'} {node.detail}</p>
-                ))}
+                {networkError ? <p className="truncate text-red-400">{networkError}</p> : networkData.events.length ? networkData.events.slice(0, 2).map((event: any) => <p key={event.id} className="truncate">{">"} {event.label}</p>) : <p className="truncate text-text-tertiary">No recorded activity in this territory and niche yet.</p>}
               </div>
             </div>
 
@@ -660,9 +671,9 @@ export default function NeuralPanel() {
             <div className="flex-1 max-w-md bg-bg-overlay border border-border-dim p-3 rounded-lg shadow-sm hover:bg-bg-base transition-colors h-full flex flex-col justify-center">
                <div className="flex items-center justify-between mb-3">
                  <h4 className="text-[10px] font-mono font-bold text-text-secondary uppercase flex items-center gap-1.5">
-                   <Clock className="w-3.5 h-3.5 text-text-tertiary" /> Historical State
+                   <Clock className="w-3.5 h-3.5 text-text-tertiary" /> Topology Visibility
                  </h4>
-                 <span className="text-[10px] font-mono text-accent font-bold">{timelineScrub}% Visible</span>
+                 <span className="text-[10px] font-mono text-accent font-bold">{timelineScrub}% of nodes</span>
                </div>
                <input 
                   type="range" 
