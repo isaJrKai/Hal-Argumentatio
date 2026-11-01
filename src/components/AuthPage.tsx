@@ -31,7 +31,11 @@ export default function AuthPage({ onAuthSuccess }: AuthPageProps) {
   
   const [email, setEmail] = useState(() => {
     if (typeof window === 'undefined') return '';
-    return localStorage.getItem('halbiz_last_email') || '';
+    try {
+      return localStorage.getItem('halbiz_last_email') || '';
+    } catch {
+      return '';
+    }
   });
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
@@ -49,7 +53,9 @@ export default function AuthPage({ onAuthSuccess }: AuthPageProps) {
     setSuccess(null);
 
     const url = isLogin ? '/api/auth/login' : '/api/auth/register';
-    const payload = isLogin ? { email, password } : { email, password, name };
+    const normalizedEmail = email.trim().toLowerCase();
+    const normalizedName = name.trim();
+    const payload = isLogin ? { email: normalizedEmail, password } : { email: normalizedEmail, password, name: normalizedName };
 
     try {
       const res = await fetch(url, {
@@ -64,10 +70,17 @@ export default function AuthPage({ onAuthSuccess }: AuthPageProps) {
         throw new Error(data.error || 'Authentication failed');
       }
 
-      localStorage.setItem('halbiz_last_email', email);
+      if (typeof data.token !== 'string' || !data.token || !data.contractor || typeof data.contractor !== 'object' || typeof data.contractor.id !== 'string') {
+        throw new Error('The server did not return a valid authenticated session. Please try again.');
+      }
+      try {
+        localStorage.setItem('halbiz_last_email', normalizedEmail);
+      } catch {
+        // Email convenience storage is optional; it must not block a successful sign-in.
+      }
       onAuthSuccess(data.token, data.contractor);
     } catch (err: any) {
-      setError(err.message || 'An error occurred. Please try again.');
+      setError(err instanceof Error ? err.message : 'An error occurred. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -83,7 +96,7 @@ export default function AuthPage({ onAuthSuccess }: AuthPageProps) {
       const res = await fetch('/api/auth/forgot-password', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email })
+        body: JSON.stringify({ email: email.trim().toLowerCase() })
       });
 
       const data = await parseApiResponse(res);
@@ -94,7 +107,7 @@ export default function AuthPage({ onAuthSuccess }: AuthPageProps) {
 
       setSuccess(data.message || 'If the account exists, password-reset instructions will be provided.');
     } catch (err: any) {
-      setError(err.message);
+      setError(err instanceof Error ? err.message : 'Password reset request could not be completed.');
     } finally {
       setLoading(false);
     }
@@ -183,6 +196,7 @@ export default function AuthPage({ onAuthSuccess }: AuthPageProps) {
             <div className="text-center mt-4">
               <button
                 type="button"
+                disabled={loading}
                 onClick={() => {
                   setShowForgotPassword(false);
                   setError(null);
@@ -234,6 +248,7 @@ export default function AuthPage({ onAuthSuccess }: AuthPageProps) {
                 {isLogin && (
                   <button
                     type="button"
+                    disabled={loading}
                     onClick={() => {
                       setShowForgotPassword(true);
                       setError(null);
@@ -281,6 +296,7 @@ export default function AuthPage({ onAuthSuccess }: AuthPageProps) {
             <div className="text-center mt-6">
               <button
                 type="button"
+                disabled={loading}
                 onClick={() => {
                   setIsLogin(!isLogin);
                   setError(null);
