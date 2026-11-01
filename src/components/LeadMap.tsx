@@ -299,10 +299,10 @@ function MarkerWithInfoWindow({
               
               <div className="flex gap-2 mt-2 border-t pt-2">
                 <div className="bg-gray-100 px-1.5 py-0.5 rounded text-[10px]">
-                  <span>Speed:</span> <span className="font-bold text-amber-600">{lead.performanceScore ?? 'Not measured'}/100</span>
+                  <span>Speed:</span> <span className="font-bold text-amber-600">{typeof lead.performanceScore === 'number' && Number.isFinite(lead.performanceScore) ? `${lead.performanceScore}/100` : 'Not measured'}</span>
                 </div>
                 <div className="bg-gray-100 px-1.5 py-0.5 rounded text-[10px]">
-                  <span>SEO:</span> <span className="font-bold text-gray-800">{lead.seoScore ?? 'Not measured'}/100</span>
+                  <span>SEO:</span> <span className="font-bold text-gray-800">{typeof lead.seoScore === 'number' && Number.isFinite(lead.seoScore) ? `${lead.seoScore}/100` : 'Not measured'}</span>
                 </div>
               </div>
 
@@ -831,10 +831,10 @@ function OpenStreetMapContainer({
 
           <div style="display: flex; gap: 6px; margin-top: 6px; padding-top: 6px; border-top: 1px solid #374151;">
             <div style="background: #1f2937; padding: 3px 6px; border-radius: 3px; font-size: 9px; font-family: monospace;">
-              SEO: <b style="color:#10b981;">${lead.seoScore ?? 'Not measured'}/100</b>
+              SEO: <b style="color:#10b981;">${typeof lead.seoScore === 'number' && Number.isFinite(lead.seoScore) ? lead.seoScore + '/100' : 'Not measured'}</b>
             </div>
             <div style="background: #1f2937; padding: 3px 6px; border-radius: 3px; font-size: 9px; font-family: monospace;">
-              SPEED: <b style="color:#f59e0b;">${lead.performanceScore ?? 'Not measured'}/100</b>
+              SPEED: <b style="color:#f59e0b;">${typeof lead.performanceScore === 'number' && Number.isFinite(lead.performanceScore) ? lead.performanceScore + '/100' : 'Not measured'}</b>
             </div>
           </div>
 
