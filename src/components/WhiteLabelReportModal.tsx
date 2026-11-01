@@ -301,7 +301,7 @@ export default function WhiteLabelReportModal({ lead, isOpen, onClose }: WhiteLa
               </div>
 
               <div className="p-3 bg-bg-subtle border border-border-dim rounded-sm flex items-start gap-2.5">
-                <CheckCircle2 className="w-4 h-4 text-brand shrink-0 mt-0.5" />
+                <Circle className="w-4 h-4 text-text-tertiary shrink-0 mt-0.5" />
                 <div>
                   <span className="font-bold text-text-primary block">{activeIndustry.auditFocus.key2}</span>
                   <span className="text-[10px] text-text-secondary">Credential badging and trust verification signals.</span>
@@ -309,7 +309,7 @@ export default function WhiteLabelReportModal({ lead, isOpen, onClose }: WhiteLa
               </div>
 
               <div className="p-3 bg-bg-subtle border border-border-dim rounded-sm flex items-start gap-2.5">
-                <CheckCircle2 className="w-4 h-4 text-brand shrink-0 mt-0.5" />
+                <Circle className="w-4 h-4 text-text-tertiary shrink-0 mt-0.5" />
                 <div>
                   <span className="font-bold text-text-primary block">{activeIndustry.auditFocus.key3}</span>
                   <span className="text-[10px] text-text-secondary">Instant estimation & booking friction reduction.</span>
@@ -317,7 +317,7 @@ export default function WhiteLabelReportModal({ lead, isOpen, onClose }: WhiteLa
               </div>
 
               <div className="p-3 bg-bg-subtle border border-border-dim rounded-sm flex items-start gap-2.5">
-                <CheckCircle2 className="w-4 h-4 text-brand shrink-0 mt-0.5" />
+                <Circle className="w-4 h-4 text-text-tertiary shrink-0 mt-0.5" />
                 <div>
                   <span className="font-bold text-text-primary block">{activeIndustry.auditFocus.key4}</span>
                   <span className="text-[10px] text-text-secondary">Local territory search dominance & reputation management.</span>
