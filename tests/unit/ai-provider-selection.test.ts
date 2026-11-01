@@ -51,4 +51,19 @@ describe('AI provider selection', () => {
 
     expect(getActiveAI()).toBe('gemini');
   });
+  it('keeps provider selection isolated to the current request', async () => {
+    process.env.HAL_ACTIVE_AI = 'nemotron';
+    process.env.GEMINI_API_KEY = 'test-gemini-key';
+    process.env.NVIDIA_API_KEY = 'test-nvidia-key';
+
+    const requestSelection = await runWithAIProvider('gemini', async () => {
+      await Promise.resolve();
+      return { selected: getActiveAI(), context: getRequestAIProvider() };
+    });
+
+    expect(requestSelection).toEqual({ selected: 'gemini', context: 'gemini' });
+    expect(getRequestAIProvider()).toBeNull();
+    expect(getActiveAI()).toBe('nemotron');
+  });
+
 });
