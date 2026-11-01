@@ -100,6 +100,16 @@ export async function ingestAndCalibrateGoogleAds(
       .where(eq(googleAdsDailyPerformance.contractorId, contractorId))
       .orderBy(desc(googleAdsDailyPerformance.date));
 
+    // A city/niche change must change the evidence set, not merely the chart label.
+    const cityKey = _targetCity.trim().toLowerCase();
+    const nicheKey = _targetNiche.trim().toLowerCase();
+    if (cityKey) {
+      records = records.filter(record => String(record.geo || '').trim().toLowerCase().includes(cityKey));
+    }
+    if (nicheKey) {
+      records = records.filter(record => String(record.campaignName || '').trim().toLowerCase().includes(nicheKey));
+    }
+
     // A forecast requires actual tenant-owned records and at least one recorded conversion.
     if (records.length === 0 || records.reduce((sum, record) => sum + Number(record.conversions || 0), 0) <= 0) {
       return {
