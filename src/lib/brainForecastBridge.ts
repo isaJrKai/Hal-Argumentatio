@@ -41,8 +41,8 @@ export interface WeatherTriggerSignal {
 }
 
 export interface GuardrailEvaluationResult {
-  targetCac: number;
-  maxAllowableCpl: number;
+  targetCac: number | null;
+  maxAllowableCpl: number | null;
   breachDetected: boolean;
   breachWeeks: string[];
   highestObservedCpl: number;
@@ -390,8 +390,8 @@ export async function executeBrainSynchronizedForecast(
   const horizonWeeks = options.horizonWeeks || 12;
   const applyGuardrails = options.applyGuardrails ?? false;
 
-  // A forecast is only defensible when both the tenant's own target CAC and
-  // sufficient tenant-scoped historical observations are available.
+  // Demand forecasting needs observed history. A configured target CAC is only
+  // required when the operator explicitly requests budget guardrail evaluation.
   let targetCac: number | null = null;
   if (options.targetCac && Number.isFinite(options.targetCac) && options.targetCac > 0) {
     targetCac = Number(options.targetCac);
@@ -412,8 +412,8 @@ export async function executeBrainSynchronizedForecast(
       // Fail closed below. A database read failure is not a valid benchmark.
     }
   }
-  if (!targetCac) {
-    throw new Error('Forecast unavailable: configure a valid contractor target CAC before running guardrails.');
+  if (!targetCac && applyGuardrails) {
+    throw new Error('Forecast unavailable: configure a valid target CAC before running budget guardrails.');
   }
 
   const adsBaseline = await ingestAndCalibrateGoogleAds(contractorId, niche, city);
@@ -453,13 +453,22 @@ export async function executeBrainSynchronizedForecast(
     };
   });
 
-  // Step 4: Evaluate & Enforce Budget Guardrails (Layer 2: Goals & Layer 10: Execution)
-  const guardrails = await evaluateAndEnforceBudgetGuardrails(
-    contractorId,
-    forecastCurve,
-    targetCac,
-    applyGuardrails
-  );
+  // Step 4: Evaluate guardrails only when a real target CAC has been configured.
+  const observedCpl = forecastCurve.length
+    ? Math.max(...forecastCurve.map(point => point.observedCplUsd))
+    : 0;
+  const guardrails: GuardrailEvaluationResult = targetCac
+    ? await evaluateAndEnforceBudgetGuardrails(contractorId, forecastCurve, targetCac, applyGuardrails)
+    : {
+        targetCac: null,
+        maxAllowableCpl: null,
+        breachDetected: false,
+        breachWeeks: [],
+        highestObservedCpl: observedCpl,
+        suggestedAction: 'MAINTAIN',
+        budgetMultiplierRecommended: 1,
+        actionsExecuted: []
+      };
 
   // Identify peak demand week
   let peakWeek = 'W+1';
@@ -479,9 +488,11 @@ export async function executeBrainSynchronizedForecast(
       layer5Knowledge: `TimesFM input: ${adsBaseline.weeklyDemandSeries.length} observed weekly conversion totals from ${adsBaseline.recordsCount} tenant-scoped Google Ads records. Trailing observed CPL: ${adsBaseline.empiricalCpl}.`,
       layer6WorldModel: `${weatherTrigger.conditionTitle}. Weather is contextual only; no demand multiplier is applied.`,
       layer8Skills: `Executed Google TimesFM ${modelResult.version} inference for a ${horizonWeeks}-week horizon. Demand bands use the model's q10/q50/q90 output. CPL remains the trailing observed baseline, not a model forecast.`,
-      layer10Execution: guardrails.breachDetected
-        ? `A budget guardrail recommendation is indicated: ${guardrails.suggestedAction}. It is based on trailing observed CPL; no ad budget was changed.`
-        : 'No trailing-CPL guardrail breach was found. This is not a profitability certification.',
+      layer10Execution: !targetCac
+        ? 'Budget guardrails were skipped because no target CAC is configured. No ad budget was changed.'
+        : guardrails.breachDetected
+          ? `A budget guardrail recommendation is indicated: ${guardrails.suggestedAction}. It is based on trailing observed CPL; no ad budget was changed.`
+          : 'No trailing-CPL guardrail breach was found. This is not a profitability certification.',
       layer11Learning: `Model input is grounded in ${adsBaseline.weeklyDemandSeries.length} weekly observations. No new learning or model fine-tuning is claimed by this inference.`
     },
     targetCity: city,
