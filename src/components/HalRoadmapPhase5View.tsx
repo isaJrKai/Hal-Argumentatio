@@ -89,7 +89,12 @@ export const HalRoadmapPhase5View: React.FC = () => {
       if (res.ok) {
         if (data.block) setAuditBlock(data.block);
         if (Array.isArray(data.brainLayers)) setBrainLayers(data.brainLayers);
-        setActionNotice('Diagnostic response received.');
+        const diagnostic = data.diagnostics;
+        if (diagnostic) {
+          setActionNotice(`System checks complete: database reachable; ledger ${diagnostic.ledger?.status || 'unknown'}; Gemini key ${diagnostic.providers?.geminiKeyConfigured ? 'configured' : 'not configured'}; NVIDIA key ${diagnostic.providers?.nemotronKeyConfigured ? 'configured' : 'not configured'}. Provider connectivity and 11-layer synchronization remain unverified.`);
+        } else {
+          setActionNotice('Diagnostic response received, but no diagnostic details were returned.');
+        }
       } else {
         setActionNotice(data.error || 'Runtime brain health instrumentation is unavailable.');
       }
@@ -171,19 +176,19 @@ export const HalRoadmapPhase5View: React.FC = () => {
               Global Enterprise Deployment & Unified Business Brain
             </h2>
             <p className="text-xs text-text-secondary max-w-3xl leading-relaxed">
-              Designed for future multi-organization support, edge integrations, and cross-industry knowledge transfer. Tenant isolation, edge connectivity, and knowledge-transfer behavior have not been verified in this deployment.
+              Run tenant-scoped database and ledger checks, inspect configured AI provider keys, and view runtime metrics. This does not claim 11-layer synchronization, edge federation, or provider connectivity.
             </p>
           </div>
 
           <div className="flex items-center gap-2.5 shrink-0">
             <button
               onClick={handleSyncBrain}
-              disabled
-              title="Not connected: layer-level runtime health instrumentation is not configured."
-              className="px-3.5 py-2 rounded-lg bg-bg-overlay text-text-tertiary border border-border-dim transition-all text-xs font-semibold flex items-center gap-2 cursor-not-allowed opacity-60"
+              disabled={isSyncingBrain}
+              title="Runs real tenant database, ledger, provider-configuration and runtime checks."
+              className="px-3.5 py-2 rounded-lg bg-accent text-white hover:bg-accent/90 transition-all text-xs font-semibold flex items-center gap-2 disabled:opacity-50"
             >
               <Cpu className={`w-3.5 h-3.5 ${isSyncingBrain ? 'animate-spin' : ''}`} />
-              <span>Not connected</span>
+              <span>{isSyncingBrain ? 'Checking…' : 'Run system checks'}</span>
             </button>
             <button
               onClick={handleFederateRegions}
