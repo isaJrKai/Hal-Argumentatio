@@ -71,10 +71,12 @@ export async function generateContractorLandingPage(params: ContractorGeneratorP
 
   if (!apiKey) {
     // Graceful fallback if API key is not configured in environment
-    const safeConfig = applyVerifiedBusinessDetails(baseTemplate, { businessName, city, phone, address, trade, prompt });
+    const safeConfig = applyVerifiedBusinessDetails(baseTemplate, { businessName, city, phone, address, trade, prompt }, false);
     const html = generateLandingPageHtml(safeConfig);
     return { config: safeConfig, html };
   }
+
+  let generatedCopyApplied = false;
 
   try {
     const ai = new GoogleGenAI({ apiKey });
@@ -150,7 +152,11 @@ Return ONLY a JSON object matching this schema:
 
     const parsed = safeExtractJson(responseText);
 
-    if (parsed) {
+    if (parsed && typeof parsed === 'object') {
+      generatedCopyApplied = Boolean(
+        typeof parsed.headline === 'string' && parsed.headline.trim() &&
+        typeof parsed.subheadline === 'string' && parsed.subheadline.trim()
+      );
       if (parsed.headline) baseTemplate.sections.hero.headline = parsed.headline;
       if (parsed.subheadline) baseTemplate.sections.hero.subheadline = parsed.subheadline;
       if (parsed.badgeText) baseTemplate.sections.hero.badgeText = parsed.badgeText;
@@ -198,7 +204,7 @@ Return ONLY a JSON object matching this schema:
 
   // Mandatory Quality Gate: Pass all generated copy through the Anti-Slop Humanizer
   const { cleanedConfig } = applyHumanizerPass(baseTemplate);
-  const safeConfig = applyVerifiedBusinessDetails(cleanedConfig, { businessName, city, phone, address, trade, prompt });
+  const safeConfig = applyVerifiedBusinessDetails(cleanedConfig, { businessName, city, phone, address, trade, prompt }, generatedCopyApplied);
 
   const html = generateLandingPageHtml(safeConfig);
   return { config: safeConfig, html };
@@ -206,22 +212,18 @@ Return ONLY a JSON object matching this schema:
 
 function applyVerifiedBusinessDetails(
   config: LandingPageConfig,
-  details: { businessName?: string; city?: string; phone?: string; address?: string; trade: TradeType; prompt: string }
+  details: { businessName?: string; city?: string; phone?: string; address?: string; trade: TradeType; prompt: string },
+  preserveGeneratedCopy = false
 ): LandingPageConfig {
   const businessName = details.businessName?.trim() || 'Business Name';
   const city = details.city?.trim() || 'Service Area';
   const phone = details.phone?.trim() || '';
   const address = details.address?.trim() || '';
-  const tradeLabel = details.trade.replace(/_/g, ' ').replace(/\b\w/g, letter => letter.toUpperCase());
-  const promptText = details.prompt.toLowerCase();
-  const serviceFocus = /\bsump\s*pumps?\b/.test(promptText)
-    ? 'Sump Pump'
-    : /\bwaterproofing\b/.test(promptText)
-      ? 'Waterproofing'
-      : /\bflood(?:ing)?\s*(?:damage|restoration|cleanup)?\b/.test(promptText)
-        ? 'Flood Restoration'
-        : tradeLabel;
+  const tradeLabel = details.trade.replace(/_/g, ' ').replace(/\\b\\w/g, letter => letter.toUpperCase());
+  const promptText = details.prompt.trim();
 
+  // Verified identity fields always win. Marketing copy is preserved only when it
+  // came from a successfully parsed AI response; static demo-template claims never do.
   config.businessName = businessName;
   config.city = city;
   config.phone = phone;
@@ -229,47 +231,90 @@ function applyVerifiedBusinessDetails(
   config.emergencyService = false;
   config.dispatchWindow = '';
   config.branding.logoText = businessName;
-  config.title = `${businessName} — ${serviceFocus} Services in ${city}`;
+  config.title = preserveGeneratedCopy && config.title?.trim()
+    ? config.title
+    : `${businessName} — ${tradeLabel} Services in ${city}`;
 
   config.sections.announcement_bar.active = false;
-  config.sections.header.ctaText = phone ? `Call ${phone}` : 'Contact Us';
-  config.sections.hero.badgeText = `${serviceFocus} in ${city}`;
-  config.sections.hero.headline = `${serviceFocus} Services in ${city}`;
-  config.sections.hero.subheadline = `${businessName} provides ${serviceFocus.toLowerCase()} services in ${city}. Contact the business to discuss your requirements and confirm availability.`;
-  config.sections.lead_form.title = `Contact ${businessName}`;
-  config.sections.lead_form.subtitle = 'Share your contact details and a brief description of the work you need.';
-  config.sections.lead_form.buttonText = 'Send Service Request';
+  config.sections.header.active = true;
+  config.sections.header.ctaText = phone ? `Call ${phone}` : 'Request a quote';
+
+  config.sections.hero.active = true;
+  if (!preserveGeneratedCopy || !config.sections.hero.headline?.trim()) {
+    config.sections.hero.headline = `${tradeLabel} Services in ${city}`;
+  }
+  if (!preserveGeneratedCopy || !config.sections.hero.subheadline?.trim()) {
+    config.sections.hero.subheadline = promptText
+      ? `${businessName} provides ${tradeLabel.toLowerCase()} services in ${city}. ${promptText}`
+      : `${businessName} provides ${tradeLabel.toLowerCase()} services in ${city}. Contact the business to discuss your project.`;
+  }
+  if (!preserveGeneratedCopy) {
+    config.sections.hero.badgeText = `${tradeLabel} in ${city}`;
+  }
+
+  config.sections.lead_form.active = true;
+  config.sections.lead_form.title = `Request a quote from ${businessName}`;
+  config.sections.lead_form.subtitle = 'Share your contact details and a short description of the work you need.';
+  config.sections.lead_form.buttonText = 'Request a quote';
   config.sections.lead_form.dispatchNote = 'The business will contact you to discuss your request.';
+
+  // The AI may describe services from the supplied contractor brief. If it did not
+  // return usable copy, do not publish sample-template services as if this business
+  // had confirmed those offerings.
+  const generatedServices = Array.isArray(config.sections.services.items)
+    ? config.sections.services.items.filter(item =>
+        typeof item?.title === 'string' && item.title.trim() &&
+        typeof item?.description === 'string' && item.description.trim()
+      )
+    : [];
+  config.sections.services.active = true;
+  config.sections.services.title = 'Services';
+  config.sections.services.subtitle = 'Contact the business to confirm scope, availability and pricing.';
+  config.sections.services.items = preserveGeneratedCopy && generatedServices.length > 0
+    ? generatedServices.slice(0, 6)
+    : [{
+        id: 'service-enquiry',
+        title: `${tradeLabel} Enquiries`,
+        description: 'Contact the business to discuss the work you need and confirm the services available.'
+      }];
+
+  // Never publish sample-business proof, prices, guarantees, coverage, booking promises,
+  // testimonials or project claims as facts about the prospect being demonstrated.
   config.sections.trust_bar.active = false;
-  config.sections.bento_features = config.sections.bento_features
-    ? { ...config.sections.bento_features, active: false }
-    : undefined;
+  config.sections.trust_bar.badges = [];
+  if (config.sections.bento_features) {
+    config.sections.bento_features.active = false;
+    config.sections.bento_features.items = [];
+  }
+  if (config.sections.pricing_packages) {
+    config.sections.pricing_packages.active = false;
+    config.sections.pricing_packages.items = [];
+  }
   config.sections.seasonal_alert.active = false;
   config.sections.before_after.active = false;
+  config.sections.before_after.items = [];
   config.sections.reviews.active = false;
+  config.sections.reviews.items = [];
+  config.sections.reviews.rating = 0;
+  config.sections.reviews.totalReviews = 0;
   config.sections.service_areas.active = false;
+  config.sections.service_areas.cities = [];
   config.sections.guarantee.active = false;
   config.sections.online_booking.active = false;
   config.sections.faq.active = false;
-  if (config.sections.pricing_packages) config.sections.pricing_packages.active = false;
 
-  config.sections.services.active = true;
-  config.sections.services.title = 'Services';
-  config.sections.services.subtitle = 'Contact the business to discuss the work you need.';
-  config.sections.services.items = [{
-    id: 'service-enquiry',
-    title: `${serviceFocus} Service Enquiries`,
-    description: 'Contact the business to discuss scope, availability, and pricing.',
-  }];
-
-  config.sections.footer.address = address || 'Business address not provided — add the verified address before publishing.';
+  config.sections.footer.address = address;
   config.sections.footer.copyright = `© ${new Date().getFullYear()} ${businessName}.`;
   config.sections.sticky_mobile_call.active = Boolean(phone);
   config.sections.sticky_mobile_call.crewStatus = `Contact ${businessName}`;
-  config.sections.sticky_mobile_call.buttonText = phone ? `Call ${phone}` : 'Contact Us';
+  config.sections.sticky_mobile_call.buttonText = phone ? `Call ${phone}` : 'Request a quote';
 
-  config.seo.metaTitle = `${businessName} | ${serviceFocus} in ${city}`;
-  config.seo.metaDescription = `Contact ${businessName} in ${city} about ${serviceFocus.toLowerCase()} services.`;
+  if (!preserveGeneratedCopy || !config.seo.metaTitle?.trim()) {
+    config.seo.metaTitle = `${businessName} | ${tradeLabel} in ${city}`;
+  }
+  if (!preserveGeneratedCopy || !config.seo.metaDescription?.trim()) {
+    config.seo.metaDescription = `Contact ${businessName} in ${city} about ${tradeLabel.toLowerCase()} services.`;
+  }
   config.seo.schemaType = 'LocalBusiness';
 
   return config;
