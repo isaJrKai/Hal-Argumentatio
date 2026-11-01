@@ -1,5 +1,4 @@
 import { GoogleGenAI } from "@google/genai";
-import { getRequestAIProvider } from "../lib/aiRequestContext";
 
 let aiClient: GoogleGenAI | null = null;
 
@@ -127,7 +126,7 @@ export function getActiveAI(preferred?: string): AIModelType {
   const geminiConfigured = Boolean(process.env.GEMINI_API_KEY);
   const nemotronConfigured = Boolean(process.env.NVIDIA_API_KEY);
 
-  let requested = preferred || getRequestAIProvider() || undefined;
+  let requested = preferred;
   if (!requested && process.env.HAL_ACTIVE_AI) {
     requested = process.env.HAL_ACTIVE_AI;
   }
