@@ -280,7 +280,7 @@ export async function fetchTerritoryWeatherTrigger(
 
 /**
  * 3. Budget Guardrail Recommendations (Layer 2: Goals & Layer 10: Execution)
- * Evaluates a heuristic scenario against a configured target CAC. It does not change ad budgets.
+ * Compares the trailing observed CPL with a configured target CAC. It does not change ad budgets.
  */
 export async function evaluateAndEnforceBudgetGuardrails(
   contractorId: string,
@@ -337,17 +337,15 @@ export async function evaluateAndEnforceBudgetGuardrails(
           impactScore: 0,
           confidenceScore: 94.0,
           expectedImpact: `Preserves CAC below target of $${targetCac}`,
-          status: 'executed',
-          executedAt: new Date(),
-          executedBy: 'HAL Brain Autonomous Guardrail'
+          status: 'pending'
         });
 
         // Insert system notification
         await pgDb.insert(notifications).values({
           id: crypto.randomUUID(),
           contractorId,
-          title: '🛡️ Automated Budget Guardrail Activated',
-          message: `TimesFM forecast indicated CPL will reach $${highestProjectedCpl} in ${breachWeeks.join(', ')}, exceeding your $${maxAllowableCpl} limit. HAL auto-throttled campaign pacing to protect margins.`,
+          title: 'Budget guardrail recommendation needs review',
+          message: `Trailing observed CPL is ${highestProjectedCpl}, above your ${maxAllowableCpl} limit. HAL has not changed campaign spend.`,
           type: 'warning',
           read: false,
           createdAt: new Date()
@@ -357,20 +355,17 @@ export async function evaluateAndEnforceBudgetGuardrails(
         await pgDb.insert(auditLogs).values({
           id: crypto.randomUUID(),
           contractorId,
-          action: 'HAL_BUDGET_GUARDRAIL_APPLIED',
-          details: `Autonomous spend guardrail enforced for contractor ${contractorId}. CPL breach detected in ${breachWeeks.length} weeks. Throttled spend to 0.75x.`
+          action: 'HAL_BUDGET_GUARDRAIL_RECOMMENDATION_CREATED',
+          details: `A human-review budget recommendation was recorded for contractor ${contractorId}; no spend change was made.`
         });
       } catch (err: any) {
         console.warn('Error applying automated budget guardrail changes:', err.message);
       }
     }
   } else {
-    // If no breach, check if high-demand weather surge justifies scaling budget
-    const avgDemand = forecastCurve.reduce((acc, p) => acc + p.predictedDemandIndex, 0) / (forecastCurve.length || 1);
-    if (avgDemand > 75) {
-      suggestedAction = 'SCALE_UP';
-      budgetMultiplierRecommended = 1.35;
-    }
+    // Demand forecasts alone are not enough evidence to recommend scaling spend.
+    suggestedAction = 'MAINTAIN';
+    budgetMultiplierRecommended = 1.0;
   }
 
   return {
@@ -405,7 +400,7 @@ export async function executeBrainSynchronizedForecast(
   const city = options.city || 'Calgary';
   const niche = options.niche || 'roofing';
   const horizonWeeks = options.horizonWeeks || 12;
-  const applyGuardrails = options.applyGuardrails ?? true;
+  const applyGuardrails = options.applyGuardrails ?? false;
 
   // A forecast is only defensible when both the tenant's own target CAC and
   // sufficient tenant-scoped historical observations are available.
@@ -497,8 +492,8 @@ export async function executeBrainSynchronizedForecast(
       layer6WorldModel: `${weatherTrigger.conditionTitle}. Weather is contextual only; no demand multiplier is applied.`,
       layer8Skills: `Executed Google TimesFM ${modelResult.version} inference for a ${horizonWeeks}-week horizon. Demand bands use the model's q10/q50/q90 output. CPL remains the trailing observed baseline, not a model forecast.`,
       layer10Execution: guardrails.breachDetected
-        ? `A budget guardrail recommendation is indicated: ${guardrails.suggestedAction}. No ad budget was automatically changed.`
-        : 'No guardrail breach was found in this heuristic scenario; profitability is not verified.',
+        ? `A budget guardrail recommendation is indicated: ${guardrails.suggestedAction}. It is based on trailing observed CPL; no ad budget was changed.`
+        : 'No trailing-CPL guardrail breach was found. This is not a profitability certification.',
       layer11Learning: `Model input is grounded in ${adsBaseline.weeklyDemandSeries.length} weekly observations. No new learning or model fine-tuning is claimed by this inference.`
     },
     targetCity: city,
@@ -508,7 +503,7 @@ export async function executeBrainSynchronizedForecast(
     weatherTrigger,
     budgetGuardrails: guardrails,
     forecastCurve,
-    peakDemandWeek: `${peakWeek} (${weatherTrigger.hazardCategory === 'STABLE_SEASONAL' ? 'Seasonal Peak' : 'Weather Surge Window'})`,
+    peakDemandWeek: `${peakWeek} (TimesFM demand peak)`,
     recommendedCampaignBudgetMultiplier: guardrails.budgetMultiplierRecommended,
     timestamp: new Date().toISOString()
   };
