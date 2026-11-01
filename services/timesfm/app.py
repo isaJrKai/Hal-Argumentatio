@@ -51,7 +51,6 @@ def load_model():
         try:
             model = timesfm.TimesFM_2p5_200M_torch.from_pretrained(
                 MODEL_ID,
-                torch_compile=False,
             )
             model.compile(
                 timesfm.ForecastConfig(
