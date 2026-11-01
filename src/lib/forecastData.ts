@@ -56,17 +56,18 @@ export function buildWeeklyDemandSeries<T extends {
   }
 
   const weeks = [...buckets.entries()].sort(([a], [b]) => a.localeCompare(b));
-  if (weeks.length < 8 || weeks.some(([weekKey, bucket]) => {
+  const completeWeeks = weeks.filter(([weekKey, bucket]) => {
     const days = [...bucket.observedDays].sort();
     const weekStart = Date.parse(`${weekKey}T00:00:00.000Z`);
     const firstOffset = (Date.parse(`${days[0]}T00:00:00.000Z`) - weekStart) / 86400000;
     const lastOffset = (Date.parse(`${days[days.length - 1]}T00:00:00.000Z`) - weekStart) / 86400000;
-    return days.length < 5 || firstOffset > 1 || lastOffset < 4;
-  })) return [];
-  for (let index = 1; index < weeks.length; index += 1) {
-    const previous = Date.parse(`${weeks[index - 1][0]}T00:00:00.000Z`);
-    const current = Date.parse(`${weeks[index][0]}T00:00:00.000Z`);
+    return days.length >= 5 && firstOffset <= 1 && lastOffset >= 4;
+  });
+  if (completeWeeks.length < 8) return [];
+  for (let index = 1; index < completeWeeks.length; index += 1) {
+    const previous = Date.parse(`${completeWeeks[index - 1][0]}T00:00:00.000Z`);
+    const current = Date.parse(`${completeWeeks[index][0]}T00:00:00.000Z`);
     if (current - previous !== 7 * 24 * 60 * 60 * 1000) return [];
   }
-  return weeks.map(([, bucket]) => bucket.conversions);
+  return completeWeeks.map(([, bucket]) => bucket.conversions);
 }
