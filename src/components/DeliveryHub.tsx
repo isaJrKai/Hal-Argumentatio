@@ -571,6 +571,18 @@ export default function DeliveryHub({ token, leads = [] }: DeliveryHubProps) {
                 </div>
               </div>
 
+              <div className="space-y-1">
+                <label className="text-[10px] text-text-secondary uppercase font-bold">Service Type *</label>
+                <input
+                  type="text"
+                  required
+                  value={newProjectServiceType}
+                  onChange={(e) => setNewProjectServiceType(e.target.value)}
+                  placeholder="e.g. Roofing, plumbing, electrical"
+                  className="w-full bg-bg-dark border border-border-dim rounded-sm p-2 text-text-primary outline-none focus:border-brand"
+                />
+              </div>
+
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
                   <label className="text-[10px] text-text-secondary uppercase font-bold">Package Tier</label>
