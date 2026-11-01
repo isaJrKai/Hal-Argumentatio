@@ -50,19 +50,19 @@ export async function generateContractorLandingPage(params: ContractorGeneratorP
 
   // Set directional archetype branding/tone
   if (variantArchetype === 'emergency_dispatch') {
-    baseTemplate.branding.colorPreset = 'emergency_amber';
+    baseTemplate.branding.colorPreset = 'executive_carbon';
     baseTemplate.branding.primaryColor = '#f59e0b';
     baseTemplate.branding.secondaryColor = '#0f172a';
     baseTemplate.emergencyService = true;
     baseTemplate.dispatchWindow = '30-45 Minutes';
   } else if (variantArchetype === 'master_craftsman') {
-    baseTemplate.branding.colorPreset = 'trust_navy';
+    baseTemplate.branding.colorPreset = 'paper_ink';
     baseTemplate.branding.primaryColor = '#2563eb';
     baseTemplate.branding.secondaryColor = '#0f172a';
     baseTemplate.emergencyService = false;
     baseTemplate.dispatchWindow = 'Same-Day Service';
   } else if (variantArchetype === 'flat_rate') {
-    baseTemplate.branding.colorPreset = 'modern_slate';
+    baseTemplate.branding.colorPreset = 'modern_swiss';
     baseTemplate.branding.primaryColor = '#10b981';
     baseTemplate.branding.secondaryColor = '#0f172a';
     baseTemplate.emergencyService = false;
@@ -225,6 +225,7 @@ export function applyVerifiedBusinessDetails(
   const address = details.address?.trim() || '';
   const tradeLabel = details.trade.replace(/_/g, ' ').replace(/\\b\\w/g, letter => letter.toUpperCase());
   const promptText = details.prompt.trim();
+  const hasCuratedSpecialistTemplate = ['sump_pump', 'waterproofing', 'flood_restoration', 'emergency_dispatch'].includes(details.trade);
 
   // Verified identity fields always win. Marketing copy is preserved only when it
   // came from a successfully parsed AI response; static demo-template claims never do.
@@ -235,24 +236,22 @@ export function applyVerifiedBusinessDetails(
   config.emergencyService = false;
   config.dispatchWindow = '';
   config.branding.logoText = businessName;
-  config.title = preserveGeneratedCopy && config.title?.trim()
-    ? config.title
-    : `${businessName} — ${tradeLabel} Services in ${city}`;
+  config.title = `${businessName} — ${tradeLabel} Services in ${city}`;
 
   config.sections.announcement_bar.active = false;
   config.sections.header.active = true;
   config.sections.header.ctaText = phone ? `Call ${phone}` : 'Request a quote';
 
   config.sections.hero.active = true;
-  if (!preserveGeneratedCopy || !config.sections.hero.headline?.trim()) {
+  if ((!preserveGeneratedCopy && !hasCuratedSpecialistTemplate) || !config.sections.hero.headline?.trim()) {
     config.sections.hero.headline = `${tradeLabel} Services in ${city}`;
   }
-  if (!preserveGeneratedCopy || !config.sections.hero.subheadline?.trim()) {
+  if ((!preserveGeneratedCopy && !hasCuratedSpecialistTemplate) || !config.sections.hero.subheadline?.trim()) {
     config.sections.hero.subheadline = promptText
       ? `${businessName} provides ${tradeLabel.toLowerCase()} services in ${city}. ${promptText}`
       : `${businessName} provides ${tradeLabel.toLowerCase()} services in ${city}. Contact the business to discuss your project.`;
   }
-  if (!preserveGeneratedCopy) {
+  if (!preserveGeneratedCopy && !hasCuratedSpecialistTemplate) {
     config.sections.hero.badgeText = `${tradeLabel} in ${city}`;
   }
 
@@ -274,7 +273,7 @@ export function applyVerifiedBusinessDetails(
   config.sections.services.active = true;
   config.sections.services.title = 'Services';
   config.sections.services.subtitle = 'Contact the business to confirm scope, availability and pricing.';
-  config.sections.services.items = preserveGeneratedCopy && generatedServices.length > 0
+  config.sections.services.items = (preserveGeneratedCopy || hasCuratedSpecialistTemplate) && generatedServices.length > 0
     ? generatedServices.slice(0, 6).map(item => ({ ...item, priceEstimate: undefined, badge: undefined }))
     : [{
         id: 'service-enquiry',
