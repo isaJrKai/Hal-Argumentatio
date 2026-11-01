@@ -99,14 +99,30 @@ app.use(express.json({
 }));
 
 // Allow browser origins explicitly; same-origin requests do not require CORS.
+const configuredCorsOrigins = (process.env.CORS_ALLOWED_ORIGINS || process.env.APP_URL || '')
+  .split(',')
+  .map(value => value.trim())
+  .filter(Boolean);
 const corsAllowedOrigins = new Set(
-  (process.env.CORS_ALLOWED_ORIGINS || process.env.APP_URL || '')
-    .split(',')
+  configuredCorsOrigins
     .map(value => {
-      try { return new URL(value.trim()).origin; } catch { return ''; }
+      try {
+        const parsed = new URL(value);
+        if (parsed.protocol !== 'https:' && parsed.hostname !== 'localhost' && parsed.hostname !== '127.0.0.1') {
+          console.warn(`[CORS] Ignoring non-HTTPS browser origin: ${parsed.origin}`);
+          return '';
+        }
+        return parsed.origin;
+      } catch {
+        console.warn('[CORS] Ignoring invalid CORS_ALLOWED_ORIGINS entry.');
+        return '';
+      }
     })
     .filter(Boolean)
 );
+if (process.env.NODE_ENV === 'production' && corsAllowedOrigins.size === 0) {
+  console.warn('[CORS] No browser origins configured. Set CORS_ALLOWED_ORIGINS to a comma-separated list of exact HTTPS origins.');
+}
 
 app.use((req, res, next) => {
   const origin = req.headers.origin;
