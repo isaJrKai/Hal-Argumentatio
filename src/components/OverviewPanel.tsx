@@ -545,9 +545,9 @@ export default function OverviewPanel({
               <div className="truncate">
                 <span className="text-text-tertiary block text-[9px] uppercase font-sans">Weather Trigger</span>
                 <span className="text-text-primary font-semibold truncate">
-                  {forecastMetadata?.weatherTrigger 
-                    ? `${forecastMetadata.weatherTrigger.hazardCategory.replaceAll('_', ' ')} scenario (${forecastMetadata.weatherTrigger.demandSurgeMultiplier}x)`
-                    : 'No live weather reading'}
+                  {forecastMetadata?.weatherTrigger?.isLiveForecast
+                    ? `${forecastMetadata.weatherTrigger.hazardCategory.replaceAll('_', ' ')} observed signal`
+                    : 'Live weather unavailable; no adjustment'}
                 </span>
               </div>
             </div>
@@ -569,7 +569,7 @@ export default function OverviewPanel({
             {forecastChartData.length === 0 ? (
               <div className="h-full flex flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-border-dim text-center px-5">
                 <span className="text-sm font-semibold text-text-secondary">Scenario unavailable</span>
-                <span className="text-xs text-text-tertiary max-w-md">Connect measured Google Ads records, configure a target CAC, and verify live weather before viewing a demand scenario. No revenue forecast is generated.</span>
+                <span className="text-xs text-text-tertiary max-w-md">{forecastError || 'A scenario requires measured Google Ads records for this tenant, city and niche, plus a configured target CAC. Weather is contextual only when a live reading is available. No TimesFM model is currently connected.'}</span>
               </div>
             ) : (
             <ResponsiveContainer width="100%" height="100%">
