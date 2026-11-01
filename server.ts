@@ -3330,15 +3330,15 @@ app.post('/api/missions', authenticate, async (req, res) => {
       },
       {
         id: crypto.randomBytes(8).toString('hex'),
-        title: 'Technical Web Speed & SSL Audits',
-        description: 'Analyzes mobile page performance, responsiveness, and SSL indicators.',
+        title: 'DNS / HTTP / TLS Grounding Checks',
+        description: 'Uses measured public DNS, HTTP reachability, and TLS evidence. PageSpeed and SEO are not measured.',
         status: 'pending',
         updatedAt: new Date().toISOString()
       },
       {
         id: crypto.randomBytes(8).toString('hex'),
-        title: 'Personalized Value Outreach Drafting',
-        description: 'Formulates targeted cold-pitch hooks and objection counter-arguments.',
+        title: 'Evidence-Based Outreach Drafts',
+        description: 'Creates draft-only email copy from available prospect details. No messages are sent.',
         status: 'pending',
         updatedAt: new Date().toISOString()
       }
@@ -3371,6 +3371,7 @@ app.post('/api/missions', authenticate, async (req, res) => {
       try {
         // Step 1: Harvest
         const harvested = await harvestRealBusinesses(city, niche);
+        const createdLeads: any[] = [];
         
         steps[0].status = 'completed';
         (steps[0] as any).result = `Successfully discovered and profiled ${harvested.length} active service companies.`;
@@ -3396,58 +3397,88 @@ app.post('/api/missions', authenticate, async (req, res) => {
             emailEncrypted,
             phoneEncrypted,
             isSynthetic: Boolean(hl.isSynthetic),
-            sourceType: hl.sourceType || 'live_harvest',
+            sourceType: hl.sourceType || 'unknown',
             city,
             niche: niche,
             source: 'sourced_intelligence',
             status: 'new',
-            urgencyScore: (hl as any).urgencyScore ?? 0,
-            predictedLtv: (hl as any).predictedLtvUsd ?? 0,
+            urgencyScore: null,
+            predictedLtv: null,
             notes: hl.notes || `Sourced automatically via Territory Conquest in ${city}.`,
             websiteUrl: hl.websiteUrl,
-            seoScore: hl.seoScore,
-            performanceScore: hl.performanceScore,
-            sslStatus: hl.sslStatus,
-            googleRating: hl.googleRating,
-            reviewCount: hl.reviewCount,
-            sentimentScore: hl.sentimentScore,
+            seoScore: null,
+            performanceScore: null,
+            sslStatus: null,
+            googleRating: null,
+            reviewCount: null,
+            sentimentScore: null,
             outreachStrategy: hl.outreachStrategy,
             verificationStatus: (hl as any).verificationStatus || (hl.isSynthetic ? 'FABRICATED_REJECTED' : 'UNVERIFIED_STAGING'),
             dnsVerified: (hl as any).dnsVerified !== undefined ? Boolean((hl as any).dnsVerified) : false,
             groundingEvidence: (hl as any).groundingEvidence || null,
           }).returning();
+          createdLeads.push(addedLead);
 
           await pgDb.insert(leadEvents).values({
             id: crypto.randomUUID(),
             leadId: addedLead.id,
             eventType: 'LeadCreated',
             newStage: 'new',
-            notes: `Lead profiles loaded with Website & Reputation Sourced Intelligence.`
+            notes: `Prospect profile imported. DNS/HTTP/TLS evidence is stored separately; PageSpeed and reputation metrics were not measured.`
           });
         }
 
-        // Step 2: Audits
+        // Step 2: summarize the actual DNS / HTTP / TLS evidence collected during harvest.
         steps[1].status = 'running';
         steps[1].updatedAt = new Date().toISOString();
         await pgDb.update(missions).set({ steps, updatedAt: new Date() }).where(and(eq(missions.id, mission.id), eq(missions.contractorId, contractorId)));
 
-        // Small delay for realism
-        await new Promise(r => setTimeout(r, 1200));
-        
+        const verifiedCount = harvested.filter(lead => lead.verificationStatus === 'VERIFIED').length;
+        const stagingCount = harvested.filter(lead => lead.verificationStatus === 'UNVERIFIED_STAGING').length;
+        const rejectedCount = harvested.filter(lead => lead.verificationStatus === 'FABRICATED_REJECTED').length;
+        const dnsResolvedCount = harvested.filter(lead => Boolean(lead.groundingEvidence?.dnsResolved)).length;
+        const tlsSecuredCount = harvested.filter(lead => Boolean(lead.groundingEvidence?.sslSecured)).length;
         steps[1].status = 'completed';
-        (steps[1] as any).result = `Completed technical audits. Injected PageSpeed, mobile viewport indices, and SSL validation data.`;
+        (steps[1] as any).result = 'Grounding evidence: ' + verifiedCount + ' verified, ' + stagingCount + ' unverified, ' + rejectedCount + ' rejected; DNS resolved for ' + dnsResolvedCount + '; TLS confirmed for ' + tlsSecuredCount + '. PageSpeed and SEO were not measured.';
         steps[1].updatedAt = new Date().toISOString();
         await pgDb.update(missions).set({ steps, updatedAt: new Date() }).where(and(eq(missions.id, mission.id), eq(missions.contractorId, contractorId)));
 
-        // Step 3: Outreach Pitch Drafts
+        // Step 3: create and persist draft-only outreach copy; never dispatch messages here.
         steps[2].status = 'running';
         steps[2].updatedAt = new Date().toISOString();
         await pgDb.update(missions).set({ steps, updatedAt: new Date() }).where(and(eq(missions.id, mission.id), eq(missions.contractorId, contractorId)));
 
-        await new Promise(r => setTimeout(r, 1200));
+        let draftsCreated = 0;
+        for (const lead of createdLeads.slice(0, 5)) {
+          const draft = await draftOutreachMessage({
+            channel: 'email',
+            lead: {
+              businessName: lead.businessName,
+              ownerName: lead.ownerName || undefined,
+              city: lead.city,
+              serviceType: lead.niche
+            },
+            niche,
+            city
+          });
+          await pgDb.insert(leadEvents).values({
+            id: crypto.randomUUID(),
+            leadId: lead.id,
+            eventType: 'OutreachDraftCreated',
+            newStage: lead.status,
+            notes: JSON.stringify({
+              mode: 'draft_only',
+              channel: 'email',
+              subject: draft.subject || null,
+              body: draft.body,
+              callToAction: draft.callToAction
+            })
+          });
+          draftsCreated++;
+        }
 
         steps[2].status = 'completed';
-        (steps[2] as any).result = `Generated personalized pitch copies and objections sheets. Sourced leads ready for outreach.`;
+        (steps[2] as any).result = draftsCreated + ' draft-only email messages were saved to lead activity. No messages were sent.';
         steps[2].updatedAt = new Date().toISOString();
         await pgDb.update(missions).set({ steps, updatedAt: new Date() }).where(and(eq(missions.id, mission.id), eq(missions.contractorId, contractorId)));
 
@@ -3459,14 +3490,14 @@ app.post('/api/missions', authenticate, async (req, res) => {
           id: crypto.randomUUID(),
           contractorId,
           action: 'MISSION_COMPLETED',
-          details: `Territory Conquest Mission resolved successfully for ${city} ${niche}.`
+          details: `Territory Conquest discovery and draft preparation completed for ${city} ${niche}; no outreach messages were sent.`
         });
 
         broadcastNotification(
           contractorId,
           'success',
-          'Territory Conquest Succeeded',
-          `Territory Conquest completed for ${city} ${niche}! Loaded ${harvested.length} leads.`
+          'Territory Conquest Completed',
+          `Loaded ${harvested.length} prospect records and saved up to five draft-only emails for ${city} ${niche}. No outreach messages were sent.`
         );
 
       } catch (err: any) {
