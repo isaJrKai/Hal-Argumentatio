@@ -49,7 +49,7 @@ export async function sendResendEmail(
   if (!apiKey) {
     throw new EmailProviderConfigurationError('Resend is not configured. Set RESEND_API_KEY on the server.');
   }
-  const senderAddress = from?.match(/<([^<>]+)>\\s*$/)?.[1]?.trim() || from?.trim();
+  const senderAddress = from?.includes('<') && from.includes('>') ? from.slice(from.lastIndexOf('<') + 1, from.lastIndexOf('>')).trim() : from?.trim();
   if (!senderAddress || !EMAIL_PATTERN.test(senderAddress)) {
     throw new EmailProviderConfigurationError('A verified HAL_SENDER_EMAIL address is required for Resend.');
   }
