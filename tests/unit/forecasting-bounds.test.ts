@@ -1,73 +1,91 @@
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
+import { buildWeeklyDemandSeries, filterGoogleAdsTerritoryRecords, matchesTerritoryContext } from '../../src/lib/forecastData';
+import { validateTimesFmForecast } from '../../src/lib/timesfmClient';
 
-/**
- * Audit and Boundary Tests for Forecasting Logic
- * 
- * ARCHITECTURAL CLASSIFICATION:
- * TIMESFM FOUNDATION MODEL: UNVERIFIED — NO IMPLEMENTATION FOUND
- * The repository claims "TimesFM-1.0-200M (Google Foundation Time-Series)" in telemetry and logs,
- * but the actual engine is a synthetic sine-wave polynomial generator implemented in server.ts.
- */
+const records = [
+  { id: 'calgary-roofing', geo: 'Calgary, AB', campaignName: 'Roofing Leads' },
+  { id: 'calgary-plumbing', geo: 'Calgary, AB', campaignName: 'Plumbing Search' },
+  { id: 'austin-roofing', geo: 'Austin, TX', campaignName: 'Roofing Leads' },
+  { id: 'unscoped', geo: null, campaignName: 'Roofing Leads' }
+];
 
-function generateSyntheticTimesFMCurve(weeks: number, baseDemand = 68, baseCpl = 42) {
-  const curve = [];
-  for (let w = 1; w <= weeks; w++) {
-    const seasonalFactor = Math.sin((w / 12) * Math.PI) * 22;
-    const noise = (Math.sin(w * 13.7) * 4);
-    const predictedDemand = Math.round(baseDemand + seasonalFactor + noise);
-    const predictedCpl = parseFloat((baseCpl - (seasonalFactor * 0.4) + (noise * 0.2)).toFixed(2));
-    const lowerBound = Math.max(20, Math.round(predictedDemand * 0.88));
-    const upperBound = Math.round(predictedDemand * 1.14);
-
-    curve.push({
-      week: `W+${w}`,
-      predictedDemandIndex: predictedDemand,
-      lowerBound,
-      upperBound,
-      projectedCplUsd: predictedCpl
-    });
+function makeWeeklyRecords(weeks = 8) {
+  const records: Array<{ date: string; conversions: number }> = [];
+  const firstMonday = Date.UTC(2026, 0, 5);
+  for (let week = 0; week < weeks; week += 1) {
+    for (let day = 0; day < 5; day += 1) {
+      records.push({
+        date: new Date(firstMonday + (week * 7 + day) * 86400000).toISOString(),
+        conversions: week + 1
+      });
+    }
   }
-  return curve;
+  return records;
 }
 
-describe('Unit: Forecasting Invariants & TimesFM Reality Audit', () => {
-  it('RECORD: documents that genuine TimesFM weights are UNVERIFIED / NO IMPLEMENTATION FOUND', () => {
-    // Asserting the architectural finding required by Section 3 of the Directive
-    const timesFmImplementationType = 'HEURISTIC_SYNTHETIC_CURVE';
-    expect(timesFmImplementationType).not.toBe('LIVE_NEURAL_WEIGHTS');
+describe('TimesFM input and forecast invariants', () => {
+  it('builds a model series only from contiguous weeks with five observed days', () => {
+    expect(buildWeeklyDemandSeries(makeWeeklyRecords())).toHaveLength(8);
+    const incomplete = makeWeeklyRecords().filter((record, index) => index !== 12);
+    expect(buildWeeklyDemandSeries(incomplete)).toEqual([]);
   });
 
-  describe('Mathematical Boundaries of the Synthetic Engine', () => {
-    it('enforces non-negative demand index and lower bounds', () => {
-      const curve = generateSyntheticTimesFMCurve(12);
-      expect(curve.length).toBe(12);
+  it('ignores a partial current week while preserving eight complete weeks', () => {
+    const records = makeWeeklyRecords();
+    const nextMonday = Date.UTC(2026, 2, 2);
+    records.push(
+      { date: new Date(nextMonday).toISOString(), conversions: 2 },
+      { date: new Date(nextMonday + 86400000).toISOString(), conversions: 3 }
+    );
+    expect(buildWeeklyDemandSeries(records)).toHaveLength(8);
+  });
 
-      for (const point of curve) {
-        expect(point.predictedDemandIndex).toBeGreaterThan(0);
-        expect(point.lowerBound).toBeGreaterThanOrEqual(20); // Explicit clamp in implementation
-        expect(point.upperBound).toBeGreaterThan(point.lowerBound);
-        expect(point.projectedCplUsd).toBeGreaterThan(0);
-      }
+  it('rejects missing weeks instead of compressing time gaps', () => {
+    const withGap = makeWeeklyRecords(9).filter((record) => {
+      const date = new Date(record.date);
+      return date < new Date(Date.UTC(2026, 0, 19)) || date >= new Date(Date.UTC(2026, 0, 26));
     });
+    expect(buildWeeklyDemandSeries(withGap)).toEqual([]);
+  });
 
-    it('produces bounded confidence bands around demand predictions', () => {
-      const curve = generateSyntheticTimesFMCurve(12);
-      for (const point of curve) {
-        // Lower bound is clamped at Math.max(20, round(demand * 0.88))
-        // Upper bound is round(demand * 1.14)
-        expect(point.lowerBound).toBeLessThanOrEqual(point.predictedDemandIndex);
-        expect(point.upperBound).toBeGreaterThanOrEqual(point.predictedDemandIndex);
-      }
-    });
+  it('changes the selected historical series when the city changes', () => {
+    expect(filterGoogleAdsTerritoryRecords(records, 'roofing', 'Calgary').map(x => x.id))
+      .toEqual(['calgary-roofing']);
+    expect(filterGoogleAdsTerritoryRecords(records, 'roofing', 'Austin').map(x => x.id))
+      .toEqual(['austin-roofing']);
+  });
 
-    it('verifies inverse correlation between seasonal demand surge and CPL in the heuristic', () => {
-      const curve = generateSyntheticTimesFMCurve(12);
-      // In the heuristic: high demand (summer week 6) decreases CPL due to natural inrush
-      const week1 = curve[0];
-      const week6 = curve[5]; // Peak of sin((6/12)*PI) = 1.0
+  it('changes the selected historical series when the trade changes', () => {
+    expect(filterGoogleAdsTerritoryRecords(records, 'plumbing', 'Calgary').map(x => x.id))
+      .toEqual(['calgary-plumbing']);
+  });
 
-      expect(week6.predictedDemandIndex).toBeGreaterThan(week1.predictedDemandIndex);
-      expect(week6.projectedCplUsd).toBeLessThan(week1.projectedCplUsd);
-    });
+  it('uses the selected territory for neural graph records', () => {
+    expect(matchesTerritoryContext('Kampala Central', 'Roofing', 'Kampala', 'roofing')).toBe(true);
+    expect(matchesTerritoryContext('Kampala Central', 'Plumbing', 'Kampala', 'roofing')).toBe(false);
+    expect(matchesTerritoryContext('Entebbe', 'Roofing', 'Kampala', 'roofing')).toBe(false);
+  });
+
+  it('fails closed for missing territory metadata', () => {
+    expect(filterGoogleAdsTerritoryRecords(records, 'roofing', '').length).toBe(0);
+    expect(filterGoogleAdsTerritoryRecords(records, 'roofing', 'Calgary').map(x => x.id))
+      .not.toContain('unscoped');
+  });
+
+  it('accepts TimesFM median and q10/q90 bounds only when ordered', () => {
+    const valid = {
+      success: true,
+      model: 'google/timesfm-2.5-200m-pytorch',
+      version: '2.5',
+      backend: 'pytorch',
+      input_points: 12,
+      horizon: 2,
+      forecast: [
+        { step: 1, point: 10, lower: 7, upper: 14 },
+        { step: 2, point: 12, lower: 8, upper: 16 }
+      ]
+    };
+    expect(validateTimesFmForecast(valid, 2).forecast).toHaveLength(2);
+    expect(() => validateTimesFmForecast({ ...valid, horizon: 3 }, 2)).toThrow();
   });
 });
