@@ -57,6 +57,7 @@ def load_model():
                 timesfm.ForecastConfig(
                     max_context=MAX_CONTEXT,
                     max_horizon=MAX_HORIZON,
+                    per_core_batch_size=1,
                     normalize_inputs=True,
                     use_continuous_quantile_head=True,
                     force_flip_invariance=True,
