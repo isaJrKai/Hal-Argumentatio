@@ -220,6 +220,8 @@ export function applyVerifiedBusinessDetails(
   config.title = `${businessName} — ${tradeLabel} Services in ${city}`;
 
   config.sections.announcement_bar.active = false;
+  config.sections.announcement_bar.text = '';
+  config.sections.announcement_bar.urgencyBadge = '';
   config.sections.header.active = true;
   config.sections.header.ctaText = phone ? `Call ${phone}` : 'Request a quote';
 
@@ -266,24 +268,50 @@ export function applyVerifiedBusinessDetails(
   config.sections.trust_bar.badges = [];
   if (config.sections.bento_features) {
     config.sections.bento_features.active = false;
+    config.sections.bento_features.badge = '';
+    config.sections.bento_features.title = '';
+    config.sections.bento_features.subtitle = '';
     config.sections.bento_features.items = [];
   }
   if (config.sections.pricing_packages) {
     config.sections.pricing_packages.active = false;
+    config.sections.pricing_packages.badge = '';
+    config.sections.pricing_packages.title = '';
+    config.sections.pricing_packages.subtitle = '';
     config.sections.pricing_packages.items = [];
   }
   config.sections.seasonal_alert.active = false;
+  config.sections.seasonal_alert.tag = '';
+  config.sections.seasonal_alert.title = '';
+  config.sections.seasonal_alert.description = '';
+  config.sections.seasonal_alert.bulletPoints = [];
   config.sections.before_after.active = false;
+  config.sections.before_after.title = '';
+  config.sections.before_after.subtitle = '';
   config.sections.before_after.items = [];
   config.sections.reviews.active = false;
+  config.sections.reviews.title = '';
+  config.sections.reviews.subtitle = '';
   config.sections.reviews.items = [];
   config.sections.reviews.rating = 0;
   config.sections.reviews.totalReviews = 0;
   config.sections.service_areas.active = false;
+  config.sections.service_areas.title = '';
+  config.sections.service_areas.subtitle = '';
   config.sections.service_areas.cities = [];
   config.sections.guarantee.active = false;
+  config.sections.guarantee.badgeText = '';
+  config.sections.guarantee.title = '';
+  config.sections.guarantee.description = '';
+  config.sections.guarantee.ctaText = '';
   config.sections.online_booking.active = false;
+  config.sections.online_booking.title = '';
+  config.sections.online_booking.description = '';
+  config.sections.online_booking.bookingUrl = '';
+  config.sections.online_booking.buttonText = '';
   config.sections.faq.active = false;
+  config.sections.faq.title = '';
+  config.sections.faq.items = [];
 
   config.sections.footer.address = address;
   config.sections.footer.copyright = `© ${new Date().getFullYear()} ${businessName}.`;
