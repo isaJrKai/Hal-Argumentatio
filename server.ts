@@ -3270,10 +3270,20 @@ app.patch('/api/intelligence/chat/projects/:id', authenticate, async (req, res) 
 app.delete('/api/intelligence/chat/projects/:id', authenticate, async (req, res) => {
   const contractorId = resolveChatContractorId(req);
   try {
-    const [project] = await pgDb.select().from(chatProjects).where(and(eq(chatProjects.id, req.params.id), eq(chatProjects.contractorId, contractorId))).limit(1);
-    if (!project) return res.status(404).json({ error: 'Project not found.' });
-    await pgDb.update(chatConversations).set({ projectId: null, updatedAt: new Date() }).where(and(eq(chatConversations.projectId, project.id), eq(chatConversations.contractorId, contractorId)));
-    await pgDb.delete(chatProjects).where(and(eq(chatProjects.id, project.id), eq(chatProjects.contractorId, contractorId)));
+    const deleted = await pgDb.transaction(async (tx) => {
+      const [project] = await tx.select().from(chatProjects)
+        .where(and(eq(chatProjects.id, req.params.id), eq(chatProjects.contractorId, contractorId))).limit(1);
+      if (!project) return false;
+      // Keep conversation reassignment and project deletion atomic. A failed delete
+      // must not leave conversations detached from a project that still exists.
+      await tx.update(chatConversations).set({ projectId: null, updatedAt: new Date() })
+        .where(and(eq(chatConversations.projectId, project.id), eq(chatConversations.contractorId, contractorId)));
+      const [removed] = await tx.delete(chatProjects)
+        .where(and(eq(chatProjects.id, project.id), eq(chatProjects.contractorId, contractorId)))
+        .returning({ id: chatProjects.id });
+      return !!removed;
+    });
+    if (!deleted) return res.status(404).json({ error: 'Project not found.' });
     res.json({ message: 'Project deleted. Its conversations were kept in the unassigned list.' });
   } catch (err: any) { res.status(500).json({ error: err.message }); }
 });
@@ -3341,10 +3351,18 @@ app.patch('/api/intelligence/chat/conversations/:id', authenticate, async (req, 
 app.delete('/api/intelligence/chat/conversations/:id', authenticate, async (req, res) => {
   const contractorId = resolveChatContractorId(req);
   try {
-    const [conversation] = await pgDb.select().from(chatConversations).where(and(eq(chatConversations.id, req.params.id), eq(chatConversations.contractorId, contractorId))).limit(1);
-    if (!conversation) return res.status(404).json({ error: 'Conversation not found.' });
-    await pgDb.delete(chatMessages).where(and(eq(chatMessages.conversationId, conversation.id), eq(chatMessages.contractorId, contractorId)));
-    await pgDb.delete(chatConversations).where(and(eq(chatConversations.id, conversation.id), eq(chatConversations.contractorId, contractorId)));
+    const deleted = await pgDb.transaction(async (tx) => {
+      const [conversation] = await tx.select().from(chatConversations)
+        .where(and(eq(chatConversations.id, req.params.id), eq(chatConversations.contractorId, contractorId))).limit(1);
+      if (!conversation) return false;
+      await tx.delete(chatMessages)
+        .where(and(eq(chatMessages.conversationId, conversation.id), eq(chatMessages.contractorId, contractorId)));
+      const [removed] = await tx.delete(chatConversations)
+        .where(and(eq(chatConversations.id, conversation.id), eq(chatConversations.contractorId, contractorId)))
+        .returning({ id: chatConversations.id });
+      return !!removed;
+    });
+    if (!deleted) return res.status(404).json({ error: 'Conversation not found.' });
     res.json({ message: 'Conversation permanently deleted.' });
   } catch (err: any) { res.status(500).json({ error: err.message }); }
 });
@@ -3379,8 +3397,10 @@ app.get('/api/intelligence/chat/history', authenticate, async (req, res) => {
 app.delete('/api/intelligence/chat/history', authenticate, async (req, res) => {
   const contractorId = resolveChatContractorId(req);
   try {
-    await pgDb.delete(chatMessages).where(eq(chatMessages.contractorId, contractorId));
-    await pgDb.delete(chatConversations).where(eq(chatConversations.contractorId, contractorId));
+    await pgDb.transaction(async (tx) => {
+      await tx.delete(chatMessages).where(eq(chatMessages.contractorId, contractorId));
+      await tx.delete(chatConversations).where(eq(chatConversations.contractorId, contractorId));
+    });
     res.json({ message: 'Chat history cleared successfully.' });
   } catch (err: any) { res.status(500).json({ error: err.message }); }
 });
