@@ -9,11 +9,11 @@ export interface Lead {
   serviceType: string;
   source: string;
   status: 'new' | 'contacted' | 'converted' | 'dead';
-  urgencyScore: number;
-  predictedLtvUsd: number;
+  urgencyScore: number | null;
+  predictedLtvUsd: number | null;
   notes?: string;
   isSynthetic?: boolean;
-  sourceType?: 'live_harvest' | 'synthetic_fallback' | 'manual' | 'google_ads' | 'spreadsheet_import';
+  sourceType?: 'live_harvest' | 'ai_discovery_unverified' | 'synthetic_fallback' | 'manual' | 'google_ads' | 'spreadsheet_import' | 'unknown';
   verificationStatus?: 'VERIFIED' | 'UNVERIFIED_STAGING' | 'FABRICATED_REJECTED';
   dnsVerified?: boolean;
   groundingEvidence?: {
@@ -31,12 +31,12 @@ export interface Lead {
 
   // Phase 2: Sourced Real Business Intelligence Properties
   websiteUrl?: string;
-  seoScore?: number;
-  performanceScore?: number;
-  sslStatus?: 'secured' | 'missing';
-  googleRating?: number;
-  reviewCount?: number;
-  sentimentScore?: number;
+  seoScore?: number | null;
+  performanceScore?: number | null;
+  sslStatus?: 'secured' | 'missing' | null;
+  googleRating?: number | null;
+  reviewCount?: number | null;
+  sentimentScore?: number | null;
   outreachStrategy?: string;
 }
 
