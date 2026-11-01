@@ -1,37 +1,36 @@
 # HAL — Intellectual Property & Technical Acquisition Handover
 
-This document serves as the formal technical handover and operational runbook for the complete acquisition of **HAL (Human Argumentation Layer)**. 
+This document records the current technical handover position for HAL (Human Argumentation Layer). It should be read alongside the repository README and the implementation itself.
 
 ---
 
 ## 1. Executive Summary & Asset Inventory
 
-HAL is delivered as a 100% complete, unencumbered, full-stack software asset. All proprietary source code, database architectures, machine learning orchestration layers, front-end design systems, and automated test harnesses are transferred in full to the buyer.
+HAL is **delivered as-is, CI green at handover**. This statement describes the repository state and verification evidence; it is not a claim that every feature is complete, every integration is live, or the current GitHub revision has been published to the production application.
 
-### Inventory of Delivered Intellectual Property:
+### Inventory of Delivered Intellectual Property
+
 1. **Core Application Engine:** Full TypeScript codebase (60,000+ lines of TypeScript).
-2. **Frontend Client:** React 19 single-page application with responsive Tailwind CSS v4 styling, interactive Canvas/D3 neural visualizations, and full mobile optimization.
-3. **Backend Service Layer:** Node.js / Express RESTful API server with multi-tenant authentication, webhook handlers, and Server-Sent Events.
-4. **Data & Persistence Layer:** Drizzle ORM schemas supporting PostgreSQL, Neon DB, and an automated zero-config in-memory persistence fallback.
+2. **Frontend Client:** React 19 single-page application with responsive Tailwind CSS v4 styling and interactive visualizations.
+3. **Backend Service Layer:** Node.js / Express RESTful API server with authentication, webhook handlers, and Server-Sent Events.
+4. **Data & Persistence Layer:** Neon/PostgreSQL via Drizzle for supported domains; legacy `data/db.json` persistence remains in use for other domains. These stores are not yet consolidated. PostgreSQL failures are reported explicitly rather than treated as empty datasets or silently replaced with stale local data. There is no in-memory persistence fallback.
 5. **Cryptographic Suite:** AES-256-GCM field-level PII encryption, PBKDF2/bcrypt salted password hashing, and SHA-256 tamper-evident audit ledger.
 6. **AI Orchestration Framework:** Multi-provider LLM integrations (Google Gemini, Hugging Face, OpenRouter) and Model Context Protocol (MCP) server.
-7. **Six Integrated Product Studios:**
-   - *Territory Harvester & Lead Finder:* Real-time website performance audits, SSL checks, and sentiment scoring.
-   - *B2B Landing Page Studio:* Instant Bento grid landing page generator with dual Static HTML + Next.js TSX export.
-   - *Unified Communications Hub:* Multi-channel dispatch for WhatsApp Cloud API, Resend/SMTP Email, Twilio SMS, and Cal.com scheduling.
-   - *Neural Decision Graph:* Visual knowledge graph with autonomous weight calibration.
-   - *Document & Proposal Studio:* Automated generation of client proposals and statements of work.
-   - *Contract Studio:* Dynamic Master Services Agreement (MSA) generation and signing workflows.
-8. **Automated Test Suite:** 24 test suites with **132/132 passing automated tests** verifying unit logic, integration flows, security boundaries, and schema stability.
-9. **Zero-Vulnerability Security Audit:** Clean dependency manifest with 0 reported CVEs.
+7. **Product Modules:**
+   - *Territory Harvester & Lead Finder:* Website performance audits, SSL checks, and prospect intelligence.
+   - *B2B Landing Page Studio:* Landing page generation with static HTML and Next.js TSX export.
+   - *Unified Communications Hub:* Resend email submission, with SMS and WhatsApp simulation workflows; calendar connectivity and booking remain unverified.
+   - *Neural Decision Graph:* Visual knowledge graph and business recommendation functionality. Model hosting and inference must be verified separately before claiming a production TimesFM-backed intelligence capability.
+   - *Document & Proposal Studio:* Generation of client proposals and statements of work.
+   - *Contract Studio:* Master Services Agreement (MSA) and contract workflows.
+8. **Automated Test Suite:** Latest verified main-branch CI evidence reports **178 tests across 34 test files passed**, with TypeScript and production build checks green. This is repository CI evidence, not live deployment verification.
+9. **Security Audit:** The latest documented production dependency audit passed; **two moderate development/transitive dependency advisories remain documented**. This is not a zero-vulnerability claim.
 
 ---
 
-## 2. Quickstart & Deployment Runbooks
+## 2. Runtime, Persistence & Publishing
 
-HAL is designed to deploy cleanly on any modern cloud infrastructure.
-
-### Option A: Local Development & Bare-Metal Server
+### Local Development
 
 ```bash
 # 1. Clone the repository
@@ -41,129 +40,107 @@ cd Hal-Argumentatio
 # 2. Install dependencies with locked versions
 npm ci
 
-# 3. Create your environment configuration
+# 3. Create local environment configuration
 cp .env.example .env
 
 # 4. Launch the application
 npm run dev
-
-# Application will be accessible at http://localhost:3000
 ```
 
-### Option B: Cloud PaaS (Render / Railway / Fly.io / Heroku)
+The local application runs at `http://localhost:3000`.
 
-1. Connect your GitHub repository to the PaaS platform.
-2. Configure the build and start commands:
-   - **Build Command:** `npm ci && npm run build`
-   - **Start Command:** `npm start` (or `node server.ts` with tsx)
-3. Set the environment variables in the platform dashboard (see Section 3 below).
-4. Expose Port `3000` (or allow the platform's dynamic `PORT` env var).
+### Database Configuration
 
-### Option C: Docker Container Deployment
+Configure a Neon/PostgreSQL database for database-backed features. PostgreSQL via Drizzle is used for supported domains; other legacy domains still use the local JSON store. These persistence domains are not yet consolidated and should be configured and verified separately.
 
-Create a `Dockerfile` in the root:
-```dockerfile
-FROM node:20-alpine
-WORKDIR /app
-COPY package*.json ./
-RUN npm ci
-COPY . .
-RUN npm run build
-EXPOSE 3000
-CMD ["npm", "start"]
-```
+A PostgreSQL failure is surfaced explicitly. Do not describe the application as silently falling back to in-memory persistence or stale local data.
 
-Build and run:
-```bash
-docker build -t hal-intelligence .
-docker run -p 3000:3000 --env-file .env hal-intelligence
-```
+### Publishing and Deployment
+
+The current HAL publishing workflow is the existing Google AI Studio sync/publish setup. A successful GitHub merge or CI run does not mean the live application has been published. After an approved change is synchronized and published through Google AI Studio, verify the live application separately.
+
+No alternative hosting target is designated by the repository documentation.
 
 ---
 
 ## 3. Environment Configuration Reference
 
-Configure the following parameters in your `.env` file:
+Configure provider credentials and application settings in the deployment environment. Never commit `.env` files or production credentials to version control.
 
 ### Core System Configuration
+
 | Variable | Required | Description |
 |---|---|---|
-| `PORT` | Optional | Port for HTTP server (defaults to `3000`). |
+| `PORT` | Optional | HTTP server port; defaults to `3000`. |
 | `NODE_ENV` | Optional | `development` or `production`. |
-| `APP_URL` | Recommended | Canonical URL of your deployment (e.g. `https://hal.yourdomain.com`). Used for CORS validation. |
-| `JWT_SECRET` | **Required** | High-entropy string used to sign session JWTs. Generate with `openssl rand -hex 32`. |
-| `LEAD_ENCRYPTION_KEY_B64` | **Required** | Base64-encoded 32-byte key for AES-256-GCM lead encryption. Generate with `node -e "console.log(crypto.randomBytes(32).toString('base64'))"`. |
+| `APP_URL` | Recommended | Canonical deployment URL used for CORS validation. |
+| `JWT_SECRET` | Required | High-entropy secret used to sign session JWTs. |
+| `LEAD_ENCRYPTION_KEY_B64` | Required for encrypted lead data | Base64-encoded 32-byte key for AES-256-GCM lead encryption. |
 
 ### Database Configuration
+
 | Variable | Required | Description |
 |---|---|---|
-| `DATABASE_URL` | Optional | PostgreSQL connection string (e.g., `postgresql://user:pass@host:5432/haldriver`). If omitted, HAL runs with a zero-downtime local JSON ledger. |
+| `DATABASE_URL` | Required for database-backed features | PostgreSQL connection string. PostgreSQL-backed and legacy JSON persistence domains are not yet consolidated. Omitting this variable does not provide an in-memory persistence fallback. |
 
 ### AI Providers
+
 | Variable | Required | Description |
 |---|---|---|
-| `GEMINI_API_KEY` | Recommended | Google Gemini API key for autonomous audits, content generation, and proposal generation. |
+| `GEMINI_API_KEY` | Recommended | Google Gemini API key for AI features. |
 | `OPENROUTER_API_KEY` | Optional | OpenRouter API key for auxiliary model routing. |
-| `HUGGINGFACE_API_KEY`| Optional | Hugging Face inference key. |
+| `HUGGINGFACE_API_KEY` | Optional | Hugging Face inference key. |
 
-### Multi-Channel Communications (Optional / Plug-and-Play)
-| Variable | Channel | Description |
+### Communications
+
+| Channel | Current status | Configuration / qualification |
 |---|---|---|
-| `WHATSAPP_API_TOKEN` | WhatsApp | Meta Cloud API access token. |
-| `WHATSAPP_PHONE_NUMBER_ID` | WhatsApp | Meta Phone Number ID. |
-| `WHATSAPP_APP_SECRET` | WhatsApp | Meta App Secret for webhook HMAC validation. |
-| `RESEND_API_KEY` | Email | Resend email dispatch key (or standard SMTP). |
-| `TWILIO_ACCOUNT_SID` | SMS | Twilio Account SID. |
-| `TWILIO_AUTH_TOKEN` | SMS | Twilio Auth Token. |
-| `TWILIO_FROM_NUMBER` | SMS | Twilio virtual phone number. |
-| `CAL_COM_API_KEY` | Scheduling | Cal.com API key for calendar booking sync. |
+| Email | Live submission via Resend | Configure `RESEND_API_KEY` and a verified `HAL_SENDER_EMAIL` server-side. Provider acceptance is recorded as `submitted`; recipient delivery is not claimed without a verified delivery event. |
+| SMS | Simulation-only | Composer and simulation workflows exist; live provider dispatch is not implemented. |
+| WhatsApp | Simulation-only | Composer and simulation workflows exist; live provider dispatch is not implemented. |
+| Calendar | Unverified | Provider connectivity and booking operations require separate live verification. |
+
+Live email submissions are recorded in the PostgreSQL communications outbox before provider submission, with idempotency keys and encrypted recipient/content fields. Verified Resend webhook events reconcile delivery, bounce, and related states. Durable automated retry/dead-letter processing is not yet implemented.
 
 ---
 
 ## 4. Verification & Health Check
 
-The acquiring team can verify the technical integrity of the entire codebase at any time using standard test runners:
+The latest documented main-branch CI run passed the following checks:
+
+- **178 automated tests across 34 test files**
+- TypeScript checks
+- Production build
+- Production dependency security audit
+- Full development dependency audit report
+
+The production dependency audit passed, while two moderate development/transitive dependency advisories remain documented. Review the current dependency audit output before making any later security-status representation.
+
+Useful local verification commands:
 
 ```bash
-# Run all 132 automated unit, integration, and security tests
 npm test
-
-# Run strict TypeScript type compilation
 npm run lint
-
-# Compile production bundle
 npm run build
 ```
 
-**Expected Result:**
-```
-✓ tests/unit/...
-✓ tests/integration/...
-✓ tests/security/...
-Test Files: 24 passed (24)
-Tests:      132 passed (132)
-Duration:   ~12s
-```
+A green CI run verifies the checked repository revision. It does not by itself verify production database migrations, live provider credentials, Google AI Studio publication, or live application behavior.
 
 ---
 
 ## 5. Security & Administrative Controls
 
-1. **Initial Admin Setup:**
-   - Launch the application and register an administrator account via the `/` interface.
-   - The first account automatically receives administrator credentials.
-2. **Key Rotation Protocol:**
-   - If migrating an existing database with encrypted leads, maintain `LEAD_ENCRYPTION_KEY_B64`.
-   - Never commit `.env` or production credentials to public version control.
-3. **CORS & Webhook Whitelisting:**
-   - To restrict browser access, set `CORS_ALLOWED_ORIGINS` to a comma-separated list of approved domains.
-   - Outbound webhooks are enforced over HTTPS with HMAC signature validation.
+1. **Authentication:** Authentication guards are designed to fail closed on database errors and enforce bcrypt password hashing.
+2. **Key Management:** Preserve the encryption key when migrating existing encrypted lead data. Rotate secrets through the appropriate deployment controls; never commit credentials.
+3. **CORS & Webhook Protection:** Configure approved browser origins. Outbound webhooks validate HTTPS endpoints, prohibit redirects, and use dedicated HMAC signing secrets.
+4. **Data Handling:** PII fields are encrypted with AES-256-GCM before database insertion where the relevant persistence implementation applies.
 
 ---
 
 ## 6. Commercial Asset Assignment & Closing
 
-Upon receipt of the agreed purchase price ($3,000 USD):
-1. **GitHub Repository Transfer:** Full administrative ownership of the GitHub repository `https://github.com/isaJrKai/Hal-Argumentatio` will be transferred to the buyer's GitHub username/organization.
-2. **Proprietary Rights Transfer:** The seller relinquishes all copyright, commercial rights, trademarks, and claims to HAL, granting the buyer 100% exclusive, perpetual, worldwide ownership.
-3. **Warranty & Maintenance:** The software is delivered as-is with all 132 passing tests verified green at time of delivery. Post-handover hosting, operational maintenance, and third-party API costs are the responsibility of the acquiring party.
+The commercial transaction and transfer of ownership are separate from the technical verification described above. Upon receipt of the agreed purchase price ($3,000 USD), the proposed closing steps are:
+
+1. **GitHub Repository Transfer:** Transfer administrative ownership of `https://github.com/isaJrKai/Hal-Argumentatio` to the buyer's GitHub username or organization.
+2. **Proprietary Rights Transfer:** Execute the agreed transfer of source code, intellectual property, brand, and associated commercial rights.
+3. **Delivery Condition:** The software is delivered as-is, with CI green at handover. Post-handover hosting, operational maintenance, third-party API costs, and any remaining integration or deployment work are the responsibility of the acquiring party unless separately agreed in writing.
