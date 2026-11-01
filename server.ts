@@ -3494,95 +3494,99 @@ app.post('/api/missions', authenticate, async (req, res) => {
 
 app.post('/api/audit/website', authenticate, async (req, res) => {
   const contractorId = (req as any).contractorId;
-  const { url, businessName, city, niche } = req.body;
+  const { url, businessName, city, niche } = req.body || {};
 
-  if (!url) {
-    return res.status(400).json({ error: 'Target website URL is required' });
+  if (typeof url !== 'string' || !url.trim() || url.length > 2048) {
+    return res.status(400).json({ error: 'A website URL between 1 and 2048 characters is required.' });
   }
 
-  let formattedUrl = url.trim();
-  if (!formattedUrl.startsWith('http://') && !formattedUrl.startsWith('https://')) {
-    formattedUrl = 'https://' + formattedUrl;
+  let parsedUrl: URL;
+  try {
+    const candidate = /^https?:\/\//i.test(url.trim()) ? url.trim() : 'https://' + url.trim();
+    parsedUrl = new URL(candidate);
+  } catch {
+    return res.status(400).json({ error: 'Target website URL is invalid.' });
+  }
+  if (
+    (parsedUrl.protocol !== 'https:' && parsedUrl.protocol !== 'http:') ||
+    parsedUrl.username ||
+    parsedUrl.password ||
+    isIP(parsedUrl.hostname)
+  ) {
+    return res.status(400).json({
+      error: 'Only public HTTP/HTTPS domain names are supported. IP literals and embedded credentials are not allowed.'
+    });
   }
 
   try {
-    const isHttps = formattedUrl.startsWith('https://');
-    const sslStatus: 'secured' | 'missing' | 'expired' = isHttps ? 'secured' : 'missing';
-    
-    // Deterministic yet realistic performance scores based on URL characteristics
-    let urlHash = 0;
-    for (let i = 0; i < formattedUrl.length; i++) {
-      urlHash = (urlHash << 5) - urlHash + formattedUrl.charCodeAt(i);
-      urlHash |= 0;
-    }
-    const absHash = Math.abs(urlHash);
-
-    const mobileSpeedScore = Math.max(35, Math.min(92, 45 + (absHash % 48)));
-    const desktopSpeedScore = Math.max(48, Math.min(98, mobileSpeedScore + 12 + (absHash % 15)));
-    const seoHealthScore = Math.max(40, Math.min(95, 52 + ((absHash >> 2) % 44)));
-    const mobileViewportOptimized = mobileSpeedScore > 48;
-    const hasGoogleMapsEmbed = (absHash % 3) !== 0;
-
-    const lostLeadsMonthly = Math.max(3, Math.round((100 - mobileSpeedScore) * 0.18 + (sslStatus === 'missing' ? 6 : 0)));
-    const estimatedContractValue = niche?.toLowerCase().includes('roof') ? 6500 : niche?.toLowerCase().includes('solar') ? 12000 : 2500;
-    const lostRevenueMonthly = Math.round(lostLeadsMonthly * estimatedContractValue * 0.25);
-
+    const formattedUrl = parsedUrl.origin + parsedUrl.pathname;
+    const probe = await validateDomainAndDns(formattedUrl, { probeHttp: true, timeoutMs: 5000 });
+    const generatedAt = new Date().toISOString();
     const vulnerabilities: string[] = [];
     const recommendedFixes: string[] = [];
 
-    if (sslStatus === 'missing') {
-      vulnerabilities.push('Insecure HTTP Connection (Causes browser security warnings and drops conversions by 42%)');
-      recommendedFixes.push('Install TLS 1.3 SSL certificate and enforce 301 HTTPS redirects.');
-    } else {
-      vulnerabilities.push('TLS 1.3 Active - Renewal valid for next 180 days.');
+    if (!probe.dnsResolved) {
+      vulnerabilities.push(probe.rejectionReason || 'Public DNS resolution could not be confirmed.');
+      recommendedFixes.push('Confirm the domain is registered and its public DNS records point to the intended web host.');
+    } else if (!probe.httpReachable) {
+      vulnerabilities.push('Public DNS resolved, but the HTTP/TLS HEAD probe did not receive a usable response.');
+      recommendedFixes.push('Check the web server, firewall, hosting availability, and response to HEAD requests.');
     }
 
-    if (mobileSpeedScore < 60) {
-      vulnerabilities.push(`High First Contentful Paint (FCP > 3.4s) on 4G mobile devices (Score: ${mobileSpeedScore}/100)`);
-      recommendedFixes.push('Compress unoptimized hero images to modern WebP format and defer render-blocking JavaScript.');
-    } else {
-      recommendedFixes.push('Enable edge-caching via Cloudflare or CDN for sub-500ms TTFB across regional markets.');
+    if (probe.dnsResolved && probe.httpReachable && !probe.sslSecured) {
+      vulnerabilities.push('HTTPS/TLS could not be confirmed; an HTTP response was reachable.');
+      recommendedFixes.push('Install or repair a valid TLS certificate and redirect HTTP traffic to HTTPS.');
     }
 
-    if (seoHealthScore < 70) {
-      vulnerabilities.push('Missing OpenGraph meta tags, canonical URL declarations, and Schema.org LocalBusiness structured data.');
-      recommendedFixes.push(`Implement JSON-LD LocalBusiness schema with precise geo-coordinates for ${city || 'target territory'}.`);
-    } else {
-      recommendedFixes.push('Expand location-specific landing pages and targeted search keywords.');
-    }
-
-    if (!hasGoogleMapsEmbed) {
-      vulnerabilities.push('No direct Google Map place embed or geo-tagging on contact page.');
-      recommendedFixes.push('Embed verified Google Maps CID link and NAP (Name, Address, Phone) citation consistency.');
+    if (probe.httpReachable) {
+      recommendedFixes.push('Run a full Lighthouse or Google PageSpeed Insights audit before making performance or SEO claims.');
     }
 
     const report = {
       targetUrl: formattedUrl,
-      businessName: businessName || 'Target Business',
-      city: city || 'Territory Service Area',
-      sslStatus,
-      sslExpiryDays: isHttps ? 180 : 0,
-      mobileSpeedScore,
-      desktopSpeedScore,
-      seoHealthScore,
-      mobileViewportOptimized,
-      hasGoogleMapsEmbed,
-      estimatedLostLeadsMonthly: lostLeadsMonthly,
-      estimatedLostRevenueMonthlyUsd: lostRevenueMonthly,
+      businessName: typeof businessName === 'string' ? businessName.slice(0, 200) : null,
+      city: typeof city === 'string' ? city.slice(0, 120) : null,
+      niche: typeof niche === 'string' ? niche.slice(0, 120) : null,
+      sslStatus: probe.sslSecured ? 'secured' : probe.httpReachable ? 'missing' : 'unknown',
+      sslExpiryDays: null,
+      mobileSpeedScore: null,
+      desktopSpeedScore: null,
+      seoHealthScore: null,
+      mobileViewportOptimized: null,
+      hasGoogleMapsEmbed: null,
+      estimatedLostLeadsMonthly: null,
+      estimatedLostRevenueMonthlyUsd: null,
+      dnsResolved: probe.dnsResolved,
+      httpReachable: probe.httpReachable,
+      httpStatus: probe.httpStatus ?? null,
+      ipAddresses: probe.ipAddresses || [],
+      measurementStatus: probe.httpReachable ? 'partial' : 'unreachable',
+      pageSpeedStatus: 'not_configured',
+      measurementSource: 'HAL public-DNS lookup and pinned, non-redirecting HTTP/TLS HEAD probe',
+      measurementLimitations: [
+        'No PageSpeed or Lighthouse measurement was run.',
+        'No SEO crawler or Google Business Profile lookup was run.',
+        'No lead-loss, conversion, or revenue estimate was calculated.',
+        'TLS certificate expiry was not measured.'
+      ],
       identifiedVulnerabilities: vulnerabilities,
       recommendedFixes,
-      generatedAt: new Date().toISOString()
+      generatedAt
     };
 
     db.addAuditLog({
       contractorId,
-      action: 'SITE_AUDIT_EXECUTED',
-      details: `Generated live technical audit for ${formattedUrl} (${businessName || 'Lead'}). Mobile Score: ${mobileSpeedScore}/100.`
+      action: 'SITE_CONNECTIVITY_CHECK_EXECUTED',
+      details: 'Ran public DNS and pinned HTTP/TLS connectivity checks for ' + formattedUrl + '. PageSpeed, SEO, and revenue impact were not measured.'
     });
 
-    res.json(report);
+    return res.json(report);
   } catch (err: any) {
-    res.status(500).json({ error: `Audit execution failed: ${err.message}` });
+    console.error('[HAL Website Connectivity Check]', err?.message || err);
+    return res.status(502).json({
+      success: false,
+      error: 'Website connectivity check failed. No performance or revenue metrics were generated.'
+    });
   }
 });
 
