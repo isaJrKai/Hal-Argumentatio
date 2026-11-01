@@ -1,8 +1,8 @@
-# HAL — Enterprise AI Business Operating Intelligence Platform
+# HAL — AI Business Operating Intelligence Platform
 
-HAL (Human Argumentation Layer) is a full-stack AI Business Operating Intelligence System. It consolidates lead harvesting, technical SEO auditing, high-conversion landing page generation, multi-channel outreach (WhatsApp, Email, SMS, Calendar), client intelligence graphs, and an immutable cryptographic audit ledger into a unified, turnkey software platform.
+HAL (Human Argumentation Layer) is a full-stack AI Business Operating Intelligence System. It consolidates lead harvesting, technical SEO auditing, high-conversion landing page generation, multi-channel outreach (WhatsApp, Email, SMS, Calendar), client intelligence graphs, and an immutable cryptographic audit ledger into a unified software platform.
 
-HAL is built for operators, agencies, and enterprise consultancies seeking an autonomous decision engine with human-in-the-loop governance.
+HAL is built for operators, agencies, and consultancies seeking a decision-support system with human-in-the-loop governance.
 
 ---
 
@@ -10,7 +10,7 @@ HAL is built for operators, agencies, and enterprise consultancies seeking an au
 
 | Attribute | Specification |
 |---|---|
-| **Asset Type** | Turnkey Full-Stack Software Platform / Complete Intellectual Property |
+| **Asset Type** | Full-Stack Software Platform / Intellectual Property |
 | **Frontend Architecture** | React 19, TypeScript, Vite, Tailwind CSS v4, Lucide Icons, Responsive Mobile/Desktop |
 | **Backend Architecture** | Node.js, Express, TypeScript, RESTful API, Server-Sent Events |
 | **Database & Persistence** | Neon/PostgreSQL via Drizzle for supported domains; legacy `data/db.json` persistence remains in use for other domains. These stores are not yet consolidated. A PostgreSQL failure is reported explicitly rather than treated as an empty dataset or silently replaced with stale local data. |
@@ -47,9 +47,6 @@ HAL is built for operators, agencies, and enterprise consultancies seeking an au
 ### 5. Document & Contract Studio
 - **Turnkey Legal & Sales Collateral:** Automatically compiles custom Master Services Agreements (MSAs), Statements of Work (SOWs), and strategic proposals customized to prospect audit findings.
 
-### 6. GitHub Deploy & Version Synchronization Engine
-- **One-Click Code Push:** In-app GitHub deployment interface with sanitized token handling, allowing seamless continuous delivery to remote repositories.
-
 ---
 
 ## Architecture & Codebase Map
@@ -62,8 +59,8 @@ HAL is built for operators, agencies, and enterprise consultancies seeking an au
 │   ├── lib/                   # Auth handlers, JWT token verification, and utility libraries
 │   ├── services/              # AI providers (Gemini, OpenRouter, HF), MCP dispatchers, webhooks
 │   └── skills/                # Agent skill registry and business heuristic executors
-├── server.ts                  # Enterprise Express server, REST endpoints, CORS policies, webhooks
-├── tests/                     # 24 test suites (Unit, Integration, Security, API, Schema Drift)
+├── server.ts                  # Express server, REST endpoints, CORS policies, webhooks
+├── tests/                     # 34 test suites (Unit, Integration, Security, API, Schema Drift)
 ├── public/                    # Production static assets, PWA manifest, and icons
 ├── docs/                      # Technical specifications, handover manifests, and architecture guides
 └── vitest.config.ts           # Automated test harness configuration
@@ -132,4 +129,4 @@ No alternative hosting target is designated by this repository documentation.
 
 ## Commercial Licensing & Transfer
 
-This codebase, associated documentation, algorithms, and design assets are delivered as a complete, proprietary software asset. Ownership, source code, and commercial exploitation rights transfer in full to the acquiring party upon transaction execution.
+This codebase, associated documentation, algorithms, and design assets are delivered as a proprietary software asset. Ownership, source code, and commercial exploitation rights transfer to the acquiring party upon transaction execution.
