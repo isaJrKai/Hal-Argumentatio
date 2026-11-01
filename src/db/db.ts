@@ -258,6 +258,7 @@ export interface StructuredLedgerEntry {
     | 'phase4_weights_recalibrated'
     | 'phase4_arbitrage_executed'
     | 'phase5_verification_audit'
+    | 'phase5_runtime_diagnostic'
     | 'phase5_brain_synced'
     | 'phase5_regions_federated'
     | 'phase5_ontology_propagated'
