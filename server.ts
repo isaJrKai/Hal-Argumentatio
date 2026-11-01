@@ -21,7 +21,7 @@ import {
   Recommendation
 } from './src/db/db';
 import { db as pgDb } from './src/db/index.ts';
-import { contractors, auditLogs, leads, leadEvents, revenueRecords, campaigns, winLossRecords, performanceSnapshots, recommendations, forecasts, learningInsights, chatMessages, missions, clientProjects, outreachSequences, apiKeys, notifications, schedulerJobs, leadAttribution, conversionOutbox, googleAdsDailyPerformance, revenueExperiments, revenueRecommendations, revenueRecommendationEvents, revenueSimulations, revenueOutcomes, communicationsOutbox, communicationsDeliveryEvents, halLoops, halLoopEvents, hermesLabArtifacts, hermesDiagnosticIncidents, hermesLabMessages } from './src/db/schema.ts';
+import { contractors, auditLogs, leads, leadEvents, revenueRecords, campaigns, winLossRecords, performanceSnapshots, recommendations, forecasts, learningInsights, chatMessages, chatProjects, chatConversations, missions, clientProjects, outreachSequences, apiKeys, notifications, schedulerJobs, leadAttribution, conversionOutbox, googleAdsDailyPerformance, revenueExperiments, revenueRecommendations, revenueRecommendationEvents, revenueSimulations, revenueOutcomes, communicationsOutbox, communicationsDeliveryEvents, halLoops, halLoopEvents, hermesLabArtifacts, hermesDiagnosticIncidents, hermesLabMessages } from './src/db/schema.ts';
 import { eq, inArray, desc, and, or, like, sql, gte, lte } from 'drizzle-orm';
 import { 
   generateLearningFromOutcome, 
@@ -3197,54 +3197,167 @@ function resolveChatContractorId(req: express.Request): string {
   return (req as any).contractorId as string;
 }
 
-app.get('/api/intelligence/chat/history', authenticate, async (req, res) => {
+app.get('/api/intelligence/chat/projects', authenticate, async (req, res) => {
   const contractorId = resolveChatContractorId(req);
   const targetIds = getTargetContractorIds(contractorId);
   try {
-    const history = await pgDb.select().from(chatMessages).where(inArray(chatMessages.contractorId, targetIds)).orderBy(chatMessages.createdAt);
+    const projects = await pgDb.select().from(chatProjects).where(inArray(chatProjects.contractorId, targetIds)).orderBy(desc(chatProjects.updatedAt));
+    res.json(projects);
+  } catch (err: any) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/intelligence/chat/projects', authenticate, async (req, res) => {
+  const contractorId = resolveChatContractorId(req);
+  const name = String(req.body?.name || '').trim().slice(0, 100);
+  if (!name) return res.status(400).json({ error: 'Project name is required.' });
+  try {
+    const now = new Date();
+    const [project] = await pgDb.insert(chatProjects).values({
+      id: 'project_' + crypto.randomBytes(10).toString('hex'), contractorId, name,
+      description: String(req.body?.description || '').trim().slice(0, 500) || null,
+      color: 'cyan', createdAt: now, updatedAt: now
+    }).returning();
+    res.status(201).json(project);
+  } catch (err: any) { res.status(500).json({ error: err.message }); }
+});
+
+app.patch('/api/intelligence/chat/projects/:id', authenticate, async (req, res) => {
+  const contractorId = resolveChatContractorId(req);
+  try {
+    const name = typeof req.body?.name === 'string' ? req.body.name.trim().slice(0, 100) : undefined;
+    const [project] = await pgDb.update(chatProjects).set({
+      ...(name ? { name } : {}),
+      ...(req.body?.archived === true ? { archivedAt: new Date() } : req.body?.archived === false ? { archivedAt: null } : {}),
+      updatedAt: new Date()
+    }).where(and(eq(chatProjects.id, req.params.id), eq(chatProjects.contractorId, contractorId))).returning();
+    if (!project) return res.status(404).json({ error: 'Project not found.' });
+    res.json(project);
+  } catch (err: any) { res.status(500).json({ error: err.message }); }
+});
+
+app.delete('/api/intelligence/chat/projects/:id', authenticate, async (req, res) => {
+  const contractorId = resolveChatContractorId(req);
+  try {
+    const [project] = await pgDb.select().from(chatProjects).where(and(eq(chatProjects.id, req.params.id), eq(chatProjects.contractorId, contractorId))).limit(1);
+    if (!project) return res.status(404).json({ error: 'Project not found.' });
+    await pgDb.update(chatConversations).set({ projectId: null, updatedAt: new Date() }).where(and(eq(chatConversations.projectId, project.id), eq(chatConversations.contractorId, contractorId)));
+    await pgDb.delete(chatProjects).where(and(eq(chatProjects.id, project.id), eq(chatProjects.contractorId, contractorId)));
+    res.json({ message: 'Project deleted. Its conversations were kept in the unassigned list.' });
+  } catch (err: any) { res.status(500).json({ error: err.message }); }
+});
+
+app.get('/api/intelligence/chat/conversations', authenticate, async (req, res) => {
+  const contractorId = resolveChatContractorId(req);
+  const targetIds = getTargetContractorIds(contractorId);
+  try {
+    // Serialize the one-time legacy migration per contractor. Without this lock,
+    // simultaneous workspace loads can create duplicate "Previous Copilot chat"
+    // conversations and race to attach the same orphaned messages.
+    await pgDb.transaction(async (tx) => {
+      await tx.execute(sql`SELECT pg_advisory_xact_lock(42, hashtext(${contractorId}))`);
+      const legacy = await tx.select().from(chatMessages)
+        .where(and(inArray(chatMessages.contractorId, targetIds), sql`${chatMessages.conversationId} IS NULL`))
+        .orderBy(chatMessages.createdAt);
+      if (legacy.length) {
+        const id = 'conversation_' + crypto.randomBytes(10).toString('hex');
+        const now = new Date();
+        await tx.insert(chatConversations).values({
+          id, contractorId, title: 'Previous Copilot chat', projectId: null,
+          createdAt: legacy[0].createdAt || now, updatedAt: now
+        });
+        await tx.update(chatMessages).set({ conversationId: id })
+          .where(and(inArray(chatMessages.id, legacy.map(m => m.id)), inArray(chatMessages.contractorId, targetIds), sql`${chatMessages.conversationId} IS NULL`));
+      }
+    });
+    const conversations = await pgDb.select().from(chatConversations)
+      .where(inArray(chatConversations.contractorId, targetIds)).orderBy(desc(chatConversations.updatedAt));
+    res.json(conversations);
+  } catch (err: any) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/intelligence/chat/conversations', authenticate, async (req, res) => {
+  const contractorId = resolveChatContractorId(req);
+  const projectId = typeof req.body?.projectId === 'string' ? req.body.projectId : null;
+  const title = String(req.body?.title || 'New chat').trim().slice(0, 120) || 'New chat';
+  try {
+    if (projectId) {
+      const [project] = await pgDb.select().from(chatProjects).where(and(eq(chatProjects.id, projectId), eq(chatProjects.contractorId, contractorId))).limit(1);
+      if (!project) return res.status(404).json({ error: 'Project not found.' });
+    }
+    const now = new Date();
+    const [conversation] = await pgDb.insert(chatConversations).values({
+      id: 'conversation_' + crypto.randomBytes(10).toString('hex'), contractorId, projectId, title, createdAt: now, updatedAt: now
+    }).returning();
+    res.status(201).json(conversation);
+  } catch (err: any) { res.status(500).json({ error: err.message }); }
+});
+
+app.patch('/api/intelligence/chat/conversations/:id', authenticate, async (req, res) => {
+  const contractorId = resolveChatContractorId(req);
+  try {
+    const title = typeof req.body?.title === 'string' ? req.body.title.trim().slice(0, 120) : undefined;
+    const [conversation] = await pgDb.update(chatConversations).set({
+      ...(title ? { title } : {}),
+      ...(req.body?.archived === true ? { archivedAt: new Date() } : req.body?.archived === false ? { archivedAt: null } : {}),
+      updatedAt: new Date()
+    }).where(and(eq(chatConversations.id, req.params.id), eq(chatConversations.contractorId, contractorId))).returning();
+    if (!conversation) return res.status(404).json({ error: 'Conversation not found.' });
+    res.json(conversation);
+  } catch (err: any) { res.status(500).json({ error: err.message }); }
+});
+
+app.delete('/api/intelligence/chat/conversations/:id', authenticate, async (req, res) => {
+  const contractorId = resolveChatContractorId(req);
+  try {
+    const [conversation] = await pgDb.select().from(chatConversations).where(and(eq(chatConversations.id, req.params.id), eq(chatConversations.contractorId, contractorId))).limit(1);
+    if (!conversation) return res.status(404).json({ error: 'Conversation not found.' });
+    await pgDb.delete(chatMessages).where(and(eq(chatMessages.conversationId, conversation.id), eq(chatMessages.contractorId, contractorId)));
+    await pgDb.delete(chatConversations).where(and(eq(chatConversations.id, conversation.id), eq(chatConversations.contractorId, contractorId)));
+    res.json({ message: 'Conversation permanently deleted.' });
+  } catch (err: any) { res.status(500).json({ error: err.message }); }
+});
+
+app.get('/api/intelligence/chat/history', authenticate, async (req, res) => {
+  const contractorId = resolveChatContractorId(req);
+  const conversationId = String(req.query.conversationId || '');
+  if (!conversationId) return res.status(400).json({ error: 'conversationId is required.' });
+  try {
+    const [conversation] = await pgDb.select().from(chatConversations).where(and(eq(chatConversations.id, conversationId), eq(chatConversations.contractorId, contractorId))).limit(1);
+    if (!conversation) return res.status(404).json({ error: 'Conversation not found.' });
+    const history = await pgDb.select().from(chatMessages).where(and(eq(chatMessages.contractorId, contractorId), eq(chatMessages.conversationId, conversationId))).orderBy(chatMessages.createdAt);
     res.json(history);
-  } catch (err: any) {
-    res.status(500).json({ error: err.message });
-  }
+  } catch (err: any) { res.status(500).json({ error: err.message }); }
 });
 
 app.delete('/api/intelligence/chat/history', authenticate, async (req, res) => {
   const contractorId = resolveChatContractorId(req);
   try {
-    const targetIds = getTargetContractorIds(contractorId);
-    await pgDb.delete(chatMessages).where(inArray(chatMessages.contractorId, targetIds));
+    await pgDb.delete(chatMessages).where(eq(chatMessages.contractorId, contractorId));
+    await pgDb.delete(chatConversations).where(eq(chatConversations.contractorId, contractorId));
     res.json({ message: 'Chat history cleared successfully.' });
-  } catch (err: any) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-app.delete('/api/intelligence/chat/message/:id', authenticate, async (req, res) => {
-  const contractorId = resolveChatContractorId(req);
-  const { id } = req.params;
-  try {
-    const deleted = await pgDb.delete(chatMessages).where(and(eq(chatMessages.id, id), eq(chatMessages.contractorId, contractorId))).returning();
-    if (deleted.length > 0) {
-      res.json({ message: 'Chat message deleted successfully.' });
-    } else {
-      res.status(404).json({ error: 'Chat message not found or unauthorized.' });
-    }
-  } catch (err: any) {
-    res.status(500).json({ error: err.message });
-  }
+  } catch (err: any) { res.status(500).json({ error: err.message }); }
 });
 
 app.post('/api/intelligence/chat', authenticate, async (req, res) => {
   const contractorId = resolveChatContractorId(req);
-  const { message, enableGrounding, activeAi } = req.body;
+  const { message, enableGrounding, activeAi, conversationId } = req.body;
+  if (typeof message !== 'string' || !message.trim()) return res.status(400).json({ error: 'A message is required.' });
+  if (typeof conversationId !== 'string' || !conversationId) return res.status(400).json({ error: 'A conversation must be selected.' });
   try {
-    // 1. Fetch current chat history to supply to askHalBot as context
-    const currentHistory = await pgDb.select().from(chatMessages).where(eq(chatMessages.contractorId, contractorId)).orderBy(chatMessages.createdAt);
-    
-    // Format history for Google GenAI / Nemotron expectation
-    const formattedHistory = currentHistory.map(m => ({
+    const [conversation] = await pgDb.select().from(chatConversations).where(and(eq(chatConversations.id, conversationId), eq(chatConversations.contractorId, contractorId))).limit(1);
+    if (!conversation) return res.status(404).json({ error: 'Conversation not found.' });
+    // Keep conversation history separate by default. Within a project, include a bounded
+    // window of that project's recent messages so HAL can carry context across its chats.
+    const contextRows = conversation.projectId
+      ? await pgDb.select().from(chatMessages)
+          .where(and(eq(chatMessages.contractorId, contractorId), eq(chatMessages.projectId, conversation.projectId)))
+          .orderBy(desc(chatMessages.createdAt)).limit(30)
+      : await pgDb.select().from(chatMessages)
+          .where(and(eq(chatMessages.contractorId, contractorId), eq(chatMessages.conversationId, conversationId)))
+          .orderBy(desc(chatMessages.createdAt)).limit(30);
+    const formattedHistory = contextRows.reverse().map(m => ({
       role: m.role as 'user' | 'model',
-      parts: [{ text: m.text }]
+      parts: [{ text: m.conversationId === conversationId ? m.text : `[Earlier conversation in this project] ${m.text}` }]
     }));
 
     // 2. Add the User's message to the persistent database
@@ -3253,6 +3366,8 @@ app.post('/api/intelligence/chat', authenticate, async (req, res) => {
     const [userMsg] = await pgDb.insert(chatMessages).values({
       id: 'msg_' + crypto.randomBytes(8).toString('hex'),
       contractorId,
+      conversationId,
+      projectId: conversation.projectId,
       role: 'user',
       text: message,
       enableGrounding: !!enableGrounding,
@@ -3268,6 +3383,8 @@ app.post('/api/intelligence/chat', authenticate, async (req, res) => {
     const [modelMsg] = await pgDb.insert(chatMessages).values({
       id: 'msg_' + crypto.randomBytes(8).toString('hex'),
       contractorId,
+      conversationId,
+      projectId: conversation.projectId,
       role: 'model',
       text: result.text,
       enableGrounding: !!enableGrounding,
@@ -3275,6 +3392,13 @@ app.post('/api/intelligence/chat', authenticate, async (req, res) => {
       timestamp: replyDate,
       createdAt: replyDate,
     }).returning();
+
+    if (conversation.title === 'New chat') {
+      const title = message.trim().replace(/\\s+/g, ' ').slice(0, 64);
+      await pgDb.update(chatConversations).set({ title, updatedAt: replyDate }).where(and(eq(chatConversations.id, conversationId), eq(chatConversations.contractorId, contractorId)));
+    } else {
+      await pgDb.update(chatConversations).set({ updatedAt: replyDate }).where(and(eq(chatConversations.id, conversationId), eq(chatConversations.contractorId, contractorId)));
+    }
 
     res.json({ 
       reply: result.text, 

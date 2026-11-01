@@ -115,9 +115,32 @@ export const learningInsights = pgTable('learning_insights', {
   createdAt: timestamp('created_at').defaultNow().notNull(),
 });
 
+export const chatProjects = pgTable('chat_projects', {
+  id: text('id').primaryKey(),
+  contractorId: text('contractor_id').notNull(),
+  name: text('name').notNull(),
+  description: text('description'),
+  color: text('color').default('cyan').notNull(),
+  archivedAt: timestamp('archived_at'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+});
+
+export const chatConversations = pgTable('chat_conversations', {
+  id: text('id').primaryKey(),
+  contractorId: text('contractor_id').notNull(),
+  projectId: text('project_id'),
+  title: text('title').notNull(),
+  archivedAt: timestamp('archived_at'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+});
+
 export const chatMessages = pgTable('chat_messages', {
   id: text('id').primaryKey(),
   contractorId: text('contractor_id').notNull(),
+  conversationId: text('conversation_id'),
+  projectId: text('project_id'),
   role: text('role').notNull(), // 'user' | 'model'
   text: text('text').notNull(),
   enableGrounding: boolean('enable_grounding').default(false).notNull(),

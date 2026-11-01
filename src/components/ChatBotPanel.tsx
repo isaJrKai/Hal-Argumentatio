@@ -1,365 +1,249 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { 
-  Send, 
-  Sparkles, 
-  Trash2, 
-  Bot, 
-  User, 
-  Globe, 
-  ArrowRight, 
-  Copy, 
-  Check, 
-  Search,
-  RefreshCw,
-  Terminal,
-  ShieldCheck,
-  Zap
-} from 'lucide-react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Archive, Bot, ChevronLeft, ChevronRight, Copy, FolderPlus, Globe, MessageSquare, Plus, Send, Sparkles, Trash2 } from 'lucide-react';
 import { useBusinessContext } from '../context/BusinessContext';
 import { useToast } from '../context/ToastContext';
 
 interface ChatMessage {
-  id: string;
-  role: 'user' | 'model';
-  text: string;
-  enableGrounding?: boolean;
-  sources?: Array<{ title: string; uri: string }>;
-  createdAt?: string;
+  id: string; role: 'user' | 'model'; text: string;
+  enableGrounding?: boolean; sources?: Array<{ title: string; uri: string }>; createdAt?: string;
 }
+interface ChatProject { id: string; name: string; description?: string | null; archivedAt?: string | null; }
+interface ChatConversation { id: string; projectId?: string | null; title: string; archivedAt?: string | null; updatedAt: string; }
+interface Props { token: string | null; }
 
-const renderMessageText = (text: string) => text.split(/(\*\*[^*]+\*\*|\*[^*]+\*|`[^`]+`)/g).map((part, index) => {
+const renderMessageText = (text: string) => text.split(/(\*\*[^*]+\*\*|\*[^*]+\*|\x60[^\x60]+\x60)/g).map((part, index) => {
   if (part.startsWith('**') && part.endsWith('**')) return <strong key={index}>{part.slice(2, -2)}</strong>;
   if (part.startsWith('*') && part.endsWith('*')) return <em key={index}>{part.slice(1, -1)}</em>;
   if (part.startsWith('`') && part.endsWith('`')) return <code key={index} className="px-1 py-0.5 rounded bg-black/10 dark:bg-white/10 font-mono">{part.slice(1, -1)}</code>;
   return part;
 });
 
-interface ChatBotPanelProps {
-  token: string | null;
-}
-
-export const ChatBotPanel: React.FC<ChatBotPanelProps> = ({ token }) => {
-  const { workspaceConfig, regionalProfile, activeNiche } = useBusinessContext();
+export const ChatBotPanel: React.FC<Props> = ({ token }) => {
+  const { regionalProfile, activeNiche } = useBusinessContext();
   const { showToast } = useToast();
-
+  const authToken = token || localStorage.getItem('halbiz_auth_token') || localStorage.getItem('token') || '';
+  const [projects, setProjects] = useState<ChatProject[]>([]);
+  const [conversations, setConversations] = useState<ChatConversation[]>([]);
+  const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
+  const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputText, setInputText] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-  const [enableGrounding, setEnableGrounding] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [grounding, setGrounding] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [showArchived, setShowArchived] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const endRef = useRef<HTMLDivElement>(null);
+  const historyRequestRef = useRef(0);
+  const activeConversationIdRef = useRef<string | null>(activeConversationId);
+  activeConversationIdRef.current = activeConversationId;
 
-  const authToken = token || localStorage.getItem('halbiz_auth_token') || localStorage.getItem('token') || '';
-
-  const quickPrompts = [
-    `Analyze ${regionalProfile.city} ${activeNiche} conversion bottlenecks`,
-    `How should we price our emergency dispatch retainer?`,
-    `What are our Core Web Vitals speed benchmarks?`,
-    `Draft a 3-touch follow-up pitch for a cold lead`
-  ];
-
-  const fetchHistory = async () => {
-    if (!authToken) return;
-    try {
-      const res = await fetch('/api/intelligence/chat/history', {
-        headers: { 'Authorization': `Bearer ${authToken}` }
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setMessages(Array.isArray(data) ? data : []);
-      }
-    } catch (e: any) {
-      console.warn('Chat history unavailable temporarily:', e?.message || e);
+  const api = useCallback(async (url: string, init: RequestInit = {}) => {
+    const response = await fetch(url, { ...init, headers: { Authorization: `Bearer ${authToken}`, ...(init.headers || {}) } });
+    if (!response.ok) {
+      const body = await response.json().catch(() => ({}));
+      throw new Error(body.error || `Request failed (${response.status})`);
     }
-  };
-
-  useEffect(() => {
-    fetchHistory();
+    return response.status === 204 ? null : response.json();
   }, [authToken]);
 
+  const refreshWorkspace = useCallback(async () => {
+    const [projectRows, conversationRows] = await Promise.all([
+      api('/api/intelligence/chat/projects'),
+      api('/api/intelligence/chat/conversations')
+    ]);
+    setProjects(Array.isArray(projectRows) ? projectRows : []);
+    const rows = Array.isArray(conversationRows) ? conversationRows : [];
+    setConversations(rows);
+    return rows as ChatConversation[];
+  }, [api]);
+
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages, isLoading]);
+    if (!authToken) return;
+    refreshWorkspace().then(rows => {
+      if (rows.length) setActiveConversationId(current => current || rows.find(c => !c.archivedAt)?.id || rows[0].id);
+    }).catch(error => showToast({ title: 'Chat workspace unavailable', message: error.message, type: 'error' }));
+  }, [authToken, refreshWorkspace, showToast]);
 
-  const handleSendMessage = async (textToSend?: string) => {
-    const query = (textToSend || inputText).trim();
-    if (!query || isLoading) return;
-
-    const tempUserMsg: ChatMessage = {
-      id: 'temp_' + Date.now(),
-      role: 'user',
-      text: query,
-      enableGrounding,
-      createdAt: new Date().toISOString()
-    };
-
-    setMessages(prev => [...prev, tempUserMsg]);
-    setInputText('');
-    setIsLoading(true);
-
+  const loadConversation = useCallback(async (id: string) => {
+    const requestId = ++historyRequestRef.current;
+    setActiveConversationId(id);
+    setMessages([]);
     try {
-      const res = await fetch('/api/intelligence/chat', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${authToken}`
-        },
-        body: JSON.stringify({
-          message: query,
-          enableGrounding,
-          activeAi: 'dual'
-        })
-      });
-
-      if (res.ok) {
-        const data = await res.json();
-        const modelText = data.modelMessage?.text || data.reply || data.text || 'Response received from HAL Core.';
-        setMessages(prev => [
-          ...prev.filter(m => m.id !== tempUserMsg.id),
-          data.userMessage || tempUserMsg,
-          data.modelMessage || {
-            id: 'mod_' + Date.now(),
-            role: 'model',
-            text: modelText,
-            sources: data.sources,
-            createdAt: new Date().toISOString()
-          }
-        ]);
-      } else {
-        const errorData = await res.json().catch(() => ({}));
-        throw new Error(errorData.error || `HAL chat request failed (${res.status}).`);
+      const rows = await api(`/api/intelligence/chat/history?conversationId=${encodeURIComponent(id)}`);
+      if (requestId === historyRequestRef.current) setMessages(Array.isArray(rows) ? rows : []);
+    } catch (error: any) {
+      if (requestId === historyRequestRef.current) {
+        setMessages([]);
+        showToast({ title: 'Could not open conversation', message: error.message, type: 'error' });
       }
-    } catch (err: any) {
-      console.error(err);
-      showToast({ title: 'HAL could not respond', message: err?.message || 'Please retry. No generated answer was saved.', type: 'error' });
-    } finally {
-      setIsLoading(false);
     }
-  };
+  }, [api, showToast]);
 
-  const handleClearHistory = async () => {
-    if (!window.confirm('Permanently delete all HAL chat messages in this workspace? This cannot be undone.')) return;
-    if (!authToken) {
-      showToast({ title: 'Sign in required', message: 'Sign in again before managing chat history.', type: 'error' });
-      return;
-    }
+  useEffect(() => {
+    if (activeConversationId) loadConversation(activeConversationId);
+    else { historyRequestRef.current += 1; setMessages([]); }
+  }, [activeConversationId, loadConversation]);
+
+  // Keep the project filter/header aligned when a conversation is selected
+  // indirectly (initial load, delete fallback, or restore), not only on row clicks.
+  useEffect(() => {
+    if (!activeConversationId) return;
+    const selected = conversations.find(conversation => conversation.id === activeConversationId);
+    if (selected) setActiveProjectId(selected.projectId || null);
+  }, [activeConversationId, conversations]);
+
+  useEffect(() => { endRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages, loading]);
+
+  const activeConversation = conversations.find(c => c.id === activeConversationId) || null;
+  const visibleConversations = useMemo(() => conversations.filter(c => showArchived ? !!c.archivedAt : !c.archivedAt)
+    .filter(c => !activeProjectId || c.projectId === activeProjectId), [conversations, showArchived, activeProjectId]);
+
+  const createConversation = async (projectId: string | null = activeProjectId) => {
     try {
-      const response = await fetch('/api/intelligence/chat/history', {
-        method: 'DELETE',
-        headers: { 'Authorization': `Bearer ${authToken}` }
-      });
-      if (!response.ok) {
-        const data = await response.json().catch(() => ({}));
-        throw new Error(data.error || `Could not delete chat history (${response.status}).`);
-      }
+      const created = await api('/api/intelligence/chat/conversations', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ projectId, title: 'New chat' }) });
+      await refreshWorkspace();
+      setActiveProjectId(projectId);
+      setActiveConversationId(created.id);
       setMessages([]);
-      showToast({ title: 'Chat history deleted', message: 'The server confirmed deletion.', type: 'success' });
-    } catch (e: any) {
-      console.error(e);
-      showToast({ title: 'Deletion failed', message: e?.message || 'Chat history was not cleared.', type: 'error' });
-    }
+    } catch (error: any) { showToast({ title: 'Could not create chat', message: error.message, type: 'error' }); }
   };
 
-  const handleCopy = (text: string, id: string) => {
-    navigator.clipboard.writeText(text);
-    setCopiedId(id);
-    setTimeout(() => setCopiedId(null), 2000);
-    showToast({ title: 'Copied', message: 'Message copied to clipboard', type: 'success' });
+  const createProject = async () => {
+    const name = window.prompt('Name this project (for example, Edmonton — Custom Home Builders):');
+    if (!name?.trim()) return;
+    try {
+      const project = await api('/api/intelligence/chat/projects', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: name.trim() }) });
+      await refreshWorkspace();
+      setActiveProjectId(project.id);
+      await createConversation(project.id);
+    } catch (error: any) { showToast({ title: 'Could not create project', message: error.message, type: 'error' }); }
   };
+
+  const archiveConversation = async (conversation: ChatConversation) => {
+    try {
+      await api(`/api/intelligence/chat/conversations/${conversation.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ archived: !conversation.archivedAt }) });
+      await refreshWorkspace();
+      if (!conversation.archivedAt && activeConversationId === conversation.id) {
+        const next = conversations.find(c => c.id !== conversation.id && !c.archivedAt && c.projectId === conversation.projectId);
+        setActiveConversationId(next?.id || null);
+        if (!next) setMessages([]);
+      }
+    } catch (error: any) { showToast({ title: 'Could not update chat', message: error.message, type: 'error' }); }
+  };
+
+  const deleteConversation = async (conversation: ChatConversation) => {
+    if (!window.confirm(`Permanently delete “${conversation.title}” and its messages?`)) return;
+    try {
+      await api(`/api/intelligence/chat/conversations/${conversation.id}`, { method: 'DELETE' });
+      const remaining = conversations.filter(c => c.id !== conversation.id);
+      setConversations(remaining);
+      if (activeConversationId === conversation.id) setActiveConversationId(remaining.find(c => !c.archivedAt)?.id || null);
+      showToast({ title: 'Conversation deleted', message: 'The server confirmed permanent deletion.', type: 'success' });
+    } catch (error: any) { showToast({ title: 'Delete failed', message: error.message, type: 'error' }); }
+  };
+
+  const sendMessage = async (value?: string) => {
+    const message = (value || inputText).trim();
+    if (!message || loading) return;
+    let conversationId = activeConversationId;
+    if (!conversationId) {
+      try {
+        const created = await api('/api/intelligence/chat/conversations', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ projectId: activeProjectId, title: 'New chat' }) });
+        conversationId = created.id;
+        setActiveConversationId(conversationId);
+        await refreshWorkspace();
+      } catch (error: any) { showToast({ title: 'Could not start chat', message: error.message, type: 'error' }); return; }
+    }
+    setInputText('');
+    setLoading(true);
+    const tempId = 'pending-' + Date.now();
+    setMessages(prev => [...prev, { id: tempId, role: 'user', text: message, createdAt: new Date().toISOString() }]);
+    try {
+      await api('/api/intelligence/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message, enableGrounding: grounding, activeAi: 'dual', conversationId }) });
+      const rows = await api(`/api/intelligence/chat/history?conversationId=${encodeURIComponent(conversationId)}`);
+      // A slow response from a chat the user has since left must not replace
+      // the currently visible conversation's messages.
+      if (activeConversationIdRef.current === conversationId) {
+        setMessages(Array.isArray(rows) ? rows : []);
+      }
+      await refreshWorkspace();
+    } catch (error: any) {
+      setMessages(prev => prev.filter(m => m.id !== tempId));
+      showToast({ title: 'HAL could not respond', message: error.message, type: 'error' });
+    } finally { setLoading(false); }
+  };
+
+  const copyMessage = async (message: ChatMessage) => {
+    await navigator.clipboard.writeText(message.text);
+    setCopiedId(message.id);
+    showToast({ title: 'Copied', message: 'Message copied to clipboard.', type: 'success' });
+    window.setTimeout(() => setCopiedId(null), 1800);
+  };
+
+  const projectName = projects.find(p => p.id === activeProjectId)?.name || 'All chats';
 
   return (
-    <div className="flex flex-col h-full w-full bg-bg-base text-text-primary overflow-hidden">
-      {/* TOP HEADER */}
-      <div className="px-5 py-3.5 border-b border-border-dim bg-bg-raised flex items-center justify-between gap-3 shrink-0">
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg bg-cyan-500/15 border border-cyan-500/30 flex items-center justify-center text-cyan-400 shadow-xs">
-            <Bot className="w-4 h-4" />
-          </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <h2 className="text-sm font-bold text-text-primary font-display">HAL AI Copilot</h2>
-              <span className="px-1.5 py-0.5 rounded text-[9px] font-mono bg-cyan-500/15 text-cyan-400 border border-cyan-500/30 font-bold uppercase">
-                Active
-              </span>
-            </div>
-            <p className="text-[11px] text-text-secondary">
-              Executive business operating intelligence & real-time decision copilot
-            </p>
-          </div>
+    <div className="flex h-full min-h-0 w-full overflow-hidden bg-bg-base text-text-primary">
+      {sidebarOpen && <aside className="w-64 shrink-0 border-r border-border-dim bg-bg-raised flex flex-col min-h-0">
+        <div className="p-3 flex items-center gap-2">
+          <button onClick={() => createConversation(activeProjectId)} className="flex-1 flex items-center justify-center gap-2 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white px-3 py-2 text-xs font-semibold"><Plus className="w-4 h-4"/> New chat</button>
+          <button onClick={() => setSidebarOpen(false)} title="Collapse sidebar" className="p-2 rounded-lg hover:bg-bg-subtle text-text-secondary"><ChevronLeft className="w-4 h-4"/></button>
         </div>
-
-        <div className="flex items-center gap-2">
-          {/* Grounding Toggle */}
-          <button
-            onClick={() => setEnableGrounding(!enableGrounding)}
-            className={`px-2.5 py-1.5 rounded-lg border text-xs font-mono flex items-center gap-1.5 transition-all cursor-pointer ${
-              enableGrounding 
-                ? 'bg-indigo-500/15 border-indigo-500/40 text-indigo-400 font-bold' 
-                : 'bg-bg-subtle border-border-dim text-text-tertiary hover:text-text-primary'
-            }`}
-            title="Enable Google Search Grounding for live live web intelligence"
-          >
-            <Globe className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">Search Grounding</span>
-          </button>
-
-          {/* Refresh History */}
-          <button
-            onClick={fetchHistory}
-            className="p-1.5 rounded-lg border border-border-dim bg-bg-subtle hover:bg-bg-raised text-text-secondary hover:text-text-primary transition-all cursor-pointer"
-            title="Refresh memory stream"
-          >
-            <RefreshCw className="w-3.5 h-3.5" />
-          </button>
-
-          {/* Clear History */}
-          <button
-            onClick={handleClearHistory}
-            className="p-1.5 rounded-lg border border-border-dim bg-bg-subtle hover:bg-rose-500/15 hover:border-rose-500/30 text-text-secondary hover:text-rose-400 transition-all cursor-pointer"
-            title="Clear chat history"
-          >
-            <Trash2 className="w-3.5 h-3.5" />
-          </button>
+        <div className="px-3 pb-2 flex items-center justify-between"><span className="text-[10px] uppercase tracking-wider font-semibold text-text-tertiary">Projects</span><button onClick={createProject} title="Create project" className="p-1.5 rounded hover:bg-bg-subtle"><FolderPlus className="w-4 h-4"/></button></div>
+        <div className="px-2 space-y-1 overflow-y-auto max-h-[38%]">
+          <button onClick={() => setActiveProjectId(null)} className={`w-full text-left px-2.5 py-2 rounded-lg text-xs ${!activeProjectId ? 'bg-bg-subtle text-text-primary' : 'text-text-secondary hover:bg-bg-subtle'}`}>All chats</button>
+          {projects.filter(p => !p.archivedAt).map(project => <button key={project.id} onClick={() => { setActiveProjectId(project.id); const next = conversations.find(c => c.projectId === project.id && !c.archivedAt); setActiveConversationId(next?.id || null); }} className={`w-full text-left px-2.5 py-2 rounded-lg text-xs truncate ${activeProjectId === project.id ? 'bg-cyan-500/10 text-cyan-500' : 'text-text-secondary hover:bg-bg-subtle'}`}><span className="mr-2 text-cyan-500">▦</span>{project.name}</button>)}
         </div>
-      </div>
-
-      {/* CHAT MESSAGES BODY */}
-      <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4">
-        {messages.length === 0 ? (
-          <div className="h-full flex flex-col items-center justify-center text-center max-w-lg mx-auto p-6 space-y-5">
-            <div className="w-12 h-12 rounded-xl bg-cyan-500/10 border border-cyan-500/25 flex items-center justify-center text-cyan-400 shadow-md">
-              <Sparkles className="w-6 h-6" />
-            </div>
-            <div className="space-y-1.5">
-              <h3 className="text-base font-bold text-text-primary font-display">
-                How can HAL assist your business operations today?
-              </h3>
-              <p className="text-xs text-text-secondary leading-relaxed">
-                HAL reasons across your territory data, verified leads, ad performance, contracts, and Core Web Vitals to deliver actionable, high-intent decisions.
-              </p>
-            </div>
-
-            {/* Quick Prompts */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 w-full pt-2">
-              {quickPrompts.map((prompt, idx) => (
-                <button
-                  key={idx}
-                  onClick={() => handleSendMessage(prompt)}
-                  className="p-3 text-left rounded-lg border border-border-dim bg-bg-raised hover:bg-bg-subtle hover:border-cyan-500/40 text-xs text-text-secondary hover:text-text-primary transition-all cursor-pointer group flex items-start justify-between gap-2"
-                >
-                  <span className="leading-snug">{prompt}</span>
-                  <ArrowRight className="w-3 h-3 text-text-tertiary group-hover:text-cyan-400 shrink-0 mt-0.5" />
-                </button>
-              ))}
-            </div>
+        <div className="mt-4 px-3 pb-2 flex items-center justify-between"><span className="text-[10px] uppercase tracking-wider font-semibold text-text-tertiary">{showArchived ? 'Archived chats' : 'Recent chats'}</span><button onClick={() => setShowArchived(!showArchived)} className="text-[10px] text-cyan-500 hover:underline">{showArchived ? 'Recent' : 'Archived'}</button></div>
+        <div className="flex-1 min-h-0 overflow-y-auto px-2 pb-3 space-y-1">
+          {visibleConversations.map(conversation => <div key={conversation.id} className={`group flex items-center gap-1 rounded-lg ${activeConversationId === conversation.id ? 'bg-bg-subtle' : 'hover:bg-bg-subtle'}`}>
+            <button onClick={() => { setActiveProjectId(conversation.projectId || null); setActiveConversationId(conversation.id); }} className="flex-1 min-w-0 text-left px-2.5 py-2 text-xs truncate text-text-secondary"><MessageSquare className="w-3 h-3 inline mr-2 opacity-60"/>{conversation.title}</button>
+            <button onClick={() => archiveConversation(conversation)} title={conversation.archivedAt ? 'Restore chat' : 'Archive chat'} className="p-1.5 opacity-0 group-hover:opacity-100 text-text-tertiary hover:text-cyan-500"><Archive className="w-3 h-3"/></button>
+            <button onClick={() => deleteConversation(conversation)} title="Delete chat" className="p-1.5 mr-1 opacity-0 group-hover:opacity-100 text-text-tertiary hover:text-rose-500"><Trash2 className="w-3 h-3"/></button>
+          </div>)}
+          {!visibleConversations.length && <p className="px-3 py-4 text-[11px] text-text-tertiary">No chats here yet.</p>}
+        </div>
+      </aside>}
+      <main className="flex-1 min-w-0 flex flex-col min-h-0">
+        <header className="h-14 shrink-0 border-b border-border-dim bg-bg-raised/80 flex items-center justify-between px-4 gap-3">
+          <div className="flex items-center gap-2 min-w-0">
+            {!sidebarOpen && <button onClick={() => setSidebarOpen(true)} title="Open sidebar" className="p-2 rounded-lg hover:bg-bg-subtle"><ChevronRight className="w-4 h-4"/></button>}
+            <div className="w-8 h-8 rounded-lg bg-cyan-500/10 border border-cyan-500/25 flex items-center justify-center text-cyan-500"><Bot className="w-4 h-4"/></div>
+            <div className="min-w-0"><div className="text-xs font-semibold truncate">{activeConversation?.title || 'HAL AI'}</div><div className="text-[10px] text-text-tertiary truncate">{projectName} · Project-aware conversations</div></div>
           </div>
-        ) : (
-          messages.map((msg) => {
-            const isUser = msg.role === 'user';
-            return (
-              <div 
-                key={msg.id}
-                className={`flex gap-3 max-w-3xl ${isUser ? 'ml-auto flex-row-reverse' : 'mr-auto'}`}
-              >
-                <div className={`w-7 h-7 rounded-lg shrink-0 flex items-center justify-center text-xs font-bold ${
-                  isUser 
-                    ? 'bg-blue-600 text-white shadow-xs' 
-                    : 'bg-cyan-500/15 border border-cyan-500/30 text-cyan-400'
-                }`}>
-                  {isUser ? <User className="w-4 h-4" /> : <Bot className="w-4 h-4" />}
-                </div>
-
-                <div className={`space-y-1.5 max-w-[85%] sm:max-w-xl rounded-xl p-3.5 text-xs leading-relaxed border ${
-                  isUser
-                    ? 'bg-blue-600 text-white border-blue-500 shadow-sm'
-                    : 'bg-bg-raised text-text-primary border-border-dim shadow-xs font-sans'
-                }`}>
-                  <div className="flex items-center justify-between gap-2 pb-1 border-b border-black/10 dark:border-white/10 text-[10px] opacity-75 font-mono">
-                    <span>{isUser ? 'Operator' : 'HAL Intelligence Core'}</span>
-                    <div className="flex items-center gap-1.5">
-                      <button 
-                        onClick={() => handleCopy(msg.text, msg.id)}
-                        className="hover:opacity-100 transition-opacity cursor-pointer p-0.5"
-                        title="Copy message"
-                      >
-                        {copiedId === msg.id ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="whitespace-pre-wrap font-sans text-xs">
-                    {renderMessageText(msg.text)}
-                  </div>
-
-                  {msg.sources && msg.sources.length > 0 && (
-                    <div className="pt-2 mt-2 border-t border-border-dim space-y-1">
-                      <span className="text-[10px] font-mono font-bold text-text-tertiary block uppercase">
-                        Verified Sources
-                      </span>
-                      <div className="flex flex-wrap gap-1.5">
-                        {msg.sources.map((src, idx) => (
-                          <a
-                            key={idx}
-                            href={src.uri}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-[10px] text-cyan-400 hover:underline bg-bg-base px-2 py-0.5 rounded border border-border-dim truncate max-w-[200px]"
-                          >
-                            {src.title || src.uri}
-                          </a>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
+          <button onClick={() => setGrounding(!grounding)} className={`shrink-0 px-2.5 py-1.5 rounded-lg border text-[10px] flex items-center gap-1.5 ${grounding ? 'border-cyan-500/40 bg-cyan-500/10 text-cyan-500' : 'border-border-dim text-text-tertiary'}`}><Globe className="w-3.5 h-3.5"/> Search grounding</button>
+        </header>
+        <section className="flex-1 min-h-0 overflow-y-auto px-4 sm:px-8 py-6">
+          <div className="max-w-3xl mx-auto space-y-6">
+            {!messages.length && <div className="min-h-[55vh] flex flex-col justify-center items-center text-center gap-4">
+              <div className="w-12 h-12 rounded-2xl bg-cyan-500/10 flex items-center justify-center text-cyan-500"><Sparkles className="w-6 h-6"/></div>
+              <div><h2 className="text-xl font-semibold">What are we working on?</h2><p className="text-sm text-text-secondary mt-2">Start a conversation in {projectName === 'All chats' ? 'HAL' : projectName}. Chats stay saved in their project.</p></div>
+              <div className="grid sm:grid-cols-2 gap-2 w-full max-w-xl text-left">
+                {[`Analyze ${regionalProfile.city} ${activeNiche} conversion bottlenecks`,'Build a prospect research plan','Review this project’s commercial strategy','Draft an evidence-based outreach sequence'].map(prompt => <button key={prompt} onClick={() => sendMessage(prompt)} className="p-3 rounded-xl border border-border-dim hover:bg-bg-raised text-xs text-text-secondary">{prompt}</button>)}
               </div>
-            );
-          })
-        )}
-
-        {isLoading && (
-          <div className="flex gap-3 max-w-xl mr-auto">
-            <div className="w-7 h-7 rounded-lg shrink-0 flex items-center justify-center bg-cyan-500/15 border border-cyan-500/30 text-cyan-400 animate-pulse">
-              <Bot className="w-4 h-4" />
-            </div>
-            <div className="bg-bg-raised border border-border-dim rounded-xl p-3 text-xs text-text-secondary flex items-center gap-2">
-              <div className="w-2 h-2 rounded-full bg-cyan-400 animate-ping" />
-              <span>HAL is reasoning with memory and models...</span>
-            </div>
+            </div>}
+            {messages.map(message => <article key={message.id} className={`flex gap-3 ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+              {message.role === 'model' && <div className="w-7 h-7 shrink-0 rounded-lg bg-cyan-500/10 text-cyan-500 flex items-center justify-center"><Bot className="w-4 h-4"/></div>}
+              <div className={`max-w-[88%] sm:max-w-[78%] rounded-2xl px-4 py-3 text-sm leading-7 ${message.role === 'user' ? 'bg-blue-600 text-white rounded-br-md' : 'bg-bg-raised border border-border-dim text-text-primary rounded-bl-md'}`}>
+                <div className="whitespace-pre-wrap">{renderMessageText(message.text)}</div>
+                {message.sources?.length ? <div className="mt-3 pt-2 border-t border-border-dim text-xs space-y-1"><div className="font-semibold text-text-tertiary">Sources</div>{message.sources.map((source, index) => <a key={index} href={source.uri} target="_blank" rel="noreferrer" className="block text-cyan-500 hover:underline truncate">{source.title || source.uri}</a>)}</div> : null}
+                {message.role === 'model' && <div className="flex justify-end mt-2"><button onClick={() => copyMessage(message)} title="Copy response" className="text-text-tertiary hover:text-cyan-500">{copiedId === message.id ? 'Copied' : <Copy className="w-3.5 h-3.5"/>}</button></div>}
+              </div>
+              {message.role === 'user' && <div className="w-7 h-7 shrink-0 rounded-lg bg-blue-600 text-white flex items-center justify-center text-[10px] font-semibold">You</div>}
+            </article>)}
+            {loading && <div className="flex items-center gap-2 text-xs text-text-tertiary"><span className="w-2 h-2 rounded-full bg-cyan-500 animate-pulse"/>HAL is thinking…</div>}
+            <div ref={endRef}/>
           </div>
-        )}
-
-        <div ref={messagesEndRef} />
-      </div>
-
-      {/* INPUT BAR */}
-      <div className="p-3.5 sm:p-4 border-t border-border-dim bg-bg-raised/70">
-        <form 
-          onSubmit={(e) => {
-            e.preventDefault();
-            handleSendMessage();
-          }}
-          className="max-w-4xl mx-auto flex items-center gap-2"
-        >
-          <input
-            type="text"
-            value={inputText}
-            onChange={(e) => setInputText(e.target.value)}
-            placeholder="Ask HAL anything about operations, leads, speed audits, or strategy..."
-            className="flex-1 bg-bg-base border border-border-dim focus:border-cyan-500 rounded-xl px-3.5 py-2.5 text-xs text-text-primary outline-hidden placeholder:text-text-tertiary shadow-inner"
-            disabled={isLoading}
-          />
-
-          <button
-            type="submit"
-            disabled={!inputText.trim() || isLoading}
-            className="px-4 py-2.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-bold font-sans flex items-center gap-1.5 transition-all cursor-pointer shadow-md shadow-cyan-600/25 shrink-0"
-          >
-            <Send className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">Send</span>
-          </button>
-        </form>
-      </div>
+        </section>
+        <footer className="shrink-0 border-t border-border-dim bg-bg-raised/70 p-3 sm:p-4">
+          <form onSubmit={event => { event.preventDefault(); sendMessage(); }} className="max-w-3xl mx-auto flex items-end gap-2">
+            <textarea value={inputText} onChange={event => setInputText(event.target.value)} onKeyDown={event => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); sendMessage(); } }} placeholder="Message HAL… (Enter to send, Shift+Enter for a new line)" rows={2} className="flex-1 resize-none rounded-2xl border border-border-dim bg-bg-base px-4 py-3 text-sm outline-none focus:border-cyan-500 text-text-primary" disabled={loading}/>
+            <button type="submit" disabled={!inputText.trim() || loading} className="p-3 rounded-xl bg-cyan-600 hover:bg-cyan-500 disabled:opacity-40 text-white"><Send className="w-4 h-4"/></button>
+          </form>
+          <p className="text-center text-[10px] text-text-tertiary mt-2">HAL can make mistakes. Verify important business decisions against source data.</p>
+        </footer>
+      </main>
     </div>
   );
 };
