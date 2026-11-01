@@ -24,6 +24,7 @@ export interface GoogleAdsBaseline {
   source: 'LIVE_POSTGRES_TABLE' | 'UNAVAILABLE';
   daysSampled: number;
   weeklyDemandSeries: number[];
+  weeklyObservations?: number;
 }
 
 export interface WeatherTriggerSignal {
@@ -498,7 +499,7 @@ export async function executeBrainSynchronizedForecast(
     targetCity: city,
     targetNiche: niche,
     horizonWeeks,
-    googleAdsBaseline: { ...adsBaseline, weeklyDemandSeries: [] },
+    googleAdsBaseline: { ...adsBaseline, weeklyDemandSeries: [], weeklyObservations: adsBaseline.weeklyDemandSeries.length },
     weatherTrigger,
     budgetGuardrails: guardrails,
     forecastCurve,
