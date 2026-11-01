@@ -35,9 +35,10 @@ HAL is built for operators, agencies, and enterprise consultancies seeking an au
 - **Dual Export Engine:** One-click download of standalone static HTML/CSS or production-ready Next.js TSX components.
 
 ### 3. Unified Communications Hub
-- **Multi-Channel Orchestration:** Centralized dispatch console for WhatsApp Business Cloud API, Resend/SMTP Email, and Twilio SMS.
-- **Meeting Automation:** Integrated Cal.com booking sync for automated calendar reservations.
-- **Cryptographic Audit Blocks:** Every outbound dispatch event generates an immutable SHA-256 verification hash recorded to the system ledger.
+- **Email:** Live email submission is available through the Resend API when `RESEND_API_KEY` and a verified `HAL_SENDER_EMAIL` are configured server-side. HAL records provider acceptance as `submitted`; it does not claim recipient delivery without a verified delivery event.
+- **SMS and WhatsApp:** Composer and simulation workflows are available. Live provider dispatch is not implemented and is not represented as operational.
+- **Dispatch history:** Current dispatch history is process-memory based; it is not yet a durable transactional outbox. The audit ledger records dispatch metadata, but provider delivery callbacks and durable retry/dead-letter handling remain outstanding.
+- **Calendar:** Provider connectivity and booking operations require separate live verification; do not assume calendar bookings are operational.
 
 ### 4. Neural Intelligence & Decision Graph
 - **Interactive Visual Topology:** Visualizes lead nodes, operational clusters, and autonomous recommendation confidence scores.
