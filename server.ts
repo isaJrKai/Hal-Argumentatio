@@ -1428,8 +1428,22 @@ app.get('/api/leads', authenticate, async (req, res) => {
         : l.verificationStatus;
       return {
         ...l,
+        sourceType: l.externalSource || l.externalCrmId ? (l.externalSource || l.sourceType || 'unknown') : 'unknown',
         verificationStatus: safeVerificationStatus,
-        dnsVerified: hasCurrentGroundingEvidence ? l.dnsVerified : (safeVerificationStatus === 'VERIFIED' ? l.dnsVerified : false),
+        dnsVerified: hasCurrentGroundingEvidence ? l.dnsVerified : false,
+        // These columns historically had schema defaults without source evidence.
+        // Keep them unavailable until each metric has a measured provenance record.
+        reviewCount: null,
+        reviewScore: null,
+        predictedMonthlyLostRevenueUsd: null,
+        performanceScore: null,
+        sslStatus: null,
+        mobileFriendly: null,
+        urgencyScore: null,
+        predictedLtv: null,
+        seoScore: null,
+        googleRating: null,
+        sentimentScore: null,
         email: l.emailEncrypted ? (decrypt(l.emailEncrypted) || l.email) : l.email,
         phone: l.phoneEncrypted ? (decrypt(l.phoneEncrypted) || l.phone) : l.phone
       };
