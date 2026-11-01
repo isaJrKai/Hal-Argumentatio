@@ -95,7 +95,7 @@ export default function ${componentName}() {
             >
               <span>📞</span>
               <span className="hidden sm:inline">${sections.header.ctaText}</span>
-              <span className="sm:hidden">Call Now</span>
+              <span className="sm:hidden">\${phone ? 'Call Now' : 'Request a Quote'}</span>
             </a>
           </div>
         </div>
