@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Bot, 
+  AlertCircle,
   ShieldCheck, 
   Cpu, 
   Network, 
