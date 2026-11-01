@@ -260,8 +260,6 @@ export default function OverviewPanel({
             demand: c.predictedDemandIndex,
             demandLower: c.lowerBound,
             demandUpper: c.upperBound,
-            observedCpl: c.observedCplUsd,
-            isBreach: c.isBreachingCplLimit,
           }));
           setForecastChartData(formatted);
         }
@@ -634,15 +632,7 @@ export default function OverviewPanel({
                             <span className="font-semibold text-text-primary">{item.demandLower}–{item.demandUpper}</span>
                           </div>
                         )}
-                        {item.observedCpl !== undefined && (
-                          <div className="flex items-center justify-between text-[10px]">
-                            <span className="text-text-tertiary">Trailing observed CPL:</span>
-                            <span className={`font-medium ${item.isBreach ? 'text-danger font-bold flex items-center gap-1' : 'text-text-primary'}`}>
-                              ${item.observedCpl}
-                              {item.isBreach && <span className="text-[8.5px] px-1 py-0.2 rounded bg-danger-dim text-danger">BREACH</span>}
-                            </span>
-                          </div>
-                        )}
+
 
                       </div>
                     );
