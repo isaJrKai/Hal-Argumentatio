@@ -5372,7 +5372,7 @@ app.post('/api/ai/simulate-outreach', authenticate, async (req, res) => {
   }
 });
 
-app.post('/api/ai/test-timesfm', authenticate, async (req, res) => {
+app.post('/api/forecast/scenario', authenticate, async (req, res) => {
   const contractorId = (req as any).contractorId;
   const { city, niche, horizonWeeks, applyGuardrails, targetCac, targetCAC } = req.body;
   const targetCity = city || 'Calgary';
@@ -5391,8 +5391,8 @@ app.post('/api/ai/test-timesfm', authenticate, async (req, res) => {
 
     db.addAuditLog({
       contractorId,
-      action: 'TIMESFM_BRAIN_SYNCHRONIZED_INFERENCE',
-      details: `TimesFM forward demand synthesis executed with Live Google Ads ingestion, Weather Triggers (${result.weatherTrigger.hazardCategory}), and Automated Budget Guardrails for ${targetNiche} in ${targetCity}.`
+      action: 'HAL_HEURISTIC_FORECAST_SCENARIO',
+      details: `A heuristic scenario used tenant-owned Google Ads history for ${targetNiche} in ${targetCity}. It is not TimesFM and does not change ad budgets.`
     });
 
     res.json(result);
