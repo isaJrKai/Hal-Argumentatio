@@ -41,7 +41,9 @@ function renderInlineMarkdown(value: string): React.ReactNode[] {
     }
     return <React.Fragment key={index}>{part}</React.Fragment>;
   });
-}interface ChatBotPanelProps {
+}
+
+interface ChatBotPanelProps {
   token: string | null;
 }
 
@@ -339,7 +341,7 @@ What niche or city would you like to inspect first?`;
                   </div>
 
                   <div className="whitespace-pre-wrap font-sans text-xs">
-                    {msg.text.split('\\n').map((line, lineIndex) => (
+                    {msg.text.split('\n').map((line, lineIndex) => (
                       <div key={lineIndex} className="min-h-[1em]">{renderInlineMarkdown(line)}</div>
                     ))}
                   </div>
