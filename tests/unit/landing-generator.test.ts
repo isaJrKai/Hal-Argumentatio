@@ -25,7 +25,7 @@ describe('contractor landing page factual normalization', () => {
     expect(config.licenseNumber).toBe('');
     expect(config.sections.header.ctaText).toBe('Call +14165550123');
     expect(config.sections.footer.address).toBe('123 Queen Street West');
-    expect(config.sections.hero.headline).toContain('Sump Pump');
+    expect(config.sections.hero.headline).toBe('Plumbing Services in Toronto');
     expect(config.sections.services.items).toHaveLength(1);
     expect(config.sections.services.items[0].title).toBe('Sump Pump Enquiries');
     expect(config.sections.trust_bar.active).toBe(false);
@@ -58,7 +58,7 @@ describe('contractor landing page factual normalization', () => {
 
     const config = applyVerifiedBusinessDetails(template, businessDetails, true);
 
-    expect(config.title).toBe('A tailored title for the contractor');
+    expect(config.title).toBe('Dry Basement Co — sump pump Services in Toronto');
     expect(config.sections.hero.headline).toBe('Keep Toronto basements dry with a properly sized sump pump');
     expect(config.sections.hero.subheadline).toContain('property and drainage');
     expect(config.sections.services.items[0].title).toBe('Sump pump installation');
