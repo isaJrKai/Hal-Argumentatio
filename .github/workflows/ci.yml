@@ -27,7 +27,7 @@ jobs:
         with:
           python-version: '3.11'
       - name: Check TimesFM service Python syntax
-        run: python -m py_compile services/timesfm/app.py
+        run: python -m py_compile services/timesfm/app.py services/timesfm/batch_forecast.py
       - name: Type-check and run automated tests
         run: npm run test:ci
       - name: Build production artifacts
