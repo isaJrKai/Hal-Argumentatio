@@ -1984,8 +1984,7 @@ app.all(['/api/webhooks/twilio', '/api/webhooks/whatsapp'], async (req, res) => 
     const targetContractorId = matchedLead.contractorId;
     const now = new Date().toISOString();
 
-    } else {
-      // Advance lead status to 'contacted' if it was new
+    // Advance lead status to 'contacted' if it was new
       const newStatus = (matchedLead.status === 'new' ? 'contacted' : matchedLead.status) as 'new' | 'contacted' | 'converted' | 'dead';
       const updatedNotes = `${matchedLead.notes || ''}\n[Inbound ${isWhatsApp ? 'WhatsApp' : 'SMS'} - ${now.slice(0, 16)}]: ${rawBody}`.trim();
       
@@ -1994,7 +1993,6 @@ app.all(['/api/webhooks/twilio', '/api/webhooks/whatsapp'], async (req, res) => 
         notes: updatedNotes
       });
       matchedLead.status = newStatus;
-    }
 
     // Commit cryptographic ledger audit entry
     try {
