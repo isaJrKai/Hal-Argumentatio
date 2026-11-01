@@ -425,7 +425,7 @@ export default function NeuralPanel() {
       else if (node.type === 'decaying') color = '#ef4444';
       else if (node.type === 'win') color = '#10b981';
       else if (node.type === 'loss') color = '#ef4444';
-      else if (node.type === 'niche') color = '#8b5cf6';
+      else if (node.type === 'niche') color = '#eab308';
       else if (node.type === 'lead') color = '#3b82f6';
 
       if (influenceRef.current && node.type !== 'core' && node.type !== 'niche') {
