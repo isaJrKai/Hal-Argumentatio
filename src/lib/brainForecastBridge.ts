@@ -5,11 +5,12 @@ import {
   revenueRecommendations, 
   notifications, 
   auditLogs,
-  contractors
+  contractors,
+  forecasts
 } from '../db/schema';
 import { eq, desc } from 'drizzle-orm';
 import crypto from 'crypto';
-import { requestTimesFmForecast } from './timesfmClient';
+import { requestTimesFmForecast, TimesFmForecastResponse } from './timesfmClient';
 import { buildWeeklyDemandSeries, filterGoogleAdsTerritoryRecords } from './forecastData';
 
 export interface GoogleAdsBaseline {
@@ -375,6 +376,107 @@ export async function evaluateAndEnforceBudgetGuardrails(
  * Executes the complete 11-Layer Brain synchronization loop:
  * Ingests tenant-scoped Google Ads -> runs TimesFM demand inference -> compares trailing CPL to a human-reviewed CAC guardrail.
  */
+interface ScheduledTimesFmForecast {
+  response: TimesFmForecastResponse;
+  generatedAt: string;
+  historicalMean: number;
+  recordsCount: number;
+  daysSampled: number;
+  totalCost: number;
+  totalConversions: number;
+  empiricalCpl: number;
+}
+
+/**
+ * Reads the last successful scheduled TimesFM batch result for this tenant and
+ * territory. The batch workflow writes only model outputs and non-PII provenance
+ * metadata to the existing forecasts table. Stale or incomplete snapshots fail closed.
+ */
+async function loadScheduledTimesFmForecast(
+  contractorId: string,
+  city: string,
+  niche: string,
+  horizonWeeks: number
+): Promise<ScheduledTimesFmForecast | null> {
+  const rows = await pgDb
+    .select()
+    .from(forecasts)
+    .where(eq(forecasts.contractorId, contractorId))
+    .orderBy(desc(forecasts.targetDate))
+    .limit(300);
+
+  const now = Date.now();
+  const cityNeedle = city.trim().toLowerCase();
+  const nicheNeedle = niche.trim().toLowerCase();
+  const candidates = rows.flatMap((row) => {
+    if (row.metric !== 'conversions' || row.modelVersion !== 'timesfm-2.5-batch-v1') return [];
+    const targetDate = new Date(row.targetDate as any);
+    if (!Number.isFinite(targetDate.getTime()) || targetDate.getTime() <= now) return [];
+    let metadata: any;
+    try {
+      metadata = typeof row.assumptions === 'string' ? JSON.parse(row.assumptions) : row.assumptions;
+    } catch {
+      return [];
+    }
+    if (!metadata || typeof metadata !== 'object') return [];
+    const storedCity = String(metadata.territory_city || '').trim().toLowerCase();
+    const storedNiche = String(metadata.territory_trade || '').trim().toLowerCase();
+    const cityMatches = Boolean(storedCity && cityNeedle)
+      && (storedCity.includes(cityNeedle) || cityNeedle.includes(storedCity));
+    const nicheMatches = Boolean(storedNiche && nicheNeedle)
+      && (storedNiche.includes(nicheNeedle) || nicheNeedle.includes(storedNiche));
+    if (!cityMatches || !nicheMatches) return [];
+
+    const generatedAt = String(metadata.generated_at || '');
+    const generatedMs = Date.parse(generatedAt);
+    if (!Number.isFinite(generatedMs) || generatedMs > now || now - generatedMs > 24 * 60 * 60 * 1000) return [];
+
+    const point = Number(row.predicted);
+    const lower = Number(metadata.lower);
+    const upper = Number(metadata.upper);
+    if (![point, lower, upper].every(Number.isFinite) || lower < 0 || lower > point || point > upper) return [];
+    return [{ row, metadata, generatedAt, generatedMs, targetDate, point, lower, upper }];
+  });
+
+  if (!candidates.length) return null;
+  const latestGeneratedMs = Math.max(...candidates.map(item => item.generatedMs));
+  const snapshot = candidates
+    .filter(item => item.generatedMs === latestGeneratedMs)
+    .sort((a, b) => a.targetDate.getTime() - b.targetDate.getTime())
+    .slice(0, horizonWeeks);
+  if (snapshot.length < horizonWeeks) return null;
+
+  const firstMetadata = snapshot[0].metadata;
+  const inputWeeks = Number(firstMetadata.input_weeks);
+  const historicalMean = Number(firstMetadata.historical_mean);
+  if (!Number.isInteger(inputWeeks) || inputWeeks < 8 || inputWeeks > 1024
+    || !Number.isFinite(historicalMean) || historicalMean <= 0) return null;
+
+  return {
+    response: {
+      success: true,
+      model: 'google/timesfm-2.5-200m-pytorch',
+      version: '2.5',
+      backend: 'pytorch',
+      input_points: inputWeeks,
+      horizon: horizonWeeks,
+      forecast: snapshot.map((item, index) => ({
+        step: index + 1,
+        point: item.point,
+        lower: item.lower,
+        upper: item.upper
+      }))
+    },
+    generatedAt: snapshot[0].generatedAt,
+    historicalMean,
+    recordsCount: Number(firstMetadata.input_records) || 0,
+    daysSampled: Number(firstMetadata.input_days) || 0,
+    totalCost: Number(firstMetadata.input_total_cost) || 0,
+    totalConversions: Number(firstMetadata.input_total_conversions) || 0,
+    empiricalCpl: Number(firstMetadata.observed_cpl_usd) || 0
+  };
+}
+
 export async function executeBrainSynchronizedForecast(
   contractorId: string,
   options: {
@@ -428,10 +530,38 @@ export async function executeBrainSynchronizedForecast(
     throw new Error('Forecast unavailable: historical conversion totals contain no positive observations.');
   }
 
-  // Actual TimesFM 2.5 inference. There is deliberately no heuristic or mock fallback.
-  const modelResult = await requestTimesFmForecast(adsBaseline.weeklyDemandSeries, horizonWeeks);
-  const historicalMean = adsBaseline.weeklyDemandSeries.reduce((sum, value) => sum + value, 0)
-    / adsBaseline.weeklyDemandSeries.length;
+  // Prefer on-demand inference when a private HTTPS service is configured. If it
+  // is not available, use only a fresh, tenant- and territory-scoped scheduled
+  // TimesFM 2.5 result. Neither path has a heuristic or mock forecast fallback.
+  let modelResult: TimesFmForecastResponse;
+  let scheduledSnapshot: ScheduledTimesFmForecast | null = null;
+  let inferenceMode: 'http' | 'scheduled_batch' = 'http';
+  let forecastTimestamp = new Date().toISOString();
+  const httpServiceConfigured = Boolean(process.env.TIMESFM_SERVICE_URL && process.env.TIMESFM_API_KEY);
+
+  if (httpServiceConfigured) {
+    try {
+      modelResult = await requestTimesFmForecast(adsBaseline.weeklyDemandSeries, horizonWeeks);
+    } catch (inferenceError) {
+      scheduledSnapshot = await loadScheduledTimesFmForecast(contractorId, city, niche, horizonWeeks);
+      if (!scheduledSnapshot) throw inferenceError;
+      modelResult = scheduledSnapshot.response;
+      forecastTimestamp = scheduledSnapshot.generatedAt;
+      inferenceMode = 'scheduled_batch';
+    }
+  } else {
+    scheduledSnapshot = await loadScheduledTimesFmForecast(contractorId, city, niche, horizonWeeks);
+    if (!scheduledSnapshot) {
+      throw new Error('Forecast unavailable: configure the private TimesFM service or wait for a fresh scheduled TimesFM batch forecast for this territory.');
+    }
+    modelResult = scheduledSnapshot.response;
+    forecastTimestamp = scheduledSnapshot.generatedAt;
+    inferenceMode = 'scheduled_batch';
+  }
+
+  const historicalMean = scheduledSnapshot?.historicalMean
+    ?? adsBaseline.weeklyDemandSeries.reduce((sum, value) => sum + value, 0) / adsBaseline.weeklyDemandSeries.length;
+  const observedCplBaseline = scheduledSnapshot?.empiricalCpl ?? adsBaseline.empiricalCpl;
   if (!Number.isFinite(historicalMean) || historicalMean <= 0) {
     throw new Error('Forecast unavailable: historical demand baseline is invalid.');
   }
@@ -449,7 +579,7 @@ export async function executeBrainSynchronizedForecast(
       lowerBound: toIndex(point.lower),
       upperBound: Math.max(toIndex(point.point), toIndex(point.upper)),
       // CPL is the observed trailing CPL, not a TimesFM prediction.
-      observedCplUsd: adsBaseline.empiricalCpl,
+      observedCplUsd: observedCplBaseline,
       isBreachingCplLimit: false
     };
   });
@@ -483,28 +613,39 @@ export async function executeBrainSynchronizedForecast(
 
   return {
     success: true,
-    engine: `Google TimesFM ${modelResult.version} (${modelResult.model}, ${modelResult.backend})`,
+    engine: `Google TimesFM ${modelResult.version} (${modelResult.model}, ${modelResult.backend})${inferenceMode === 'scheduled_batch' ? ' — scheduled batch' : ''}`,
     brainLayerAlignments: {
       layer2Goals: `Contractor-configured target CAC: ${targetCac} (Max allowable CPL: ${guardrails.maxAllowableCpl}).`,
       layer5Knowledge: `TimesFM input: ${adsBaseline.weeklyDemandSeries.length} observed weekly conversion totals from ${adsBaseline.recordsCount} tenant-scoped Google Ads records. Trailing observed CPL: ${adsBaseline.empiricalCpl}.`,
       layer6WorldModel: `${weatherTrigger.conditionTitle}. Weather is contextual only; no demand multiplier is applied.`,
-      layer8Skills: `Executed Google TimesFM ${modelResult.version} inference for a ${horizonWeeks}-week horizon. Demand bands use the model's q10/q50/q90 output. CPL remains the trailing observed baseline, not a model forecast.`,
+      layer8Skills: `${inferenceMode === 'scheduled_batch' ? 'Using the last successful scheduled' : 'Executed'} Google TimesFM ${modelResult.version} inference for a ${horizonWeeks}-week horizon${inferenceMode === 'scheduled_batch' ? ` (generated ${forecastTimestamp})` : ''}. Demand bands use the model's q10/q50/q90 output. CPL remains the trailing observed baseline, not a model forecast.`,
       layer10Execution: !targetCac
         ? 'Budget guardrails were skipped because no target CAC is configured. No ad budget was changed.'
         : guardrails.breachDetected
           ? `A budget guardrail recommendation is indicated: ${guardrails.suggestedAction}. It is based on trailing observed CPL; no ad budget was changed.`
           : 'No trailing-CPL guardrail breach was found. This is not a profitability certification.',
-      layer11Learning: `Model input is grounded in ${adsBaseline.weeklyDemandSeries.length} weekly observations. No new learning or model fine-tuning is claimed by this inference.`
+      layer11Learning: `Model input is grounded in ${modelResult.input_points} weekly observations. No new learning or model fine-tuning is claimed by this inference.`
     },
     targetCity: city,
     targetNiche: niche,
     horizonWeeks,
-    googleAdsBaseline: { ...adsBaseline, weeklyDemandSeries: [], weeklyObservations: adsBaseline.weeklyDemandSeries.length },
+    googleAdsBaseline: {
+      ...adsBaseline,
+      ...(scheduledSnapshot ? {
+        recordsCount: scheduledSnapshot.recordsCount,
+        totalCost: Math.round(scheduledSnapshot.totalCost),
+        totalConversions: scheduledSnapshot.totalConversions,
+        empiricalCpl: scheduledSnapshot.empiricalCpl,
+        daysSampled: scheduledSnapshot.daysSampled
+      } : {}),
+      weeklyDemandSeries: [],
+      weeklyObservations: modelResult.input_points
+    },
     weatherTrigger,
     budgetGuardrails: guardrails,
     forecastCurve,
     peakDemandWeek: `${peakWeek} (TimesFM demand peak)`,
     recommendedCampaignBudgetMultiplier: guardrails.budgetMultiplierRecommended,
-    timestamp: new Date().toISOString()
+    timestamp: forecastTimestamp
   };
 }
