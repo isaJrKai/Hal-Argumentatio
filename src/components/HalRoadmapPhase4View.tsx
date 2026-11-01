@@ -439,12 +439,13 @@ export const HalRoadmapPhase4View: React.FC = () => {
                 </p>
               </div>
               <button
-                onClick={handleRunConsensus}
-                disabled={isExecutingConsensus}
-                className="px-4 py-2 rounded-lg bg-accent text-white hover:bg-accent/90 transition-all text-xs font-semibold flex items-center gap-2 cursor-pointer disabled:opacity-50"
+                type="button"
+                disabled
+                title="Unavailable: live Gemini/NVIDIA adapters and a persisted consensus store are not configured."
+                className="px-4 py-2 rounded-lg bg-bg-overlay text-text-tertiary border border-border-dim transition-all text-xs font-semibold flex items-center gap-2 cursor-not-allowed opacity-60"
               >
-                <RefreshCw className={`w-3.5 h-3.5 ${isExecutingConsensus ? 'animate-spin' : ''}`} />
-                <span>{isExecutingConsensus ? 'Checking...' : 'Unavailable · no live providers'}</span>
+                <RefreshCw className="w-3.5 h-3.5" />
+                <span>Unavailable · no live providers</span>
               </button>
             </div>
 
