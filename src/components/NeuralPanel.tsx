@@ -15,13 +15,11 @@ export default function NeuralPanel() {
   const [networkError, setNetworkError] = useState<string | null>(null);
   
   // New features state
-  const [isPruningMode, setIsPruningMode] = useState(false);
   const [showInfluence, setShowInfluence] = useState(false);
   const [timelineScrub, setTimelineScrub] = useState(100);
   
   const [hoveredNode, setHoveredNode] = useState<any>(null);
   const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 });
-  const [selectedPruneNode, setSelectedPruneNode] = useState<any>(null);
 
   const simulationRef = useRef<any>(null);
   const zoomRef = useRef<any>(null);
@@ -228,7 +226,7 @@ export default function NeuralPanel() {
       if (closestNode) {
         setHoveredNode(closestNode);
         setTooltipPos({ x: mx, y: my });
-        canvas.style.cursor = (isPruningMode && closestNode.type === 'decaying') ? 'crosshair' : 'pointer';
+        canvas.style.cursor = 'pointer';
       } else {
         setHoveredNode(null);
         canvas.style.cursor = 'default';
@@ -257,13 +255,7 @@ export default function NeuralPanel() {
       }
       
       if (closestNode) {
-        if (isPruningMode && closestNode.type === 'decaying') {
-          setSelectedPruneNode(closestNode);
-        } else {
-          setActiveSubsystem(closestNode.id);
-        }
-      } else {
-         setSelectedPruneNode(null);
+        setActiveSubsystem(closestNode.id);
       }
     });
 
@@ -507,38 +499,6 @@ export default function NeuralPanel() {
     ctx.restore();
   };
 
-  const handlePruneNode = async () => {
-    if (!selectedPruneNode) return;
-    
-    // Call the backend to persist pruning
-    try {
-      await fetch(`/api/neural/network/prune/${selectedPruneNode.id}`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('halbiz_auth_token') || localStorage.getItem('token')}`
-        }
-      });
-    } catch (e) {
-      console.error('Failed to prune node on backend', e);
-    }
-    
-    // Optimistic UI update
-    setNetworkData(prev => ({
-      ...prev,
-      nodes: prev.nodes.filter(n => n.id !== selectedPruneNode.id),
-      links: prev.links.filter(l => l.source.id !== selectedPruneNode.id && l.target.id !== selectedPruneNode.id)
-    }));
-    nodesRef.current = nodesRef.current.filter(n => n.id !== selectedPruneNode.id);
-    linksRef.current = linksRef.current.filter(l => l.source.id !== selectedPruneNode.id && l.target.id !== selectedPruneNode.id);
-    setSelectedPruneNode(null);
-    setHoveredNode(null);
-    if (simulationRef.current) {
-      simulationRef.current.nodes(nodesRef.current);
-      simulationRef.current.force('link').links(linksRef.current);
-      simulationRef.current.alpha(1).restart();
-    }
-  };
-
   const handleZoom = (factor: number) => {
     if (canvasRef.current && zoomRef.current) {
       d3.select(canvasRef.current).transition().duration(300).call(zoomRef.current.scaleBy, factor);
@@ -576,16 +536,6 @@ export default function NeuralPanel() {
           </div>
         </div>
         <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2 px-3 py-1.5 bg-bg-overlay border border-border-dim rounded-lg mr-2">
-            <Scissors className={`w-4 h-4 ${isPruningMode ? 'text-red-500' : 'text-text-tertiary'}`} />
-            <span className="text-xs font-medium text-text-secondary mr-2">Manual Pruning</span>
-            <button 
-              onClick={() => setIsPruningMode(!isPruningMode)}
-              className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${isPruningMode ? 'bg-red-500' : 'bg-bg-raised border border-border-dim'}`}
-            >
-              <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${isPruningMode ? 'translate-x-4.5' : 'translate-x-1'}`} />
-            </button>
-          </div>
           <button onClick={fetchNetwork} className="flex items-center gap-2 px-4 py-2 bg-bg-overlay border border-border-dim hover:border-accent text-text-secondary hover:text-accent rounded-lg text-sm font-medium transition-colors">
             <RefreshCw className={`w-4 h-4 ${isSyncing ? 'animate-spin' : ''}`} />
             Re-Calibrate
@@ -641,7 +591,7 @@ export default function NeuralPanel() {
             {/* Overlays Left */}
             <div className="absolute top-4 left-4 z-10 space-y-3 pointer-events-none">
               <div className="px-3 py-1.5 bg-black/60 backdrop-blur-md border border-white/10 rounded text-[10px] font-mono text-white/70 uppercase flex items-center gap-2 w-fit">
-                <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></div>Domain-Clustered Topology Active
+                <div className={`w-1.5 h-1.5 rounded-full ${networkError ? 'bg-red-500' : 'bg-green-500'}`}></div>{networkError ? 'Topology unavailable' : 'Tenant data topology'}
               </div>
               
               <button 
@@ -687,7 +637,7 @@ export default function NeuralPanel() {
           </div>
           
           {/* Dynamic Tooltip */}
-          {hoveredNode && !selectedPruneNode && (
+          {hoveredNode && (
              <div 
                className="absolute z-50 pointer-events-none bg-bg-raised border border-border-dim rounded-lg p-3 shadow-xl max-w-[250px]"
                style={{ left: tooltipPos.x + 15, top: Math.max(10, tooltipPos.y - 40) }}
@@ -712,44 +662,11 @@ export default function NeuralPanel() {
                       </span>
                     </div>
                   )}
-                  {isPruningMode && hoveredNode.type === 'decaying' && (
-                    <div className="mt-2 text-[10px] font-bold text-red-500 animate-pulse text-center">
-                       CLICK TO MANUAL PRUNE
-                    </div>
-                  )}
                </div>
              </div>
           )}
 
-          {/* Pruning Verification Modal Overlay */}
-          {selectedPruneNode && isPruningMode && (
-            <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-               <div className="bg-bg-raised border border-red-500/30 rounded-xl p-6 shadow-2xl max-w-sm w-full relative overflow-hidden">
-                  <div className="absolute top-0 left-0 w-full h-1 bg-red-500" />
-                  <Scissors className="w-8 h-8 text-red-500 mb-4" />
-                  <h3 className="text-lg font-bold text-text-primary mb-2">Verify Synapse Pruning</h3>
-                  <p className="text-sm text-text-secondary mb-4 leading-relaxed">
-                    This neural connection (<strong className="text-text-primary">{selectedPruneNode.label}</strong>) exhibits decaying confidence. 
-                    Do you authorize manual pruning to sever this policy from the active matrix?
-                  </p>
-                  
-                  <div className="bg-bg-overlay p-3 rounded-lg border border-border-dim mb-6 space-y-2 font-mono text-xs">
-                     <div className="flex justify-between"><span className="text-text-tertiary">ID:</span><span className="text-text-secondary">{selectedPruneNode.id}</span></div>
-                     <div className="flex justify-between"><span className="text-text-tertiary">Condition:</span><span className="text-red-400">Decaying / Deprecated</span></div>
-                     <div className="flex justify-between"><span className="text-text-tertiary">Detail:</span><span className="text-text-secondary truncate ml-4">{selectedPruneNode.detail}</span></div>
-                  </div>
 
-                  <div className="flex gap-3">
-                     <button onClick={handlePruneNode} className="flex-1 flex items-center justify-center gap-2 bg-red-500/10 hover:bg-red-500/20 text-red-500 border border-red-500/20 py-2 rounded-lg text-sm font-bold transition-colors">
-                        <CheckCircle className="w-4 h-4" /> Confirm Prune
-                     </button>
-                     <button onClick={() => setSelectedPruneNode(null)} className="flex-1 flex items-center justify-center gap-2 bg-bg-overlay hover:bg-bg-base text-text-secondary border border-border-dim py-2 rounded-lg text-sm font-bold transition-colors">
-                        <XCircle className="w-4 h-4" /> Cancel
-                     </button>
-                  </div>
-               </div>
-            </div>
-          )}
 
         </div>
       </div>
