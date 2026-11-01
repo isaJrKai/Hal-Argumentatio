@@ -85,6 +85,31 @@ export interface BrainSynchronizedForecastResult {
   timestamp: string;
 }
 
+export function filterGoogleAdsTerritoryRecords<T extends {
+  geo?: string | null;
+  campaignName?: string | null;
+  keyword?: string | null;
+  searchTerm?: string | null;
+}>(
+  records: T[],
+  targetNiche: string,
+  targetCity: string
+): T[] {
+  const cityNeedle = targetCity.trim().toLocaleLowerCase();
+  const nicheNeedle = targetNiche.trim().toLocaleLowerCase();
+  if (!cityNeedle || !nicheNeedle) return [];
+  return records.filter((record) => {
+    const geo = String(record.geo || '').trim().toLocaleLowerCase();
+    const tradeText = [record.campaignName, record.keyword, record.searchTerm]
+      .filter(Boolean)
+      .join(' ')
+      .toLocaleLowerCase();
+    return Boolean(geo && tradeText)
+      && geo.includes(cityNeedle)
+      && tradeText.includes(nicheNeedle);
+  });
+}
+
 /**
  * 1. Live Google Ads Ingestion Pipeline (Layer 5: Knowledge)
  * Ingests real historical records from `google_ads_daily_performance` for the contractor.
@@ -104,18 +129,7 @@ export async function ingestAndCalibrateGoogleAds(
 
     // Territory and trade are part of the model input. Unscoped rows are excluded
     // rather than allowing a city/niche selector to produce the same global series.
-    const cityNeedle = targetCity.trim().toLocaleLowerCase();
-    const nicheNeedle = targetNiche.trim().toLocaleLowerCase();
-    const records = contractorRecords.filter((record) => {
-      const geo = String(record.geo || '').trim().toLocaleLowerCase();
-      const tradeText = [record.campaignName, record.keyword, record.searchTerm]
-        .filter(Boolean)
-        .join(' ')
-        .toLocaleLowerCase();
-      return Boolean(geo && tradeText)
-        && geo.includes(cityNeedle)
-        && tradeText.includes(nicheNeedle);
-    });
+    const records = filterGoogleAdsTerritoryRecords(contractorRecords, targetNiche, targetCity);
 
     // Do not fall back to another contractor's or territory's campaign records.
     if (records.length === 0) {
