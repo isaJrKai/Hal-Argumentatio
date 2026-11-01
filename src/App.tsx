@@ -544,51 +544,57 @@ export default function App() {
 
   const fetchAllData = async (retryCount = 0) => {
     if (!token) return;
+    const endpoints: { url: string; label: string; apply: (value: any) => void }[] = [
+      { url: '/api/leads', label: 'leads', apply: setLeads },
+      { url: '/api/campaigns', label: 'campaigns', apply: setCampaigns },
+      { url: '/api/revenues', label: 'revenue records', apply: setRevenues },
+      { url: '/api/forecasts', label: 'forecasts', apply: setForecasts },
+      { url: '/api/learning-insights', label: 'learning insights', apply: setLearningInsights },
+      { url: '/api/recommendations', label: 'recommendations', apply: setRecommendations },
+      { url: '/api/scheduler/jobs', label: 'scheduled jobs', apply: setSchedulerJobs }
+    ];
+
     try {
       const headers = { 'Authorization': `Bearer ${token}` };
+      const results = await Promise.allSettled(endpoints.map(async endpoint => {
+        const response = await fetch(endpoint.url, { headers });
+        if (!response.ok) throw new Error(`${endpoint.url} returned HTTP ${response.status}`);
+        return response.json();
+      }));
 
-      const safeFetchJson = async (url: string) => {
-        const res = await fetch(url, { headers });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        return res.json();
-      };
+      const failedEndpoints: string[] = [];
+      results.forEach((result, index) => {
+        if (result.status === 'fulfilled') endpoints[index].apply(result.value);
+        else failedEndpoints.push(endpoints[index].label);
+      });
 
-      const results = await Promise.allSettled([
-        safeFetchJson('/api/leads'),
-        safeFetchJson('/api/campaigns'),
-        safeFetchJson('/api/revenues'),
-        safeFetchJson('/api/forecasts'),
-        safeFetchJson('/api/learning-insights'),
-        safeFetchJson('/api/recommendations'),
-        safeFetchJson('/api/scheduler/jobs')
-      ]);
-
-      const [leadsRes, campaignsRes, revenuesRes, forecastsRes, insightsRes, recsRes, jobsRes] = results;
-
-      if (leadsRes.status === 'fulfilled') setLeads(leadsRes.value);
-      if (campaignsRes.status === 'fulfilled') setCampaigns(campaignsRes.value);
-      if (revenuesRes.status === 'fulfilled') setRevenues(revenuesRes.value);
-      if (forecastsRes.status === 'fulfilled') setForecasts(forecastsRes.value);
-      if (insightsRes.status === 'fulfilled') setLearningInsights(insightsRes.value);
-      if (recsRes.status === 'fulfilled') setRecommendations(recsRes.value);
-      if (jobsRes.status === 'fulfilled') setSchedulerJobs(jobsRes.value);
-
-      // If all failed (e.g. server rebooting or offline), trigger retry
-      const allFailed = results.every(r => r.status === 'rejected');
-      if (allFailed) {
-        throw new Error('All store endpoints rejected');
+      if (failedEndpoints.length > 0) {
+        const exhaustedRetries = retryCount >= 3;
+        setToastAlert({
+          id: 'data-sync',
+          title: exhaustedRetries ? 'Partial Sync Failure' : 'Sync Delayed',
+          message: exhaustedRetries
+            ? `Could not refresh ${failedEndpoints.join(', ')}. Some displayed data may be stale.`
+            : `Could not refresh ${failedEndpoints.join(', ')}. Retrying while keeping the last available data.`,
+          type: 'system'
+        });
+        if (!exhaustedRetries) {
+          setTimeout(() => { void fetchAllData(retryCount + 1); }, 1500 * (retryCount + 1));
+        }
+        return;
       }
 
+      setToastAlert(previous => previous?.id === 'data-sync' ? null : previous);
     } catch (err) {
+      console.warn('Unexpected dashboard synchronization failure:', err);
       if (retryCount < 3) {
-        setTimeout(() => fetchAllData(retryCount + 1), 1500 * (retryCount + 1));
+        setTimeout(() => { void fetchAllData(retryCount + 1); }, 1500 * (retryCount + 1));
       } else {
-        console.warn('Failed to fetch full application store after retries:', err);
         setToastAlert({
-          id: Date.now().toString(),
-          title: "Connection Lost",
-          message: "Failed to sync with Neural Matrix. The server might be rebooting.",
-          type: "system"
+          id: 'data-sync',
+          title: 'Connection Lost',
+          message: 'The dashboard could not refresh its data. Some displayed values may be stale.',
+          type: 'system'
         });
       }
     }
@@ -598,75 +604,90 @@ export default function App() {
   const sseTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const setupSSEConnection = () => {
-    if (sseTimeoutRef.current) {
-      clearTimeout(sseTimeoutRef.current);
-    }
-    
-    const token = localStorage.getItem('token');
-    if (!token) return;
+    if (sseTimeoutRef.current) clearTimeout(sseTimeoutRef.current);
 
-    const eventSource = new EventSource(`/api/events?token=${encodeURIComponent(token)}`);
+    const sessionToken = localStorage.getItem('halbiz_auth_token') || localStorage.getItem('token');
+    if (!sessionToken) return;
 
-    eventSource.onopen = () => {
-      setSseConnected(true);
-      sseRetryCountRef.current = 0; // Reset backoff on success
-    };
+    let active = true;
+    let currentController: AbortController | null = null;
 
-    eventSource.onmessage = (event) => {
+    const handleSseData = (rawData: string) => {
       try {
-        const payload = JSON.parse(event.data);
+        const payload = JSON.parse(rawData);
         if (payload.type === 'notification') {
           const newNotif = payload.data as Notification;
-          
-          // Verify if notification belongs to current contractor
           if (newNotif.contractorId === contractor?.id) {
-            setNotifications(prev => [newNotif, ...prev]);
-            
-            // Trigger dynamic toast slide-in alert
+            setNotifications(previous => [newNotif, ...previous]);
             setToastAlert({
               id: newNotif.id,
               title: newNotif.title,
               message: newNotif.message,
               type: newNotif.type
             });
-
-            // Auto-dismiss toast
             setTimeout(() => {
-              setToastAlert(prev => prev?.id === newNotif.id ? null : prev);
+              setToastAlert(previous => previous?.id === newNotif.id ? null : previous);
             }, 6000);
-
-            // Instant refresh of data stores
-            fetchAllData();
+            void fetchAllData();
           }
-        } else if (payload.type === 'heartbeat') {
-          // Heartbeat received, connection is healthy
         }
       } catch (err) {
-        console.error('SSE Message parsing failed:', err);
+        console.error('SSE message parsing failed:', err);
       }
     };
 
-    eventSource.onerror = (err: any) => {
-      setSseConnected(false);
-      eventSource.close();
-      
-      // Implement exponential backoff: 2s, 4s, 8s, 16s... up to 30s
-      const backoffDelay = Math.min(1000 * Math.pow(2, sseRetryCountRef.current + 1), 30000);
-      sseRetryCountRef.current += 1;
-      
-      console.warn(`SSE Connection lost. Retrying in ${backoffDelay}ms (Attempt ${sseRetryCountRef.current})`);
-      
-      sseTimeoutRef.current = setTimeout(setupSSEConnection, backoffDelay);
+    const connect = async () => {
+      currentController = new AbortController();
+      try {
+        const response = await fetch('/api/events', {
+          headers: {
+            'Accept': 'text/event-stream',
+            'Authorization': `Bearer ${sessionToken}`
+          },
+          signal: currentController.signal
+        });
+        if (!response.ok) throw new Error(`SSE connection failed (HTTP ${response.status})`);
+        if (!response.body) throw new Error('SSE response did not provide a readable stream');
+
+        setSseConnected(true);
+        sseRetryCountRef.current = 0;
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+
+        while (active) {
+          const { value, done } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+          const frames = buffer.split(/\r?\n\r?\n/);
+          buffer = frames.pop() || '';
+          for (const frame of frames) {
+            const data = frame.split(/\r?\n/)
+              .filter(line => line.startsWith('data:'))
+              .map(line => line.slice(5).trimStart())
+              .join('\n');
+            if (data) handleSseData(data);
+          }
+        }
+        if (active) throw new Error('SSE stream closed unexpectedly');
+      } catch (err) {
+        if (!active || currentController?.signal.aborted) return;
+        setSseConnected(false);
+        const backoffDelay = Math.min(1000 * Math.pow(2, sseRetryCountRef.current + 1), 30000);
+        sseRetryCountRef.current += 1;
+        console.warn(`SSE connection lost. Retrying in ${backoffDelay}ms (attempt ${sseRetryCountRef.current}).`, err);
+        sseTimeoutRef.current = setTimeout(() => { void connect(); }, backoffDelay);
+      }
     };
 
+    void connect();
     return () => {
-      eventSource.close();
-      if (sseTimeoutRef.current) {
-        clearTimeout(sseTimeoutRef.current);
-      }
+      active = false;
+      currentController?.abort();
+      if (sseTimeoutRef.current) clearTimeout(sseTimeoutRef.current);
+      setSseConnected(false);
     };
   };
-
   const handleAuthSuccess = (newToken: string, newContractor: Contractor) => {
     localStorage.setItem('halbiz_auth_token', newToken);
     localStorage.setItem('token', newToken);
