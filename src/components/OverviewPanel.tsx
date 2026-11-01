@@ -565,7 +565,7 @@ export default function OverviewPanel({
             {forecastChartData.length === 0 ? (
               <div className="h-full flex flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-border-dim text-center px-5">
                 <span className="text-sm font-semibold text-text-secondary">Forecast unavailable</span>
-                <span className="text-xs text-text-tertiary max-w-md">Connect at least eight observed weeks of Google Ads conversion history and configure a target CAC. Weather is contextual only. No synthetic forecast is shown.</span>
+                <span className="text-xs text-text-tertiary max-w-md">Connect at least eight complete weeks of territory-scoped Google Ads conversion history and configure the TimesFM service. A target CAC is only needed for optional budget guardrails. No synthetic forecast is shown.</span>
               </div>
             ) : (
             <ResponsiveContainer width="100%" height="100%">
