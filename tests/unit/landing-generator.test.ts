@@ -3,7 +3,7 @@ import { applyVerifiedBusinessDetails } from '../../src/services/landingGenerato
 import { TRADE_TEMPLATES } from '../../src/components/landing/templates';
 import { generateLandingPageHtml } from '../../src/components/landing/htmlGenerator';
 import { generateLandingPageTsx } from '../../src/components/landing/tsxGenerator';
-import ts from 'typescript';
+import * as ts from 'typescript';
 
 const clonePlumbingTemplate = () =>
   JSON.parse(JSON.stringify(TRADE_TEMPLATES.plumbing));
