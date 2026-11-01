@@ -76,7 +76,7 @@ const HalLoopOperationsView = lazy(() => import('./components/HalLoopOperationsV
 const HermesLabPanel = lazy(() => import('./components/HermesLabPanel'));
 const BlueprintViewerPanel = lazy(() => import('./components/BlueprintViewerPanel').then(module => ({ default: module.BlueprintViewerPanel })));
 import { ErrorBoundary } from './components/ErrorBoundary';
-import { parseCachedContractor } from './lib/sessionStorage';
+import { parseCachedContractor, safeStorageGet, safeStorageSet, safeStorageRemove } from './lib/sessionStorage';
 
 // 4-Zone Workstation Shell & Tools
 import { InspectorProvider } from './context/InspectorContext';
@@ -106,6 +106,30 @@ import {
   Contractor 
 } from './types';
 
+function readLocalStorage(key: string): string | null {
+  try {
+    return typeof window === 'undefined' ? null : safeStorageGet(window.localStorage, key);
+  } catch {
+    return null;
+  }
+}
+
+function writeLocalStorage(key: string, value: string): void {
+  try {
+    if (typeof window !== 'undefined') safeStorageSet(window.localStorage, key, value);
+  } catch {
+    // Browser storage is optional; session and UI actions must remain usable without it.
+  }
+}
+
+function removeLocalStorage(key: string): void {
+  try {
+    if (typeof window !== 'undefined') safeStorageRemove(window.localStorage, key);
+  } catch {
+    // Ignore storage restrictions; in-memory state is cleared separately.
+  }
+}
+
 export default function App() {
   const { 
     activeCity, 
@@ -126,13 +150,13 @@ export default function App() {
   // Authentication State
   const [token, setToken] = useState<string | null>(() => {
     if (reviewMode) return null;
-    return localStorage.getItem('halbiz_auth_token') || localStorage.getItem('token');
+    return readLocalStorage('halbiz_auth_token') || readLocalStorage('token');
   });
   const [contractor, setContractor] = useState<Contractor | null>(() => {
     if (reviewMode) {
       return { id: 'review-mode', email: 'review@halbiz.local', name: 'Workspace Preview', role: 'user' };
     }
-    const saved = localStorage.getItem('halbiz_auth_contractor');
+    const saved = readLocalStorage('halbiz_auth_contractor');
     return parseCachedContractor(saved);
   });
 
@@ -141,16 +165,16 @@ export default function App() {
     // Review mode is deliberately unauthenticated and must not rehydrate a real saved session.
     if (reviewMode) return;
 
-    const existingToken = localStorage.getItem('halbiz_auth_token') || localStorage.getItem('token');
+    const existingToken = readLocalStorage('halbiz_auth_token') || readLocalStorage('token');
     if (existingToken) {
       fetch('/api/auth/me', {
         headers: { 'Authorization': `Bearer ${existingToken}` }
       })
         .then(res => {
           if (res.status === 401 || res.status === 403) {
-            localStorage.removeItem('halbiz_auth_token');
-            localStorage.removeItem('token');
-            localStorage.removeItem('halbiz_auth_contractor');
+            removeLocalStorage('halbiz_auth_token');
+            removeLocalStorage('token');
+            removeLocalStorage('halbiz_auth_contractor');
             setToken(null);
             setContractor(null);
             throw new Error('Saved session is no longer valid');
@@ -161,7 +185,7 @@ export default function App() {
         .then(data => {
           if (data.contractor) {
             setContractor(data.contractor);
-            localStorage.setItem('halbiz_auth_contractor', JSON.stringify(data.contractor));
+            writeLocalStorage('halbiz_auth_contractor', JSON.stringify(data.contractor));
           }
         })
         .catch((error: unknown) => {
@@ -275,38 +299,38 @@ export default function App() {
 
   // Theme & Identity States
   const [theme, setTheme] = useState<'dark' | 'light'>(() => {
-    const saved = localStorage.getItem('hal_theme') as 'dark' | 'light' | null;
+    const saved = readLocalStorage('hal_theme') as 'dark' | 'light' | null;
     if (saved === 'dark' || saved === 'light') return saved;
     return window.matchMedia?.('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
   });
   const [profilePhoto, setProfilePhoto] = useState<string | null>(() => {
-    return localStorage.getItem('hal_profile_photo');
+    return readLocalStorage('hal_profile_photo');
   });
   const [companyLogo, setCompanyLogo] = useState<string | null>(() => {
-    return localStorage.getItem('hal_company_logo');
+    return readLocalStorage('hal_company_logo');
   });
 
   const handleProfilePhotoUpdate = (photo: string | null) => {
     if (photo) {
-      localStorage.setItem('hal_profile_photo', photo);
+      writeLocalStorage('hal_profile_photo', photo);
     } else {
-      localStorage.removeItem('hal_profile_photo');
+      removeLocalStorage('hal_profile_photo');
     }
     setProfilePhoto(photo);
   };
 
   const handleCompanyLogoUpdate = (logo: string | null) => {
     if (logo) {
-      localStorage.setItem('hal_company_logo', logo);
+      writeLocalStorage('hal_company_logo', logo);
     } else {
-      localStorage.removeItem('hal_company_logo');
+      removeLocalStorage('hal_company_logo');
     }
     setCompanyLogo(logo);
   };
 
   const toggleTheme = () => {
     const next = theme === 'dark' ? 'light' : 'dark';
-    localStorage.setItem('hal_theme', next);
+    writeLocalStorage('hal_theme', next);
     setTheme(next);
   };
 
@@ -315,7 +339,7 @@ export default function App() {
     const mq = window.matchMedia?.('(prefers-color-scheme: light)');
     if (!mq) return;
     const onChange = (e: MediaQueryListEvent) => {
-      if (!localStorage.getItem('hal_theme')) setTheme(e.matches ? 'light' : 'dark');
+      if (!readLocalStorage('hal_theme')) setTheme(e.matches ? 'light' : 'dark');
     };
     mq.addEventListener('change', onChange);
     return () => mq.removeEventListener('change', onChange);
@@ -342,7 +366,7 @@ export default function App() {
 
       // Auto-inject or repair Authorization header for /api requests if not an auth endpoint
       if (!reviewMode && urlStr && urlStr.startsWith('/api') && !urlStr.startsWith('/api/auth/')) {
-        const storedToken = localStorage.getItem('halbiz_auth_token') || localStorage.getItem('token');
+        const storedToken = readLocalStorage('halbiz_auth_token') || readLocalStorage('token');
         if (storedToken) {
           const headers = new Headers(modifiedInit.headers || {});
           const existingAuth = headers.get('Authorization');
@@ -383,12 +407,12 @@ export default function App() {
 
       // Gracefully handle genuinely expired authentication tokens across /api calls
       if (!reviewMode && response.status === 401 && urlStr && urlStr.startsWith('/api') && !urlStr.startsWith('/api/auth/')) {
-        const hasStoredSession = localStorage.getItem('halbiz_auth_token') || localStorage.getItem('token');
+        const hasStoredSession = readLocalStorage('halbiz_auth_token') || readLocalStorage('token');
         if (hasStoredSession) {
           console.warn('Session token expired or invalid; resetting authentication state.');
-          localStorage.removeItem('halbiz_auth_token');
-          localStorage.removeItem('token');
-          localStorage.removeItem('halbiz_auth_contractor');
+          removeLocalStorage('halbiz_auth_token');
+          removeLocalStorage('token');
+          removeLocalStorage('halbiz_auth_contractor');
           setToken(null);
           setContractor(null);
           window.dispatchEvent(new Event('halbiz_auth_expired'));
@@ -434,7 +458,7 @@ export default function App() {
     const handleDisplayModeChange = (e: MediaQueryListEvent) => {
       if (e.matches) {
         setIsAppInstalled(true);
-        localStorage.setItem('hal_app_installed', 'true');
+        writeLocalStorage('hal_app_installed', 'true');
       }
     };
     mql.addEventListener('change', handleDisplayModeChange);
@@ -447,7 +471,7 @@ export default function App() {
     const handleAppInstalled = () => {
       console.log('HALBiz was installed successfully');
       setIsAppInstalled(true);
-      localStorage.setItem('hal_app_installed', 'true');
+      writeLocalStorage('hal_app_installed', 'true');
       setDeferredPrompt(null);
       setShowDesktopInstallModal(false);
       setToastAlert({
@@ -470,7 +494,7 @@ export default function App() {
 
   const markAsInstalled = () => {
     setIsAppInstalled(true);
-    localStorage.setItem('hal_app_installed', 'true');
+    writeLocalStorage('hal_app_installed', 'true');
     setShowDesktopInstallModal(false);
     setToastAlert({
       id: 'installed_' + Date.now(),
@@ -606,7 +630,7 @@ export default function App() {
   const setupSSEConnection = () => {
     if (sseTimeoutRef.current) clearTimeout(sseTimeoutRef.current);
 
-    const sessionToken = localStorage.getItem('halbiz_auth_token') || localStorage.getItem('token');
+    const sessionToken = readLocalStorage('halbiz_auth_token') || readLocalStorage('token');
     if (!sessionToken) return;
 
     let active = true;
@@ -689,9 +713,9 @@ export default function App() {
     };
   };
   const handleAuthSuccess = (newToken: string, newContractor: Contractor) => {
-    localStorage.setItem('halbiz_auth_token', newToken);
-    localStorage.setItem('token', newToken);
-    localStorage.setItem('halbiz_auth_contractor', JSON.stringify(newContractor));
+    writeLocalStorage('halbiz_auth_token', newToken);
+    writeLocalStorage('token', newToken);
+    writeLocalStorage('halbiz_auth_contractor', JSON.stringify(newContractor));
     setToken(newToken);
     setContractor(newContractor);
   };
@@ -705,9 +729,9 @@ export default function App() {
     } catch (err) {
       console.error(err);
     } finally {
-      localStorage.removeItem('halbiz_auth_token');
-      localStorage.removeItem('token');
-      localStorage.removeItem('halbiz_auth_contractor');
+      removeLocalStorage('halbiz_auth_token');
+      removeLocalStorage('token');
+      removeLocalStorage('halbiz_auth_contractor');
       setToken(null);
       setContractor(null);
       setNotifications([]);
@@ -1287,7 +1311,7 @@ export default function App() {
             onClick={() => setActiveTab('credentials')} 
             className="hover:text-accent hover:underline cursor-pointer flex items-center gap-1"
           >
-            DATABASE: {typeof window !== 'undefined' && localStorage.getItem('halbiz_postgres_url') ? 'NEON_POSTGRES' : 'SECURE_SQLITE'}
+            DATABASE: SERVER-MANAGED
           </button>
           <span className="text-text-tertiary">|</span>
           <button 
