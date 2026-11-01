@@ -3,14 +3,33 @@ import {
   getAuth, 
   signInWithPopup, 
   GoogleAuthProvider, 
-  onAuthStateChanged, 
-  User 
+  onAuthStateChanged,
+  signOut,
+  User,
+  Auth
 } from '@firebase/auth';
-import firebaseConfig from '../../firebase-applet-config.json';
 
-// Initialize Firebase only once
-const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
-export const auth = getAuth(app);
+const firebaseConfig = {
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || '',
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || '',
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || '',
+  appId: import.meta.env.VITE_FIREBASE_APP_ID || '',
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || '',
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || ''
+};
+
+export const isGoogleWorkspaceConfigured = Boolean(
+  firebaseConfig.apiKey &&
+  firebaseConfig.authDomain &&
+  firebaseConfig.projectId &&
+  firebaseConfig.appId
+);
+
+// Never initialize Firebase from the committed placeholder applet configuration.
+const app = isGoogleWorkspaceConfigured
+  ? (getApps().length === 0 ? initializeApp(firebaseConfig) : getApp())
+  : null;
+export const auth: Auth | null = app ? getAuth(app) : null;
 
 // Unified Provider with Google Drive, Calendar, and Gmail scopes
 const provider = new GoogleAuthProvider();
@@ -38,6 +57,10 @@ export const initGoogleWorkspaceAuth = (
   onAuthSuccess?: (user: User, token: string) => void,
   onAuthFailure?: () => void
 ) => {
+  if (!auth) {
+    onAuthFailure?.();
+    return () => {};
+  }
   return onAuthStateChanged(auth, async (user: User | null) => {
     if (user) {
       if (cachedAccessToken) {
@@ -58,6 +81,9 @@ export const initGoogleWorkspaceAuth = (
 };
 
 export const googleWorkspaceSignIn = async (): Promise<{ user: User; accessToken: string } | null> => {
+  if (!auth) {
+    throw new Error('Google Workspace is not configured. Firebase project credentials are missing; no placeholder project will be used.');
+  }
   try {
     isSigningIn = true;
     const result = await signInWithPopup(auth, provider);
@@ -96,11 +122,11 @@ export const googleWorkspaceSignIn = async (): Promise<{ user: User; accessToken
 };
 
 export const getGoogleWorkspaceToken = async (): Promise<string | null> => {
-  return cachedAccessToken;
+  return auth ? cachedAccessToken : null;
 };
 
 export const googleWorkspaceLogout = async () => {
-  await auth.signOut();
+  if (auth) await signOut(auth);
   cachedAccessToken = null;
   try {
     sessionStorage.removeItem('google_workspace_access_token');
