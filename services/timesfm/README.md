@@ -28,7 +28,8 @@ service private where the hosting platform supports private networking.
 ## Contract and truthfulness rules
 
 - Forecast requests contain weekly tenant-scoped historical conversion totals.
-- At least eight finite, non-negative, non-constant observations are required.
+- HAL requires at least eight complete, contiguous weeks; each week must have at least five observed days. An incomplete boundary week is ignored, while gaps inside the series fail closed.
+- Inputs must be finite, non-negative, and non-constant.
 - Horizon is limited to 1–52 weeks.
 - The service returns the TimesFM median plus q10/q90 quantile bounds.
 - Missing configuration, missing weights, invalid inputs, or inference failures
