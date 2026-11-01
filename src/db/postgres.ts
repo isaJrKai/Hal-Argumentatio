@@ -204,6 +204,27 @@ export async function bootstrapPostgresTables(poolInstance?: Pool): Promise<void
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
       );
 
+      CREATE TABLE IF NOT EXISTS chat_projects (
+        id TEXT PRIMARY KEY,
+        contractor_id TEXT NOT NULL,
+        name TEXT NOT NULL,
+        description TEXT,
+        color TEXT DEFAULT 'cyan' NOT NULL,
+        archived_at TIMESTAMP,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
+      );
+
+      CREATE TABLE IF NOT EXISTS chat_conversations (
+        id TEXT PRIMARY KEY,
+        contractor_id TEXT NOT NULL,
+        project_id TEXT,
+        title TEXT NOT NULL,
+        archived_at TIMESTAMP,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
+      );
+
       CREATE TABLE IF NOT EXISTS chat_messages (
         id TEXT PRIMARY KEY,
         contractor_id TEXT NOT NULL,
@@ -214,6 +235,12 @@ export async function bootstrapPostgresTables(poolInstance?: Pool): Promise<void
         timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
       );
+
+      ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS conversation_id TEXT;
+      ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS project_id TEXT;
+      CREATE INDEX IF NOT EXISTS idx_chat_messages_conversation_created ON chat_messages(conversation_id, created_at);
+      CREATE INDEX IF NOT EXISTS idx_chat_conversations_contractor_updated ON chat_conversations(contractor_id, updated_at DESC);
+      CREATE INDEX IF NOT EXISTS idx_chat_projects_contractor_created ON chat_projects(contractor_id, created_at DESC);
 
       CREATE TABLE IF NOT EXISTS win_loss_records (
         id TEXT PRIMARY KEY,
