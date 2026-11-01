@@ -301,7 +301,7 @@ export default function RevenueIntelligenceView({ token }: RevenueIntelligenceVi
                   <th className="pb-3 px-3">Qualified</th>
                   <th className="pb-3 px-3">SAL</th>
                   <th className="pb-3 px-3">Customers</th>
-                  <th className="pb-3 px-3">Revenue</th>
+                  <th className="pb-3 px-3">Recorded Revenue</th>
                   <th className="pb-3 px-3">CAC</th>
                   <th className="pb-3 px-3">ROAS</th>
                 </tr>
@@ -343,8 +343,8 @@ export default function RevenueIntelligenceView({ token }: RevenueIntelligenceVi
                   <th className="pb-3 px-3">Search Term</th>
                   <th className="pb-3 px-3">Spend</th>
                   <th className="pb-3 px-3">Leads</th>
-                  <th className="pb-3 px-3">Revenue</th>
-                  <th className="pb-3 px-3">ROAS</th>
+                  <th className="pb-3 px-3">Ads Conversion Value</th>
+                  <th className="pb-3 px-3">Ads-Reported ROAS</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border-dim/50">
@@ -398,8 +398,8 @@ export default function RevenueIntelligenceView({ token }: RevenueIntelligenceVi
                       <td className="py-3 px-3">{g.leads}</td>
                       <td className="py-3 px-3">{g.customers}</td>
                       <td className="py-3 px-3 text-emerald-400">${g.revenue.toLocaleString()}</td>
-                      <td className="py-3 px-3">${g.cac.toFixed(0)}</td>
-                      <td className="py-3 px-3 font-bold text-accent">{g.roas.toFixed(2)}x</td>
+                      <td className="py-3 px-3">Unavailable</td>
+                      <td className="py-3 px-3 font-bold text-accent">Unavailable</td>
                     </tr>
                   ))
                 )}
