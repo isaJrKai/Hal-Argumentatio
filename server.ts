@@ -5165,8 +5165,16 @@ app.post('/api/ai/test-timesfm', authenticate, async (req, res) => {
     res.json(result);
   } catch (err: any) {
     console.error('TimesFM Brain execution error:', err);
-    const unavailable = String(err?.message || '').includes('Forecast unavailable');
-    res.status(unavailable ? 409 : 500).json({ error: err.message });
+    const message = String(err?.message || 'Forecast unavailable');
+    const status = message.includes('Forecast unavailable') ? 409
+      : message.includes('TimesFM') ? 503
+      : 500;
+    res.status(status).json({
+      success: false,
+      error: status === 503
+        ? 'TimesFM inference is currently unavailable. No substitute forecast was generated.'
+        : message
+    });
   }
 });
 
