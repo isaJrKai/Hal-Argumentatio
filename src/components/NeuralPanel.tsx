@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Network, Database, TrendingUp, Shield, RefreshCw, Brain, Focus, Fingerprint, Code2, Scissors, CheckCircle, XCircle, ZoomIn, ZoomOut, Maximize, Activity, Clock } from 'lucide-react';
 import * as d3 from 'd3';
 
-export default function NeuralPanel() {
+export default function NeuralPanel({ activeCity, activeNiche }: { activeCity: string; activeNiche: string }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   
@@ -31,55 +31,63 @@ export default function NeuralPanel() {
   const scrubRef = useRef(100);
   const influenceRef = useRef(false);
   const drawRef = useRef<() => void>(() => {});
+  const networkRequestIdRef = useRef(0);
 
   const fetchNetwork = async () => {
+    const requestId = ++networkRequestIdRef.current;
     setIsSyncing(true);
     try {
       const authToken = localStorage.getItem('halbiz_auth_token') || localStorage.getItem('token') || '';
-      const res = await fetch('/api/neural/network', {
+      const params = new URLSearchParams({ city: activeCity, niche: activeNiche });
+      const res = await fetch(`/api/neural/network?${params.toString()}`, {
         headers: authToken ? { 'Authorization': `Bearer ${authToken}` } : {}
       });
       if (!res.ok) {
         if (res.status === 401) {
-          console.warn('Neural network sync deferred: authentication token invalid or expired.');
-          return;
+          if (requestId === networkRequestIdRef.current) {
+            setNetworkData({ nodes: [], links: [], telemetry: null });
+            setLearningMetrics(null);
+          }
+          throw new Error('Session expired. Sign in again to load territory intelligence.');
         }
-        throw new Error(`Failed to fetch network (${res.status})`);
+        throw new Error(`Failed to fetch territory graph (${res.status})`);
       }
       const data = await res.json();
-      
+      if (requestId !== networkRequestIdRef.current) return;
       if (data.error) throw new Error(data.error);
 
       setNetworkData({
-        nodes: data.nodes || [],
-        links: data.links || [],
+        nodes: Array.isArray(data.nodes) ? data.nodes : [],
+        links: Array.isArray(data.links) ? data.links : [],
         telemetry: data.telemetry || null
       });
-      
       setLearningMetrics({
-        autonomyScore: data.telemetry?.autonomyReadinessScore ?? 0,
-        epoch: data.telemetry?.calibrationEpoch ?? 0,
-        outcomesDigested: data.telemetry?.totalOutcomesDigested || 1250,
-        activeWeights: ((data.nodes || []).length || 0) * 14 + 1024,
-        confidenceGlobal: (data.telemetry?.nicheMap?.general?.confidenceScore ?? 0) * 100
+        epoch: null,
+        outcomesDigested: Number(data.telemetry?.matchedOutcomeCount ?? 0),
+        confidenceGlobal: null
       });
-      
-      if (data.nodes && data.links) {
+
+      if (Array.isArray(data.nodes) && Array.isArray(data.links)) {
         initSimulation(data.nodes, data.links);
       }
     } catch (e) {
-      console.warn('Network visualization sync paused:', e);
+      if (requestId === networkRequestIdRef.current) {
+        console.warn('Territory graph sync paused:', e);
+        setNetworkData({ nodes: [], links: [], telemetry: null });
+        setLearningMetrics(null);
+      }
     } finally {
-      setIsSyncing(false);
+      if (requestId === networkRequestIdRef.current) setIsSyncing(false);
     }
   };
 
   useEffect(() => {
     fetchNetwork();
     return () => {
+      networkRequestIdRef.current += 1;
       if (simulationRef.current) simulationRef.current.stop();
     };
-  }, []);
+  }, [activeCity, activeNiche]);
 
   // Resize Observer to fix canvas stretch and bounds
   useEffect(() => {
@@ -598,9 +606,9 @@ export default function NeuralPanel() {
           <div className="p-4 space-y-4">
             <h3 className="text-xs font-mono font-bold text-text-tertiary uppercase tracking-wider">Matrix Live Telemetry</h3>
             <div className="bg-bg-base border border-border-dim rounded-lg p-4 space-y-3">
-              <div className="flex justify-between items-center"><span className="text-[10px] font-mono text-text-secondary">Epoch</span><span className="text-xs font-mono font-bold text-text-primary">{learningMetrics?.epoch || '---'}</span></div>
-              <div className="flex justify-between items-center"><span className="text-[10px] font-mono text-text-secondary">Digested Outcomes</span><span className="text-xs font-mono font-bold text-accent">{learningMetrics?.outcomesDigested || '---'}</span></div>
-              <div className="flex justify-between items-center"><span className="text-[10px] font-mono text-text-secondary">Global Confidence</span><span className="text-xs font-mono font-bold text-green-400">{Number(learningMetrics?.confidenceGlobal || 0).toFixed(1)}%</span></div>
+              <div className="flex justify-between items-center"><span className="text-[10px] font-mono text-text-secondary">Epoch</span><span className="text-xs font-mono font-bold text-text-primary">{learningMetrics?.epoch ?? 'Not measured'}</span></div>
+              <div className="flex justify-between items-center"><span className="text-[10px] font-mono text-text-secondary">Digested Outcomes</span><span className="text-xs font-mono font-bold text-accent">{learningMetrics?.outcomesDigested ?? '0'}</span></div>
+              <div className="flex justify-between items-center"><span className="text-[10px] font-mono text-text-secondary">Global Confidence (not available)</span><span className="text-xs font-mono font-bold text-green-400">{learningMetrics?.confidenceGlobal == null ? 'Not measured' : `${Number(learningMetrics.confidenceGlobal).toFixed(1)}%`}</span></div>
               <div className="flex justify-between items-center"><span className="text-[10px] font-mono text-text-secondary">Total Active Nodes</span><span className="text-xs font-mono font-bold text-text-primary">{(networkData.nodes || []).length}</span></div>
             </div>
           </div>
