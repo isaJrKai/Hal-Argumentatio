@@ -1968,40 +1968,22 @@ app.all(['/api/webhooks/twilio', '/api/webhooks/whatsapp'], async (req, res) => 
 
     console.log(`[Inbound Webhook Received] Channel: ${isWhatsApp ? 'WhatsApp' : 'SMS'} | From: ${cleanFrom} | Body: "${rawBody}"`);
 
-    // Match against existing leads in local DB & PostgreSQL
+    // Only update a lead when the sender can be matched unambiguously.
+    // Never assign an unmatched sender to the first contractor or invent business data.
     const allLeads = db.getLeads() || [];
-    let matchedLead = allLeads.find(l => {
+    const matchedCandidates = allLeads.filter(l => {
       const p = (l.phone || '').replace(/\D/g, '');
-      return p.length >= 7 && (p.endsWith(fromDigits) || fromDigits.endsWith(p));
+      return p.length >= 7 && fromDigits.length >= 7 && (p === fromDigits);
     });
 
+    if (matchedCandidates.length !== 1) {
+      return res.status(404).type('text/xml').send('<?xml version="1.0" encoding="UTF-8"?><Response></Response>');
+    }
+
+    let matchedLead = matchedCandidates[0];
+    const targetContractorId = matchedLead.contractorId;
     const now = new Date().toISOString();
-    let targetContractorId = matchedLead ? matchedLead.contractorId : 'demo_contractor';
 
-    if (!matchedLead) {
-      // Find first contractor to assign inbound lead
-      const contractorsList = db.getContractors();
-      if (contractorsList.length > 0) {
-        targetContractorId = contractorsList[0].id;
-      }
-
-      // Create new authentic inbound lead
-      const newLeadId = 'lead_inbound_' + crypto.randomBytes(6).toString('hex');
-      const senderTitle = profileName ? `${profileName} (${cleanFrom})` : `Inbound Prospect (${cleanFrom})`;
-      matchedLead = db.addLead({
-        contractorId: targetContractorId,
-        businessName: senderTitle,
-        ownerName: profileName || 'Inbound Prospect',
-        phone: cleanFrom,
-        email: `inbound_${fromDigits || 'lead'}@contractor-inbound.ca`,
-        city: 'Calgary',
-        serviceType: 'Commercial Roofing & Exterior',
-        source: isWhatsApp ? 'whatsapp_inbound' : 'sms_inbound',
-        status: 'contacted',
-        urgencyScore: 9.2,
-        predictedLtvUsd: 8500,
-        notes: `[Inbound ${isWhatsApp ? 'WhatsApp' : 'SMS'} - ${now.slice(0, 16)}]: ${rawBody}`
-      });
     } else {
       // Advance lead status to 'contacted' if it was new
       const newStatus = (matchedLead.status === 'new' ? 'contacted' : matchedLead.status) as 'new' | 'contacted' | 'converted' | 'dead';
