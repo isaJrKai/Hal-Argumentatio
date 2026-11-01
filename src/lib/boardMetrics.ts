@@ -11,7 +11,7 @@ export interface KnownLeadValueSummary {
 
 /** Sum only explicitly recorded values; never substitute a default valuation. */
 export function summarizeKnownLeadValue(leads: readonly LeadValueEvidence[]): KnownLeadValueSummary {
-  const included = leads.filter(lead => lead.status !== 'dead');
+  const included = leads.filter(lead => lead.status !== 'dead' && lead.status !== 'closed_lost');
   const measured = included.filter(lead =>
     typeof lead.predictedLtvUsd === 'number' &&
     Number.isFinite(lead.predictedLtvUsd) &&
