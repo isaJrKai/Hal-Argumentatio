@@ -217,9 +217,13 @@ export default function OverviewPanel({
   // Forecast chart data
   const [forecastMetadata, setForecastMetadata] = useState<any>(null);
   const [forecastChartData, setForecastChartData] = useState<any[]>([]);
+  const [forecastError, setForecastError] = useState<string | null>(null);
 
   useEffect(() => {
     let isMounted = true;
+    setForecastMetadata(null);
+    setForecastChartData([]);
+    setForecastError(null);
     const fetchForecast = async (retryCount = 0) => {
       try {
         const storedToken = localStorage.getItem('halbiz_auth_token') || localStorage.getItem('token');
@@ -229,7 +233,7 @@ export default function OverviewPanel({
         if (storedToken) {
           headers['Authorization'] = `Bearer ${storedToken}`;
         }
-        const res = await fetch('/api/ai/test-timesfm', {
+        const res = await fetch('/api/forecast/scenario', {
           method: 'POST',
           headers,
           body: JSON.stringify({ 
@@ -237,11 +241,11 @@ export default function OverviewPanel({
             niche: activeNiche, 
             horizonWeeks: 12, 
             applyGuardrails: true,
-            targetCAC: workspaceConfig.targetCAC || 145 
+            targetCAC: workspaceConfig.targetCAC || undefined 
           })
         });
         if (!res.ok) {
-          throw new Error(`TimesFM endpoint returned HTTP ${res.status}`);
+          throw new Error(`Forecast scenario endpoint returned HTTP ${res.status}`);
         }
         const data = await res.json();
         if (isMounted && data.success && data.forecastCurve) {
@@ -261,7 +265,9 @@ export default function OverviewPanel({
             if (isMounted) fetchForecast(retryCount + 1);
           }, 1500 * (retryCount + 1));
         } else {
-          console.warn('TimesFM forecast unavailable; no synthetic forecast will be displayed.');
+          const message = err instanceof Error ? err.message : 'Forecast scenario unavailable';
+          setForecastError(message);
+          console.warn('Forecast scenario unavailable:', message);
         }
       }
     };
