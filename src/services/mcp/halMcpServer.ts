@@ -86,22 +86,22 @@ function sanitizeProspect(lead: any) {
     phone: phone && !phone.includes('[ENCRYPTED]') ? phone : (lead.phoneEncrypted ? '[DECRYPTED]' : null),
     websiteUrl: lead.websiteUrl || null,
     gmbListingUrl: lead.gmbListingUrl || null,
-    reviewCount: lead.reviewCount ?? null,
-    reviewScore: lead.reviewScore ?? null,
-    predictedMonthlyLostRevenueUsd: lead.predictedMonthlyLostRevenueUsd ?? null,
+    reviewCount: null,
+    reviewScore: null,
+    predictedMonthlyLostRevenueUsd: null,
     status: lead.status,
     source: lead.source,
-    sourceType: lead.sourceType || 'unknown',
+    sourceType: lead.externalSource || lead.externalCrmId ? (lead.sourceType || 'unknown') : 'unknown',
     verificationStatus: lead.verificationStatus || 'UNVERIFIED_STAGING',
     dnsVerified: Boolean(lead.dnsVerified),
-    performanceScore: lead.performanceScore ?? null,
-    sslStatus: lead.sslStatus ?? null,
-    mobileFriendly: lead.mobileFriendly ?? null,
-    urgencyScore: lead.urgencyScore ?? null,
-    predictedLtv: lead.predictedLtv ?? lead.predictedLtvUsd ?? null,
-    seoScore: lead.seoScore ?? null,
-    googleRating: lead.googleRating ?? null,
-    sentimentScore: lead.sentimentScore ?? null,
+    performanceScore: null,
+    sslStatus: null,
+    mobileFriendly: null,
+    urgencyScore: null,
+    predictedLtv: null,
+    seoScore: null,
+    googleRating: null,
+    sentimentScore: null,
     notes: lead.notes || null,
     createdAt: lead.createdAt,
     updatedAt: lead.updatedAt
@@ -343,9 +343,6 @@ export function buildHalMcpServer(): McpServer {
       }
 
       const counts: Record<string, number> = {};
-      let totalValueUsd = 0;
-      let totalLostRevenueUsd = 0;
-
       for (const lead of allLeads) {
         let key = 'unknown';
         if (group_by === 'status') key = lead.status || 'new';
@@ -355,15 +352,14 @@ export function buildHalMcpServer(): McpServer {
         else if (group_by === 'verification_status') key = lead.verificationStatus || 'UNVERIFIED_STAGING';
 
         counts[key] = (counts[key] || 0) + 1;
-        totalValueUsd += Number(lead.predictedLtv || lead.predictedLtvUsd || 0);
-        totalLostRevenueUsd += Number(lead.predictedMonthlyLostRevenueUsd || 0);
       }
 
       return formatMcpResponse({
         group_by,
         total_prospects: allLeads.length,
-        total_projected_ltv_usd: totalValueUsd,
-        total_predicted_monthly_lost_revenue_usd: totalLostRevenueUsd,
+        total_projected_ltv_usd: null,
+        total_predicted_monthly_lost_revenue_usd: null,
+        financial_metrics_status: 'unavailable_pending_verified_source_data',
         breakdown: counts
       });
     } catch (err: any) {
@@ -392,8 +388,8 @@ export function buildHalMcpServer(): McpServer {
           .from(outreachSequences)
           .where(eq(outreachSequences.contractorId, contractorId))
           .orderBy(desc(outreachSequences.createdAt));
-      } catch {
-        records = [];
+      } catch (err: any) {
+        throw err;
       }
 
       const total = records.length;
@@ -509,8 +505,8 @@ export function buildHalMcpServer(): McpServer {
           .from(clientProjects)
           .where(eq(clientProjects.contractorId, contractorId))
           .orderBy(desc(clientProjects.createdAt));
-      } catch {
-        records = [];
+      } catch (err: any) {
+        throw err;
       }
 
       // Safe projection: remove sensitive portal access tokens
@@ -564,8 +560,8 @@ export function buildHalMcpServer(): McpServer {
           .select()
           .from(leadEvents)
           .orderBy(desc(leadEvents.createdAt));
-      } catch {
-        records = [];
+      } catch (err: any) {
+        throw err;
       }
 
       const total = records.length;
@@ -603,8 +599,8 @@ export function buildHalMcpServer(): McpServer {
           .from(auditLogs)
           .where(eq(auditLogs.contractorId, contractorId))
           .orderBy(desc(auditLogs.timestamp));
-      } catch {
-        records = [];
+      } catch (err: any) {
+        throw err;
       }
 
       const total = records.length;
@@ -640,8 +636,8 @@ export function buildHalMcpServer(): McpServer {
           .select()
           .from(schedulerJobs)
           .orderBy(desc(schedulerJobs.createdAt));
-      } catch {
-        records = [];
+      } catch (err: any) {
+        throw err;
       }
 
       const total = records.length;
@@ -757,8 +753,8 @@ export function buildHalMcpServer(): McpServer {
           .from(revenueRecords)
           .where(eq(revenueRecords.contractorId, contractorId))
           .orderBy(desc(revenueRecords.createdAt));
-      } catch {
-        records = [];
+      } catch (err: any) {
+        throw err;
       }
 
       const total = records.length;
@@ -796,8 +792,8 @@ export function buildHalMcpServer(): McpServer {
           .from(winLossRecords)
           .where(eq(winLossRecords.contractorId, contractorId))
           .orderBy(desc(winLossRecords.closedAt));
-      } catch {
-        records = [];
+      } catch (err: any) {
+        throw err;
       }
 
       const total = records.length;
@@ -835,8 +831,8 @@ export function buildHalMcpServer(): McpServer {
           .from(halLoops)
           .where(eq(halLoops.contractorId, contractorId))
           .orderBy(desc(halLoops.createdAt));
-      } catch {
-        records = [];
+      } catch (err: any) {
+        throw err;
       }
 
       const total = records.length;
@@ -874,8 +870,8 @@ export function buildHalMcpServer(): McpServer {
           .from(hermesDiagnosticIncidents)
           .where(eq(hermesDiagnosticIncidents.contractorId, contractorId))
           .orderBy(desc(hermesDiagnosticIncidents.createdAt));
-      } catch {
-        records = [];
+      } catch (err: any) {
+        throw err;
       }
 
       const total = records.length;
@@ -913,8 +909,8 @@ export function buildHalMcpServer(): McpServer {
           .from(hermesLabArtifacts)
           .where(eq(hermesLabArtifacts.contractorId, contractorId))
           .orderBy(desc(hermesLabArtifacts.createdAt));
-      } catch {
-        records = [];
+      } catch (err: any) {
+        throw err;
       }
 
       const total = records.length;
@@ -952,8 +948,8 @@ export function buildHalMcpServer(): McpServer {
           .from(notifications)
           .where(eq(notifications.contractorId, contractorId))
           .orderBy(desc(notifications.createdAt));
-      } catch {
-        records = [];
+      } catch (err: any) {
+        throw err;
       }
 
       const total = records.length;
