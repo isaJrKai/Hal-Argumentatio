@@ -366,7 +366,7 @@ export default function App() {
 
       // Auto-inject or repair Authorization header for /api requests if not an auth endpoint
       if (!reviewMode && urlStr && urlStr.startsWith('/api') && !urlStr.startsWith('/api/auth/')) {
-        const storedToken = readLocalStorage('halbiz_auth_token') || readLocalStorage('token');
+        const storedToken = token || readLocalStorage('halbiz_auth_token') || readLocalStorage('token');
         if (storedToken) {
           const headers = new Headers(modifiedInit.headers || {});
           const existingAuth = headers.get('Authorization');
@@ -407,7 +407,7 @@ export default function App() {
 
       // Gracefully handle genuinely expired authentication tokens across /api calls
       if (!reviewMode && response.status === 401 && urlStr && urlStr.startsWith('/api') && !urlStr.startsWith('/api/auth/')) {
-        const hasStoredSession = readLocalStorage('halbiz_auth_token') || readLocalStorage('token');
+        const hasStoredSession = token || readLocalStorage('halbiz_auth_token') || readLocalStorage('token');
         if (hasStoredSession) {
           console.warn('Session token expired or invalid; resetting authentication state.');
           removeLocalStorage('halbiz_auth_token');
@@ -630,7 +630,7 @@ export default function App() {
   const setupSSEConnection = () => {
     if (sseTimeoutRef.current) clearTimeout(sseTimeoutRef.current);
 
-    const sessionToken = readLocalStorage('halbiz_auth_token') || readLocalStorage('token');
+    const sessionToken = token || readLocalStorage('halbiz_auth_token') || readLocalStorage('token');
     if (!sessionToken) return;
 
     let active = true;
