@@ -17,6 +17,16 @@ export function generateLandingPageHtml(config: LandingPageConfig): string {
   const primaryColor = branding.primaryColor || '#0284c7';
   const secondaryColor = branding.secondaryColor || '#0f172a';
   const accentColor = branding.accentColor || '#f59e0b';
+  const heroImageUrl = (() => {
+    try {
+      const candidate = new URL(sections.hero?.heroImageUrl || '');
+      return candidate.protocol === 'https:' && candidate.hostname === 'images.unsplash.com'
+        ? candidate.toString()
+        : '';
+    } catch {
+      return '';
+    }
+  })();
 
   // Include only business details supplied by the contractor; do not invent hours or pricing.
   const businessAddress = sections.footer?.address || '';
@@ -114,6 +124,10 @@ export function generateLandingPageHtml(config: LandingPageConfig): string {
             <div class="text-[11px] text-slate-400 mt-0.5">${phone || 'Use the service request form'}</div>
           </div>
         </div>
+        ${heroImageUrl ? `<figure class="mt-6 relative overflow-hidden rounded-2xl border border-slate-700/70 bg-slate-900/40 shadow-xl">
+          <img src="${heroImageUrl}" alt="Illustrative trade photography" loading="eager" decoding="async" class="w-full h-52 sm:h-64 object-cover" />
+          <figcaption class="absolute bottom-3 left-3 px-2.5 py-1 rounded-full bg-slate-950/80 text-slate-200 text-[10px] tracking-wide">Illustrative image</figcaption>
+        </figure>` : ''}
       </div>
 
       <!-- Lead Capture Card (3-Field High Conversion) -->
