@@ -562,7 +562,11 @@ export default function NeuralPanel() {
           <div>
             <h1 className="text-xl font-bold text-text-primary tracking-tight flex items-center gap-2">
               Neural Data Center
-              <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-green-500/10 text-green-400 border border-green-500/20 uppercase">
+              <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold border uppercase ${
+                networkData.telemetry ? 'bg-green-500/10 text-green-400 border-green-500/20'
+                  : isSyncing ? 'bg-amber-500/10 text-amber-400 border-amber-500/20'
+                  : 'bg-bg-base text-text-tertiary border-border-dim'
+              }`}>
                 {isSyncing ? 'Syncing' : networkData.telemetry ? 'Data synced' : 'Unavailable'}
               </span>
             </h1>
@@ -575,7 +579,9 @@ export default function NeuralPanel() {
             <span className="text-xs font-medium text-text-secondary mr-2">Manual Pruning</span>
             <button 
               onClick={() => setIsPruningMode(!isPruningMode)}
-              className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${isPruningMode ? 'bg-red-500' : 'bg-bg-raised border border-border-dim'}`}
+              disabled={!networkData.nodes.some(node => node.type === 'decaying')}
+              title={networkData.nodes.some(node => node.type === 'decaying') ? 'Toggle pruning for verified decaying nodes' : 'No verified decaying nodes are present in this territory'}
+              className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${isPruningMode ? 'bg-red-500' : 'bg-bg-raised border border-border-dim'}`}
             >
               <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${isPruningMode ? 'translate-x-4.5' : 'translate-x-1'}`} />
             </button>
