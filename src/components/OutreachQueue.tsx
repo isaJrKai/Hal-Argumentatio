@@ -45,7 +45,7 @@ export interface BatchItem {
 }
 
 export default function OutreachQueue({ leads, token, onRefresh }: OutreachQueueProps) {
-  const { workspaceConfig, activeIndustry, activeCity, activeNiche, regionalProfile } = useBusinessContext();
+  const { workspaceConfig, activeCity, activeNiche } = useBusinessContext();
   const [selectedLeadIds, setSelectedLeadIds] = useState<string[]>([]);
   const [activeChannelFilter, setActiveChannelFilter] = useState<'all' | 'email' | 'sms' | 'call'>('all');
   const [activeStatusFilter, setActiveStatusFilter] = useState<string>('all');
@@ -69,8 +69,6 @@ export default function OutreachQueue({ leads, token, onRefresh }: OutreachQueue
   const [templateBody, setTemplateBody] = useState(
     `Hi {{ownerName}},\n\nI’m reaching out because {{businessName}} serves {{city}}. I haven’t completed a verified audit, so I don’t want to assume there is a specific website or marketing problem.\n\nIf useful, I can review your public website and local search presence and share a short, evidence-based summary of any opportunities I can verify.\n\nWould you be open to a brief conversation?\n\nBest regards,\n${workspaceConfig.operatorName}\n${workspaceConfig.agencyName}`
   );
-  const [targetFollowUpDays, setTargetFollowUpDays] = useState(3);
-  const [autoAdvanceStatus, setAutoAdvanceStatus] = useState(true);
 
   // Draft with Hermes - for global template
   const handleDraftGlobalWithHermes = async () => {
@@ -399,6 +397,7 @@ export default function OutreachQueue({ leads, token, onRefresh }: OutreachQueue
               <span className="text-[10px] font-mono text-text-secondary uppercase font-bold block">
                 Record Outreach Simulation ({selectedLeadIds.length} Selected)
               </span>
+              <p className="text-[10px] text-text-dim">Simulation only: this queue records intended outreach but does not send email, SMS, or calls.</p>
 
               <div className="grid grid-cols-3 gap-2 font-mono text-xs">
                 <button
@@ -425,7 +424,7 @@ export default function OutreachQueue({ leads, token, onRefresh }: OutreachQueue
                   className="p-2 bg-bg-dark border border-border-dim hover:border-brand text-text-primary disabled:opacity-30 rounded-sm font-bold uppercase flex flex-col items-center justify-center gap-1 transition-colors cursor-pointer"
                 >
                   <Phone className="w-4 h-4 text-text-secondary" />
-                  <span className="text-[10px]">CALL LOG</span>
+                  <span className="text-[10px]">SIMULATE CALL LOG</span>
                 </button>
               </div>
             </div>
