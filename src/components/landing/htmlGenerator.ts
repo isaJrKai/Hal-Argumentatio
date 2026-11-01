@@ -77,7 +77,7 @@ export function generateLandingPageHtml(config: LandingPageConfig): string {
         <a href="${cleanPhone ? 'tel:' + cleanPhone : '#lead-form'}" class="bg-amber-500 hover:bg-amber-400 text-slate-950 font-extrabold px-4 py-2.5 rounded-xl text-xs sm:text-sm transition flex items-center gap-2 shadow-lg hover:shadow-amber-500/20">
           <span>📞</span>
           <span class="hidden sm:inline">${sections.header.ctaText}</span>
-          <span class="sm:hidden">Call Now</span>
+          <span class="sm:hidden">\${cleanPhone ? 'Call Now' : 'Request a Quote'}</span>
         </a>
       </div>
     </div>
