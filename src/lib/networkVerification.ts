@@ -377,6 +377,9 @@ export function enforceFailClosedOutreachGate(lead: {
   if (lead.sourceType === 'synthetic_fallback') {
     violations.push('Lead originated from synthetic fallback seed');
   }
+  if (lead.sourceType === 'ai_discovery_unverified') {
+    violations.push('Lead originated from unverified AI discovery and requires independent verification');
+  }
 
   // 2. Invariant: Grounding verification gate
   if (lead.verificationStatus !== 'VERIFIED') {
