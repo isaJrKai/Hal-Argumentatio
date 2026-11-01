@@ -30,6 +30,16 @@ describe('TimesFM input and forecast invariants', () => {
     expect(buildWeeklyDemandSeries(incomplete)).toEqual([]);
   });
 
+  it('ignores a partial current week while preserving eight complete weeks', () => {
+    const records = makeWeeklyRecords();
+    const nextMonday = Date.UTC(2026, 2, 2);
+    records.push(
+      { date: new Date(nextMonday).toISOString(), conversions: 2 },
+      { date: new Date(nextMonday + 86400000).toISOString(), conversions: 3 }
+    );
+    expect(buildWeeklyDemandSeries(records)).toHaveLength(8);
+  });
+
   it('rejects missing weeks instead of compressing time gaps', () => {
     const withGap = makeWeeklyRecords(9).filter((record) => {
       const date = new Date(record.date);
