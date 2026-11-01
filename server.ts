@@ -3125,29 +3125,27 @@ app.post('/api/skills', authenticate, (req, res) => {
     icon: icon || 'Cpu',
     inputs: inputs || [],
     execute: async (inp, contractorId) => {
-      if (process.env.GEMINI_API_KEY) {
-        try {
-          const { GoogleGenAI } = await import('@google/genai');
-          const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-          const prompt = `You are HAL. Analyze the following inputs for the custom capability "${name}" (${description}):
+      if (!process.env.GEMINI_API_KEY) {
+        throw new Error('Custom skill execution is unavailable: GEMINI_API_KEY is not configured.');
+      }
+      const { GoogleGenAI } = await import('@google/genai');
+      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+      const prompt = `You are HAL. Analyze the following inputs for the custom capability "${name}" (${description}):
 Inputs: ${JSON.stringify(inp)}
 
-Generate an elegant, high-fidelity Swiss-style diagnostic audit report. Make it extremely precise and professional, filled with action plans and actionable directives. Avoid any conversational filler.`;
-          const response = await ai.models.generateContent({
-            model: "gemini-3.5-flash",
-            contents: prompt,
-            config: {
-              systemInstruction: "You are HAL, a highly professional AI Business Operating Intelligence system.",
-              temperature: 0.2
-            }
-          });
-          return { report: response.text };
-        } catch (e: any) {
-          return { report: `[SYS_AUTOREPORT] Custom execution completed for "${name}".\nParameters parsed: ${JSON.stringify(inp)}\nStatus: 200 OK\nExecution Log:\n- Allocated cloud thread\n- Sanitized input variables\n- Dispatched success webhook` };
+Generate a precise, evidence-based professional report. Clearly separate verified facts, assumptions, and recommendations.`;
+      const response = await ai.models.generateContent({
+        model: "gemini-3.5-flash",
+        contents: prompt,
+        config: {
+          systemInstruction: "You are HAL, a professional AI Business Operating Intelligence system. Never fabricate execution, data, or integrations.",
+          temperature: 0.2
         }
-      } else {
-        return { report: `[SYS_AUTOREPORT] Custom execution completed for "${name}".\nParameters parsed: ${JSON.stringify(inp)}\nStatus: 200 OK\nExecution Log:\n- Allocated cloud thread\n- Sanitized input variables\n- Dispatched success webhook` };
+      });
+      if (!response.text) {
+        throw new Error('Gemini returned an empty response; the custom skill did not produce a report.');
       }
+      return { report: response.text };
     }
   });
 
@@ -4976,7 +4974,12 @@ app.get('/api/ai/engine-status', authenticate, async (req, res) => {
   const contractorId = (req as any).contractorId;
   const geminiKeySet = !!process.env.GEMINI_API_KEY;
   const nvidiaKeySet = !!process.env.NVIDIA_API_KEY;
-  const activeAiPreference = process.env.HAL_ACTIVE_AI || (geminiKeySet && nvidiaKeySet ? 'dual' : 'gemini');
+  const requestedPreference = process.env.HAL_ACTIVE_AI;
+  const activeAiPreference =
+    requestedPreference === 'dual' && geminiKeySet && nvidiaKeySet ? 'dual' :
+    requestedPreference === 'nemotron' && nvidiaKeySet ? 'nemotron' :
+    geminiKeySet ? 'gemini' :
+    nvidiaKeySet ? 'nemotron' : 'unavailable';
   const learningState = autonomousLearning.getState();
   const allLeads = await pgDb.select().from(leads).where(eq(leads.contractorId, contractorId));
 
@@ -4986,7 +4989,7 @@ app.get('/api/ai/engine-status', authenticate, async (req, res) => {
     engines: {
       dual_drive: {
         name: 'HAL True Dual-Drive (Consensus Co-Pilot)',
-        status: (geminiKeySet || nvidiaKeySet) ? 'online' : 'offline',
+        status: geminiKeySet && nvidiaKeySet ? 'configured_unverified' : 'degraded',
         active: activeAiPreference === 'dual',
         role: 'Simultaneous Multimodal Discovery (Gemini) + High-Speed Structured Verification (Nemotron)',
         capabilities: ['Parallel Consensus', 'Cross-Validation', 'Zero-Downtime Resilience']
@@ -4995,7 +4998,7 @@ app.get('/api/ai/engine-status', authenticate, async (req, res) => {
         name: 'Google Gemini',
         model: 'gemini-2.5-flash',
         configured: geminiKeySet,
-        status: geminiKeySet ? 'online' : 'offline',
+        status: geminiKeySet ? 'configured_unverified' : 'not_configured',
         role: 'Deep Multimodal Reasoning & Discovery',
         capabilities: ['Search Grounding', 'Code Audits', 'Vision & Document Extraction']
       },
@@ -5003,7 +5006,7 @@ app.get('/api/ai/engine-status', authenticate, async (req, res) => {
         name: 'NVIDIA Nemotron',
         model: 'nvidia/nemotron-3.5-lightning-30b-a3b',
         configured: nvidiaKeySet,
-        status: nvidiaKeySet ? 'online' : 'offline',
+        status: nvidiaKeySet ? 'configured_unverified' : 'not_configured',
         role: 'High-Throughput Policy & Structured Execution',
         capabilities: ['Rapid JSON Ingest', 'Deterministic Synthesis', 'Low-Latency Fallback']
       },
@@ -5046,13 +5049,15 @@ app.get('/api/ai/engine-status', authenticate, async (req, res) => {
         isOfflineModeSimulated: learningState.isOfflineModeActive
       }
     },
-    fallbackChain: activeAiPreference === 'dual' 
+    fallbackChain: activeAiPreference === 'dual'
       ? ['Dual-Drive (Gemini + Nemotron)', 'HAL Self-Taught Autonomous Neural Engine']
-      : [
-          activeAiPreference === 'nemotron' ? 'NVIDIA Nemotron' : 'Google Gemini',
-          activeAiPreference === 'nemotron' ? 'Google Gemini' : 'NVIDIA Nemotron',
-          'HAL Self-Taught Autonomous Neural Engine'
-        ]
+      : activeAiPreference === 'unavailable'
+        ? []
+        : [
+            activeAiPreference === 'nemotron' ? 'NVIDIA Nemotron' : 'Google Gemini',
+            activeAiPreference === 'nemotron' ? 'Google Gemini' : 'NVIDIA Nemotron',
+            'HAL Self-Taught Autonomous Neural Engine'
+          ]
   });
 });
 
