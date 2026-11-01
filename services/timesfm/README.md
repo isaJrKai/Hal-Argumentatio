@@ -52,9 +52,11 @@ running inference server. When no private HTTP endpoint is configured, HAL's
 forecast API reads the latest successful, fresh, tenant- and territory-scoped
 batch results from the existing `forecasts` table. The workflow at
 `.github/workflows/timesfm-batch.yml` runs the official TimesFM 2.5 PyTorch
-checkpoint on a GitHub-hosted runner, reads each contractor's own Google Ads
-history, and writes the median forecast plus q10/q90 bounds into the existing
-`forecasts` table. It is a scheduled batch job, not a live HTTP inference API.
+checkpoint on a GitHub-hosted runner, reads tenant-scoped Google Ads history
+for each contractor's active territories and primary service type, and writes
+the median forecast plus q10/q90 bounds into the existing `forecasts` table.
+Other niche selections require the optional HTTP inference mode. It is a
+scheduled batch job, not a live HTTP inference API.
 
 ### Required setup
 
