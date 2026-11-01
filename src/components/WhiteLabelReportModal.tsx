@@ -227,7 +227,7 @@ export default function WhiteLabelReportModal({ lead, isOpen, onClose }: WhiteLa
 
             <div className="flex items-center gap-3 border-t md:border-t-0 md:border-l border-border-dim pt-3 md:pt-0 md:pl-6 font-mono">
               <div className="text-center px-2">
-                <span className="text-[9px] text-text-dim block uppercase">RECORDED LTV</span>
+                <span className="text-[9px] text-text-dim block uppercase">PREDICTED LTV</span>
                 <span className="text-base font-bold text-positive flex items-center justify-center">
                   {ltv !== null ? `${ltv.toLocaleString()}` : 'Not measured'}
                 </span>
