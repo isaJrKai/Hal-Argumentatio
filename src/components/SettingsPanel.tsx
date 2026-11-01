@@ -824,6 +824,9 @@ export default function SettingsPanel({
 
       {/* DIRECT INTEGRATION GATEWAY: POSTGRESQL & JWT SECURITY */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 min-w-0">
+        <details className={`border rounded-lg ${cardBg}`}>
+          <summary className="cursor-pointer list-none p-5 font-mono text-xs font-bold uppercase tracking-wider">Advanced · PostgreSQL connection and sync</summary>
+          <div className="px-5 pb-5">
         {/* PostgreSQL Database Section */}
         <div className={`border rounded-lg p-5 space-y-6 ${cardBg}`}>
           <div className="flex flex-wrap items-center gap-2 border-b pb-3 border-inherit">
@@ -903,9 +906,9 @@ export default function SettingsPanel({
               )}
             </div>
           )}
-
-
         </div>
+          </div>
+        </details>
 
         {/* Session credentials are intentionally not exposed in the settings UI. */}
         <div className={`border rounded-lg p-5 space-y-3 ${cardBg}`}>
