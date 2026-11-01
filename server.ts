@@ -4971,7 +4971,6 @@ app.get('/api/neural/network', authenticate, async (req, res) => {
 // ─── AI ENGINE DUAL-DRIVE & AUTONOMOUS ENGINE STATUS ─────────────────────────
 
 app.get('/api/ai/engine-status', authenticate, async (req, res) => {
-  const contractorId = (req as any).contractorId;
   const geminiKeySet = !!process.env.GEMINI_API_KEY;
   const nvidiaKeySet = !!process.env.NVIDIA_API_KEY;
   const requestedPreference = process.env.HAL_ACTIVE_AI;
@@ -4981,7 +4980,6 @@ app.get('/api/ai/engine-status', authenticate, async (req, res) => {
     geminiKeySet ? 'gemini' :
     nvidiaKeySet ? 'nemotron' : 'unavailable';
   const learningState = autonomousLearning.getState();
-  const allLeads = await pgDb.select().from(leads).where(eq(leads.contractorId, contractorId));
 
   res.json({
     activeEngine: activeAiPreference,
