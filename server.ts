@@ -712,22 +712,15 @@ app.post('/api/auth/forgot-password', async (req, res) => {
 
     const cleanEmail = email.toLowerCase().trim();
 
-    // Check if contractor exists in pgDb or fallback db
-    let userExists = false;
-    try {
-      const result = await pgDb.select().from(contractors).where(eq(contractors.email, cleanEmail)).limit(1);
-      if (result && result.length > 0) {
-        userExists = true;
-      }
-    } catch (_) {}
+    // PostgreSQL is the sole source of truth for login. Never issue a reset
+    // token for a local-only fallback account that cannot authenticate.
+    const result = await pgDb.select({ id: contractors.id })
+      .from(contractors)
+      .where(eq(contractors.email, cleanEmail))
+      .limit(1);
 
-    if (!userExists) {
-      const localCon = db.getContractorByEmail(cleanEmail);
-      if (localCon) userExists = true;
-    }
-
-    // Generate cryptographically secure single-use token if user exists
-    if (userExists) {
+    // Keep account-existence responses indistinguishable.
+    if (result.length > 0) {
       const rawToken = crypto.randomBytes(32).toString('hex');
       db.createPasswordReset(cleanEmail, rawToken, 3600 * 1000); // 1 hour validity
 
@@ -790,7 +783,8 @@ app.post('/api/auth/forgot-password', async (req, res) => {
     // Generic response if account doesn't exist (prevents email enumeration)
     return res.json(buildPasswordResetResponse());
   } catch (err: any) {
-    return res.status(500).json({ error: 'Failed to process password reset request.' });
+    console.error('[HAL Auth] Password reset request could not be processed:', err?.message || err);
+    return res.status(503).json({ error: 'Password reset service temporarily unavailable. Please try again later.' });
   }
 });
 
@@ -814,22 +808,40 @@ app.post('/api/auth/reset-password', async (req, res) => {
     const cleanEmail = verification.email;
     const newPasswordHash = hashPassword(password);
 
-    // Update in Postgres if available
+    // The PostgreSQL account is the source of truth for login. A reset is
+    // successful only when that exact account row is updated.
+    let updatedAccounts: Array<{ id: string }>;
     try {
-      await pgDb.update(contractors)
+      updatedAccounts = await pgDb.update(contractors)
         .set({ passwordHash: newPasswordHash })
-        .where(eq(contractors.email, cleanEmail));
-    } catch (_) {}
+        .where(eq(contractors.email, cleanEmail))
+        .returning({ id: contractors.id });
+    } catch (databaseError: any) {
+      // The token was claimed above. Restore it so a transient database outage
+      // does not permanently invalidate a legitimate reset link.
+      db.restorePasswordReset(token.trim());
+      console.error('[HAL Auth] Password reset database update failed:', databaseError?.message || databaseError);
+      return res.status(503).json({ error: 'Password reset service temporarily unavailable. Please try again later.' });
+    }
 
-    // Update in local fallback DB and revoke old sessions
-    db.updateContractorPassword(cleanEmail, newPasswordHash);
+    if (updatedAccounts.length !== 1) {
+      return res.status(400).json({ error: 'This password reset link is invalid or no longer available.' });
+    }
+
+    // Local state is only a compatibility cache; it must never determine whether
+    // the PostgreSQL password update succeeded.
+    try {
+      db.updateContractorPassword(cleanEmail, newPasswordHash);
+    } catch (localUpdateError: any) {
+      console.warn('[HAL Auth] Local session cleanup was incomplete:', localUpdateError?.message || localUpdateError);
+    }
 
     try {
       await pgDb.insert(auditLogs).values({
         id: crypto.randomUUID(),
-        contractorId: 'system',
+        contractorId: updatedAccounts[0].id,
         action: 'PASSWORD_RESET_SUCCESS',
-        details: `Password successfully updated for: ${cleanEmail} from IP: ${req.ip}`
+        details: `Password successfully updated from IP: ${req.ip}`
       });
     } catch (_) {}
 
