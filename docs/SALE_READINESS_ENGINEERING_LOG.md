@@ -48,6 +48,7 @@
 - Moved third-party integration credential controls into a collapsed Advanced section so routine workspace settings are less cluttered; credential values remain encrypted and are not exposed in the UI.
 - Improved the HAL Bible specification/manual reading layout: larger body text and line-height, wrapping for long file/metadata values, and stacked metadata rows on narrow screens.
 - Hardened CORS configuration diagnostics: production now warns clearly when no browser origins are configured; malformed entries and non-HTTPS non-local origins are rejected rather than silently accepted. Exact production origin values still must be supplied in deployment environment settings.
+- Added a real Phase 5 system-check action: tenant-scoped database reachability and lead count, cryptographic ledger integrity, AI key-configuration flags, process uptime/memory/runtime version, and an audit-ledger record. The UI explicitly distinguishes configured keys from verified provider connectivity and does not claim the 11-layer brain is synchronized.
 - These follow-on commits have not yet been verified by a fresh CI run. Do not treat them as release-ready until CI/type-check/build pass.
 
 ## Verification evidence
