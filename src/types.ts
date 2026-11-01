@@ -251,15 +251,20 @@ export interface TechAuditReport {
   targetUrl: string;
   businessName?: string;
   city?: string;
-  sslStatus: 'secured' | 'missing' | 'expired';
-  sslExpiryDays?: number;
-  mobileSpeedScore: number; // 0-100
-  desktopSpeedScore: number; // 0-100
-  seoHealthScore: number; // 0-100
-  mobileViewportOptimized: boolean;
-  hasGoogleMapsEmbed: boolean;
-  estimatedLostLeadsMonthly: number;
-  estimatedLostRevenueMonthlyUsd: number;
+  sslStatus: 'secured' | 'missing' | 'unknown' | null;
+  sslExpiryDays: number | null;
+  mobileSpeedScore: number | null;
+  desktopSpeedScore: number | null;
+  seoHealthScore: number | null;
+  mobileViewportOptimized: boolean | null;
+  hasGoogleMapsEmbed: boolean | null;
+  estimatedLostLeadsMonthly: number | null;
+  estimatedLostRevenueMonthlyUsd: number | null;
+  dnsResolved: boolean;
+  httpReachable: boolean;
+  httpStatus: number | null;
+  measurementStatus: 'measured' | 'partial' | 'unreachable';
+  pageSpeedStatus: 'not_configured' | 'measured';
   identifiedVulnerabilities: string[];
   recommendedFixes: string[];
   generatedAt: string;
