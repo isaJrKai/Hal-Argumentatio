@@ -214,7 +214,7 @@ Return ONLY a JSON object matching this schema:
   return { config: safeConfig, html };
 }
 
-function applyVerifiedBusinessDetails(
+export function applyVerifiedBusinessDetails(
   config: LandingPageConfig,
   details: { businessName?: string; city?: string; phone?: string; address?: string; trade: TradeType; prompt: string },
   preserveGeneratedCopy = false
