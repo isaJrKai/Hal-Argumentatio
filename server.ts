@@ -3250,14 +3250,27 @@ app.get('/api/intelligence/chat/conversations', authenticate, async (req, res) =
   const contractorId = resolveChatContractorId(req);
   const targetIds = getTargetContractorIds(contractorId);
   try {
-    const legacy = await pgDb.select().from(chatMessages).where(and(inArray(chatMessages.contractorId, targetIds), sql`${chatMessages.conversationId} IS NULL`)).orderBy(chatMessages.createdAt);
-    if (legacy.length) {
-      const id = 'conversation_' + crypto.randomBytes(10).toString('hex');
-      const now = new Date();
-      await pgDb.insert(chatConversations).values({ id, contractorId, title: 'Previous Copilot chat', projectId: null, createdAt: legacy[0].createdAt || now, updatedAt: now });
-      await pgDb.update(chatMessages).set({ conversationId: id }).where(and(inArray(chatMessages.id, legacy.map(m => m.id)), inArray(chatMessages.contractorId, targetIds)));
-    }
-    const conversations = await pgDb.select().from(chatConversations).where(inArray(chatConversations.contractorId, targetIds)).orderBy(desc(chatConversations.updatedAt));
+    // Serialize the one-time legacy migration per contractor. Without this lock,
+    // simultaneous workspace loads can create duplicate "Previous Copilot chat"
+    // conversations and race to attach the same orphaned messages.
+    await pgDb.transaction(async (tx) => {
+      await tx.execute(sql`SELECT pg_advisory_xact_lock(42, hashtext(${contractorId}))`);
+      const legacy = await tx.select().from(chatMessages)
+        .where(and(inArray(chatMessages.contractorId, targetIds), sql`${chatMessages.conversationId} IS NULL`))
+        .orderBy(chatMessages.createdAt);
+      if (legacy.length) {
+        const id = 'conversation_' + crypto.randomBytes(10).toString('hex');
+        const now = new Date();
+        await tx.insert(chatConversations).values({
+          id, contractorId, title: 'Previous Copilot chat', projectId: null,
+          createdAt: legacy[0].createdAt || now, updatedAt: now
+        });
+        await tx.update(chatMessages).set({ conversationId: id })
+          .where(and(inArray(chatMessages.id, legacy.map(m => m.id)), inArray(chatMessages.contractorId, targetIds), sql`${chatMessages.conversationId} IS NULL`));
+      }
+    });
+    const conversations = await pgDb.select().from(chatConversations)
+      .where(inArray(chatConversations.contractorId, targetIds)).orderBy(desc(chatConversations.updatedAt));
     res.json(conversations);
   } catch (err: any) { res.status(500).json({ error: err.message }); }
 });
