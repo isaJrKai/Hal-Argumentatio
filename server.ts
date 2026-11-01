@@ -8958,7 +8958,7 @@ async function startServer() {
         entityType: 'roadmap_milestone',
         entityId: 'phase5_enterprise_brain_sync',
         actor: 'HAL Enterprise Verifier',
-        details: `Verified Phase 5 Global Enterprise & 11-Layer Brain Architecture. Score: ${verificationResult.totalScore}/100. 11/11 layers locked in phase with Instrument vs. Workflow paradigm.`,
+        details: `Phase 5 evidence check completed; verification status: ${verificationResult.allPassed ? 'verified' : 'not verified'}. Score: ${verificationResult.totalScore}/100. No connected organization records, edge health telemetry, persisted ontologies, or layer-level runtime instrumentation were available unless explicitly reported by the verification result.`,
         metadata: {
           verificationResult,
           pillar1Status: verificationResult.pillar1.status,
@@ -8970,6 +8970,7 @@ async function startServer() {
 
       res.json({
         success: true,
+        verified: verificationResult.allPassed,
         verificationResult,
         block: auditBlock,
         integrity: db.verifyLedgerIntegrity(contractorId)
