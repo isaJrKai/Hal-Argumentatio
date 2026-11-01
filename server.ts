@@ -5154,14 +5154,21 @@ app.get('/api/portal/project/:token', async (req, res) => {
 app.get('/api/financials/overview', authenticate, async (req, res) => {
   const contractorId = (req as any).contractorId;
   try {
-    let projects: any[] = [];
+    // Financial reporting must use the authoritative tenant-scoped PostgreSQL
+    // records. Falling back to legacy JSON here can present stale data as current.
+    let projects: any[];
     try {
       projects = await pgDb
         .select()
         .from(clientProjects)
-        .where(eq(clientProjects.contractorId, contractorId)) || [];
-    } catch (pgErr) {
-      projects = db.getClientProjects(contractorId) || [];
+        .where(eq(clientProjects.contractorId, contractorId));
+    } catch (databaseError: any) {
+      console.error('Financial overview PostgreSQL read failed:', databaseError);
+      return res.status(503).json({
+        success: false,
+        code: 'FINANCIALS_DATABASE_UNAVAILABLE',
+        error: 'Financial data is temporarily unavailable because the database could not be read. No legacy or cached figures were substituted.'
+      });
     }
 
     const snapshot = buildFinancialSnapshotCore(Array.isArray(projects) ? projects : []);

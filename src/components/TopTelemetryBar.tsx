@@ -74,6 +74,7 @@ export const TopTelemetryBar: React.FC<TopTelemetryBarProps> = ({
     activeCity, 
     regionalProfile, 
     formatCurrency, 
+    supportedCities,
     setActiveCity,
     setCity 
   } = useBusinessContext();
@@ -343,21 +344,16 @@ export const TopTelemetryBar: React.FC<TopTelemetryBarProps> = ({
               {/* Mini-Panel: Territory & Trade Selector */}
               <div className="flex items-center gap-2 px-3 border-r border-border-dim/50 shrink-0">
                 <span className="text-[11px] text-text-tertiary font-sans">Location:</span>
-                <div className="flex items-center gap-1">
-                  {['Calgary', 'Winnipeg', 'Edmonton'].map((city) => (
-                    <button
-                      key={city}
-                      onClick={() => (setActiveCity ? setActiveCity(city) : setCity?.(city))}
-                      className={`px-2 py-0.5 rounded text-[11px] font-sans font-medium transition-colors cursor-pointer border ${
-                        activeCity === city
-                          ? 'bg-accent text-accent-contrast border-accent font-bold shadow-xs'
-                          : 'bg-bg-raised text-text-secondary hover:text-text-primary border-border-dim hover:bg-bg-subtle'
-                      }`}
-                    >
-                      {city}
-                    </button>
+                <select
+                  aria-label="Workspace territory"
+                  value={activeCity}
+                  onChange={(event) => (setActiveCity ? setActiveCity(event.target.value) : setCity?.(event.target.value))}
+                  className="max-w-[180px] px-2 py-1 rounded text-[11px] font-sans font-medium bg-bg-raised text-text-primary border border-border-dim focus:outline-none focus:border-accent cursor-pointer"
+                >
+                  {Array.from(new Set([activeCity, ...(supportedCities || [])])).map((city) => (
+                    <option key={city} value={city}>{city}</option>
                   ))}
-                </div>
+                </select>
               </div>
 
               {/* Mini-Panel: Trade Focus */}
