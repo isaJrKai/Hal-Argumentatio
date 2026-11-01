@@ -84,6 +84,8 @@ export default function NeuralPanel() {
   };
 
   useEffect(() => {
+    setNetworkData({ nodes: [], links: [], telemetry: null });
+    setLearningMetrics(null);
     fetchNetwork();
     return () => {
       networkRequestIdRef.current += 1;
