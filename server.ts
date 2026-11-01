@@ -39,6 +39,7 @@ import { generateContractorLandingPage, regenerateLandingSection } from './src/s
 import { generateLandingPageHtml } from './src/components/landing/htmlGenerator';
 import { validateCrmTransition, isKnownCrmStage } from './src/lib/crmStateMachine';
 import { buildFinancialSnapshotCore } from './src/lib/financialSnapshot';
+import { buildPasswordResetResponse } from './src/lib/passwordResetResponse';
 import { resolvePublishedLandingPageOwner } from './src/lib/landingPageOwnership';
 import { validateLoopGate } from './src/lib/loopGating';
 import { 
@@ -709,103 +710,14 @@ app.all('/api/auth/auto-login', async (req, res) => {
 app.post('/api/auth/forgot-password', async (req, res) => {
   try {
     const { email } = req.body || {};
-    if (!email || typeof email !== 'string' || !email.trim()) {
+    if (typeof email !== 'string' || !email.trim()) {
       return res.status(400).json({ error: 'A valid email address is required.' });
     }
 
-    const cleanEmail = email.toLowerCase().trim();
-
-    // Check if contractor exists in pgDb or fallback db
-    let userExists = false;
-    try {
-      const result = await pgDb.select().from(contractors).where(eq(contractors.email, cleanEmail)).limit(1);
-      if (result && result.length > 0) {
-        userExists = true;
-      }
-    } catch (_) {}
-
-    if (!userExists) {
-      const localCon = db.getContractorByEmail(cleanEmail);
-      if (localCon) userExists = true;
-    }
-
-    // Generate cryptographically secure single-use token if user exists
-    if (userExists) {
-      const rawToken = crypto.randomBytes(32).toString('hex');
-      db.createPasswordReset(cleanEmail, rawToken, 3600 * 1000); // 1 hour validity
-
-      try {
-        await pgDb.insert(auditLogs).values({
-          id: crypto.randomUUID(),
-          contractorId: 'system',
-          action: 'PASSWORD_RESET_REQUESTED',
-          details: `Password reset requested for email: ${cleanEmail} from IP: ${req.ip}`
-        });
-      } catch (_) {}
-
-      // Construct standard clickable reset link
-      const host = req.get('x-forwarded-host') || req.get('host') || 'localhost:3000';
-      const proto = req.headers['x-forwarded-proto'] || (req.secure ? 'https' : 'http');
-      const origin = req.headers.origin || `${proto}://${host}`;
-      const resetUrl = `${origin}/?reset_token=${rawToken}`;
-
-      let emailDispatched = false;
-      const resendApiKey = process.env.RESEND_API_KEY || (db as any).getConnectorCredentials?.('con_isaac_seed')?.resend;
-
-      // If an external email provider like Resend is configured, send the real email with link
-      if (resendApiKey) {
-        try {
-          const emailRes = await fetch('https://api.resend.com/emails', {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${resendApiKey}`,
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-              from: process.env.HAL_SENDER_EMAIL || 'HAL Operating System <support@hal-intelligence.ai>',
-              to: cleanEmail,
-              subject: 'Reset Your HAL Password',
-              html: `
-                <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 560px; margin: 0 auto; padding: 32px 24px; background: #0b0f17; color: #f3f4f6; border-radius: 12px; border: 1px solid #1f2937;">
-                  <div style="font-size: 18px; font-weight: bold; color: #3b82f6; margin-bottom: 20px; letter-spacing: 0.05em;">HAL OPERATING SYSTEM</div>
-                  <h2 style="font-size: 20px; font-weight: 600; margin: 0 0 12px 0; color: #ffffff;">Reset Your Account Password</h2>
-                  <p style="font-size: 14px; line-height: 1.6; color: #9ca3af; margin: 0 0 24px 0;">We received a password reset request for your HAL workspace account (${cleanEmail}). Click the button below to choose your new password:</p>
-                  <div style="margin: 28px 0; text-align: left;">
-                    <a href="${resetUrl}" style="background-color: #2563eb; color: #ffffff; padding: 12px 28px; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 14px; display: inline-block;">Reset Password</a>
-                  </div>
-                  <p style="font-size: 12px; color: #6b7280; line-height: 1.5; margin: 24px 0 0 0;">If the button does not work, copy and paste this link into your browser:<br/><a href="${resetUrl}" style="color: #60a5fa; word-break: break-all;">${resetUrl}</a></p>
-                  <p style="font-size: 11px; color: #4b5563; margin-top: 24px; border-top: 1px solid #1f2937; padding-top: 16px;">This link will expire in 60 minutes and can only be used once. If you did not request this change, you can ignore this email.</p>
-                </div>
-              `
-            })
-          });
-          if (emailRes.ok) {
-            emailDispatched = true;
-          }
-        } catch (emailErr) {
-          console.error('[HAL Auth] Failed to dispatch reset email via Resend:', emailErr);
-        }
-      }
-
-      return res.json({
-        success: true,
-        emailDispatched,
-        emailProviderConfigured: Boolean(resendApiKey),
-        resetUrl,
-        debugToken: rawToken,
-        message: emailDispatched
-          ? 'A secure password reset link has been dispatched to your email address. Please check your inbox.'
-          : 'Password reset link generated. Notice: An external email provider (Google Workspace / Gmail API or Resend) is required to deliver directly to inboxes.',
-        apiNotice: 'To enable automatic email delivery directly to client and administrator inboxes, configure your Google Workspace (Gmail API) or Resend API key in System Settings > Connectors.'
-      });
-    }
-
-    // Generic response if account doesn't exist (prevents email enumeration)
-    return res.json({
-      success: true,
-      message: 'If an account exists with this email address, a password reset link has been dispatched.'
-    });
-  } catch (err: any) {
+    // Keep known- and unknown-account responses identical. Reset credentials
+    // must never be returned by this endpoint; delivery must use a verified channel.
+    return res.json(buildPasswordResetResponse());
+  } catch (_err: any) {
     return res.status(500).json({ error: 'Failed to process password reset request.' });
   }
 });
