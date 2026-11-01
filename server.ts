@@ -5056,163 +5056,145 @@ app.delete('/api/neural/network/prune/:id', authenticate, async (req, res) => {
 app.get('/api/neural/network', authenticate, async (req, res) => {
   try {
     const contractorId = (req as any).contractorId;
-    
-    // Fetch live data from PostgreSQL DB
-    
+    const cityFilter = String(req.query.city || '').trim();
+    const nicheFilter = String(req.query.niche || '').trim().toLowerCase();
     const dbInstance = getDrizzleDb();
-    if (!dbInstance) throw new Error('Database not initialized');
-    const insights = await dbInstance.select().from(learningInsights).orderBy(desc(learningInsights.createdAt)).limit(50);
-    const winLoss = await dbInstance.select().from(winLossRecords).where(eq(winLossRecords.contractorId, contractorId)).limit(30);
-    const recentLeads = await dbInstance.select().from(leads).where(eq(leads.contractorId, contractorId)).limit(300);
-    
-    // Get autonomous state memory
-    const autoState = autonomousLearning.getState();
+    if (!dbInstance) throw new Error('Neon/PostgreSQL is unavailable');
 
-    const nodes: any[] = [];
+    // Every record below is scoped to the authenticated tenant before graph construction.
+    const [allLeads, allOutcomes, adsRows] = await Promise.all([
+      dbInstance.select().from(leads).where(eq(leads.contractorId, contractorId)).orderBy(desc(leads.createdAt)).limit(1000),
+      dbInstance.select().from(winLossRecords).where(eq(winLossRecords.contractorId, contractorId)).orderBy(desc(winLossRecords.closedAt)).limit(500),
+      dbInstance.select().from(googleAdsDailyPerformance).where(eq(googleAdsDailyPerformance.contractorId, contractorId)).orderBy(desc(googleAdsDailyPerformance.date)).limit(2000)
+    ]);
+
+    const normalizedCity = cityFilter.toLowerCase();
+    const scopedLeads = allLeads.filter(lead =>
+      (!normalizedCity || String(lead.city || '').trim().toLowerCase() === normalizedCity) &&
+      (!nicheFilter || String(lead.niche || '').trim().toLowerCase() === nicheFilter)
+    );
+    const scopedOutcomes = allOutcomes.filter(record =>
+      (!normalizedCity || String(record.city || '').trim().toLowerCase() === normalizedCity) &&
+      (!nicheFilter || String(record.niche || '').trim().toLowerCase() === nicheFilter)
+    );
+    const scopedAds = adsRows.filter(record =>
+      (!normalizedCity || !record.geo || String(record.geo).toLowerCase().includes(normalizedCity)) &&
+      (!nicheFilter || !record.campaignName || String(record.campaignName).toLowerCase().includes(nicheFilter))
+    );
+
+    const nodes: any[] = [
+      { id: 'core_leads', label: 'Lead Pipeline', type: 'core', group: 1, size: 22, detail: scopedLeads.length + ' tenant leads in the selected territory and niche.' },
+      { id: 'core_outcomes', label: 'Recorded Outcomes', type: 'core', group: 2, size: 22, detail: scopedOutcomes.length + ' recorded win/loss outcomes in this scope.' },
+      { id: 'core_ads', label: 'Google Ads Observations', type: 'core', group: 3, size: 22, detail: scopedAds.length + ' tenant-owned Google Ads performance records matched this scope.' },
+      { id: 'core_timesfm', label: 'TimesFM Adapter', type: 'unavailable', group: 4, size: 18, detail: 'Not configured: this deployment has no verified TimesFM inference endpoint or model weights. No TimesFM predictions or learned weights are being fabricated.' }
+    ];
     const links: any[] = [];
-
-    // 1. Core Subsystems
-    const cores = [
-      { id: 'core_bayes', label: 'Bayesian Base', type: 'core', group: 1, size: 25 },
-      { id: 'core_objection', label: 'Objection Graph', type: 'core', group: 2, size: 20 },
-      { id: 'core_niche', label: 'Niche Calibration', type: 'core', group: 3, size: 20 },
-      { id: 'core_timesfm', label: 'TimesFM Prediction', type: 'core', group: 4, size: 22 }
-    ];
-    nodes.push(...cores);
-
-    // Link cores together
-    links.push({ source: 'core_bayes', target: 'core_objection', value: 5 });
-    links.push({ source: 'core_bayes', target: 'core_niche', value: 8 });
-    links.push({ source: 'core_bayes', target: 'core_timesfm', value: 4 });
-
-    // 1b. TimesFM Prediction Layer Active Foundation Nodes
-    const timesFmNodes = [
-      { id: 'tfm_horizon_30d', label: '30D Demand Horizon', type: 'prediction', group: 4, size: 14, detail: 'TimesFM Zero-Shot 30-Day Contract Volume Projection (+18.4% forecast)' },
-      { id: 'tfm_seasonal_peak', label: 'May Seasonal Peak', type: 'prediction', group: 4, size: 16, detail: '1.35x Seasonal Ad Multiplier & Elasticity Factor' },
-      { id: 'tfm_cpl_elasticity', label: 'CPL Elasticity Horizon', type: 'prediction', group: 4, size: 13, detail: 'Dynamic bid adjustment based on weather rainfall events' },
-      { id: 'tfm_mrr_projection', label: '12M MRR Trajectory', type: 'prediction', group: 4, size: 15, detail: '$138.4k Projected ARR Run-Rate Confidence (94.2%)' }
-    ];
-    nodes.push(...timesFmNodes);
-    timesFmNodes.forEach(tNode => {
-      links.push({ source: 'core_timesfm', target: tNode.id, value: 4 });
-    });
-
-    // 2. Niche Nodes from Autonomous Learning state
-    if (autoState.nicheMap) {
-      Object.keys(autoState.nicheMap).forEach(nicheKey => {
-        const niche = autoState.nicheMap[nicheKey];
-        const nodeId = 'niche_' + nicheKey;
-        nodes.push({
-          id: nodeId,
-          label: nicheKey.toUpperCase(),
-          type: 'niche',
-          group: 3,
-          size: 10 + (niche.confidenceScore * 10),
-          confidence: niche.confidenceScore
-        });
-        links.push({ source: 'core_niche', target: nodeId, value: niche.confidenceScore * 10 });
-      });
-    }
-
-    // 3. Learning Insights (The "Lessons Learnt")
-    // "one lesson learnt equals one node to another"
-    insights.forEach((insight, idx) => {
-      const nodeId = 'insight_' + insight.id;
-      
-      // Deterministic hash based on ID so state persists visibly across reloads
-      let hash = 0;
-      for (let i = 0; i < insight.id.length; i++) {
-        hash = Math.imul(31, hash) + insight.id.charCodeAt(i) | 0;
+    const addLink = (source: string, target: string, value: number) => {
+      if (nodes.some(node => node.id === source) && nodes.some(node => node.id === target)) {
+        links.push({ source, target, value });
       }
-      const rand1 = Math.abs(Math.sin(hash));
-      const rand2 = Math.abs(Math.sin(hash + 1));
-      
-      // High confidence = strong node, low confidence = weak/broken node
-      const isWeak = insight.confidenceShift < 0.05 && rand1 > 0.5; 
-      
+    };
+
+    const cityNodeId = normalizedCity ? 'scope_city' : null;
+    const nicheNodeId = nicheFilter ? 'scope_niche' : null;
+    if (cityNodeId) nodes.push({ id: cityNodeId, label: cityFilter, type: 'scope', group: 5, size: 13, detail: 'Active city filter supplied by the workspace.' });
+    if (nicheNodeId) nodes.push({ id: nicheNodeId, label: nicheFilter.toUpperCase(), type: 'scope', group: 5, size: 13, detail: 'Active service-niche filter supplied by the workspace.' });
+
+    if (scopedLeads.length) addLink('core_leads', cityNodeId || nicheNodeId || 'core_outcomes', 3);
+    if (scopedOutcomes.length) addLink('core_outcomes', nicheNodeId || cityNodeId || 'core_leads', 3);
+    if (scopedAds.length) addLink('core_ads', nicheNodeId || cityNodeId || 'core_leads', 3);
+
+    const leadIds = new Set(scopedLeads.map(lead => lead.id));
+    scopedLeads.forEach(lead => {
+      const nodeId = 'lead_' + lead.id;
       nodes.push({
         id: nodeId,
-        label: insight.metric || 'Insight',
-        detail: insight.lesson,
-        type: isWeak ? 'decaying' : 'insight',
-        group: 5,
-        size: isWeak ? 4 : 8 + (insight.confidenceShift * 50),
-        createdAt: insight.createdAt
+        label: lead.businessName || 'Unnamed lead',
+        detail: [lead.niche, lead.city, 'Stage: ' + lead.status].filter(Boolean).join(' · '),
+        type: 'lead',
+        group: 1,
+        size: 5,
+        status: lead.status,
+        createdAt: lead.createdAt
       });
-      
-      // Connect to a core or niche
-      // Try to map metric to a niche, else connect to core bayes
-      const targetCore = insight.metric.toLowerCase().includes('cpl') ? 'core_timesfm' : 'core_bayes';
-      
-      // Broken node means the link is weak or non-existent
-      if (!isWeak) {
-        links.push({ source: nodeId, target: targetCore, value: 2 + insight.confidenceShift * 20 });
-        
-        // Also connect to a random niche to simulate cross-wiring if high confidence
-        if (insight.confidenceShift > 0.1 && autoState.nicheMap) {
-           const niches = Object.keys(autoState.nicheMap);
-           if (niches.length > 0) {
-             const randIndex = Math.floor(rand2 * niches.length);
-             const randNiche = niches[randIndex];
-             links.push({ source: nodeId, target: 'niche_' + randNiche, value: 1 });
-           }
-        }
-      }
+      addLink('core_leads', nodeId, 1);
+      if (cityNodeId) addLink(cityNodeId, nodeId, 1);
+      if (nicheNodeId) addLink(nicheNodeId, nodeId, 1);
     });
 
-    // 4. Win/Loss Events (Recent real-world outcomes)
-    winLoss.forEach(record => {
-       const nodeId = 'outcome_' + record.id;
-       nodes.push({
-         id: nodeId,
-         label: record.outcome === 'won' ? 'WIN' : 'LOSS',
-         detail: record.businessName,
-         type: record.outcome === 'won' ? 'win' : 'loss',
-         group: 6,
-         size: 6
-       });
-       
-       // Connect outcome to its niche
-       if (record.niche) {
-         const nicheId = 'niche_' + record.niche.toLowerCase();
-         // If niche node exists
-         if (nodes.find(n => n.id === nicheId)) {
-            links.push({ source: nodeId, target: nicheId, value: record.outcome === 'won' ? 5 : 1 });
-         } else {
-            links.push({ source: nodeId, target: 'core_bayes', value: 2 });
-         }
-       }
+    scopedOutcomes.forEach(record => {
+      const nodeId = 'outcome_' + record.id;
+      nodes.push({
+        id: nodeId,
+        label: record.outcome === 'won' ? 'WON' : 'LOST',
+        detail: [record.businessName, record.niche, record.city, record.primaryReason].filter(Boolean).join(' · '),
+        type: record.outcome === 'won' ? 'win' : 'loss',
+        group: 2,
+        size: 7,
+        createdAt: record.closedAt
+      });
+      addLink('core_outcomes', nodeId, record.outcome === 'won' ? 4 : 2);
+      if (record.leadId && leadIds.has(record.leadId)) addLink(nodeId, 'lead_' + record.leadId, 2);
+      if (cityNodeId) addLink(cityNodeId, nodeId, 1);
+      if (nicheNodeId) addLink(nicheNodeId, nodeId, 1);
     });
 
-    
-    // 5. Raw Leads (The "cells")
-    recentLeads.forEach(lead => {
-       const nodeId = 'lead_' + lead.id;
-       nodes.push({
-         id: nodeId,
-         label: lead.businessName || 'Target',
-         detail: lead.niche + ' in ' + lead.city,
-         type: 'lead',
-         group: 7,
-         size: 3,
-         status: lead.status,
-         createdAt: lead.createdAt
-       });
-       
-       if (lead.niche) {
-         const nicheId = 'niche_' + lead.niche.toLowerCase();
-         if (nodes.find(n => n.id === nicheId)) {
-           links.push({ source: nodeId, target: nicheId, value: 0.5 });
-         } else {
-           links.push({ source: nodeId, target: 'core_objection', value: 0.5 });
-         }
-       }
+    const campaignGroups = new Map<string, { name: string; cost: number; clicks: number; impressions: number; conversions: number; records: number }>();
+    scopedAds.forEach(record => {
+      const key = String(record.campaignId || record.campaignName);
+      const current = campaignGroups.get(key) || { name: String(record.campaignName || 'Unnamed campaign'), cost: 0, clicks: 0, impressions: 0, conversions: 0, records: 0 };
+      current.cost += Number(record.cost || 0);
+      current.clicks += Number(record.clicks || 0);
+      current.impressions += Number(record.impressions || 0);
+      current.conversions += Number(record.conversions || 0);
+      current.records += 1;
+      campaignGroups.set(key, current);
+    });
+    campaignGroups.forEach((campaign, key) => {
+      const nodeId = 'campaign_' + key;
+      nodes.push({
+        id: nodeId,
+        label: campaign.name,
+        detail: campaign.records + ' daily records · ' + campaign.clicks + ' clicks · ' + campaign.conversions + ' conversions · spend ' + campaign.cost.toFixed(2),
+        type: 'campaign',
+        group: 3,
+        size: 6,
+        metrics: campaign
+      });
+      addLink('core_ads', nodeId, Math.max(1, campaign.conversions));
+      if (nicheNodeId) addLink(nicheNodeId, nodeId, 1);
     });
 
-    res.json({ nodes, links, telemetry: autoState });
+    const totalWins = scopedOutcomes.filter(record => record.outcome === 'won').length;
+    const totalLosses = scopedOutcomes.filter(record => record.outcome === 'lost').length;
+    const lastActivity = [
+      ...scopedLeads.map(lead => lead.createdAt),
+      ...scopedOutcomes.map(record => record.closedAt),
+      ...scopedAds.map(record => record.date)
+    ].filter(Boolean).map(value => new Date(value as any).getTime()).filter(Number.isFinite);
+    const telemetry = {
+      scope: { city: cityFilter || null, niche: nicheFilter || null },
+      leadsInScope: scopedLeads.length,
+      recordedOutcomes: scopedOutcomes.length,
+      wins: totalWins,
+      losses: totalLosses,
+      googleAdsRecords: scopedAds.length,
+      campaignNodes: campaignGroups.size,
+      totalNodes: nodes.length,
+      totalLinks: links.length,
+      lastActivityAt: lastActivity.length ? new Date(Math.max(...lastActivity)).toISOString() : null,
+      learningStatus: scopedOutcomes.length ? 'Recorded outcomes available; model calibration is not yet validated.' : 'No recorded outcomes in this scope; no learning confidence is claimed.',
+      timesFmStatus: 'NOT_CONFIGURED'
+    };
+    const events = [
+      ...scopedOutcomes.slice(0, 5).map(record => ({ id: 'event_' + record.id, label: (record.outcome || 'outcome').toUpperCase() + ': ' + record.businessName, at: record.closedAt })),
+      ...scopedLeads.slice(0, 5).map(lead => ({ id: 'event_' + lead.id, label: 'LEAD: ' + lead.businessName + ' (' + lead.status + ')', at: lead.createdAt }))
+    ].sort((a, b) => new Date(b.at as any).getTime() - new Date(a.at as any).getTime()).slice(0, 8);
+
+    return res.json({ nodes, links, telemetry, events });
   } catch (err: any) {
-    console.error('Failed to fetch neural network:', err);
-    res.status(500).json({ error: err.message });
+    console.error('Failed to fetch tenant-scoped neural topology:', err);
+    return res.status(503).json({ error: 'Neural topology unavailable because its tenant data could not be loaded.', code: 'NEURAL_DATA_UNAVAILABLE' });
   }
 });
 
