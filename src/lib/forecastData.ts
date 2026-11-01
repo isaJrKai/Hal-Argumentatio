@@ -1,3 +1,18 @@
+export function matchesTerritoryContext(
+  recordCity: unknown,
+  recordNiche: unknown,
+  targetCity: string,
+  targetNiche: string
+): boolean {
+  const cityNeedle = targetCity.trim().toLocaleLowerCase();
+  const nicheNeedle = targetNiche.trim().toLocaleLowerCase();
+  const cityValue = String(recordCity || '').trim().toLocaleLowerCase();
+  const nicheValue = String(recordNiche || '').trim().toLocaleLowerCase();
+  return Boolean(cityNeedle && nicheNeedle && cityValue && nicheValue)
+    && cityValue.includes(cityNeedle)
+    && nicheValue.includes(nicheNeedle);
+}
+
 export function filterGoogleAdsTerritoryRecords<T extends {
   geo?: string | null;
   campaignName?: string | null;
@@ -17,8 +32,6 @@ export function filterGoogleAdsTerritoryRecords<T extends {
       .filter(Boolean)
       .join(' ')
       .toLocaleLowerCase();
-    return Boolean(geo && tradeText)
-      && geo.includes(cityNeedle)
-      && tradeText.includes(nicheNeedle);
+    return matchesTerritoryContext(geo, tradeText, targetCity, targetNiche);
   });
 }
