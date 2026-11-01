@@ -38,6 +38,15 @@
 - Compatible dependency security fixes were applied.
 - The temporary lockfile-repair workflow was removed after the lockfile was repaired.
 
+
+### Follow-on implementation (2026-11-01)
+- Added dedicated landing-page template types for sump pump, waterproofing, flood restoration, and emergency contractor dispatch.
+- Added four specialist templates using the existing builder structure. New templates start with owner-configurable business details and disable unverified reviews, ratings, prices, licence claims, service areas, response promises, galleries, booking links, and sticky call CTAs.
+- Added unit coverage for template availability and evidence-safety defaults.
+- Added a route-specific anonymous write rate limit to public audit booking, landing-page lead intake, and delivery webhook routes.
+- Added bounded field validation to public audit booking and require a name plus at least one contact method.
+- These follow-on commits have not yet been verified by a fresh CI run. Do not treat them as release-ready until CI/type-check/build pass.
+
 ## Verification evidence
 
 GitHub Actions run:
