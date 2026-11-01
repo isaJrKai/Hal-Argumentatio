@@ -1,0 +1,47 @@
+name: HAL TimesFM scheduled forecasts
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 */6 * * *"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: hal-timesfm-batch
+  cancel-in-progress: false
+
+jobs:
+  forecast:
+    # Scheduled jobs run from the default branch. Manual runs can be started
+    # from this feature branch while testing, once repository secrets are set.
+    if: ${{ github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/main' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      DATABASE_URL: ${{ secrets.HAL_FORECAST_DATABASE_URL }}
+      HF_HOME: ${{ runner.temp }}/huggingface
+      TIMESFM_BATCH_HORIZON: "12"
+      TIMESFM_BATCH_MAX_CONTEXT: "256"
+      HF_HUB_DISABLE_TELEMETRY: "1"
+      TOKENIZERS_PARALLELISM: "false"
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: services/timesfm/requirements-batch.txt
+      - name: Install TimesFM batch dependencies
+        run: pip install -r services/timesfm/requirements-batch.txt
+      - name: Validate configuration
+        run: |
+          if [ -z "$DATABASE_URL" ]; then
+            echo "HAL_FORECAST_DATABASE_URL repository secret is not configured."
+            exit 1
+          fi
+      - name: Run tenant-scoped TimesFM forecasts
+        run: python services/timesfm/batch_forecast.py
