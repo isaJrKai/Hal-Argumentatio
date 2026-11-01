@@ -31,7 +31,7 @@ describe('TimesFM input and forecast invariants', () => {
   });
 
   it('rejects missing weeks instead of compressing time gaps', () => {
-    const withGap = makeWeeklyRecords().filter((record) => {
+    const withGap = makeWeeklyRecords(9).filter((record) => {
       const date = new Date(record.date);
       return date < new Date(Date.UTC(2026, 0, 19)) || date >= new Date(Date.UTC(2026, 0, 26));
     });
