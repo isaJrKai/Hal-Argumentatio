@@ -1,5 +1,6 @@
 import { getDrizzleDb } from './src/db/postgres';
 import express from 'express';
+import { getRequestAIProvider, runWithAIProvider } from './src/lib/aiRequestContext';
 import path from 'path';
 import fs from 'fs';
 import crypto from 'crypto';
@@ -296,11 +297,12 @@ app.get(['/sw.js', '/service-worker.js'], (req, res) => {
   `);
 });
 
-// Intercept client-selected preferred AI (Gemini 3.5 vs Nemotron)
+// Keep client-selected AI preference request-scoped. Never mutate process.env
+// from a request: concurrent tenants could otherwise change one another's model.
 app.use((req, res, next) => {
   const activeAiHeader = req.headers['x-active-ai'];
   if (activeAiHeader === 'gemini' || activeAiHeader === 'nemotron') {
-    process.env.HAL_ACTIVE_AI = activeAiHeader;
+    return runWithAIProvider(activeAiHeader, () => next());
   }
   next();
 });
@@ -4973,7 +4975,7 @@ app.get('/api/neural/network', authenticate, async (req, res) => {
 app.get('/api/ai/engine-status', authenticate, async (req, res) => {
   const geminiKeySet = !!process.env.GEMINI_API_KEY;
   const nvidiaKeySet = !!process.env.NVIDIA_API_KEY;
-  const requestedPreference = process.env.HAL_ACTIVE_AI;
+  const requestedPreference = getRequestAIProvider() || process.env.HAL_ACTIVE_AI;
   const activeAiPreference =
     requestedPreference === 'dual' && geminiKeySet && nvidiaKeySet ? 'dual' :
     requestedPreference === 'nemotron' && nvidiaKeySet ? 'nemotron' :
