@@ -38,4 +38,4 @@ service private where the hosting platform supports private networking.
 - HAL currently forecasts conversion demand only. CPL is shown as the trailing
   observed baseline and must not be described as a model-generated CPL forecast.
 
-The service uses the TimesFM 2.5 checkpoint, not TimesFM 3.0.
+The service deliberately uses the TimesFM 2.5 checkpoint, not TimesFM 3.0. The upstream project states that pretrained weights through 2.5 remain Apache-2.0, while TimesFM 3.0's default pretrained weights are under a non-commercial, non-production license. Do not switch model IDs for this commercial product without reviewing the applicable license first.
