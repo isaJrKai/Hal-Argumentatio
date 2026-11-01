@@ -37,6 +37,7 @@ export interface WorkspaceConfig {
   hermesDirectives?: HermesDirectives;
   ltvMultiplier: number; // Formula tuning multiplier (e.g. 1.0)
   targetCAC: number; // Configurable operational target CAC
+  targetCACConfigured?: boolean; // True only after an operator explicitly sets the target
   budgetMultiplier: number; // Budget scaling factor
   autoDeployHermesAssets: boolean; // Dynamic cross-system deployment
 }
@@ -130,7 +131,8 @@ export const BusinessProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         includePhoneSticky: true
       },
       ltvMultiplier: 1.0,
-      targetCAC: 145,
+      targetCAC: 0,
+      targetCACConfigured: false,
       budgetMultiplier: 1.0,
       autoDeployHermesAssets: true
     };
