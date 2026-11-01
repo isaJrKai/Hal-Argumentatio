@@ -29,3 +29,9 @@ NOT verified (needs a human or an agent with a browser/live DB): rendered UI, li
 10. Google Workspace / Drive Firebase auth now requires real `VITE_FIREBASE_*` project configuration. The committed placeholder applet credentials were removed; integration remains not configured until a real project is supplied.
 11. Verify end to end with a throwaway Neon DB: connect -> test -> sync; register -> login -> create lead -> outreach flow; switch city (Toronto, Lagos) and check currency/territory.
 12. Remove or disable any button that calls an endpoint returning "unavailable" (Phase 4/5 actions) so the demo has no dead ends.
+
+
+## Additional verified persistence finding (2026-11-01)
+
+- The codebase still has split persistence: `src/db/db.ts` writes to `data/db.json`, while `src/db/index.ts` exposes Drizzle/PostgreSQL. The server imports both stores. Connector credentials are currently encrypted in the legacy JSON store, not a Neon table. Therefore a configured Neon URL does not, by itself, prove every HAL domain (auth, connector credentials, notifications, local ledger, etc.) is Neon-backed or durable across ephemeral deployments.
+- Do not remove the local store or claim Neon is the sole source of truth until each domain is migrated with a verified backup, migration, row-count reconciliation, and rollback plan. This is an outstanding database architecture task, not a reason to replace the existing Neon database.
