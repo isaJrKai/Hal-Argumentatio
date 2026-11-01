@@ -4989,7 +4989,7 @@ app.get('/api/ai/engine-status', authenticate, async (req, res) => {
       },
       gemini: {
         name: 'Google Gemini',
-        model: 'gemini-2.5-flash',
+        model: 'gemini-3.8-flash (fallbacks: gemini-flash-latest, gemini-3.1-flash-lite)',
         configured: geminiKeySet,
         status: geminiKeySet ? 'configured_unverified' : 'not_configured',
         role: 'Deep Multimodal Reasoning & Discovery',
