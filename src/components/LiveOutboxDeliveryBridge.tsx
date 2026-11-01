@@ -58,7 +58,6 @@ interface QuickLeadOption {
   urgencyScore: number;
 }
 
-const VERIFIED_TERRITORY_LEADS: QuickLeadOption[] = [];
 const EMPTY_LEAD: QuickLeadOption = {
   id: '',
   businessName: '',
@@ -73,6 +72,7 @@ const EMPTY_LEAD: QuickLeadOption = {
 export const LiveOutboxDeliveryBridge: React.FC = () => {
   const [selectedChannel, setSelectedChannel] = useState<'email' | 'sms' | 'whatsapp' | 'webhook'>('email');
   const [selectedLead, setSelectedLead] = useState<QuickLeadOption>(EMPTY_LEAD);
+  const [verifiedLeads, setVerifiedLeads] = useState<QuickLeadOption[]>([]);
   
   // Dispatch Inputs
   const [recipient, setRecipient] = useState('');
@@ -108,6 +108,34 @@ export const LiveOutboxDeliveryBridge: React.FC = () => {
       : '');
   };
 
+  const fetchVerifiedLeads = async () => {
+    try {
+      const token = localStorage.getItem('token') || localStorage.getItem('halbiz_auth_token') || '';
+      const res = await fetch('/api/leads', {
+        headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+      });
+      if (!res.ok) throw new Error(`Lead request failed (${res.status})`);
+      const payload = await res.json();
+      const rows = Array.isArray(payload) ? payload : Array.isArray(payload?.leads) ? payload.leads : [];
+      const verified = rows
+        .filter((lead: any) => lead?.verificationStatus === 'VERIFIED' && lead?.isSynthetic !== true)
+        .map((lead: any): QuickLeadOption => ({
+          id: String(lead.id),
+          businessName: String(lead.businessName || 'Unnamed business'),
+          ownerName: String(lead.ownerName || 'Owner'),
+          city: String(lead.city || 'Unknown location'),
+          niche: String(lead.niche || lead.serviceType || 'Unknown trade'),
+          email: String(lead.email || ''),
+          phone: String(lead.phone || ''),
+          urgencyScore: Number(lead.urgencyScore || 0)
+        }));
+      setVerifiedLeads(verified);
+    } catch (err) {
+      console.error('Failed to load verified leads for delivery composer', err);
+      setVerifiedLeads([]);
+    }
+  };
+
   const fetchOutboxQueue = async () => {
     try {
       setIsLoadingQueue(true);
@@ -128,6 +156,7 @@ export const LiveOutboxDeliveryBridge: React.FC = () => {
 
   useEffect(() => {
     fetchOutboxQueue();
+    fetchVerifiedLeads();
   }, []);
 
   const handleExecuteLiveDispatch = async () => {
@@ -201,18 +230,18 @@ export const LiveOutboxDeliveryBridge: React.FC = () => {
             <div className="flex items-center gap-2">
               <span className="text-xs font-mono font-bold tracking-widest text-accent uppercase flex items-center gap-1.5">
                 <Send className="w-3.5 h-3.5 text-accent" />
-                Live Outbox Delivery Bridge
+                Outbound Delivery Bridge
               </span>
-              <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-500/15 text-emerald-500 border border-emerald-500/30 flex items-center gap-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                PROVIDER STATUS UNVERIFIED
+              <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-amber-500/15 text-amber-600 border border-amber-500/30 flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                LIVE DELIVERY DISABLED
               </span>
             </div>
             <h3 className="text-sm font-bold text-text-primary">
-              Multi-Channel Transactional Dispatch Instrument
+              Multi-Channel Outbound Status & Inspection
             </h3>
             <p className="text-xs text-text-secondary leading-relaxed">
-              Dispatches outreach messages via SendGrid / SMTP, Twilio SMS, WhatsApp Business, and external webhooks with HMAC-SHA256 envelopes, Merkle ledger attribution, and zero-leakage PII encryption.
+              Shows provider configuration and queued records. Live email, SMS, WhatsApp, and webhook delivery are disabled until verified server-side adapters are implemented and tested. No message is sent from this screen.
             </p>
           </div>
 
@@ -223,7 +252,7 @@ export const LiveOutboxDeliveryBridge: React.FC = () => {
               className="px-3 py-1.5 rounded-lg bg-bg-overlay hover:bg-bg-subtle text-text-primary border border-border-dim hover:border-border-default text-xs font-medium flex items-center gap-1.5 transition-all cursor-pointer disabled:opacity-50"
             >
               <RefreshCw className={`w-3 h-3 ${isDrainingOutbox ? 'animate-spin' : ''}`} />
-              <span>Drain Outbox Queue</span>
+              <span>Inspect Outbox</span>
             </button>
             <button
               onClick={fetchOutboxQueue}
@@ -244,12 +273,12 @@ export const LiveOutboxDeliveryBridge: React.FC = () => {
                 <Mail className="w-3.5 h-3.5 text-sky-400" />
                 <span>Email Gateway</span>
               </div>
-              <span className="w-2 h-2 rounded-full bg-emerald-500" />
+              <span className="w-2 h-2 rounded-full bg-amber-500" />
             </div>
             <div className="text-[11px] font-mono text-text-secondary">Email provider: not verified</div>
             <div className="flex items-center justify-between text-[10px] font-mono pt-1 border-t border-border-dim/60">
               <span className="text-text-tertiary">LATENCY: NOT MEASURED</span>
-              <span className="text-emerald-500 font-bold">DELIVERY: UNKNOWN</span>
+              <span className="text-text-tertiary font-bold">DELIVERY: UNKNOWN</span>
             </div>
           </div>
 
@@ -259,12 +288,12 @@ export const LiveOutboxDeliveryBridge: React.FC = () => {
                 <Phone className="w-3.5 h-3.5 text-emerald-400" />
                 <span>SMS Gateway</span>
               </div>
-              <span className="w-2 h-2 rounded-full bg-emerald-500" />
+              <span className="w-2 h-2 rounded-full bg-amber-500" />
             </div>
             <div className="text-[11px] font-mono text-text-secondary">SMS provider: not verified</div>
             <div className="flex items-center justify-between text-[10px] font-mono pt-1 border-t border-border-dim/60">
               <span className="text-text-tertiary">LATENCY: NOT MEASURED</span>
-              <span className="text-emerald-500 font-bold">DELIVERY: UNKNOWN</span>
+              <span className="text-text-tertiary font-bold">DELIVERY: UNKNOWN</span>
             </div>
           </div>
 
@@ -274,12 +303,12 @@ export const LiveOutboxDeliveryBridge: React.FC = () => {
                 <MessageSquare className="w-3.5 h-3.5 text-green-500" />
                 <span>WhatsApp Bridge</span>
               </div>
-              <span className="w-2 h-2 rounded-full bg-emerald-500" />
+              <span className="w-2 h-2 rounded-full bg-amber-500" />
             </div>
             <div className="text-[11px] font-mono text-text-secondary">WhatsApp provider: not verified</div>
             <div className="flex items-center justify-between text-[10px] font-mono pt-1 border-t border-border-dim/60">
               <span className="text-text-tertiary">LATENCY: NOT MEASURED</span>
-              <span className="text-emerald-500 font-bold">UNVERIFIED</span>
+              <span className="text-text-tertiary font-bold">UNVERIFIED</span>
             </div>
           </div>
 
@@ -289,12 +318,12 @@ export const LiveOutboxDeliveryBridge: React.FC = () => {
                 <Globe className="w-3.5 h-3.5 text-accent" />
                 <span>Webhook Outbox</span>
               </div>
-              <span className="w-2 h-2 rounded-full bg-emerald-500" />
+              <span className="w-2 h-2 rounded-full bg-amber-500" />
             </div>
             <div className="text-[11px] font-mono text-text-secondary">Signing and retry status: not verified</div>
             <div className="flex items-center justify-between text-[10px] font-mono pt-1 border-t border-border-dim/60">
               <span className="text-text-tertiary">LATENCY: NOT MEASURED</span>
-              <span className="text-emerald-500 font-bold">AUDIT: NOT VERIFIED</span>
+              <span className="text-text-tertiary font-bold">AUDIT: NOT VERIFIED</span>
             </div>
           </div>
         </div>
@@ -378,7 +407,11 @@ export const LiveOutboxDeliveryBridge: React.FC = () => {
                 <span className="text-accent">{selectedLead.id ? `${selectedLead.niche} • ${selectedLead.city}` : 'No verified lead selected'}</span>
               </label>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                {VERIFIED_TERRITORY_LEADS.map((lead) => (
+                {verifiedLeads.length === 0 ? (
+                  <div className="col-span-full rounded-lg border border-border-dim bg-bg-base p-3 text-[11px] text-text-tertiary">
+                    No verified, non-synthetic leads are available. You can still enter a recipient manually, but live delivery is disabled.
+                  </div>
+                ) : verifiedLeads.map((lead) => (
                   <button
                     key={lead.id}
                     onClick={() => handleSelectLead(lead)}
@@ -469,12 +502,12 @@ export const LiveOutboxDeliveryBridge: React.FC = () => {
             {/* Trigger Button */}
             <div className="pt-2">
               <button
-                onClick={handleExecuteLiveDispatch}
-                disabled={isDispatching || !recipient || !body}
-                className="w-full py-2.5 rounded-lg bg-accent text-white hover:bg-accent/90 active:scale-98 transition-all text-xs font-semibold flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 shadow-xs"
+                type="button"
+                disabled
+                className="w-full py-2.5 rounded-lg bg-bg-overlay text-text-tertiary border border-border-dim text-xs font-semibold flex items-center justify-center gap-2 cursor-not-allowed opacity-70"
               >
-                <Send className={`w-3.5 h-3.5 ${isDispatching ? 'animate-spin' : ''}`} />
-                <span>{isDispatching ? `Dispatching ${selectedChannel.toUpperCase()}...` : `Execute Live ${selectedChannel.toUpperCase()} Dispatch`}</span>
+                <Lock className="w-3.5 h-3.5" />
+                <span>Live delivery disabled — no verified provider adapter</span>
               </button>
             </div>
 
