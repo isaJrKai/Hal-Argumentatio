@@ -1,10 +1,5 @@
-import { initializeApp, getApps, getApp } from '@firebase/app';
-import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, User } from '@firebase/auth';
-import firebaseConfig from '../../firebase-applet-config.json';
-
-// Initialize Firebase only once
-const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
-export const auth = getAuth(app);
+import { signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut, User } from '@firebase/auth';
+import { auth, isGoogleWorkspaceConfigured } from './googleWorkspace';
 
 const provider = new GoogleAuthProvider();
 // Add all Google Drive scopes requested by the user
@@ -29,6 +24,10 @@ export const initAuth = (
   onAuthSuccess?: (user: User, token: string) => void,
   onAuthFailure?: () => void
 ) => {
+  if (!auth || !isGoogleWorkspaceConfigured) {
+    onAuthFailure?.();
+    return () => {};
+  }
   return onAuthStateChanged(auth, async (user: User | null) => {
     if (user) {
       if (cachedAccessToken) {
@@ -48,6 +47,9 @@ export const initAuth = (
 };
 
 export const googleSignIn = async (): Promise<{ user: User; accessToken: string } | null> => {
+  if (!auth || !isGoogleWorkspaceConfigured) {
+    throw new Error('Google Drive is not configured. A real Firebase project is required; no placeholder project will be used.');
+  }
   try {
     isSigningIn = true;
     const result = await signInWithPopup(auth, provider);
@@ -84,11 +86,11 @@ export const googleSignIn = async (): Promise<{ user: User; accessToken: string 
 };
 
 export const getAccessToken = async (): Promise<string | null> => {
-  return cachedAccessToken;
+  return auth && isGoogleWorkspaceConfigured ? cachedAccessToken : null;
 };
 
 export const logout = async () => {
-  await auth.signOut();
+  if (auth) await signOut(auth);
   cachedAccessToken = null;
   try {
     sessionStorage.removeItem('gdrive_access_token');
