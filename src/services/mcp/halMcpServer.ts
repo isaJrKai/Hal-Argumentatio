@@ -21,7 +21,6 @@ import {
   notifications,
   revenueRecommendations
 } from '../../db/schema.ts';
-import { db as localDb, decrypt } from '../../db/db.ts';
 import { eq, and, desc, sql, like, or } from 'drizzle-orm';
 
 // Common annotations required for all read-only MCP tools
@@ -70,10 +69,9 @@ export async function getEffectiveContractorId(): Promise<string> {
   return envId;
 }
 
-// Strips sensitive fields and decrypts PII safely
-function sanitizeProspect(lead: any) {
-  const email = lead.emailEncrypted ? (decrypt(lead.emailEncrypted) || lead.email) : lead.email;
-  const phone = lead.phoneEncrypted ? (decrypt(lead.phoneEncrypted) || lead.phone) : lead.phone;
+// Strips sensitive fields; contact details remain redacted and unverified metrics stay unavailable
+export function sanitizeProspect(lead: any) {
+  const hasContactDetails = Boolean(lead.email || lead.phone || lead.emailEncrypted || lead.phoneEncrypted);
 
   return {
     id: lead.id,
@@ -82,26 +80,27 @@ function sanitizeProspect(lead: any) {
     ownerName: lead.ownerName || null,
     city: lead.city,
     niche: lead.niche || lead.serviceType,
-    email: email && !email.includes('[ENCRYPTED]') ? email : (lead.emailEncrypted ? '[DECRYPTED]' : null),
-    phone: phone && !phone.includes('[ENCRYPTED]') ? phone : (lead.phoneEncrypted ? '[DECRYPTED]' : null),
+    email: null,
+    phone: null,
+    contactDetailsRedacted: hasContactDetails,
     websiteUrl: lead.websiteUrl || null,
     gmbListingUrl: lead.gmbListingUrl || null,
-    reviewCount: lead.reviewCount ?? 0,
-    reviewScore: lead.reviewScore ?? 0,
-    predictedMonthlyLostRevenueUsd: lead.predictedMonthlyLostRevenueUsd ?? 0,
+    reviewCount: null,
+    reviewScore: null,
+    predictedMonthlyLostRevenueUsd: null,
     status: lead.status,
     source: lead.source,
-    sourceType: lead.sourceType || 'live_harvest',
-    verificationStatus: lead.verificationStatus || 'VERIFIED',
+    sourceType: lead.externalSource || lead.externalCrmId ? (lead.externalSource || lead.sourceType || 'unknown') : lead.sourceType === 'ai_discovery_unverified' ? 'ai_discovery_unverified' : lead.sourceType === 'live_harvest' && lead.verificationStatus === 'VERIFIED' && lead.groundingEvidence ? 'live_harvest' : 'unknown',
+    verificationStatus: lead.verificationStatus || 'UNVERIFIED_STAGING',
     dnsVerified: Boolean(lead.dnsVerified),
-    performanceScore: lead.performanceScore ?? 50,
-    sslStatus: lead.sslStatus || 'secured',
-    mobileFriendly: lead.mobileFriendly ?? true,
-    urgencyScore: lead.urgencyScore ?? 5.0,
-    predictedLtv: lead.predictedLtv ?? lead.predictedLtvUsd ?? 5000,
-    seoScore: lead.seoScore ?? 50,
-    googleRating: lead.googleRating ?? 0,
-    sentimentScore: lead.sentimentScore ?? 5.0,
+    performanceScore: null,
+    sslStatus: null,
+    mobileFriendly: null,
+    urgencyScore: null,
+    predictedLtv: null,
+    seoScore: null,
+    googleRating: null,
+    sentimentScore: null,
     notes: lead.notes || null,
     createdAt: lead.createdAt,
     updatedAt: lead.updatedAt
@@ -196,30 +195,12 @@ export function buildHalMcpServer(): McpServer {
         }
       }
 
-      // Fallback row counts if postgres is not connected or env vars missing
       if (!dbConnected) {
-        const localLeads = localDb.getLeads(contractorId) || [];
-        const localCampaigns = localDb.getCampaigns(contractorId) || [];
-        const localForecasts = localDb.getForecasts(contractorId) || [];
-        const localRecs = localDb.getRecommendations(contractorId) || [];
-        const localMissions = localDb.getMissions(contractorId) || [];
-
-        counts = {
-          prospects: localLeads.length,
-          campaigns: localCampaigns.length,
-          forecasts: localForecasts.length,
-          recommendations: localRecs.length,
-          missions: localMissions.length,
-          client_projects: 0,
-          outreach_sequences: 0,
-          audit_logs: 0,
-          revenue_records: 0,
-          win_loss_debriefs: 0,
-          operating_loops: 0,
-          diagnostic_incidents: 0,
-          lab_artifacts: 0,
-          scheduled_tasks: 0
-        };
+        return formatMcpError(
+          dbErrorMessage
+            ? `Neon/PostgreSQL is unavailable; HAL did not substitute local data. ${dbErrorMessage}`
+            : 'Neon/PostgreSQL is not configured. HAL MCP status is unavailable until the authoritative database is connected.'
+        );
       }
 
       return formatMcpResponse({
@@ -262,8 +243,8 @@ export function buildHalMcpServer(): McpServer {
           .from(leads)
           .where(eq(leads.contractorId, contractorId))
           .orderBy(desc(leads.createdAt));
-      } catch {
-        allLeads = localDb.getLeads(contractorId) || [];
+      } catch (err) {
+        throw err;
       }
 
       let sanitized = allLeads.map(sanitizeProspect);
@@ -322,9 +303,8 @@ export function buildHalMcpServer(): McpServer {
           )
           .limit(1);
         target = found;
-      } catch {
-        const localLeads = localDb.getLeads(contractorId) || [];
-        target = localLeads.find(l => l.id === id);
+      } catch (err) {
+        throw err;
       }
 
       if (!target) {
@@ -357,32 +337,28 @@ export function buildHalMcpServer(): McpServer {
           .select()
           .from(leads)
           .where(eq(leads.contractorId, contractorId));
-      } catch {
-        allLeads = localDb.getLeads(contractorId) || [];
+      } catch (err) {
+        throw err;
       }
 
       const counts: Record<string, number> = {};
-      let totalValueUsd = 0;
-      let totalLostRevenueUsd = 0;
-
       for (const lead of allLeads) {
         let key = 'unknown';
         if (group_by === 'status') key = lead.status || 'new';
         else if (group_by === 'niche') key = lead.niche || lead.serviceType || 'general';
         else if (group_by === 'city') key = lead.city || 'unspecified';
         else if (group_by === 'source') key = lead.source || 'manual';
-        else if (group_by === 'verification_status') key = lead.verificationStatus || 'VERIFIED';
+        else if (group_by === 'verification_status') key = lead.verificationStatus || 'UNVERIFIED_STAGING';
 
         counts[key] = (counts[key] || 0) + 1;
-        totalValueUsd += Number(lead.predictedLtv || lead.predictedLtvUsd || 0);
-        totalLostRevenueUsd += Number(lead.predictedMonthlyLostRevenueUsd || 0);
       }
 
       return formatMcpResponse({
         group_by,
         total_prospects: allLeads.length,
-        total_projected_ltv_usd: totalValueUsd,
-        total_predicted_monthly_lost_revenue_usd: totalLostRevenueUsd,
+        total_projected_ltv_usd: null,
+        total_predicted_monthly_lost_revenue_usd: null,
+        financial_metrics_status: 'unavailable_pending_verified_source_data',
         breakdown: counts
       });
     } catch (err: any) {
@@ -411,8 +387,8 @@ export function buildHalMcpServer(): McpServer {
           .from(outreachSequences)
           .where(eq(outreachSequences.contractorId, contractorId))
           .orderBy(desc(outreachSequences.createdAt));
-      } catch {
-        records = [];
+      } catch (err: any) {
+        throw err;
       }
 
       const total = records.length;
@@ -450,8 +426,8 @@ export function buildHalMcpServer(): McpServer {
           .from(campaigns)
           .where(eq(campaigns.contractorId, contractorId))
           .orderBy(desc(campaigns.createdAt));
-      } catch {
-        records = localDb.getCampaigns(contractorId) || [];
+      } catch (err) {
+        throw err;
       }
 
       const total = records.length;
@@ -489,8 +465,8 @@ export function buildHalMcpServer(): McpServer {
           .from(missions)
           .where(eq(missions.contractorId, contractorId))
           .orderBy(desc(missions.createdAt));
-      } catch {
-        records = localDb.getMissions(contractorId) || [];
+      } catch (err) {
+        throw err;
       }
 
       const total = records.length;
@@ -528,8 +504,8 @@ export function buildHalMcpServer(): McpServer {
           .from(clientProjects)
           .where(eq(clientProjects.contractorId, contractorId))
           .orderBy(desc(clientProjects.createdAt));
-      } catch {
-        records = [];
+      } catch (err: any) {
+        throw err;
       }
 
       // Safe projection: remove sensitive portal access tokens
@@ -583,8 +559,8 @@ export function buildHalMcpServer(): McpServer {
           .select()
           .from(leadEvents)
           .orderBy(desc(leadEvents.createdAt));
-      } catch {
-        records = [];
+      } catch (err: any) {
+        throw err;
       }
 
       const total = records.length;
@@ -622,8 +598,8 @@ export function buildHalMcpServer(): McpServer {
           .from(auditLogs)
           .where(eq(auditLogs.contractorId, contractorId))
           .orderBy(desc(auditLogs.timestamp));
-      } catch {
-        records = [];
+      } catch (err: any) {
+        throw err;
       }
 
       const total = records.length;
@@ -659,8 +635,8 @@ export function buildHalMcpServer(): McpServer {
           .select()
           .from(schedulerJobs)
           .orderBy(desc(schedulerJobs.createdAt));
-      } catch {
-        records = [];
+      } catch (err: any) {
+        throw err;
       }
 
       const total = records.length;
@@ -698,8 +674,8 @@ export function buildHalMcpServer(): McpServer {
           .from(revenueRecommendations)
           .where(eq(revenueRecommendations.contractorId, contractorId))
           .orderBy(desc(revenueRecommendations.createdAt));
-      } catch {
-        records = localDb.getRecommendations(contractorId) || [];
+      } catch (err) {
+        throw err;
       }
 
       const total = records.length;
@@ -737,8 +713,8 @@ export function buildHalMcpServer(): McpServer {
           .from(forecasts)
           .where(eq(forecasts.contractorId, contractorId))
           .orderBy(desc(forecasts.createdAt));
-      } catch {
-        records = localDb.getForecasts(contractorId) || [];
+      } catch (err) {
+        throw err;
       }
 
       const total = records.length;
@@ -776,8 +752,8 @@ export function buildHalMcpServer(): McpServer {
           .from(revenueRecords)
           .where(eq(revenueRecords.contractorId, contractorId))
           .orderBy(desc(revenueRecords.createdAt));
-      } catch {
-        records = [];
+      } catch (err: any) {
+        throw err;
       }
 
       const total = records.length;
@@ -815,8 +791,8 @@ export function buildHalMcpServer(): McpServer {
           .from(winLossRecords)
           .where(eq(winLossRecords.contractorId, contractorId))
           .orderBy(desc(winLossRecords.closedAt));
-      } catch {
-        records = [];
+      } catch (err: any) {
+        throw err;
       }
 
       const total = records.length;
@@ -854,8 +830,8 @@ export function buildHalMcpServer(): McpServer {
           .from(halLoops)
           .where(eq(halLoops.contractorId, contractorId))
           .orderBy(desc(halLoops.createdAt));
-      } catch {
-        records = [];
+      } catch (err: any) {
+        throw err;
       }
 
       const total = records.length;
@@ -893,8 +869,8 @@ export function buildHalMcpServer(): McpServer {
           .from(hermesDiagnosticIncidents)
           .where(eq(hermesDiagnosticIncidents.contractorId, contractorId))
           .orderBy(desc(hermesDiagnosticIncidents.createdAt));
-      } catch {
-        records = [];
+      } catch (err: any) {
+        throw err;
       }
 
       const total = records.length;
@@ -932,8 +908,8 @@ export function buildHalMcpServer(): McpServer {
           .from(hermesLabArtifacts)
           .where(eq(hermesLabArtifacts.contractorId, contractorId))
           .orderBy(desc(hermesLabArtifacts.createdAt));
-      } catch {
-        records = [];
+      } catch (err: any) {
+        throw err;
       }
 
       const total = records.length;
@@ -971,8 +947,8 @@ export function buildHalMcpServer(): McpServer {
           .from(notifications)
           .where(eq(notifications.contractorId, contractorId))
           .orderBy(desc(notifications.createdAt));
-      } catch {
-        records = [];
+      } catch (err: any) {
+        throw err;
       }
 
       const total = records.length;

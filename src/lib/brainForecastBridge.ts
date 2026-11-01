@@ -100,9 +100,18 @@ export async function ingestAndCalibrateGoogleAds(
       .where(eq(googleAdsDailyPerformance.contractorId, contractorId))
       .orderBy(desc(googleAdsDailyPerformance.date));
 
-    // Do not fall back to another contractor's campaign records. Missing tenant
-    // data is unavailable evidence, not permission to use shared performance data.
-    if (records.length === 0) {
+    // A city/niche change must change the evidence set, not merely the chart label.
+    const cityKey = _targetCity.trim().toLowerCase();
+    const nicheKey = _targetNiche.trim().toLowerCase();
+    if (cityKey) {
+      records = records.filter(record => String(record.geo || '').trim().toLowerCase().includes(cityKey));
+    }
+    if (nicheKey) {
+      records = records.filter(record => String(record.campaignName || '').trim().toLowerCase().includes(nicheKey));
+    }
+
+    // A forecast requires actual tenant-owned records and at least one recorded conversion.
+    if (records.length === 0 || records.reduce((sum, record) => sum + Number(record.conversions || 0), 0) <= 0) {
       return {
         recordsCount: 0,
         totalCost: 0,
@@ -317,19 +326,17 @@ export async function evaluateAndEnforceBudgetGuardrails(
             throttleMultiplier: 0.75
           },
           impactScore: 0,
-          confidenceScore: 94.0,
-          expectedImpact: `Preserves CAC below target of $${targetCac}`,
-          status: 'executed',
-          executedAt: new Date(),
-          executedBy: 'HAL Brain Autonomous Guardrail'
+          confidenceScore: null,
+          expectedImpact: 'Scenario recommendation only; outcome and savings have not been measured.',
+          status: 'proposed'
         });
 
         // Insert system notification
         await pgDb.insert(notifications).values({
           id: crypto.randomUUID(),
           contractorId,
-          title: '🛡️ Automated Budget Guardrail Activated',
-          message: `TimesFM forecast indicated CPL will reach $${highestProjectedCpl} in ${breachWeeks.join(', ')}, exceeding your $${maxAllowableCpl} limit. HAL auto-throttled campaign pacing to protect margins.`,
+          title: 'Budget Guardrail Recommendation',
+          message: `The HAL heuristic scenario estimates CPL may reach ${highestProjectedCpl} in ${breachWeeks.join(', ')}, above the configured ceiling of ${maxAllowableCpl}. Human review is required; no campaign budget was changed.`,
           type: 'warning',
           read: false,
           createdAt: new Date()
@@ -339,8 +346,8 @@ export async function evaluateAndEnforceBudgetGuardrails(
         await pgDb.insert(auditLogs).values({
           id: crypto.randomUUID(),
           contractorId,
-          action: 'HAL_BUDGET_GUARDRAIL_APPLIED',
-          details: `Autonomous spend guardrail enforced for contractor ${contractorId}. CPL breach detected in ${breachWeeks.length} weeks. Throttled spend to 0.75x.`
+          action: 'HAL_BUDGET_GUARDRAIL_RECOMMENDED',
+          details: `A heuristic CPL scenario breach was recorded for contractor ${contractorId}. A recommendation was created for human review; no campaign budget was changed.`
         });
       } catch (err: any) {
         console.warn('Error applying automated budget guardrail changes:', err.message);
@@ -412,48 +419,21 @@ export async function executeBrainSynchronizedForecast(
     }
   }
 
-  const DEFAULT_TARGET_CAC = 145;
-  const isDefaultBenchmark = targetCac === null || !Number.isFinite(targetCac) || targetCac <= 0;
-  if (isDefaultBenchmark) {
-    targetCac = DEFAULT_TARGET_CAC;
+  if (targetCac === null || !Number.isFinite(targetCac) || targetCac <= 0) {
+    throw new Error('Forecast unavailable: configure a target CAC for this contractor before running budget guardrails. No benchmark CAC was substituted.');
   }
+  const isDefaultBenchmark = false;
 
   // Step 1: Ingest advertising history or calibrated live territory baseline
-  let adsBaseline = await ingestAndCalibrateGoogleAds(contractorId, niche, city);
-  if (adsBaseline.source !== 'LIVE_POSTGRES_TABLE' || adsBaseline.recordsCount === 0) {
-    adsBaseline = {
-      recordsCount: 30,
-      totalCost: 4500,
-      totalClicks: 180,
-      totalImpressions: 3600,
-      totalConversions: 45,
-      empiricalCpl: 42.50,
-      empiricalCtr: 0.05,
-      empiricalConversionRate: 0.25,
-      source: 'LIVE_POSTGRES_TABLE',
-      daysSampled: 30
-    };
+  const adsBaseline = await ingestAndCalibrateGoogleAds(contractorId, niche, city);
+  if (adsBaseline.source !== 'LIVE_POSTGRES_TABLE' || adsBaseline.recordsCount === 0 || adsBaseline.totalConversions <= 0) {
+    throw new Error('Forecast unavailable: this tenant has no measured Google Ads history with recorded conversions for the selected territory. No sample campaign data was substituted.');
   }
 
-  // Step 2: Live weather reading with verified seasonal fallback
-  let weatherTrigger = await fetchTerritoryWeatherTrigger(city, niche);
-  if (!weatherTrigger.isLiveForecast) {
-    weatherTrigger = {
-      city,
-      region: 'Territory',
-      currentTempC: 18,
-      windspeedKmh: 12,
-      weatherCode: 0,
-      conditionTitle: `Seasonal historical baseline for ${city}`,
-      hazardCategory: 'STABLE_SEASONAL',
-      demandSurgeMultiplier: 1.0,
-      emergencyRepairWindowWeeks: 0,
-      strategicDirective: 'Operating on seasonal territory baseline; live weather telemetry calibrated for standard run rate.',
-      isLiveForecast: true
-    };
-  }
+  // Step 2: Read live weather when available; unavailable remains unavailable.
+  const weatherTrigger = await fetchTerritoryWeatherTrigger(city, niche);
 
-  // Step 3: Run TimesFM Synthesis Engine (Layer 8: Skills & Layer 9: Tools)
+  // Step 3: Run an explicitly labelled heuristic scenario; this is not the TimesFM foundation model.
   const forecastCurve: BrainForecastCurvePoint[] = [];
   const baseDemand = Math.round(52 + (adsBaseline.empiricalConversionRate * 180));
   const baseCpl = adsBaseline.empiricalCpl || 42.50;
@@ -521,12 +501,14 @@ export async function executeBrainSynchronizedForecast(
         ? `Target CAC Hurdle Rate calibrated to standard operational benchmark $${targetCac} (Max allowable CPL: $${guardrails.maxAllowableCpl}).`
         : `Target CAC Hurdle Rate locked at $${targetCac} (Max allowable CPL: $${guardrails.maxAllowableCpl}).`,
       layer5Knowledge: `Calibrated with ${adsBaseline.recordsCount} Google Ads daily performance records (${adsBaseline.source}). Trailing CPL: $${adsBaseline.empiricalCpl}.`,
-      layer6WorldModel: `${weatherTrigger.conditionTitle}. Emergency repair multiplier: ${weatherTrigger.demandSurgeMultiplier}x.`,
+      layer6WorldModel: weatherTrigger.isLiveForecast
+        ? `${weatherTrigger.conditionTitle}. Weather is contextual evidence only; no demand multiplier is treated as measured.`
+        : `Weather unavailable for ${city}; no weather-driven adjustment was applied.`,
       layer8Skills: `Hand-coded seasonal scenario heuristic with a ${horizonWeeks}-week horizon; not a TimesFM model.`,
       layer10Execution: guardrails.breachDetected
         ? `A budget guardrail recommendation is indicated: ${guardrails.suggestedAction}. No ad budget was automatically changed.`
         : 'No guardrail breach was found in this heuristic scenario; profitability is not verified.',
-      layer11Learning: `Bayesian demand priors synchronized. Trailing conversion rate anchor: ${(adsBaseline.empiricalConversionRate * 100).toFixed(1)}%.`
+      layer11Learning: `Observed tenant conversion rate anchor: ${(adsBaseline.empiricalConversionRate * 100).toFixed(1)}%. This scenario does not update or train model weights.`
     },
     targetCity: city,
     targetNiche: niche,

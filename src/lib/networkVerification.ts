@@ -9,6 +9,9 @@
  */
 
 import dns from 'dns';
+import http from 'http';
+import https from 'https';
+import { isIP } from 'node:net';
 import { URL } from 'url';
 
 export interface PhoneValidationResult {
@@ -172,107 +175,195 @@ export function extractHostname(rawUrl: string): string {
 /**
  * Performs asynchronous DNS lookup with a strict safety timeout.
  */
-async function resolveDnsWithTimeout(hostname: string, timeoutMs = 4000): Promise<{ resolved: boolean; ips?: string[]; error?: string }> {
+export function isPubliclyRoutableIp(address: string): boolean {
+  const family = isIP(address);
+  if (family === 4) {
+    const octets = address.split('.').map(Number);
+    if (octets.length !== 4 || octets.some(value => !Number.isInteger(value) || value < 0 || value > 255)) return false;
+    const a = octets[0], b = octets[1], c = octets[2];
+    if (
+      a === 0 || a === 10 || a === 127 || a >= 224 ||
+      (a === 100 && b >= 64 && b <= 127) ||
+      (a === 169 && b === 254) ||
+      (a === 172 && b >= 16 && b <= 31) ||
+      (a === 192 && b === 168) ||
+      (a === 192 && b === 0 && c === 0) ||
+      (a === 192 && b === 0 && c === 2) ||
+      (a === 192 && b === 88 && c === 99) ||
+      (a === 198 && (b === 18 || b === 19)) ||
+      (a === 198 && b === 51 && c === 100) ||
+      (a === 203 && b === 0 && c === 113)
+    ) return false;
+    return true;
+  }
+
+  if (family !== 6 || address.includes('%')) return false;
+  const normalized = address.toLowerCase();
+  if (normalized.startsWith('::ffff:')) {
+    const mapped = normalized.slice(7);
+    if (mapped.includes('.')) return isPubliclyRoutableIp(mapped);
+    const parts = mapped.split(':');
+    if (parts.length === 2) {
+      const high = parseInt(parts[0], 16);
+      const low = parseInt(parts[1], 16);
+      if (Number.isFinite(high) && Number.isFinite(low)) {
+        return isPubliclyRoutableIp([
+          high >> 8, high & 255, low >> 8, low & 255
+        ].join('.'));
+      }
+    }
+    return false;
+  }
+
+  const firstHextet = parseInt(normalized.split(':')[0] || '0', 16);
+  // Only global-unicast 2000::/3 addresses are eligible for outbound probes.
+  if (!Number.isFinite(firstHextet) || firstHextet < 0x2000 || firstHextet > 0x3fff) return false;
+  if (normalized.startsWith('2001:db8:') || normalized.startsWith('2002:') || normalized.startsWith('2001:0000:')) return false;
+  return true;
+}
+
+async function resolveDnsWithTimeout(hostname: string, timeoutMs = 4000): Promise<{ resolved: boolean; ips?: string[]; resolvedHostname?: string; error?: string }> {
   const tryLookup = async (host: string) => {
-    const lookupPromise = dns.promises.lookup(host, { all: true });
-    const timeoutPromise = new Promise<{ resolved: boolean; error: string }>((_, reject) =>
-      setTimeout(() => reject(new Error(`DNS resolution timed out after ${timeoutMs}ms`)), timeoutMs)
+    const lookupPromise = dns.promises.lookup(host, { all: true, verbatim: true });
+    const timeoutPromise = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error('DNS resolution timed out after ' + timeoutMs + 'ms')), timeoutMs)
     );
-    return await Promise.race([lookupPromise, timeoutPromise]) as dns.LookupAddress[];
+    const results = await Promise.race([lookupPromise, timeoutPromise]);
+    return Array.isArray(results) ? results.map((item: any) => item.address as string) : [];
   };
 
   try {
-    const results = await tryLookup(hostname);
-    if (Array.isArray(results) && results.length > 0) {
-      return { resolved: true, ips: results.map(r => r.address) };
-    }
+    const ips = await tryLookup(hostname);
+    if (ips.length > 0) return { resolved: true, ips, resolvedHostname: hostname };
   } catch (err: any) {
-    // If apex domain failed, try with www. prefix
     if (!hostname.startsWith('www.')) {
       try {
-        const wwwResults = await tryLookup('www.' + hostname);
-        if (Array.isArray(wwwResults) && wwwResults.length > 0) {
-          return { resolved: true, ips: wwwResults.map(r => r.address) };
-        }
-      } catch {}
+        const wwwHostname = 'www.' + hostname;
+        const ips = await tryLookup(wwwHostname);
+        if (ips.length > 0) return { resolved: true, ips, resolvedHostname: wwwHostname };
+      } catch (wwwError: any) {
+        return { resolved: false, error: wwwError?.message || err?.message || 'DNS lookup failed' };
+      }
     }
-    return { resolved: false, error: err.message || 'DNS lookup failed' };
+    return { resolved: false, error: err?.message || 'DNS lookup failed' };
+  }
+  if (!hostname.startsWith('www.')) {
+    try {
+      const wwwHostname = 'www.' + hostname;
+      const ips = await tryLookup(wwwHostname);
+      if (ips.length > 0) return { resolved: true, ips, resolvedHostname: wwwHostname };
+    } catch (err: any) {
+      return { resolved: false, error: err?.message || 'DNS lookup failed' };
+    }
   }
   return { resolved: false, error: 'No IP records returned' };
 }
 
+function requestHeadPinned(
+  hostname: string,
+  address: string,
+  protocol: 'http:' | 'https:',
+  timeoutMs: number
+): Promise<number> {
+  const transport = protocol === 'https:' ? https : http;
+  return new Promise((resolve, reject) => {
+    const request = transport.request({
+      protocol,
+      hostname,
+      path: '/',
+      method: 'HEAD',
+      agent: false,
+      servername: protocol === 'https:' ? hostname : undefined,
+      headers: {
+        Host: hostname,
+        'User-Agent': 'HAL-Grounding-Verifier/3.0'
+      },
+      lookup: (_host: string, _options: any, callback: (error: NodeJS.ErrnoException | null, address: string, family: number) => void) => {
+        callback(null, address, isIP(address));
+      }
+    } as any, (response) => {
+      const status = response.statusCode || 0;
+      response.resume();
+      resolve(status);
+    });
+    request.setTimeout(timeoutMs, () => request.destroy(new Error('HTTP probe timed out')));
+    request.on('error', reject);
+    request.end();
+  });
+}
+
 /**
- * Validates a website domain using real DNS queries and optional HTTP/TLS probe.
+ * Validates a public website domain using DNS and a pinned, non-redirecting HTTP/TLS probe.
+ * Private, loopback, link-local, reserved, and non-global IP destinations are rejected.
  */
 export async function validateDomainAndDns(
   websiteUrl: string,
   options: { probeHttp?: boolean; timeoutMs?: number } = { probeHttp: true, timeoutMs: 4000 }
 ): Promise<DomainValidationResult> {
   const hostname = extractHostname(websiteUrl);
-
-  if (!hostname || hostname.length < 3 || !hostname.includes('.')) {
+  if (!hostname || hostname.length < 3 || !hostname.includes('.') || isIP(hostname)) {
     return {
       dnsResolved: false,
       httpReachable: false,
       sslSecured: false,
       hostname,
-      rejectionReason: 'Malformed or missing domain name'
+      rejectionReason: 'Malformed domain name or IP-literal targets are not permitted'
     };
   }
 
-  // 1. Perform DNS lookup with www fallback
-  const dnsResult = await resolveDnsWithTimeout(hostname, options.timeoutMs);
-
-  if (!dnsResult.resolved) {
+  const timeoutMs = options.timeoutMs || 4000;
+  const dnsResult = await resolveDnsWithTimeout(hostname, timeoutMs);
+  if (!dnsResult.resolved || !dnsResult.ips?.length) {
     return {
       dnsResolved: false,
       httpReachable: false,
       sslSecured: false,
       hostname,
-      rejectionReason: `DNS resolution failed: ${dnsResult.error || 'NXDOMAIN'}`
+      rejectionReason: 'DNS resolution failed: ' + (dnsResult.error || 'NXDOMAIN')
     };
   }
 
-  let httpReachable = false;
+  const unsafeAddresses = dnsResult.ips.filter(address => !isPubliclyRoutableIp(address));
+  if (unsafeAddresses.length > 0) {
+    return {
+      dnsResolved: false,
+      httpReachable: false,
+      sslSecured: false,
+      hostname,
+      ipAddresses: dnsResult.ips,
+      rejectionReason: 'DNS resolved to a non-public or reserved network address'
+    };
+  }
+
+  if (!options.probeHttp) {
+    return {
+      dnsResolved: true,
+      httpReachable: false,
+      sslSecured: false,
+      hostname,
+      ipAddresses: dnsResult.ips
+    };
+  }
+
+  const probeHostname = dnsResult.resolvedHostname || hostname;
+  const pinnedAddress = dnsResult.ips[0];
   let httpStatus: number | undefined;
+  let httpReachable = false;
   let sslSecured = false;
 
-  // 2. Optional fast HTTP / TLS probe
-  if (options.probeHttp) {
-    try {
-      const probeUrl = `https://${hostname}`;
-      const res = await fetch(probeUrl, {
-        method: 'HEAD',
-        signal: AbortSignal.timeout(options.timeoutMs || 2500),
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) HAL-Grounding-Verifier/2.0'
-        },
-        redirect: 'follow'
-      });
-      httpStatus = res.status;
-      httpReachable = res.status < 500;
-      sslSecured = true; // HTTPS handshake succeeded
-    } catch (tlsErr) {
-      // Fallback: Try plain HTTP if HTTPS failed
-      try {
-        const probeUrlHttp = `http://${hostname}`;
-        const resHttp = await fetch(probeUrlHttp, {
-          method: 'HEAD',
-          signal: AbortSignal.timeout(1500),
-          redirect: 'follow'
-        });
-        httpStatus = resHttp.status;
-        httpReachable = resHttp.status < 500;
-        sslSecured = false;
-      } catch {
-        httpReachable = false;
-        sslSecured = false;
-      }
-    }
-  } else {
-    // If probing is disabled, DNS resolution establishes network registration
-    httpReachable = true;
+  try {
+    httpStatus = await requestHeadPinned(probeHostname, pinnedAddress, 'https:', timeoutMs);
+    httpReachable = httpStatus > 0 && httpStatus < 500;
     sslSecured = true;
+  } catch {
+    try {
+      httpStatus = await requestHeadPinned(probeHostname, pinnedAddress, 'http:', timeoutMs);
+      httpReachable = httpStatus > 0 && httpStatus < 500;
+      sslSecured = false;
+    } catch {
+      httpReachable = false;
+      sslSecured = false;
+    }
   }
 
   return {
@@ -280,14 +371,11 @@ export async function validateDomainAndDns(
     httpReachable,
     httpStatus,
     sslSecured,
-    hostname,
+    hostname: probeHostname,
     ipAddresses: dnsResult.ips
   };
 }
 
-/**
- * Validates ground truth for a business profile before it can be added to the lead pipeline.
- */
 export async function verifyLeadGrounding(lead: {
   businessName?: string;
   websiteUrl?: string;
@@ -377,10 +465,17 @@ export function enforceFailClosedOutreachGate(lead: {
   if (lead.sourceType === 'synthetic_fallback') {
     violations.push('Lead originated from synthetic fallback seed');
   }
+  if (lead.sourceType === 'ai_discovery_unverified') {
+    violations.push('Lead originated from unverified AI discovery and requires independent verification');
+  }
 
   // 2. Invariant: Grounding verification gate
-  if (lead.verificationStatus === 'FABRICATED_REJECTED') {
-    violations.push('Lead failed network grounding verification (DNS or phone validation failed)');
+  if (lead.verificationStatus !== 'VERIFIED') {
+    violations.push(
+      lead.verificationStatus === 'FABRICATED_REJECTED'
+        ? 'Lead failed network grounding verification (DNS or phone validation failed)'
+        : 'Lead has not passed live grounding verification'
+    );
   }
 
   // 3. Invariant: DNS verification check

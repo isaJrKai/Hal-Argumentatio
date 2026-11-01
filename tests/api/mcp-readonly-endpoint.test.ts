@@ -109,24 +109,46 @@ describe('HAL Read-Only MCP Endpoint (/mcp/:secret)', () => {
     }
   });
 
-  it('successfully executes hal_status and returns db row counts', async () => {
-    const server = buildHalMcpServer();
-    const statusTool = (server as any)._registeredTools['hal_status'];
-    const res = await statusTool.handler({});
-    expect(res).toHaveProperty('content');
-    expect(res.content[0].type).toBe('text');
-    const parsed = JSON.parse(res.content[0].text);
-    expect(parsed).toHaveProperty('table_row_counts');
+  it('fails visibly when the authoritative PostgreSQL database is not configured', async () => {
+    const originalDatabaseUrl = process.env.DATABASE_URL;
+    const originalNeonUrl = process.env.NEON_DATABASE_URL;
+    const originalSqlHost = process.env.SQL_HOST;
+    try {
+      delete process.env.DATABASE_URL;
+      delete process.env.NEON_DATABASE_URL;
+      delete process.env.SQL_HOST;
+      const server = buildHalMcpServer();
+      const statusTool = (server as any)._registeredTools['hal_status'];
+      const res = await statusTool.handler({});
+      expect(res).toHaveProperty('content');
+      expect(res.content[0].type).toBe('text');
+      expect(res.content[0].text).toMatch(/Neon\/PostgreSQL is not configured/);
+      expect(res.content[0].text).not.toContain('local_encrypted_store');
+    } finally {
+      if (originalDatabaseUrl !== undefined) process.env.DATABASE_URL = originalDatabaseUrl;
+      if (originalNeonUrl !== undefined) process.env.NEON_DATABASE_URL = originalNeonUrl;
+      if (originalSqlHost !== undefined) process.env.SQL_HOST = originalSqlHost;
+    }
   });
 
-  it('successfully executes hal_list_prospects and respects limit and offset', async () => {
-    const server = buildHalMcpServer();
-    const listTool = (server as any)._registeredTools['hal_list_prospects'];
-    const res = await listTool.handler({ limit: 3, offset: 0 });
-    const parsed = JSON.parse(res.content[0].text);
-    expect(parsed).toHaveProperty('total');
-    expect(parsed).toHaveProperty('prospects');
-    expect(parsed.count).toBeLessThanOrEqual(3);
+  it('does not substitute local-store prospects when PostgreSQL queries fail', async () => {
+    const originalDatabaseUrl = process.env.DATABASE_URL;
+    const originalNeonUrl = process.env.NEON_DATABASE_URL;
+    const originalSqlHost = process.env.SQL_HOST;
+    try {
+      delete process.env.DATABASE_URL;
+      delete process.env.NEON_DATABASE_URL;
+      delete process.env.SQL_HOST;
+      const server = buildHalMcpServer();
+      const listTool = (server as any)._registeredTools['hal_list_prospects'];
+      const res = await listTool.handler({ limit: 3, offset: 0 });
+      expect(res.content[0].text).toMatch(/Failed to list prospects/);
+      expect(res.content[0].text).not.toContain('"prospects"');
+    } finally {
+      if (originalDatabaseUrl !== undefined) process.env.DATABASE_URL = originalDatabaseUrl;
+      if (originalNeonUrl !== undefined) process.env.NEON_DATABASE_URL = originalNeonUrl;
+      if (originalSqlHost !== undefined) process.env.SQL_HOST = originalSqlHost;
+    }
   });
 
   it('fails closed when no explicit MCP account scope or account can be resolved', async () => {

@@ -83,3 +83,31 @@ They were not force-upgraded across a potentially breaking major-version boundar
 ## Release rule
 
 Keep this branch as a draft for independent review. Do not merge or deploy until the latest CI is green and the owner has reviewed the diff and accepted the remaining limitations.
+
+
+### Communications implementation follow-on (2026-11-01)
+- Added a server-only Resend adapter using the existing `RESEND_API_KEY` and `HAL_SENDER_EMAIL` environment variable names. The browser never receives the provider secret.
+- Added recipient, sender, subject, and message validation; text plus HTML-safe message rendering; request timeout; and non-sensitive provider error handling.
+- The authenticated dispatch endpoint now supports an explicit `mode: live` for email only. It reports `submitted` only after Resend returns a provider message ID; it does not call this delivered.
+- Added a tenant-scoped in-process limit of five live email submissions per ten-minute window.
+- The communications UI now requires an explicit switch from Simulation to Live email. SMS and WhatsApp live actions remain unavailable and cannot be sent through this endpoint.
+- Bridge readiness reports Resend as configured-but-unverified only when both server environment variables are present.
+- Updated README communications claims to distinguish live email submission from simulated SMS/WhatsApp and to disclose that dispatch history is not yet a durable outbox.
+- Added five unit tests for missing credentials, recipient validation, HTML escaping, provider rejection, and missing provider message IDs.
+
+### Communications limitations still open
+- Resend submission has not been tested against the production account because production environment values and a verified sender domain have not been inspected.
+- Resend delivery webhooks, signature verification, durable event storage, and delivered/bounced status reconciliation are not implemented.
+- Dispatch history remains process-memory based; the structured audit ledger is not a substitute for a transactional outbox.
+- SMS/Twilio and WhatsApp Cloud API live sending, retries, idempotency, and inbound delivery/reply reconciliation remain outstanding.
+- The current in-process email rate limit is a safety guard, not a distributed or durable abuse-control system.
+
+
+### Neon migration safety follow-on (2026-11-01)
+- Changed the admin Neon sync endpoint to preview by default. The preview reports local record counts, existing Neon counts, and the number of missing lead and win/loss IDs; it does not write rows.
+- Commit mode now requires an explicit `confirm: true` after preview.
+- The Settings action now runs preview first and asks for confirmation before the commit request.
+- Lead and win/loss syncs use `ON CONFLICT DO NOTHING`; existing Neon records are never updated from the legacy JSON store.
+- Lead sync writes contact data only to encrypted columns, marks imported leads `UNVERIFIED_STAGING`, and leaves unmeasured SEO, review, SSL, performance, urgency, LTV, and lost-revenue metrics null.
+- Learned weights are inserted only when the global record is absent; existing Neon weights are not overwritten.
+- Inserts are idempotent, so a partial additive sync can be safely previewed and retried. A live Neon preview/commit has not been run in this environment.

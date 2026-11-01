@@ -118,27 +118,28 @@ export async function bootstrapPostgresTables(poolInstance?: Pool): Promise<void
         phone_encrypted TEXT,
         email_encrypted TEXT,
         is_synthetic BOOLEAN DEFAULT false NOT NULL,
-        source_type TEXT DEFAULT 'live_harvest' NOT NULL,
+        source_type TEXT,
         verification_status TEXT DEFAULT 'UNVERIFIED_STAGING' NOT NULL,
         dns_verified BOOLEAN DEFAULT false NOT NULL,
+        grounding_evidence JSONB,
         external_crm_id TEXT,
         external_source TEXT,
         website_url TEXT,
         gmb_listing_url TEXT,
-        review_count INTEGER DEFAULT 0,
-        review_score DOUBLE PRECISION DEFAULT 0,
-        predicted_monthly_lost_revenue_usd INTEGER DEFAULT 0,
+        review_count INTEGER,
+        review_score DOUBLE PRECISION,
+        predicted_monthly_lost_revenue_usd INTEGER,
         status TEXT DEFAULT 'new' NOT NULL,
         source TEXT DEFAULT 'territory_harvest' NOT NULL,
         assigned_contractor_id TEXT,
-        performance_score INTEGER DEFAULT 50,
-        ssl_status TEXT DEFAULT 'secured',
-        mobile_friendly BOOLEAN DEFAULT true,
-        urgency_score DOUBLE PRECISION DEFAULT 5.0,
-        predicted_ltv INTEGER DEFAULT 5000,
-        seo_score INTEGER DEFAULT 50,
-        google_rating DOUBLE PRECISION DEFAULT 0,
-        sentiment_score DOUBLE PRECISION DEFAULT 5.0,
+        performance_score INTEGER,
+        ssl_status TEXT,
+        mobile_friendly BOOLEAN,
+        urgency_score DOUBLE PRECISION,
+        predicted_ltv INTEGER,
+        seo_score INTEGER,
+        google_rating DOUBLE PRECISION,
+        sentiment_score DOUBLE PRECISION,
         outreach_strategy TEXT,
         notes TEXT,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
@@ -360,6 +361,46 @@ export async function bootstrapPostgresTables(poolInstance?: Pool): Promise<void
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
       );
 
+      CREATE TABLE IF NOT EXISTS communications_outbox (
+        id TEXT PRIMARY KEY,
+        contractor_id TEXT NOT NULL,
+        lead_id TEXT NOT NULL,
+        channel TEXT NOT NULL,
+        provider TEXT NOT NULL,
+        recipient_encrypted TEXT NOT NULL,
+        subject_encrypted TEXT,
+        body_encrypted TEXT NOT NULL,
+        status TEXT DEFAULT 'queued' NOT NULL,
+        provider_message_id TEXT UNIQUE,
+        idempotency_key TEXT NOT NULL UNIQUE,
+        attempts INTEGER DEFAULT 0 NOT NULL,
+        last_attempt_at TIMESTAMP,
+        submitted_at TIMESTAMP,
+        delivered_at TIMESTAMP,
+        bounced_at TIMESTAMP,
+        error_code TEXT,
+        error_message TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
+      );
+
+      CREATE TABLE IF NOT EXISTS communications_delivery_events (
+        id TEXT PRIMARY KEY,
+        outbox_id TEXT,
+        provider TEXT NOT NULL,
+        provider_message_id TEXT,
+        event_type TEXT NOT NULL,
+        payload JSONB NOT NULL,
+        received_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
+      );
+
+      CREATE INDEX IF NOT EXISTS communications_outbox_tenant_created_idx
+        ON communications_outbox (contractor_id, created_at DESC);
+      CREATE INDEX IF NOT EXISTS communications_outbox_status_idx
+        ON communications_outbox (status, updated_at);
+      CREATE INDEX IF NOT EXISTS communications_delivery_provider_message_idx
+        ON communications_delivery_events (provider, provider_message_id);
+
       CREATE TABLE IF NOT EXISTS conversion_outbox (
         id TEXT PRIMARY KEY,
         contractor_id TEXT NOT NULL,
@@ -579,22 +620,37 @@ export async function bootstrapPostgresTables(poolInstance?: Pool): Promise<void
       ALTER TABLE leads ADD COLUMN IF NOT EXISTS external_source TEXT;
       ALTER TABLE leads ADD COLUMN IF NOT EXISTS website_url TEXT;
       ALTER TABLE leads ADD COLUMN IF NOT EXISTS gmb_listing_url TEXT;
-      ALTER TABLE leads ADD COLUMN IF NOT EXISTS review_count INTEGER DEFAULT 0;
-      ALTER TABLE leads ADD COLUMN IF NOT EXISTS review_score DOUBLE PRECISION DEFAULT 0;
-      ALTER TABLE leads ADD COLUMN IF NOT EXISTS predicted_monthly_lost_revenue_usd INTEGER DEFAULT 0;
+      ALTER TABLE leads ADD COLUMN IF NOT EXISTS review_count INTEGER;
+      ALTER TABLE leads ADD COLUMN IF NOT EXISTS review_score DOUBLE PRECISION;
+      ALTER TABLE leads ADD COLUMN IF NOT EXISTS predicted_monthly_lost_revenue_usd INTEGER;
       ALTER TABLE leads ADD COLUMN IF NOT EXISTS assigned_contractor_id TEXT;
-      ALTER TABLE leads ADD COLUMN IF NOT EXISTS performance_score INTEGER DEFAULT 0;
-      ALTER TABLE leads ADD COLUMN IF NOT EXISTS ssl_status TEXT DEFAULT 'secure';
-      ALTER TABLE leads ADD COLUMN IF NOT EXISTS mobile_friendly BOOLEAN DEFAULT TRUE;
-      ALTER TABLE leads ADD COLUMN IF NOT EXISTS urgency_score DOUBLE PRECISION DEFAULT 5.0;
-      ALTER TABLE leads ADD COLUMN IF NOT EXISTS predicted_ltv INTEGER DEFAULT 1500;
-      ALTER TABLE leads ADD COLUMN IF NOT EXISTS seo_score INTEGER DEFAULT 0;
-      ALTER TABLE leads ADD COLUMN IF NOT EXISTS google_rating DOUBLE PRECISION DEFAULT 0;
-      ALTER TABLE leads ADD COLUMN IF NOT EXISTS sentiment_score DOUBLE PRECISION DEFAULT 0;
+      ALTER TABLE leads ADD COLUMN IF NOT EXISTS performance_score INTEGER;
+      ALTER TABLE leads ADD COLUMN IF NOT EXISTS ssl_status TEXT;
+      ALTER TABLE leads ADD COLUMN IF NOT EXISTS mobile_friendly BOOLEAN;
+      ALTER TABLE leads ADD COLUMN IF NOT EXISTS urgency_score DOUBLE PRECISION;
+      ALTER TABLE leads ADD COLUMN IF NOT EXISTS predicted_ltv INTEGER;
+      ALTER TABLE leads ADD COLUMN IF NOT EXISTS seo_score INTEGER;
+      ALTER TABLE leads ADD COLUMN IF NOT EXISTS google_rating DOUBLE PRECISION;
+      ALTER TABLE leads ADD COLUMN IF NOT EXISTS sentiment_score DOUBLE PRECISION;
       ALTER TABLE leads ADD COLUMN IF NOT EXISTS outreach_strategy TEXT;
       ALTER TABLE leads ADD COLUMN IF NOT EXISTS notes TEXT;
       ALTER TABLE leads ADD COLUMN IF NOT EXISTS verification_status TEXT DEFAULT 'UNVERIFIED_STAGING';
       ALTER TABLE leads ADD COLUMN IF NOT EXISTS dns_verified BOOLEAN DEFAULT false;
+      ALTER TABLE leads ADD COLUMN IF NOT EXISTS grounding_evidence JSONB;
+
+      ALTER TABLE leads ALTER COLUMN source_type DROP DEFAULT;
+      ALTER TABLE leads ALTER COLUMN source_type DROP NOT NULL;
+      ALTER TABLE leads ALTER COLUMN review_count DROP DEFAULT;
+      ALTER TABLE leads ALTER COLUMN review_score DROP DEFAULT;
+      ALTER TABLE leads ALTER COLUMN predicted_monthly_lost_revenue_usd DROP DEFAULT;
+      ALTER TABLE leads ALTER COLUMN performance_score DROP DEFAULT;
+      ALTER TABLE leads ALTER COLUMN ssl_status DROP DEFAULT;
+      ALTER TABLE leads ALTER COLUMN mobile_friendly DROP DEFAULT;
+      ALTER TABLE leads ALTER COLUMN urgency_score DROP DEFAULT;
+      ALTER TABLE leads ALTER COLUMN predicted_ltv DROP DEFAULT;
+      ALTER TABLE leads ALTER COLUMN seo_score DROP DEFAULT;
+      ALTER TABLE leads ALTER COLUMN google_rating DROP DEFAULT;
+      ALTER TABLE leads ALTER COLUMN sentiment_score DROP DEFAULT;
 
       ALTER TABLE lead_events ADD COLUMN IF NOT EXISTS external_event_id TEXT;
       ALTER TABLE lead_events ADD COLUMN IF NOT EXISTS event_type TEXT;

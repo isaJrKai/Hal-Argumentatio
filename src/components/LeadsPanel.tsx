@@ -1003,24 +1003,24 @@ export default function LeadsPanel({ leads, token, onRefresh }: LeadsPanelProps)
                             <Globe className="w-3.5 h-3.5 text-text-dim" />
                             <span className="truncate max-w-[150px]">{hl.websiteUrl}</span>
                             <span className={`text-[9px] px-1 py-0.5 rounded-sm font-bold uppercase ${
-                              hl.sslStatus === 'secured' ? 'bg-green-500/10 text-green-400' : 'bg-red-500/10 text-red-400'
-                            }`}>{hl.sslStatus}</span>
+                              hl.sslStatus == null ? 'bg-bg-subtle text-text-tertiary' : hl.sslStatus === 'secured' ? 'bg-green-500/10 text-green-400' : 'bg-red-500/10 text-red-400'
+                            }`}>{hl.sslStatus == null ? 'NOT MEASURED' : hl.sslStatus}</span>
                           </p>
                           <p className="flex items-center gap-1.5">
                             <Cpu className="w-3 h-3 text-text-dim" />
-                            <span>SEO Score: <strong className="text-brand font-bold">{hl.seoScore}</strong></span>
+                            <span>SEO Score: <strong className="text-brand font-bold">{hl.seoScore == null ? 'Not measured' : hl.seoScore}</strong></span>
                             <span>•</span>
-                            <span>Perf Score: <strong className="text-text-primary font-bold">{hl.performanceScore}</strong></span>
+                            <span>Perf Score: <strong className="text-text-primary font-bold">{hl.performanceScore == null ? 'Not measured' : hl.performanceScore}</strong></span>
                           </p>
                         </div>
                         <div className="md:col-span-3 space-y-1 font-mono text-[11px] text-text-secondary">
                           <p className="flex items-center gap-1.5">
                             <Star className="w-3 h-3 text-yellow-400 fill-yellow-400" />
-                            <span>{hl.googleRating} ({hl.reviewCount} reviews)</span>
+                            <span>{hl.googleRating == null || hl.reviewCount == null ? 'Review data not measured' : `${hl.googleRating} (${hl.reviewCount} reviews)`}</span>
                           </p>
                           <p className="flex items-center gap-1.5">
                             <Smile className="w-3 h-3 text-text-dim" />
-                            <span>Sentiment Index: <strong className="text-brand font-bold">{Math.round(hl.sentimentScore * 100)}% POS</strong></span>
+                            <span>Sentiment Index: <strong className="text-brand font-bold">{hl.sentimentScore == null ? 'Not measured' : `${Math.round(hl.sentimentScore * 100)}% POS`}</strong></span>
                           </p>
                         </div>
                       </div>
@@ -1461,9 +1461,9 @@ Next-Gen Waterproofing	Calgary	Waterproofing	Jane Smith	jane@nextgen.ca	403-555-
                       <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] sm:text-xs text-text-secondary font-mono">
                         <span className="flex items-center gap-1"><MapPin className="w-3 h-3 text-text-dim" /> {l.city}</span>
                         <span className="text-border-dark select-none hidden sm:inline">•</span>
-                        <span>SCORE: <strong className="text-brand font-bold">{l.urgencyScore}</strong></span>
+                        <span>SCORE: <strong className="text-brand font-bold">{l.urgencyScore == null ? '—' : l.urgencyScore}</strong></span>
                         <span className="text-border-dark select-none hidden sm:inline">•</span>
-                        <span>EST. LTV: <strong className="text-text-primary font-bold">${l.predictedLtvUsd}</strong></span>
+                        <span>EST. LTV: <strong className="text-text-primary font-bold">{l.predictedLtvUsd == null ? '—' : Number(l.predictedLtvUsd).toLocaleString()}</strong></span>
                       </div>
                     </div>
 
@@ -1642,7 +1642,9 @@ Next-Gen Waterproofing	Calgary	Waterproofing	Jane Smith	jane@nextgen.ca	403-555-
                     <div className="flex justify-between items-center">
                       <span className="text-text-secondary">SSL Certificate:</span>
                       <span className="flex items-center gap-1">
-                        {selectedLead.sslStatus === 'secured' ? (
+                        {selectedLead.sslStatus == null ? (
+                          <span className="text-text-tertiary bg-bg-subtle px-1.5 py-0.5 rounded-sm font-bold uppercase tracking-wider text-[9px]">NOT MEASURED</span>
+                        ) : selectedLead.sslStatus === 'secured' ? (
                           <span className="text-green-400 bg-green-500/10 px-1.5 py-0.5 rounded-sm font-bold uppercase tracking-wider text-[9px] flex items-center gap-1">
                             <ShieldCheck className="w-3 h-3" /> SECURED
                           </span>
@@ -1656,30 +1658,34 @@ Next-Gen Waterproofing	Calgary	Waterproofing	Jane Smith	jane@nextgen.ca	403-555-
                     <div className="space-y-1">
                       <div className="flex justify-between text-[10px]">
                         <span className="text-text-secondary">Technical SEO:</span>
-                        <span className={`font-bold ${selectedLead.seoScore! >= 75 ? 'text-green-400' : selectedLead.seoScore! >= 50 ? 'text-yellow-400' : 'text-red-400'}`}>
-                          {selectedLead.seoScore}/100
+                        <span className={`font-bold ${selectedLead.seoScore == null ? 'text-text-tertiary' : selectedLead.seoScore >= 75 ? 'text-green-400' : selectedLead.seoScore >= 50 ? 'text-yellow-400' : 'text-red-400'}`}>
+                          {selectedLead.seoScore == null ? 'Not measured' : `${selectedLead.seoScore}/100`}
                         </span>
                       </div>
-                      <div className="w-full bg-card-dark h-1.5 rounded-full overflow-hidden border border-border-dark/40">
-                        <div 
-                          className={`h-full rounded-full ${selectedLead.seoScore! >= 75 ? 'bg-green-400' : selectedLead.seoScore! >= 50 ? 'bg-yellow-400' : 'bg-red-400'}`}
-                          style={{ width: `${selectedLead.seoScore}%` }}
-                        />
-                      </div>
+                      {selectedLead.seoScore != null && (
+                        <div className="w-full bg-card-dark h-1.5 rounded-full overflow-hidden border border-border-dark/40">
+                          <div
+                            className={`h-full rounded-full ${selectedLead.seoScore >= 75 ? 'bg-green-400' : selectedLead.seoScore >= 50 ? 'bg-yellow-400' : 'bg-red-400'}`}
+                            style={{ width: `${Math.max(0, Math.min(100, selectedLead.seoScore))}%` }}
+                          />
+                        </div>
+                      )}
                     </div>
                     <div className="space-y-1">
                       <div className="flex justify-between text-[10px]">
                         <span className="text-text-secondary">Page Performance:</span>
-                        <span className={`font-bold ${selectedLead.performanceScore! >= 75 ? 'text-green-400' : selectedLead.performanceScore! >= 50 ? 'text-yellow-400' : 'text-red-400'}`}>
-                          {selectedLead.performanceScore}/100
+                        <span className={`font-bold ${selectedLead.performanceScore == null ? 'text-text-tertiary' : selectedLead.performanceScore >= 75 ? 'text-green-400' : selectedLead.performanceScore >= 50 ? 'text-yellow-400' : 'text-red-400'}`}>
+                          {selectedLead.performanceScore == null ? 'Not measured' : `${selectedLead.performanceScore}/100`}
                         </span>
                       </div>
-                      <div className="w-full bg-card-dark h-1.5 rounded-full overflow-hidden border border-border-dark/40">
-                        <div 
-                          className={`h-full rounded-full ${selectedLead.performanceScore! >= 75 ? 'bg-green-400' : selectedLead.performanceScore! >= 50 ? 'bg-yellow-400' : 'bg-red-400'}`}
-                          style={{ width: `${selectedLead.performanceScore}%` }}
-                        />
-                      </div>
+                      {selectedLead.performanceScore != null && (
+                        <div className="w-full bg-card-dark h-1.5 rounded-full overflow-hidden border border-border-dark/40">
+                          <div
+                            className={`h-full rounded-full ${selectedLead.performanceScore >= 75 ? 'bg-green-400' : selectedLead.performanceScore >= 50 ? 'bg-yellow-400' : 'bg-red-400'}`}
+                            style={{ width: `${Math.max(0, Math.min(100, selectedLead.performanceScore))}%` }}
+                          />
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -1691,18 +1697,18 @@ Next-Gen Waterproofing	Calgary	Waterproofing	Jane Smith	jane@nextgen.ca	403-555-
                       <span className="text-text-secondary">Google Business Rating:</span>
                       <span className="flex items-center gap-1 text-text-primary font-bold font-sans">
                         <Star className="w-3.5 h-3.5 text-yellow-400 fill-yellow-400" />
-                        {selectedLead.googleRating} ({selectedLead.reviewCount} reviews)
+{selectedLead.googleRating == null || selectedLead.reviewCount == null ? 'Review data not measured' : `${selectedLead.googleRating} (${selectedLead.reviewCount} reviews)`}
                       </span>
                     </div>
                     <div className="space-y-1">
                       <div className="flex justify-between text-[10px]">
                         <span className="text-text-secondary">Customer Sentiment:</span>
-                        <span className="text-brand font-bold">{Math.round(selectedLead.sentimentScore! * 100)}% POSITIVE</span>
+                        <span className="text-brand font-bold">{selectedLead.sentimentScore == null ? 'Not measured' : `${Math.round(selectedLead.sentimentScore * 100)}% POSITIVE`}</span>
                       </div>
                       <div className="w-full bg-card-dark h-1.5 rounded-full overflow-hidden border border-border-dark/40">
                         <div 
                           className="h-full bg-brand rounded-full"
-                          style={{ width: `${selectedLead.sentimentScore! * 100}%` }}
+                          style={{ width: selectedLead.sentimentScore == null ? '0%' : `${Math.max(0, Math.min(100, selectedLead.sentimentScore * 100))}%` }}
                         />
                       </div>
                     </div>

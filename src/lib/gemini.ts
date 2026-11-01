@@ -334,16 +334,16 @@ export async function harvestRealBusinesses(
   city: string;
   serviceType: string;
   websiteUrl: string;
-  seoScore: number;
-  performanceScore: number;
-  sslStatus: 'secured' | 'missing';
-  googleRating: number;
-  reviewCount: number;
-  sentimentScore: number;
+  seoScore?: number | null;
+  performanceScore?: number | null;
+  sslStatus?: 'secured' | 'missing' | null;
+  googleRating?: number | null;
+  reviewCount?: number | null;
+  sentimentScore?: number | null;
   outreachStrategy: string;
   notes: string;
   isSynthetic: boolean;
-  sourceType: 'live_harvest' | 'synthetic_fallback';
+  sourceType: 'live_harvest' | 'ai_discovery_unverified' | 'synthetic_fallback';
   verificationStatus?: 'VERIFIED' | 'UNVERIFIED_STAGING' | 'FABRICATED_REJECTED';
   dnsVerified?: boolean;
   groundingEvidence?: any;
@@ -361,21 +361,26 @@ For each business, research and provide verified details:
 5. "city" - "${city}".
 6. "serviceType" - "${niche}".
 7. "websiteUrl" - Official active website URL.
-8. "seoScore" - Estimated technical SEO grade from 35 to 95.
-9. "performanceScore" - Estimated mobile performance & Core Web Vitals score (30 to 95).
-10. "sslStatus" - 'secured' or 'missing'.
-11. "googleRating" - Current Google review star rating (1.0 to 5.0).
-12. "reviewCount" - Number of Google Reviews (0 to 1000).
-13. "sentimentScore" - Review sentiment score between 0.0 and 1.0.
-14. "outreachStrategy" - Specific local pain-point, speed gap, or positioning opportunity to pitch.
-15. "notes" - Operational assessment of their current market presence.
+8. "outreachStrategy" - A cautious outreach angle based only on facts actually present in the search results.
+9. "notes" - State which details are unknown; do not invent ratings, review counts, technical scores, SSL, performance, or sentiment.
 
 IMPORTANT: Output ONLY a valid JSON array of objects with the keys above inside a markdown json block. Do not include introductory text or commentary outside the JSON block.`;
 
   const activeAI = getActiveAI(preferredAI);
 
-  const groundHarvestedBusinesses = async (items: any[]) => {
+  const groundHarvestedBusinesses = async (
+    items: any[],
+    provenance: 'live_harvest' | 'ai_discovery_unverified'
+  ) => {
     return await Promise.all(items.map(async (b) => {
+      const unmeasuredMetrics = {
+        seoScore: null,
+        performanceScore: null,
+        sslStatus: null,
+        googleRating: null,
+        reviewCount: null,
+        sentimentScore: null,
+      };
       try {
         const grounding = await verifyLeadGrounding({
           businessName: b.businessName,
@@ -383,22 +388,23 @@ IMPORTANT: Output ONLY a valid JSON array of objects with the keys above inside 
           phone: b.phone,
           isSynthetic: false
         });
-        const isGroundTruth = grounding.isGroundTruth;
         return {
           ...b,
+          ...unmeasuredMetrics,
           isSynthetic: false,
-          sourceType: 'live_harvest' as const,
-          verificationStatus: grounding.status,
+          sourceType: provenance,
+          verificationStatus: provenance === 'live_harvest' ? grounding.status : 'UNVERIFIED_STAGING',
           dnsVerified: grounding.evidence.dnsResolved,
           groundingEvidence: grounding.evidence
         };
-      } catch (e) {
+      } catch {
         return {
           ...b,
+          ...unmeasuredMetrics,
           isSynthetic: false,
-          sourceType: 'live_harvest' as const,
+          sourceType: provenance,
           verificationStatus: 'UNVERIFIED_STAGING' as const,
-          dnsVerified: true
+          dnsVerified: false
         };
       }
     }));
@@ -431,7 +437,7 @@ IMPORTANT: Output ONLY a valid JSON array of objects with the keys above inside 
               isSynthetic: false,
               sourceType: 'live_harvest' as const
             }));
-            return await groundHarvestedBusinesses(mapped);
+            return await groundHarvestedBusinesses(mapped, 'live_harvest');
           }
         } catch (err: any) {
           const is503 = err?.status === 503 || err?.message?.includes('503') || err?.message?.includes('high demand');
@@ -467,7 +473,7 @@ IMPORTANT: Output ONLY a valid JSON array of objects with the keys above inside 
             isSynthetic: false,
             sourceType: 'live_harvest' as const
           }));
-          return await groundHarvestedBusinesses(mapped);
+          return await groundHarvestedBusinesses(mapped, 'ai_discovery_unverified');
         }
       } catch (fallbackErr: any) {
         console.warn(`[Prospect Finder] Structured ${model} harvest fallback failed:`, fallbackErr?.message || fallbackErr);
@@ -489,7 +495,7 @@ IMPORTANT: Output ONLY a valid JSON array of objects with the keys above inside 
           isSynthetic: false,
           sourceType: 'live_harvest' as const
         }));
-        return await groundHarvestedBusinesses(mapped);
+        return await groundHarvestedBusinesses(mapped, 'ai_discovery_unverified');
       }
     } catch (err) {
       console.error("[Prospect Finder] NVIDIA Nemotron business harvesting fallback failed:", err);

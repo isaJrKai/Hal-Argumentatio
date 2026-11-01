@@ -23,6 +23,8 @@ describe('Database: Schema Drift & Table Invariant Tests', () => {
     'schedulerJobs',
     'leadAttribution',
     'conversionOutbox',
+    'communicationsOutbox',
+    'communicationsDeliveryEvents',
     'googleAdsDailyPerformance',
     'revenueExperiments',
     'revenueRecommendations',

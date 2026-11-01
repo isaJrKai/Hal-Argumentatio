@@ -13,11 +13,11 @@ HAL is built for operators, agencies, and enterprise consultancies seeking an au
 | **Asset Type** | Turnkey Full-Stack Software Platform / Complete Intellectual Property |
 | **Frontend Architecture** | React 19, TypeScript, Vite, Tailwind CSS v4, Lucide Icons, Responsive Mobile/Desktop |
 | **Backend Architecture** | Node.js, Express, TypeScript, RESTful API, Server-Sent Events |
-| **Database & Persistence** | PostgreSQL, Neon DB, Drizzle ORM, with zero-config in-memory ledger fallback |
+| **Database & Persistence** | Neon/PostgreSQL via Drizzle for supported domains; legacy `data/db.json` persistence remains in use for other domains. These stores are not yet consolidated. A PostgreSQL failure is reported explicitly rather than treated as an empty dataset or silently replaced with stale local data. |
 | **Cryptographic Security** | AES-256-GCM field-level PII encryption, SHA-256 immutable audit ledger, PBKDF2/bcrypt salted password hashing |
 | **AI Integration Engine** | Google Gemini (`gemini-2.5-flash`, `gemini-1.5-pro`), Hugging Face, OpenRouter, and Model Context Protocol (MCP) |
-| **Test Coverage** | **132/132 Automated Tests Passing (100% Green)** across 24 test suites |
-| **Security Audit** | **0 Known Vulnerabilities** in production and full dependency trees |
+| **Test Coverage** | Latest verified PR #14 CI: **173 tests across 33 test files passed**, with TypeScript and production build checks green. |
+| **Security Audit** | Latest PR #14 CI production dependency audit passed; two moderate development/transitive dependency advisories remain documented. |
 | **Codebase Volume** | 60,000+ lines of TypeScript |
 
 ---
@@ -35,9 +35,10 @@ HAL is built for operators, agencies, and enterprise consultancies seeking an au
 - **Dual Export Engine:** One-click download of standalone static HTML/CSS or production-ready Next.js TSX components.
 
 ### 3. Unified Communications Hub
-- **Multi-Channel Orchestration:** Centralized dispatch console for WhatsApp Business Cloud API, Resend/SMTP Email, and Twilio SMS.
-- **Meeting Automation:** Integrated Cal.com booking sync for automated calendar reservations.
-- **Cryptographic Audit Blocks:** Every outbound dispatch event generates an immutable SHA-256 verification hash recorded to the system ledger.
+- **Email:** Live email submission is available through the Resend API when `RESEND_API_KEY` and a verified `HAL_SENDER_EMAIL` are configured server-side. HAL records provider acceptance as `submitted`; it does not claim recipient delivery without a verified delivery event.
+- **SMS and WhatsApp:** Composer and simulation workflows are available. Live provider dispatch is not implemented and is not represented as operational.
+- **Dispatch history:** Current dispatch history is process-memory based; it is not yet a durable transactional outbox. The audit ledger records dispatch metadata, but provider delivery callbacks and durable retry/dead-letter handling remain outstanding.
+- **Calendar:** Provider connectivity and booking operations require separate live verification; do not assume calendar bookings are operational.
 
 ### 4. Neural Intelligence & Decision Graph
 - **Interactive Visual Topology:** Visualizes lead nodes, operational clusters, and autonomous recommendation confidence scores.
@@ -84,7 +85,7 @@ HAL is built for operators, agencies, and enterprise consultancies seeking an au
 ### Prerequisites
 - Node.js 20 or higher
 - npm 10 or higher
-- (Optional) PostgreSQL database (system automatically uses resilient local persistence if no database URL is provided)
+- A configured Neon/PostgreSQL database for database-backed features. Other legacy domains still use the local JSON store; configure and verify each persistence domain separately.
 
 ### Installation & Launch
 
@@ -109,7 +110,7 @@ npm run dev
 ### Verification & Testing
 
 ```bash
-# Run the complete test suite (132 tests across 24 suites)
+# Run the complete test suite
 npm test
 
 # Run production build compilation
@@ -121,14 +122,11 @@ npm run lint
 
 ---
 
-## Deployment Options
+## Publishing and Deployment
 
-HAL is container-ready and can be deployed in minutes to any standard cloud infrastructure:
-- **Docker / Cloud Run:** Use standard Node 20 alpine container.
-- **Render / Railway / Fly.io:** Direct deployment using `npm run build` and `npm start`.
-- **Vercel / Netlify:** SPA client deployment pointing API routes to the Node.js backend.
+The current HAL publishing workflow is the existing Google AI Studio sync/publish setup. Do not assume a successful GitHub CI run means the live application has been published or verified. After an approved change is synchronized and published through that workflow, verify the live application separately.
 
-For complete turnkey deployment instructions, environment variables, and intellectual property transfer details, refer to `ACQUISITION_HANDOVER.md`.
+No alternative hosting target is designated by this repository documentation.
 
 ---
 

@@ -123,26 +123,30 @@ export type AIModelType = 'gemini' | 'nemotron' | 'dual';
  * Get currently active AI model based on preference, localStorage or environment variables
  */
 export function getActiveAI(preferred?: string): AIModelType {
-  if (preferred === 'gemini' || preferred === 'nemotron' || preferred === 'dual') {
-    return preferred;
+  const geminiConfigured = Boolean(process.env.GEMINI_API_KEY);
+  const nemotronConfigured = Boolean(process.env.NVIDIA_API_KEY);
+
+  let requested = preferred;
+  if (!requested && process.env.HAL_ACTIVE_AI) {
+    requested = process.env.HAL_ACTIVE_AI;
   }
-  if (process.env.HAL_ACTIVE_AI === 'gemini' || process.env.HAL_ACTIVE_AI === 'nemotron' || process.env.HAL_ACTIVE_AI === 'dual') {
-    return process.env.HAL_ACTIVE_AI as AIModelType;
-  }
-  if (typeof window !== 'undefined') {
-    const saved = localStorage.getItem('hal_active_ai');
-    if (saved === 'gemini' || saved === 'nemotron' || saved === 'dual') {
-      return saved as AIModelType;
+  if (!requested && typeof window !== 'undefined') {
+    try {
+      requested = localStorage.getItem('hal_active_ai') || undefined;
+    } catch {
+      // Storage can be unavailable in restricted browser contexts.
     }
   }
-  // Default to dual-drive if both keys exist, otherwise gemini/nemotron
-  if (process.env.GEMINI_API_KEY && process.env.NVIDIA_API_KEY) {
-    return 'dual';
-  }
-  if (process.env.GEMINI_API_KEY) {
-    return 'gemini';
-  }
-  return 'nemotron';
+
+  // Never select an unconfigured provider when another supported provider is ready.
+  if (requested === 'dual' && geminiConfigured && nemotronConfigured) return 'dual';
+  if (requested === 'gemini' && geminiConfigured) return 'gemini';
+  if (requested === 'nemotron' && nemotronConfigured) return 'nemotron';
+  if (geminiConfigured) return 'gemini';
+  if (nemotronConfigured) return 'nemotron';
+
+  // Preserve a deterministic selection so the caller can return a clear missing-key error.
+  return requested === 'gemini' || requested === 'dual' ? requested : 'nemotron';
 }
 
 /**

@@ -26,8 +26,9 @@ import {
   initGoogleWorkspaceAuth, 
   googleWorkspaceSignIn, 
   googleWorkspaceLogout, 
-  listCalendarEvents, 
-  CalendarEvent 
+  listCalendarEvents,
+  isGoogleWorkspaceConfigured,
+  CalendarEvent
 } from '../lib/googleWorkspace';
 import { User } from '@firebase/auth';
 
@@ -513,11 +514,11 @@ export default function ConnectorsPanel() {
                 ) : (
                   <Button 
                     onClick={handleGoogleConnect} 
-                    disabled={isGoogleLoading}
+                    disabled={isGoogleLoading || !isGoogleWorkspaceConfigured}
                     className="bg-blue-600 hover:bg-blue-700 text-white text-xs shadow-sm font-medium"
                   >
                     <Key className="w-3.5 h-3.5 mr-1.5" />
-                    {isGoogleLoading ? 'Connecting...' : 'Connect Google Workspace'}
+                    {!isGoogleWorkspaceConfigured ? 'Not configured' : isGoogleLoading ? 'Connecting...' : 'Connect Google Workspace'}
                   </Button>
                 )}
               </div>
@@ -533,7 +534,7 @@ export default function ConnectorsPanel() {
                       Google Drive Cloud
                     </span>
                     <Badge variant={googleUser ? "active" : "neutral"}>
-                      {googleUser ? "Active Scope" : "Disconnected"}
+                      {googleUser ? "Active Scope" : isGoogleWorkspaceConfigured ? "Disconnected" : "Not configured"}
                     </Badge>
                   </div>
                   <p className="text-xs text-zinc-500 dark:text-zinc-400">
