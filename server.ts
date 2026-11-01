@@ -5547,6 +5547,13 @@ app.post('/api/system/postgres-connect', authenticate, requireRole('admin'), asy
 app.post('/api/system/postgres-sync', authenticate, requireRole('admin'), async (req, res) => {
   const contractorId = (req as any).contractorId;
   const { mode = 'preview', confirm } = req.body || {};
+  if (!['preview', 'commit'].includes(mode)) {
+    return res.status(400).json({
+      success: false,
+      code: 'INVALID_SYNC_MODE',
+      error: 'Sync mode must be preview or commit.'
+    });
+  }
   
   try {
     const { getPostgresPool, bootstrapPostgresTables } = await import('./src/db/postgres');
