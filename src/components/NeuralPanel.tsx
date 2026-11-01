@@ -655,6 +655,14 @@ export default function NeuralPanel() {
               </button>
             </div>
             
+            {networkData.telemetry
+              && Number(networkData.telemetry.matchedLeadCount || 0) === 0
+              && Number(networkData.telemetry.matchedOutcomeCount || 0) === 0 && (
+                <div className="absolute inset-x-6 top-6 z-10 mx-auto max-w-md rounded-lg border border-border-dim bg-bg-raised/95 px-4 py-3 text-center shadow-sm pointer-events-none">
+                  <p className="text-sm font-semibold text-text-primary">No territory evidence yet</p>
+                  <p className="mt-1 text-xs text-text-secondary">No matching leads or recorded outcomes for {activeNiche} in {activeCity}. The core systems shown are architecture, not learned connections.</p>
+                </div>
+              )}
             <canvas ref={canvasRef} className="absolute inset-0 outline-none block cursor-grab active:cursor-grabbing" style={{ filter: 'contrast(1.2) brightness(1.1)' }} />
           </div>
           
