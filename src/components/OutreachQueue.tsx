@@ -64,10 +64,10 @@ export default function OutreachQueue({ leads, token, onRefresh }: OutreachQueue
 
   // Template customizer state
   const [templateSubject, setTemplateSubject] = useState(
-    'Actionable Speed & Revenue Leakage Audit for {{businessName}} ({{city}})'
+    'Digital Presence Review for {{businessName}} ({{city}})'
   );
   const [templateBody, setTemplateBody] = useState(
-    `Hi {{ownerName}},\n\nI conducted a preliminary diagnostic on {{businessName}}'s digital presence in {{city}} and identified immediate technical optimizations (Core Web Vitals acceleration & Google Map Pack visibility for ${activeIndustry.name}).\n\nGiven current ${regionalProfile.currentSeasonalFocus.toLowerCase()}, we prepared a live technical teardown showing how to capture high-intent ${activeNiche} inquiries before competitors.\n\nWould you have 5 minutes this week for a quick walkthrough?\n\nBest regards,\n${workspaceConfig.operatorName}\n${workspaceConfig.agencyName}`
+    `Hi {{ownerName}},\n\nI’m reaching out because {{businessName}} serves {{city}}. I haven’t completed a verified audit, so I don’t want to assume there is a specific website or marketing problem.\n\nIf useful, I can review your public website and local search presence and share a short, evidence-based summary of any opportunities I can verify.\n\nWould you be open to a brief conversation?\n\nBest regards,\n${workspaceConfig.operatorName}\n${workspaceConfig.agencyName}`
   );
   const [targetFollowUpDays, setTargetFollowUpDays] = useState(3);
   const [autoAdvanceStatus, setAutoAdvanceStatus] = useState(true);
@@ -140,18 +140,18 @@ export default function OutreachQueue({ leads, token, onRefresh }: OutreachQueue
             businessName: lead.businessName,
             city: lead.city,
             serviceType: lead.serviceType,
-            ownerName: lead.ownerName || 'Business Owner',
-            websiteUrl: lead.websiteUrl || `https://${lead.businessName.toLowerCase().replace(/[^a-z0-9]/g, '')}.com`,
-            performanceScore: lead.performanceScore || 52,
-            seoScore: lead.seoScore || 64,
-            sslStatus: lead.sslStatus || 'valid',
-            googleRating: lead.googleRating || 4.2,
-            reviewCount: lead.reviewCount || 18,
+            ...(lead.ownerName ? { ownerName: lead.ownerName } : {}),
+            ...(lead.websiteUrl ? { websiteUrl: lead.websiteUrl } : {}),
+            ...(typeof lead.performanceScore === 'number' && Number.isFinite(lead.performanceScore) ? { performanceScore: lead.performanceScore } : {}),
+            ...(typeof lead.seoScore === 'number' && Number.isFinite(lead.seoScore) ? { seoScore: lead.seoScore } : {}),
+            ...(lead.sslStatus ? { sslStatus: lead.sslStatus } : {}),
+            ...(typeof lead.googleRating === 'number' && Number.isFinite(lead.googleRating) ? { googleRating: lead.googleRating } : {}),
+            ...(typeof lead.reviewCount === 'number' && Number.isFinite(lead.reviewCount) ? { reviewCount: lead.reviewCount } : {}),
             operatorName: workspaceConfig.operatorName,
             agencyName: workspaceConfig.agencyName,
             framework: 'Direct Outreach'
           },
-          promptOverride: `Generate a sharp direct response pitch for ${lead.businessName} (${lead.serviceType} in ${lead.city}). Cite their technical speed score (${lead.performanceScore || 52}/100) and provide a concise, non-pushy message.`
+          promptOverride: `Draft a concise outreach message for ${lead.businessName} (${lead.serviceType} in ${lead.city}). Use only the supplied, verified facts. Do not invent website issues, scores, ratings, security findings, or financial uplift. If no audit evidence is supplied, ask permission to conduct a review instead of claiming one has been completed.`
         })
       });
 
@@ -161,7 +161,7 @@ export default function OutreachQueue({ leads, token, onRefresh }: OutreachQueue
         const steps = content.structuredData?.steps || [];
         const step = steps[0] || {};
         
-        const newSubject = step.subject || content.subject || `Preliminary Speed & Lead Leakage Audit: ${lead.businessName}`;
+        const newSubject = step.subject || content.subject || `Digital Presence Review: ${lead.businessName}`;
         const newBody = step.body || content.renderedOutput || content.summary || '';
 
         if (newSubject) setTemplateSubject(newSubject);
@@ -187,9 +187,9 @@ export default function OutreachQueue({ leads, token, onRefresh }: OutreachQueue
 
   // Quick preset loader
   const handleLoadRegionalAngle = () => {
-    setTemplateSubject(`Seasonal Growth Audit: Capture High-Intent ${(activeNiche || 'Contracting').toUpperCase()} Inquiries in ${activeCity || 'Your City'}`);
+    setTemplateSubject(`Digital Presence Review for ${(activeNiche || 'contracting').toUpperCase()} Businesses in ${activeCity || 'Your Area'}`);
     setTemplateBody(
-      `Hi {{ownerName}},\n\nOur system detected that {{businessName}} serves the ${activeCity || 'local'} market. With ${regionalProfile.climateZone.toLowerCase()} seasonal load underway, homeowners are seeking verified ${activeNiche || 'trade'} specialists.\n\nOur audit revealed technical bottlenecks in mobile load times and local search ranking.\n\nMay I share a 1-page breakdown outlining the 3 fastest fixes to increase inbound calls?\n\nRegards,\n${workspaceConfig.operatorName}\n${workspaceConfig.agencyName}`
+      `Hi {{ownerName}},\n\nI’m reaching out because {{businessName}} serves ${activeCity || 'your local area'}. I haven’t completed a verified audit, so I don’t want to assume there is a specific problem.\n\nIf useful, I can review your public website and local search presence and share a short, evidence-based summary of any opportunities I can verify.\n\nWould you be open to a brief conversation?\n\nRegards,\n${workspaceConfig.operatorName}\n${workspaceConfig.agencyName}`
     );
   };
 
@@ -247,7 +247,7 @@ export default function OutreachQueue({ leads, token, onRefresh }: OutreachQueue
 
       const data = await res.json();
       if (res.ok) {
-        setBatchSuccessMessage(`Transmitted ${(channel || 'Email').toUpperCase()} outreach to ${data.successfulCount || selectedLeadIds.length} target accounts.`);
+        setBatchSuccessMessage(`Recorded ${data.simulatedCount ?? data.simulated ?? 0} simulated ${(channel || 'email').toUpperCase()} attempts. No external messages were sent. ${data.failed ?? 0} blocked or skipped.`);
         setSelectedLeadIds([]);
         onRefresh();
         setTimeout(() => setBatchSuccessMessage(null), 5000);
@@ -397,7 +397,7 @@ export default function OutreachQueue({ leads, token, onRefresh }: OutreachQueue
             {/* BATCH ACTION TRIGGER BUTTONS */}
             <div className="pt-3 border-t border-border-dim/60 space-y-2">
               <span className="text-[10px] font-mono text-text-secondary uppercase font-bold block">
-                Execute Batch Transmit ({selectedLeadIds.length} Selected)
+                Record Outreach Simulation ({selectedLeadIds.length} Selected)
               </span>
 
               <div className="grid grid-cols-3 gap-2 font-mono text-xs">
@@ -407,7 +407,7 @@ export default function OutreachQueue({ leads, token, onRefresh }: OutreachQueue
                   className="p-2 bg-brand text-black hover:bg-brand-dim disabled:opacity-30 rounded-sm font-bold uppercase flex flex-col items-center justify-center gap-1 transition-colors cursor-pointer"
                 >
                   <Mail className="w-4 h-4" />
-                  <span className="text-[10px]">BATCH EMAIL</span>
+                  <span className="text-[10px]">SIMULATE EMAIL</span>
                 </button>
 
                 <button
@@ -416,7 +416,7 @@ export default function OutreachQueue({ leads, token, onRefresh }: OutreachQueue
                   className="p-2 bg-positive text-black hover:bg-positive/80 disabled:opacity-30 rounded-sm font-bold uppercase flex flex-col items-center justify-center gap-1 transition-colors cursor-pointer"
                 >
                   <MessageSquare className="w-4 h-4" />
-                  <span className="text-[10px]">BATCH SMS</span>
+                  <span className="text-[10px]">SIMULATE SMS</span>
                 </button>
 
                 <button
@@ -516,7 +516,7 @@ export default function OutreachQueue({ leads, token, onRefresh }: OutreachQueue
                           </td>
                           <td className="p-3">
                             <div className="font-bold text-text-primary">{lead.businessName}</div>
-                            <div className="text-[10px] text-text-dim">{lead.email || lead.phone || 'Contact on file'}</div>
+                            <div className="text-[10px] text-text-dim">{lead.email || lead.phone || 'No contact provided'}</div>
                           </td>
                           <td className="p-3">
                             <div className="text-text-secondary">{lead.city}</div>
@@ -524,9 +524,9 @@ export default function OutreachQueue({ leads, token, onRefresh }: OutreachQueue
                           </td>
                           <td className="p-3">
                             <div className="flex items-center gap-2">
-                              <span className="font-bold text-brand">{lead.urgencyScore || 7.5}</span>
+                              <span className="font-bold text-brand">{typeof lead.urgencyScore === 'number' && Number.isFinite(lead.urgencyScore) ? lead.urgencyScore : 'Not measured'}</span>
                               <span className="text-[10px] text-text-dim">
-                                Speed: <strong className={lead.performanceScore && lead.performanceScore > 60 ? 'text-positive' : 'text-warning'}>{lead.performanceScore || 52}/100</strong>
+                                Speed: <strong className={typeof lead.performanceScore === 'number' && Number.isFinite(lead.performanceScore) ? (lead.performanceScore > 60 ? 'text-positive' : 'text-warning') : 'text-text-tertiary'}>{typeof lead.performanceScore === 'number' && Number.isFinite(lead.performanceScore) ? `${lead.performanceScore}/100` : 'Not measured'}</strong>
                               </span>
                             </div>
                           </td>
