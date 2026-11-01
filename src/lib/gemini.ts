@@ -833,38 +833,44 @@ export async function draftOutreachMessage({
   customInstructions?: string;
 }): Promise<{ subject?: string; body: string; callToAction: string }> {
   const client = getAIClient();
-  const targetCity = city || lead.city || 'Calgary';
-  const targetNiche = niche || lead.serviceType || 'Home Services';
+  const targetCity = city || lead.city || 'your local market';
+  const targetNiche = niche || lead.serviceType || 'your services';
   const targetOwner = lead.ownerName || 'Owner';
 
   if (!client) {
     if (channel === 'whatsapp') {
       return {
-        body: `Hi ${targetOwner}, noticed ${lead.businessName} is currently missing automated fast-response triggers for ${targetCity} emergency calls. We built a 30-sec call-routing solution for local ${targetNiche} operators. Would you like a 60-second video demo?`,
-        callToAction: 'Reply YES for demo'
+        body: `Hi ${targetOwner}, I came across ${lead.businessName} and wanted to ask whether improving how customers find and contact your ${targetNiche} business is a priority. I’m working on HAL, a business operations tool for contractors. Would a short overview be useful?`,
+        callToAction: 'Reply if a short overview would help'
       };
     }
     if (channel === 'sms') {
       return {
-        body: `Hi ${targetOwner}, quick question on ${lead.businessName}'s ${targetCity} dispatch capacity this week? We have incoming homeowner requests. Let me know if you can take more volume.`,
-        callToAction: 'Reply to accept dispatch'
+        body: `Hi ${targetOwner}, I’m reaching out about ${lead.businessName} and how customers discover and contact local ${targetNiche} businesses. I’m working on HAL, a business operations tool for contractors. Would you be open to a short overview?`,
+        callToAction: 'Reply if interested'
       };
     }
     return {
       subject: `Urgent diagnostic & call intake opportunity for ${lead.businessName} (${targetCity})`,
-      body: `Hi ${targetOwner},\n\nI conducted a preliminary diagnostic on ${lead.businessName}'s digital visibility in ${targetCity}.\n\nLocal homeowners searching for ${targetNiche} are prioritizing contractors with sub-minute response times. We identified that your intake flow has immediate capacity to capture 4–8 additional qualified emergency jobs weekly.\n\nCould we do a brief 5-minute walkthrough this Thursday?\n\nBest regards,\nHAL Business Operations Intelligence`,
-      callToAction: 'Book a 5-minute diagnostic call'
+      body: `Hi ${targetOwner},\n\nI came across ${lead.businessName} and wanted to introduce HAL, a business operations tool designed to help contractors manage customer inquiries and business information.\n\nI have not assumed anything about your current systems or results; I would be interested to learn how you currently manage customer inquiries and whether there is an area where better visibility or follow-up would help.\n\nWould you be open to a brief introductory call?\n\nBest regards,\nHAL Business Operations Intelligence`,
+      callToAction: 'Arrange an introductory call'
     };
   }
 
-  const prompt = `You are HAL, an AI Business Operating Intelligence system for home service contractors.
-Draft a high-converting, strictly professional outreach message for:
+  const prompt = `You are HAL, an AI Business Operations Intelligence assistant for contractors.
+Draft a professional, respectful outreach message for the following prospect. Use only supplied evidence and do not invent claims:
 - Channel: ${channel.toUpperCase()}
 - Prospect Business: ${lead.businessName}
 - Contact Name: ${targetOwner}
 - Market / City: ${targetCity}
 - Niche: ${targetNiche}
-- Custom Instructions: ${customInstructions || 'Focus on immediate homeowner call capture, speed of response, and zero wasted ad spend.'}
+- Supplied audit evidence (may be empty): ${JSON.stringify(lead.auditData || {})}
+- Custom Instructions: ${customInstructions || 'Introduce HAL briefly and ask one low-pressure question.'}
+
+Evidence and honesty rules:
+- Never claim that an audit was conducted, the prospect has a specific problem, demand/leads exist, or a number of jobs/revenue can be gained unless that exact claim is supported by supplied audit evidence.
+- If evidence is empty, keep the message introductory and ask a question; do not fabricate local market facts.
+- Do not imply HAL is already serving the prospect or that the sender has a relationship with them.
 
 Formatting Rules:
 - If WhatsApp: Conversational, executive tone, under 70 words, high curiosity, clear direct question at the end. No cheesy emojis or fluff.
