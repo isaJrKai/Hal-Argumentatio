@@ -36,6 +36,7 @@ export default function DeliveryHub({ token, leads = [] }: DeliveryHubProps) {
   const [projects, setProjects] = useState<ClientProject[]>([]);
   const [selectedProject, setSelectedProject] = useState<ClientProject | null>(null);
   const [loading, setLoading] = useState(true);
+  const [projectError, setProjectError] = useState<string | null>(null);
   const [copiedLink, setCopiedLink] = useState(false);
 
   // New Project Modal State
@@ -49,31 +50,32 @@ export default function DeliveryHub({ token, leads = [] }: DeliveryHubProps) {
   const [newProjectRetainer, setNewProjectRetainer] = useState(2400);
 
   const fetchProjects = async (retry = 1) => {
+    let retryScheduled = false;
     try {
       setLoading(true);
       const activeToken = token || localStorage.getItem('halbiz_auth_token') || localStorage.getItem('token') || '';
+      if (!activeToken) throw new Error('Sign in to load client projects.');
       const res = await fetch('/api/projects', {
-        headers: activeToken ? { 'Authorization': `Bearer ${activeToken}` } : {}
+        headers: { 'Authorization': `Bearer ${activeToken}` }
       });
-      if (res.ok) {
-        const data = await res.json();
-        if (Array.isArray(data)) {
-          setProjects(data);
-          if (data.length > 0 && !selectedProject) {
-            setSelectedProject(data[0]);
-          }
-        }
-      } else if (retry > 0) {
-        setTimeout(() => fetchProjects(retry - 1), 600);
-      }
+      if (!res.ok) throw new Error(`Project list request failed (HTTP ${res.status}).`);
+      const data = await res.json();
+      if (!Array.isArray(data)) throw new Error('Project list response was not a valid array.');
+      setProjects(data);
+      setSelectedProject(current => current && data.some(project => project.id === current.id)
+        ? data.find(project => project.id === current.id) || null
+        : data[0] || null);
+      setProjectError(null);
     } catch (err) {
       if (retry > 0) {
-        setTimeout(() => fetchProjects(retry - 1), 600);
+        retryScheduled = true;
+        setTimeout(() => { void fetchProjects(retry - 1); }, 600);
       } else {
-        console.warn('Client projects temporarily unavailable:', err);
+        console.warn('Client projects unavailable:', err);
+        setProjectError(err instanceof Error ? err.message : 'Client projects could not be loaded.');
       }
     } finally {
-      setLoading(false);
+      if (!retryScheduled) setLoading(false);
     }
   };
 
@@ -83,115 +85,123 @@ export default function DeliveryHub({ token, leads = [] }: DeliveryHubProps) {
 
   const handleCreateProject = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newProjectBusinessName.trim()) return;
+    if (!newProjectBusinessName.trim() || !newProjectCity.trim() || !newProjectServiceType.trim()) {
+      setProjectError('Business name, city and service type are required.');
+      return;
+    }
 
+    setProjectError(null);
     try {
+      const activeToken = token || localStorage.getItem('halbiz_auth_token') || localStorage.getItem('token') || '';
+      if (!activeToken) throw new Error('Your session has expired. Sign in again to create a project.');
       const res = await fetch('/api/projects', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
+          'Authorization': `Bearer ${activeToken}`
         },
         body: JSON.stringify({
           leadId: newProjectLeadId,
-          businessName: newProjectBusinessName,
-          clientName: newProjectClientName || 'Business Owner',
-          city: newProjectCity || 'Calgary',
-          serviceType: newProjectServiceType || 'Trade Services',
+          businessName: newProjectBusinessName.trim(),
+          clientName: newProjectClientName.trim(),
+          city: newProjectCity.trim(),
+          serviceType: newProjectServiceType.trim(),
           packageTier: newProjectPackage,
-          monthlyRetainerUsd: newProjectRetainer,
-          initialAuditScore: 48
+          monthlyRetainerUsd: newProjectRetainer
         })
       });
+      const responseData = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(responseData.error || `Project creation failed (HTTP ${res.status}).`);
 
-      if (res.ok) {
-        const created = await res.json();
-        setProjects(prev => [created, ...prev]);
-        setSelectedProject(created);
+      // A successful POST is not enough: confirm the project appears in the durable list.
+      const verifyRes = await fetch('/api/projects', { headers: { 'Authorization': `Bearer ${activeToken}` } });
+      if (!verifyRes.ok) throw new Error(`Project was accepted, but persistence could not be verified (HTTP ${verifyRes.status}).`);
+      const persistedProjects = await verifyRes.json();
+      const created = responseData as ClientProject;
+      if (!Array.isArray(persistedProjects) || !persistedProjects.some((project: ClientProject) => project.id === created.id)) {
+        setProjectError('The server accepted this project, but it is missing from the persistent project list. It may not survive a refresh. Project storage needs repair before this project can be considered saved.');
         setShowNewProjectModal(false);
-        // Reset fields
-        setNewProjectBusinessName('');
-        setNewProjectClientName('');
+        return;
       }
+
+      setProjects(persistedProjects);
+      setSelectedProject(persistedProjects.find((project: ClientProject) => project.id === created.id) || created);
+      setShowNewProjectModal(false);
+      setNewProjectBusinessName('');
+      setNewProjectClientName('');
+      setNewProjectCity('');
+      setNewProjectServiceType('');
+      setNewProjectLeadId('');
+      setProjectError(null);
     } catch (err) {
       console.error('Error creating project:', err);
+      setProjectError(err instanceof Error ? err.message : 'Project could not be created.');
     }
   };
 
   const handleUpdateMilestone = async (milestoneId: string, newStatus: ClientMilestone['status']) => {
     if (!selectedProject) return;
 
-    const updatedMilestones = selectedProject.milestones.map(m => {
-      if (m.id === milestoneId) {
-        return {
-          ...m,
-          status: newStatus,
-          completedAt: newStatus === 'completed' ? new Date().toISOString() : undefined
-        };
-      }
-      return m;
-    });
-
-    // Recalculate score based on completed milestones
+    const updatedMilestones = selectedProject.milestones.map(m => m.id === milestoneId
+      ? { ...m, status: newStatus, completedAt: newStatus === 'completed' ? new Date().toISOString() : undefined }
+      : m);
     const completedCount = updatedMilestones.filter(m => m.status === 'completed').length;
-    const progressPct = completedCount / updatedMilestones.length;
-    const newScore = Math.round(selectedProject.initialAuditScore + (progressPct * (selectedProject.targetScore - selectedProject.initialAuditScore)));
-
+    const allMilestonesComplete = updatedMilestones.length > 0 && completedCount === updatedMilestones.length;
     const updatedProject = {
       ...selectedProject,
       milestones: updatedMilestones,
-      currentScore: newScore,
-      status: completedCount === updatedMilestones.length ? ('completed' as const) : ('active_delivery' as const)
+      status: allMilestonesComplete ? ('completed' as const) : ('active_delivery' as const)
     };
 
-    setSelectedProject(updatedProject);
-    setProjects(prev => prev.map(p => p.id === updatedProject.id ? updatedProject : p));
-
     try {
-      await fetch(`/api/projects/${selectedProject.id}`, {
+      const activeToken = token || localStorage.getItem('halbiz_auth_token') || localStorage.getItem('token') || '';
+      const res = await fetch(`/api/projects/${selectedProject.id}`, {
         method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          milestones: updatedMilestones,
-          currentScore: newScore,
-          status: updatedProject.status
-        })
+        headers: { 'Content-Type': 'application/json', ...(activeToken ? { 'Authorization': `Bearer ${activeToken}` } : {}) },
+        body: JSON.stringify({ milestones: updatedMilestones, status: updatedProject.status })
       });
+      const responseData = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(responseData.error || `Milestone update failed (HTTP ${res.status}).`);
+      const savedProject = responseData && typeof responseData === 'object' ? { ...updatedProject, ...responseData } : updatedProject;
+      setSelectedProject(savedProject);
+      setProjects(prev => prev.map(project => project.id === savedProject.id ? savedProject : project));
+      setProjectError(null);
     } catch (err) {
       console.error('Failed to save milestone update:', err);
+      setProjectError(err instanceof Error ? err.message : 'Milestone update was not saved.');
     }
   };
 
   const handleUpdateAssetStatus = async (assetId: string, newStatus: ClientAsset['status']) => {
     if (!selectedProject) return;
 
-    const updatedAssets = selectedProject.assets.map(a => {
-      if (a.id === assetId) {
-        return { ...a, status: newStatus, uploadedAt: newStatus !== 'pending' ? new Date().toISOString() : undefined };
-      }
-      return a;
-    });
-
+    const updatedAssets = selectedProject.assets.map(asset => asset.id === assetId
+      ? { ...asset, status: newStatus, uploadedAt: newStatus !== 'pending' ? new Date().toISOString() : undefined }
+      : asset);
     const updatedProject = { ...selectedProject, assets: updatedAssets };
-    setSelectedProject(updatedProject);
-    setProjects(prev => prev.map(p => p.id === updatedProject.id ? updatedProject : p));
 
     try {
-      await fetch(`/api/projects/${selectedProject.id}`, {
+      const activeToken = token || localStorage.getItem('halbiz_auth_token') || localStorage.getItem('token') || '';
+      const res = await fetch(`/api/projects/${selectedProject.id}`, {
         method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
+        headers: { 'Content-Type': 'application/json', ...(activeToken ? { 'Authorization': `Bearer ${activeToken}` } : {}) },
         body: JSON.stringify({ assets: updatedAssets })
       });
+      const responseData = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(responseData.error || `Asset status update failed (HTTP ${res.status}).`);
+      const savedProject = responseData && typeof responseData === 'object' ? { ...updatedProject, ...responseData } : updatedProject;
+      setSelectedProject(savedProject);
+      setProjects(prev => prev.map(project => project.id === savedProject.id ? savedProject : project));
+      setProjectError(null);
     } catch (err) {
       console.error('Failed to save asset status:', err);
+      setProjectError(err instanceof Error ? err.message : 'Asset status was not saved.');
     }
   };
+
+  const completedMilestones = selectedProject?.milestones.filter(milestone => milestone.status === 'completed').length || 0;
+  const totalMilestones = selectedProject?.milestones.length || 0;
+  const deliveryProgress = totalMilestones > 0 ? Math.round((completedMilestones / totalMilestones) * 100) : null;
 
   return (
     <div className="space-y-6">
