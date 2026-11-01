@@ -85,8 +85,8 @@ export default function DeliveryHub({ token, leads = [] }: DeliveryHubProps) {
 
   const handleCreateProject = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newProjectBusinessName.trim() || !newProjectCity.trim() || !newProjectServiceType.trim()) {
-      setProjectError('Business name, city and service type are required.');
+    if (!newProjectBusinessName.trim() || !newProjectCity.trim() || !newProjectServiceType.trim() || !Number.isFinite(newProjectRetainer) || newProjectRetainer <= 0) {
+      setProjectError('Business name, city, service type and a positive monthly retainer are required.');
       return;
     }
 
@@ -224,7 +224,7 @@ export default function DeliveryHub({ token, leads = [] }: DeliveryHubProps) {
 
         <div className="flex items-center gap-3">
           <button
-            onClick={() => setShowNewProjectModal(true)}
+            onClick={() => { setProjectError(null); setShowNewProjectModal(true); }}
             className="px-3 py-1.5 bg-brand text-black hover:bg-brand-dim rounded-sm font-mono text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 transition-colors cursor-pointer"
           >
             <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
@@ -248,10 +248,10 @@ export default function DeliveryHub({ token, leads = [] }: DeliveryHubProps) {
           <div className="bg-bg-raised border border-border-dim rounded-sm p-4 space-y-3">
             <div className="flex items-center justify-between border-b border-border-dim/60 pb-2">
               <span className="text-[10px] font-mono font-bold text-text-primary uppercase tracking-wider">
-                Active Client Projects ({projects.filter(project => project.status !== 'completed').length})
+                Client Projects ({projects.length})
               </span>
               <span className="text-[9px] font-mono text-brand font-bold uppercase">
-                ${projects.filter(project => project.status !== 'completed').reduce((sum, project) => sum + project.monthlyRetainerUsd, 0).toLocaleString()}/mo MRR
+                ${projects.filter(project => project.status !== 'completed' && typeof project.monthlyRetainerUsd === 'number' && Number.isFinite(project.monthlyRetainerUsd)).reduce((sum, project) => sum + project.monthlyRetainerUsd, 0).toLocaleString()}/mo MRR
               </span>
             </div>
 
@@ -339,11 +339,19 @@ export default function DeliveryHub({ token, leads = [] }: DeliveryHubProps) {
                   {/* Share Client Portal Token Link */}
                   <div className="flex items-center gap-2 font-mono text-xs">
                     <button
-                      onClick={() => {
+                      onClick={async () => {
+                        if (!selectedProject.portalAccessToken) {
+                          setProjectError('This project does not have a client portal token.');
+                          return;
+                        }
                         const url = `${window.location.origin}/?portal=${selectedProject.portalAccessToken}#portal-${selectedProject.portalAccessToken}`;
-                        navigator.clipboard.writeText(url);
-                        setCopiedLink(true);
-                        setTimeout(() => setCopiedLink(false), 2000);
+                        try {
+                          await navigator.clipboard.writeText(url);
+                          setCopiedLink(true);
+                          setTimeout(() => setCopiedLink(false), 2000);
+                        } catch {
+                          setProjectError('Could not copy the client portal link. Check browser clipboard permissions.');
+                        }
                       }}
                       className="px-2.5 py-1.5 bg-bg-dark border border-border-dim hover:border-brand text-text-primary rounded-sm text-[10px] font-bold uppercase flex items-center gap-1.5 transition-colors cursor-pointer"
                       title="Copy public client review link"
@@ -605,6 +613,8 @@ export default function DeliveryHub({ token, leads = [] }: DeliveryHubProps) {
                   <label className="text-[10px] text-text-secondary uppercase font-bold">Monthly Retainer ($ USD)</label>
                   <input
                     type="number"
+                    required
+                    min="1"
                     value={newProjectRetainer}
                     onChange={(e) => setNewProjectRetainer(Number(e.target.value))}
                     className="w-full bg-bg-dark border border-border-dim rounded-sm p-2 text-text-primary outline-none focus:border-brand"
