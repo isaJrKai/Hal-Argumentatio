@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { applyVerifiedBusinessDetails } from '../../src/services/landingGenerator';
 import { TRADE_TEMPLATES } from '../../src/components/landing/templates';
 import { generateLandingPageHtml } from '../../src/components/landing/htmlGenerator';
+import { generateLandingPageTsx } from '../../src/components/landing/tsxGenerator';
+import ts from 'typescript';
 
 const clonePlumbingTemplate = () =>
   JSON.parse(JSON.stringify(TRADE_TEMPLATES.plumbing));
@@ -100,6 +102,32 @@ describe('contractor landing page factual normalization', () => {
 
     expect(html).not.toContain('javascript:alert(1)');
     expect(html).not.toContain('<img src="javascript:');
+  });
+
+  it('exports syntactically valid React TSX and does not report failed lead submissions as successful', () => {
+    const config = JSON.parse(JSON.stringify(TRADE_TEMPLATES.roofing));
+    config.businessName = 'North Ridge Roofing';
+    config.city = 'Denver';
+    config.phone = '';
+    config.contractorId = 'contractor-test';
+    config.sections.lead_form.buttonText = 'Request a quote';
+    const source = generateLandingPageTsx(config);
+    const result = ts.transpileModule(source, {
+      reportDiagnostics: true,
+      compilerOptions: {
+        jsx: ts.JsxEmit.ReactJSX,
+        target: ts.ScriptTarget.ES2022,
+        module: ts.ModuleKind.ESNext
+      }
+    });
+    const errors = (result.diagnostics || []).filter(
+      diagnostic => diagnostic.category === ts.DiagnosticCategory.Error
+    );
+
+    expect(errors).toHaveLength(0);
+    expect(source).toContain("if (!res.ok) throw new Error");
+    expect(source).toContain("setSubmitError");
+    expect(source).not.toContain("Our on-duty dispatcher is routing a technician");
   });
 
 });
