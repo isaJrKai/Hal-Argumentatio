@@ -419,11 +419,10 @@ export async function executeBrainSynchronizedForecast(
     }
   }
 
-  const DEFAULT_TARGET_CAC = 145;
-  const isDefaultBenchmark = targetCac === null || !Number.isFinite(targetCac) || targetCac <= 0;
-  if (isDefaultBenchmark) {
-    targetCac = DEFAULT_TARGET_CAC;
+  if (targetCac === null || !Number.isFinite(targetCac) || targetCac <= 0) {
+    throw new Error('Forecast unavailable: configure a target CAC for this contractor before running budget guardrails. No benchmark CAC was substituted.');
   }
+  const isDefaultBenchmark = false;
 
   // Step 1: Ingest advertising history or calibrated live territory baseline
   const adsBaseline = await ingestAndCalibrateGoogleAds(contractorId, niche, city);
