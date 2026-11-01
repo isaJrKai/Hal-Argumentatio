@@ -6278,13 +6278,18 @@ app.get('/api/revenue/intelligence', authenticate, async (req, res) => {
     let totalRevenue = contractorRevenues.reduce((acc, r) => acc + r.amountUsd, 0);
 
     const attributedLeadIds = new Set(contractorAttributions.map(a => a.leadId));
-    const attributedLeadCount = contractorLeads.filter(lead => attributedLeadIds.has(lead.id)).length;
+    const attributedLeads = contractorLeads.filter(lead => attributedLeadIds.has(lead.id));
+    const attributedLeadCount = attributedLeads.length;
+    const attributedQualified = attributedLeads.filter(lead => ['qualified', 'sal', 'customer', 'closed_won'].includes(lead.status)).length;
+    const attributedSal = attributedLeads.filter(lead => ['sal', 'customer', 'closed_won'].includes(lead.status)).length;
+    const attributedCustomers = attributedLeads.filter(lead => ['customer', 'closed_won'].includes(lead.status)).length;
+    const attributedRevenue = contractorRevenues.reduce((sum, revenue) => sum + (attributedLeadIds.has(revenue.leadId) ? Number(revenue.amountUsd || 0) : 0), 0);
     const cpl = attributedLeadCount > 0 ? totalSpend / attributedLeadCount : null;
-    const costPerQualified = totalQualified > 0 && attributedLeadCount > 0 ? totalSpend / totalQualified : null;
-    const costPerSal = totalSal > 0 && attributedLeadCount > 0 ? totalSpend / totalSal : null;
-    const costPerAppointment = totalAppointments > 0 && attributedLeadCount > 0 ? totalSpend / totalAppointments : null;
-    const cac = totalCustomers > 0 && attributedLeadCount > 0 ? totalSpend / totalCustomers : null;
-    const roas = totalSpend > 0 ? totalRevenue / totalSpend : null;
+    const costPerQualified = attributedQualified > 0 ? totalSpend / attributedQualified : null;
+    const costPerSal = attributedSal > 0 ? totalSpend / attributedSal : null;
+    const costPerAppointment = null;
+    const cac = attributedCustomers > 0 ? totalSpend / attributedCustomers : null;
+    const roas = totalSpend > 0 && attributedRevenue > 0 ? attributedRevenue / totalSpend : null;
 
     // Dimensional: By Campaign
     const campaignMap: Record<string, { spend: number; impressions: number; clicks: number; leads: number; qualified: number; sal: number; customers: number; revenue: number }> = {};
