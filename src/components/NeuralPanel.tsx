@@ -563,7 +563,7 @@ export default function NeuralPanel() {
           </div>
           <div>
             <h1 className="text-xl font-bold text-text-primary tracking-tight flex items-center gap-2">
-              Neural Data Center
+              Territory Intelligence Graph
               <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold border uppercase ${
                 networkData.telemetry ? 'bg-green-500/10 text-green-400 border-green-500/20'
                   : isSyncing ? 'bg-amber-500/10 text-amber-400 border-amber-500/20'
@@ -607,7 +607,7 @@ export default function NeuralPanel() {
                 return (
                   <button key={sys.id} onClick={() => setActiveSubsystem(sys.id)} className={`w-full flex items-center gap-3 p-3 rounded-lg border transition-all text-left ${activeSubsystem === sys.id ? 'bg-bg-raised border-border-dim shadow-sm' : 'border-transparent hover:bg-bg-base text-text-secondary'}`}>
                     <div className={`p-1.5 rounded-md ${activeSubsystem === sys.id ? sys.bg : 'bg-bg-base'}`}><sys.icon className={`w-4 h-4 ${activeSubsystem === sys.id ? sys.color : 'text-text-tertiary'}`} /></div>
-                    <div><span className={`block text-sm font-bold ${activeSubsystem === sys.id ? 'text-text-primary' : ''}`}>{sys.label}</span><span className="block text-[10px] font-mono text-text-tertiary">{nodeCount} Synapses</span></div>
+                    <div><span className={`block text-sm font-bold ${activeSubsystem === sys.id ? 'text-text-primary' : ''}`}>{sys.label}</span><span className="block text-[10px] font-mono text-text-tertiary">{nodeCount} Connections</span></div>
                   </button>
                 );
               })}
