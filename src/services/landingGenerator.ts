@@ -204,7 +204,7 @@ export function applyVerifiedBusinessDetails(
   const city = details.city?.trim() || 'Service Area';
   const phone = details.phone?.trim() || '';
   const address = details.address?.trim() || '';
-  const tradeLabel = details.trade.replace(/_/g, ' ').replace(/\\b\\w/g, letter => letter.toUpperCase());
+  const tradeLabel = details.trade.replace(/_/g, ' ').replace(/\b\w/g, letter => letter.toUpperCase());
   const promptText = details.prompt.trim();
   const hasCuratedSpecialistTemplate = ['sump_pump', 'waterproofing', 'flood_restoration', 'emergency_dispatch'].includes(details.trade);
 
