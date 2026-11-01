@@ -220,6 +220,8 @@ export default function OverviewPanel({
 
   useEffect(() => {
     let isMounted = true;
+    setForecastMetadata(null);
+    setForecastChartData([]);
     const fetchForecast = async (retryCount = 0) => {
       try {
         const storedToken = localStorage.getItem('halbiz_auth_token') || localStorage.getItem('token');
@@ -241,6 +243,13 @@ export default function OverviewPanel({
           })
         });
         if (!res.ok) {
+          if ([400, 401, 409].includes(res.status)) {
+            if (isMounted) {
+              setForecastMetadata(null);
+              setForecastChartData([]);
+            }
+            return;
+          }
           throw new Error(`TimesFM endpoint returned HTTP ${res.status}`);
         }
         const data = await res.json();
@@ -269,7 +278,7 @@ export default function OverviewPanel({
     };
     fetchForecast();
     return () => { isMounted = false; };
-  }, [activeCity, activeNiche, workspaceConfig.budgetMultiplier, regionalProfile.territoryMetrics.typicalCPC]);
+  }, [activeCity, activeNiche, workspaceConfig.targetCAC, workspaceConfig.targetCACConfigured]);
 
   // Activities list dynamic
   const displayActivities = leads.slice(0, 5).map((lead) => ({
