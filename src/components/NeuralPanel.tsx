@@ -546,10 +546,10 @@ export default function NeuralPanel() {
   };
 
   const SUBSYSTEMS = [
-    { id: 'core_bayes', label: 'Bayesian Base', icon: Network, color: 'text-amber-500', bg: 'bg-amber-500/10' },
-    { id: 'core_objection', label: 'Objection Graph', icon: Shield, color: 'text-amber-500', bg: 'bg-amber-500/10' },
+    { id: 'core_bayes', label: 'Outcome Analysis', icon: Network, color: 'text-amber-500', bg: 'bg-amber-500/10' },
+    { id: 'core_objection', label: 'Lead Signals', icon: Shield, color: 'text-amber-500', bg: 'bg-amber-500/10' },
     { id: 'core_niche', label: 'Niche Calibration', icon: Database, color: 'text-amber-500', bg: 'bg-amber-500/10' },
-    { id: 'core_timesfm', label: 'TimesFM Prediction Layer', icon: TrendingUp, color: 'text-amber-500', bg: 'bg-amber-500/10' }
+    { id: 'core_timesfm', label: 'TimesFM 2.5 Adapter', icon: TrendingUp, color: 'text-amber-500', bg: 'bg-amber-500/10' }
   ];
 
   return (
@@ -563,10 +563,10 @@ export default function NeuralPanel() {
             <h1 className="text-xl font-bold text-text-primary tracking-tight flex items-center gap-2">
               Neural Data Center
               <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-green-500/10 text-green-400 border border-green-500/20 uppercase">
-                Active / Online
+                {isSyncing ? 'Syncing' : networkData.telemetry ? 'Data synced' : 'Unavailable'}
               </span>
             </h1>
-            <p className="text-sm text-text-secondary mt-1">Deep Learning Core & Autonomous Policy Visualizer</p>
+            <p className="text-sm text-text-secondary mt-1">{activeNiche} · {activeCity} — tenant-scoped leads and recorded outcomes</p>
           </div>
         </div>
         <div className="flex items-center gap-3">
@@ -582,7 +582,7 @@ export default function NeuralPanel() {
           </div>
           <button onClick={fetchNetwork} className="flex items-center gap-2 px-4 py-2 bg-bg-overlay border border-border-dim hover:border-accent text-text-secondary hover:text-accent rounded-lg text-sm font-medium transition-colors">
             <RefreshCw className={`w-4 h-4 ${isSyncing ? 'animate-spin' : ''}`} />
-            Re-Calibrate
+            Refresh Graph
           </button>
         </div>
       </header>
@@ -590,11 +590,11 @@ export default function NeuralPanel() {
       <div className="flex-1 flex overflow-hidden">
         <div className="w-72 border-r border-border-dim bg-bg-overlay overflow-y-auto shrink-0 flex flex-col z-20 shadow-xl">
           <div className="p-4 border-b border-border-dim">
-            <h3 className="text-xs font-mono font-bold text-text-tertiary uppercase tracking-wider mb-3">Core Neural Hubs</h3>
+            <h3 className="text-xs font-mono font-bold text-text-tertiary uppercase tracking-wider mb-3">Core Systems</h3>
             <div className="space-y-2">
               {SUBSYSTEMS.map(sys => {
                 const nodeCount = (networkData.nodes || []).filter(n => 
-                  n.id === sys.id || (networkData.links || []).some(l => (l.source.id === sys.id && l.target.id === n.id) || (l.target.id === sys.id && l.source.id === n.id))
+                  n.id === sys.id || (networkData.links || []).some(l => ((typeof l.source === 'string' ? l.source : l.source.id) === sys.id && (typeof l.target === 'string' ? l.target : l.target.id) === n.id) || ((typeof l.target === 'string' ? l.target : l.target.id) === sys.id && (typeof l.source === 'string' ? l.source : l.source.id) === n.id))
                 ).length;
                 return (
                   <button key={sys.id} onClick={() => setActiveSubsystem(sys.id)} className={`w-full flex items-center gap-3 p-3 rounded-lg border transition-all text-left ${activeSubsystem === sys.id ? 'bg-bg-raised border-border-dim shadow-sm' : 'border-transparent hover:bg-bg-base text-text-secondary'}`}>
@@ -606,11 +606,11 @@ export default function NeuralPanel() {
             </div>
           </div>
           <div className="p-4 space-y-4">
-            <h3 className="text-xs font-mono font-bold text-text-tertiary uppercase tracking-wider">Matrix Live Telemetry</h3>
+            <h3 className="text-xs font-mono font-bold text-text-tertiary uppercase tracking-wider">Territory Data</h3>
             <div className="bg-bg-base border border-border-dim rounded-lg p-4 space-y-3">
-              <div className="flex justify-between items-center"><span className="text-[10px] font-mono text-text-secondary">Epoch</span><span className="text-xs font-mono font-bold text-text-primary">{learningMetrics?.epoch ?? 'Not measured'}</span></div>
-              <div className="flex justify-between items-center"><span className="text-[10px] font-mono text-text-secondary">Digested Outcomes</span><span className="text-xs font-mono font-bold text-accent">{learningMetrics?.outcomesDigested ?? '0'}</span></div>
-              <div className="flex justify-between items-center"><span className="text-[10px] font-mono text-text-secondary">Global Confidence (not available)</span><span className="text-xs font-mono font-bold text-green-400">{learningMetrics?.confidenceGlobal == null ? 'Not measured' : `${Number(learningMetrics.confidenceGlobal).toFixed(1)}%`}</span></div>
+              <div className="flex justify-between items-center"><span className="text-[10px] font-mono text-text-secondary" >Learning Epoch</span><span className="text-xs font-mono font-bold text-text-primary">{learningMetrics?.epoch ?? 'Not measured'}</span></div>
+              <div className="flex justify-between items-center"><span className="text-[10px] font-mono text-text-secondary" >Matched Outcomes</span><span className="text-xs font-mono font-bold text-accent">{learningMetrics?.outcomesDigested ?? '0'}</span></div>
+              <div className="flex justify-between items-center"><span className="text-[10px] font-mono text-text-secondary" >Model Confidence</span><span className="text-xs font-mono font-bold text-green-400">{learningMetrics?.confidenceGlobal == null ? 'Not measured' : `${Number(learningMetrics.confidenceGlobal).toFixed(1)}%`}</span></div>
               <div className="flex justify-between items-center"><span className="text-[10px] font-mono text-text-secondary">Total Active Nodes</span><span className="text-xs font-mono font-bold text-text-primary">{(networkData.nodes || []).length}</span></div>
             </div>
           </div>
