@@ -87,15 +87,15 @@ export default function ${componentName}() {
           <div className="flex items-center gap-3">
             <div className="hidden sm:block text-right">
               <div className="text-[10px] uppercase font-bold text-amber-400 tracking-wider">Contact the Business</div>
-              <div className="text-sm font-black text-white">${phone}</div>
+              <div className="text-sm font-black text-white">${phone || 'Use the quote form'}</div>
             </div>
             <a
-              href="tel:${phone.replace(/[^0-9+]/g, '')}"
+              href="${phone.replace(/[^0-9+]/g, '') ? 'tel:' + phone.replace(/[^0-9+]/g, '') : '#lead-form'}"
               className="bg-amber-500 hover:bg-amber-400 text-slate-950 font-extrabold px-4 py-2.5 rounded-xl text-xs sm:text-sm transition flex items-center gap-2 shadow-lg"
             >
               <span>📞</span>
               <span className="hidden sm:inline">${sections.header.ctaText}</span>
-              <span className="sm:hidden">\${phone ? 'Call Now' : 'Request a Quote'}</span>
+              <span className="sm:hidden">${phone ? 'Call Now' : 'Request a Quote'}</span>
             </a>
           </div>
         </div>
@@ -140,8 +140,9 @@ export default function ${componentName}() {
                     </p>
                   </div>
                 ) : (
-                  {submitError && <p role="alert" className="text-sm text-rose-400 mb-3">{submitError}</p>}
-                  <form onSubmit={handleSubmit} className="space-y-3.5">
+                  <>
+                    {submitError && <p role="alert" className="text-sm text-rose-400 mb-3">{submitError}</p>}
+                    <form onSubmit={handleSubmit} className="space-y-3.5">
                     <div>
                       <label className="block text-[11px] font-semibold text-slate-300 mb-1">Full Name *</label>
                       <input
@@ -182,7 +183,8 @@ export default function ${componentName}() {
                     >
                       {isSubmitting ? 'Sending Request...' : '${sections.lead_form?.buttonText || '⚡ Dispatch Technician Now'}'}
                     </button>
-                  </form>
+                    </form>
+                  </>
                 )}
               </div>
             </div>
