@@ -1436,18 +1436,12 @@ app.get('/api/leads', authenticate, async (req, res) => {
     });
     res.json(decryptedLeads);
   } catch (err: any) {
-    try {
-      const localLeads = db.getLeads(contractorId);
-      // The in-memory fallback has no durable grounding audit history, so never
-      // present its legacy VERIFIED flag as proof of a current live probe.
-      return res.json(localLeads.map(lead => ({
-        ...lead,
-        verificationStatus: lead.verificationStatus === 'VERIFIED' ? 'UNVERIFIED_STAGING' : lead.verificationStatus,
-        dnsVerified: lead.verificationStatus === 'VERIFIED' ? false : lead.dnsVerified
-      })));
-    } catch (localErr) {
-      res.json([]);
-    }
+    console.error('Failed to fetch tenant leads from authoritative PostgreSQL:', err);
+    return res.status(503).json({
+      success: false,
+      code: 'DATABASE_UNAVAILABLE',
+      error: 'Neon/PostgreSQL is unavailable. HAL did not substitute stale local JSON data.'
+    });
   }
 });
 
