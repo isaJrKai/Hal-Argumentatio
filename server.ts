@@ -1684,6 +1684,7 @@ app.post('/api/leads/:id/verify-grounding', authenticate, async (req, res) => {
     const [updatedLead] = await pgDb.update(leads).set({
       verificationStatus: verification.status,
       dnsVerified: verification.evidence.dnsResolved,
+      groundingEvidence: verification.evidence,
       updatedAt: new Date()
     }).where(and(eq(leads.id, leadId), eq(leads.contractorId, contractorId))).returning();
 
@@ -1725,6 +1726,7 @@ app.post('/api/leads/verify-all', authenticate, async (req, res) => {
       await pgDb.update(leads).set({
         verificationStatus: verification.status,
         dnsVerified: verification.evidence.dnsResolved,
+        groundingEvidence: verification.evidence,
         updatedAt: new Date()
       }).where(and(eq(leads.id, lead.id), eq(leads.contractorId, contractorId)));
 
@@ -2600,6 +2602,7 @@ app.post('/api/leads/ingest', authenticate, async (req, res) => {
         sentimentScore: null,
         verificationStatus: (hl as any).verificationStatus || 'UNVERIFIED_STAGING',
         dnsVerified: (hl as any).dnsVerified !== undefined ? Boolean((hl as any).dnsVerified) : false,
+        groundingEvidence: (hl as any).groundingEvidence || null,
       }).returning();
 
       // 2. Add lead creation event
@@ -2637,6 +2640,7 @@ app.post('/api/leads/ingest', authenticate, async (req, res) => {
         isSynthetic: Boolean(hl.isSynthetic),
         verificationStatus: (hl as any).verificationStatus || 'UNVERIFIED_STAGING',
         dnsVerified: (hl as any).dnsVerified !== undefined ? Boolean((hl as any).dnsVerified) : false,
+        groundingEvidence: (hl as any).groundingEvidence || null,
       });
 
       addedItems.push(addedLead);
@@ -2714,6 +2718,7 @@ app.post('/api/leads/purge-and-replace', authenticate, async (req, res) => {
         sentimentScore: null,
         verificationStatus: (hl as any).verificationStatus || 'UNVERIFIED_STAGING',
         dnsVerified: (hl as any).dnsVerified !== undefined ? Boolean((hl as any).dnsVerified) : false,
+        groundingEvidence: (hl as any).groundingEvidence || null,
       }).returning();
 
       db.addLead({
@@ -2741,6 +2746,7 @@ app.post('/api/leads/purge-and-replace', authenticate, async (req, res) => {
         sentimentScore: null,
         verificationStatus: (hl as any).verificationStatus || 'UNVERIFIED_STAGING',
         dnsVerified: (hl as any).dnsVerified !== undefined ? Boolean((hl as any).dnsVerified) : false,
+        groundingEvidence: (hl as any).groundingEvidence || null,
       });
 
       // Add a creation event for the newly harvested lead
@@ -3408,6 +3414,7 @@ app.post('/api/missions', authenticate, async (req, res) => {
             outreachStrategy: hl.outreachStrategy,
             verificationStatus: (hl as any).verificationStatus || (hl.isSynthetic ? 'FABRICATED_REJECTED' : 'UNVERIFIED_STAGING'),
             dnsVerified: (hl as any).dnsVerified !== undefined ? Boolean((hl as any).dnsVerified) : false,
+            groundingEvidence: (hl as any).groundingEvidence || null,
           }).returning();
 
           await pgDb.insert(leadEvents).values({
@@ -8644,6 +8651,7 @@ async function startServer() {
           reviewCount: null,
           verificationStatus: (hl as any).verificationStatus || (hl.isSynthetic ? 'FABRICATED_REJECTED' : 'UNVERIFIED_STAGING'),
           dnsVerified: (hl as any).dnsVerified !== undefined ? Boolean((hl as any).dnsVerified) : false,
+          groundingEvidence: (hl as any).groundingEvidence || null,
         }).returning();
 
         // Add lead creation event
