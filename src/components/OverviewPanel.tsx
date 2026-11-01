@@ -262,7 +262,7 @@ export default function OverviewPanel({
             demandUpper: c.upperBound,
             observedCpl: c.observedCplUsd,
             isBreach: c.isBreachingCplLimit,
-            weatherSurge: c.weatherSurgeFactor
+            weatherSurge: 1
           }));
           setForecastChartData(formatted);
         }
@@ -508,14 +508,14 @@ export default function OverviewPanel({
           </div>
         </section>
 
-        {/* Evidence-gated demand scenario */}
+        {/* Evidence-gated TimesFM demand forecast */}
         <section className={`border rounded-xl p-5 flex flex-col justify-between ${cardBg} lg:col-span-7 md:col-span-2 col-span-1 min-w-0 transition-all`}>
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3 pb-3 border-b border-border-dim/40">
             <div>
               <div className="flex items-center gap-2">
-                <h3 className="text-sm font-semibold tracking-tight text-text-primary">12-Week Demand Scenario</h3>
+                <h3 className="text-sm font-semibold tracking-tight text-text-primary">12-Week Demand Forecast</h3>
                 <span className="px-2 py-0.5 bg-bg-subtle text-text-secondary font-sans text-xs font-medium rounded-md flex items-center gap-1 border border-border-dim">
-                  <Activity className="w-3 h-3 text-accent" /> {forecastMetadata ? 'Active scenario' : 'Baseline projection'}
+                  <Activity className="w-3 h-3 text-accent" /> {forecastMetadata ? 'Forecast ready' : 'Awaiting evidence'}
                 </span>
                 {forecastMetadata?.budgetGuardrails?.breachDetected && (
                   <span className="px-2 py-0.5 bg-danger-dim text-danger font-sans text-xs font-medium rounded-md flex items-center gap-1 border border-danger/30 animate-pulse">
@@ -523,7 +523,7 @@ export default function OverviewPanel({
                   </span>
                 )}
               </div>
-              <p className="text-xs text-text-tertiary mt-0.5">Empirical seasonal projection based on territory benchmarks</p>
+              <p className="text-xs text-text-tertiary mt-0.5">TimesFM 2.5 forecast from complete weekly conversion history; index is relative to recent history.</p>
             </div>
 
             <div className="text-xs font-mono text-text-tertiary px-2.5 py-1 rounded-md border border-border-dim shrink-0">
@@ -548,10 +548,10 @@ export default function OverviewPanel({
             <div className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-bg-base border border-border-dim text-[10px] font-mono">
               <CloudRain className={`w-3.5 h-3.5 shrink-0 ${forecastMetadata?.weatherTrigger?.hazardCategory !== 'STABLE_SEASONAL' ? 'text-warning' : 'text-info'}`} />
               <div className="truncate">
-                <span className="text-text-tertiary block text-[9px] uppercase font-sans">Weather Trigger</span>
+                <span className="text-text-tertiary block text-[9px] uppercase font-sans">Live Weather Context</span>
                 <span className="text-text-primary font-semibold truncate">
                   {forecastMetadata?.weatherTrigger 
-                    ? `${forecastMetadata.weatherTrigger.hazardCategory.replaceAll('_', ' ')} scenario (${forecastMetadata.weatherTrigger.demandSurgeMultiplier}x)`
+                    ? `${forecastMetadata.weatherTrigger.hazardCategory.replaceAll('_', ' ')} signal · context only`
                     : 'No live weather reading'}
                 </span>
               </div>
@@ -564,7 +564,7 @@ export default function OverviewPanel({
                 <span className="text-text-primary font-semibold truncate">
                   {forecastMetadata?.budgetGuardrails?.breachDetected
                     ? `Recommendation: ${forecastMetadata.budgetGuardrails.suggestedAction}; no budget changed`
-                    : (forecastMetadata?.budgetGuardrails?.maxAllowableCpl != null ? `Scenario threshold ≤${forecastMetadata.budgetGuardrails.maxAllowableCpl} CPL; no automatic action`  : 'Not evaluated')}
+                    : (forecastMetadata?.budgetGuardrails?.maxAllowableCpl != null ? `35% target-CAC rule-of-thumb CPL ceiling: ${forecastMetadata.budgetGuardrails.maxAllowableCpl}; advisory only`  : 'Not evaluated')}
                 </span>
               </div>
             </div>
@@ -647,9 +647,9 @@ export default function OverviewPanel({
                         {item.weatherSurge && item.weatherSurge > 1.0 && (
                           <div className="flex items-center justify-between text-[9.5px] pt-1 border-t border-border-dim/50 text-warning">
                             <span className="flex items-center gap-1">
-                              <CloudRain className="w-2.5 h-2.5" /> Weather scenario:
+                              <CloudRain className="w-2.5 h-2.5" /> Weather context:
                             </span>
-                            <span className="font-bold">+{Math.round((item.weatherSurge - 1) * 100)}% Surge</span>
+                            <span className="font-bold">Context only</span>
                           </div>
                         )}
                       </div>
@@ -678,7 +678,7 @@ export default function OverviewPanel({
               <span className="font-medium text-text-secondary whitespace-nowrap">Demand Index (relative to recent history; q10–q90 model range)</span>
             </div>
             <div className="min-w-0 flex items-center">
-              <span className="text-text-tertiary text-xs truncate" title={forecastMetadata?.weatherTrigger?.strategicDirective || 'Standard seasonal baseline active.'}>
+              <span className="text-text-tertiary text-xs truncate" title={forecastMetadata?.weatherTrigger?.strategicDirective || 'Weather is contextual only; no demand multiplier is applied.'}>
                 {forecastMetadata?.weatherTrigger?.strategicDirective || 'Standard seasonal baseline active.'}
               </span>
             </div>
