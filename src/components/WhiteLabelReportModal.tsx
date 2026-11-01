@@ -81,8 +81,8 @@ export default function WhiteLabelReportModal({ lead, isOpen, onClose }: WhiteLa
     const row = [
       targetName,
       ownerName,
-      lead?.city || activeCity,
-      lead?.serviceType || activeNiche,
+      lead ? (lead.city || 'Not provided') : activeCity,
+      lead ? (lead.serviceType || 'Not provided') : activeNiche,
       website || 'Not provided',
       lead?.phone || '',
       lead?.email || '',
@@ -92,8 +92,8 @@ export default function WhiteLabelReportModal({ lead, isOpen, onClose }: WhiteLa
       rating ?? 'Not measured',
       reviews ?? 'Not measured',
       ltv ?? 'Not measured',
-      lead?.status || 'new',
-      lead?.notes || activeIndustry.outreachAngle,
+      lead?.status || 'Not applicable',
+      lead?.notes || 'No lead-specific notes recorded',
       lead?.outreachStrategy || ''
     ].map(cell => {
       const cellStr = cell === null || cell === undefined ? '' : String(cell);
