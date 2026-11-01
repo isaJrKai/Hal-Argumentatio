@@ -257,20 +257,50 @@ export default function SettingsPanel({
   const handleSyncToPostgres = async () => {
     setPostgresSyncing(true);
     try {
-      const res = await fetch('/api/system/postgres-sync', {
+      const headers = {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      };
+      const previewResponse = await fetch('/api/system/postgres-sync', {
         method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}` 
-        }
+        headers,
+        body: JSON.stringify({ mode: 'preview' })
       });
-      const data = await res.json();
-      if (data.success) {
-        setPostgresSuccess(`Successfully synchronized ${data.syncedLeads} leads and neural weights to Neon PostgreSQL!`);
-      } else {
-        setPostgresSuccess(`Sync response: ${data.message || data.error}`);
+      const preview = await previewResponse.json();
+      if (!previewResponse.ok || !preview.success) {
+        throw new Error(preview.error || preview.message || 'Could not preview the Neon sync.');
       }
-      setTimeout(() => setPostgresSuccess(null), 6000);
+
+      const leadsToInsert = Number(preview.leadsToInsert || 0);
+      const winLossToInsert = Number(preview.winLossToInsert || 0);
+      if (leadsToInsert === 0 && winLossToInsert === 0) {
+        setPostgresSuccess('Neon preview complete: no missing lead or win/loss records were found. No data was changed.');
+        setTimeout(() => setPostgresSuccess(null), 8000);
+        return;
+      }
+
+      const approved = window.confirm(
+        `Neon sync preview:\\n\\n${leadsToInsert} missing leads\\n${winLossToInsert} missing win/loss records\\n\\nOnly missing IDs will be inserted. Existing Neon rows will not be overwritten. Unknown intelligence metrics will remain blank. Continue?`
+      );
+      if (!approved) {
+        setPostgresSuccess('Neon sync cancelled. No data was changed.');
+        setTimeout(() => setPostgresSuccess(null), 5000);
+        return;
+      }
+
+      const commitResponse = await fetch('/api/system/postgres-sync', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ mode: 'commit', confirm: true })
+      });
+      const result = await commitResponse.json();
+      if (!commitResponse.ok || !result.success) {
+        throw new Error(result.error || result.message || 'Neon additive sync failed.');
+      }
+      setPostgresSuccess(
+        `Additive sync complete: inserted ${result.syncedLeads} leads and ${result.syncedWinLoss} win/loss records. Existing Neon records were not overwritten.`
+      );
+      setTimeout(() => setPostgresSuccess(null), 10000);
     } catch (err: any) {
       setPostgresSuccess(`Sync failed: ${err.message}`);
     } finally {
