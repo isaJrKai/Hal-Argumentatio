@@ -5152,7 +5152,7 @@ app.post('/api/ai/test-timesfm', authenticate, async (req, res) => {
       city: targetCity,
       niche: targetNiche,
       horizonWeeks: weeks,
-      applyGuardrails: applyGuardrails ?? true,
+      applyGuardrails: applyGuardrails ?? false,
       targetCac: resolvedTargetCac
     });
 
