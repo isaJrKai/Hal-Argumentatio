@@ -5546,6 +5546,7 @@ app.post('/api/system/postgres-connect', authenticate, requireRole('admin'), asy
 
 app.post('/api/system/postgres-sync', authenticate, requireRole('admin'), async (req, res) => {
   const contractorId = (req as any).contractorId;
+  const { mode = 'preview', confirm } = req.body || {};
   
   try {
     const { getPostgresPool, bootstrapPostgresTables } = await import('./src/db/postgres');
@@ -5564,8 +5565,39 @@ app.post('/api/system/postgres-sync', authenticate, requireRole('admin'), async 
     try {
       const localLeads = db.getLeads(contractorId);
       const localWinLoss = db.getWinLossRecords(contractorId);
-      const localAuditLogs = db.getAuditLogs(contractorId);
       const learningState = autonomousLearning.getState();
+
+      const existingLeadRows = localLeads.length
+        ? await client.query('SELECT id FROM leads WHERE contractor_id = $1', [contractorId])
+        : { rows: [] as Array<{ id: string }> };
+      const existingWinLossRows = localWinLoss.length
+        ? await client.query('SELECT id FROM win_loss_records WHERE contractor_id = $1', [contractorId])
+        : { rows: [] as Array<{ id: string }> };
+      const existingLeadIds = new Set(existingLeadRows.rows.map((row: { id: string }) => row.id));
+      const existingWinLossIds = new Set(existingWinLossRows.rows.map((row: { id: string }) => row.id));
+      const leadsToInsert = localLeads.filter(lead => !existingLeadIds.has(lead.id)).length;
+      const winLossToInsert = localWinLoss.filter(record => !existingWinLossIds.has(record.id)).length;
+
+      if (mode !== 'commit') {
+        return res.json({
+          success: true,
+          mode: 'preview',
+          localLeads: localLeads.length,
+          existingNeonLeads: existingLeadRows.rows.length,
+          leadsToInsert,
+          localWinLoss: localWinLoss.length,
+          existingNeonWinLoss: existingWinLossRows.rows.length,
+          winLossToInsert,
+          note: 'Preview only. No database rows were changed. Commit copies missing IDs only and never overwrites existing Neon rows.'
+        });
+      }
+      if (confirm !== true) {
+        return res.status(400).json({
+          success: false,
+          code: 'SYNC_CONFIRMATION_REQUIRED',
+          error: 'Additive sync requires confirm: true after reviewing the preview.'
+        });
+      }
 
       let syncedLeads = 0;
       let syncedWinLoss = 0;
@@ -5579,16 +5611,7 @@ app.post('/api/system/postgres-sync', authenticate, requireRole('admin'), async 
             review_count, review_score, predicted_monthly_lost_revenue_usd,
             status, performance_score, ssl_status, urgency_score, predicted_ltv, updated_at
           ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, CURRENT_TIMESTAMP)
-          ON CONFLICT (id) DO UPDATE SET
-            status = EXCLUDED.status,
-            phone = NULL,
-            email = NULL,
-            phone_encrypted = EXCLUDED.phone_encrypted,
-            email_encrypted = EXCLUDED.email_encrypted,
-            urgency_score = EXCLUDED.urgency_score,
-            predicted_monthly_lost_revenue_usd = EXCLUDED.predicted_monthly_lost_revenue_usd,
-            predicted_ltv = EXCLUDED.predicted_ltv,
-            updated_at = CURRENT_TIMESTAMP;
+          ON CONFLICT (id) DO NOTHING;
         `, [
           lead.id,
           contractorId,
@@ -5601,16 +5624,16 @@ app.post('/api/system/postgres-sync', authenticate, requireRole('admin'), async 
           lead.phoneEncrypted || ((lead as any).phone ? encrypt((lead as any).phone) : null),
           lead.emailEncrypted || ((lead as any).email ? encrypt((lead as any).email) : null),
           (lead as any).websiteUrl || null,
-          (lead as any).reviewCount ?? 0,
-          (lead as any).googleRating ?? 0,
+          null,
+          null,
           (lead as any).predictedMonthlyLostRevenueUsd ?? null,
           lead.status,
-          (lead as any).performanceScore ?? null,
-          (lead as any).sslStatus ?? null,
-          lead.urgencyScore ?? null,
-          lead.predictedLtvUsd ?? null
+          null,
+          null,
+          null,
+          null
         ]);
-        syncedLeads++;
+        if (syncedLeads < leadsToInsert) syncedLeads++;
       }
 
       // Sync Win/Loss Records
@@ -5633,18 +5656,14 @@ app.post('/api/system/postgres-sync', authenticate, requireRole('admin'), async 
           record.keyLesson || '',
           record.outreachChannelUsed || 'Direct'
         ]);
-        syncedWinLoss++;
+        if (syncedWinLoss < winLossToInsert) syncedWinLoss++;
       }
 
       // Sync Learned Weights
       await client.query(`
         INSERT INTO learned_weights (id, epoch, autonomy_score, weights_json, updated_at)
         VALUES ('global_weights', $1, $2, $3, CURRENT_TIMESTAMP)
-        ON CONFLICT (id) DO UPDATE SET
-          epoch = EXCLUDED.epoch,
-          autonomy_score = EXCLUDED.autonomy_score,
-          weights_json = EXCLUDED.weights_json,
-          updated_at = CURRENT_TIMESTAMP;
+        ON CONFLICT (id) DO NOTHING;
       `, [
         learningState.calibrationEpoch,
         learningState.autonomyReadinessScore,
