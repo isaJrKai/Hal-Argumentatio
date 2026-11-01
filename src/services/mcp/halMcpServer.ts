@@ -21,7 +21,7 @@ import {
   notifications,
   revenueRecommendations
 } from '../../db/schema.ts';
-import { db as localDb, decrypt } from '../../db/db.ts';
+import { decrypt } from '../../db/db.ts';
 import { eq, and, desc, sql, like, or } from 'drizzle-orm';
 
 // Common annotations required for all read-only MCP tools
@@ -86,22 +86,22 @@ function sanitizeProspect(lead: any) {
     phone: phone && !phone.includes('[ENCRYPTED]') ? phone : (lead.phoneEncrypted ? '[DECRYPTED]' : null),
     websiteUrl: lead.websiteUrl || null,
     gmbListingUrl: lead.gmbListingUrl || null,
-    reviewCount: lead.reviewCount ?? 0,
-    reviewScore: lead.reviewScore ?? 0,
-    predictedMonthlyLostRevenueUsd: lead.predictedMonthlyLostRevenueUsd ?? 0,
+    reviewCount: lead.reviewCount ?? null,
+    reviewScore: lead.reviewScore ?? null,
+    predictedMonthlyLostRevenueUsd: lead.predictedMonthlyLostRevenueUsd ?? null,
     status: lead.status,
     source: lead.source,
-    sourceType: lead.sourceType || 'live_harvest',
-    verificationStatus: lead.verificationStatus || 'VERIFIED',
+    sourceType: lead.sourceType || 'unknown',
+    verificationStatus: lead.verificationStatus || 'UNVERIFIED_STAGING',
     dnsVerified: Boolean(lead.dnsVerified),
-    performanceScore: lead.performanceScore ?? 50,
-    sslStatus: lead.sslStatus || 'secured',
-    mobileFriendly: lead.mobileFriendly ?? true,
-    urgencyScore: lead.urgencyScore ?? 5.0,
-    predictedLtv: lead.predictedLtv ?? lead.predictedLtvUsd ?? 5000,
-    seoScore: lead.seoScore ?? 50,
-    googleRating: lead.googleRating ?? 0,
-    sentimentScore: lead.sentimentScore ?? 5.0,
+    performanceScore: lead.performanceScore ?? null,
+    sslStatus: lead.sslStatus ?? null,
+    mobileFriendly: lead.mobileFriendly ?? null,
+    urgencyScore: lead.urgencyScore ?? null,
+    predictedLtv: lead.predictedLtv ?? lead.predictedLtvUsd ?? null,
+    seoScore: lead.seoScore ?? null,
+    googleRating: lead.googleRating ?? null,
+    sentimentScore: lead.sentimentScore ?? null,
     notes: lead.notes || null,
     createdAt: lead.createdAt,
     updatedAt: lead.updatedAt
@@ -196,30 +196,12 @@ export function buildHalMcpServer(): McpServer {
         }
       }
 
-      // Fallback row counts if postgres is not connected or env vars missing
       if (!dbConnected) {
-        const localLeads = localDb.getLeads(contractorId) || [];
-        const localCampaigns = localDb.getCampaigns(contractorId) || [];
-        const localForecasts = localDb.getForecasts(contractorId) || [];
-        const localRecs = localDb.getRecommendations(contractorId) || [];
-        const localMissions = localDb.getMissions(contractorId) || [];
-
-        counts = {
-          prospects: localLeads.length,
-          campaigns: localCampaigns.length,
-          forecasts: localForecasts.length,
-          recommendations: localRecs.length,
-          missions: localMissions.length,
-          client_projects: 0,
-          outreach_sequences: 0,
-          audit_logs: 0,
-          revenue_records: 0,
-          win_loss_debriefs: 0,
-          operating_loops: 0,
-          diagnostic_incidents: 0,
-          lab_artifacts: 0,
-          scheduled_tasks: 0
-        };
+        return formatMcpError(
+          dbErrorMessage
+            ? `Neon/PostgreSQL is unavailable; HAL did not substitute local data. ${dbErrorMessage}`
+            : 'Neon/PostgreSQL is not configured. HAL MCP status is unavailable until the authoritative database is connected.'
+        );
       }
 
       return formatMcpResponse({
@@ -262,8 +244,8 @@ export function buildHalMcpServer(): McpServer {
           .from(leads)
           .where(eq(leads.contractorId, contractorId))
           .orderBy(desc(leads.createdAt));
-      } catch {
-        allLeads = localDb.getLeads(contractorId) || [];
+      } catch (err) {
+        throw err;
       }
 
       let sanitized = allLeads.map(sanitizeProspect);
@@ -322,9 +304,8 @@ export function buildHalMcpServer(): McpServer {
           )
           .limit(1);
         target = found;
-      } catch {
-        const localLeads = localDb.getLeads(contractorId) || [];
-        target = localLeads.find(l => l.id === id);
+      } catch (err) {
+        throw err;
       }
 
       if (!target) {
@@ -357,8 +338,8 @@ export function buildHalMcpServer(): McpServer {
           .select()
           .from(leads)
           .where(eq(leads.contractorId, contractorId));
-      } catch {
-        allLeads = localDb.getLeads(contractorId) || [];
+      } catch (err) {
+        throw err;
       }
 
       const counts: Record<string, number> = {};
@@ -371,7 +352,7 @@ export function buildHalMcpServer(): McpServer {
         else if (group_by === 'niche') key = lead.niche || lead.serviceType || 'general';
         else if (group_by === 'city') key = lead.city || 'unspecified';
         else if (group_by === 'source') key = lead.source || 'manual';
-        else if (group_by === 'verification_status') key = lead.verificationStatus || 'VERIFIED';
+        else if (group_by === 'verification_status') key = lead.verificationStatus || 'UNVERIFIED_STAGING';
 
         counts[key] = (counts[key] || 0) + 1;
         totalValueUsd += Number(lead.predictedLtv || lead.predictedLtvUsd || 0);
@@ -450,8 +431,8 @@ export function buildHalMcpServer(): McpServer {
           .from(campaigns)
           .where(eq(campaigns.contractorId, contractorId))
           .orderBy(desc(campaigns.createdAt));
-      } catch {
-        records = localDb.getCampaigns(contractorId) || [];
+      } catch (err) {
+        throw err;
       }
 
       const total = records.length;
@@ -489,8 +470,8 @@ export function buildHalMcpServer(): McpServer {
           .from(missions)
           .where(eq(missions.contractorId, contractorId))
           .orderBy(desc(missions.createdAt));
-      } catch {
-        records = localDb.getMissions(contractorId) || [];
+      } catch (err) {
+        throw err;
       }
 
       const total = records.length;
@@ -698,8 +679,8 @@ export function buildHalMcpServer(): McpServer {
           .from(revenueRecommendations)
           .where(eq(revenueRecommendations.contractorId, contractorId))
           .orderBy(desc(revenueRecommendations.createdAt));
-      } catch {
-        records = localDb.getRecommendations(contractorId) || [];
+      } catch (err) {
+        throw err;
       }
 
       const total = records.length;
@@ -737,8 +718,8 @@ export function buildHalMcpServer(): McpServer {
           .from(forecasts)
           .where(eq(forecasts.contractorId, contractorId))
           .orderBy(desc(forecasts.createdAt));
-      } catch {
-        records = localDb.getForecasts(contractorId) || [];
+      } catch (err) {
+        throw err;
       }
 
       const total = records.length;
