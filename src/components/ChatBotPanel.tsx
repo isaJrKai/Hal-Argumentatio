@@ -80,7 +80,7 @@ export const ChatBotPanel: React.FC<Props> = ({ token }) => {
 
   useEffect(() => {
     if (activeConversationId) loadConversation(activeConversationId);
-    else setMessages([]);
+    else { historyRequestRef.current += 1; setMessages([]); }
   }, [activeConversationId, loadConversation]);
 
   useEffect(() => { endRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages, loading]);
