@@ -6,6 +6,8 @@ describe('MCP prospect evidence truthfulness', () => {
     const prospect = sanitizeProspect({
       id: 'lead_test',
       businessName: 'Example Contractor',
+      email: 'owner@example.com',
+      phone: '+14165550123',
       city: 'Toronto',
       niche: 'Plumbing',
       status: 'new',
@@ -26,6 +28,9 @@ describe('MCP prospect evidence truthfulness', () => {
     });
 
     expect(prospect.sourceType).toBe('unknown');
+    expect(prospect.email).toBeNull();
+    expect(prospect.phone).toBeNull();
+    expect(prospect.contactDetailsRedacted).toBe(true);
     expect(prospect.verificationStatus).toBe('UNVERIFIED_STAGING');
     expect(prospect.reviewCount).toBeNull();
     expect(prospect.reviewScore).toBeNull();
