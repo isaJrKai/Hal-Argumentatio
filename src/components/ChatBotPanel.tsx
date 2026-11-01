@@ -27,7 +27,7 @@ interface ChatMessage {
   createdAt?: string;
 }
 
-const renderMessageText = (text: string) => text.split(/(\\*\\*[^*]+\\*\\*|\\*[^*]+\\*|`[^`]+`)/g).map((part, index) => {
+const renderMessageText = (text: string) => text.split(/(\*\*[^*]+\*\*|\*[^*]+\*|`[^`]+`)/g).map((part, index) => {
   if (part.startsWith('**') && part.endsWith('**')) return <strong key={index}>{part.slice(2, -2)}</strong>;
   if (part.startsWith('*') && part.endsWith('*')) return <em key={index}>{part.slice(1, -1)}</em>;
   if (part.startsWith('`') && part.endsWith('`')) return <code key={index} className="px-1 py-0.5 rounded bg-black/10 dark:bg-white/10 font-mono">{part.slice(1, -1)}</code>;
