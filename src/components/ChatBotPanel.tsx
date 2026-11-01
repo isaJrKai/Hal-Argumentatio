@@ -34,6 +34,7 @@ export const ChatBotPanel: React.FC<Props> = ({ token }) => {
   const [showArchived, setShowArchived] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const endRef = useRef<HTMLDivElement>(null);
+  const historyRequestRef = useRef(0);
 
   const api = useCallback(async (url: string, init: RequestInit = {}) => {
     const response = await fetch(url, { ...init, headers: { Authorization: `Bearer ${authToken}`, ...(init.headers || {}) } });
@@ -63,13 +64,17 @@ export const ChatBotPanel: React.FC<Props> = ({ token }) => {
   }, [authToken, refreshWorkspace, showToast]);
 
   const loadConversation = useCallback(async (id: string) => {
+    const requestId = ++historyRequestRef.current;
     setActiveConversationId(id);
+    setMessages([]);
     try {
       const rows = await api(`/api/intelligence/chat/history?conversationId=${encodeURIComponent(id)}`);
-      setMessages(Array.isArray(rows) ? rows : []);
+      if (requestId === historyRequestRef.current) setMessages(Array.isArray(rows) ? rows : []);
     } catch (error: any) {
-      setMessages([]);
-      showToast({ title: 'Could not open conversation', message: error.message, type: 'error' });
+      if (requestId === historyRequestRef.current) {
+        setMessages([]);
+        showToast({ title: 'Could not open conversation', message: error.message, type: 'error' });
+      }
     }
   }, [api, showToast]);
 
@@ -174,7 +179,7 @@ export const ChatBotPanel: React.FC<Props> = ({ token }) => {
         <div className="px-3 pb-2 flex items-center justify-between"><span className="text-[10px] uppercase tracking-wider font-semibold text-text-tertiary">Projects</span><button onClick={createProject} title="Create project" className="p-1.5 rounded hover:bg-bg-subtle"><FolderPlus className="w-4 h-4"/></button></div>
         <div className="px-2 space-y-1 overflow-y-auto max-h-[38%]">
           <button onClick={() => setActiveProjectId(null)} className={`w-full text-left px-2.5 py-2 rounded-lg text-xs ${!activeProjectId ? 'bg-bg-subtle text-text-primary' : 'text-text-secondary hover:bg-bg-subtle'}`}>All chats</button>
-          {projects.filter(p => !p.archivedAt).map(project => <button key={project.id} onClick={() => { setActiveProjectId(project.id); const next = conversations.find(c => c.projectId === project.id && !c.archivedAt); if (next) loadConversation(next.id); else { setActiveConversationId(null); setMessages([]); } }} className={`w-full text-left px-2.5 py-2 rounded-lg text-xs truncate ${activeProjectId === project.id ? 'bg-cyan-500/10 text-cyan-500' : 'text-text-secondary hover:bg-bg-subtle'}`}><span className="mr-2 text-cyan-500">▦</span>{project.name}</button>)}
+          {projects.filter(p => !p.archivedAt).map(project => <button key={project.id} onClick={() => { setActiveProjectId(project.id); const next = conversations.find(c => c.projectId === project.id && !c.archivedAt); if (next) loadConversation(next.id); else { historyRequestRef.current += 1; setActiveConversationId(null); setMessages([]); } }} className={`w-full text-left px-2.5 py-2 rounded-lg text-xs truncate ${activeProjectId === project.id ? 'bg-cyan-500/10 text-cyan-500' : 'text-text-secondary hover:bg-bg-subtle'}`}><span className="mr-2 text-cyan-500">▦</span>{project.name}</button>)}
         </div>
         <div className="mt-4 px-3 pb-2 flex items-center justify-between"><span className="text-[10px] uppercase tracking-wider font-semibold text-text-tertiary">{showArchived ? 'Archived chats' : 'Recent chats'}</span><button onClick={() => setShowArchived(!showArchived)} className="text-[10px] text-cyan-500 hover:underline">{showArchived ? 'Recent' : 'Archived'}</button></div>
         <div className="flex-1 min-h-0 overflow-y-auto px-2 pb-3 space-y-1">
