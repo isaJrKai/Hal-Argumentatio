@@ -12,7 +12,7 @@ import {
   Globe, 
   Zap, 
   Award, 
-  CheckCircle2, 
+  Circle, 
   Calendar,
   User,
   Phone,
@@ -50,14 +50,14 @@ export default function WhiteLabelReportModal({ lead, isOpen, onClose }: WhiteLa
   if (!isOpen) return null;
 
   const targetName = lead ? lead.businessName : `${activeCity} ${activeNiche.toUpperCase()} TERRITORY AUDIT`;
-  const ownerName = lead?.ownerName || 'Business Owner / Principal';
-  const website = lead?.websiteUrl || `https://www.${targetName.toLowerCase().replace(/[^a-z0-9]/g, '')}.com`;
-  const seo = lead?.seoScore ?? 68;
-  const perf = lead?.performanceScore ?? 54;
-  const ssl = lead?.sslStatus ?? 'secured';
-  const rating = lead?.googleRating ?? 4.4;
-  const reviews = lead?.reviewCount ?? 38;
-  const ltv = lead?.predictedLtvUsd ?? activeIndustry.ltvRange.averageContract;
+  const ownerName = lead?.ownerName || 'Not provided';
+  const website = lead?.websiteUrl || null;
+  const seo = typeof lead?.seoScore === 'number' && Number.isFinite(lead.seoScore) && lead.seoScore >= 0 && lead.seoScore <= 100 ? lead.seoScore : null;
+  const perf = typeof lead?.performanceScore === 'number' && Number.isFinite(lead.performanceScore) && lead.performanceScore >= 0 && lead.performanceScore <= 100 ? lead.performanceScore : null;
+  const ssl = lead?.sslStatus === 'secured' || lead?.sslStatus === 'missing' ? lead.sslStatus : null;
+  const rating = typeof lead?.googleRating === 'number' && Number.isFinite(lead.googleRating) && lead.googleRating >= 0 && lead.googleRating <= 5 ? lead.googleRating : null;
+  const reviews = typeof lead?.reviewCount === 'number' && Number.isFinite(lead.reviewCount) && lead.reviewCount >= 0 ? lead.reviewCount : null;
+  const ltv = typeof lead?.predictedLtvUsd === 'number' && Number.isFinite(lead.predictedLtvUsd) && lead.predictedLtvUsd >= 0 ? lead.predictedLtvUsd : null;
 
   const handlePrint = () => {
     window.print();
@@ -81,19 +81,19 @@ export default function WhiteLabelReportModal({ lead, isOpen, onClose }: WhiteLa
     const row = [
       targetName,
       ownerName,
-      lead?.city || activeCity,
-      lead?.serviceType || activeNiche,
-      website,
+      lead ? (lead.city || 'Not provided') : activeCity,
+      lead ? (lead.serviceType || 'Not provided') : activeNiche,
+      website || 'Not provided',
       lead?.phone || '',
       lead?.email || '',
-      seo,
-      perf,
-      ssl,
-      rating,
-      reviews,
-      ltv,
-      lead?.status || 'new',
-      lead?.notes || activeIndustry.outreachAngle,
+      seo ?? 'Not measured',
+      perf ?? 'Not measured',
+      ssl ?? 'Not measured',
+      rating ?? 'Not measured',
+      reviews ?? 'Not measured',
+      ltv ?? 'Not measured',
+      lead?.status || 'Not applicable',
+      lead?.notes || 'No lead-specific notes recorded',
       lead?.outreachStrategy || ''
     ].map(cell => {
       const cellStr = cell === null || cell === undefined ? '' : String(cell);
@@ -221,7 +221,7 @@ export default function WhiteLabelReportModal({ lead, isOpen, onClose }: WhiteLa
               </h2>
               <p className="text-xs font-mono text-text-secondary mt-1 flex items-center gap-3">
                 <span className="flex items-center gap-1"><User className="w-3 h-3 text-text-dim" /> {ownerName}</span>
-                <span className="flex items-center gap-1"><Globe className="w-3 h-3 text-text-dim" /> {website}</span>
+                <span className="flex items-center gap-1"><Globe className="w-3 h-3 text-text-dim" /> {website || 'Website not provided'}</span>
               </p>
             </div>
 
@@ -229,13 +229,13 @@ export default function WhiteLabelReportModal({ lead, isOpen, onClose }: WhiteLa
               <div className="text-center px-2">
                 <span className="text-[9px] text-text-dim block uppercase">PREDICTED LTV</span>
                 <span className="text-base font-bold text-positive flex items-center justify-center">
-                  ${ltv.toLocaleString()}
+                  {ltv !== null ? `${ltv.toLocaleString()}` : 'Not measured'}
                 </span>
               </div>
               <div className="text-center px-2 border-l border-border-dim/50">
                 <span className="text-[9px] text-text-dim block uppercase">RATING</span>
                 <span className="text-base font-bold text-amber-400 flex items-center justify-center gap-1">
-                  ★ {rating}
+                  {rating !== null ? `★ ${rating}` : 'Not measured'}
                 </span>
               </div>
             </div>
@@ -251,25 +251,25 @@ export default function WhiteLabelReportModal({ lead, isOpen, onClose }: WhiteLa
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 font-mono">
               <div className="p-3 bg-bg-subtle border border-border-dim rounded-sm">
                 <span className="text-[9px] text-text-secondary uppercase block">TECHNICAL SEO</span>
-                <span className={`text-xl font-bold ${seo >= 70 ? 'text-positive' : seo >= 50 ? 'text-amber-400' : 'text-negative'}`}>
-                  {seo}/100
+                <span className={`text-xl font-bold ${seo === null ? 'text-text-secondary' : seo >= 70 ? 'text-positive' : seo >= 50 ? 'text-amber-400' : 'text-negative'}`}>
+                  {seo === null ? 'Not measured' : `${seo}/100`}
                 </span>
                 <span className="text-[9px] text-text-dim block mt-0.5">Search index score</span>
               </div>
 
               <div className="p-3 bg-bg-subtle border border-border-dim rounded-sm">
                 <span className="text-[9px] text-text-secondary uppercase block">MOBILE SPEED</span>
-                <span className={`text-xl font-bold ${perf >= 70 ? 'text-positive' : perf >= 50 ? 'text-amber-400' : 'text-negative'}`}>
-                  {perf}/100
+                <span className={`text-xl font-bold ${perf === null ? 'text-text-secondary' : perf >= 70 ? 'text-positive' : perf >= 50 ? 'text-amber-400' : 'text-negative'}`}>
+                  {perf === null ? 'Not measured' : `${perf}/100`}
                 </span>
                 <span className="text-[9px] text-text-dim block mt-0.5">Load responsiveness</span>
               </div>
 
               <div className="p-3 bg-bg-subtle border border-border-dim rounded-sm">
                 <span className="text-[9px] text-text-secondary uppercase block">SSL CERTIFICATE</span>
-                <span className={`text-sm font-bold flex items-center gap-1 mt-1 ${ssl === 'secured' ? 'text-positive' : 'text-negative'}`}>
-                  {ssl === 'secured' ? <ShieldCheck className="w-4 h-4" /> : <AlertTriangle className="w-4 h-4" />}
-                  {ssl.toUpperCase()}
+                <span className={`text-sm font-bold flex items-center gap-1 mt-1 ${ssl === 'secured' ? 'text-positive' : ssl === 'missing' ? 'text-negative' : 'text-text-secondary'}`}>
+                  {ssl === 'secured' ? <ShieldCheck className="w-4 h-4" /> : ssl === 'missing' ? <AlertTriangle className="w-4 h-4" /> : null}
+                  {ssl ? ssl.toUpperCase() : 'NOT MEASURED'}
                 </span>
                 <span className="text-[9px] text-text-dim block mt-0.5">Browser trust lock</span>
               </div>
@@ -277,14 +277,14 @@ export default function WhiteLabelReportModal({ lead, isOpen, onClose }: WhiteLa
               <div className="p-3 bg-bg-subtle border border-border-dim rounded-sm">
                 <span className="text-[9px] text-text-secondary uppercase block">GOOGLE REVIEWS</span>
                 <span className="text-sm font-bold text-text-primary mt-1 block">
-                  {reviews} REVIEWS
+                  {reviews !== null ? `${reviews} REVIEWS` : 'Not measured'}
                 </span>
                 <span className="text-[9px] text-text-dim block mt-0.5">Public reputation</span>
               </div>
             </div>
           </div>
 
-          {/* INDUSTRY SPECIFIC AUDIT FOCUS CHECKLIST */}
+          {/* INDUSTRY REVIEW AREAS */}
           <div className="space-y-3">
             <h3 className="text-xs font-mono font-bold text-text-primary uppercase tracking-wider flex items-center gap-2">
               <Award className="w-3.5 h-3.5 text-brand" />
@@ -293,7 +293,7 @@ export default function WhiteLabelReportModal({ lead, isOpen, onClose }: WhiteLa
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3 font-mono text-xs">
               <div className="p-3 bg-bg-subtle border border-border-dim rounded-sm flex items-start gap-2.5">
-                <CheckCircle2 className="w-4 h-4 text-brand shrink-0 mt-0.5" />
+                <Circle className="w-4 h-4 text-text-tertiary shrink-0 mt-0.5" />
                 <div>
                   <span className="font-bold text-text-primary block">{activeIndustry.auditFocus.key1}</span>
                   <span className="text-[10px] text-text-secondary">Core speed & mobile usability benchmark for {activeNiche}.</span>
@@ -301,7 +301,7 @@ export default function WhiteLabelReportModal({ lead, isOpen, onClose }: WhiteLa
               </div>
 
               <div className="p-3 bg-bg-subtle border border-border-dim rounded-sm flex items-start gap-2.5">
-                <CheckCircle2 className="w-4 h-4 text-brand shrink-0 mt-0.5" />
+                <Circle className="w-4 h-4 text-text-tertiary shrink-0 mt-0.5" />
                 <div>
                   <span className="font-bold text-text-primary block">{activeIndustry.auditFocus.key2}</span>
                   <span className="text-[10px] text-text-secondary">Credential badging and trust verification signals.</span>
@@ -309,7 +309,7 @@ export default function WhiteLabelReportModal({ lead, isOpen, onClose }: WhiteLa
               </div>
 
               <div className="p-3 bg-bg-subtle border border-border-dim rounded-sm flex items-start gap-2.5">
-                <CheckCircle2 className="w-4 h-4 text-brand shrink-0 mt-0.5" />
+                <Circle className="w-4 h-4 text-text-tertiary shrink-0 mt-0.5" />
                 <div>
                   <span className="font-bold text-text-primary block">{activeIndustry.auditFocus.key3}</span>
                   <span className="text-[10px] text-text-secondary">Instant estimation & booking friction reduction.</span>
@@ -317,7 +317,7 @@ export default function WhiteLabelReportModal({ lead, isOpen, onClose }: WhiteLa
               </div>
 
               <div className="p-3 bg-bg-subtle border border-border-dim rounded-sm flex items-start gap-2.5">
-                <CheckCircle2 className="w-4 h-4 text-brand shrink-0 mt-0.5" />
+                <Circle className="w-4 h-4 text-text-tertiary shrink-0 mt-0.5" />
                 <div>
                   <span className="font-bold text-text-primary block">{activeIndustry.auditFocus.key4}</span>
                   <span className="text-[10px] text-text-secondary">Local territory search dominance & reputation management.</span>
@@ -333,7 +333,7 @@ export default function WhiteLabelReportModal({ lead, isOpen, onClose }: WhiteLa
               <span>STRATEGIC ACQUISITION ANGLE & VALUE PROPOSITION</span>
             </h4>
             <p className="text-xs text-text-primary leading-relaxed">
-              "{lead?.notes || activeIndustry.outreachAngle}"
+              "{lead?.notes || `General industry context (not a lead-specific finding): ${activeIndustry.outreachAngle}`}"
             </p>
             {lead?.outreachStrategy && (
               <div className="pt-2 border-t border-brand/20 text-[11px] text-text-secondary">
@@ -351,7 +351,7 @@ export default function WhiteLabelReportModal({ lead, isOpen, onClose }: WhiteLa
                 <span>SCHEDULE 15-MIN EXECUTIVE STRATEGY REVIEW</span>
               </div>
               <p className="text-[11px] text-text-secondary">
-                Direct calendar link for {lead ? lead.businessName : 'Prospect'}: <span className="text-brand underline">{workspaceConfig.bookingUrl || 'https://cal.com/hal-strategy'}</span>
+                Direct calendar link for {lead ? lead.businessName : 'Prospect'}: <span className="text-brand underline">{workspaceConfig.bookingUrl || 'Booking link not configured'}</span>
               </p>
             </div>
             {lead && (

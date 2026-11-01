@@ -4,6 +4,9 @@ import { motion, AnimatePresence } from 'motion/react';
 import { useBusinessContext } from '../context/BusinessContext';
 import { useInspector } from '../context/InspectorContext';
 import { useToast } from '../context/ToastContext';
+import { isMeasuredRating, isMeasuredScore, summarizeKnownLeadValue } from '../lib/boardMetrics';
+import { CRM_BOARD_STAGES, DEFAULT_CRM_BOARD_STAGE_NAMES, getAdjacentCrmBoardStage, getAllowedCrmBoardStages, getCrmBoardStage } from '../lib/crmBoard';
+import type { CrmStage } from '../lib/crmStateMachine';
 import { 
   ArrowLeft, 
   ArrowRight, 
@@ -40,21 +43,23 @@ interface BoardPanelProps {
 export default function BoardPanel({ leads, token, onRefresh }: BoardPanelProps) {
   const { toast } = useToast();
   // State for customized sales stages
-  const [stageNames, setStageNames] = useState<Record<Lead['status'], string>>(() => {
-    const saved = localStorage.getItem('hal_custom_stage_names');
-    if (saved) {
-      try {
-        return JSON.parse(saved);
-      } catch (e) {
-        // Fallback
+  const [stageNames, setStageNames] = useState<Record<CrmStage, string>>(() => {
+    const defaults = { ...DEFAULT_CRM_BOARD_STAGE_NAMES };
+    try {
+      const saved = localStorage.getItem('hal_custom_stage_names');
+      if (!saved) return defaults;
+      const parsed = JSON.parse(saved) as Record<string, unknown>;
+      for (const stage of CRM_BOARD_STAGES) {
+        const label = parsed[stage];
+        if (typeof label === 'string' && label.trim()) defaults[stage] = label.trim();
       }
+      // Migrate user-customized labels from the four-column legacy board.
+      if (typeof parsed.converted === 'string' && typeof parsed.closed_won !== 'string') defaults.closed_won = parsed.converted;
+      if (typeof parsed.dead === 'string' && typeof parsed.closed_lost !== 'string') defaults.closed_lost = parsed.dead;
+      return defaults;
+    } catch {
+      return defaults;
     }
-    return {
-      new: 'Untouched Prospects',
-      contacted: 'Engaged & Contacted',
-      converted: 'Converted & Closed',
-      dead: 'Dead & Dismissed'
-    };
   });
 
   // Selected lead for detail inspection modal
@@ -63,6 +68,7 @@ export default function BoardPanel({ leads, token, onRefresh }: BoardPanelProps)
   const { openInspector } = useInspector();
   const { showToast } = useToast();
   const [isDraftingWithHermes, setIsDraftingWithHermes] = useState(false);
+  const pipelineValue = summarizeKnownLeadValue(leads);
 
   const handleDraftSelectedLeadWithHermes = async (lead: Lead) => {
     setIsDraftingWithHermes(true);
@@ -79,14 +85,14 @@ export default function BoardPanel({ leads, token, onRefresh }: BoardPanelProps)
             businessName: lead.businessName,
             city: lead.city,
             serviceType: lead.serviceType,
-            ownerName: lead.ownerName || 'Business Owner',
-            websiteUrl: lead.websiteUrl || '',
-            performanceScore: lead.performanceScore || 50,
-            seoScore: lead.seoScore || 65,
-            sslStatus: lead.sslStatus || 'valid',
+            ...(lead.ownerName ? { ownerName: lead.ownerName } : {}),
+            ...(lead.websiteUrl ? { websiteUrl: lead.websiteUrl } : {}),
+            ...(isMeasuredScore(lead.performanceScore) ? { performanceScore: lead.performanceScore } : {}),
+            ...(isMeasuredScore(lead.seoScore) ? { seoScore: lead.seoScore } : {}),
+            ...(lead.sslStatus ? { sslStatus: lead.sslStatus } : {}),
             framework: 'Direct Outreach'
           },
-          promptOverride: `Draft a high-conversion cold pitch for ${lead.businessName} in ${lead.city} referencing their digital footprint.`
+          promptOverride: `Draft an outreach message for ${lead.businessName} in ${lead.city}. Use only the supplied facts. Do not invent website problems, audit scores, security findings, customer results, or financial uplift. If evidence is missing, do not imply that it was measured.`
         })
       });
 
@@ -110,15 +116,15 @@ export default function BoardPanel({ leads, token, onRefresh }: BoardPanelProps)
   };
 
   // Inline editing column state
-  const [editingStage, setEditingStage] = useState<Lead['status'] | null>(null);
+  const [editingStage, setEditingStage] = useState<CrmStage | null>(null);
   const [tempStageName, setTempStageName] = useState('');
 
   // Drag over tracking
-  const [draggedOverColumnId, setDraggedOverColumnId] = useState<Lead['status'] | null>(null);
+  const [draggedOverColumnId, setDraggedOverColumnId] = useState<CrmStage | null>(null);
   const [draggedLeadId, setDraggedLeadId] = useState<string | null>(null);
 
   // Core movement endpoint handler
-  const moveLeadToStatus = async (leadId: string, nextStatus: Lead['status']) => {
+  const moveLeadToStatus = async (leadId: string, nextStatus: CrmStage): Promise<boolean> => {
     const effectiveToken = token || localStorage.getItem('token') || localStorage.getItem('halbiz_auth_token') || '';
     try {
       const res = await fetch(`/api/leads/${leadId}`, {
@@ -132,6 +138,7 @@ export default function BoardPanel({ leads, token, onRefresh }: BoardPanelProps)
 
       if (res.ok) {
         onRefresh();
+        return true;
       } else {
         const errorData = await res.json().catch(() => ({}));
         toast({
@@ -139,6 +146,7 @@ export default function BoardPanel({ leads, token, onRefresh }: BoardPanelProps)
           title: 'Stage Transition Notice',
           description: errorData.error || 'Could not move lead to requested status.'
         });
+        return false;
       }
     } catch (err: any) {
       console.warn('Network issue moving lead to status:', err?.message || err);
@@ -147,30 +155,21 @@ export default function BoardPanel({ leads, token, onRefresh }: BoardPanelProps)
         title: 'Connection Issue',
         description: 'Unable to reach backend to update lead status. Please check connectivity.'
       });
+      return false;
     }
   };
 
   const shiftLeadDirection = async (lead: Lead, direction: 'forward' | 'backward') => {
-    const statuses: Lead['status'][] = ['new', 'contacted', 'converted', 'dead'];
-    const currentIndex = statuses.indexOf(lead.status);
-    let nextIndex = currentIndex;
-
-    if (direction === 'forward' && currentIndex < statuses.length - 1) {
-      nextIndex = currentIndex + 1;
-    } else if (direction === 'backward' && currentIndex > 0) {
-      nextIndex = currentIndex - 1;
-    }
-
-    if (nextIndex === currentIndex) return;
-    await moveLeadToStatus(lead.id, statuses[nextIndex]);
+    const nextStage = getAdjacentCrmBoardStage(lead.status, direction);
+    if (nextStage) await moveLeadToStatus(lead.id, nextStage);
   };
 
-  const handleStartEdit = (status: Lead['status']) => {
+  const handleStartEdit = (status: CrmStage) => {
     setEditingStage(status);
     setTempStageName(stageNames[status]);
   };
 
-  const handleSaveStageName = (status: Lead['status']) => {
+  const handleSaveStageName = (status: CrmStage) => {
     if (tempStageName.trim()) {
       const updated = { ...stageNames, [status]: tempStageName.trim() };
       setStageNames(updated);
@@ -180,12 +179,7 @@ export default function BoardPanel({ leads, token, onRefresh }: BoardPanelProps)
   };
 
   const handleResetStages = () => {
-    const defaults = {
-      new: 'Untouched Prospects',
-      contacted: 'Engaged & Contacted',
-      converted: 'Converted & Closed',
-      dead: 'Dead & Dismissed'
-    };
+    const defaults = { ...DEFAULT_CRM_BOARD_STAGE_NAMES };
     setStageNames(defaults);
     localStorage.setItem('hal_custom_stage_names', JSON.stringify(defaults));
   };
@@ -202,19 +196,19 @@ export default function BoardPanel({ leads, token, onRefresh }: BoardPanelProps)
     setDraggedOverColumnId(null);
   };
 
-  const handleDragOver = (e: React.DragEvent, status: Lead['status']) => {
+  const handleDragOver = (e: React.DragEvent, status: CrmStage) => {
     e.preventDefault();
     if (draggedOverColumnId !== status) {
       setDraggedOverColumnId(status);
     }
   };
 
-  const handleDrop = async (e: React.DragEvent, status: Lead['status']) => {
+  const handleDrop = async (e: React.DragEvent, status: CrmStage) => {
     e.preventDefault();
     const leadId = e.dataTransfer.getData('text/plain') || draggedLeadId;
     if (leadId) {
       const lead = leads.find(l => l.id === leadId);
-      if (lead && lead.status !== status) {
+      if (lead && getCrmBoardStage(lead.status) !== status) {
         await moveLeadToStatus(leadId, status);
       }
     }
@@ -223,39 +217,19 @@ export default function BoardPanel({ leads, token, onRefresh }: BoardPanelProps)
   };
 
   const columns = [
-    {
-      id: 'new' as const,
-      icon: Inbox,
-      color: 'border-t-accent',
-      accentColor: 'text-accent',
-      dragGlow: 'rgba(200, 245, 66, 0.08)',
-      lightDragGlow: 'rgba(15, 98, 254, 0.08)'
-    },
-    {
-      id: 'contacted' as const,
-      icon: PhoneCall,
-      color: 'border-t-positive',
-      accentColor: 'text-positive',
-      dragGlow: 'rgba(16, 185, 129, 0.08)',
-      lightDragGlow: 'rgba(16, 185, 129, 0.08)'
-    },
-    {
-      id: 'converted' as const,
-      icon: CheckCircle,
-      color: 'border-t-warning',
-      accentColor: 'text-warning',
-      dragGlow: 'rgba(245, 158, 11, 0.08)',
-      lightDragGlow: 'rgba(245, 158, 11, 0.08)'
-    },
-    {
-      id: 'dead' as const,
-      icon: Trash2,
-      color: 'border-t-negative',
-      accentColor: 'text-negative',
-      dragGlow: 'rgba(239, 68, 68, 0.08)',
-      lightDragGlow: 'rgba(239, 68, 68, 0.08)'
-    }
+    { id: 'new' as CrmStage, icon: Inbox, color: 'border-t-accent', accentColor: 'text-accent', dragGlow: 'rgba(200, 245, 66, 0.08)', lightDragGlow: 'rgba(15, 98, 254, 0.08)' },
+    { id: 'contacted' as CrmStage, icon: PhoneCall, color: 'border-t-positive', accentColor: 'text-positive', dragGlow: 'rgba(16, 185, 129, 0.08)', lightDragGlow: 'rgba(16, 185, 129, 0.08)' },
+    { id: 'unresponsive' as CrmStage, icon: Clock, color: 'border-t-warning', accentColor: 'text-warning', dragGlow: 'rgba(245, 158, 11, 0.08)', lightDragGlow: 'rgba(245, 158, 11, 0.08)' },
+    { id: 'qualified' as CrmStage, icon: Target, color: 'border-t-accent', accentColor: 'text-accent', dragGlow: 'rgba(200, 245, 66, 0.08)', lightDragGlow: 'rgba(15, 98, 254, 0.08)' },
+    { id: 'sal' as CrmStage, icon: Sparkles, color: 'border-t-positive', accentColor: 'text-positive', dragGlow: 'rgba(16, 185, 129, 0.08)', lightDragGlow: 'rgba(16, 185, 129, 0.08)' },
+    { id: 'proposal' as CrmStage, icon: DollarSign, color: 'border-t-warning', accentColor: 'text-warning', dragGlow: 'rgba(245, 158, 11, 0.08)', lightDragGlow: 'rgba(245, 158, 11, 0.08)' },
+    { id: 'closed_won' as CrmStage, icon: CheckCircle, color: 'border-t-positive', accentColor: 'text-positive', dragGlow: 'rgba(16, 185, 129, 0.08)', lightDragGlow: 'rgba(16, 185, 129, 0.08)' },
+    { id: 'closed_lost' as CrmStage, icon: Trash2, color: 'border-t-negative', accentColor: 'text-negative', dragGlow: 'rgba(239, 68, 68, 0.08)', lightDragGlow: 'rgba(239, 68, 68, 0.08)' },
+    { id: 'retained' as CrmStage, icon: Shield, color: 'border-t-positive', accentColor: 'text-positive', dragGlow: 'rgba(16, 185, 129, 0.08)', lightDragGlow: 'rgba(16, 185, 129, 0.08)' },
+    { id: 'churned' as CrmStage, icon: AlertCircle, color: 'border-t-negative', accentColor: 'text-negative', dragGlow: 'rgba(239, 68, 68, 0.08)', lightDragGlow: 'rgba(239, 68, 68, 0.08)' },
+    { id: 'reactivated' as CrmStage, icon: RotateCcw, color: 'border-t-warning', accentColor: 'text-warning', dragGlow: 'rgba(245, 158, 11, 0.08)', lightDragGlow: 'rgba(245, 158, 11, 0.08)' }
   ];
+  const unclassifiedLeads = leads.filter(lead => !getCrmBoardStage(lead.status));
 
   return (
     <div className="space-y-6 animate-fadeIn">
@@ -278,14 +252,17 @@ export default function BoardPanel({ leads, token, onRefresh }: BoardPanelProps)
             <div className="px-3.5 py-1.5 border border-border-dim rounded bg-bg-raised text-center min-w-[90px]">
               <span className="block text-[10px] text-text-secondary uppercase whitespace-nowrap">Active Deals</span>
               <span className="text-sm font-semibold text-text-primary mt-0.5 block whitespace-nowrap">
-                {leads.filter(l => l.status !== 'converted' && l.status !== 'dead').length}
+                {leads.filter(l => !['closed_won', 'closed_lost', 'retained', 'churned'].includes(getCrmBoardStage(l.status) || '')).length}
               </span>
             </div>
             <div className="px-3.5 py-1.5 border border-border-dim rounded bg-bg-raised text-center min-w-[100px]">
-              <span className="block text-[10px] text-text-secondary uppercase whitespace-nowrap">Pipeline Value</span>
+              <span className="block text-[10px] text-text-secondary uppercase whitespace-nowrap">Recorded Lead Value</span>
               <span className="text-sm font-semibold text-accent mt-0.5 block whitespace-nowrap">
-                ${leads.filter(l => l.status !== 'dead').reduce((acc, l) => acc + (l.predictedLtvUsd || 4500), 0).toLocaleString()}
+                {pipelineValue.measuredCount > 0 ? `${pipelineValue.totalUsd.toLocaleString()}` : 'Not measured'}
               </span>
+              {pipelineValue.unmeasuredCount > 0 && (
+                <span className="block text-[8px] text-text-tertiary mt-0.5">{pipelineValue.unmeasuredCount} lead(s) without a recorded value</span>
+              )}
             </div>
           </div>
         </div>
@@ -295,7 +272,7 @@ export default function BoardPanel({ leads, token, onRefresh }: BoardPanelProps)
       <div className="bg-bg-raised border border-border-dim p-4 rounded-xl flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h3 className="text-xs font-mono font-bold text-text-primary uppercase tracking-wider">Kanban Stages Management</h3>
-          <p className="text-[11px] text-text-secondary mt-1 font-sans">Rename, reorder, or drag cards to update stages in real time.</p>
+          <p className="text-[11px] text-text-secondary mt-1 font-sans">Rename stages or drag cards to move them through the validated CRM pipeline.</p>
         </div>
         <div className="flex flex-wrap gap-3 items-center">
           <button 
@@ -308,15 +285,15 @@ export default function BoardPanel({ leads, token, onRefresh }: BoardPanelProps)
           </button>
           <div className="hidden lg:flex items-center gap-1.5 text-[10px] font-mono text-text-secondary font-bold uppercase tracking-wider bg-bg-base px-3 py-1.5 rounded-sm border border-border-dim">
             <Sparkles className="w-3.5 h-3.5 text-accent animate-pulse" /> 
-            Drag cards or click arrows to route pipeline
+            Drag cards or use arrows for permitted stage transitions
           </div>
         </div>
       </div>
 
       {/* Grid columns */}
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+      <div className="grid grid-flow-col auto-cols-[minmax(230px,1fr)] gap-4 overflow-x-auto pb-3 snap-x snap-mandatory">
         {columns.map(col => {
-          const colLeads = leads.filter(l => l.status === col.id);
+          const colLeads = leads.filter(l => getCrmBoardStage(l.status) === col.id);
           const isCurrentDragOver = draggedOverColumnId === col.id;
           const currentStageName = stageNames[col.id];
           const isEditingThis = editingStage === col.id;
@@ -327,7 +304,7 @@ export default function BoardPanel({ leads, token, onRefresh }: BoardPanelProps)
               onDragOver={(e) => handleDragOver(e, col.id)}
               onDragLeave={() => setDraggedOverColumnId(null)}
               onDrop={(e) => handleDrop(e, col.id)}
-              className={`bg-bg-raised border rounded-sm flex flex-col h-[580px] transition-all duration-200 ${
+              className={`bg-bg-raised border rounded-sm flex flex-col h-[580px] min-w-0 snap-start transition-all duration-200 ${
                 isCurrentDragOver 
                   ? 'border-accent shadow-md scale-[1.01]' 
                   : 'border-border-dim'
@@ -444,24 +421,24 @@ export default function BoardPanel({ leads, token, onRefresh }: BoardPanelProps)
                               {lead.city}
                             </span>
                             <span>
-                              SCORE: <strong className="text-accent font-extrabold">{lead.urgencyScore || 0}</strong>
+                              SCORE: <strong className="text-accent font-extrabold">{isMeasuredScore(lead.urgencyScore) ? lead.urgencyScore : 'Not measured'}</strong>
                             </span>
                           </div>
 
                           {/* Secondary metrics summary if present (Phase 2 audit) */}
-                          {(lead.seoScore !== undefined || lead.googleRating !== undefined) && (
+                          {(isMeasuredScore(lead.seoScore) || isMeasuredRating(lead.googleRating)) && (
                             <div className="flex items-center gap-2 mt-1.5 pt-1.5 border-t border-border-dim/20 text-[8px] font-mono text-text-tertiary uppercase">
-                              {lead.seoScore !== undefined && (
+                              {isMeasuredScore(lead.seoScore) && (
                                 <span>SEO: <strong className={lead.seoScore > 75 ? 'text-positive font-bold' : 'text-warning font-bold'}>{lead.seoScore}%</strong></span>
                               )}
-                              {lead.googleRating !== undefined && (
+                              {isMeasuredRating(lead.googleRating) && (
                                 <span>Rating: <strong className="text-warning font-bold">{lead.googleRating}★</strong></span>
                               )}
                             </div>
                           )}
 
                           {/* Phase 3: Cadence & Follow-up status indicators */}
-                          {lead.status === 'contacted' && (
+                          {getCrmBoardStage(lead.status) === 'contacted' && (
                             <div className="mt-2 py-1 px-2 rounded-sm bg-warning/10 border border-warning/20 flex items-center justify-between text-[8.5px] font-mono">
                               <span className="text-warning font-bold flex items-center gap-1">
                                 <Clock className="w-2.5 h-2.5" /> Follow-up Ready
@@ -473,7 +450,7 @@ export default function BoardPanel({ leads, token, onRefresh }: BoardPanelProps)
                           {/* Keyboard/Click shifting helpers */}
                           <div className="flex justify-between items-center pt-2.5 mt-2.5 border-t border-border-dim/30 opacity-100 sm:opacity-0 group-hover:opacity-100 transition-opacity">
                             <button
-                              disabled={lead.status === 'new'}
+                              disabled={!getAdjacentCrmBoardStage(lead.status, 'backward')}
                               onClick={() => shiftLeadDirection(lead, 'backward')}
                               className="p-1 rounded-sm bg-bg-base border border-border-dim hover:bg-bg-subtle text-text-secondary hover:text-text-primary disabled:opacity-20 disabled:hover:bg-bg-base transition-colors"
                               title="Shift Backwards"
@@ -484,7 +461,7 @@ export default function BoardPanel({ leads, token, onRefresh }: BoardPanelProps)
                             <span className="text-[8px] font-mono uppercase text-text-tertiary font-bold tracking-wider opacity-60">Move Stage</span>
 
                             <button
-                              disabled={lead.status === 'dead'}
+                              disabled={!getAdjacentCrmBoardStage(lead.status, 'forward')}
                               onClick={() => shiftLeadDirection(lead, 'forward')}
                               className="p-1 rounded-sm bg-bg-base border border-border-dim hover:bg-bg-subtle text-text-secondary hover:text-text-primary disabled:opacity-20 disabled:hover:bg-bg-base transition-colors"
                               title="Shift Forwards"
@@ -502,6 +479,20 @@ export default function BoardPanel({ leads, token, onRefresh }: BoardPanelProps)
           );
         })}
       </div>
+
+      {unclassifiedLeads.length > 0 && (
+        <div className="border border-warning/30 bg-warning/5 rounded-lg p-4 space-y-2">
+          <div className="text-xs font-mono font-bold text-warning uppercase">Leads needing stage review ({unclassifiedLeads.length})</div>
+          <p className="text-xs text-text-secondary">These records have an unknown CRM stage and are not moved automatically. Normalize their stage before using the pipeline controls.</p>
+          <div className="flex flex-wrap gap-2">
+            {unclassifiedLeads.map(lead => (
+              <button key={lead.id} onClick={() => setSelectedBoardLead(lead)} className="text-xs px-2 py-1 rounded border border-border-dim bg-bg-raised text-text-primary hover:border-warning">
+                {lead.businessName} · {String(lead.status || 'blank')}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* LEAD INTELLIGENCE & ACTION MODAL */}
       <AnimatePresence>
@@ -559,40 +550,36 @@ export default function BoardPanel({ leads, token, onRefresh }: BoardPanelProps)
                     <div className="p-2.5 rounded-lg bg-bg-base border border-border-dim">
                       <span className="block text-[9px] text-text-tertiary uppercase">SSL Security</span>
                       <span className={`text-xs font-bold mt-1 block flex items-center justify-center gap-1 ${
-                        selectedBoardLead.sslStatus === 'missing' ? 'text-negative' : 'text-positive'
+                        selectedBoardLead.sslStatus === 'missing' ? 'text-negative' : selectedBoardLead.sslStatus === 'secured' ? 'text-positive' : 'text-text-tertiary'
                       }`}>
                         {selectedBoardLead.sslStatus === 'missing' ? (
-                          <>
-                            <AlertCircle className="w-3 h-3" /> Unsecured
-                          </>
-                        ) : (
-                          <>
-                            <Shield className="w-3 h-3" /> Encrypted
-                          </>
-                        )}
+                          <><AlertCircle className="w-3 h-3" /> Unsecured</>
+                        ) : selectedBoardLead.sslStatus === 'secured' ? (
+                          <><Shield className="w-3 h-3" /> Secured</>
+                        ) : 'Not measured'}
                       </span>
                     </div>
 
                     <div className="p-2.5 rounded-lg bg-bg-base border border-border-dim">
                       <span className="block text-[9px] text-text-tertiary uppercase">Page Speed</span>
                       <span className={`text-xs font-bold mt-1 block flex items-center justify-center gap-1 ${
-                        (selectedBoardLead.performanceScore || 50) < 60 ? 'text-warning' : 'text-positive'
+                        isMeasuredScore(selectedBoardLead.performanceScore) ? (selectedBoardLead.performanceScore < 60 ? 'text-warning' : 'text-positive') : 'text-text-tertiary'
                       }`}>
-                        <Gauge className="w-3 h-3" /> {selectedBoardLead.performanceScore || 48}/100
+                        {isMeasuredScore(selectedBoardLead.performanceScore) ? <><Gauge className="w-3 h-3" /> {selectedBoardLead.performanceScore}/100</> : 'Not measured'}
                       </span>
                     </div>
 
                     <div className="p-2.5 rounded-lg bg-bg-base border border-border-dim">
                       <span className="block text-[9px] text-text-tertiary uppercase">SEO Health</span>
                       <span className="text-xs font-bold text-accent mt-1 block">
-                        {selectedBoardLead.seoScore || 68}%
+                        {isMeasuredScore(selectedBoardLead.seoScore) ? `${selectedBoardLead.seoScore}%` : 'Not measured'}
                       </span>
                     </div>
 
                     <div className="p-2.5 rounded-lg bg-bg-base border border-border-dim">
                       <span className="block text-[9px] text-text-tertiary uppercase">Reputation</span>
                       <span className="text-xs font-bold text-warning mt-1 block">
-                        {selectedBoardLead.googleRating ? `${selectedBoardLead.googleRating}★` : '4.2★'}
+                        {isMeasuredRating(selectedBoardLead.googleRating) ? `${selectedBoardLead.googleRating}★` : 'Not measured'}
                       </span>
                     </div>
                   </div>
@@ -610,7 +597,7 @@ export default function BoardPanel({ leads, token, onRefresh }: BoardPanelProps)
                   <div className="p-3 bg-bg-base rounded-lg border border-border-dim space-y-1">
                     <span className="text-[9px] text-text-tertiary uppercase block">Predicted Deal LTV</span>
                     <span className="font-bold text-accent">
-                      ${(selectedBoardLead.predictedLtvUsd || 4500).toLocaleString()} USD
+                      {typeof selectedBoardLead.predictedLtvUsd === 'number' && Number.isFinite(selectedBoardLead.predictedLtvUsd) && selectedBoardLead.predictedLtvUsd >= 0 ? `${selectedBoardLead.predictedLtvUsd.toLocaleString()} USD` : 'Not measured'}
                     </span>
                   </div>
                 </div>
@@ -624,8 +611,11 @@ export default function BoardPanel({ leads, token, onRefresh }: BoardPanelProps)
                     </span>
                     <button
                       onClick={() => {
-                        const textToCopy = selectedBoardLead.outreachStrategy || 
-                          `Hi ${selectedBoardLead.ownerName || 'there'}, noticed ${selectedBoardLead.businessName} has a ${selectedBoardLead.sslStatus === 'missing' ? 'missing SSL certificate and ' : ''}slow mobile load speed impacting Google rankings in ${selectedBoardLead.city}. We can resolve this within 48 hours to capture top search volume.`;
+                        const textToCopy = selectedBoardLead.outreachStrategy?.trim();
+                        if (!textToCopy) {
+                          showToast('No evidence-backed pitch is saved yet. Draft one with Hermes first.', 'warning');
+                          return;
+                        }
                         navigator.clipboard.writeText(textToCopy);
                         setCopiedPitch(true);
                         setTimeout(() => setCopiedPitch(false), 2000);
@@ -637,8 +627,7 @@ export default function BoardPanel({ leads, token, onRefresh }: BoardPanelProps)
                     </button>
                   </div>
                   <p className="text-xs text-text-primary leading-relaxed">
-                    {selectedBoardLead.outreachStrategy || 
-                      `"We analyzed ${selectedBoardLead.businessName}'s digital conversion surface in ${selectedBoardLead.city}. Their website ${selectedBoardLead.sslStatus === 'missing' ? 'flags an unencrypted SSL error and ' : ''}scores below standard mobile speed, leaking valuable high-intent local customer calls to competitors. Immediate remediation unlocks an estimated +$${(selectedBoardLead.predictedLtvUsd || 4500).toLocaleString()} in pipeline value."`}
+                    {selectedBoardLead.outreachStrategy || 'No evidence-backed pitch has been saved. Draft one with Hermes using only the available, verified lead information.'}
                   </p>
                   <div className="flex items-center gap-2 pt-1 border-t border-accent/20">
                     <button
@@ -667,24 +656,30 @@ export default function BoardPanel({ leads, token, onRefresh }: BoardPanelProps)
                   <span className="text-[10px] font-mono uppercase tracking-wider text-text-tertiary block mb-1.5 font-bold">
                     Move Pipeline Stage
                   </span>
-                  <div className="grid grid-cols-4 gap-1.5 font-mono text-[9px]">
-                    {(['new', 'contacted', 'converted', 'dead'] as Lead['status'][]).map(st => (
-                      <button
-                        key={st}
-                        onClick={() => {
-                          moveLeadToStatus(selectedBoardLead.id, st);
-                          setSelectedBoardLead(prev => prev ? { ...prev, status: st } : null);
-                        }}
-                        className={`py-1.5 px-1 rounded border text-center font-bold uppercase transition-all ${
-                          selectedBoardLead.status === st 
-                            ? 'bg-accent text-accent-contrast border-accent' 
-                            : 'bg-bg-base border-border-dim text-text-secondary hover:text-text-primary'
-                        }`}
-                      >
-                        {st}
-                      </button>
-                    ))}
-                  </div>
+                  {getCrmBoardStage(selectedBoardLead.status) ? (
+                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-1.5 font-mono text-[9px]">
+                      {[getCrmBoardStage(selectedBoardLead.status)!, ...getAllowedCrmBoardStages(selectedBoardLead.status)].filter((stage, index, stages) => stages.indexOf(stage) === index).map(st => (
+                        <button
+                          key={st}
+                          disabled={st === getCrmBoardStage(selectedBoardLead.status)}
+                          onClick={async () => {
+                            if (await moveLeadToStatus(selectedBoardLead.id, st)) {
+                              setSelectedBoardLead(prev => prev ? { ...prev, status: st as Lead['status'] } : null);
+                            }
+                          }}
+                          className={`py-1.5 px-1 rounded border text-center font-bold uppercase transition-all disabled:opacity-100 disabled:cursor-default ${
+                            getCrmBoardStage(selectedBoardLead.status) === st
+                              ? 'bg-accent text-accent-contrast border-accent'
+                              : 'bg-bg-base border-border-dim text-text-secondary hover:text-text-primary'
+                          }`}
+                        >
+                          {stageNames[st]}
+                        </button>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-warning">This lead has an unrecognized CRM stage. It must be normalized before it can be moved.</p>
+                  )}
                 </div>
               </div>
 

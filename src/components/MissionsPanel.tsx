@@ -431,15 +431,15 @@ export default function MissionsPanel({ token, leads, onRefreshLeads }: Missions
                         <div className="grid grid-cols-3 gap-2 text-[9px] font-mono text-text-secondary">
                           <div className="bg-bg-subtle p-2 rounded-md border border-border-dim text-center">
                             <span className="text-text-secondary block text-[8px] uppercase tracking-wider mb-0.5">Speed Index</span>
-                            <span className="font-bold text-yellow-500">{l.performanceScore || '68'}/100</span>
+                            <span className="font-bold text-yellow-500">{typeof l.performanceScore === 'number' && Number.isFinite(l.performanceScore) ? `${l.performanceScore}/100` : 'Not measured'}</span>
                           </div>
                           <div className="bg-bg-subtle p-2 rounded-md border border-border-dim text-center">
                             <span className="text-text-secondary block text-[8px] uppercase tracking-wider mb-0.5">SSL Secured</span>
-                            <span className={`font-bold uppercase ${l.sslStatus === 'secured' ? 'text-accent' : 'text-red-500'}`}>{l.sslStatus || 'UNSECURED'}</span>
+                            <span className={`font-bold uppercase ${l.sslStatus === 'secured' ? 'text-accent' : l.sslStatus === 'missing' ? 'text-red-500' : 'text-text-secondary'}`}>{l.sslStatus === 'secured' ? 'SECURED' : l.sslStatus === 'missing' ? 'MISSING' : 'NOT MEASURED'}</span>
                           </div>
                           <div className="bg-bg-subtle p-2 rounded-md border border-border-dim text-center">
                             <span className="text-text-secondary block text-[8px] uppercase tracking-wider mb-0.5">SEO Profile</span>
-                            <span className="font-bold text-text-primary">{l.seoScore || 'N/A'}/100</span>
+                            <span className="font-bold text-text-primary">{typeof l.seoScore === 'number' && Number.isFinite(l.seoScore) ? `${l.seoScore}/100` : 'Not measured'}</span>
                           </div>
                         </div>
 

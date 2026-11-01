@@ -76,6 +76,7 @@ const HalLoopOperationsView = lazy(() => import('./components/HalLoopOperationsV
 const HermesLabPanel = lazy(() => import('./components/HermesLabPanel'));
 const BlueprintViewerPanel = lazy(() => import('./components/BlueprintViewerPanel').then(module => ({ default: module.BlueprintViewerPanel })));
 import { ErrorBoundary } from './components/ErrorBoundary';
+import { parseCachedContractor, safeStorageGet, safeStorageSet, safeStorageRemove } from './lib/sessionStorage';
 
 // 4-Zone Workstation Shell & Tools
 import { InspectorProvider } from './context/InspectorContext';
@@ -105,6 +106,30 @@ import {
   Contractor 
 } from './types';
 
+function readLocalStorage(key: string): string | null {
+  try {
+    return typeof window === 'undefined' ? null : safeStorageGet(window.localStorage, key);
+  } catch {
+    return null;
+  }
+}
+
+function writeLocalStorage(key: string, value: string): void {
+  try {
+    if (typeof window !== 'undefined') safeStorageSet(window.localStorage, key, value);
+  } catch {
+    // Browser storage is optional; session and UI actions must remain usable without it.
+  }
+}
+
+function removeLocalStorage(key: string): void {
+  try {
+    if (typeof window !== 'undefined') safeStorageRemove(window.localStorage, key);
+  } catch {
+    // Ignore storage restrictions; in-memory state is cleared separately.
+  }
+}
+
 export default function App() {
   const { 
     activeCity, 
@@ -125,35 +150,48 @@ export default function App() {
   // Authentication State
   const [token, setToken] = useState<string | null>(() => {
     if (reviewMode) return null;
-    return localStorage.getItem('halbiz_auth_token') || localStorage.getItem('token');
+    return readLocalStorage('halbiz_auth_token') || readLocalStorage('token');
   });
   const [contractor, setContractor] = useState<Contractor | null>(() => {
     if (reviewMode) {
       return { id: 'review-mode', email: 'review@halbiz.local', name: 'Workspace Preview', role: 'user' };
     }
-    const saved = localStorage.getItem('halbiz_auth_contractor');
-    return saved ? JSON.parse(saved) : null;
+    const saved = readLocalStorage('halbiz_auth_contractor');
+    return parseCachedContractor(saved);
   });
 
   // Session rehydration and token validation on mount
   useEffect(() => {
-    const existingToken = localStorage.getItem('halbiz_auth_token') || localStorage.getItem('token');
+    // Review mode is deliberately unauthenticated and must not rehydrate a real saved session.
+    if (reviewMode) return;
+
+    const existingToken = readLocalStorage('halbiz_auth_token') || readLocalStorage('token');
     if (existingToken) {
       fetch('/api/auth/me', {
         headers: { 'Authorization': `Bearer ${existingToken}` }
       })
         .then(res => {
-          if (!res.ok) throw new Error('Session invalid');
+          if (res.status === 401 || res.status === 403) {
+            removeLocalStorage('halbiz_auth_token');
+            removeLocalStorage('token');
+            removeLocalStorage('halbiz_auth_contractor');
+            setToken(null);
+            setContractor(null);
+            throw new Error('Saved session is no longer valid');
+          }
+          if (!res.ok) throw new Error(`Session verification failed (HTTP ${res.status})`);
           return res.json();
         })
         .then(data => {
           if (data.contractor) {
             setContractor(data.contractor);
-            localStorage.setItem('halbiz_auth_contractor', JSON.stringify(data.contractor));
+            writeLocalStorage('halbiz_auth_contractor', JSON.stringify(data.contractor));
           }
         })
-        .catch(() => {
-          console.warn('Session verification failed, requesting re-authentication.');
+        .catch((error: unknown) => {
+          // Keep the cached session on transient server/network errors; only an explicit
+          // 401/403 above clears it. This avoids logging users out during an outage.
+          console.warn('Session verification could not be completed.', error);
         });
     }
   }, []);
@@ -261,38 +299,38 @@ export default function App() {
 
   // Theme & Identity States
   const [theme, setTheme] = useState<'dark' | 'light'>(() => {
-    const saved = localStorage.getItem('hal_theme') as 'dark' | 'light' | null;
+    const saved = readLocalStorage('hal_theme') as 'dark' | 'light' | null;
     if (saved === 'dark' || saved === 'light') return saved;
     return window.matchMedia?.('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
   });
   const [profilePhoto, setProfilePhoto] = useState<string | null>(() => {
-    return localStorage.getItem('hal_profile_photo');
+    return readLocalStorage('hal_profile_photo');
   });
   const [companyLogo, setCompanyLogo] = useState<string | null>(() => {
-    return localStorage.getItem('hal_company_logo');
+    return readLocalStorage('hal_company_logo');
   });
 
   const handleProfilePhotoUpdate = (photo: string | null) => {
     if (photo) {
-      localStorage.setItem('hal_profile_photo', photo);
+      writeLocalStorage('hal_profile_photo', photo);
     } else {
-      localStorage.removeItem('hal_profile_photo');
+      removeLocalStorage('hal_profile_photo');
     }
     setProfilePhoto(photo);
   };
 
   const handleCompanyLogoUpdate = (logo: string | null) => {
     if (logo) {
-      localStorage.setItem('hal_company_logo', logo);
+      writeLocalStorage('hal_company_logo', logo);
     } else {
-      localStorage.removeItem('hal_company_logo');
+      removeLocalStorage('hal_company_logo');
     }
     setCompanyLogo(logo);
   };
 
   const toggleTheme = () => {
     const next = theme === 'dark' ? 'light' : 'dark';
-    localStorage.setItem('hal_theme', next);
+    writeLocalStorage('hal_theme', next);
     setTheme(next);
   };
 
@@ -301,7 +339,7 @@ export default function App() {
     const mq = window.matchMedia?.('(prefers-color-scheme: light)');
     if (!mq) return;
     const onChange = (e: MediaQueryListEvent) => {
-      if (!localStorage.getItem('hal_theme')) setTheme(e.matches ? 'light' : 'dark');
+      if (!readLocalStorage('hal_theme')) setTheme(e.matches ? 'light' : 'dark');
     };
     mq.addEventListener('change', onChange);
     return () => mq.removeEventListener('change', onChange);
@@ -327,8 +365,8 @@ export default function App() {
       const urlStr = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
 
       // Auto-inject or repair Authorization header for /api requests if not an auth endpoint
-      if (urlStr && urlStr.startsWith('/api') && !urlStr.startsWith('/api/auth/')) {
-        const storedToken = localStorage.getItem('halbiz_auth_token') || localStorage.getItem('token');
+      if (!reviewMode && urlStr && urlStr.startsWith('/api') && !urlStr.startsWith('/api/auth/')) {
+        const storedToken = token || readLocalStorage('halbiz_auth_token') || readLocalStorage('token');
         if (storedToken) {
           const headers = new Headers(modifiedInit.headers || {});
           const existingAuth = headers.get('Authorization');
@@ -368,13 +406,13 @@ export default function App() {
       }
 
       // Gracefully handle genuinely expired authentication tokens across /api calls
-      if (response.status === 401 && urlStr && urlStr.startsWith('/api') && !urlStr.startsWith('/api/auth/')) {
-        const hasStoredSession = localStorage.getItem('halbiz_auth_token') || localStorage.getItem('token');
+      if (!reviewMode && response.status === 401 && urlStr && urlStr.startsWith('/api') && !urlStr.startsWith('/api/auth/')) {
+        const hasStoredSession = token || readLocalStorage('halbiz_auth_token') || readLocalStorage('token');
         if (hasStoredSession) {
           console.warn('Session token expired or invalid; resetting authentication state.');
-          localStorage.removeItem('halbiz_auth_token');
-          localStorage.removeItem('token');
-          localStorage.removeItem('halbiz_auth_contractor');
+          removeLocalStorage('halbiz_auth_token');
+          removeLocalStorage('token');
+          removeLocalStorage('halbiz_auth_contractor');
           setToken(null);
           setContractor(null);
           window.dispatchEvent(new Event('halbiz_auth_expired'));
@@ -386,7 +424,7 @@ export default function App() {
     return () => {
       window.fetch = originalFetch;
     };
-  }, []);
+  }, [token, reviewMode]);
 
   // Auto-fetch data on token load
   useEffect(() => {
@@ -420,7 +458,7 @@ export default function App() {
     const handleDisplayModeChange = (e: MediaQueryListEvent) => {
       if (e.matches) {
         setIsAppInstalled(true);
-        localStorage.setItem('hal_app_installed', 'true');
+        writeLocalStorage('hal_app_installed', 'true');
       }
     };
     mql.addEventListener('change', handleDisplayModeChange);
@@ -433,7 +471,7 @@ export default function App() {
     const handleAppInstalled = () => {
       console.log('HALBiz was installed successfully');
       setIsAppInstalled(true);
-      localStorage.setItem('hal_app_installed', 'true');
+      writeLocalStorage('hal_app_installed', 'true');
       setDeferredPrompt(null);
       setShowDesktopInstallModal(false);
       setToastAlert({
@@ -456,7 +494,7 @@ export default function App() {
 
   const markAsInstalled = () => {
     setIsAppInstalled(true);
-    localStorage.setItem('hal_app_installed', 'true');
+    writeLocalStorage('hal_app_installed', 'true');
     setShowDesktopInstallModal(false);
     setToastAlert({
       id: 'installed_' + Date.now(),
@@ -530,51 +568,57 @@ export default function App() {
 
   const fetchAllData = async (retryCount = 0) => {
     if (!token) return;
+    const endpoints: { url: string; label: string; apply: (value: any) => void }[] = [
+      { url: '/api/leads', label: 'leads', apply: setLeads },
+      { url: '/api/campaigns', label: 'campaigns', apply: setCampaigns },
+      { url: '/api/revenues', label: 'revenue records', apply: setRevenues },
+      { url: '/api/forecasts', label: 'forecasts', apply: setForecasts },
+      { url: '/api/learning-insights', label: 'learning insights', apply: setLearningInsights },
+      { url: '/api/recommendations', label: 'recommendations', apply: setRecommendations },
+      { url: '/api/scheduler/jobs', label: 'scheduled jobs', apply: setSchedulerJobs }
+    ];
+
     try {
       const headers = { 'Authorization': `Bearer ${token}` };
+      const results = await Promise.allSettled(endpoints.map(async endpoint => {
+        const response = await fetch(endpoint.url, { headers });
+        if (!response.ok) throw new Error(`${endpoint.url} returned HTTP ${response.status}`);
+        return response.json();
+      }));
 
-      const safeFetchJson = async (url: string) => {
-        const res = await fetch(url, { headers });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        return res.json();
-      };
+      const failedEndpoints: string[] = [];
+      results.forEach((result, index) => {
+        if (result.status === 'fulfilled') endpoints[index].apply(result.value);
+        else failedEndpoints.push(endpoints[index].label);
+      });
 
-      const results = await Promise.allSettled([
-        safeFetchJson('/api/leads'),
-        safeFetchJson('/api/campaigns'),
-        safeFetchJson('/api/revenues'),
-        safeFetchJson('/api/forecasts'),
-        safeFetchJson('/api/learning-insights'),
-        safeFetchJson('/api/recommendations'),
-        safeFetchJson('/api/scheduler/jobs')
-      ]);
-
-      const [leadsRes, campaignsRes, revenuesRes, forecastsRes, insightsRes, recsRes, jobsRes] = results;
-
-      if (leadsRes.status === 'fulfilled') setLeads(leadsRes.value);
-      if (campaignsRes.status === 'fulfilled') setCampaigns(campaignsRes.value);
-      if (revenuesRes.status === 'fulfilled') setRevenues(revenuesRes.value);
-      if (forecastsRes.status === 'fulfilled') setForecasts(forecastsRes.value);
-      if (insightsRes.status === 'fulfilled') setLearningInsights(insightsRes.value);
-      if (recsRes.status === 'fulfilled') setRecommendations(recsRes.value);
-      if (jobsRes.status === 'fulfilled') setSchedulerJobs(jobsRes.value);
-
-      // If all failed (e.g. server rebooting or offline), trigger retry
-      const allFailed = results.every(r => r.status === 'rejected');
-      if (allFailed) {
-        throw new Error('All store endpoints rejected');
+      if (failedEndpoints.length > 0) {
+        const exhaustedRetries = retryCount >= 3;
+        setToastAlert({
+          id: 'data-sync',
+          title: exhaustedRetries ? 'Partial Sync Failure' : 'Sync Delayed',
+          message: exhaustedRetries
+            ? `Could not refresh ${failedEndpoints.join(', ')}. Some displayed data may be stale.`
+            : `Could not refresh ${failedEndpoints.join(', ')}. Retrying while keeping the last available data.`,
+          type: 'system'
+        });
+        if (!exhaustedRetries) {
+          setTimeout(() => { void fetchAllData(retryCount + 1); }, 1500 * (retryCount + 1));
+        }
+        return;
       }
 
+      setToastAlert(previous => previous?.id === 'data-sync' ? null : previous);
     } catch (err) {
+      console.warn('Unexpected dashboard synchronization failure:', err);
       if (retryCount < 3) {
-        setTimeout(() => fetchAllData(retryCount + 1), 1500 * (retryCount + 1));
+        setTimeout(() => { void fetchAllData(retryCount + 1); }, 1500 * (retryCount + 1));
       } else {
-        console.warn('Failed to fetch full application store after retries:', err);
         setToastAlert({
-          id: Date.now().toString(),
-          title: "Connection Lost",
-          message: "Failed to sync with Neural Matrix. The server might be rebooting.",
-          type: "system"
+          id: 'data-sync',
+          title: 'Connection Lost',
+          message: 'The dashboard could not refresh its data. Some displayed values may be stale.',
+          type: 'system'
         });
       }
     }
@@ -584,79 +628,94 @@ export default function App() {
   const sseTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const setupSSEConnection = () => {
-    if (sseTimeoutRef.current) {
-      clearTimeout(sseTimeoutRef.current);
-    }
-    
-    const token = localStorage.getItem('token');
-    if (!token) return;
+    if (sseTimeoutRef.current) clearTimeout(sseTimeoutRef.current);
 
-    const eventSource = new EventSource(`/api/events?token=${encodeURIComponent(token)}`);
+    const sessionToken = token || readLocalStorage('halbiz_auth_token') || readLocalStorage('token');
+    if (!sessionToken) return;
 
-    eventSource.onopen = () => {
-      setSseConnected(true);
-      sseRetryCountRef.current = 0; // Reset backoff on success
-    };
+    let active = true;
+    let currentController: AbortController | null = null;
 
-    eventSource.onmessage = (event) => {
+    const handleSseData = (rawData: string) => {
       try {
-        const payload = JSON.parse(event.data);
+        const payload = JSON.parse(rawData);
         if (payload.type === 'notification') {
           const newNotif = payload.data as Notification;
-          
-          // Verify if notification belongs to current contractor
           if (newNotif.contractorId === contractor?.id) {
-            setNotifications(prev => [newNotif, ...prev]);
-            
-            // Trigger dynamic toast slide-in alert
+            setNotifications(previous => [newNotif, ...previous]);
             setToastAlert({
               id: newNotif.id,
               title: newNotif.title,
               message: newNotif.message,
               type: newNotif.type
             });
-
-            // Auto-dismiss toast
             setTimeout(() => {
-              setToastAlert(prev => prev?.id === newNotif.id ? null : prev);
+              setToastAlert(previous => previous?.id === newNotif.id ? null : previous);
             }, 6000);
-
-            // Instant refresh of data stores
-            fetchAllData();
+            void fetchAllData();
           }
-        } else if (payload.type === 'heartbeat') {
-          // Heartbeat received, connection is healthy
         }
       } catch (err) {
-        console.error('SSE Message parsing failed:', err);
+        console.error('SSE message parsing failed:', err);
       }
     };
 
-    eventSource.onerror = (err: any) => {
-      setSseConnected(false);
-      eventSource.close();
-      
-      // Implement exponential backoff: 2s, 4s, 8s, 16s... up to 30s
-      const backoffDelay = Math.min(1000 * Math.pow(2, sseRetryCountRef.current + 1), 30000);
-      sseRetryCountRef.current += 1;
-      
-      console.warn(`SSE Connection lost. Retrying in ${backoffDelay}ms (Attempt ${sseRetryCountRef.current})`);
-      
-      sseTimeoutRef.current = setTimeout(setupSSEConnection, backoffDelay);
+    const connect = async () => {
+      currentController = new AbortController();
+      try {
+        const response = await fetch('/api/events', {
+          headers: {
+            'Accept': 'text/event-stream',
+            'Authorization': `Bearer ${sessionToken}`
+          },
+          signal: currentController.signal
+        });
+        if (!response.ok) throw new Error(`SSE connection failed (HTTP ${response.status})`);
+        if (!response.body) throw new Error('SSE response did not provide a readable stream');
+
+        setSseConnected(true);
+        sseRetryCountRef.current = 0;
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+
+        while (active) {
+          const { value, done } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+          const frames = buffer.split(/\r?\n\r?\n/);
+          buffer = frames.pop() || '';
+          for (const frame of frames) {
+            const data = frame.split(/\r?\n/)
+              .filter(line => line.startsWith('data:'))
+              .map(line => line.slice(5).trimStart())
+              .join('\n');
+            if (data) handleSseData(data);
+          }
+        }
+        if (active) throw new Error('SSE stream closed unexpectedly');
+      } catch (err) {
+        if (!active || currentController?.signal.aborted) return;
+        setSseConnected(false);
+        const backoffDelay = Math.min(1000 * Math.pow(2, sseRetryCountRef.current + 1), 30000);
+        sseRetryCountRef.current += 1;
+        console.warn(`SSE connection lost. Retrying in ${backoffDelay}ms (attempt ${sseRetryCountRef.current}).`, err);
+        sseTimeoutRef.current = setTimeout(() => { void connect(); }, backoffDelay);
+      }
     };
 
+    void connect();
     return () => {
-      eventSource.close();
-      if (sseTimeoutRef.current) {
-        clearTimeout(sseTimeoutRef.current);
-      }
+      active = false;
+      currentController?.abort();
+      if (sseTimeoutRef.current) clearTimeout(sseTimeoutRef.current);
+      setSseConnected(false);
     };
   };
-
   const handleAuthSuccess = (newToken: string, newContractor: Contractor) => {
-    localStorage.setItem('halbiz_auth_token', newToken);
-    localStorage.setItem('token', newToken);
-    localStorage.setItem('halbiz_auth_contractor', JSON.stringify(newContractor));
+    writeLocalStorage('halbiz_auth_token', newToken);
+    writeLocalStorage('token', newToken);
+    writeLocalStorage('halbiz_auth_contractor', JSON.stringify(newContractor));
     setToken(newToken);
     setContractor(newContractor);
   };
@@ -670,9 +729,9 @@ export default function App() {
     } catch (err) {
       console.error(err);
     } finally {
-      localStorage.removeItem('halbiz_auth_token');
-      localStorage.removeItem('token');
-      localStorage.removeItem('halbiz_auth_contractor');
+      removeLocalStorage('halbiz_auth_token');
+      removeLocalStorage('token');
+      removeLocalStorage('halbiz_auth_contractor');
       setToken(null);
       setContractor(null);
       setNotifications([]);
@@ -1252,7 +1311,7 @@ export default function App() {
             onClick={() => setActiveTab('credentials')} 
             className="hover:text-accent hover:underline cursor-pointer flex items-center gap-1"
           >
-            DATABASE: {typeof window !== 'undefined' && localStorage.getItem('halbiz_postgres_url') ? 'NEON_POSTGRES' : 'SECURE_SQLITE'}
+            DATABASE: SERVER-MANAGED
           </button>
           <span className="text-text-tertiary">|</span>
           <button 

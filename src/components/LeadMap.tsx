@@ -299,10 +299,10 @@ function MarkerWithInfoWindow({
               
               <div className="flex gap-2 mt-2 border-t pt-2">
                 <div className="bg-gray-100 px-1.5 py-0.5 rounded text-[10px]">
-                  <span>Speed:</span> <span className="font-bold text-amber-600">{lead.performanceScore || 'N/A'}/100</span>
+                  <span>Speed:</span> <span className="font-bold text-amber-600">{typeof lead.performanceScore === 'number' && Number.isFinite(lead.performanceScore) ? `${lead.performanceScore}/100` : 'Not measured'}</span>
                 </div>
                 <div className="bg-gray-100 px-1.5 py-0.5 rounded text-[10px]">
-                  <span>SEO:</span> <span className="font-bold text-gray-800">{lead.seoScore || 'N/A'}/100</span>
+                  <span>SEO:</span> <span className="font-bold text-gray-800">{typeof lead.seoScore === 'number' && Number.isFinite(lead.seoScore) ? `${lead.seoScore}/100` : 'Not measured'}</span>
                 </div>
               </div>
 
@@ -663,8 +663,8 @@ function OpenStreetMapContainer({
       let innerColor = '#ef4444';
 
       if (activeOverlay === 'density') {
-        const urgency = lead.urgencyScore || 5;
-        const ltv = lead.predictedLtvUsd || 0;
+        const urgency = typeof lead.urgencyScore === 'number' && Number.isFinite(lead.urgencyScore) ? lead.urgencyScore : 0;
+        const ltv = typeof lead.predictedLtvUsd === 'number' && Number.isFinite(lead.predictedLtvUsd) ? lead.predictedLtvUsd : 0;
         weight = Math.min(1.0, (urgency / 10) * 0.6 + (ltv / 15000) * 0.4);
         outerColor = '#06b6d4';
         midColor = '#d946ef';
@@ -676,7 +676,7 @@ function OpenStreetMapContainer({
         midColor = '#34d399';
         innerColor = '#059669';
       } else if (activeOverlay === 'neural') {
-        const score = lead.urgencyScore || 5;
+        const score = typeof lead.urgencyScore === 'number' && Number.isFinite(lead.urgencyScore) ? lead.urgencyScore : 0;
         weight = score / 10;
         outerColor = '#8b5cf6'; // violet
         midColor = '#a855f7'; // purple
@@ -831,16 +831,16 @@ function OpenStreetMapContainer({
 
           <div style="display: flex; gap: 6px; margin-top: 6px; padding-top: 6px; border-top: 1px solid #374151;">
             <div style="background: #1f2937; padding: 3px 6px; border-radius: 3px; font-size: 9px; font-family: monospace;">
-              SEO: <b style="color:#10b981;">${lead.seoScore || 'N/A'}/100</b>
+              SEO: <b style="color:#10b981;">${typeof lead.seoScore === 'number' && Number.isFinite(lead.seoScore) ? lead.seoScore + '/100' : 'Not measured'}</b>
             </div>
             <div style="background: #1f2937; padding: 3px 6px; border-radius: 3px; font-size: 9px; font-family: monospace;">
-              SPEED: <b style="color:#f59e0b;">${lead.performanceScore || 'N/A'}/100</b>
+              SPEED: <b style="color:#f59e0b;">${typeof lead.performanceScore === 'number' && Number.isFinite(lead.performanceScore) ? lead.performanceScore + '/100' : 'Not measured'}</b>
             </div>
           </div>
 
-          ${lead.predictedLtvUsd ? `
+          ${typeof lead.predictedLtvUsd === 'number' && Number.isFinite(lead.predictedLtvUsd) && lead.predictedLtvUsd >= 0 ? `
             <div style="margin-top: 6px; background: rgba(59, 130, 246, 0.15); border: 1px solid rgba(59, 130, 246, 0.3); padding: 4px; border-radius: 3px; font-size: 10px; font-family: monospace; color: #60a5fa; text-align: center;">
-              EST. LTV: <b>$${lead.predictedLtvUsd.toLocaleString()} USD</b>
+              PREDICTED LTV: <b>${lead.predictedLtvUsd.toLocaleString()} USD</b>
             </div>
           ` : ''}
         </div>

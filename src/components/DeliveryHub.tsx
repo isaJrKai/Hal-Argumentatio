@@ -36,6 +36,7 @@ export default function DeliveryHub({ token, leads = [] }: DeliveryHubProps) {
   const [projects, setProjects] = useState<ClientProject[]>([]);
   const [selectedProject, setSelectedProject] = useState<ClientProject | null>(null);
   const [loading, setLoading] = useState(true);
+  const [projectError, setProjectError] = useState<string | null>(null);
   const [copiedLink, setCopiedLink] = useState(false);
 
   // New Project Modal State
@@ -49,31 +50,32 @@ export default function DeliveryHub({ token, leads = [] }: DeliveryHubProps) {
   const [newProjectRetainer, setNewProjectRetainer] = useState(2400);
 
   const fetchProjects = async (retry = 1) => {
+    let retryScheduled = false;
     try {
       setLoading(true);
       const activeToken = token || localStorage.getItem('halbiz_auth_token') || localStorage.getItem('token') || '';
+      if (!activeToken) throw new Error('Sign in to load client projects.');
       const res = await fetch('/api/projects', {
-        headers: activeToken ? { 'Authorization': `Bearer ${activeToken}` } : {}
+        headers: { 'Authorization': `Bearer ${activeToken}` }
       });
-      if (res.ok) {
-        const data = await res.json();
-        if (Array.isArray(data)) {
-          setProjects(data);
-          if (data.length > 0 && !selectedProject) {
-            setSelectedProject(data[0]);
-          }
-        }
-      } else if (retry > 0) {
-        setTimeout(() => fetchProjects(retry - 1), 600);
-      }
+      if (!res.ok) throw new Error(`Project list request failed (HTTP ${res.status}).`);
+      const data = await res.json();
+      if (!Array.isArray(data)) throw new Error('Project list response was not a valid array.');
+      setProjects(data);
+      setSelectedProject(current => current && data.some(project => project.id === current.id)
+        ? data.find(project => project.id === current.id) || null
+        : data[0] || null);
+      setProjectError(null);
     } catch (err) {
       if (retry > 0) {
-        setTimeout(() => fetchProjects(retry - 1), 600);
+        retryScheduled = true;
+        setTimeout(() => { void fetchProjects(retry - 1); }, 600);
       } else {
-        console.warn('Client projects temporarily unavailable:', err);
+        console.warn('Client projects unavailable:', err);
+        setProjectError(err instanceof Error ? err.message : 'Client projects could not be loaded.');
       }
     } finally {
-      setLoading(false);
+      if (!retryScheduled) setLoading(false);
     }
   };
 
@@ -83,115 +85,123 @@ export default function DeliveryHub({ token, leads = [] }: DeliveryHubProps) {
 
   const handleCreateProject = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newProjectBusinessName.trim()) return;
+    if (!newProjectBusinessName.trim() || !newProjectCity.trim() || !newProjectServiceType.trim() || !Number.isFinite(newProjectRetainer) || newProjectRetainer <= 0) {
+      setProjectError('Business name, city, service type and a positive monthly retainer are required.');
+      return;
+    }
 
+    setProjectError(null);
     try {
+      const activeToken = token || localStorage.getItem('halbiz_auth_token') || localStorage.getItem('token') || '';
+      if (!activeToken) throw new Error('Your session has expired. Sign in again to create a project.');
       const res = await fetch('/api/projects', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
+          'Authorization': `Bearer ${activeToken}`
         },
         body: JSON.stringify({
           leadId: newProjectLeadId,
-          businessName: newProjectBusinessName,
-          clientName: newProjectClientName || 'Business Owner',
-          city: newProjectCity || 'Calgary',
-          serviceType: newProjectServiceType || 'Trade Services',
+          businessName: newProjectBusinessName.trim(),
+          clientName: newProjectClientName.trim(),
+          city: newProjectCity.trim(),
+          serviceType: newProjectServiceType.trim(),
           packageTier: newProjectPackage,
-          monthlyRetainerUsd: newProjectRetainer,
-          initialAuditScore: 48
+          monthlyRetainerUsd: newProjectRetainer
         })
       });
+      const responseData = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(responseData.error || `Project creation failed (HTTP ${res.status}).`);
 
-      if (res.ok) {
-        const created = await res.json();
-        setProjects(prev => [created, ...prev]);
-        setSelectedProject(created);
+      // A successful POST is not enough: confirm the project appears in the durable list.
+      const verifyRes = await fetch('/api/projects', { headers: { 'Authorization': `Bearer ${activeToken}` } });
+      if (!verifyRes.ok) throw new Error(`Project was accepted, but persistence could not be verified (HTTP ${verifyRes.status}).`);
+      const persistedProjects = await verifyRes.json();
+      const created = responseData as ClientProject;
+      if (!Array.isArray(persistedProjects) || !persistedProjects.some((project: ClientProject) => project.id === created.id)) {
+        setProjectError('The server accepted this project, but it is missing from the persistent project list. It may not survive a refresh. Project storage needs repair before this project can be considered saved.');
         setShowNewProjectModal(false);
-        // Reset fields
-        setNewProjectBusinessName('');
-        setNewProjectClientName('');
+        return;
       }
+
+      setProjects(persistedProjects);
+      setSelectedProject(persistedProjects.find((project: ClientProject) => project.id === created.id) || created);
+      setShowNewProjectModal(false);
+      setNewProjectBusinessName('');
+      setNewProjectClientName('');
+      setNewProjectCity('');
+      setNewProjectServiceType('');
+      setNewProjectLeadId('');
+      setProjectError(null);
     } catch (err) {
       console.error('Error creating project:', err);
+      setProjectError(err instanceof Error ? err.message : 'Project could not be created.');
     }
   };
 
   const handleUpdateMilestone = async (milestoneId: string, newStatus: ClientMilestone['status']) => {
     if (!selectedProject) return;
 
-    const updatedMilestones = selectedProject.milestones.map(m => {
-      if (m.id === milestoneId) {
-        return {
-          ...m,
-          status: newStatus,
-          completedAt: newStatus === 'completed' ? new Date().toISOString() : undefined
-        };
-      }
-      return m;
-    });
-
-    // Recalculate score based on completed milestones
+    const updatedMilestones = selectedProject.milestones.map(m => m.id === milestoneId
+      ? { ...m, status: newStatus, completedAt: newStatus === 'completed' ? new Date().toISOString() : undefined }
+      : m);
     const completedCount = updatedMilestones.filter(m => m.status === 'completed').length;
-    const progressPct = completedCount / updatedMilestones.length;
-    const newScore = Math.round(selectedProject.initialAuditScore + (progressPct * (selectedProject.targetScore - selectedProject.initialAuditScore)));
-
+    const allMilestonesComplete = updatedMilestones.length > 0 && completedCount === updatedMilestones.length;
     const updatedProject = {
       ...selectedProject,
       milestones: updatedMilestones,
-      currentScore: newScore,
-      status: completedCount === updatedMilestones.length ? ('completed' as const) : ('active_delivery' as const)
+      status: allMilestonesComplete ? ('completed' as const) : ('active_delivery' as const)
     };
 
-    setSelectedProject(updatedProject);
-    setProjects(prev => prev.map(p => p.id === updatedProject.id ? updatedProject : p));
-
     try {
-      await fetch(`/api/projects/${selectedProject.id}`, {
+      const activeToken = token || localStorage.getItem('halbiz_auth_token') || localStorage.getItem('token') || '';
+      const res = await fetch(`/api/projects/${selectedProject.id}`, {
         method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          milestones: updatedMilestones,
-          currentScore: newScore,
-          status: updatedProject.status
-        })
+        headers: { 'Content-Type': 'application/json', ...(activeToken ? { 'Authorization': `Bearer ${activeToken}` } : {}) },
+        body: JSON.stringify({ milestones: updatedMilestones, status: updatedProject.status })
       });
+      const responseData = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(responseData.error || `Milestone update failed (HTTP ${res.status}).`);
+      const savedProject = responseData && typeof responseData === 'object' ? { ...updatedProject, ...responseData } : updatedProject;
+      setSelectedProject(savedProject);
+      setProjects(prev => prev.map(project => project.id === savedProject.id ? savedProject : project));
+      setProjectError(null);
     } catch (err) {
       console.error('Failed to save milestone update:', err);
+      setProjectError(err instanceof Error ? err.message : 'Milestone update was not saved.');
     }
   };
 
   const handleUpdateAssetStatus = async (assetId: string, newStatus: ClientAsset['status']) => {
     if (!selectedProject) return;
 
-    const updatedAssets = selectedProject.assets.map(a => {
-      if (a.id === assetId) {
-        return { ...a, status: newStatus, uploadedAt: newStatus !== 'pending' ? new Date().toISOString() : undefined };
-      }
-      return a;
-    });
-
+    const updatedAssets = selectedProject.assets.map(asset => asset.id === assetId
+      ? { ...asset, status: newStatus, uploadedAt: newStatus !== 'pending' ? new Date().toISOString() : undefined }
+      : asset);
     const updatedProject = { ...selectedProject, assets: updatedAssets };
-    setSelectedProject(updatedProject);
-    setProjects(prev => prev.map(p => p.id === updatedProject.id ? updatedProject : p));
 
     try {
-      await fetch(`/api/projects/${selectedProject.id}`, {
+      const activeToken = token || localStorage.getItem('halbiz_auth_token') || localStorage.getItem('token') || '';
+      const res = await fetch(`/api/projects/${selectedProject.id}`, {
         method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
+        headers: { 'Content-Type': 'application/json', ...(activeToken ? { 'Authorization': `Bearer ${activeToken}` } : {}) },
         body: JSON.stringify({ assets: updatedAssets })
       });
+      const responseData = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(responseData.error || `Asset status update failed (HTTP ${res.status}).`);
+      const savedProject = responseData && typeof responseData === 'object' ? { ...updatedProject, ...responseData } : updatedProject;
+      setSelectedProject(savedProject);
+      setProjects(prev => prev.map(project => project.id === savedProject.id ? savedProject : project));
+      setProjectError(null);
     } catch (err) {
       console.error('Failed to save asset status:', err);
+      setProjectError(err instanceof Error ? err.message : 'Asset status was not saved.');
     }
   };
+
+  const completedMilestones = selectedProject?.milestones.filter(milestone => milestone.status === 'completed').length || 0;
+  const totalMilestones = selectedProject?.milestones.length || 0;
+  const deliveryProgress = totalMilestones > 0 ? Math.round((completedMilestones / totalMilestones) * 100) : null;
 
   return (
     <div className="space-y-6">
@@ -206,15 +216,15 @@ export default function DeliveryHub({ token, leads = [] }: DeliveryHubProps) {
             <span className="w-1 h-1 rounded-full bg-text-tertiary" />
             <span className="text-[10px] font-mono text-text-secondary">CLIENT ONBOARDING & PROJECT DELIVERY HUB</span>
           </div>
-          <h2 className="text-xl font-bold tracking-tight text-text-primary mt-1">Client Delivery & Performance Hub</h2>
+          <h2 className="text-xl font-bold tracking-tight text-text-primary mt-1">Client Delivery Hub</h2>
           <p className="text-xs text-text-secondary max-w-2xl mt-0.5">
-            Oversee active client retainer deliverables, track milestone velocity, intake technical assets, and generate white-label progress portals.
+            Track client project milestones, manually record asset intake, and share client progress portals.
           </p>
         </div>
 
         <div className="flex items-center gap-3">
           <button
-            onClick={() => setShowNewProjectModal(true)}
+            onClick={() => { setProjectError(null); setShowNewProjectModal(true); }}
             className="px-3 py-1.5 bg-brand text-black hover:bg-brand-dim rounded-sm font-mono text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 transition-colors cursor-pointer"
           >
             <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
@@ -222,6 +232,13 @@ export default function DeliveryHub({ token, leads = [] }: DeliveryHubProps) {
           </button>
         </div>
       </div>
+
+      {projectError && (
+        <div role="alert" className="flex items-start gap-2 rounded-sm border border-warning/30 bg-warning/5 p-3 text-xs text-text-primary">
+          <AlertCircle className="w-4 h-4 text-warning shrink-0 mt-0.5" />
+          <span>{projectError}</span>
+        </div>
+      )}
 
       {/* DUAL COLUMN WORKSPACE */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
@@ -231,23 +248,23 @@ export default function DeliveryHub({ token, leads = [] }: DeliveryHubProps) {
           <div className="bg-bg-raised border border-border-dim rounded-sm p-4 space-y-3">
             <div className="flex items-center justify-between border-b border-border-dim/60 pb-2">
               <span className="text-[10px] font-mono font-bold text-text-primary uppercase tracking-wider">
-                Active Client Projects ({projects.length})
+                Client Projects ({projects.length})
               </span>
               <span className="text-[9px] font-mono text-brand font-bold uppercase">
-                ${projects.reduce((sum, p) => sum + p.monthlyRetainerUsd, 0).toLocaleString()}/mo MRR
+                ${projects.filter(project => project.status !== 'completed' && typeof project.monthlyRetainerUsd === 'number' && Number.isFinite(project.monthlyRetainerUsd)).reduce((sum, project) => sum + project.monthlyRetainerUsd, 0).toLocaleString()}/mo MRR
               </span>
             </div>
 
             <div className="space-y-2">
               {projects.length === 0 ? (
                 <div className="p-6 text-center text-text-dim text-xs font-mono">
-                  No active projects. Click "Onboard New Client" to start fulfillment.
+                  {loading ? 'Loading client projects…' : 'No persisted projects are available. Click “Onboard New Client” to start fulfillment.'}
                 </div>
               ) : (
                 projects.map((project) => {
                   const isSelected = selectedProject?.id === project.id;
                   const completedMilestones = project.milestones.filter(m => m.status === 'completed').length;
-                  const progressPct = Math.round((completedMilestones / project.milestones.length) * 100);
+                  const progressPct = project.milestones.length > 0 ? Math.round((completedMilestones / project.milestones.length) * 100) : null;
 
                   return (
                     <div
@@ -282,12 +299,12 @@ export default function DeliveryHub({ token, leads = [] }: DeliveryHubProps) {
                       <div className="mt-2 space-y-1">
                         <div className="flex justify-between text-[9px] font-mono text-text-dim">
                           <span>Milestones ({completedMilestones}/{project.milestones.length})</span>
-                          <span>{progressPct}%</span>
+                          <span>{progressPct !== null ? `${progressPct}%` : 'No milestones'}</span>
                         </div>
                         <div className="w-full h-1 bg-bg-base rounded-full overflow-hidden">
                           <div 
                             className="h-full bg-brand rounded-full transition-all duration-300"
-                            style={{ width: `${progressPct}%` }}
+                            style={{ width: `${progressPct ?? 0}%` }}
                           />
                         </div>
                       </div>
@@ -322,46 +339,52 @@ export default function DeliveryHub({ token, leads = [] }: DeliveryHubProps) {
                   {/* Share Client Portal Token Link */}
                   <div className="flex items-center gap-2 font-mono text-xs">
                     <button
-                      onClick={() => {
+                      onClick={async () => {
+                        if (!selectedProject.portalAccessToken) {
+                          setProjectError('This project does not have a client portal token.');
+                          return;
+                        }
                         const url = `${window.location.origin}/?portal=${selectedProject.portalAccessToken}#portal-${selectedProject.portalAccessToken}`;
-                        navigator.clipboard.writeText(url);
-                        setCopiedLink(true);
-                        setTimeout(() => setCopiedLink(false), 2000);
+                        try {
+                          await navigator.clipboard.writeText(url);
+                          setCopiedLink(true);
+                          setTimeout(() => setCopiedLink(false), 2000);
+                        } catch {
+                          setProjectError('Could not copy the client portal link. Check browser clipboard permissions.');
+                        }
                       }}
                       className="px-2.5 py-1.5 bg-bg-dark border border-border-dim hover:border-brand text-text-primary rounded-sm text-[10px] font-bold uppercase flex items-center gap-1.5 transition-colors cursor-pointer"
                       title="Copy public client review link"
                     >
                       {copiedLink ? <Check className="w-3 h-3 text-positive" /> : <Copy className="w-3 h-3 text-brand" />}
-                      <span>{copiedLink ? 'Copied Link!' : 'Client Live Portal Link'}</span>
+                      <span>{copiedLink ? 'Copied Link!' : 'Client Portal Link'}</span>
                     </button>
                   </div>
                 </div>
 
-                {/* BEFORE & AFTER PROOF SPEED COMPARISON */}
+                {/* DELIVERY PROGRESS — derived only from milestone states */}
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 font-mono">
                   <div className="p-3 bg-bg-dark border border-border-dim rounded-sm">
-                    <span className="text-[9px] text-text-dim uppercase block font-bold">Initial Audit Health</span>
+                    <span className="text-[9px] text-text-dim uppercase block font-bold">Milestones Complete</span>
                     <div className="flex items-baseline gap-2 mt-1">
-                      <span className="text-lg font-bold text-warning">{selectedProject.initialAuditScore}/100</span>
-                      <span className="text-[10px] text-text-dim">Day 1 Baseline</span>
+                      <span className="text-lg font-bold text-text-primary">{completedMilestones} / {totalMilestones || '—'}</span>
+                      <span className="text-[10px] text-text-dim">Operator-updated</span>
                     </div>
                   </div>
 
                   <div className="p-3 bg-bg-dark border border-border-dim rounded-sm">
-                    <span className="text-[9px] text-text-dim uppercase block font-bold">Current Speed & SEO Score</span>
+                    <span className="text-[9px] text-text-dim uppercase block font-bold">Delivery Progress</span>
                     <div className="flex items-baseline gap-2 mt-1">
-                      <span className="text-lg font-bold text-brand">{selectedProject.currentScore}/100</span>
-                      <span className="text-[10px] text-positive font-bold">
-                        +{selectedProject.currentScore - selectedProject.initialAuditScore} pts gain
-                      </span>
+                      <span className="text-lg font-bold text-brand">{deliveryProgress !== null ? `${deliveryProgress}%` : 'Not available'}</span>
+                      <span className="text-[10px] text-text-dim">Based on completed milestones</span>
                     </div>
                   </div>
 
                   <div className="p-3 bg-bg-dark border border-border-dim rounded-sm">
-                    <span className="text-[9px] text-text-dim uppercase block font-bold">Target Target Velocity</span>
+                    <span className="text-[9px] text-text-dim uppercase block font-bold">Project Status</span>
                     <div className="flex items-baseline gap-2 mt-1">
-                      <span className="text-lg font-bold text-text-primary">{selectedProject.targetScore}/100</span>
-                      <span className="text-[10px] text-text-dim">Optimal Zone</span>
+                      <span className="text-lg font-bold text-text-primary capitalize">{selectedProject.status.replace('_', ' ')}</span>
+                      <span className="text-[10px] text-text-dim">Current workflow state</span>
                     </div>
                   </div>
                 </div>
@@ -373,10 +396,10 @@ export default function DeliveryHub({ token, leads = [] }: DeliveryHubProps) {
                   <div className="flex items-center gap-2">
                     <CheckCheck className="w-4 h-4 text-brand" />
                     <h4 className="text-xs font-mono font-bold text-text-primary uppercase tracking-wider">
-                      Fulfillment Milestones & Proof of Delivery
+                      Milestone Status & Proof References
                     </h4>
                   </div>
-                  <span className="text-[10px] font-mono text-text-dim">Click milestone state to update</span>
+                  <span className="text-[10px] font-mono text-text-dim">Milestone states are manually recorded</span>
                 </div>
 
                 <div className="space-y-3">
@@ -434,10 +457,10 @@ export default function DeliveryHub({ token, leads = [] }: DeliveryHubProps) {
                   <div className="flex items-center gap-2">
                     <FolderCheck className="w-4 h-4 text-brand" />
                     <h4 className="text-xs font-mono font-bold text-text-primary uppercase tracking-wider">
-                      Technical Asset Intake & Credentials Registry
+                      Technical Asset Intake Status
                     </h4>
                   </div>
-                  <span className="text-[10px] font-mono text-text-dim">Secured Vault</span>
+                  <span className="text-[10px] font-mono text-text-dim">Status tracking only — no credentials stored</span>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 font-mono text-xs">
@@ -506,7 +529,7 @@ export default function DeliveryHub({ token, leads = [] }: DeliveryHubProps) {
                         setNewProjectBusinessName(matched.businessName);
                         setNewProjectClientName(matched.ownerName || '');
                         setNewProjectCity(matched.city);
-                        setNewProjectServiceType(matched.serviceType);
+                        setNewProjectServiceType(matched.serviceType || '');
                       }
                     }}
                     className="w-full bg-bg-dark border border-border-dim rounded-sm p-2 text-text-primary outline-none focus:border-brand"
@@ -526,7 +549,7 @@ export default function DeliveryHub({ token, leads = [] }: DeliveryHubProps) {
                   required
                   value={newProjectBusinessName}
                   onChange={(e) => setNewProjectBusinessName(e.target.value)}
-                  placeholder="e.g. Apex Roofing Experts"
+                  placeholder="Enter the client business name"
                   className="w-full bg-bg-dark border border-border-dim rounded-sm p-2 text-text-primary outline-none focus:border-brand"
                 />
               </div>
@@ -538,7 +561,7 @@ export default function DeliveryHub({ token, leads = [] }: DeliveryHubProps) {
                     type="text"
                     value={newProjectClientName}
                     onChange={(e) => setNewProjectClientName(e.target.value)}
-                    placeholder="e.g. John Miller"
+                    placeholder="Enter client contact (optional)"
                     className="w-full bg-bg-dark border border-border-dim rounded-sm p-2 text-text-primary outline-none focus:border-brand"
                   />
                 </div>
@@ -547,12 +570,25 @@ export default function DeliveryHub({ token, leads = [] }: DeliveryHubProps) {
                   <label className="text-[10px] text-text-secondary uppercase font-bold">City / Market</label>
                   <input
                     type="text"
+                    required
                     value={newProjectCity}
                     onChange={(e) => setNewProjectCity(e.target.value)}
-                    placeholder="e.g. Calgary"
+                    placeholder="Enter client city"
                     className="w-full bg-bg-dark border border-border-dim rounded-sm p-2 text-text-primary outline-none focus:border-brand"
                   />
                 </div>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[10px] text-text-secondary uppercase font-bold">Service Type *</label>
+                <input
+                  type="text"
+                  required
+                  value={newProjectServiceType}
+                  onChange={(e) => setNewProjectServiceType(e.target.value)}
+                  placeholder="e.g. Roofing, plumbing, electrical"
+                  className="w-full bg-bg-dark border border-border-dim rounded-sm p-2 text-text-primary outline-none focus:border-brand"
+                />
               </div>
 
               <div className="grid grid-cols-2 gap-3">
@@ -577,6 +613,8 @@ export default function DeliveryHub({ token, leads = [] }: DeliveryHubProps) {
                   <label className="text-[10px] text-text-secondary uppercase font-bold">Monthly Retainer ($ USD)</label>
                   <input
                     type="number"
+                    required
+                    min="1"
                     value={newProjectRetainer}
                     onChange={(e) => setNewProjectRetainer(Number(e.target.value))}
                     className="w-full bg-bg-dark border border-border-dim rounded-sm p-2 text-text-primary outline-none focus:border-brand"
