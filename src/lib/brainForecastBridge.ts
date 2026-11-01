@@ -326,7 +326,7 @@ export async function evaluateAndEnforceBudgetGuardrails(
           impactScore: 0,
           confidenceScore: 0,
           expectedImpact: 'No impact estimate is available until a human approves a change and outcomes are measured.',
-          status: 'pending'
+          status: 'proposed'
         });
 
         // Insert system notification
