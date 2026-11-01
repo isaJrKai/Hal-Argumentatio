@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { filterGoogleAdsTerritoryRecords, matchesTerritoryContext } from '../../src/lib/forecastData';
+import { buildWeeklyDemandSeries, filterGoogleAdsTerritoryRecords, matchesTerritoryContext } from '../../src/lib/forecastData';
 import { validateTimesFmForecast } from '../../src/lib/timesfmClient';
 
 const records = [
@@ -9,7 +9,35 @@ const records = [
   { id: 'unscoped', geo: null, campaignName: 'Roofing Leads' }
 ];
 
+function makeWeeklyRecords(weeks = 8) {
+  const records: Array<{ date: string; conversions: number }> = [];
+  const firstMonday = Date.UTC(2026, 0, 5);
+  for (let week = 0; week < weeks; week += 1) {
+    for (let day = 0; day < 5; day += 1) {
+      records.push({
+        date: new Date(firstMonday + (week * 7 + day) * 86400000).toISOString(),
+        conversions: week + 1
+      });
+    }
+  }
+  return records;
+}
+
 describe('TimesFM input and forecast invariants', () => {
+  it('builds a model series only from contiguous weeks with five observed days', () => {
+    expect(buildWeeklyDemandSeries(makeWeeklyRecords())).toHaveLength(8);
+    const incomplete = makeWeeklyRecords().filter((record, index) => index !== 12);
+    expect(buildWeeklyDemandSeries(incomplete)).toEqual([]);
+  });
+
+  it('rejects missing weeks instead of compressing time gaps', () => {
+    const withGap = makeWeeklyRecords().filter((record) => {
+      const date = new Date(record.date);
+      return date < new Date(Date.UTC(2026, 0, 19)) || date >= new Date(Date.UTC(2026, 0, 26));
+    });
+    expect(buildWeeklyDemandSeries(withGap)).toEqual([]);
+  });
+
   it('changes the selected historical series when the city changes', () => {
     expect(filterGoogleAdsTerritoryRecords(records, 'roofing', 'Calgary').map(x => x.id))
       .toEqual(['calgary-roofing']);
