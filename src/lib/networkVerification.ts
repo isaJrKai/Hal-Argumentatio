@@ -379,8 +379,12 @@ export function enforceFailClosedOutreachGate(lead: {
   }
 
   // 2. Invariant: Grounding verification gate
-  if (lead.verificationStatus === 'FABRICATED_REJECTED') {
-    violations.push('Lead failed network grounding verification (DNS or phone validation failed)');
+  if (lead.verificationStatus !== 'VERIFIED') {
+    violations.push(
+      lead.verificationStatus === 'FABRICATED_REJECTED'
+        ? 'Lead failed network grounding verification (DNS or phone validation failed)'
+        : 'Lead has not passed live grounding verification'
+    );
   }
 
   // 3. Invariant: DNS verification check
