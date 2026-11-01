@@ -10,7 +10,7 @@ import {
 import { eq, desc } from 'drizzle-orm';
 import crypto from 'crypto';
 import { requestTimesFmForecast } from './timesfmClient';
-import { filterGoogleAdsTerritoryRecords } from './forecastData';
+import { buildWeeklyDemandSeries, filterGoogleAdsTerritoryRecords } from './forecastData';
 
 export interface GoogleAdsBaseline {
   recordsCount: number;
@@ -129,18 +129,7 @@ export async function ingestAndCalibrateGoogleAds(
     const totalImpressions = records.reduce((acc, r) => acc + Number(r.impressions || 0), 0);
     const totalConversions = records.reduce((acc, r) => acc + Number(r.conversions || 0), 0);
 
-    const weeklyTotals = new Map<string, number>();
-    for (const record of records) {
-      const date = new Date(record.date);
-      const weekStart = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
-      const day = (weekStart.getUTCDay() + 6) % 7;
-      weekStart.setUTCDate(weekStart.getUTCDate() - day);
-      const key = weekStart.toISOString().slice(0, 10);
-      weeklyTotals.set(key, (weeklyTotals.get(key) || 0) + Number(record.conversions || 0));
-    }
-    const weeklyDemandSeries = [...weeklyTotals.entries()]
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([, conversions]) => conversions);
+    const weeklyDemandSeries = buildWeeklyDemandSeries(records);
 
     return {
       recordsCount: records.length,
