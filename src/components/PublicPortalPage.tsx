@@ -26,22 +26,32 @@ export default function PublicPortalPage({ token, onNavigateToLogin }: PublicPor
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    const controller = new AbortController();
     const fetchPortalData = async () => {
+      setLoading(true);
+      setError(null);
+      setProject(null);
       try {
-        const res = await fetch(`/api/portal/project/${token}`);
-        if (res.ok) {
-          const data = await res.json();
-          setProject(data);
-        } else {
-          setError('Project delivery portal link is invalid or has expired.');
+        const res = await fetch(`/api/portal/project/${encodeURIComponent(token)}`, { signal: controller.signal });
+        if (res.status === 404) {
+          setError('This client portal link is invalid or the project is unavailable.');
+          return;
         }
+        if (!res.ok) throw new Error(`Client portal request failed (HTTP ${res.status}).`);
+        const data = await res.json();
+        if (!data || typeof data !== 'object' || typeof data.businessName !== 'string') {
+          throw new Error('Client portal returned an invalid project record.');
+        }
+        setProject(data);
       } catch (err) {
-        setError('Failed to connect to client portal service.');
+        if (controller.signal.aborted) return;
+        setError(err instanceof Error ? err.message : 'Failed to connect to the client portal service.');
       } finally {
-        setLoading(false);
+        if (!controller.signal.aborted) setLoading(false);
       }
     };
-    fetchPortalData();
+    void fetchPortalData();
+    return () => controller.abort();
   }, [token]);
 
   if (loading) {
@@ -49,7 +59,7 @@ export default function PublicPortalPage({ token, onNavigateToLogin }: PublicPor
       <div className="min-h-screen bg-bg-base text-text-primary flex items-center justify-center font-mono text-xs">
         <div className="flex items-center gap-2">
           <Sparkles className="w-4 h-4 text-emerald-400 animate-spin" />
-          <span>Authenticating client portal session...</span>
+          <span>Loading client project...</span>
         </div>
       </div>
     );
@@ -72,9 +82,10 @@ export default function PublicPortalPage({ token, onNavigateToLogin }: PublicPor
     );
   }
 
-  const completedMilestones = project.milestones?.filter(m => m.status === 'completed').length || 0;
-  const totalMilestones = project.milestones?.length || 1;
-  const progressPct = Math.round((completedMilestones / totalMilestones) * 100);
+  const milestones = Array.isArray(project.milestones) ? project.milestones : [];
+  const completedMilestones = milestones.filter(m => m.status === 'completed').length;
+  const totalMilestones = milestones.length;
+  const progressPct = totalMilestones > 0 ? Math.round((completedMilestones / totalMilestones) * 100) : null;
 
   return (
     <div className="min-h-screen bg-bg-base text-text-primary font-sans selection:bg-emerald-500/30 selection:text-white pb-16">
@@ -87,7 +98,7 @@ export default function PublicPortalPage({ token, onNavigateToLogin }: PublicPor
           </div>
           <div>
             <h1 className="text-sm font-bold text-text-primary tracking-wide">{project.businessName}</h1>
-            <span className="text-[10px] font-mono text-text-secondary uppercase">Live Technical Fulfillment Portal • Tier: {project.packageTier}</span>
+            <span className="text-[10px] font-mono text-text-secondary uppercase">Client Project Portal • Tier: {project.packageTier}</span>
           </div>
         </div>
 
@@ -107,17 +118,17 @@ export default function PublicPortalPage({ token, onNavigateToLogin }: PublicPor
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
               <span className="text-[10px] font-mono uppercase tracking-widest text-emerald-400 font-bold block">
-                Fulfillment Status • {(project.status ? project.status.replace('_', ' ') : 'ACTIVE').toUpperCase()}
+                Project Status • {(project.status ? project.status.replace('_', ' ') : 'NOT PROVIDED').toUpperCase()}
               </span>
               <h2 className="text-2xl font-bold text-text-primary mt-1">Infrastructure & Growth Roadmap</h2>
               <p className="text-xs text-text-secondary mt-1 max-w-xl leading-relaxed">
-                Real-time transparency into your ongoing technical SEO speed optimizations, security certificates, and local lead pipeline infrastructure.
+                Track the project milestones and asset-intake statuses recorded by your service provider.
               </p>
             </div>
 
             <div className="text-right font-mono">
-              <span className="text-[10px] text-text-secondary block uppercase">Overall Completion</span>
-              <span className="text-3xl font-extrabold text-emerald-400">{progressPct}%</span>
+              <span className="text-[10px] text-text-secondary block uppercase">Milestone Completion</span>
+              <span className="text-3xl font-extrabold text-emerald-400">{progressPct !== null ? `${progressPct}%` : 'Not available'}</span>
             </div>
           </div>
 
@@ -125,30 +136,28 @@ export default function PublicPortalPage({ token, onNavigateToLogin }: PublicPor
           <div className="w-full h-2 bg-bg-subtle rounded-full overflow-hidden border border-border-dim">
             <div 
               className="h-full bg-gradient-to-r from-emerald-500 to-teal-400 rounded-full transition-all duration-500"
-              style={{ width: `${progressPct}%` }}
+              style={{ width: `${progressPct ?? 0}%` }}
             />
           </div>
 
-          {/* PROOF METRICS */}
+          {/* PROJECT STATUS — no synthetic audit scores */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2">
             <div className="p-4 bg-bg-base border border-border-dim rounded">
-              <span className="text-[10px] font-mono text-text-secondary uppercase font-bold block">Baseline Speed & Health</span>
-              <div className="text-xl font-bold text-amber-400 mt-1">{project.initialAuditScore}/100</div>
-              <span className="text-[10px] text-text-tertiary font-mono">Prior to optimization</span>
+              <span className="text-[10px] font-mono text-text-secondary uppercase font-bold block">Milestones Complete</span>
+              <div className="text-xl font-bold text-text-primary mt-1">{completedMilestones} / {totalMilestones || '—'}</div>
+              <span className="text-[10px] text-text-tertiary font-mono">Provider-recorded statuses</span>
             </div>
 
             <div className="p-4 bg-bg-base border border-emerald-500/30 rounded">
-              <span className="text-[10px] font-mono text-emerald-400 uppercase font-bold block">Current Verified Score</span>
-              <div className="text-xl font-bold text-emerald-400 mt-1">{project.currentScore}/100</div>
-              <span className="text-[10px] text-emerald-500 font-mono font-bold">
-                +{ (project.currentScore || 0) - (project.initialAuditScore || 0) } point velocity gain
-              </span>
+              <span className="text-[10px] font-mono text-emerald-400 uppercase font-bold block">Completion</span>
+              <div className="text-xl font-bold text-emerald-400 mt-1">{progressPct !== null ? `${progressPct}%` : 'Not available'}</div>
+              <span className="text-[10px] text-text-tertiary font-mono">Calculated from completed milestones</span>
             </div>
 
             <div className="p-4 bg-bg-base border border-border-dim rounded">
-              <span className="text-[10px] font-mono text-text-secondary uppercase font-bold block">Target Optimization Goal</span>
-              <div className="text-xl font-bold text-text-primary mt-1">{project.targetScore}/100</div>
-              <span className="text-[10px] text-text-tertiary font-mono">Market leader standard</span>
+              <span className="text-[10px] font-mono text-text-secondary uppercase font-bold block">Service</span>
+              <div className="text-xl font-bold text-text-primary mt-1">{project.serviceType || 'Not provided'}</div>
+              <span className="text-[10px] text-text-tertiary font-mono">{project.city || 'Location not provided'}</span>
             </div>
           </div>
         </div>
@@ -157,7 +166,7 @@ export default function PublicPortalPage({ token, onNavigateToLogin }: PublicPor
         <div className="bg-bg-raised border border-border-dim rounded-lg p-6 space-y-4">
           <h3 className="text-sm font-mono font-bold text-text-primary uppercase tracking-wider flex items-center gap-2 border-b border-border-dim pb-3">
             <Layers className="w-4 h-4 text-emerald-400" />
-            <span>Fulfillment Deliverables & Proof of Work</span>
+            <span>Project Milestones & Notes</span>
           </h3>
 
           <div className="space-y-3">
@@ -191,7 +200,7 @@ export default function PublicPortalPage({ token, onNavigateToLogin }: PublicPor
                       {ms.deliverablesProof && (
                         <div className="mt-2 text-[11px] font-mono text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-1 rounded inline-flex items-center gap-1.5">
                           <ShieldCheck className="w-3.5 h-3.5" />
-                          <span>Delivered: {ms.deliverablesProof}</span>
+                          <span>Reference: {ms.deliverablesProof}</span>
                         </div>
                       )}
                     </div>
@@ -202,7 +211,7 @@ export default function PublicPortalPage({ token, onNavigateToLogin }: PublicPor
                     ms.status === 'in_progress' ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30' :
                     'bg-bg-subtle text-text-secondary border border-border-dim'
                   }`}>
-                    {ms.status.replace('_', ' ')}
+                    {ms.status === 'completed' ? 'Marked complete' : ms.status.replace('_', ' ')}
                   </span>
                 </div>
               </div>
@@ -214,7 +223,7 @@ export default function PublicPortalPage({ token, onNavigateToLogin }: PublicPor
         <div className="bg-bg-raised border border-border-dim rounded-lg p-6 space-y-4">
           <h3 className="text-sm font-mono font-bold text-text-primary uppercase tracking-wider flex items-center gap-2 border-b border-border-dim pb-3">
             <FolderCheck className="w-4 h-4 text-emerald-400" />
-            <span>Asset Intake & Credentials Vault Status</span>
+            <span>Asset Intake Status</span>
           </h3>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 font-mono text-xs">
@@ -229,7 +238,7 @@ export default function PublicPortalPage({ token, onNavigateToLogin }: PublicPor
                   asset.status === 'received' ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30' :
                   'bg-amber-500/20 text-amber-400 border border-amber-500/30'
                 }`}>
-                  {asset.status}
+                  {asset.status === 'verified' ? 'Marked verified' : asset.status}
                 </span>
               </div>
             ))}
@@ -239,7 +248,7 @@ export default function PublicPortalPage({ token, onNavigateToLogin }: PublicPor
       </main>
 
       <footer className="max-w-4xl mx-auto px-6 mt-12 text-center text-text-tertiary text-xs font-mono">
-        Secured by HAL AI Operating Intelligence System • End-to-End Encrypted Client Hub
+        This portal displays project details and status updates shared by your service provider.
       </footer>
 
     </div>
