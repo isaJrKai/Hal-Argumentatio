@@ -306,7 +306,6 @@ export async function evaluateAndEnforceBudgetGuardrails(
     point.isBreachingCplLimit = false;
   }
 
-  const breachDetected = breachWeeks.length > 0;
   let suggestedAction: GuardrailEvaluationResult['suggestedAction'] = 'MAINTAIN';
   let budgetMultiplierRecommended = 1.0;
   const actionsExecuted: string[] = [];
@@ -326,7 +325,7 @@ export async function evaluateAndEnforceBudgetGuardrails(
           contractorId,
           category: 'budget',
           title: `Budget Guardrail Recommendation: CPL Ceiling Breach in ${breachWeeks.join(', ')}`,
-          rationale: `The heuristic scenario estimates CPL (${highestProjectedCpl}) above the configured target CAC ceiling (${targetCac}). This is a recommendation for human review; no ad budget was changed.`,
+          rationale: `The trailing observed CPL baseline (${highestObservedCpl}) is above the configured target CAC ceiling (${targetCac}). Human review is required; no future CPL prediction or financial impact estimate is available.`,
           citationData: {
             breachWeeks,
             highestObservedCpl,
@@ -335,8 +334,8 @@ export async function evaluateAndEnforceBudgetGuardrails(
             throttleMultiplier: 0.75
           },
           impactScore: 0,
-          confidenceScore: 94.0,
-          expectedImpact: `Preserves CAC below target of $${targetCac}`,
+          confidenceScore: 0,
+          expectedImpact: 'No impact estimate is available until a human approves a change and outcomes are measured.',
           status: 'pending'
         });
 
@@ -345,7 +344,7 @@ export async function evaluateAndEnforceBudgetGuardrails(
           id: crypto.randomUUID(),
           contractorId,
           title: 'Budget guardrail recommendation needs review',
-          message: `Trailing observed CPL is ${highestProjectedCpl}, above your ${maxAllowableCpl} limit. HAL has not changed campaign spend.`,
+          message: `Trailing observed CPL is ${highestObservedCpl}, above your ${maxAllowableCpl} limit. HAL has not changed campaign spend.`,
           type: 'warning',
           read: false,
           createdAt: new Date()
@@ -359,7 +358,7 @@ export async function evaluateAndEnforceBudgetGuardrails(
           details: `A human-review budget recommendation was recorded for contractor ${contractorId}; no spend change was made.`
         });
       } catch (err: any) {
-        console.warn('Error applying automated budget guardrail changes:', err.message);
+        console.warn('Error recording budget guardrail recommendation:', err.message);
       }
     }
   } else {
