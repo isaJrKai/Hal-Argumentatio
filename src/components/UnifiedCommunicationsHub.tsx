@@ -78,6 +78,7 @@ export const UnifiedCommunicationsHub: React.FC<UnifiedCommunicationsHubProps> =
   const [customInstructions, setCustomInstructions] = useState('');
   const [isDrafting, setIsDrafting] = useState(false);
   const [isDispatching, setIsDispatching] = useState(false);
+  const [dispatchMode, setDispatchMode] = useState<'simulation' | 'live'>('simulation');
   const [bridges, setBridges] = useState<BridgeStatus | null>(null);
   const [showConfigModal, setShowConfigModal] = useState(false);
   const [dispatchHistory, setDispatchHistory] = useState<any[]>([]);
@@ -206,7 +207,7 @@ export const UnifiedCommunicationsHub: React.FC<UnifiedCommunicationsHubProps> =
           leadBusinessName: selectedLead.businessName,
           subject: subject.trim() || undefined,
           message: message.trim(),
-          mode: 'simulation',
+          mode: dispatchMode,
           variables: {
             businessName: selectedLead.businessName,
             ownerName: selectedLead.ownerName || 'Owner',
@@ -223,8 +224,10 @@ export const UnifiedCommunicationsHub: React.FC<UnifiedCommunicationsHubProps> =
       }
 
       showToast({
-        title: 'Simulation recorded',
-        message: `Prepared a ${activeChannel.toUpperCase()} message for ${recipient}. No external message was sent.`,
+        title: data.mode === 'live' ? 'Email submitted to Resend' : 'Simulation recorded',
+        message: data.mode === 'live'
+          ? `Resend accepted the email request for ${recipient}. Recipient delivery is not yet confirmed.`
+          : `Prepared a ${activeChannel.toUpperCase()} message for ${recipient}. No external message was sent.`,
         type: 'success'
       });
 
@@ -535,24 +538,28 @@ export const UnifiedCommunicationsHub: React.FC<UnifiedCommunicationsHubProps> =
               onChange={(e) => setCustomInstructions(e.target.value)}
               className="flex-1 px-3 py-1.5 text-xs rounded-xl bg-bg-base border border-border-dim text-text-primary placeholder-text-tertiary focus:outline-none focus:border-amber-400"
             />
-            <button
-              type="button"
-              disabled={isDispatching}
-              onClick={handleDispatch}
-              className="px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-accent-contrast font-black text-xs transition flex items-center gap-2 shadow-lg cursor-pointer disabled:opacity-50"
-            >
-              {isDispatching ? (
-                <>
-                  <RefreshCw className="w-4 h-4 animate-spin" />
-                  <span>Recording simulation...</span>
-                </>
-              ) : (
-                <>
-                  <Send className="w-4 h-4" />
-                  <span>Record simulated dispatch</span>
-                </>
-              )}
-            </button>
+            <div className="flex items-center gap-1 rounded-lg border border-border-dim bg-bg-base p-1">
+            <button type="button" onClick={() => setDispatchMode('simulation')} className={`px-3 py-1.5 rounded-md text-[11px] font-semibold ${dispatchMode === 'simulation' ? 'bg-bg-overlay text-text-primary' : 'text-text-secondary'}`}>Simulation</button>
+            <button type="button" onClick={() => setDispatchMode('live')} disabled={activeChannel !== 'email'} title={activeChannel === 'email' ? 'Send a real email through Resend' : 'Live sending is currently implemented for email only'} className={`px-3 py-1.5 rounded-md text-[11px] font-semibold ${dispatchMode === 'live' ? 'bg-amber-500 text-white' : 'text-text-secondary'} disabled:opacity-40 disabled:cursor-not-allowed`}>Live email</button>
+          </div>
+          <button
+            type="button"
+            disabled={isDispatching || (dispatchMode === 'live' && activeChannel !== 'email')}
+            onClick={handleDispatch}
+            className="px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-accent-contrast font-black text-xs transition flex items-center gap-2 shadow-lg cursor-pointer disabled:opacity-50"
+          >
+            {isDispatching ? (
+              <>
+                <RefreshCw className="w-4 h-4 animate-spin" />
+                <span>{dispatchMode === 'live' ? 'Submitting email...' : 'Recording simulation...'}</span>
+              </>
+            ) : (
+              <>
+                <Send className="w-4 h-4" />
+                <span>{dispatchMode === 'live' ? 'Send real email' : 'Record simulated dispatch'}</span>
+              </>
+            )}
+          </button>
           </div>
         </div>
       </div>
@@ -563,7 +570,7 @@ export const UnifiedCommunicationsHub: React.FC<UnifiedCommunicationsHubProps> =
           <div className="flex items-center gap-2">
             <ShieldCheck className="w-4 h-4 text-emerald-400" />
             <h4 className="text-xs font-bold uppercase tracking-wider text-text-primary">
-              Dispatch Simulation Log
+              Dispatch History
             </h4>
           </div>
           <span className="text-[10px] font-mono text-text-secondary">Encryption status not verified</span>
@@ -592,7 +599,7 @@ export const UnifiedCommunicationsHub: React.FC<UnifiedCommunicationsHubProps> =
                 <div className="flex items-center gap-4 text-[11px]">
                   <span className="text-text-secondary font-mono hidden sm:inline">{item.providerId || 'Simulation only'}</span>
                   <span className="text-text-secondary font-semibold flex items-center gap-1">
-                    <CheckCircle2 className="w-3.5 h-3.5" /> {item.status === "delivered" ? "Delivered" : "Simulation recorded"}
+                    <CheckCircle2 className="w-3.5 h-3.5" /> {item.status === 'delivered' ? 'Delivered' : item.status === 'submitted' ? 'Submitted to provider' : item.status === 'failed' ? 'Failed' : 'Simulation recorded'}
                   </span>
                   <span className="text-text-tertiary font-mono text-[10px]">
                     {new Date(item.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
