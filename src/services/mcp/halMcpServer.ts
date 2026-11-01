@@ -69,7 +69,7 @@ export async function getEffectiveContractorId(): Promise<string> {
   return envId;
 }
 
-// Strips sensitive fields and decrypts PII safely
+// Strips sensitive fields; contact details remain redacted and unverified metrics stay unavailable
 export function sanitizeProspect(lead: any) {
   const hasContactDetails = Boolean(lead.email || lead.phone || lead.emailEncrypted || lead.phoneEncrypted);
 
