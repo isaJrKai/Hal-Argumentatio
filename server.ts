@@ -3820,6 +3820,89 @@ interface DispatchLogEntry {
 const dispatchLogs: DispatchLogEntry[] = [];
 const liveEmailDispatchLimits = new Map<string, { count: number; resetAt: number }>();
 
+app.post('/api/webhooks/resend', async (req, res) => {
+  const webhookSecret = process.env.RESEND_WEBHOOK_SECRET || '';
+  const rawBody = (req as any).rawBody as Buffer | undefined;
+  const svixId = String(req.headers['svix-id'] || '');
+  const svixTimestamp = String(req.headers['svix-timestamp'] || '');
+  const svixSignature = String(req.headers['svix-signature'] || '');
+
+  if (!webhookSecret.startsWith('whsec_')) {
+    return res.status(503).json({ error: 'Resend delivery webhook is not configured.' });
+  }
+  if (!rawBody || !svixId || !svixTimestamp || !svixSignature) {
+    return res.status(401).json({ error: 'Missing signed Resend webhook headers or raw payload.' });
+  }
+  const timestampSeconds = Number(svixTimestamp);
+  if (!Number.isFinite(timestampSeconds) || Math.abs(Date.now() / 1000 - timestampSeconds) > 300) {
+    return res.status(401).json({ error: 'Webhook timestamp is outside the accepted five-minute replay window.' });
+  }
+
+  try {
+    const secretBytes = Buffer.from(webhookSecret.slice('whsec_'.length), 'base64');
+    const signedContent = svixId + '.' + svixTimestamp + '.' + rawBody.toString('utf8');
+    const expected = crypto.createHmac('sha256', secretBytes).update(signedContent).digest('base64');
+    const validSignature = svixSignature.split(' ').some(part => {
+      if (!part.startsWith('v1,')) return false;
+      const supplied = Buffer.from(part.slice(3));
+      const expectedBytes = Buffer.from(expected);
+      return supplied.length === expectedBytes.length && crypto.timingSafeEqual(supplied, expectedBytes);
+    });
+    if (!validSignature) return res.status(401).json({ error: 'Invalid Resend webhook signature.' });
+
+    const event = JSON.parse(rawBody.toString('utf8'));
+    const eventType = String(event.type || 'unknown');
+    const providerMessageId = String(event.data?.email_id || event.data?.id || '');
+    const [existingEvent] = await pgDb.select().from(communicationsDeliveryEvents).where(eq(communicationsDeliveryEvents.id, svixId)).limit(1);
+    if (existingEvent) return res.status(200).json({ success: true, duplicate: true });
+
+    const [outbox] = providerMessageId
+      ? await pgDb.select().from(communicationsOutbox).where(eq(communicationsOutbox.providerMessageId, providerMessageId)).limit(1)
+      : [];
+
+    await pgDb.insert(communicationsDeliveryEvents).values({
+      id: svixId,
+      outboxId: outbox?.id || null,
+      provider: 'resend',
+      providerMessageId: providerMessageId || null,
+      eventType,
+      payload: event
+    }).onConflictDoNothing();
+
+    if (outbox) {
+      const statusByEvent: Record<string, string> = {
+        'email.sent': 'sent',
+        'email.delivered': 'delivered',
+        'email.delivery_delayed': 'delayed',
+        'email.bounced': 'bounced',
+        'email.complained': 'complained',
+        'email.opened': 'opened',
+        'email.clicked': 'clicked'
+      };
+      const nextStatus = statusByEvent[eventType];
+      if (nextStatus) {
+        const currentRank: Record<string, number> = { queued: 0, processing: 1, submitted: 2, sent: 3, delayed: 3, delivered: 4, opened: 5, clicked: 6, bounced: 7, complained: 8, failed: 9 };
+        const nextRank: Record<string, number> = { sent: 3, delayed: 3, delivered: 4, opened: 5, clicked: 6, bounced: 7, complained: 8 };
+        const current = outbox.status;
+        const shouldUpdate = (currentRank[nextStatus] || 0) >= (currentRank[current] || 0);
+        if (shouldUpdate) {
+          await pgDb.update(communicationsOutbox).set({
+            status: nextStatus,
+            deliveredAt: eventType === 'email.delivered' ? new Date() : outbox.deliveredAt,
+            bouncedAt: eventType === 'email.bounced' ? new Date() : outbox.bouncedAt,
+            updatedAt: new Date()
+          }).where(eq(communicationsOutbox.id, outbox.id));
+        }
+      }
+    }
+
+    return res.status(200).json({ success: true, matchedDispatch: Boolean(outbox), eventType });
+  } catch (err: any) {
+    console.error('[Resend Delivery Webhook] Processing failed:', err?.message || err);
+    return res.status(500).json({ error: 'Delivery event could not be persisted.' });
+  }
+});
+
 app.get('/api/dispatch/status', authenticate, (_req, res) => {
   const signingConfigured = Boolean(process.env.HAL_WEBHOOK_SIGNING_SECRET && process.env.HAL_WEBHOOK_SIGNING_SECRET.length >= 32);
   res.json({
@@ -3828,6 +3911,10 @@ app.get('/api/dispatch/status', authenticate, (_req, res) => {
       configured: signingConfigured,
       signatureAlgorithm: 'HMAC-SHA256',
       status: signingConfigured ? 'configured_unverified' : 'not_configured'
+    },
+    deliveryWebhook: {
+      configured: Boolean(process.env.RESEND_WEBHOOK_SECRET?.startsWith('whsec_')),
+      status: process.env.RESEND_WEBHOOK_SECRET?.startsWith('whsec_') ? 'configured_unverified' : 'not_configured'
     },
     messaging: {
       status: process.env.RESEND_API_KEY && process.env.HAL_SENDER_EMAIL
@@ -3845,10 +3932,40 @@ app.get('/api/dispatch/status', authenticate, (_req, res) => {
   });
 });
 
-app.get('/api/dispatch/history', authenticate, (req, res) => {
+app.get('/api/dispatch/history', authenticate, async (req, res) => {
   const contractorId = (req as any).contractorId;
-  const filtered = dispatchLogs.filter(l => l.contractorId === contractorId);
-  res.json(filtered.slice(-50).reverse());
+  try {
+    const persisted = await pgDb.select().from(communicationsOutbox)
+      .where(eq(communicationsOutbox.contractorId, contractorId))
+      .orderBy(desc(communicationsOutbox.createdAt))
+      .limit(50);
+    const liveHistory = persisted.map(row => {
+      const rawRecipient = row.recipientEncrypted ? decrypt(row.recipientEncrypted) : '';
+      const parts = String(rawRecipient || '').split('@');
+      const maskedRecipient = parts.length === 2
+        ? (parts[0].slice(0, 1) + '***@' + parts[1])
+        : 'Saved recipient';
+      return {
+        id: row.id,
+        contractorId: row.contractorId,
+        channel: row.channel,
+        recipient: maskedRecipient,
+        leadId: row.leadId,
+        leadBusinessName: 'Saved lead',
+        status: row.status,
+        mode: 'live',
+        providerId: row.providerMessageId,
+        timestamp: (row.deliveredAt || row.submittedAt || row.createdAt).toISOString(),
+        subject: row.subjectEncrypted ? decrypt(row.subjectEncrypted) : '',
+        preview: 'Message content is encrypted at rest'
+      };
+    });
+    const simulations = dispatchLogs.filter(item => item.contractorId === contractorId && item.mode === 'simulation');
+    return res.json([...simulations, ...liveHistory].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()).slice(0, 50));
+  } catch (err: any) {
+    console.error('[HAL Dispatch History] Neon read failed:', err?.message || err);
+    return res.status(503).json({ success: false, code: 'OUTBOX_UNAVAILABLE', error: 'Durable dispatch history is unavailable from Neon.' });
+  }
 });
 
 app.post('/api/dispatch/webhook', authenticate, async (req, res) => {
