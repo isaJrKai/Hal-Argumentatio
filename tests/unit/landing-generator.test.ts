@@ -69,4 +69,18 @@ describe('contractor landing page factual normalization', () => {
     expect(config.city).toBe('Toronto');
     expect(config.phone).toBe('+14165550123');
   });
+  it('keeps curated specialist service content when AI is unavailable', () => {
+    const specialist = JSON.parse(JSON.stringify(TRADE_TEMPLATES.sump_pump));
+    const config = applyVerifiedBusinessDetails(specialist, {
+      ...businessDetails,
+      trade: 'sump_pump'
+    }, false);
+
+    expect(config.sections.hero.headline).toBe('Sump pump installation, repair and maintenance');
+    expect(config.sections.services.items.length).toBeGreaterThan(1);
+    expect(config.sections.services.items[0].title).toBe('Sump pump installation');
+    expect(config.sections.reviews.active).toBe(false);
+    expect(config.sections.service_areas.active).toBe(false);
+  });
+
 });
