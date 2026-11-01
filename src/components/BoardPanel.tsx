@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { useBusinessContext } from '../context/BusinessContext';
 import { useInspector } from '../context/InspectorContext';
 import { useToast } from '../context/ToastContext';
+import { isMeasuredRating, isMeasuredScore, summarizeKnownLeadValue } from '../lib/boardMetrics';
 import { 
   ArrowLeft, 
   ArrowRight, 
@@ -63,6 +64,7 @@ export default function BoardPanel({ leads, token, onRefresh }: BoardPanelProps)
   const { openInspector } = useInspector();
   const { showToast } = useToast();
   const [isDraftingWithHermes, setIsDraftingWithHermes] = useState(false);
+  const pipelineValue = summarizeKnownLeadValue(leads);
 
   const handleDraftSelectedLeadWithHermes = async (lead: Lead) => {
     setIsDraftingWithHermes(true);
@@ -79,14 +81,14 @@ export default function BoardPanel({ leads, token, onRefresh }: BoardPanelProps)
             businessName: lead.businessName,
             city: lead.city,
             serviceType: lead.serviceType,
-            ownerName: lead.ownerName || 'Business Owner',
-            websiteUrl: lead.websiteUrl || '',
-            performanceScore: lead.performanceScore || 50,
-            seoScore: lead.seoScore || 65,
-            sslStatus: lead.sslStatus || 'valid',
+            ...(lead.ownerName ? { ownerName: lead.ownerName } : {}),
+            ...(lead.websiteUrl ? { websiteUrl: lead.websiteUrl } : {}),
+            ...(isMeasuredScore(lead.performanceScore) ? { performanceScore: lead.performanceScore } : {}),
+            ...(isMeasuredScore(lead.seoScore) ? { seoScore: lead.seoScore } : {}),
+            ...(lead.sslStatus ? { sslStatus: lead.sslStatus } : {}),
             framework: 'Direct Outreach'
           },
-          promptOverride: `Draft a high-conversion cold pitch for ${lead.businessName} in ${lead.city} referencing their digital footprint.`
+          promptOverride: `Draft an outreach message for ${lead.businessName} in ${lead.city}. Use only the supplied facts. Do not invent website problems, audit scores, security findings, customer results, or financial uplift. If evidence is missing, do not imply that it was measured.`
         })
       });
 
@@ -282,10 +284,13 @@ export default function BoardPanel({ leads, token, onRefresh }: BoardPanelProps)
               </span>
             </div>
             <div className="px-3.5 py-1.5 border border-border-dim rounded bg-bg-raised text-center min-w-[100px]">
-              <span className="block text-[10px] text-text-secondary uppercase whitespace-nowrap">Pipeline Value</span>
+              <span className="block text-[10px] text-text-secondary uppercase whitespace-nowrap">Recorded Lead Value</span>
               <span className="text-sm font-semibold text-accent mt-0.5 block whitespace-nowrap">
-                ${leads.filter(l => l.status !== 'dead').reduce((acc, l) => acc + (l.predictedLtvUsd || 4500), 0).toLocaleString()}
+                {pipelineValue.measuredCount > 0 ? `${pipelineValue.totalUsd.toLocaleString()}` : 'Not measured'}
               </span>
+              {pipelineValue.unmeasuredCount > 0 && (
+                <span className="block text-[8px] text-text-tertiary mt-0.5">{pipelineValue.unmeasuredCount} lead(s) without a recorded value</span>
+              )}
             </div>
           </div>
         </div>
@@ -444,17 +449,17 @@ export default function BoardPanel({ leads, token, onRefresh }: BoardPanelProps)
                               {lead.city}
                             </span>
                             <span>
-                              SCORE: <strong className="text-accent font-extrabold">{lead.urgencyScore || 0}</strong>
+                              SCORE: <strong className="text-accent font-extrabold">{isMeasuredScore(lead.urgencyScore) ? lead.urgencyScore : 'Not measured'}</strong>
                             </span>
                           </div>
 
                           {/* Secondary metrics summary if present (Phase 2 audit) */}
-                          {(lead.seoScore !== undefined || lead.googleRating !== undefined) && (
+                          {(isMeasuredScore(lead.seoScore) || isMeasuredRating(lead.googleRating)) && (
                             <div className="flex items-center gap-2 mt-1.5 pt-1.5 border-t border-border-dim/20 text-[8px] font-mono text-text-tertiary uppercase">
-                              {lead.seoScore !== undefined && (
+                              {isMeasuredScore(lead.seoScore) && (
                                 <span>SEO: <strong className={lead.seoScore > 75 ? 'text-positive font-bold' : 'text-warning font-bold'}>{lead.seoScore}%</strong></span>
                               )}
-                              {lead.googleRating !== undefined && (
+                              {isMeasuredRating(lead.googleRating) && (
                                 <span>Rating: <strong className="text-warning font-bold">{lead.googleRating}★</strong></span>
                               )}
                             </div>
@@ -559,40 +564,36 @@ export default function BoardPanel({ leads, token, onRefresh }: BoardPanelProps)
                     <div className="p-2.5 rounded-lg bg-bg-base border border-border-dim">
                       <span className="block text-[9px] text-text-tertiary uppercase">SSL Security</span>
                       <span className={`text-xs font-bold mt-1 block flex items-center justify-center gap-1 ${
-                        selectedBoardLead.sslStatus === 'missing' ? 'text-negative' : 'text-positive'
+                        selectedBoardLead.sslStatus === 'missing' ? 'text-negative' : selectedBoardLead.sslStatus === 'secured' ? 'text-positive' : 'text-text-tertiary'
                       }`}>
                         {selectedBoardLead.sslStatus === 'missing' ? (
-                          <>
-                            <AlertCircle className="w-3 h-3" /> Unsecured
-                          </>
-                        ) : (
-                          <>
-                            <Shield className="w-3 h-3" /> Encrypted
-                          </>
-                        )}
+                          <><AlertCircle className="w-3 h-3" /> Unsecured</>
+                        ) : selectedBoardLead.sslStatus === 'secured' ? (
+                          <><Shield className="w-3 h-3" /> Secured</>
+                        ) : 'Not measured'}
                       </span>
                     </div>
 
                     <div className="p-2.5 rounded-lg bg-bg-base border border-border-dim">
                       <span className="block text-[9px] text-text-tertiary uppercase">Page Speed</span>
                       <span className={`text-xs font-bold mt-1 block flex items-center justify-center gap-1 ${
-                        (selectedBoardLead.performanceScore || 50) < 60 ? 'text-warning' : 'text-positive'
+                        isMeasuredScore(selectedBoardLead.performanceScore) ? (selectedBoardLead.performanceScore < 60 ? 'text-warning' : 'text-positive') : 'text-text-tertiary'
                       }`}>
-                        <Gauge className="w-3 h-3" /> {selectedBoardLead.performanceScore || 48}/100
+                        {isMeasuredScore(selectedBoardLead.performanceScore) ? <><Gauge className="w-3 h-3" /> {selectedBoardLead.performanceScore}/100</> : 'Not measured'}
                       </span>
                     </div>
 
                     <div className="p-2.5 rounded-lg bg-bg-base border border-border-dim">
                       <span className="block text-[9px] text-text-tertiary uppercase">SEO Health</span>
                       <span className="text-xs font-bold text-accent mt-1 block">
-                        {selectedBoardLead.seoScore || 68}%
+                        {isMeasuredScore(selectedBoardLead.seoScore) ? `${selectedBoardLead.seoScore}%` : 'Not measured'}
                       </span>
                     </div>
 
                     <div className="p-2.5 rounded-lg bg-bg-base border border-border-dim">
                       <span className="block text-[9px] text-text-tertiary uppercase">Reputation</span>
                       <span className="text-xs font-bold text-warning mt-1 block">
-                        {selectedBoardLead.googleRating ? `${selectedBoardLead.googleRating}★` : '4.2★'}
+                        {isMeasuredRating(selectedBoardLead.googleRating) ? `${selectedBoardLead.googleRating}★` : 'Not measured'}
                       </span>
                     </div>
                   </div>
@@ -610,7 +611,7 @@ export default function BoardPanel({ leads, token, onRefresh }: BoardPanelProps)
                   <div className="p-3 bg-bg-base rounded-lg border border-border-dim space-y-1">
                     <span className="text-[9px] text-text-tertiary uppercase block">Predicted Deal LTV</span>
                     <span className="font-bold text-accent">
-                      ${(selectedBoardLead.predictedLtvUsd || 4500).toLocaleString()} USD
+                      {typeof selectedBoardLead.predictedLtvUsd === 'number' && Number.isFinite(selectedBoardLead.predictedLtvUsd) && selectedBoardLead.predictedLtvUsd >= 0 ? `${selectedBoardLead.predictedLtvUsd.toLocaleString()} USD` : 'Not measured'}
                     </span>
                   </div>
                 </div>
@@ -624,8 +625,11 @@ export default function BoardPanel({ leads, token, onRefresh }: BoardPanelProps)
                     </span>
                     <button
                       onClick={() => {
-                        const textToCopy = selectedBoardLead.outreachStrategy || 
-                          `Hi ${selectedBoardLead.ownerName || 'there'}, noticed ${selectedBoardLead.businessName} has a ${selectedBoardLead.sslStatus === 'missing' ? 'missing SSL certificate and ' : ''}slow mobile load speed impacting Google rankings in ${selectedBoardLead.city}. We can resolve this within 48 hours to capture top search volume.`;
+                        const textToCopy = selectedBoardLead.outreachStrategy?.trim();
+                        if (!textToCopy) {
+                          showToast('No evidence-backed pitch is saved yet. Draft one with Hermes first.', 'warning');
+                          return;
+                        }
                         navigator.clipboard.writeText(textToCopy);
                         setCopiedPitch(true);
                         setTimeout(() => setCopiedPitch(false), 2000);
@@ -637,8 +641,7 @@ export default function BoardPanel({ leads, token, onRefresh }: BoardPanelProps)
                     </button>
                   </div>
                   <p className="text-xs text-text-primary leading-relaxed">
-                    {selectedBoardLead.outreachStrategy || 
-                      `"We analyzed ${selectedBoardLead.businessName}'s digital conversion surface in ${selectedBoardLead.city}. Their website ${selectedBoardLead.sslStatus === 'missing' ? 'flags an unencrypted SSL error and ' : ''}scores below standard mobile speed, leaking valuable high-intent local customer calls to competitors. Immediate remediation unlocks an estimated +$${(selectedBoardLead.predictedLtvUsd || 4500).toLocaleString()} in pipeline value."`}
+                    {selectedBoardLead.outreachStrategy || 'No evidence-backed pitch has been saved. Draft one with Hermes using only the available, verified lead information.'}
                   </p>
                   <div className="flex items-center gap-2 pt-1 border-t border-accent/20">
                     <button
