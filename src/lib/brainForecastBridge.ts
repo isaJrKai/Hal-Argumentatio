@@ -403,7 +403,7 @@ async function loadScheduledTimesFmForecast(
     .from(forecasts)
     .where(eq(forecasts.contractorId, contractorId))
     .orderBy(desc(forecasts.targetDate))
-    .limit(300);
+    .limit(2000);
 
   const now = Date.now();
   const cityNeedle = city.trim().toLowerCase();
