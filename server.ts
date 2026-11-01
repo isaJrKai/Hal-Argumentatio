@@ -4832,6 +4832,7 @@ app.get('/api/neural/network', authenticate, async (req, res) => {
     const recentLeads = allLeads.filter(lead =>
       matchesTerritoryContext(lead.city, lead.niche, targetCity, targetNiche)
     );
+    const timesfmConfigured = Boolean(process.env.TIMESFM_SERVICE_URL && (process.env.TIMESFM_API_KEY || '').length >= 32);
 
     const nodes: any[] = [
       { id: 'core_bayes', label: 'Outcome Analysis', type: 'core', group: 1, size: 22 },
@@ -4854,7 +4855,6 @@ app.get('/api/neural/network', authenticate, async (req, res) => {
     ];
 
     const nicheKey = targetNiche.toLocaleLowerCase();
-    const timesfmConfigured = Boolean(process.env.TIMESFM_SERVICE_URL && (process.env.TIMESFM_API_KEY || '').length >= 32);
     const nicheNodeId = `niche_${nicheKey.replace(/[^a-z0-9_-]/g, '_')}`;
     nodes.push({
       id: nicheNodeId,
