@@ -26,6 +26,6 @@ NOT verified (needs a human or an agent with a browser/live DB): rendered UI, li
 7. **CORS**: allow-list is empty unless `CORS_ALLOWED_ORIGINS`/`APP_URL` set; fine for same-origin, but set it in production.
 8. **Bundle size**: main chunk >500 kB; add route-level `React.lazy` for heavy panels (Maps, D3, studios).
 9. **JWT lifetime** is 30 days (comment says 24h); shorten or add refresh/revocation.
-10. `firebase-applet-config.json` placeholder configuration active; customize with project credentials upon deployment.
+10. Google Workspace / Drive Firebase auth now requires real `VITE_FIREBASE_*` project configuration. The committed placeholder applet credentials were removed; integration remains not configured until a real project is supplied.
 11. Verify end to end with a throwaway Neon DB: connect -> test -> sync; register -> login -> create lead -> outreach flow; switch city (Toronto, Lagos) and check currency/territory.
 12. Remove or disable any button that calls an endpoint returning "unavailable" (Phase 4/5 actions) so the demo has no dead ends.
