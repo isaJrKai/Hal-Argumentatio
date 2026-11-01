@@ -71,9 +71,8 @@ export async function getEffectiveContractorId(): Promise<string> {
 }
 
 // Strips sensitive fields and decrypts PII safely
-export function sanitizeProspect(lead: any) {
-  const email = lead.emailEncrypted ? (decrypt(lead.emailEncrypted) || lead.email) : lead.email;
-  const phone = lead.phoneEncrypted ? (decrypt(lead.phoneEncrypted) || lead.phone) : lead.phone;
+export export function sanitizeProspect(lead: any) {
+  const hasContactDetails = Boolean(lead.email || lead.phone || lead.emailEncrypted || lead.phoneEncrypted);
 
   return {
     id: lead.id,
@@ -82,8 +81,9 @@ export function sanitizeProspect(lead: any) {
     ownerName: lead.ownerName || null,
     city: lead.city,
     niche: lead.niche || lead.serviceType,
-    email: email && !email.includes('[ENCRYPTED]') ? email : (lead.emailEncrypted ? '[DECRYPTED]' : null),
-    phone: phone && !phone.includes('[ENCRYPTED]') ? phone : (lead.phoneEncrypted ? '[DECRYPTED]' : null),
+    email: null,
+    phone: null,
+    contactDetailsRedacted: hasContactDetails,
     websiteUrl: lead.websiteUrl || null,
     gmbListingUrl: lead.gmbListingUrl || null,
     reviewCount: null,
