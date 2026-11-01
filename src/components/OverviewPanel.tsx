@@ -618,7 +618,7 @@ export default function OverviewPanel({
                       <div className="bg-bg-raised/95 backdrop-blur border border-border-dim rounded-lg p-2.5 shadow-xl font-mono text-[11px] min-w-[190px] space-y-1.5 z-50">
                         <div className="flex items-center justify-between border-b border-border-dim/60 pb-1">
                           <span className="font-bold text-text-primary">{label || item.day} Horizon</span>
-                          <span className="text-[9px] text-accent font-semibold px-1 py-0.2 rounded bg-accent/10" >{forecastMetadata?.engine || 'Model output'}</span>
+                          <span className="text-[9px] text-accent font-semibold px-1 py-0.2 rounded bg-accent/10" >TimesFM 2.5</span>
                         </div>
                         {item.demand !== undefined && (
                           <div className="flex items-center justify-between text-[10px]">
