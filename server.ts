@@ -6326,8 +6326,8 @@ app.get('/api/revenue/intelligence', authenticate, async (req, res) => {
     const byCampaign = Object.entries(campaignMap).map(([name, data]) => ({
       campaign: name,
       ...data,
-      cac: data.customers > 0 ? data.spend / data.customers : 0,
-      roas: data.spend > 0 ? data.revenue / data.spend : 0
+      cac: null,
+      roas: null
     }));
 
     // Dimensional: By Search Term
