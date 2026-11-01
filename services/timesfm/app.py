@@ -24,6 +24,7 @@ app = FastAPI(title="HAL TimesFM Inference", version="1.0.0")
 _model = None
 _model_error: str | None = None
 _model_lock = threading.Lock()
+_inference_lock = threading.Lock()
 
 
 class ForecastRequest(BaseModel):
@@ -72,6 +73,9 @@ def load_model():
 
 @app.on_event("startup")
 def warm_model():
+    # Avoid downloading model weights when the service has not been configured securely.
+    if len(API_KEY) < 32:
+        return
     # Keep the process alive if weights are temporarily unavailable; readiness
     # reports the failure and forecast requests return 503 rather than fake data.
     try:
@@ -100,10 +104,11 @@ def forecast(request: ForecastRequest, authorization: str | None = Header(defaul
 
     try:
         model = load_model()
-        point, quantiles = model.forecast(
-            horizon=request.horizon,
-            inputs=[np.asarray(request.series, dtype=np.float32)],
-        )
+        with _inference_lock:
+            point, quantiles = model.forecast(
+                horizon=request.horizon,
+                inputs=[np.asarray(request.series, dtype=np.float32)],
+            )
         point_values = np.asarray(point[0], dtype=float)
         quantile_values = np.asarray(quantiles[0], dtype=float)
 
