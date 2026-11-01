@@ -261,7 +261,7 @@ export const OperatingCommandRibbon: React.FC<OperatingCommandRibbonProps> = ({
                 <div className="p-3 bg-bg-base rounded-lg border border-border-dim space-y-2">
                   <div className="flex justify-between items-center text-[10px] uppercase font-bold text-text-secondary">
                     <span>Target Customer Acquisition Cost (CAC)</span>
-                    <span className="text-accent">{formatCurrency(workspaceConfig.targetCAC || 145)}</span>
+                    <span className="text-accent">{workspaceConfig.targetCACConfigured ? formatCurrency(workspaceConfig.targetCAC) : 'Not configured'}</span>
                   </div>
                   <input
                     type="range"
@@ -269,11 +269,11 @@ export const OperatingCommandRibbon: React.FC<OperatingCommandRibbonProps> = ({
                     max="1000"
                     step="10"
                     value={workspaceConfig.targetCAC || 145}
-                    onChange={(e) => updateWorkspaceConfig({ targetCAC: Number(e.target.value) })}
+                    onChange={(e) => updateWorkspaceConfig({ targetCAC: Number(e.target.value), targetCACConfigured: true })}
                     className="w-full accent-accent cursor-pointer"
                   />
                   <p className="text-[10px] text-text-tertiary font-sans">
-                    Governs Hermes ad bid recommendations and positive ROI threshold alerts.
+                    Set a measured target CAC to enable guardrail comparisons. No default benchmark is assumed.
                   </p>
                 </div>
 
