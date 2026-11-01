@@ -264,6 +264,7 @@ export default function AuthPage({ onAuthSuccess }: AuthPageProps) {
                 <input
                   type={showPassword ? 'text' : 'password'}
                   required
+                  minLength={isLogin ? undefined : 12}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
@@ -278,6 +279,10 @@ export default function AuthPage({ onAuthSuccess }: AuthPageProps) {
                 </button>
               </div>
             </div>
+
+            {!isLogin && (
+              <p className="text-[10px] text-text-dim font-mono">Registration passwords must be at least 12 characters.</p>
+            )}
 
             <button
               type="submit"
