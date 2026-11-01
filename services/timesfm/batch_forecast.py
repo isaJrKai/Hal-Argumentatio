@@ -78,7 +78,7 @@ def main() -> None:
             CROSS JOIN LATERAL unnest(
                 CASE
                     WHEN c.active_territories IS NOT NULL AND cardinality(c.active_territories) > 0
-                    THEN c.active_territories
+                    THEN array_append(c.active_territories, c.city)
                     ELSE ARRAY[c.city]
                 END
             ) AS territory(city)
