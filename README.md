@@ -16,7 +16,7 @@ HAL is built for operators, agencies, and enterprise consultancies seeking an au
 | **Database & Persistence** | Neon/PostgreSQL via Drizzle for supported domains; legacy `data/db.json` persistence remains in use for other domains. These stores are not yet consolidated. A PostgreSQL failure is reported explicitly rather than treated as an empty dataset or silently replaced with stale local data. |
 | **Cryptographic Security** | AES-256-GCM field-level PII encryption, SHA-256 immutable audit ledger, PBKDF2/bcrypt salted password hashing |
 | **AI Integration Engine** | Google Gemini (`gemini-2.5-flash`, `gemini-1.5-pro`), Hugging Face, OpenRouter, and Model Context Protocol (MCP) |
-| **Test Coverage** | Latest verified PR #14 CI: **173 tests across 33 test files passed**, with TypeScript and production build checks green. |
+| **Test Coverage** | Latest verified main-branch CI after PR #15 and PR #14 merges: **178 tests across 34 test files passed**, with TypeScript and production build checks green. This is CI evidence, not live deployment verification. |
 | **Security Audit** | Latest PR #14 CI production dependency audit passed; two moderate development/transitive dependency advisories remain documented. |
 | **Codebase Volume** | 60,000+ lines of TypeScript |
 
@@ -37,7 +37,7 @@ HAL is built for operators, agencies, and enterprise consultancies seeking an au
 ### 3. Unified Communications Hub
 - **Email:** Live email submission is available through the Resend API when `RESEND_API_KEY` and a verified `HAL_SENDER_EMAIL` are configured server-side. HAL records provider acceptance as `submitted`; it does not claim recipient delivery without a verified delivery event.
 - **SMS and WhatsApp:** Composer and simulation workflows are available. Live provider dispatch is not implemented and is not represented as operational.
-- **Dispatch history:** Current dispatch history is process-memory based; it is not yet a durable transactional outbox. The audit ledger records dispatch metadata, but provider delivery callbacks and durable retry/dead-letter handling remain outstanding.
+- **Dispatch history:** Live email submissions are recorded in the PostgreSQL communications outbox before provider submission, with idempotency keys and encrypted recipient/content fields. Provider acceptance is recorded as `submitted`; verified Resend webhook events reconcile delivery, bounce, and related states. Durable automated retry/dead-letter processing is not yet implemented. SMS and WhatsApp remain simulation-only.
 - **Calendar:** Provider connectivity and booking operations require separate live verification; do not assume calendar bookings are operational.
 
 ### 4. Neural Intelligence & Decision Graph
