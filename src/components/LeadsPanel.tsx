@@ -1658,30 +1658,34 @@ Next-Gen Waterproofing	Calgary	Waterproofing	Jane Smith	jane@nextgen.ca	403-555-
                     <div className="space-y-1">
                       <div className="flex justify-between text-[10px]">
                         <span className="text-text-secondary">Technical SEO:</span>
-                        <span className={`font-bold ${selectedLead.seoScore! >= 75 ? 'text-green-400' : selectedLead.seoScore! >= 50 ? 'text-yellow-400' : 'text-red-400'}`}>
-                          {selectedLead.seoScore}/100
+                        <span className={`font-bold ${selectedLead.seoScore == null ? 'text-text-tertiary' : selectedLead.seoScore >= 75 ? 'text-green-400' : selectedLead.seoScore >= 50 ? 'text-yellow-400' : 'text-red-400'}`}>
+                          {selectedLead.seoScore == null ? 'Not measured' : `${selectedLead.seoScore}/100`}
                         </span>
                       </div>
-                      <div className="w-full bg-card-dark h-1.5 rounded-full overflow-hidden border border-border-dark/40">
-                        <div 
-                          className={`h-full rounded-full ${selectedLead.seoScore! >= 75 ? 'bg-green-400' : selectedLead.seoScore! >= 50 ? 'bg-yellow-400' : 'bg-red-400'}`}
-                          style={{ width: `${selectedLead.seoScore}%` }}
-                        />
-                      </div>
+                      {selectedLead.seoScore != null && (
+                        <div className="w-full bg-card-dark h-1.5 rounded-full overflow-hidden border border-border-dark/40">
+                          <div
+                            className={`h-full rounded-full ${selectedLead.seoScore >= 75 ? 'bg-green-400' : selectedLead.seoScore >= 50 ? 'bg-yellow-400' : 'bg-red-400'}`}
+                            style={{ width: `${Math.max(0, Math.min(100, selectedLead.seoScore))}%` }}
+                          />
+                        </div>
+                      )}
                     </div>
                     <div className="space-y-1">
                       <div className="flex justify-between text-[10px]">
                         <span className="text-text-secondary">Page Performance:</span>
-                        <span className={`font-bold ${selectedLead.performanceScore! >= 75 ? 'text-green-400' : selectedLead.performanceScore! >= 50 ? 'text-yellow-400' : 'text-red-400'}`}>
-                          {selectedLead.performanceScore}/100
+                        <span className={`font-bold ${selectedLead.performanceScore == null ? 'text-text-tertiary' : selectedLead.performanceScore >= 75 ? 'text-green-400' : selectedLead.performanceScore >= 50 ? 'text-yellow-400' : 'text-red-400'}`}>
+                          {selectedLead.performanceScore == null ? 'Not measured' : `${selectedLead.performanceScore}/100`}
                         </span>
                       </div>
-                      <div className="w-full bg-card-dark h-1.5 rounded-full overflow-hidden border border-border-dark/40">
-                        <div 
-                          className={`h-full rounded-full ${selectedLead.performanceScore! >= 75 ? 'bg-green-400' : selectedLead.performanceScore! >= 50 ? 'bg-yellow-400' : 'bg-red-400'}`}
-                          style={{ width: `${selectedLead.performanceScore}%` }}
-                        />
-                      </div>
+                      {selectedLead.performanceScore != null && (
+                        <div className="w-full bg-card-dark h-1.5 rounded-full overflow-hidden border border-border-dark/40">
+                          <div
+                            className={`h-full rounded-full ${selectedLead.performanceScore >= 75 ? 'bg-green-400' : selectedLead.performanceScore >= 50 ? 'bg-yellow-400' : 'bg-red-400'}`}
+                            style={{ width: `${Math.max(0, Math.min(100, selectedLead.performanceScore))}%` }}
+                          />
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
