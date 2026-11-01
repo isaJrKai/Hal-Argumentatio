@@ -424,7 +424,7 @@ export default function App() {
     return () => {
       window.fetch = originalFetch;
     };
-  }, []);
+  }, [token, reviewMode]);
 
   // Auto-fetch data on token load
   useEffect(() => {
