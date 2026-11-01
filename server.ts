@@ -4256,6 +4256,56 @@ app.post('/api/outreach/dispatch', authenticate, async (req, res) => {
         error: `Live ${channel} delivery is not implemented. No provider was contacted.`
       });
     }
+    if (!leadId) {
+      return res.status(400).json({
+        success: false,
+        code: 'LEAD_ID_REQUIRED',
+        error: 'Live email must be sent to a saved lead whose contact details and grounding status can be checked.'
+      });
+    }
+    const [storedLead] = await pgDb.select().from(leads).where(
+      and(eq(leads.id, String(leadId)), eq(leads.contractorId, contractorId))
+    );
+    if (!storedLead) {
+      return res.status(404).json({
+        success: false,
+        code: 'LEAD_NOT_FOUND',
+        error: 'The selected lead was not found in this account.'
+      });
+    }
+    const verifiedRecipient = storedLead.emailEncrypted
+      ? decrypt(storedLead.emailEncrypted)
+      : (storedLead.email && !storedLead.email.includes('[ENCRYPTED]') ? storedLead.email : '');
+    if (!verifiedRecipient || verifiedRecipient.trim().toLowerCase() !== String(recipient).trim().toLowerCase()) {
+      return res.status(409).json({
+        success: false,
+        code: 'RECIPIENT_DOES_NOT_MATCH_LEAD',
+        error: 'Recipient does not match the saved lead email. Refresh the lead record before sending.'
+      });
+    }
+    try {
+      enforceFailClosedOutreachGate({
+        id: storedLead.id,
+        businessName: storedLead.businessName,
+        isSynthetic: storedLead.isSynthetic,
+        sourceType: storedLead.sourceType || undefined,
+        verificationStatus: storedLead.verificationStatus || undefined,
+        dnsVerified: storedLead.dnsVerified,
+        websiteUrl: storedLead.websiteUrl || undefined,
+        email: verifiedRecipient,
+        channel: 'email'
+      });
+    } catch (gateError: any) {
+      if (gateError instanceof FailClosedOutreachError) {
+        return res.status(409).json({
+          success: false,
+          code: 'OUTREACH_GROUNDING_BLOCKED',
+          error: gateError.message
+        });
+      }
+      throw gateError;
+    }
+
     if (!process.env.RESEND_API_KEY || !process.env.HAL_SENDER_EMAIL) {
       return res.status(503).json({
         success: false,
