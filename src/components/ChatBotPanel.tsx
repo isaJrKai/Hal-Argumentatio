@@ -32,20 +32,16 @@ interface ChatMessage {
 // Render the common inline Markdown HAL emits (bold, italic and inline code)
 // as React elements instead of exposing literal Markdown markers to operators.
 function renderInlineMarkdown(value: string): React.ReactNode[] {
-  return value.split(/(\\*\\*[^*]+\\*\\*|\\*[^*]+\\*|`[^`]+`)/g).map((part, index) => {
+  return value.split(/(\*\*[^*]+\*\*|\*[^*]+\*)/g).map((part, index) => {
     if (part.startsWith('**') && part.endsWith('**')) {
       return <strong key={index}>{part.slice(2, -2)}</strong>;
     }
     if (part.startsWith('*') && part.endsWith('*')) {
       return <em key={index}>{part.slice(1, -1)}</em>;
     }
-    if (part.startsWith('`') && part.endsWith('`')) {
-      return <code key={index} className="px-1 py-0.5 rounded bg-bg-subtle font-mono">{part.slice(1, -1)}</code>;
-    }
     return <React.Fragment key={index}>{part}</React.Fragment>;
   });
-}
-interface ChatBotPanelProps {
+}interface ChatBotPanelProps {
   token: string | null;
 }
 
