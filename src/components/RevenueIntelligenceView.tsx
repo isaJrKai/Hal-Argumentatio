@@ -124,8 +124,8 @@ export default function RevenueIntelligenceView({ token }: RevenueIntelligenceVi
 
       {/* Health & Attribution Warnings Banner */}
       {health.warnings.length > 0 && (
-        <div className="p-4 rounded-xl border border-amber-500/30 bg-amber-500/10 text-amber-200 flex items-start gap-3 text-xs font-mono">
-          <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+        <div className="p-4 rounded-xl border border-warning/30 bg-warning-dim/10 text-warning flex items-start gap-3 text-xs font-mono">
+          <AlertTriangle className="w-4 h-4 text-warning shrink-0 mt-0.5" />
           <div className="space-y-1">
             <div className="font-bold">Attribution Health Warning ({health.warnings.length})</div>
             {health.warnings.map((w: string, idx: number) => (
