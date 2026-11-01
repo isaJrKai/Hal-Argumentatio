@@ -145,7 +145,7 @@ export const UnifiedCommunicationsHub: React.FC<UnifiedCommunicationsHubProps> =
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Idempotency-Key': idempotencyKey,
+          'Idempotency-Key': crypto.randomUUID(),
           ...(token ? { Authorization: `Bearer ${token}` } : {})
         },
         body: JSON.stringify({
