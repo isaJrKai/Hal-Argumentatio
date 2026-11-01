@@ -4970,15 +4970,15 @@ app.get('/api/ai/engine-status', authenticate, async (req, res) => {
       },
       timesfm: {
         name: 'TimesFM Demand Prediction Engine',
-        model: 'TimesFM-1.0-200M (Zero-Shot Time-Series)',
-        configured: true,
-        status: 'online',
-        health: 'excellent',
-        role: 'Zero-Shot Provincial Trade Demand Wave Modeling, Seasonal CPL Elasticity & Storm Volume Forecasting',
-        capabilities: ['12-Week Rolling Forward Horizon', 'CPL Volatility Indexing', 'Storm Inrush Estimator', 'Regional Elasticity Bands'],
-        forecastHorizon: '12 Weeks Rolling Forward',
-        confidenceInterval: '95.4% Bayesian Bound',
-        lastInference: new Date().toISOString()
+        model: 'google/timesfm-2.5-200m-pytorch',
+        configured: Boolean(process.env.TIMESFM_SERVICE_URL && process.env.TIMESFM_API_KEY),
+        status: process.env.TIMESFM_SERVICE_URL && process.env.TIMESFM_API_KEY ? 'unverified' : 'offline',
+        health: 'not_verified',
+        role: 'Tenant-scoped weekly conversion-demand forecasting from historical Google Ads observations',
+        capabilities: ['TimesFM 2.5 Inference', 'Median Forecast', 'q10/q90 Quantile Bands'],
+        forecastHorizon: '1–52 weeks, subject to available history',
+        confidenceInterval: 'Not measured as a percentage; quantile bounds are returned by the model',
+        lastInference: null
       },
       autonomous_offline: {
         name: 'HAL Self-Taught Autonomous Neural Engine',
