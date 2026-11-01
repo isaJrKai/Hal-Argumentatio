@@ -1554,7 +1554,7 @@ app.post('/api/leads', authenticate, async (req, res) => {
   }
 });
 
-app.post('/api/leads/ingest', authenticate, async (req, res) => {
+app.post('/api/leads/create', authenticate, async (req, res) => {
   const contractorId = (req as any).contractorId;
   const { 
     businessName, ownerName, email, phone, city, serviceType, notes,
@@ -2233,13 +2233,13 @@ app.post('/api/leads/bulk', authenticate, async (req, res) => {
         continue;
       }
 
-      const calculatedUrgency = urgencyScore !== undefined && !isNaN(Number(urgencyScore))
-        ? Number(urgencyScore) 
-        : 5.0;
+      const calculatedUrgency = urgencyScore !== undefined && urgencyScore !== null && Number.isFinite(Number(urgencyScore))
+        ? Number(urgencyScore)
+        : null;
 
-      const calculatedLtv = predictedLtvUsd !== undefined && !isNaN(Number(predictedLtvUsd))
-        ? Number(predictedLtvUsd) 
-        : 0;
+      const calculatedLtv = predictedLtvUsd !== undefined && predictedLtvUsd !== null && Number.isFinite(Number(predictedLtvUsd))
+        ? Number(predictedLtvUsd)
+        : null;
 
       const emailEncrypted = email ? encrypt(String(email)) : null;
       const phoneEncrypted = phone ? encrypt(String(phone)) : null;
@@ -2257,6 +2257,10 @@ app.post('/api/leads/bulk', authenticate, async (req, res) => {
         city,
         niche: serviceType,
         source: 'spreadsheet_import',
+        sourceType: 'spreadsheet_import',
+        isSynthetic: false,
+        verificationStatus: 'UNVERIFIED_STAGING',
+        dnsVerified: false,
         status: 'new',
         urgencyScore: calculatedUrgency,
         predictedLtv: calculatedLtv,
@@ -2579,18 +2583,21 @@ app.post('/api/leads/ingest', authenticate, async (req, res) => {
         emailEncrypted,
         phoneEncrypted,
         isSynthetic: Boolean(hl.isSynthetic),
-        sourceType: hl.sourceType || 'live_harvest',
+        sourceType: hl.sourceType || 'unknown',
         city: hl.city,
         niche: hl.serviceType,
         source: 'harvested_intelligence',
         status: 'new',
-        urgencyScore: hl.urgencyScore ?? 0,
-        predictedLtv: hl.predictedLtvUsd ?? 0,
+        urgencyScore: null,
+        predictedLtv: null,
         notes: hl.notes || `Harvested real business profile. Niche: ${hl.serviceType}.`,
         websiteUrl: hl.websiteUrl,
-        performanceScore: hl.performanceScore,
-        sslStatus: hl.sslStatus,
-        reviewCount: hl.reviewCount,
+        performanceScore: null,
+        sslStatus: null,
+        reviewCount: null,
+        googleRating: null,
+        seoScore: null,
+        sentimentScore: null,
         verificationStatus: (hl as any).verificationStatus || 'UNVERIFIED_STAGING',
         dnsVerified: (hl as any).dnsVerified !== undefined ? Boolean((hl as any).dnsVerified) : false,
       }).returning();
@@ -2685,18 +2692,21 @@ app.post('/api/leads/purge-and-replace', authenticate, async (req, res) => {
         emailEncrypted,
         phoneEncrypted,
         isSynthetic: Boolean(hl.isSynthetic),
-        sourceType: hl.sourceType || 'live_harvest',
+        sourceType: hl.sourceType || 'unknown',
         city: hl.city,
         niche: hl.serviceType,
         source: 'harvested_intelligence',
         status: 'new',
-        urgencyScore: hl.urgencyScore ?? 0,
-        predictedLtv: hl.predictedLtvUsd ?? 0,
+        urgencyScore: null,
+        predictedLtv: null,
         notes: hl.notes || `Harvested real business profile. Niche: ${hl.serviceType}.`,
         websiteUrl: hl.websiteUrl,
-        performanceScore: hl.performanceScore,
-        sslStatus: hl.sslStatus,
-        reviewCount: hl.reviewCount,
+        performanceScore: null,
+        sslStatus: null,
+        reviewCount: null,
+        googleRating: null,
+        seoScore: null,
+        sentimentScore: null,
         verificationStatus: (hl as any).verificationStatus || 'UNVERIFIED_STAGING',
         dnsVerified: (hl as any).dnsVerified !== undefined ? Boolean((hl as any).dnsVerified) : false,
       }).returning();
@@ -2712,13 +2722,16 @@ app.post('/api/leads/purge-and-replace', authenticate, async (req, res) => {
         serviceType: hl.serviceType,
         source: 'harvested_intelligence',
         status: 'new',
-        urgencyScore: hl.urgencyScore ?? 0,
-        predictedLtvUsd: (hl as any).predictedLtvUsd ?? 0,
+        urgencyScore: null,
+        predictedLtvUsd: null,
         notes: hl.notes || `Harvested real business profile. Niche: ${hl.serviceType}.`,
         websiteUrl: hl.websiteUrl,
-        performanceScore: hl.performanceScore,
-        sslStatus: hl.sslStatus,
-        reviewCount: hl.reviewCount,
+        performanceScore: null,
+        sslStatus: null,
+        reviewCount: null,
+        googleRating: null,
+        seoScore: null,
+        sentimentScore: null,
         verificationStatus: (hl as any).verificationStatus || 'UNVERIFIED_STAGING',
         dnsVerified: (hl as any).dnsVerified !== undefined ? Boolean((hl as any).dnsVerified) : false,
       });
