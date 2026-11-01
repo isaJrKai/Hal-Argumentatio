@@ -76,6 +76,7 @@ const HalLoopOperationsView = lazy(() => import('./components/HalLoopOperationsV
 const HermesLabPanel = lazy(() => import('./components/HermesLabPanel'));
 const BlueprintViewerPanel = lazy(() => import('./components/BlueprintViewerPanel').then(module => ({ default: module.BlueprintViewerPanel })));
 import { ErrorBoundary } from './components/ErrorBoundary';
+import { parseCachedContractor } from './lib/sessionStorage';
 
 // 4-Zone Workstation Shell & Tools
 import { InspectorProvider } from './context/InspectorContext';
@@ -132,18 +133,29 @@ export default function App() {
       return { id: 'review-mode', email: 'review@halbiz.local', name: 'Workspace Preview', role: 'user' };
     }
     const saved = localStorage.getItem('halbiz_auth_contractor');
-    return saved ? JSON.parse(saved) : null;
+    return parseCachedContractor(saved);
   });
 
   // Session rehydration and token validation on mount
   useEffect(() => {
+    // Review mode is deliberately unauthenticated and must not rehydrate a real saved session.
+    if (reviewMode) return;
+
     const existingToken = localStorage.getItem('halbiz_auth_token') || localStorage.getItem('token');
     if (existingToken) {
       fetch('/api/auth/me', {
         headers: { 'Authorization': `Bearer ${existingToken}` }
       })
         .then(res => {
-          if (!res.ok) throw new Error('Session invalid');
+          if (res.status === 401 || res.status === 403) {
+            localStorage.removeItem('halbiz_auth_token');
+            localStorage.removeItem('token');
+            localStorage.removeItem('halbiz_auth_contractor');
+            setToken(null);
+            setContractor(null);
+            throw new Error('Saved session is no longer valid');
+          }
+          if (!res.ok) throw new Error(`Session verification failed (HTTP ${res.status})`);
           return res.json();
         })
         .then(data => {
@@ -152,8 +164,10 @@ export default function App() {
             localStorage.setItem('halbiz_auth_contractor', JSON.stringify(data.contractor));
           }
         })
-        .catch(() => {
-          console.warn('Session verification failed, requesting re-authentication.');
+        .catch((error: unknown) => {
+          // Keep the cached session on transient server/network errors; only an explicit
+          // 401/403 above clears it. This avoids logging users out during an outage.
+          console.warn('Session verification could not be completed.', error);
         });
     }
   }, []);
