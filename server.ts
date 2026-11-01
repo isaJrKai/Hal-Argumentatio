@@ -1457,13 +1457,13 @@ app.post('/api/leads', authenticate, async (req, res) => {
     return res.status(400).json({ error: 'Business name and city are required' });
   }
 
-  // Deterministic values - no fabricated randomness
-  const urgencyScore = req.body.urgencyScore !== undefined && !isNaN(Number(req.body.urgencyScore))
+  // Missing intelligence metrics remain unavailable; a deal value is not a measured LTV.
+  const urgencyScore = req.body.urgencyScore !== undefined && req.body.urgencyScore !== null && !isNaN(Number(req.body.urgencyScore))
     ? Number(req.body.urgencyScore)
-    : 5.0;
-  const predictedLtv = req.body.predictedLtv !== undefined && !isNaN(Number(req.body.predictedLtv))
+    : null;
+  const predictedLtv = req.body.predictedLtv !== undefined && req.body.predictedLtv !== null && !isNaN(Number(req.body.predictedLtv))
     ? Number(req.body.predictedLtv)
-    : (req.body.dealValue !== undefined && !isNaN(Number(req.body.dealValue)) ? Number(req.body.dealValue) : 0);
+    : null;
 
   // Cryptographic PII handling
   const emailEncrypted = email ? encrypt(String(email)) : null;
@@ -1483,6 +1483,10 @@ app.post('/api/leads', authenticate, async (req, res) => {
       city,
       niche: serviceType, // mapping serviceType to niche
       source: gclid ? 'google_ads' : 'manual',
+      sourceType: gclid ? 'google_ads' : 'manual',
+      isSynthetic: false,
+      verificationStatus: 'UNVERIFIED_STAGING',
+      dnsVerified: false,
       status: 'new',
       urgencyScore,
       predictedLtv,
@@ -1563,6 +1567,11 @@ app.post('/api/leads/ingest', authenticate, async (req, res) => {
       city,
       niche: serviceType,
       source: gclid || gbraid || wbraid ? 'google_ads' : (utmSource || 'direct'),
+      sourceType: gclid || gbraid || wbraid ? 'google_ads' : 'web_form',
+      externalSource: gclid || gbraid || wbraid ? 'google_ads' : 'web_form',
+      isSynthetic: false,
+      verificationStatus: 'UNVERIFIED_STAGING',
+      dnsVerified: false,
       status: 'new',
       notes
     }).returning();
