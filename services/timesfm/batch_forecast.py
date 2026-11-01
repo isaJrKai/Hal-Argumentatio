@@ -72,7 +72,22 @@ def main() -> None:
 
     with psycopg.connect(DATABASE_URL, row_factory=dict_row, connect_timeout=20) as conn:
         contractors = conn.execute(
-            "SELECT id, city, service_type FROM contractors WHERE city <> '' AND service_type <> ''"
+            """
+            SELECT c.id, c.service_type, territory.city
+            FROM contractors AS c
+            CROSS JOIN LATERAL unnest(
+                CASE
+                    WHEN c.active_territories IS NOT NULL AND cardinality(c.active_territories) > 0
+                    THEN c.active_territories
+                    ELSE ARRAY[c.city]
+                END
+            ) AS territory(city)
+            WHERE c.city <> ''
+              AND c.service_type <> ''
+              AND territory.city IS NOT NULL
+              AND btrim(territory.city) <> ''
+            ORDER BY c.id, territory.city
+            """
         ).fetchall()
 
         for contractor in contractors:
