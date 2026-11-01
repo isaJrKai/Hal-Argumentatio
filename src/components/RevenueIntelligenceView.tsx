@@ -144,17 +144,17 @@ export default function RevenueIntelligenceView({ token }: RevenueIntelligenceVi
         </div>
         <div className="p-4 rounded-xl border border-border-dim bg-bg-raised">
           <div className="text-[10px] font-mono text-text-tertiary uppercase">Cost Per Lead (CPL)</div>
-          <div className="text-lg font-bold font-mono text-text-primary mt-1">${(summary.cpl || 0).toFixed(2)}</div>
+          <div className="text-lg font-bold font-mono text-text-primary mt-1">{summary.cpl == null ? "Unavailable" : `${summary.cpl.toFixed(2)}`}</div>
           <div className="text-[10px] text-text-secondary font-mono mt-0.5">{summary.totalLeads || 0} total leads</div>
         </div>
         <div className="p-4 rounded-xl border border-border-dim bg-bg-raised">
           <div className="text-[10px] font-mono text-text-tertiary uppercase">Cost Per SAL</div>
-          <div className="text-lg font-bold font-mono text-text-primary mt-1">${(summary.costPerSal || 0).toFixed(2)}</div>
+          <div className="text-lg font-bold font-mono text-text-primary mt-1">{summary.costPerSal == null ? "Unavailable" : `${summary.costPerSal.toFixed(2)}`}</div>
           <div className="text-[10px] text-text-secondary font-mono mt-0.5">{summary.totalSal || 0} SALs</div>
         </div>
         <div className="p-4 rounded-xl border border-border-dim bg-bg-raised">
           <div className="text-[10px] font-mono text-text-tertiary uppercase">Customer CAC</div>
-          <div className="text-lg font-bold font-mono text-text-primary mt-1">${(summary.cac || 0).toFixed(2)}</div>
+          <div className="text-lg font-bold font-mono text-text-primary mt-1">{summary.cac == null ? "Unavailable" : `${summary.cac.toFixed(2)}`}</div>
           <div className="text-[10px] text-text-secondary font-mono mt-0.5">{summary.totalCustomers || 0} customers</div>
         </div>
         <div className="p-4 rounded-xl border border-border-dim bg-bg-raised">
@@ -164,7 +164,7 @@ export default function RevenueIntelligenceView({ token }: RevenueIntelligenceVi
         </div>
         <div className="p-4 rounded-xl border border-border-dim bg-bg-raised">
           <div className="text-[10px] font-mono text-text-tertiary uppercase">Blended ROAS</div>
-          <div className="text-lg font-bold font-mono text-accent mt-1">{(summary.roas || 0).toFixed(2)}x</div>
+          <div className="text-lg font-bold font-mono text-accent mt-1">{summary.roas == null ? "Unavailable" : `${summary.roas.toFixed(2)}x`}</div>
           <div className="text-[10px] text-accent/80 font-mono mt-0.5">Return on Ad Spend</div>
         </div>
       </div>
@@ -206,13 +206,13 @@ export default function RevenueIntelligenceView({ token }: RevenueIntelligenceVi
 
             {(() => {
               const stages = [
-                { label: 'Spend / Clicks', num: summary.totalClicks || 1250, val: `$${(summary.totalSpend || 0).toLocaleString()}`, sub: `${summary.totalClicks || 0} clicks`, color: '#6366f1' },
-                { label: 'Leads', num: summary.totalLeads || 140, val: summary.totalLeads || 0, sub: `CPL: $${(summary.cpl || 0).toFixed(0)}`, color: '#38bdf8' },
-                { label: 'Qualified', num: summary.totalQualified || 68, val: summary.totalQualified || 0, sub: `CPQ: $${(summary.costPerQualified || 0).toFixed(0)}`, color: '#06b6d4' },
-                { label: 'SAL', num: summary.totalSal || 42, val: summary.totalSal || 0, sub: `CP-SAL: $${(summary.costPerSal || 0).toFixed(0)}`, color: '#10b981' },
-                { label: 'Appointments', num: summary.totalAppointments || 28, val: summary.totalAppointments || 0, sub: `CP-Appt: $${(summary.costPerAppointment || 0).toFixed(0)}`, color: '#f59e0b' },
-                { label: 'Opportunities', num: summary.totalOpportunities || 18, val: summary.totalOpportunities || 0, sub: `Pipeline Stage`, color: '#a855f7' },
-                { label: 'Closed Won', num: summary.totalCustomers || 10, val: summary.totalCustomers || 0, sub: `CAC: $${(summary.cac || 0).toFixed(0)}`, color: '#ec4899' }
+                { label: 'Spend / Clicks', num: summary.totalClicks || 0, val: `${(summary.totalSpend || 0).toLocaleString()}`, sub: `${summary.totalClicks || 0} clicks`, color: '#6366f1' },
+                { label: 'Leads', num: summary.totalLeads || 0, val: summary.totalLeads || 0, sub: summary.cpl == null ? 'CPL: unavailable' : `CPL: ${summary.cpl.toFixed(0)}`, color: '#38bdf8' },
+                { label: 'Qualified', num: summary.totalQualified || 0, val: summary.totalQualified || 0, sub: summary.costPerQualified == null ? 'CPQ: unavailable' : `CPQ: ${summary.costPerQualified.toFixed(0)}`, color: '#06b6d4' },
+                { label: 'SAL', num: summary.totalSal || 0, val: summary.totalSal || 0, sub: summary.costPerSal == null ? 'CP-SAL: unavailable' : `CP-SAL: ${summary.costPerSal.toFixed(0)}`, color: '#10b981' },
+                { label: 'Appointments', num: summary.totalAppointments || 0, val: summary.totalAppointments || 0, sub: summary.costPerAppointment == null ? 'CP-Appt: unavailable' : `CP-Appt: ${summary.costPerAppointment.toFixed(0)}`, color: '#f59e0b' },
+                { label: 'Opportunities', num: summary.totalOpportunities || 0, val: summary.totalOpportunities || 0, sub: 'CRM-recorded opportunities', color: '#a855f7' },
+                { label: 'Closed Won', num: summary.totalCustomers || 0, val: summary.totalCustomers || 0, sub: summary.cac == null ? 'CAC: unavailable' : `CAC: ${summary.cac.toFixed(0)}`, color: '#ec4899' }
               ];
 
               const maxNum = Math.max(...stages.map(s => typeof s.num === 'number' ? s.num : 1), 1);
