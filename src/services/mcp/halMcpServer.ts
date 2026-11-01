@@ -21,7 +21,6 @@ import {
   notifications,
   revenueRecommendations
 } from '../../db/schema.ts';
-import { decrypt } from '../../db/db.ts';
 import { eq, and, desc, sql, like, or } from 'drizzle-orm';
 
 // Common annotations required for all read-only MCP tools
