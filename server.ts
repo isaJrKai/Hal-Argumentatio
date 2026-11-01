@@ -5233,8 +5233,8 @@ app.get('/api/neural/network', authenticate, async (req, res) => {
       (!nicheFilter || String(record.niche || '').trim().toLowerCase() === nicheFilter)
     );
     const scopedAds = adsRows.filter(record =>
-      (!normalizedCity || !record.geo || String(record.geo).toLowerCase().includes(normalizedCity)) &&
-      (!nicheFilter || !record.campaignName || String(record.campaignName).toLowerCase().includes(nicheFilter))
+      (!normalizedCity || (typeof record.geo === 'string' && record.geo.trim().length > 0 && record.geo.toLowerCase().includes(normalizedCity))) &&
+      (!nicheFilter || (typeof record.campaignName === 'string' && record.campaignName.trim().length > 0 && record.campaignName.toLowerCase().includes(nicheFilter)))
     );
 
     const nodes: any[] = [
