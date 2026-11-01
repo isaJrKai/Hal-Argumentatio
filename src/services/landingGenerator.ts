@@ -251,9 +251,7 @@ export function applyVerifiedBusinessDetails(
       ? `${businessName} provides ${tradeLabel.toLowerCase()} services in ${city}. ${promptText}`
       : `${businessName} provides ${tradeLabel.toLowerCase()} services in ${city}. Contact the business to discuss your project.`;
   }
-  if (!preserveGeneratedCopy && !hasCuratedSpecialistTemplate) {
-    config.sections.hero.badgeText = `${tradeLabel} in ${city}`;
-  }
+  config.sections.hero.badgeText = `${tradeLabel} in ${city}`;
 
   config.sections.lead_form.active = true;
   config.sections.lead_form.title = `Request a quote from ${businessName}`;
