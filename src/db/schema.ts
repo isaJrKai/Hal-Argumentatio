@@ -32,6 +32,7 @@ export const leads = pgTable('leads', {
   sourceType: text('source_type'), // 'live_harvest' | 'synthetic_fallback' | 'manual' | 'google_ads'
   verificationStatus: text('verification_status').default('UNVERIFIED_STAGING').notNull(), // 'VERIFIED' | 'UNVERIFIED_STAGING' | 'FABRICATED_REJECTED'
   dnsVerified: boolean('dns_verified').default(false).notNull(),
+  groundingEvidence: jsonb('grounding_evidence'),
   externalCrmId: text('external_crm_id'),
   externalSource: text('external_source'),
   websiteUrl: text('website_url'),
