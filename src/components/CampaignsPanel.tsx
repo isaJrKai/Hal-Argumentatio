@@ -521,10 +521,10 @@ export default function CampaignsPanel({ campaigns, leads = [], token, onRefresh
             <div className="flex items-center gap-2">
               <Sparkles className="w-4 h-4 text-brand" />
               <span className="text-xs font-mono font-bold text-text-primary uppercase">
-                Hermes Portfolio Diagnostics: {diagnosticReport.scope || 'Portfolio Wide'}
+                Hermes Portfolio Diagnostics: {diagnosticReport.scope || 'Unspecified scope'}
               </span>
               <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-brand/15 text-brand border border-brand/30 font-bold">
-                HEALTH: {diagnosticReport.healthScore || 89}/100
+                HEALTH: {typeof diagnosticReport.healthScore === 'number' && Number.isFinite(diagnosticReport.healthScore) && diagnosticReport.healthScore >= 0 && diagnosticReport.healthScore <= 100 ? `${diagnosticReport.healthScore}/100` : 'Not measured'}
               </span>
             </div>
             <button
@@ -540,7 +540,7 @@ export default function CampaignsPanel({ campaigns, leads = [], token, onRefresh
               <div key={idx} className="bg-bg-dark border border-border-dim rounded-sm p-3 space-y-1">
                 <div className="flex items-center justify-between">
                   <span className="text-[10px] font-mono font-bold text-accent uppercase">{anomaly.channel}</span>
-                  <span className="text-[9px] font-mono text-amber-400 uppercase font-bold">{anomaly.severity || 'vector'}</span>
+                  <span className="text-[9px] font-mono text-amber-400 uppercase font-bold">{anomaly.severity || 'Not classified'}</span>
                 </div>
                 <div className="text-xs font-mono font-bold text-text-primary">{anomaly.issue}</div>
                 <div className="text-[11px] text-text-secondary font-sans leading-relaxed">{anomaly.impact}</div>
