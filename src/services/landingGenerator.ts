@@ -87,11 +87,11 @@ Strict rules:
    - Lead directly with the point. Zero throat-clearing openings ("In today's fast-paced world", "Here's the thing").
    - NO binary contrast theater ("It's not X. It's Y."). State the claim directly.
    - Strictly BANNED words: delve, landscape, tapestry, pivotal, showcase, leverage, robust, cutting-edge, seamless, game-changer, next-level, unlock, empower, foster, utilize, paradigm, transformative, revolutionize, elevate.
-   - Be concrete: numbers, response times, upfront prices, specific local outcomes.
+   - Be concrete only when supported by the supplied business brief. Never invent prices, response times, guarantees, credentials, review counts, statistics, locations or service commitments.
    - CTA language is ACTION + OUTCOME (e.g. "Book Emergency Dispatch", "Request Flat-Rate Diagnostic").
 3. Facts only: Contractor phone: "${baseTemplate.phone}". City: "${city}". Business: "${baseTemplate.businessName}".
-4. Tone Archetype: ${variantArchetype}. Target Audience: ${audience || 'Local Homeowners'}. Core Offer: ${coreOffer || 'Fast dispatch, upfront pricing, zero hidden fees'}.
-5. Proof signals: ${proofAvailable || 'None supplied. Do not invent credentials, ratings, insurance, reviews, guarantees, response times, prices, or statistics.'}.
+4. Tone Archetype: ${variantArchetype}. Target Audience: ${audience || 'Customers seeking the contractor services described in the brief'}. Core Offer: ${coreOffer || 'No special offer supplied. Use a neutral request-a-quote CTA.'}.
+5. Proof signals: ${proofAvailable || 'None supplied. Do not invent credentials, ratings, insurance, reviews, guarantees, response times, prices, statistics, service areas or services not named in the contractor description.'}.
 
 Return ONLY a JSON object matching this schema:
 {
@@ -155,7 +155,11 @@ Return ONLY a JSON object matching this schema:
     if (parsed && typeof parsed === 'object') {
       generatedCopyApplied = Boolean(
         typeof parsed.headline === 'string' && parsed.headline.trim() &&
-        typeof parsed.subheadline === 'string' && parsed.subheadline.trim()
+        typeof parsed.subheadline === 'string' && parsed.subheadline.trim() &&
+        Array.isArray(parsed.services) && parsed.services.some((item: any) =>
+          typeof item?.title === 'string' && item.title.trim() &&
+          typeof item?.description === 'string' && item.description.trim()
+        )
       );
       if (parsed.headline) baseTemplate.sections.hero.headline = parsed.headline;
       if (parsed.subheadline) baseTemplate.sections.hero.subheadline = parsed.subheadline;
@@ -271,7 +275,7 @@ function applyVerifiedBusinessDetails(
   config.sections.services.title = 'Services';
   config.sections.services.subtitle = 'Contact the business to confirm scope, availability and pricing.';
   config.sections.services.items = preserveGeneratedCopy && generatedServices.length > 0
-    ? generatedServices.slice(0, 6)
+    ? generatedServices.slice(0, 6).map(item => ({ ...item, priceEstimate: undefined, badge: undefined }))
     : [{
         id: 'service-enquiry',
         title: `${tradeLabel} Enquiries`,
