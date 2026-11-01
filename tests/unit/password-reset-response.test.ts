@@ -9,7 +9,7 @@ describe('password reset response', () => {
     expect(knownAccountResponse).toEqual(unknownAccountResponse);
     expect(knownAccountResponse).toEqual({
       success: true,
-      message: 'If an account exists with this email address, password reset instructions will be sent.'
+      message: 'If an account exists with this email address, reset instructions will be sent when email delivery is available.'
     });
     expect(JSON.stringify(knownAccountResponse)).not.toMatch(/resetUrl|debugToken|rawToken|emailDispatched|emailProviderConfigured/i);
   });

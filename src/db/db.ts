@@ -1033,6 +1033,16 @@ class Database {
     return { valid: true, email: tokenRecord.email };
   }
 
+  public restorePasswordReset(rawToken: string): boolean {
+    if (!rawToken || typeof rawToken !== 'string') return false;
+    const tokenHash = crypto.createHash('sha256').update(rawToken.trim()).digest('hex');
+    const tokenRecord = this.data.passwordResets?.find(t => t.tokenHash === tokenHash);
+    if (!tokenRecord || new Date(tokenRecord.expiresAt) <= new Date()) return false;
+    tokenRecord.used = false;
+    this.save();
+    return true;
+  }
+
   public updateContractorPassword(email: string, newPasswordHash: string): boolean {
     const cleanEmail = email.toLowerCase().trim();
     const con = this.data.contractors.find(c => c.email.toLowerCase() === cleanEmail);

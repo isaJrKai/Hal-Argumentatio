@@ -10,6 +10,6 @@ export interface PasswordResetResponse {
 export function buildPasswordResetResponse(): PasswordResetResponse {
   return {
     success: true,
-    message: 'If an account exists with this email address, password reset instructions will be sent.'
+    message: 'If an account exists with this email address, reset instructions will be sent when email delivery is available.'
   };
 }
