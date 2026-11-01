@@ -4823,8 +4823,8 @@ app.get('/api/neural/network', authenticate, async (req, res) => {
     // The graph is constructed only from this contractor's matching territory
     // and trade. Global in-memory learning state and unscoped insights are excluded.
     const [allWinLoss, allLeads] = await Promise.all([
-      dbInstance.select().from(winLossRecords).where(eq(winLossRecords.contractorId, contractorId)).limit(500),
-      dbInstance.select().from(leads).where(eq(leads.contractorId, contractorId)).limit(1000)
+      dbInstance.select().from(winLossRecords).where(eq(winLossRecords.contractorId, contractorId)).orderBy(desc(winLossRecords.closedAt)).limit(500),
+      dbInstance.select().from(leads).where(eq(leads.contractorId, contractorId)).orderBy(desc(leads.createdAt)).limit(1000)
     ]);
     const winLoss = allWinLoss.filter(record =>
       matchesTerritoryContext(record.city, record.niche, targetCity, targetNiche)
@@ -4843,7 +4843,7 @@ app.get('/api/neural/network', authenticate, async (req, res) => {
         type: 'core',
         group: 4,
         size: 20,
-        detail: process.env.TIMESFM_SERVICE_URL && process.env.TIMESFM_API_KEY
+        detail: timesfmConfigured
           ? 'Inference endpoint configured. A live model response is verified only when a forecast request succeeds.'
           : 'Inference service is not configured. No TimesFM prediction is attached to this graph.'
       }
@@ -4854,6 +4854,7 @@ app.get('/api/neural/network', authenticate, async (req, res) => {
     ];
 
     const nicheKey = targetNiche.toLocaleLowerCase();
+    const timesfmConfigured = Boolean(process.env.TIMESFM_SERVICE_URL && (process.env.TIMESFM_API_KEY || '').length >= 32);
     const nicheNodeId = `niche_${nicheKey.replace(/[^a-z0-9_-]/g, '_')}`;
     nodes.push({
       id: nicheNodeId,
@@ -4907,7 +4908,7 @@ app.get('/api/neural/network', authenticate, async (req, res) => {
         matchedOutcomeCount: winLoss.length,
         totalOutcomesDigested: winLoss.length,
         globalLearningStateIncluded: false,
-        timesfmServiceConfigured: Boolean(process.env.TIMESFM_SERVICE_URL && process.env.TIMESFM_API_KEY),
+        timesfmServiceConfigured: timesfmConfigured,
         timesfmInferenceVerified: false
       }
     });
@@ -4923,6 +4924,7 @@ app.get('/api/ai/engine-status', authenticate, async (req, res) => {
   const contractorId = (req as any).contractorId;
   const geminiKeySet = !!process.env.GEMINI_API_KEY;
   const nvidiaKeySet = !!process.env.NVIDIA_API_KEY;
+  const timesfmConfigured = Boolean(process.env.TIMESFM_SERVICE_URL && (process.env.TIMESFM_API_KEY || '').length >= 32);
   const activeAiPreference = process.env.HAL_ACTIVE_AI || (geminiKeySet && nvidiaKeySet ? 'dual' : 'gemini');
   const learningState = autonomousLearning.getState();
   const allLeads = await pgDb.select().from(leads).where(eq(leads.contractorId, contractorId));
@@ -4971,8 +4973,8 @@ app.get('/api/ai/engine-status', authenticate, async (req, res) => {
       timesfm: {
         name: 'TimesFM Demand Prediction Engine',
         model: 'google/timesfm-2.5-200m-pytorch',
-        configured: Boolean(process.env.TIMESFM_SERVICE_URL && process.env.TIMESFM_API_KEY),
-        status: process.env.TIMESFM_SERVICE_URL && process.env.TIMESFM_API_KEY ? 'unverified' : 'offline',
+        configured: timesfmConfigured,
+        status: timesfmConfigured ? 'unverified' : 'offline',
         health: 'not_verified',
         role: 'Tenant-scoped weekly conversion-demand forecasting from historical Google Ads observations',
         capabilities: ['TimesFM 2.5 Inference', 'Median Forecast', 'q10/q90 Quantile Bands'],
