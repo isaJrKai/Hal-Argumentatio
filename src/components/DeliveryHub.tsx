@@ -218,7 +218,7 @@ export default function DeliveryHub({ token, leads = [] }: DeliveryHubProps) {
           </div>
           <h2 className="text-xl font-bold tracking-tight text-text-primary mt-1">Client Delivery & Performance Hub</h2>
           <p className="text-xs text-text-secondary max-w-2xl mt-0.5">
-            Oversee active client retainer deliverables, track milestone velocity, intake technical assets, and generate white-label progress portals.
+            Track client project milestones, manually record asset intake, and share client progress portals.
           </p>
         </div>
 
@@ -233,6 +233,13 @@ export default function DeliveryHub({ token, leads = [] }: DeliveryHubProps) {
         </div>
       </div>
 
+      {projectError && (
+        <div role="alert" className="flex items-start gap-2 rounded-sm border border-warning/30 bg-warning/5 p-3 text-xs text-text-primary">
+          <AlertCircle className="w-4 h-4 text-warning shrink-0 mt-0.5" />
+          <span>{projectError}</span>
+        </div>
+      )}
+
       {/* DUAL COLUMN WORKSPACE */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         
@@ -241,23 +248,23 @@ export default function DeliveryHub({ token, leads = [] }: DeliveryHubProps) {
           <div className="bg-bg-raised border border-border-dim rounded-sm p-4 space-y-3">
             <div className="flex items-center justify-between border-b border-border-dim/60 pb-2">
               <span className="text-[10px] font-mono font-bold text-text-primary uppercase tracking-wider">
-                Active Client Projects ({projects.length})
+                Active Client Projects ({projects.filter(project => project.status !== 'completed').length})
               </span>
               <span className="text-[9px] font-mono text-brand font-bold uppercase">
-                ${projects.reduce((sum, p) => sum + p.monthlyRetainerUsd, 0).toLocaleString()}/mo MRR
+                ${projects.filter(project => project.status !== 'completed').reduce((sum, project) => sum + project.monthlyRetainerUsd, 0).toLocaleString()}/mo MRR
               </span>
             </div>
 
             <div className="space-y-2">
               {projects.length === 0 ? (
                 <div className="p-6 text-center text-text-dim text-xs font-mono">
-                  No active projects. Click "Onboard New Client" to start fulfillment.
+                  {loading ? 'Loading client projects…' : 'No persisted projects are available. Click “Onboard New Client” to start fulfillment.'}
                 </div>
               ) : (
                 projects.map((project) => {
                   const isSelected = selectedProject?.id === project.id;
                   const completedMilestones = project.milestones.filter(m => m.status === 'completed').length;
-                  const progressPct = Math.round((completedMilestones / project.milestones.length) * 100);
+                  const progressPct = project.milestones.length > 0 ? Math.round((completedMilestones / project.milestones.length) * 100) : null;
 
                   return (
                     <div
@@ -292,12 +299,12 @@ export default function DeliveryHub({ token, leads = [] }: DeliveryHubProps) {
                       <div className="mt-2 space-y-1">
                         <div className="flex justify-between text-[9px] font-mono text-text-dim">
                           <span>Milestones ({completedMilestones}/{project.milestones.length})</span>
-                          <span>{progressPct}%</span>
+                          <span>{progressPct !== null ? `${progressPct}%` : 'No milestones'}</span>
                         </div>
                         <div className="w-full h-1 bg-bg-base rounded-full overflow-hidden">
                           <div 
                             className="h-full bg-brand rounded-full transition-all duration-300"
-                            style={{ width: `${progressPct}%` }}
+                            style={{ width: `${progressPct ?? 0}%` }}
                           />
                         </div>
                       </div>
@@ -347,31 +354,29 @@ export default function DeliveryHub({ token, leads = [] }: DeliveryHubProps) {
                   </div>
                 </div>
 
-                {/* BEFORE & AFTER PROOF SPEED COMPARISON */}
+                {/* DELIVERY PROGRESS — derived only from milestone states */}
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 font-mono">
                   <div className="p-3 bg-bg-dark border border-border-dim rounded-sm">
-                    <span className="text-[9px] text-text-dim uppercase block font-bold">Initial Audit Health</span>
+                    <span className="text-[9px] text-text-dim uppercase block font-bold">Milestones Complete</span>
                     <div className="flex items-baseline gap-2 mt-1">
-                      <span className="text-lg font-bold text-warning">{selectedProject.initialAuditScore}/100</span>
-                      <span className="text-[10px] text-text-dim">Day 1 Baseline</span>
+                      <span className="text-lg font-bold text-text-primary">{completedMilestones} / {totalMilestones || '—'}</span>
+                      <span className="text-[10px] text-text-dim">Operator-updated</span>
                     </div>
                   </div>
 
                   <div className="p-3 bg-bg-dark border border-border-dim rounded-sm">
-                    <span className="text-[9px] text-text-dim uppercase block font-bold">Current Speed & SEO Score</span>
+                    <span className="text-[9px] text-text-dim uppercase block font-bold">Delivery Progress</span>
                     <div className="flex items-baseline gap-2 mt-1">
-                      <span className="text-lg font-bold text-brand">{selectedProject.currentScore}/100</span>
-                      <span className="text-[10px] text-positive font-bold">
-                        +{selectedProject.currentScore - selectedProject.initialAuditScore} pts gain
-                      </span>
+                      <span className="text-lg font-bold text-brand">{deliveryProgress !== null ? `${deliveryProgress}%` : 'Not available'}</span>
+                      <span className="text-[10px] text-text-dim">Based on completed milestones</span>
                     </div>
                   </div>
 
                   <div className="p-3 bg-bg-dark border border-border-dim rounded-sm">
-                    <span className="text-[9px] text-text-dim uppercase block font-bold">Target Target Velocity</span>
+                    <span className="text-[9px] text-text-dim uppercase block font-bold">Project Status</span>
                     <div className="flex items-baseline gap-2 mt-1">
-                      <span className="text-lg font-bold text-text-primary">{selectedProject.targetScore}/100</span>
-                      <span className="text-[10px] text-text-dim">Optimal Zone</span>
+                      <span className="text-lg font-bold text-text-primary capitalize">{selectedProject.status.replace('_', ' ')}</span>
+                      <span className="text-[10px] text-text-dim">Current workflow state</span>
                     </div>
                   </div>
                 </div>
@@ -383,10 +388,10 @@ export default function DeliveryHub({ token, leads = [] }: DeliveryHubProps) {
                   <div className="flex items-center gap-2">
                     <CheckCheck className="w-4 h-4 text-brand" />
                     <h4 className="text-xs font-mono font-bold text-text-primary uppercase tracking-wider">
-                      Fulfillment Milestones & Proof of Delivery
+                      Milestone Status & Proof References
                     </h4>
                   </div>
-                  <span className="text-[10px] font-mono text-text-dim">Click milestone state to update</span>
+                  <span className="text-[10px] font-mono text-text-dim">Milestone states are manually recorded</span>
                 </div>
 
                 <div className="space-y-3">
@@ -444,10 +449,10 @@ export default function DeliveryHub({ token, leads = [] }: DeliveryHubProps) {
                   <div className="flex items-center gap-2">
                     <FolderCheck className="w-4 h-4 text-brand" />
                     <h4 className="text-xs font-mono font-bold text-text-primary uppercase tracking-wider">
-                      Technical Asset Intake & Credentials Registry
+                      Technical Asset Intake Status
                     </h4>
                   </div>
-                  <span className="text-[10px] font-mono text-text-dim">Secured Vault</span>
+                  <span className="text-[10px] font-mono text-text-dim">Status tracking only — no credentials stored</span>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 font-mono text-xs">
@@ -516,7 +521,7 @@ export default function DeliveryHub({ token, leads = [] }: DeliveryHubProps) {
                         setNewProjectBusinessName(matched.businessName);
                         setNewProjectClientName(matched.ownerName || '');
                         setNewProjectCity(matched.city);
-                        setNewProjectServiceType(matched.serviceType);
+                        setNewProjectServiceType(matched.serviceType || '');
                       }
                     }}
                     className="w-full bg-bg-dark border border-border-dim rounded-sm p-2 text-text-primary outline-none focus:border-brand"
@@ -536,7 +541,7 @@ export default function DeliveryHub({ token, leads = [] }: DeliveryHubProps) {
                   required
                   value={newProjectBusinessName}
                   onChange={(e) => setNewProjectBusinessName(e.target.value)}
-                  placeholder="e.g. Apex Roofing Experts"
+                  placeholder="Enter the client business name"
                   className="w-full bg-bg-dark border border-border-dim rounded-sm p-2 text-text-primary outline-none focus:border-brand"
                 />
               </div>
@@ -548,7 +553,7 @@ export default function DeliveryHub({ token, leads = [] }: DeliveryHubProps) {
                     type="text"
                     value={newProjectClientName}
                     onChange={(e) => setNewProjectClientName(e.target.value)}
-                    placeholder="e.g. John Miller"
+                    placeholder="Enter client contact (optional)"
                     className="w-full bg-bg-dark border border-border-dim rounded-sm p-2 text-text-primary outline-none focus:border-brand"
                   />
                 </div>
@@ -557,9 +562,10 @@ export default function DeliveryHub({ token, leads = [] }: DeliveryHubProps) {
                   <label className="text-[10px] text-text-secondary uppercase font-bold">City / Market</label>
                   <input
                     type="text"
+                    required
                     value={newProjectCity}
                     onChange={(e) => setNewProjectCity(e.target.value)}
-                    placeholder="e.g. Calgary"
+                    placeholder="Enter client city"
                     className="w-full bg-bg-dark border border-border-dim rounded-sm p-2 text-text-primary outline-none focus:border-brand"
                   />
                 </div>
