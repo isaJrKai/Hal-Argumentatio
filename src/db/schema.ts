@@ -320,6 +320,39 @@ export const conversionOutbox = pgTable('conversion_outbox', {
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });
 
+export const communicationsOutbox = pgTable('communications_outbox', {
+  id: text('id').primaryKey(),
+  contractorId: text('contractor_id').notNull(),
+  leadId: text('lead_id').notNull(),
+  channel: text('channel').notNull(),
+  provider: text('provider').notNull(),
+  recipientEncrypted: text('recipient_encrypted').notNull(),
+  subjectEncrypted: text('subject_encrypted'),
+  bodyEncrypted: text('body_encrypted').notNull(),
+  status: text('status').default('queued').notNull(),
+  providerMessageId: text('provider_message_id').unique(),
+  idempotencyKey: text('idempotency_key').notNull().unique(),
+  attempts: integer('attempts').default(0).notNull(),
+  lastAttemptAt: timestamp('last_attempt_at'),
+  submittedAt: timestamp('submitted_at'),
+  deliveredAt: timestamp('delivered_at'),
+  bouncedAt: timestamp('bounced_at'),
+  errorCode: text('error_code'),
+  errorMessage: text('error_message'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+});
+
+export const communicationsDeliveryEvents = pgTable('communications_delivery_events', {
+  id: text('id').primaryKey(),
+  outboxId: text('outbox_id'),
+  provider: text('provider').notNull(),
+  providerMessageId: text('provider_message_id'),
+  eventType: text('event_type').notNull(),
+  payload: jsonb('payload').notNull(),
+  receivedAt: timestamp('received_at').defaultNow().notNull(),
+});
+
 export const googleAdsDailyPerformance = pgTable('google_ads_daily_performance', {
   id: text('id').primaryKey(),
   contractorId: text('contractor_id').notNull(),
