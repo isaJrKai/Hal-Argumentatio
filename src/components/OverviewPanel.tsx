@@ -236,8 +236,8 @@ export default function OverviewPanel({
             city: activeCity, 
             niche: activeNiche, 
             horizonWeeks: 12, 
-            applyGuardrails: true,
-            targetCAC: workspaceConfig.targetCAC || 145 
+            applyGuardrails: false,
+            targetCAC: workspaceConfig.targetCAC 
           })
         });
         if (!res.ok) {
@@ -562,8 +562,8 @@ export default function OverviewPanel({
           <div className="w-full h-[230px] pt-1">
             {forecastChartData.length === 0 ? (
               <div className="h-full flex flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-border-dim text-center px-5">
-                <span className="text-sm font-semibold text-text-secondary">Scenario unavailable</span>
-                <span className="text-xs text-text-tertiary max-w-md">Connect measured Google Ads records, configure a target CAC, and verify live weather before viewing a demand scenario. No revenue forecast is generated.</span>
+                <span className="text-sm font-semibold text-text-secondary">Forecast unavailable</span>
+                <span className="text-xs text-text-tertiary max-w-md">Connect at least eight observed weeks of Google Ads conversion history and configure a target CAC. Weather is contextual only. No synthetic forecast is shown.</span>
               </div>
             ) : (
             <ResponsiveContainer width="100%" height="100%">
@@ -607,7 +607,7 @@ export default function OverviewPanel({
                       <div className="bg-bg-raised/95 backdrop-blur border border-border-dim rounded-lg p-2.5 shadow-xl font-mono text-[11px] min-w-[190px] space-y-1.5 z-50">
                         <div className="flex items-center justify-between border-b border-border-dim/60 pb-1">
                           <span className="font-bold text-text-primary">{label || item.day} Horizon</span>
-                          <span className="text-[9px] text-accent font-semibold px-1 py-0.2 rounded bg-accent/10" >Scenario</span>
+                          <span className="text-[9px] text-accent font-semibold px-1 py-0.2 rounded bg-accent/10" >{forecastMetadata?.engine || 'Model output'}</span>
                         </div>
                         {item.demand !== undefined && (
                           <div className="flex items-center justify-between text-[10px]">
@@ -618,11 +618,11 @@ export default function OverviewPanel({
                             <span className="font-semibold" style={{ color: chartPalette.demand }}>{item.demand}/100</span>
                           </div>
                         )}
-                        {item.cpl !== undefined && (
+                        {item.observedCpl !== undefined && (
                           <div className="flex items-center justify-between text-[10px]">
-                            <span className="text-text-tertiary">Estimated CPL:</span>
+                            <span className="text-text-tertiary">Trailing observed CPL:</span>
                             <span className={`font-medium ${item.isBreach ? 'text-danger font-bold flex items-center gap-1' : 'text-text-primary'}`}>
-                              ${item.cpl}
+                              ${item.observedCpl}
                               {item.isBreach && <span className="text-[8.5px] px-1 py-0.2 rounded bg-danger-dim text-danger">BREACH</span>}
                             </span>
                           </div>
