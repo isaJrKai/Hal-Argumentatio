@@ -2623,13 +2623,18 @@ app.post('/api/leads/ingest', authenticate, async (req, res) => {
         serviceType: hl.serviceType,
         source: 'harvested_intelligence',
         status: 'new',
-        urgencyScore: hl.urgencyScore ?? 0,
-        predictedLtvUsd: (hl as any).predictedLtvUsd ?? 0,
+        urgencyScore: null,
+        predictedLtvUsd: null,
         notes: hl.notes || `Harvested real business profile. Niche: ${hl.serviceType}.`,
         websiteUrl: hl.websiteUrl,
-        performanceScore: hl.performanceScore,
-        sslStatus: hl.sslStatus,
-        reviewCount: hl.reviewCount,
+        performanceScore: null,
+        sslStatus: null,
+        reviewCount: null,
+        googleRating: null,
+        seoScore: null,
+        sentimentScore: null,
+        sourceType: hl.sourceType || 'unknown',
+        isSynthetic: Boolean(hl.isSynthetic),
         verificationStatus: (hl as any).verificationStatus || 'UNVERIFIED_STAGING',
         dnsVerified: (hl as any).dnsVerified !== undefined ? Boolean((hl as any).dnsVerified) : false,
       });
@@ -2642,7 +2647,7 @@ app.post('/api/leads/ingest', authenticate, async (req, res) => {
       id: crypto.randomUUID(),
       contractorId,
       action: 'LEADS_INGESTED',
-      details: `Successfully ingested ${addedItems.length} verified territory leads into pipeline.`
+      details: `Imported ${addedItems.length} territory prospect records; verification status is preserved and must pass before outreach.`
     });
 
     // 5. Broadcast Real-time notification
@@ -2724,6 +2729,8 @@ app.post('/api/leads/purge-and-replace', authenticate, async (req, res) => {
         status: 'new',
         urgencyScore: null,
         predictedLtvUsd: null,
+        sourceType: hl.sourceType || 'unknown',
+        isSynthetic: Boolean(hl.isSynthetic),
         notes: hl.notes || `Harvested real business profile. Niche: ${hl.serviceType}.`,
         websiteUrl: hl.websiteUrl,
         performanceScore: null,
@@ -2742,7 +2749,7 @@ app.post('/api/leads/purge-and-replace', authenticate, async (req, res) => {
         leadId: addedLead.id,
         eventType: 'LeadCreated',
         newStage: 'new',
-        notes: `Harvested real-world business profile with active Website & Reputation Intelligence.`
+        notes: `Imported prospect profile; website performance and reputation metrics have not been measured by this import.`
       });
     }
 
