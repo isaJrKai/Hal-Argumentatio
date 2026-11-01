@@ -6,8 +6,9 @@ training data, tenant data, weather effects, CAC, or business metrics.
 from __future__ import annotations
 
 import os
+import secrets
 import threading
-from typing import Literal
+import time
 
 import numpy as np
 import timesfm
@@ -25,13 +26,13 @@ _model = None
 _model_error: str | None = None
 _model_lock = threading.Lock()
 _inference_lock = threading.Lock()
+_last_load_attempt = 0.0
+LOAD_RETRY_COOLDOWN_SECONDS = 30
 
 
 class ForecastRequest(BaseModel):
     series: list[float] = Field(min_length=MIN_CONTEXT, max_length=MAX_CONTEXT)
     horizon: int = Field(ge=1, le=MAX_HORIZON)
-    frequency: Literal["weekly"] = "weekly"
-
     @field_validator("series")
     @classmethod
     def validate_series(cls, values: list[float]) -> list[float]:
@@ -43,12 +44,15 @@ class ForecastRequest(BaseModel):
 
 
 def load_model():
-    global _model, _model_error
+    global _model, _model_error, _last_load_attempt
     with _model_lock:
         if _model is not None:
             return _model
-        if _model_error:
-            raise RuntimeError(_model_error)
+        now = time.monotonic()
+        if _model_error and now - _last_load_attempt < LOAD_RETRY_COOLDOWN_SECONDS:
+            raise RuntimeError("TimesFM model load is temporarily unavailable; retry after cooldown")
+        _last_load_attempt = now
+        _model_error = None
         try:
             model = timesfm.TimesFM_2p5_200M_torch.from_pretrained(
                 MODEL_ID,
@@ -92,7 +96,7 @@ def health():
         "model": MODEL_ID,
         "model_loaded": _model is not None,
         "api_key_configured": len(API_KEY) >= 32,
-        "error": _model_error,
+        "error_type": _model_error.split(":", 1)[0] if _model_error else None,
     }
 
 
@@ -100,7 +104,8 @@ def health():
 def forecast(request: ForecastRequest, authorization: str | None = Header(default=None)):
     if len(API_KEY) < 32:
         raise HTTPException(status_code=503, detail="TIMESFM_API_KEY must be configured with at least 32 characters")
-    if authorization != f"Bearer {API_KEY}":
+    expected_authorization = f"Bearer {API_KEY}"
+    if not secrets.compare_digest(authorization or "", expected_authorization):
         raise HTTPException(status_code=401, detail="Unauthorized")
 
     try:
