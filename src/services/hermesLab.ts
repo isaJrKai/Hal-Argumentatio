@@ -351,8 +351,6 @@ Generate the complete, unshortened asset now in valid JSON format.`;
         true
       );
       parsedResponse = safeExtractJson(rawResult);
-      if (parsedResponse) generationEngine = 'nemotron';
-      if (parsedResponse) generationEngine = 'huggingface';
       if (parsedResponse) generationEngine = 'openrouter';
     } catch (openRouterErr) {
       console.warn('[Hermes Lab] OpenRouter Hermes generation error, attempting cascade:', openRouterErr);
@@ -371,6 +369,7 @@ Generate the complete, unshortened asset now in valid JSON format.`;
         true
       );
       parsedResponse = safeExtractJson(rawResult);
+      if (parsedResponse) generationEngine = 'huggingface';
     } catch (hfErr) {
       console.warn('[Hermes Lab] Hugging Face Hermes generation error, attempting cascade:', hfErr);
     }
@@ -410,6 +409,7 @@ Generate the complete, unshortened asset now in valid JSON format.`;
         true
       );
       parsedResponse = safeExtractJson(rawResult);
+      if (parsedResponse) generationEngine = 'nemotron';
     } catch (nemotronErr) {
       console.warn('[Hermes Lab] NVIDIA fallback exhausted:', nemotronErr);
     }
