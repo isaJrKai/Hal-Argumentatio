@@ -734,8 +734,9 @@ app.post('/api/work-tasks', authenticate, async (req, res) => {
       return [created];
     });
     return res.status(201).json({ task });
-  } catch (err) {
+  } catch (err: any) {
     console.error('[HAL Work Tasks] Create failed:', err);
+    if (err?.code === '23505') return res.status(409).json({ error: 'The selected staff member already has active work.' });
     return res.status(503).json({ error: 'Unable to create the work task.' });
   }
 });
