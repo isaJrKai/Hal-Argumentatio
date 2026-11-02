@@ -43,6 +43,7 @@ export const auth: Auth | null = app ? getAuth(app) : null;
 // Unified Provider with Google Drive, Calendar, and Gmail scopes
 const provider = new GoogleAuthProvider();
 provider.addScope('https://www.googleapis.com/auth/drive');
+provider.addScope('https://www.googleapis.com/auth/calendar.readonly');
 provider.addScope('https://www.googleapis.com/auth/gmail.send');
 
 let isSigningIn = false;
