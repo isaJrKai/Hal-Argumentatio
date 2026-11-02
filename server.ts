@@ -5048,8 +5048,13 @@ app.post('/api/dispatch/campaign-batch', authenticate, async (req, res) => {
   const contractorId = (req as any).contractorId;
   const { campaignId, channel, template, leadIds } = req.body;
 
-  if (!channel || !template) {
-    return res.status(400).json({ error: 'Channel and template are required' });
+  if (!['email', 'sms', 'whatsapp'].includes(channel) || !template || typeof template !== 'object') {
+    return res.status(400).json({ error: 'A supported channel (email, sms or WhatsApp) and a message template are required.' });
+  }
+  if (campaignId) {
+    const [campaign] = await pgDb.select({ id: campaigns.id }).from(campaigns)
+      .where(and(eq(campaigns.id, campaignId), eq(campaigns.contractorId, contractorId))).limit(1);
+    if (!campaign) return res.status(404).json({ error: 'Campaign not found or inaccessible.' });
   }
 
   const targetLeads = leadIds && Array.isArray(leadIds) && leadIds.length > 0
@@ -5111,31 +5116,43 @@ app.post('/api/dispatch/campaign-batch', authenticate, async (req, res) => {
 
     const recipient = channel === 'email' ? decryptedEmail : decryptedPhone;
     if (recipient && recipient !== '[ENCRYPTED]') {
-      await pgDb.insert(leadEvents).values({
-        id: crypto.randomUUID(),
-        leadId: lead.id,
-        eventType: 'OutreachSimulationRecorded',
-        newStage: lead.status,
-        notes: `[Simulation only - ${channel.toUpperCase()}] No external message was sent. Intended recipient: ${recipient}. Subject: "${customizedSubject}"`
-      });
-
-      dispatchLogs.push({
-        id: 'simulation_' + crypto.randomBytes(6).toString('hex'),
-        contractorId,
-        channel,
-        recipient,
-        leadId: lead.id,
-        leadBusinessName: lead.businessName,
-        status: 'simulated',
-        mode: 'simulation' as any,
-        providerId: 'SIMULATION_ONLY',
-        timestamp: new Date().toISOString(),
-        subject: customizedSubject,
-        preview: customizedBody.slice(0, 80)
+      const outboxId = 'sim_' + crypto.randomUUID();
+      const recordedAt = new Date();
+      await pgDb.transaction(async tx => {
+        await tx.insert(communicationsOutbox).values({
+          id: outboxId,
+          contractorId,
+          leadId: lead.id,
+          channel,
+          provider: 'simulation_only',
+          recipientEncrypted: encrypt(String(recipient)),
+          subjectEncrypted: encrypt(customizedSubject),
+          bodyEncrypted: encrypt(customizedBody),
+          status: 'simulated',
+          idempotencyKey: `simulation:${contractorId}:${lead.id}:${crypto.randomUUID()}`,
+          attempts: 0,
+          createdAt: recordedAt,
+          updatedAt: recordedAt
+        });
+        await tx.insert(communicationsDeliveryEvents).values({
+          id: 'delivery_' + crypto.randomUUID(),
+          outboxId,
+          provider: 'simulation_only',
+          eventType: 'simulation_recorded',
+          payload: { channel, campaignId: campaignId || null, providerContacted: false, externalMessageSent: false },
+          receivedAt: recordedAt
+        });
+        await tx.insert(leadEvents).values({
+          id: crypto.randomUUID(),
+          leadId: lead.id,
+          eventType: 'OutreachSimulationRecorded',
+          newStage: lead.status,
+          notes: `[Simulation only - ${channel.toUpperCase()}] No external message was sent. A durable simulation record was saved.`
+        });
       });
 
       simulated++;
-      results.push({ leadId: lead.id, businessName: lead.businessName, status: 'simulated', recipient, note: 'No external message was sent; lead status was not changed.' });
+      results.push({ leadId: lead.id, businessName: lead.businessName, status: 'simulated', recipient, note: 'Simulation saved durably; no external message was sent and lead status was not changed.' });
     } else {
       results.push({ leadId: lead.id, businessName: lead.businessName, status: 'skipped', reason: 'Missing channel contact info' });
       failed++;
@@ -5150,7 +5167,8 @@ app.post('/api/dispatch/campaign-batch', authenticate, async (req, res) => {
     }
   }
 
-  db.addAuditLog({
+  await pgDb.insert(auditLogs).values({
+    id: crypto.randomUUID(),
     contractorId,
     action: 'BATCH_CAMPAIGN_SIMULATED',
     details: `Recorded ${simulated} simulated outreach attempts out of ${targetLeads.length} leads; ${failed} were blocked or skipped. No external messages were sent.`
