@@ -696,8 +696,8 @@ app.post('/api/auth/register', async (req, res) => {
   if (!email || !password || !name) {
     return res.status(400).json({ error: 'Email, password, and name are required' });
   }
-  if (typeof password !== 'string' || password.length < 12) {
-    return res.status(400).json({ error: 'Password must be at least 12 characters long' });
+  if (typeof email !== 'string' || typeof name !== 'string' || typeof password !== 'string' || password.length < 12) {
+    return res.status(400).json({ error: 'Enter a valid email, name, and password of at least 12 characters.' });
   }
 
   const cleanEmail = email.toLowerCase().trim();
@@ -709,50 +709,41 @@ app.post('/api/auth/register', async (req, res) => {
       recordAuthFailure(req, cleanEmail);
       return res.status(400).json({ error: 'Contractor already exists with this email address' });
     }
-  } catch (e) {
-    // PostgreSQL unavailable; continue with local validation
-  }
 
-  const localExisting = db.getContractorByEmail(cleanEmail);
-  if (localExisting) {
-    recordAuthFailure(req, cleanEmail);
-    return res.status(400).json({ error: 'Contractor already exists with this email address' });
-  }
-
-  const hashedPassword = hashPassword(password);
-
-  try {
+    const passwordHash = hashPassword(password);
     await pgDb.insert(contractors).values({
       id,
-      companyName: name,
+      companyName: name.trim(),
       email: cleanEmail,
-      passwordHash: hashedPassword,
+      passwordHash,
       city: 'Unspecified',
       serviceType: 'Unspecified',
+      role: 'user'
     });
-  } catch (err: any) {
-    console.warn('[HAL auth] PostgreSQL unreachable during registration; persisting to local secure store:', err?.message);
+
+    const token = signToken({ contractorId: id, email: cleanEmail, role: 'user' });
+    db.addSession(id, token, new Date(Date.now() + 30 * 24 * 3600 * 1000));
+    recordAuthSuccess(req, cleanEmail);
+
+    try {
+      await pgDb.insert(auditLogs).values({
+        id: crypto.randomUUID(),
+        contractorId: id,
+        action: 'REGISTER_SUCCESS',
+        details: `New contractor registered: ${cleanEmail} from IP: ${req.ip}`
+      });
+    } catch (auditError) {
+      // Account creation does not depend on the optional audit-log insert.
+    }
+
+    return res.json({
+      token,
+      contractor: { id, email: cleanEmail, name: name.trim(), role: 'user', marketId: 'market_default' }
+    });
+  } catch (error: any) {
+    console.error('[HAL Registration Error]', error?.message || error);
+    return res.status(503).json({ error: 'Registration service unavailable. Please try again later.' });
   }
-
-  // Always persist to local encrypted database
-  db.addContractor({
-    email: cleanEmail,
-    passwordHash: hashedPassword,
-    name,
-    role: 'user',
-    marketId: 'market_default'
-  });
-
-  const token = signToken({
-    contractorId: id,
-    email: cleanEmail,
-    role: 'user'
-  });
-
-  db.addSession(id, token, new Date(Date.now() + 30 * 24 * 3600 * 1000));
-  recordAuthSuccess(req, cleanEmail);
-
-  return res.json({ token, contractor: { id, email: cleanEmail, name, role: 'user', marketId: 'market_default' } });
 });
 
 app.post('/api/auth/login', async (req, res) => {
@@ -762,70 +753,40 @@ app.post('/api/auth/login', async (req, res) => {
   }
 
   const cleanEmail = email.toLowerCase().trim();
-  let contractor: any = null;
-  let fromPg = false;
+  if (!checkRateLimit(req, res, cleanEmail)) return;
 
   try {
     const result = await pgDb.select().from(contractors).where(eq(contractors.email, cleanEmail)).limit(1);
-    if (result && result.length > 0) {
-      contractor = result[0];
-      fromPg = true;
+    const contractor = result[0];
+
+    // PostgreSQL is the sole source of truth. Never issue a session from a local-only account.
+    if (!contractor) {
+      recordAuthFailure(req, cleanEmail);
+      return res.status(401).json({ error: 'Invalid email or password' });
     }
-  } catch (err: any) {
-    console.warn('[HAL auth] PostgreSQL unreachable during login; verifying against local secure store:', err?.message);
-  }
 
-  if (!contractor) {
-    const local = db.getContractorByEmail(cleanEmail);
-    if (local) {
-      contractor = {
-        id: local.id,
-        companyName: local.name,
-        email: local.email,
-        passwordHash: local.passwordHash,
-        role: local.role,
-        marketId: local.marketId || 'market_default'
-      };
+    const storedHash = typeof contractor.passwordHash === 'string' ? contractor.passwordHash : '';
+    if (!verifyPassword(password, storedHash)) {
+      recordAuthFailure(req, cleanEmail);
+      return res.status(401).json({ error: 'Invalid email or password' });
     }
-  }
 
-  // Auto-bootstrap workspace administrator for admin@kaislead.com or empty database initialization
-  if (!contractor && cleanEmail === 'admin@kaislead.com') {
-    const hashed = hashPassword(password);
-    const newAdmin = db.addContractor({
-      email: cleanEmail,
-      passwordHash: hashed,
-      name: 'Workspace Admin',
-      role: 'admin',
-      marketId: 'market_default'
-    });
-    contractor = {
-      id: newAdmin.id,
-      companyName: newAdmin.name,
-      email: newAdmin.email,
-      passwordHash: newAdmin.passwordHash,
-      role: newAdmin.role,
-      marketId: 'market_default'
-    };
-  }
+    // Upgrade legacy hashes after successful verification.
+    if (!/^\$2[aby]\$/.test(storedHash)) {
+      try {
+        await pgDb.update(contractors)
+          .set({ passwordHash: hashPassword(password) })
+          .where(eq(contractors.id, contractor.id));
+      } catch (upgradeError) {
+        console.error('[HAL auth] Legacy password hash upgrade failed; login remains valid.');
+      }
+    }
 
-  if (!contractor) {
-    recordAuthFailure(req, cleanEmail);
-    return res.status(401).json({ error: 'Invalid email or password' });
-  }
+    const role: 'admin' | 'user' = contractor.role === 'admin' ? 'admin' : 'user';
+    const token = signToken({ contractorId: contractor.id, email: cleanEmail, role });
+    db.addSession(contractor.id, token, new Date(Date.now() + 30 * 24 * 3600 * 1000));
+    recordAuthSuccess(req, cleanEmail);
 
-  const storedHash = typeof contractor.passwordHash === 'string' ? contractor.passwordHash : '';
-  if (!verifyPassword(password, storedHash)) {
-    recordAuthFailure(req, cleanEmail);
-    return res.status(401).json({ error: 'Invalid email or password' });
-  }
-
-  const role: 'admin' | 'user' = contractor.role === 'admin' ? 'admin' : 'user';
-  const token = signToken({ contractorId: contractor.id, email: cleanEmail, role });
-  db.addSession(contractor.id, token, new Date(Date.now() + 30 * 24 * 3600 * 1000));
-  recordAuthSuccess(req, cleanEmail);
-
-  if (fromPg) {
     try {
       await pgDb.insert(auditLogs).values({
         id: crypto.randomUUID(),
@@ -833,19 +794,25 @@ app.post('/api/auth/login', async (req, res) => {
         action: 'LOGIN_SUCCESS',
         details: `Contractor logged in successfully: ${cleanEmail} from IP: ${req.ip}`
       });
-    } catch (auditError) {}
-  }
-
-  return res.json({
-    token,
-    contractor: {
-      id: contractor.id,
-      email: cleanEmail,
-      name: contractor.companyName || contractor.name || 'Workspace',
-      role,
-      marketId: contractor.marketId || 'market_default'
+    } catch (auditError) {
+      // Authentication does not depend on the optional audit-log insert succeeding.
     }
-  });
+
+    return res.json({
+      token,
+      contractor: {
+        id: contractor.id,
+        email: contractor.email,
+        name: contractor.companyName || 'Workspace',
+        role,
+        marketId: 'market_default'
+      }
+    });
+  } catch (error: any) {
+    console.error('[HAL Login Error]', error?.message || error);
+    recordAuthFailure(req, cleanEmail);
+    return res.status(503).json({ error: 'Authentication service unavailable. Please try again later.' });
+  }
 });
 
 // Google sign-in: verify Firebase's signed ID token before trusting any identity claim.
