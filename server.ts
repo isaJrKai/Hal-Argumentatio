@@ -3736,24 +3736,35 @@ app.post('/api/intelligence/chat', authenticate, async (req, res) => {
       tools: HAL_MCP_TOOLS.filter(tool => tool.name !== 'hermes_synthesize_lab_asset'),
       execute: async (toolName, toolArgs) => {
         const correlationId = conversationId;
+        let toolResult: any;
         try {
-          const toolResult = await executeMcpTool(toolName, toolArgs, contractorId, { actorType: 'agent', actorId: 'hal_assistant', sourceModule: 'hal_assistant' });
+          toolResult = await executeMcpTool(toolName, toolArgs, contractorId, { actorType: 'agent', actorId: 'hal_assistant', sourceModule: 'hal_assistant' });
+        } catch (toolError: any) {
+          try {
+            await recordWorkEvent(pgDb, {
+              contractorId, eventType: 'assistant.tool_failed', entityType: 'conversation', entityId: conversationId,
+              actorType: 'agent', actorId: 'hal_assistant', sourceModule: 'hal_assistant',
+              correlationId, summary: `HAL Assistant tool failed: ${toolName}.`,
+              payload: { toolName, success: false, error: String(toolError?.message || 'Tool failed.').slice(0, 500) }
+            });
+          } catch (ledgerError) {
+            console.error('[HAL Work History] Could not record failed tool event:', ledgerError);
+          }
+          throw toolError;
+        }
+        // Do not turn a confirmed domain action into a retryable tool failure just
+        // because the secondary audit append is unavailable; that could duplicate work.
+        try {
           await recordWorkEvent(pgDb, {
             contractorId, eventType: 'assistant.tool_succeeded', entityType: 'conversation', entityId: conversationId,
             actorType: 'agent', actorId: 'hal_assistant', sourceModule: 'hal_assistant',
             correlationId, summary: `HAL Assistant executed tool: ${toolName}.`,
             payload: { toolName, success: true }
           });
-          return toolResult;
-        } catch (toolError: any) {
-          await recordWorkEvent(pgDb, {
-            contractorId, eventType: 'assistant.tool_failed', entityType: 'conversation', entityId: conversationId,
-            actorType: 'agent', actorId: 'hal_assistant', sourceModule: 'hal_assistant',
-            correlationId, summary: `HAL Assistant tool failed: ${toolName}.`,
-            payload: { toolName, success: false, error: String(toolError?.message || 'Tool failed.').slice(0, 500) }
-          });
-          throw toolError;
+        } catch (ledgerError) {
+          console.error('[HAL Work History] Tool succeeded but its secondary event append failed:', ledgerError);
         }
+        return toolResult;
       }
     });
 
