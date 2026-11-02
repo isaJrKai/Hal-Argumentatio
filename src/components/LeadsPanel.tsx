@@ -79,6 +79,7 @@ export default function LeadsPanel({ leads, token, onRefresh }: LeadsPanelProps)
   const [harvestedLeads, setHarvestedLeads] = useState<any[]>([]);
   const [selectedIndices, setSelectedIndices] = useState<Set<number>>(new Set());
   const [ingesting, setIngesting] = useState(false);
+  const [ingestFeedback, setIngestFeedback] = useState<string | null>(null);
   const [replacing, setReplacing] = useState(false);
   const [showHarvester, setShowHarvester] = useState(false);
 
@@ -131,6 +132,7 @@ export default function LeadsPanel({ leads, token, onRefresh }: LeadsPanelProps)
     const leadsToIngest = harvestedLeads.filter((_, i) => selectedIndices.has(i));
     if (leadsToIngest.length === 0) return;
     setIngesting(true);
+    setIngestFeedback(null);
     try {
       const res = await fetch('/api/leads/ingest', {
         method: 'POST',
@@ -141,14 +143,14 @@ export default function LeadsPanel({ leads, token, onRefresh }: LeadsPanelProps)
         body: JSON.stringify({ leads: leadsToIngest })
       });
       const data = await res.json();
-      if (res.ok && data.success) {
-        setHarvestedLeads([]);
-        setSelectedIndices(new Set());
-        setShowHarvester(false);
-        onRefresh();
-      }
-    } catch (err) {
-      console.error(err);
+      if (!res.ok || !data.success) throw new Error(data.error || `Ingestion failed (HTTP ${res.status}).`);
+      setIngestFeedback(`Imported ${data.count} prospects and created ${data.queuedTasks ?? 0} human review tasks in Work Queue.`);
+      setHarvestedLeads([]);
+      setSelectedIndices(new Set());
+      onRefresh();
+    } catch (err: any) {
+      console.error('[HAL lead ingestion]', err);
+      setIngestFeedback(err?.message || 'Could not import the selected prospects.');
     } finally {
       setIngesting(false);
     }
@@ -1032,6 +1034,7 @@ export default function LeadsPanel({ leads, token, onRefresh }: LeadsPanelProps)
                     <p className="text-[11px] font-sans text-text-secondary leading-relaxed">
                       Choose how to commit these discovered operating entities: ingest selected entities additively into your active pipeline, or purge legacy mock seeds completely.
                     </p>
+                    {ingestFeedback && <p role="status" className="text-[11px] text-text-secondary">{ingestFeedback}</p>}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                       <button
                         onClick={handleIngestSelected}
