@@ -3082,6 +3082,7 @@ app.post('/api/leads/purge-and-replace', authenticate, async (req, res) => {
   }
 
   try {
+    let queuedTasks = 0;
     // 1. Purge all mock leads and mock revenues from local DB
     await pgDb.delete(leads).where(and(eq(leads.contractorId, contractorId), like(leads.id, 'lead_seed_%')));
     await pgDb.delete(revenueRecords).where(and(eq(revenueRecords.contractorId, contractorId), like(revenueRecords.id, 'rev_seed_%')));
@@ -3161,6 +3162,35 @@ app.post('/api/leads/purge-and-replace', authenticate, async (req, res) => {
         newStage: 'new',
         notes: `Imported prospect profile; website performance and reputation metrics have not been measured by this import.`
       });
+
+      const taskId = 'task_' + crypto.randomUUID();
+      const correlationId = taskId;
+      await pgDb.transaction(async tx => {
+        await tx.insert(workTasks).values({
+          id: taskId, contractorId, taskType: 'lead_follow_up',
+          title: `Review and qualify: ${addedLead.businessName}`,
+          description: 'Review this imported territory prospect, confirm its business details and verification evidence, then record the next step. Do not contact the prospect until the outreach verification gate passes.',
+          status: 'queued', priority: 'normal', assignedWorker: 'human',
+          entityType: 'lead', entityId: addedLead.id, correlationId,
+          input: { source: 'maps_territory_harvest', verificationStatus: addedLead.verificationStatus || 'UNVERIFIED_STAGING' },
+          requiresApproval: false, createdAt: new Date(), updatedAt: new Date()
+        });
+        await tx.insert(workEvents).values({
+          id: 'evt_' + crypto.randomUUID(), contractorId,
+          eventType: 'task.created', entityType: 'work_task', entityId: taskId,
+          actorType: 'system', actorId: 'territory_harvester', sourceModule: 'lead_ingestion',
+          correlationId, summary: `Created qualification task for ${addedLead.businessName}.`,
+          payload: { taskType: 'lead_follow_up', assignedWorker: 'human', priority: 'normal', status: 'queued', entityType: 'lead', entityId: addedLead.id }
+        });
+        await tx.insert(workEvents).values({
+          id: 'evt_' + crypto.randomUUID(), contractorId,
+          eventType: 'lead.queued_for_review', entityType: 'lead', entityId: addedLead.id,
+          actorType: 'system', actorId: 'territory_harvester', sourceModule: 'lead_ingestion',
+          correlationId, summary: `${addedLead.businessName} was added to the human review queue.`,
+          payload: { taskId, verificationStatus: addedLead.verificationStatus || 'UNVERIFIED_STAGING' }
+        });
+      });
+      queuedTasks++;
     }
 
     // 3. Log Audit Action
@@ -3179,7 +3209,7 @@ app.post('/api/leads/purge-and-replace', authenticate, async (req, res) => {
       `Imported ${harvestedLeads.length} records. Verification must be performed separately.`
     );
 
-    res.json({ success: true, count: harvestedLeads.length });
+    res.json({ success: true, count: harvestedLeads.length, queuedTasks });
   } catch (err: any) {
     console.error('Failed to replace mock data:', err);
     res.status(500).json({ error: err.message });
