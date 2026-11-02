@@ -4917,33 +4917,44 @@ app.get('/api/dispatch/history', authenticate, async (req, res) => {
     const persisted = await pgDb.select().from(communicationsOutbox)
       .where(eq(communicationsOutbox.contractorId, contractorId))
       .orderBy(desc(communicationsOutbox.createdAt))
-      .limit(50);
-    const liveHistory = persisted.map(row => {
+      .limit(100);
+    const leadIds = [...new Set(persisted.map(row => row.leadId).filter(Boolean))];
+    const leadRows = leadIds.length
+      ? await pgDb.select({ id: leads.id, businessName: leads.businessName }).from(leads)
+          .where(and(eq(leads.contractorId, contractorId), inArray(leads.id, leadIds)))
+      : [];
+    const leadNames = new Map(leadRows.map(row => [row.id, row.businessName]));
+
+    const history = persisted.map(row => {
       const rawRecipient = row.recipientEncrypted ? decrypt(row.recipientEncrypted) : '';
       const parts = String(rawRecipient || '').split('@');
       const maskedRecipient = parts.length === 2
         ? (parts[0].slice(0, 1) + '***@' + parts[1])
-        : 'Saved recipient';
+        : (() => {
+            const digits = String(rawRecipient || '').replace(/\D/g, '');
+            return digits.length >= 4 ? `••••${digits.slice(-4)}` : 'Saved recipient';
+          })();
+      const body = row.bodyEncrypted ? decrypt(row.bodyEncrypted) : '';
       return {
         id: row.id,
         contractorId: row.contractorId,
         channel: row.channel,
         recipient: maskedRecipient,
         leadId: row.leadId,
-        leadBusinessName: 'Saved lead',
+        leadBusinessName: leadNames.get(row.leadId) || 'Lead no longer available',
         status: row.status,
-        mode: 'live',
+        mode: row.status === 'simulated' ? 'simulation' : 'live',
         providerId: row.providerMessageId,
+        provider: row.provider,
         timestamp: (row.deliveredAt || row.submittedAt || row.createdAt).toISOString(),
         subject: row.subjectEncrypted ? decrypt(row.subjectEncrypted) : '',
-        preview: 'Message content is encrypted at rest'
+        preview: body ? body.slice(0, 80) : 'Message content unavailable'
       };
     });
-    const simulations = dispatchLogs.filter(item => item.contractorId === contractorId && item.mode === 'simulation');
-    return res.json([...simulations, ...liveHistory].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()).slice(0, 50));
+    return res.json(history);
   } catch (err: any) {
-    console.error('[HAL Dispatch History] Neon read failed:', err?.message || err);
-    return res.status(503).json({ success: false, code: 'OUTBOX_UNAVAILABLE', error: 'Durable dispatch history is unavailable from Neon.' });
+    console.error('[HAL Dispatch History] PostgreSQL read failed:', err?.message || err);
+    return res.status(503).json({ success: false, code: 'OUTBOX_UNAVAILABLE', error: 'Durable dispatch history is unavailable.' });
   }
 });
 
