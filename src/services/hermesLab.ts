@@ -25,6 +25,14 @@ import { GoogleGenAI } from '@google/genai';
 import { getRecentWorkEvents, recordWorkEvent } from '../lib/workLedger';
 import { listWorkTasks } from '../lib/workTasks';
 
+async function recordHermesEventSafely(event: Parameters<typeof recordWorkEvent>[1]) {
+  try {
+    await recordWorkEvent(pgDb, event);
+  } catch (error) {
+    console.error('[Hermes Work History] Could not append event:', error);
+  }
+}
+
 let geminiClient: GoogleGenAI | null = null;
 function getGeminiClient(): GoogleGenAI | null {
   if (!geminiClient) {
@@ -836,7 +844,7 @@ Respond in the required JSON format.`;
   }
 
   if (updatedArtifactRecord) {
-    await recordWorkEvent(pgDb, {
+    await recordHermesEventSafely({
       contractorId, eventType: currentArtifact ? 'artifact.updated' : 'artifact.created',
       entityType: 'artifact', entityId: updatedArtifactRecord.id, actorType: 'agent', actorId: 'hermes_agent',
       sourceModule: 'hermes_studio', correlationId: executionContext?.correlationId || updatedArtifactRecord.id,
@@ -857,7 +865,7 @@ Respond in the required JSON format.`;
     createdAt: new Date()
   });
 
-  await recordWorkEvent(pgDb, {
+  await recordHermesEventSafely({
     contractorId,
     eventType: parsed.executionStatus === 'provider_unavailable' ? 'agent.execution_failed' : 'agent.responded',
     entityType: 'agent_session', entityId: assistantMsgId,
