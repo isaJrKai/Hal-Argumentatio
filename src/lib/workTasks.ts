@@ -18,7 +18,7 @@ const ALLOWED_TRANSITIONS: Record<WorkTaskStatus, WorkTaskStatus[]> = {
 export function requiresWorkTaskApproval(taskType: string, title: string, description?: string | null, input?: unknown): boolean {
   let inputText = '';
   try { inputText = input === undefined ? '' : JSON.stringify(input); } catch { inputText = '[unserializable task input]'; }
-  const actionPattern = /\\b(send|sending|dispatch|publish|publishing|spend|purchase|charge|refund|sign|signing|execute\\s+contract|delete|deletion|archive|revoke|transfer\\s+funds|bulk\\s+outreach|email\\s+blast|cold\\s+email|email\\s+outreach|sms\\s+campaign|whatsapp\\s+campaign|launch\\s+campaign)\\b/i;
+  const actionPattern = /\b(send|sending|dispatch|publish|publishing|spend|purchase|charge|refund|sign|signing|execute\s+contract|delete|deletion|archive|revoke|transfer\s+funds|bulk\s+outreach|email\s+blast|cold\s+email|email\s+outreach|sms\s+campaign|whatsapp\s+campaign|launch\s+campaign)\b/i;
   return actionPattern.test(`${taskType} ${title} ${description || ''} ${inputText}`);
 }
 
