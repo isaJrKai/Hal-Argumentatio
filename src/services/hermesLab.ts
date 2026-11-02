@@ -595,7 +595,14 @@ export async function chatWithHermesAgent(
   contractorId: string,
   userMessage: string,
   targetArtifactId?: string,
-  executionContext?: { workTaskId: string; correlationId: string }
+  executionContext?: {
+    workTaskId: string;
+    correlationId: string;
+    toolRuntime?: {
+      tools: Array<{ name: string; description: string; inputSchema: { type: 'object'; properties: Record<string, any>; required?: string[] } }>;
+      execute: (name: string, args: Record<string, any>) => Promise<any>;
+    };
+  }
 ): Promise<{
   replyMessageId: string;
   replyText: string;
