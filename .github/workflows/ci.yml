@@ -6,7 +6,7 @@ on:
     branches: [main]
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   verify:
@@ -25,6 +25,12 @@ jobs:
           bun-version: latest
       - name: Install locked dependencies
         run: bun install --frozen-lockfile
+      - name: Apply compatible security updates for this repair PR
+        if: ${{ github.event_name == 'pull_request' && github.head_ref == 'fix/google-auth-identity-verification' }}
+        run: bun audit fix || true
+      - name: Verify refreshed dependency lockfile
+        if: ${{ github.event_name == 'pull_request' && github.head_ref == 'fix/google-auth-identity-verification' }}
+        run: bun install --frozen-lockfile
       - name: Set up Python for inference service syntax check
         uses: actions/setup-python@v5
         with:
@@ -40,3 +46,15 @@ jobs:
       - name: Report full dependency audit
         if: always()
         run: bun audit || true
+      - name: Commit compatible security updates to this repair branch
+        if: ${{ github.event_name == 'pull_request' && github.head_ref == 'fix/google-auth-identity-verification' && success() }}
+        run: |
+          if git diff --quiet -- bun.lock package.json; then
+            echo "No dependency lockfile changes were needed."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add bun.lock package.json
+          git commit -m "chore: patch vulnerable dependencies"
+          git push origin "HEAD:${GITHUB_HEAD_REF}"
