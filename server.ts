@@ -3728,7 +3728,7 @@ app.post('/api/intelligence/chat', authenticate, async (req, res) => {
       execute: async (toolName, toolArgs) => {
         const correlationId = conversationId;
         try {
-          const toolResult = await executeMcpTool(toolName, toolArgs, contractorId);
+          const toolResult = await executeMcpTool(toolName, toolArgs, contractorId, { actorType: 'agent', actorId: 'hal_assistant', sourceModule: 'hal_assistant' });
           await recordWorkEvent(pgDb, {
             contractorId, eventType: 'assistant.tool_succeeded', entityType: 'conversation', entityId: conversationId,
             actorType: 'agent', actorId: 'hal_assistant', sourceModule: 'hal_assistant',
@@ -8832,7 +8832,7 @@ async function startServer() {
         assignedWorker: 'hermes',
         priority: 'normal',
         input: { toolId, parameters, ...(typeof promptOverride === 'string' ? { promptOverride } : {}) }
-      }, contractorId);
+      }, contractorId, { actorType: 'human', actorId: contractorId, sourceModule: 'hermes_studio' });
       const task = created?.task;
       if (!task?.id) throw new Error('Hermes work task could not be created.');
       if (task.status === 'awaiting_approval') {
