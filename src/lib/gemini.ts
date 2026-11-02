@@ -1,6 +1,7 @@
 import { GoogleGenAI } from "@google/genai";
 import { generateResponse, cleanJSONResponse, callNemotron, callNemotronWithTools, getActiveAI } from "../services/nemotron.ts";
 import { verifyLeadGrounding } from "./networkVerification.ts";
+import { calibrateForecastConfidence } from "./forecastConfidence";
 
 let aiClient: GoogleGenAI | null = null;
 
@@ -213,14 +214,8 @@ Return your response in a raw JSON object format (no markdown blocks, no code bl
 
   const activeAI = getActiveAI(preferredAI);
 
-  const calibrateForecastConfidence = (modelScore?: number): number => {
-    const sampleSize = historicalData?.length || 0;
-    // Sample depth multiplier: with < 7 records, epistemic uncertainty is high
-    const depthWeight = sampleSize >= 60 ? 1.0 : sampleSize >= 14 ? 0.85 : sampleSize >= 7 ? 0.70 : 0.45;
-    const raw = typeof modelScore === 'number' && Number.isFinite(modelScore) ? modelScore : 0;
-    const calibrated = Math.min(0.93, Math.max(0.20, raw * depthWeight));
-    return Math.round(calibrated * 100) / 100;
-  };
+  const calibrateConfidence = (modelScore?: number): number =>
+    calibrateForecastConfidence(typeof modelScore === 'number' ? modelScore : 0, historicalData?.length || 0);
 
   const parseForecastResponse = (result: any) => {
     const predicted = Number(result?.predicted);
@@ -229,7 +224,7 @@ Return your response in a raw JSON object format (no markdown blocks, no code bl
     if (!Number.isFinite(predicted) || !Number.isFinite(modelScore) || !assumptions) {
       throw new Error('Forecast model returned incomplete or invalid evidence.');
     }
-    return { predicted, assumptions, confidenceScore: calibrateForecastConfidence(modelScore) };
+    return { predicted, assumptions, confidenceScore: calibrateConfidence(modelScore) };
   };
 
   if (activeAI === 'gemini') {
