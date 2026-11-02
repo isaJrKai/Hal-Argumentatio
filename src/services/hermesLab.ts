@@ -559,6 +559,7 @@ export async function chatWithHermesAgent(
   replyText: string;
   updatedArtifact?: any;
   thoughtProcess?: string;
+  executionStatus?: string;
 }> {
   // Fetch contractor info
   const [contractorRecord] = await pgDb
@@ -753,9 +754,10 @@ Respond in the required JSON format.`;
 
   if (!parsed) {
     parsed = {
-      thoughtProcess: 'Deterministic response acknowledging personalization request.',
-      reply: `I have received your preferences for ${contractorName}. I will tailor our landing pages, copy, and campaigns to match your requested style, colors, and business rules.`,
-      artifactUpdate: null
+      thoughtProcess: 'No configured Hermes provider returned a valid response.',
+      reply: 'Hermes could not complete this request because its configured AI providers did not return a valid response. No artifact was changed. Check the Hermes provider configuration and retry.',
+      artifactUpdate: null,
+      executionStatus: 'provider_unavailable'
     };
   }
 
