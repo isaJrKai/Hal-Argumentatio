@@ -576,7 +576,7 @@ export const workTasks = pgTable('work_tasks', {
   description: text('description'),
   status: text('status').default('queued').notNull(), // queued | running | awaiting_approval | completed | failed | cancelled
   priority: text('priority').default('normal').notNull(), // low | normal | high | urgent
-  assignedWorker: text('assigned_worker').default('human').notNull(), // human | hal_assistant | hermes | amis | gemini | nemotron | specialist:<id>
+  assignedWorker: text('assigned_worker').default('human').notNull(), // human | hal_assistant | hermes | gemini | nemotron | specialist:<id>
   entityType: text('entity_type'),
   entityId: text('entity_id'),
   correlationId: text('correlation_id'),
