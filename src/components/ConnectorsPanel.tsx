@@ -27,6 +27,7 @@ import {
   googleWorkspaceSignIn, 
   googleWorkspaceLogout, 
   listCalendarEvents,
+  sendGmailMessage,
   isGoogleWorkspaceConfigured,
   CalendarEvent
 } from '../lib/googleWorkspace';
@@ -42,6 +43,9 @@ export default function ConnectorsPanel() {
   const [isGoogleLoading, setIsGoogleLoading] = useState(true);
   const [calendarEvents, setCalendarEvents] = useState<CalendarEvent[]>([]);
   const [isLoadingEvents, setIsLoadingEvents] = useState(false);
+  const [gmailTestRecipient, setGmailTestRecipient] = useState('');
+  const [isSendingGmailTest, setIsSendingGmailTest] = useState(false);
+  const [gmailTestResult, setGmailTestResult] = useState<string | null>(null);
 
   // ─── EMAIL DISPATCH & PASSWORD RESET DELIVERY STATE ───────────────────────
   const [resendApiKey, setResendApiKey] = useState('');
@@ -213,6 +217,36 @@ export default function ConnectorsPanel() {
       });
     } finally {
       setIsLoadingEvents(false);
+    }
+  };
+
+  const handleSendGmailTest = async () => {
+    const recipient = gmailTestRecipient.trim().toLowerCase();
+    if (!googleToken) {
+      toast({ variant: 'warning', title: 'Gmail Not Connected', description: 'Connect Google Workspace before sending a Gmail test.' });
+      return;
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipient)) {
+      toast({ variant: 'warning', title: 'Valid Recipient Required', description: 'Enter the email address that should receive the test message.' });
+      return;
+    }
+
+    setIsSendingGmailTest(true);
+    setGmailTestResult(null);
+    try {
+      const sent = await sendGmailMessage(googleToken, {
+        to: recipient,
+        subject: 'HAL Gmail connection test',
+        bodyHtml: '<p>This is a test message sent from HAL using the Gmail API.</p><p>No prospect outreach or password-reset message was sent.</p>'
+      });
+      setGmailTestResult(`Gmail accepted the test message. Message ID: ${sent.id}`);
+      toast({ variant: 'success', title: 'Gmail Test Sent', description: `Google accepted the message for ${recipient}.` });
+    } catch (error: any) {
+      const message = error?.message || 'Gmail could not send the test message.';
+      setGmailTestResult(message);
+      toast({ variant: 'danger', title: 'Gmail Test Failed', description: message });
+    } finally {
+      setIsSendingGmailTest(false);
     }
   };
 
@@ -570,10 +604,34 @@ export default function ConnectorsPanel() {
                     </Badge>
                   </div>
                   <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                    Dispatches personalized audit briefs directly through your authenticated Gmail inbox, receiving direct prospect replies.
+                    Gmail API sending is available for explicit, user-triggered messages. Prospect outreach and password-reset delivery are not yet routed through Gmail.
                   </p>
                 </div>
               </div>
+
+              {googleUser && (
+                <div className="mt-4 p-4 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50/60 dark:bg-zinc-800/30 space-y-3">
+                  <div>
+                    <h4 className="text-xs font-semibold uppercase tracking-wider text-zinc-700 dark:text-zinc-300">Gmail API send test</h4>
+                    <p className="text-[11px] text-zinc-500 mt-1">Sends one clearly identified test email only when you press the button. It does not send prospect outreach or password resets.</p>
+                  </div>
+                  <div className="flex flex-col sm:flex-row gap-2">
+                    <input
+                      type="email"
+                      value={gmailTestRecipient}
+                      onChange={(e) => setGmailTestRecipient(e.target.value)}
+                      placeholder="recipient@example.com"
+                      aria-label="Gmail test recipient"
+                      className="flex-1 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-lg py-2 px-3 text-xs text-zinc-900 dark:text-zinc-100"
+                    />
+                    <Button onClick={handleSendGmailTest} disabled={isSendingGmailTest || !googleToken || !gmailTestRecipient.trim()} className="text-xs bg-red-600 hover:bg-red-700 text-white">
+                      <Send className="w-3.5 h-3.5 mr-1.5" />
+                      {isSendingGmailTest ? 'Sending...' : 'Send Gmail Test'}
+                    </Button>
+                  </div>
+                  {gmailTestResult && <p role="status" className="text-xs text-zinc-600 dark:text-zinc-300 break-all">{gmailTestResult}</p>}
+                </div>
+              )}
 
               {/* Interactive Calendar Preview if connected */}
               {googleUser && (
@@ -652,7 +710,7 @@ export default function ConnectorsPanel() {
                   <div className="p-3 bg-white dark:bg-zinc-800/80 rounded-lg border border-zinc-200 dark:border-zinc-700/60 space-y-1">
                     <span className="font-semibold text-zinc-900 dark:text-zinc-100 block">Option A: Google Workspace (Gmail API)</span>
                     <p className="text-[11px] text-zinc-500 dark:text-zinc-400 leading-relaxed">
-                      Click the "Connect Google Workspace" button above. Authorizing the Gmail scope allows HAL to dispatch system emails and password reset links directly through your corporate Gmail address.
+                      Connect Google Workspace to authorize Gmail sending. The connector includes a manual test-send action; automated password resets and prospect campaigns still use their separately configured delivery workflows.
                     </p>
                   </div>
                   <div className="p-3 bg-white dark:bg-zinc-800/80 rounded-lg border border-zinc-200 dark:border-zinc-700/60 space-y-1">
