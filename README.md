@@ -92,7 +92,7 @@ git clone https://github.com/isaJrKai/Hal-Argumentatio.git
 cd Hal-Argumentatio
 
 # 2. Install verified dependencies
-npm ci
+bun install --frozen-lockfile
 
 # 3. Configure environment
 cp .env.example .env
