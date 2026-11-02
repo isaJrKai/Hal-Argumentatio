@@ -574,14 +574,14 @@ export default function HermesLabPanel({ token }: { token: string | null }) {
         method: 'POST',
         headers: getAuthHeaders()
       });
-      if (res.ok) {
-        toast({
-          title: 'Resilience Scan Complete',
-          message: 'All tracking tags, webhooks, and outbox queues inspected.',
-          type: 'success'
-        });
-        fetchDiagnostics();
-      }
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.success) throw new Error(data.error || `Diagnostic scan failed (HTTP ${res.status}).`);
+      toast({
+        title: 'Diagnostic Review Complete',
+        message: data.message || `Reviewed ${data.evidenceRows || 0} stored Google Ads observations; created ${data.newIncidentsFound || 0} incident(s).`,
+        type: 'success'
+      });
+      fetchDiagnostics();
     } catch (err) {
       console.error(err);
     }
@@ -603,7 +603,7 @@ export default function HermesLabPanel({ token }: { token: string | null }) {
               </span>
               <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center gap-1">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                {engineStatus?.provider ? `${engineStatus.provider.toUpperCase()} ACTIVE` : 'SANDBOX GATEWAY'}
+                {engineStatus?.provider && engineStatus.provider !== 'fallback' ? `${engineStatus.provider.toUpperCase()} CONFIGURED · UNVERIFIED` : 'DETERMINISTIC FALLBACK'}
               </span>
             </div>
             <p className="text-xs text-text-secondary mt-0.5">
