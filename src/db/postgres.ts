@@ -323,6 +323,7 @@ export async function bootstrapPostgresTables(poolInstance?: Pool): Promise<void
 
       CREATE TABLE IF NOT EXISTS scheduler_jobs (
         id TEXT PRIMARY KEY,
+        contractor_id TEXT,
         job TEXT NOT NULL,
         status TEXT NOT NULL,
         started_at TIMESTAMP,
@@ -331,6 +332,9 @@ export async function bootstrapPostgresTables(poolInstance?: Pool): Promise<void
         result TEXT,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
       );
+
+      ALTER TABLE scheduler_jobs ADD COLUMN IF NOT EXISTS contractor_id TEXT;
+      CREATE INDEX IF NOT EXISTS scheduler_jobs_tenant_created_idx ON scheduler_jobs (contractor_id, created_at DESC);
 
       CREATE TABLE IF NOT EXISTS lead_events (
         id TEXT PRIMARY KEY,
@@ -704,16 +708,9 @@ export async function bootstrapPostgresTables(poolInstance?: Pool): Promise<void
       ALTER TABLE lead_events ALTER COLUMN type DROP NOT NULL;
 
       CREATE TABLE IF NOT EXISTS staff_members (
-        id TEXT PRIMARY KEY,
-        contractor_id TEXT NOT NULL,
-        name TEXT NOT NULL,
-        email TEXT,
-        phone TEXT,
-        role TEXT NOT NULL,
-        status TEXT DEFAULT 'active' NOT NULL,
-        availability TEXT DEFAULT 'available' NOT NULL,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
+        id TEXT PRIMARY KEY, contractor_id TEXT NOT NULL, name TEXT NOT NULL, email TEXT, phone TEXT,
+        role TEXT NOT NULL, status TEXT DEFAULT 'active' NOT NULL, availability TEXT DEFAULT 'available' NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
       );
       CREATE INDEX IF NOT EXISTS staff_members_tenant_status_idx ON staff_members (contractor_id, status, availability, name);
 
