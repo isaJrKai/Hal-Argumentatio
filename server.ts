@@ -5455,7 +5455,7 @@ app.get('/api/projects', authenticate, async (req, res) => {
   }
 });
 
-app.post('/api/projects', authenticate, (req, res) => {
+app.post('/api/projects', authenticate, async (req, res) => {
   const contractorId = (req as any).contractorId;
   const { leadId, clientName, businessName, city, serviceType, packageTier, monthlyRetainerUsd, initialAuditScore } = req.body;
 
@@ -5517,7 +5517,7 @@ app.post('/api/projects', authenticate, (req, res) => {
   res.status(201).json(project);
 });
 
-app.put('/api/projects/:id', authenticate, (req, res) => {
+app.put('/api/projects/:id', authenticate, async (req, res) => {
   const contractorId = (req as any).contractorId;
   const { id } = req.params;
   const updates = req.body;
