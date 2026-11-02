@@ -40,6 +40,7 @@ import { generateContractorLandingPage, regenerateLandingSection } from './src/s
 import { generateLandingPageHtml } from './src/components/landing/htmlGenerator';
 import { validateCrmTransition, isKnownCrmStage } from './src/lib/crmStateMachine';
 import { buildFinancialSnapshotCore } from './src/lib/financialSnapshot';
+import { getRevenueAmountUsd } from './src/lib/revenueAmounts';
 import { buildPasswordResetResponse } from './src/lib/passwordResetResponse';
 import { verifyFirebaseGoogleIdToken } from './src/lib/firebaseGoogleIdentity';
 import { recordWorkEvent, getRecentWorkEvents, getEntityWorkEvents } from './src/lib/workLedger';
@@ -8126,7 +8127,7 @@ app.post('/api/revenue/decision-engine/run', authenticate, async (req, res) => {
         campaignMap[camp] = { spend: 0, clicks: 0, leads: 0, closedWon: 0, revenue: 0 };
       }
       campaignMap[camp].closedWon += 1;
-      campaignMap[camp].revenue += Number(rev.amount || 0);
+      campaignMap[camp].revenue += getRevenueAmountUsd(rev);
     }
 
     // Calculate ROAS, CPL, CAC for each campaign
@@ -8204,7 +8205,7 @@ app.post('/api/revenue/decision-engine/run', authenticate, async (req, res) => {
         geoMap[geo] = { spend: 0, leads: 0, closedWon: 0, revenue: 0 };
       }
       geoMap[geo].closedWon += 1;
-      geoMap[geo].revenue += Number(rev.amount || 0);
+      geoMap[geo].revenue += getRevenueAmountUsd(rev);
     }
 
     const geoList = Object.keys(geoMap).map(geo => {
@@ -8314,8 +8315,8 @@ app.post('/api/revenue/simulations', authenticate, async (req, res) => {
       const camp = attr?.utmCampaign || Object.keys(campaignMap)[0] || 'Unknown Campaign';
       if (!campaignMap[camp]) campaignMap[camp] = { spend: 0, revenue: 0, leads: 0, closedWon: 0 };
       campaignMap[camp].closedWon += 1;
-      campaignMap[camp].revenue += Number(rev.amount || 0);
-      totalRevenue += Number(rev.amount || 0);
+      campaignMap[camp].revenue += getRevenueAmountUsd(rev);
+      totalRevenue += getRevenueAmountUsd(rev);
       totalClosedWon += 1;
     }
 
