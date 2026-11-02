@@ -98,7 +98,7 @@ export const HAL_MCP_TOOLS: McpToolDefinition[] = [
       properties: {
         thresholdDropPct: {
           type: 'number',
-          description: 'Minimum percentage drop in ROAS or conversion rate to qualify as an anomaly (default: 20).'
+          description: 'Minimum percentage change threshold for a conversion-rate decline or cost-per-conversion increase between adjacent 30-day windows (default: 20).'
         }
       }
     }
