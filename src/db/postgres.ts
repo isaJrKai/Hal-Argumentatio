@@ -690,6 +690,20 @@ export async function bootstrapPostgresTables(poolInstance?: Pool): Promise<void
       ALTER TABLE lead_events ADD COLUMN IF NOT EXISTS occurred_at TIMESTAMP;
       ALTER TABLE lead_events ALTER COLUMN type DROP NOT NULL;
 
+      CREATE TABLE IF NOT EXISTS staff_members (
+        id TEXT PRIMARY KEY,
+        contractor_id TEXT NOT NULL,
+        name TEXT NOT NULL,
+        email TEXT,
+        phone TEXT,
+        role TEXT NOT NULL,
+        status TEXT DEFAULT 'active' NOT NULL,
+        availability TEXT DEFAULT 'available' NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS staff_members_tenant_status_idx ON staff_members (contractor_id, status, availability, name);
+
       CREATE TABLE IF NOT EXISTS work_tasks (
         id TEXT PRIMARY KEY,
         contractor_id TEXT NOT NULL,
@@ -699,6 +713,7 @@ export async function bootstrapPostgresTables(poolInstance?: Pool): Promise<void
         status TEXT DEFAULT 'queued' NOT NULL,
         priority TEXT DEFAULT 'normal' NOT NULL,
         assigned_worker TEXT DEFAULT 'human' NOT NULL,
+        assigned_staff_id TEXT,
         entity_type TEXT,
         entity_id TEXT,
         correlation_id TEXT,
@@ -716,6 +731,8 @@ export async function bootstrapPostgresTables(poolInstance?: Pool): Promise<void
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
       );
       CREATE INDEX IF NOT EXISTS work_tasks_tenant_status_idx ON work_tasks (contractor_id, status, priority, created_at);
+      ALTER TABLE work_tasks ADD COLUMN IF NOT EXISTS assigned_staff_id TEXT;
+      CREATE INDEX IF NOT EXISTS work_tasks_staff_assignee_idx ON work_tasks (contractor_id, assigned_staff_id, status, created_at);
       CREATE INDEX IF NOT EXISTS work_tasks_assignee_idx ON work_tasks (contractor_id, assigned_worker, status, created_at);
       CREATE INDEX IF NOT EXISTS work_tasks_entity_idx ON work_tasks (contractor_id, entity_type, entity_id, created_at DESC);
 
