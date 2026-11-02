@@ -111,13 +111,13 @@ export const HERMES_LAB_CATALOG: LabToolCatalogItem[] = [
     category: 'web',
     description: 'Generates standalone, mobile-responsive local service landing pages with pre-wired HAL GCLID/UTM attribution hooks, emergency click-to-call, and trust badges.',
     iconName: 'Layout',
-    defaultPrompt: 'Generate a high-converting emergency HVAC & AC Repair landing page for Dallas homeowners with 24/7 call bar and 100% satisfaction badge.',
+    defaultPrompt: "Create a landing page using only the supplied workspace profile and parameters. Do not invent contact details, service areas, offers, licenses, reviews, guarantees, prices, or claims.",
     schemaSample: {
-      niche: 'HVAC & AC Repair',
-      city: 'Dallas, TX',
-      phone: '(214) 555-0199',
-      primaryOffer: '$49 Tune-Up or $500 Off New System Installation',
-      serviceHighlights: ['24/7 Emergency Dispatch', 'Licensed & Insured Master Technicians', 'Upfront Flat-Rate Pricing']
+      niche: '',
+      city: '',
+      phone: '',
+      primaryOffer: '',
+      serviceHighlights: []
     }
   },
   {
@@ -127,11 +127,11 @@ export const HERMES_LAB_CATALOG: LabToolCatalogItem[] = [
     category: 'ads',
     description: 'Generates high-converting Google Search ads tailored to local contractor queries with location insertion and ad waste prevention.',
     iconName: 'FileSpreadsheet',
-    defaultPrompt: 'Create a high-intent Google Search Ad copy set for emergency plumbing in Austin, TX.',
+    defaultPrompt: "Create search ad copy using only supplied business facts and parameters. Mark missing proof or offer details for operator review; do not invent performance claims.",
     schemaSample: {
-      campaignType: 'Emergency Search',
-      targetKeywords: ['emergency plumber near me', 'burst pipe repair austin', '24 hr plumbing repair'],
-      uniqueSellingPoints: ['Arrive in under 45 mins', 'No overtime fees on nights/weekends', '5.0 Star Google Rating']
+      campaignType: '',
+      targetKeywords: [],
+      uniqueSellingPoints: []
     }
   },
   {
@@ -141,13 +141,12 @@ export const HERMES_LAB_CATALOG: LabToolCatalogItem[] = [
     category: 'seo',
     description: 'Produces Google-certified search structured markup so your business displays review star ratings, local service territories, business hours, and map locations directly on Google Search.',
     iconName: 'Code2',
-    defaultPrompt: 'Generate valid LocalBusiness schema for a roofing contractor serving Miami, Fort Lauderdale, and West Palm Beach.',
+    defaultPrompt: "Generate valid local-business structured data only from supplied verified fields. Omit unknown properties; never fabricate an address, coordinates, hours, ratings, or reviews.",
     schemaSample: {
-      businessName: 'Apex Roofing Experts',
-      address: '100 Biscayne Blvd, Miami, FL 33132',
-      coordinates: { lat: 25.7743, lng: -80.1937 },
-      priceRange: '$$$',
-      services: ['Commercial TPO Roofing', 'Residential Metal Roofing', 'Tile Roof Repair']
+      businessName: '',
+      address: '',
+      priceRange: '',
+      services: []
     }
   },
   {
@@ -157,11 +156,11 @@ export const HERMES_LAB_CATALOG: LabToolCatalogItem[] = [
     category: 'outreach',
     description: 'Builds multi-touch follow-up messages for quotes that stalled past 7 days, addressing financing, warranty, and limited seasonal slots.',
     iconName: 'Send',
-    defaultPrompt: 'Create a 3-touch follow-up sequence for commercial landscaping quotes over $5,000 that have not responded.',
+    defaultPrompt: "Draft a follow-up sequence for the supplied lead or deal context. Draft only; do not send messages or invent customer history, quote values, deadlines, or promises.",
     schemaSample: {
-      dealType: 'Commercial Landscaping Maintenance',
-      averageQuoteValue: '$7,200/yr',
-      objectionTarget: 'Waiting on budget approval / comparing vendors'
+      dealType: '',
+      averageQuoteValue: '',
+      objectionTarget: ''
     }
   },
   {
@@ -171,11 +170,12 @@ export const HERMES_LAB_CATALOG: LabToolCatalogItem[] = [
     category: 'outreach',
     description: 'Sends an automated, friendly SMS review prompt after a job is completed with a direct 1-tap Google Review link.',
     iconName: 'Star',
-    defaultPrompt: 'Draft an automated post-service SMS review request flow for residential electrical repair customers.',
+    defaultPrompt: "Draft a post-job review request flow using supplied job and business details. Draft only; do not send messages or invent a review link, job completion, or customer identity.",
     schemaSample: {
-      technicianName: 'Mike',
-      jobType: 'Panel Upgrade & EV Charger Install',
-      delayMinutes: 90
+      technicianName: '',
+      jobType: '',
+      reviewUrl: '',
+      delayMinutes: ''
     }
   },
   {
@@ -185,11 +185,12 @@ export const HERMES_LAB_CATALOG: LabToolCatalogItem[] = [
     category: 'diagnostics',
     description: 'Inspects page speed, security certificates (SSL), mobile responsiveness, and image sizes to recommend immediate ranking fixes.',
     iconName: 'Zap',
-    defaultPrompt: 'Generate an actionable technical fix list for a contractor site with 4.8s mobile load time and render-blocking fonts.',
+    defaultPrompt: "Audit the supplied website measurements and evidence. If no measurements or URL are provided, state what evidence is missing instead of inventing scores or defects.",
     schemaSample: {
-      currentMobileSpeedScore: 38,
-      lcpSeconds: 4.8,
-      issuesIdentified: ['Uncompressed 4MB Hero JPG', 'Missing WebP format', 'Synchronous Google Tag Manager load']
+      websiteUrl: '',
+      currentMobileSpeedScore: '',
+      lcpSeconds: '',
+      issuesIdentified: []
     }
   },
   {
@@ -199,11 +200,11 @@ export const HERMES_LAB_CATALOG: LabToolCatalogItem[] = [
     category: 'reasoning',
     description: 'Scans top local trade competitors, active promotions, and warranty terms to spot high-margin market opportunities.',
     iconName: 'ShieldAlert',
-    defaultPrompt: 'Analyze the top 3 plumbing competitors in Phoenix and identify their current seasonal promos and weak points.',
+    defaultPrompt: "Analyze competitors only from supplied competitor records or evidence. Separate verified observations from hypotheses; do not invent competitor names, prices, offers, or current promotions.",
     schemaSample: {
-      market: 'Phoenix, AZ',
-      niche: 'Plumbing & Drain Cleaning',
-      competitors: ['Parker & Sons', 'George Brazil Plumbing', 'Penguin Air & Plumbing']
+      market: '',
+      niche: '',
+      competitors: []
     }
   },
   {
@@ -213,10 +214,11 @@ export const HERMES_LAB_CATALOG: LabToolCatalogItem[] = [
     category: 'diagnostics',
     description: 'Connects Jobber, Housecall Pro, ServiceTitan, or custom website forms into HAL so new leads flow directly into your pipeline.',
     iconName: 'Cpu',
-    defaultPrompt: 'Create a transformer function that adapts ServiceTitan webhook payloads into HAL standardized Lead format.',
+    defaultPrompt: "Design a CRM/webhook mapping from the supplied source payload and target schema. If either is missing, return the required fields and validation questions rather than inventing a provider payload.",
     schemaSample: {
-      sourceCrm: 'ServiceTitan / Jobber / HousecallPro',
-      incomingPayloadStructure: 'raw JSON with nested customer fields'
+      sourceCrm: '',
+      incomingPayloadStructure: '',
+      targetLeadSchema: {}
     }
   },
   {
@@ -226,10 +228,11 @@ export const HERMES_LAB_CATALOG: LabToolCatalogItem[] = [
     category: 'ads',
     description: 'Analyzes search queries to extract negative keywords (e.g. "free", "diy", "jobs", "salary", "parts only") to prevent wasted Google Ads spend.',
     iconName: 'Filter',
-    defaultPrompt: 'Generate an exhaustive negative keyword list of 50+ waste terms for a high-ticket commercial painting company.',
+    defaultPrompt: "Identify negative keyword candidates from supplied search terms and campaign context. Clearly distinguish evidence-backed terms from general suggestions.",
     schemaSample: {
-      niche: 'Commercial Painting Contractor',
-      bannedIntents: ['residential', 'diy / how to', 'employment / careers', 'cheap / free', 'art supplies']
+      niche: '',
+      searchTerms: [],
+      bannedIntents: []
     }
   },
   {
@@ -239,10 +242,11 @@ export const HERMES_LAB_CATALOG: LabToolCatalogItem[] = [
     category: 'reasoning',
     description: 'Executes structured multi-hypothesis forensic investigation on complex revenue decay, stalled deals, or unexplained CPA spikes.',
     iconName: 'BrainCircuit',
-    defaultPrompt: 'Investigate why a $15,000 monthly Google Ads campaign saw conversion rate drop from 6.2% to 1.8% over the last 21 days.',
+    defaultPrompt: "Investigate the supplied business symptom using recorded workspace evidence. Separate facts, hypotheses, and tests; do not invent spend, conversion rates, causes, or outcomes.",
     schemaSample: {
-      symptom: 'CPA increased 180% with steady traffic',
-      hypothesesToTest: ['Landing page tracking dropped', 'Competitor launched aggressive price promo', 'Search query drift to broad terms']
+      symptom: '',
+      evidence: [],
+      hypothesesToTest: []
     }
   }
 ];
@@ -1087,6 +1091,7 @@ The user is talking directly to you in the Brand & Taste Studio to customize, pe
 2. RE-SYNTHESIS EXECUTION:
    - If the user asks to modify, rewrite, improve, or redesign an asset, output the complete, unshortened code in \`renderedOutput\` with full inline Tailwind, Google Fonts, and working interactive JavaScript.
    - Keep all HAL attribution hooks intact (hidden fields for \`gclid\`, \`utm_source\`, \`utm_medium\`, \`utm_campaign\`, and click-to-call links).
+   - Never invent business facts, customer testimonials, credentials, license numbers, addresses, coordinates, prices, offers, service guarantees, campaign metrics, or completed work. Use explicit "not provided" notes in structured data, and omit unsupported public-facing claims.
    - Address the user's critique with professional composure, explaining the specific typographic, layout, and micro-interaction upgrades implemented.
 
 Always respond in strictly formatted JSON:
