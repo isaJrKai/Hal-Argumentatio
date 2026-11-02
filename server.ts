@@ -44,6 +44,7 @@ import { buildFinancialSnapshotCore } from './src/lib/financialSnapshot';
 import { buildPasswordResetResponse } from './src/lib/passwordResetResponse';
 import { recordWorkEvent, getRecentWorkEvents, getEntityWorkEvents } from './src/lib/workLedger';
 import { canHumanUpdateWorkTask, canTransitionWorkTask, listWorkTasks, getWorkTask, requiresWorkTaskApproval } from './src/lib/workTasks';
+import { getWorkerCapabilities } from './src/lib/workerCapabilities';
 import { resolvePublishedLandingPageOwner } from './src/lib/landingPageOwnership';
 import { validateLoopGate } from './src/lib/loopGating';
 import { 
@@ -464,6 +465,12 @@ function requireRole(role: 'admin' | 'user') {
     next();
   };
 }
+
+// ─── VERIFIED WORKER CAPABILITIES ───────────────────────────────────────────
+// This endpoint exposes the difference between a model provider and an executor.
+app.get('/api/workers', authenticate, (_req, res) => {
+  return res.json({ workers: getWorkerCapabilities() });
+});
 
 // ─── SHARED WORK LEDGER ──────────────────────────────────────────────────────
 // Operational history is read-only to clients. Trusted domain handlers append events.
