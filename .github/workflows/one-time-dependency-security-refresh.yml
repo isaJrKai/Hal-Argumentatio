@@ -1,0 +1,45 @@
+name: One-time dependency security refresh
+
+on:
+  push:
+    branches: [fix/google-auth-identity-verification]
+
+permissions:
+  contents: write
+
+jobs:
+  refresh:
+    if: ${{ !startsWith(github.event.head_commit.message, 'chore: patch vulnerable dependencies') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - name: Install the current frozen dependency graph
+        run: bun install --frozen-lockfile
+      - name: Apply compatible security updates
+        run: bun audit fix || true
+      - name: Verify the updated lockfile
+        run: bun install --frozen-lockfile
+      - name: Run type checks and automated tests
+        run: npm run test:ci
+      - name: Build production artifacts
+        run: npm run build
+      - name: Require a clean production dependency audit
+        run: bun audit --prod --audit-level=high
+      - name: Commit the reviewed lockfile update
+        run: |
+          if git diff --quiet -- bun.lock package.json; then
+            echo "No dependency lockfile changes were needed."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add bun.lock package.json
+          git commit -m "chore: patch vulnerable dependencies"
+          git push origin "HEAD:${GITHUB_REF_NAME}"
