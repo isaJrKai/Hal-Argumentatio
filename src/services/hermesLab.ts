@@ -842,11 +842,19 @@ Respond in the required JSON format.`;
   });
 
   await recordWorkEvent(pgDb, {
-    contractorId, eventType: 'agent.responded', entityType: 'agent_session', entityId: assistantMsgId,
+    contractorId,
+    eventType: parsed.executionStatus === 'provider_unavailable' ? 'agent.execution_failed' : 'agent.responded',
+    entityType: 'agent_session', entityId: assistantMsgId,
     actorType: 'agent', actorId: 'hermes_agent', sourceModule: 'hermes_studio',
     correlationId: targetArtifactId || assistantMsgId,
-    summary: 'Hermes completed a response using shared HAL workspace context.',
-    payload: { artifactUpdated: Boolean(updatedArtifactRecord), artifactId: updatedArtifactRecord?.id || targetArtifactId || null }
+    summary: parsed.executionStatus === 'provider_unavailable'
+      ? 'Hermes could not complete the request because no configured provider returned a valid response.'
+      : 'Hermes completed a response using shared HAL workspace context.',
+    payload: {
+      executionStatus: parsed.executionStatus || 'completed',
+      artifactUpdated: Boolean(updatedArtifactRecord),
+      artifactId: updatedArtifactRecord?.id || targetArtifactId || null
+    }
   });
 
   return {
