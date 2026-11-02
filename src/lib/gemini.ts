@@ -618,19 +618,23 @@ RESPONSE STANDARD
             let round = 0;
             response = await ai.models.generateContent({ model, contents, config });
             while (response?.functionCalls?.length && toolRuntime && round < 5) {
-              const calls = response.functionCalls.slice(0, 4);
+              const calls = response.functionCalls;
               const modelContent = response.candidates?.[0]?.content;
               if (modelContent) contents.push(modelContent);
               const functionResponses: any[] = [];
-              for (const call of calls) {
+              for (const [callIndex, call] of calls.entries()) {
                 if (!call.name) continue;
                 let result: any;
-                try {
-                  result = await toolRuntime.execute(call.name, (call.args || {}) as Record<string, any>);
-                  toolCalls.push({ name: call.name, result });
-                } catch (toolError: any) {
-                  result = { success: false, error: String(toolError?.message || 'Tool execution failed.').slice(0, 500) };
-                  toolCalls.push({ name: call.name, result });
+                if (callIndex >= 4) {
+                  result = { success: false, error: 'The per-round tool limit is four. Retry the remaining work in a subsequent turn.' };
+                } else {
+                  try {
+                    result = await toolRuntime.execute(call.name, (call.args || {}) as Record<string, any>);
+                    toolCalls.push({ name: call.name, result });
+                  } catch (toolError: any) {
+                    result = { success: false, error: String(toolError?.message || 'Tool execution failed.').slice(0, 500) };
+                    toolCalls.push({ name: call.name, result });
+                  }
                 }
                 functionResponses.push({ functionResponse: { name: call.name, ...(call.id ? { id: call.id } : {}), response: { result } } });
               }
