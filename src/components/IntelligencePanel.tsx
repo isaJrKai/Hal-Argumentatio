@@ -126,7 +126,7 @@ export default function IntelligencePanel({
     {
       id: 'init',
       role: 'model',
-      text: "I am HAL, your Business Operating Intelligence. I have direct access to your local SQLite parameters, Conquest Mission logs, GCM-encrypted databases, and system configuration matrices. Speak, and I will resolve.",
+      text: "I’m HAL, your business operating assistant. I can work with the workspace records and tools currently connected to this account. I’ll distinguish recorded facts from estimates and request approval before consequential actions.",
       timestamp: new Date().toLocaleTimeString().slice(0, 5)
     }
   ]);
@@ -140,16 +140,13 @@ export default function IntelligencePanel({
   const [historySearchQuery, setHistorySearchQuery] = useState('');
 
   const suggestedPrompts = [
-    "What is your core Constitution?",
-    "Explain the single responsibility of Connectors.",
-    "Tell me about dynamic Skills management.",
-    "Explain the Talent Arbitrage Scoper model.",
-    "What is the Verified Lead List Packager?",
-    "How does the Automation Ops Product Scoper work?",
-    "Explain the Pricing & Margin Calculator.",
-    "How does the Ad Spend Breakeven Optimizer work?"
+    "Summarize my current pipeline and identify stalled leads.",
+    "What work is waiting for human approval?",
+    "Review recent win/loss outcomes and explain the recorded reasons.",
+    "Compare recorded revenue with Google Ads reported conversion value.",
+    "Ask Hermes to analyze the current lead pipeline.",
+    "What are the next unfinished tasks?"
   ];
-
   useEffect(() => {
     if (chatBottomRef.current) {
       chatBottomRef.current.scrollIntoView({ behavior: 'smooth' });
@@ -174,7 +171,7 @@ export default function IntelligencePanel({
               {
                 id: 'init',
                 role: 'model',
-                text: "I am HAL, your Business Operating Intelligence. I have direct access to your local SQLite parameters, Conquest Mission logs, GCM-encrypted databases, and system configuration matrices. Speak, and I will resolve.",
+                text: "I’m HAL, your business operating assistant. I can work with the workspace records and tools currently connected to this account. I’ll distinguish recorded facts from estimates and request approval before consequential actions.",
                 timestamp: new Date().toLocaleTimeString().slice(0, 5)
               },
               ...historyData
@@ -258,7 +255,7 @@ export default function IntelligencePanel({
           {
             id: 'init',
             role: 'model',
-            text: "I am HAL, your Business Operating Intelligence. I have direct access to your local SQLite parameters, Conquest Mission logs, GCM-encrypted databases, and system configuration matrices. Speak, and I will resolve.",
+            text: "I’m HAL, your business operating assistant. I can work with the workspace records and tools currently connected to this account. I’ll distinguish recorded facts from estimates and request approval before consequential actions.",
             timestamp: new Date().toLocaleTimeString().slice(0, 5)
           }
         ]);
@@ -368,7 +365,7 @@ export default function IntelligencePanel({
             Intelligence Engine
           </h1>
           <p className="text-xs text-text-secondary max-w-xl">
-            Ask HAL anything about its core architecture, and monitor active operational hypotheses and closed-loop learnings.
+            Coordinate current business work, inspect recorded outcomes, and hand off analysis or artifact revisions to the existing Hermes agent. HAL labels missing data instead of guessing.
           </p>
         </div>
 
