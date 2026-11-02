@@ -725,7 +725,7 @@ app.patch('/api/work-tasks/:id', authenticate, async (req, res) => {
       if (!canHumanUpdateWorkTask(current.assignedWorker, nextStatus)) return res.status(403).json({ error: 'Agent-assigned tasks must be started and completed through their registered executor receipt path. You may approve or cancel them here.' });
       if (!canTransitionWorkTask(current.status, nextStatus)) return res.status(409).json({ error: `Task cannot move from ${current.status} to ${nextStatus || 'unknown'}.`, currentStatus: current.status });
       if (nextStatus === 'running' && current.requiresApproval && !current.approvedAt) return res.status(403).json({ error: 'This task requires approval before execution.' });
-    } else if (!hasAssignmentChange && output === undefined) return res.status(400).json({ error: 'Provide a status, an assignment change, or task output.' });
+    } else if (!hasAssignmentChange) return res.status(400).json({ error: 'Provide a status or an assignment change.' });
     const now = new Date(); const update: Record<string, any> = { updatedAt: now };
     if (nextStatus) update.status = nextStatus; if (hasAssignmentChange) update.assignedStaffId = nextStaffId;
     if (nextStatus === 'running') { update.startedAt = current.startedAt || now; update.attemptCount = current.attemptCount + 1; update.errorMessage = null; }
@@ -736,7 +736,7 @@ app.patch('/api/work-tasks/:id', authenticate, async (req, res) => {
       const [saved] = await tx.update(workTasks).set(update).where(and(eq(workTasks.id, taskId), eq(workTasks.contractorId, contractorId), eq(workTasks.status, current.status))).returning();
       if (!saved) throw new Error('Task changed before this update could be committed.');
       if (hasAssignmentChange && nextStaffId !== current.assignedStaffId) await tx.insert(workEvents).values({ id: 'evt_' + crypto.randomUUID(), contractorId, eventType: nextStaffId ? 'task.assigned' : 'task.unassigned', entityType: 'work_task', entityId: taskId, actorType: 'human', actorId: contractorId, sourceModule: 'work_queue', correlationId: current.correlationId || taskId, summary: nextStaffId ? `Assigned task "${current.title}" to staff member ${nextStaffId}.` : `Removed staff ownership from task "${current.title}".`, payload: { previousStaffId: current.assignedStaffId || null, assignedStaffId: nextStaffId } });
-      if (nextStatus && nextStatus !== current.status) await tx.insert(workEvents).values({ id: 'evt_' + crypto.randomUUID(), contractorId, eventType: 'task.status_changed', entityType: 'work_task', entityId: taskId, actorType: 'human', actorId: contractorId, sourceModule: 'work_queue', correlationId: current.correlationId || taskId, summary: `Moved task "${current.title}" from ${current.status} to ${nextStatus}.`, payload: { previousStatus: current.status, status: nextStatus, assignedWorker: current.assignedWorker, assignedStaffId: hasAssignmentChange ? nextStaffId : current.assignedStaffId } });
+      if (nextStatus && nextStatus !== current.status) await tx.insert(workEvents).values({ id: 'evt_' + crypto.randomUUID(), contractorId, eventType: 'task.status_changed', entityType: 'work_task', entityId: taskId, actorType: 'human', actorId: contractorId, sourceModule: 'work_queue', correlationId: current.correlationId || taskId, summary: `Moved task "${current.title}" from ${current.status} to ${nextStatus}.`, payload: { previousStatus: current.status, status: nextStatus, assignedWorker: current.assignedWorker, assignedStaffId: hasAssignmentChange ? nextStaffId : current.assignedStaffId, ...(output !== undefined ? { output } : {}), ...(nextStatus === 'failed' ? { errorMessage: update.errorMessage } : {}) } });
       return saved;
     });
     return res.json({ task: updated });
@@ -4983,10 +4983,35 @@ app.post('/api/learning/winloss', authenticate, async (req, res) => {
 
 // ─── AUTONOMOUS OUTREACH SEQUENCE BUILDER ─────────────────────────────────────
 
+async function getTenantOutreachSequences(contractorId: string) {
+  const legacySequences = db.getOutreachSequences(contractorId) || [];
+  for (const legacy of legacySequences) {
+    if (!legacy?.id || !Array.isArray(legacy.steps)) continue;
+    const toDate = (value: any, fallback: Date) => {
+      if (!value) return fallback;
+      const parsed = new Date(value);
+      return Number.isFinite(parsed.getTime()) ? parsed : fallback;
+    };
+    const now = new Date();
+    await pgDb.insert(outreachSequences).values({
+      id: String(legacy.id),
+      contractorId,
+      name: String(legacy.name || 'Imported outreach sequence'),
+      niche: typeof legacy.niche === 'string' ? legacy.niche : 'General',
+      steps: legacy.steps,
+      createdAt: toDate(legacy.createdAt, now),
+      updatedAt: toDate(legacy.updatedAt || legacy.createdAt, now)
+    }).onConflictDoNothing();
+  }
+  return pgDb.select().from(outreachSequences)
+    .where(eq(outreachSequences.contractorId, contractorId))
+    .orderBy(desc(outreachSequences.createdAt));
+}
+
 app.get('/api/outreach/sequences', authenticate, async (req, res) => {
   const contractorId = (req as any).contractorId;
   try {
-    const sequences = await pgDb.select().from(outreachSequences).where(eq(outreachSequences.contractorId, contractorId)).orderBy(desc(outreachSequences.createdAt));
+    const sequences = await getTenantOutreachSequences(contractorId);
     res.json(sequences);
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -10534,7 +10559,7 @@ async function startServer() {
 
     try {
       const integrity = db.verifyLedgerIntegrity(contractorId);
-      const sequences = db.getOutreachSequences(contractorId);
+      const sequences = await getTenantOutreachSequences(contractorId);
       const sequenceTemplates = getDefaultCadenceSequences();
       const outbox = await pgDb.select().from(conversionOutbox).where(eq(conversionOutbox.contractorId, contractorId));
       const jobs = await pgDb.select().from(schedulerJobs).where(eq(schedulerJobs.contractorId, contractorId)).orderBy(desc(schedulerJobs.createdAt));
@@ -10575,7 +10600,7 @@ async function startServer() {
     const contractorId = (req as any).contractorId;
 
     try {
-      const sequences = db.getOutreachSequences(contractorId);
+      const sequences = await getTenantOutreachSequences(contractorId);
       const outbox = await pgDb.select().from(conversionOutbox).where(eq(conversionOutbox.contractorId, contractorId));
       const jobs = await pgDb.select().from(schedulerJobs).where(eq(schedulerJobs.contractorId, contractorId)).orderBy(desc(schedulerJobs.createdAt));
       const verification = verifyPhase3Pillars(sequences, outbox, jobs);
@@ -10617,7 +10642,7 @@ async function startServer() {
     const { sequenceId, businessName, ownerName, city, niche } = req.body || {};
 
     try {
-      const savedSequences = db.getOutreachSequences(contractorId);
+      const savedSequences = await getTenantOutreachSequences(contractorId);
       const savedSequence = savedSequences.find(sequence => sequence.id === sequenceId);
       const templates = getDefaultCadenceSequences();
       const templateSequence = templates.find(sequence => sequence.id === sequenceId) || templates[0];
