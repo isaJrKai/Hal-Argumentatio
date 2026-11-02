@@ -17,6 +17,14 @@ export const contractors = pgTable('contractors', {
   lastLoginAt: timestamp('last_login_at'),
 });
 
+/** Hashed JWT revocations. Raw bearer tokens are never persisted. */
+export const revokedTokens = pgTable('revoked_tokens', {
+  tokenHash: text('token_hash').primaryKey(),
+  contractorId: text('contractor_id').notNull(),
+  expiresAt: timestamp('expires_at').notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+});
+
 export const leads = pgTable('leads', {
   id: text('id').primaryKey(),
   contractorId: text('contractor_id').notNull(),
