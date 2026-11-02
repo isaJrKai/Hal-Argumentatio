@@ -43,7 +43,7 @@ export const HAL_MCP_TOOLS: McpToolDefinition[] = [
   },
   {
     name: 'hal_create_work_task',
-    description: 'Creates a durable work item assigned to a human or specialist worker. This queues work only; it does not execute the task. External communications, spend, contracts and destructive actions must require human approval.',
+    description: 'Creates a durable work item assigned to a human or specialist worker. This queues work only; it does not execute the task. For the existing Hermes agent use taskType hermes_agent_task with input.message (and optional artifactId) for Hermes Studio analysis or an explicitly requested artifact revision, or hermes_lab_asset with input.toolId and input.parameters for a registered Lab tool. External communications, spend, contracts and destructive actions require human approval.',
     inputSchema: {
       type: 'object',
       properties: {
