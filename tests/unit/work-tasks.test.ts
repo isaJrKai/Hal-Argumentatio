@@ -12,6 +12,8 @@ describe('HAL work task state machine', () => {
     expect(requiresWorkTaskApproval('research', 'Draft an email for human review')).toBe(false);
     expect(requiresWorkTaskApproval('research', 'Find competitor pricing')).toBe(false);
     expect(requiresWorkTaskApproval('lead_follow_up', 'Review and follow up')).toBe(false);
+    expect(requiresWorkTaskApproval('hermes_agent_task', 'Prepare task', undefined, { message: 'Send the campaign to all prospects' })).toBe(true);
+    expect(requiresWorkTaskApproval('hermes_agent_task', 'Prepare task', undefined, { message: 'Review the campaign draft only' })).toBe(false);
   });
 
   it('prevents humans from marking agent-assigned tasks as executed', () => {
