@@ -4738,15 +4738,16 @@ app.post('/api/outreach/sequences', authenticate, async (req, res) => {
       steps,
       updatedAt: now
     };
-    const saved = existing
-      ? (await pgDb.update(outreachSequences).set(values)
-          .where(and(eq(outreachSequences.id, sequenceId), eq(outreachSequences.contractorId, contractorId)))
-          .returning())[0]
-      : (await pgDb.insert(outreachSequences).values({
-          id: sequenceId, contractorId, ...values, createdAt: now
-        }).returning())[0];
+    const saved = await pgDb.transaction(async tx => {
+      const record = existing
+        ? (await tx.update(outreachSequences).set(values)
+            .where(and(eq(outreachSequences.id, sequenceId), eq(outreachSequences.contractorId, contractorId)))
+            .returning())[0]
+        : (await tx.insert(outreachSequences).values({
+            id: sequenceId, contractorId, ...values, createdAt: now
+          }).returning())[0];
+      if (!record) throw new Error('Outreach sequence was not persisted.');
 
-    await pgDb.transaction(async tx => {
       await tx.insert(auditLogs).values({
         id: crypto.randomUUID(),
         contractorId,
@@ -4766,6 +4767,7 @@ app.post('/api/outreach/sequences', authenticate, async (req, res) => {
         summary: `${existing ? 'Updated' : 'Created'} outreach sequence "${name.trim()}".`,
         payload: { niche: values.niche, stepCount: steps.length }
       });
+      return record;
     });
 
     return res.status(existing ? 200 : 201).json(saved);
