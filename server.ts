@@ -2493,10 +2493,26 @@ app.put('/api/leads/:id', authenticate, async (req, res) => {
           newStage: newStatus,
           dealValue: newDealValue,
           currency: 'USD',
-          notes: `Deal value adjusted from $${oldDealValue} to $${newDealValue}`,
+          notes: `Deal value adjusted from ${oldDealValue} to ${newDealValue}`,
           createdBy: 'crm_operator'
         });
       }
+
+      await tx.insert(workEvents).values({
+        id: 'evt_' + crypto.randomUUID(),
+        contractorId,
+        eventType: statusChanged ? 'lead.stage_changed' : 'lead.updated',
+        entityType: 'lead',
+        entityId: id,
+        actorType: 'human',
+        actorId: contractorId,
+        sourceModule: 'sales_pipeline',
+        correlationId: id,
+        summary: statusChanged
+          ? `Moved ${updatedLead.businessName} from ${oldStatus} to ${newStatus}.`
+          : `Updated lead record for ${updatedLead.businessName}.`,
+        payload: { previousStage: oldStatus, currentStage: newStatus, dealValueChanged: suppliedDealValue !== undefined && newDealValue !== oldDealValue }
+      });
 
       return { updatedLead, statusChanged };
     });
