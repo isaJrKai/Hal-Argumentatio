@@ -553,19 +553,26 @@ RESPONSE STANDARD
   // When the authenticated server supplies its MCP runtime, HAL can call the
   // same tenant-scoped tools exposed to connected agents. Only the server may
   // provide this callback; no model-supplied tenant or contractor ID is trusted.
+  const normalizeGeminiSchema = (schema: any): any => {
+    if (!schema || typeof schema !== 'object') return schema;
+    const normalized: Record<string, any> = { ...schema };
+    if (typeof normalized.type === 'string') normalized.type = normalized.type.toUpperCase();
+    if (normalized.properties && typeof normalized.properties === 'object') {
+      normalized.properties = Object.fromEntries(Object.entries(normalized.properties).map(([key, value]) => [key, normalizeGeminiSchema(value)]));
+    }
+    if (normalized.items) normalized.items = normalizeGeminiSchema(normalized.items);
+    return normalized;
+  };
   const geminiTools = (toolRuntime?.tools || [])
     .filter(tool => tool.name !== 'hermes_synthesize_lab_asset')
     .map(tool => ({
       name: tool.name,
       description: tool.description,
-      parameters: {
-        type: 'OBJECT',
-        properties: Object.fromEntries(Object.entries(tool.inputSchema.properties || {}).map(([key, value]: [string, any]) => [
-          key,
-          { ...value, type: typeof value.type === 'string' ? value.type.toUpperCase() : value.type }
-        ])),
+      parameters: normalizeGeminiSchema({
+        type: 'object',
+        properties: tool.inputSchema.properties || {},
         ...(tool.inputSchema.required?.length ? { required: tool.inputSchema.required } : {})
-      }
+      })
     }));
 
   if (activeAI === 'gemini' || (toolRuntime && geminiTools.length > 0)) {
@@ -591,7 +598,12 @@ RESPONSE STANDARD
           { role: 'user', parts: [{ text: message }] }
         ];
 
-        if (geminiTools.length) config.tools = [{ functionDeclarations: geminiTools }];
+        if (geminiTools.length) {
+          config.tools = [
+            ...(usedGrounding ? [{ googleSearch: {} }] : []),
+            { functionDeclarations: geminiTools }
+          ];
+        }
 
         const candidateModels = ["gemini-3.8-flash", "gemini-flash-latest", "gemini-3.1-flash-lite"];
         let response: any = null;
