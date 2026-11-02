@@ -5167,7 +5167,6 @@ interface DispatchLogEntry {
   preview?: string;
 }
 
-const dispatchLogs: DispatchLogEntry[] = [];
 const liveEmailDispatchLimits = new Map<string, { count: number; resetAt: number }>();
 
 app.post('/api/webhooks/resend', async (req, res) => {
@@ -5279,7 +5278,7 @@ app.get('/api/dispatch/history', authenticate, async (req, res) => {
       .where(eq(communicationsOutbox.contractorId, contractorId))
       .orderBy(desc(communicationsOutbox.createdAt))
       .limit(100);
-    const leadIds = [...new Set(persisted.map(row => row.leadId).filter(Boolean))];
+    const leadIds = [...new Set(persisted.map(row => row.leadId).filter((id): id is string => Boolean(id)))];
     const leadRows = leadIds.length
       ? await pgDb.select({ id: leads.id, businessName: leads.businessName }).from(leads)
           .where(and(eq(leads.contractorId, contractorId), inArray(leads.id, leadIds)))
@@ -10956,7 +10955,13 @@ async function startServer() {
       const dispatchLeadNames = new Map(dispatchLeadRows.map(row => [row.id, row.businessName]));
       const filteredLogs = dispatchRows.map(row => ({
         id: row.id, contractorId: row.contractorId, channel: row.channel,
-        recipient: row.recipientEncrypted ? decrypt(row.recipientEncrypted) : '',
+        recipient: (() => {
+          const raw = row.recipientEncrypted ? decrypt(row.recipientEncrypted) : '';
+          const parts = String(raw || '').split('@');
+          if (parts.length === 2) return parts[0].slice(0, 1) + '***@' + parts[1];
+          const digits = String(raw || '').replace(/\D/g, '');
+          return digits.length >= 4 ? `••••${digits.slice(-4)}` : 'Saved recipient';
+        })(),
         leadId: row.leadId || undefined,
         leadBusinessName: row.leadId ? (dispatchLeadNames.get(row.leadId) || 'Lead no longer available') : 'Direct Recipient',
         status: row.status, mode: row.status === 'simulated' ? 'simulation' : 'live',
