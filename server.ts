@@ -9986,8 +9986,10 @@ async function startServer() {
         }
       ];
 
-      const allRevenues = db.getRevenues(contractorId);
-      const totalRevenue = allRevenues.reduce((sum, revenue) => sum + (revenue.amountUsd || 0), 0);
+      const allRevenues = await pgDb.select({ amountUsd: revenueRecords.amountUsd })
+        .from(revenueRecords)
+        .where(eq(revenueRecords.contractorId, contractorId));
+      const totalRevenue = allRevenues.reduce((sum, revenue) => sum + getRevenueAmountUsd(revenue), 0);
 
       res.json({
         success: true,
