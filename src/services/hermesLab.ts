@@ -18,7 +18,8 @@ import {
 } from '../db/schema.ts';
 import { eq, and, desc, sql } from 'drizzle-orm';
 import crypto from 'crypto';
-import { callNemotron } from './nemotron.ts';
+import { callNemotron, callNemotronWithTools } from './nemotron.ts';
+import { callGeminiWithTools } from '../lib/gemini';
 import { callHuggingFaceHermes } from './huggingface.ts';
 import { callOpenRouterHermes } from './openrouter.ts';
 import { GoogleGenAI } from '@google/genai';
@@ -267,7 +268,14 @@ export async function executeHermesLabTool(
   parameters: Record<string, any>,
   contractorId: string,
   promptOverride?: string,
-  executionContext?: { workTaskId: string; correlationId: string }
+  executionContext?: {
+    workTaskId: string;
+    correlationId: string;
+    toolRuntime?: {
+      tools: Array<{ name: string; description: string; inputSchema: { type: 'object'; properties: Record<string, any>; required?: string[] } }>;
+      execute: (name: string, args: Record<string, any>) => Promise<any>;
+    };
+  }
 ): Promise<{
   artifactId: string;
   title: string;
@@ -594,6 +602,7 @@ export async function chatWithHermesAgent(
   updatedArtifact?: any;
   thoughtProcess?: string;
   executionStatus?: string;
+  toolCalls?: Array<{ name: string; result: any }>;
 }> {
   // Fetch contractor info
   const [contractorRecord] = await pgDb
@@ -762,6 +771,39 @@ ${userMessage}
 Respond in the required JSON format.`;
 
   let parsed: any = null;
+  let toolCallResults: Array<{ name: string; result: any }> = [];
+
+  // When Hermes is assigned a Work Queue task, allow it to inspect the same
+  // tenant-scoped MCP tools as HAL Assistant. Only read/analysis tools are passed
+  // by the queue executor; no external communication or destructive tool is exposed.
+  if (executionContext?.toolRuntime?.tools.length) {
+    const runtime = executionContext.toolRuntime;
+    const providers: Array<() => Promise<{ text: string; toolCalls: Array<{ name: string; result: any }> }>> = [];
+    if (process.env.GEMINI_API_KEY) {
+      providers.push(() => callGeminiWithTools(prompt, systemInstruction, runtime.tools, runtime.execute, 'application/json'));
+    }
+    if (process.env.NVIDIA_API_KEY) {
+      providers.push(() => callNemotronWithTools([
+        { role: 'system', content: systemInstruction },
+        { role: 'user', content: prompt }
+      ], runtime.tools, runtime.execute, 0.4));
+    }
+    for (const invoke of providers) {
+      try {
+        const toolResult = await invoke();
+        toolCallResults = toolResult.toolCalls || [];
+        parsed = safeExtractJson(toolResult.text) || {
+          thoughtProcess: 'Hermes used the connected operational tools and returned a concise result.',
+          reply: toolResult.text || 'Hermes processed the available operational tools. Review Work History for their recorded results.',
+          artifactUpdate: null,
+          executionStatus: toolCallResults.length ? 'completed_with_tool_calls' : 'completed'
+        };
+        break;
+      } catch (toolProviderError: any) {
+        console.warn('[Hermes Work Queue] Tool-capable provider failed before completing tool calls:', toolProviderError?.message || toolProviderError);
+      }
+    }
+  }
 
   // Priority 1: OpenRouter (Hermes 3 / Hermes 4)
   if (!parsed && (process.env.OPENROUTER_API_KEY || process.env.OPENROUTER_KEY)) {
