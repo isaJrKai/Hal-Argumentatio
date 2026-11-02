@@ -3936,6 +3936,7 @@ app.post('/api/missions', authenticate, async (req, res) => {
 app.post('/api/audit/website', authenticate, async (req, res) => {
   const contractorId = (req as any).contractorId;
   const { url, businessName, city, niche } = req.body || {};
+  const leadId = typeof req.body?.leadId === 'string' ? req.body.leadId.trim() : '';
 
   if (typeof url !== 'string' || !url.trim() || url.length > 2048) {
     return res.status(400).json({ error: 'A website URL between 1 and 2048 characters is required.' });
@@ -3961,6 +3962,10 @@ app.post('/api/audit/website', authenticate, async (req, res) => {
 
   try {
     const formattedUrl = parsedUrl.origin + parsedUrl.pathname;
+    const linkedLead = leadId
+      ? (await pgDb.select().from(leads).where(and(eq(leads.id, leadId), eq(leads.contractorId, contractorId))).limit(1))[0]
+      : null;
+    if (leadId && !linkedLead) return res.status(404).json({ error: 'Lead not found or inaccessible.' });
     const probe = await validateDomainAndDns(formattedUrl, { probeHttp: true, timeoutMs: 5000 });
     const generatedAt = new Date().toISOString();
     const vulnerabilities: string[] = [];
@@ -3985,9 +3990,9 @@ app.post('/api/audit/website', authenticate, async (req, res) => {
 
     const report = {
       targetUrl: formattedUrl,
-      businessName: typeof businessName === 'string' ? businessName.slice(0, 200) : null,
-      city: typeof city === 'string' ? city.slice(0, 120) : null,
-      niche: typeof niche === 'string' ? niche.slice(0, 120) : null,
+      businessName: typeof businessName === 'string' ? businessName.slice(0, 200) : linkedLead?.businessName || null,
+      city: typeof city === 'string' ? city.slice(0, 120) : linkedLead?.city || null,
+      niche: typeof niche === 'string' ? niche.slice(0, 120) : linkedLead?.niche || null,
       sslStatus: probe.sslSecured ? 'secured' : probe.httpReachable ? 'missing' : 'unknown',
       sslExpiryDays: null,
       mobileSpeedScore: null,
@@ -4015,9 +4020,20 @@ app.post('/api/audit/website', authenticate, async (req, res) => {
       generatedAt
     };
 
+    const auditEventId = crypto.randomUUID();
+    if (linkedLead) {
+      await pgDb.update(leads).set({ sslStatus: report.sslStatus, updatedAt: new Date() })
+        .where(and(eq(leads.id, linkedLead.id), eq(leads.contractorId, contractorId)));
+      await pgDb.insert(leadEvents).values({
+        id: crypto.randomUUID(), leadId: linkedLead.id, eventType: 'WebsiteConnectivityAuditCompleted',
+        newStage: linkedLead.status,
+        notes: JSON.stringify({ targetUrl: formattedUrl, measurementStatus: report.measurementStatus, dnsResolved: report.dnsResolved, httpReachable: report.httpReachable, sslStatus: report.sslStatus, pageSpeedStatus: report.pageSpeedStatus })
+      });
+    }
     await recordWorkEvent(pgDb, {
-      contractorId, eventType: 'website_audit.completed', entityType: 'website_audit', entityId: crypto.randomUUID(),
+      contractorId, eventType: 'website_audit.completed', entityType: linkedLead ? 'lead' : 'website_audit', entityId: linkedLead?.id || auditEventId,
       actorType: 'human', actorId: contractorId, sourceModule: 'website_audit',
+      correlationId: linkedLead?.id || auditEventId,
       summary: `Completed DNS/HTTP/TLS connectivity check for ${report.businessName || formattedUrl}.`,
       payload: { targetUrl: formattedUrl, measurementStatus: report.measurementStatus, dnsResolved: report.dnsResolved, httpReachable: report.httpReachable, sslStatus: report.sslStatus, pageSpeedStatus: report.pageSpeedStatus }
     });
