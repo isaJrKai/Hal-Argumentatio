@@ -861,6 +861,7 @@ Respond in the required JSON format.`;
     replyMessageId: assistantMsgId,
     replyText: parsed.reply || 'Changes applied.',
     updatedArtifact: updatedArtifactRecord,
-    thoughtProcess: parsed.thoughtProcess
+    thoughtProcess: parsed.thoughtProcess,
+    executionStatus: parsed.executionStatus || 'completed'
   };
 }
