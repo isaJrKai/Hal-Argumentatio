@@ -33,6 +33,7 @@ import { executeHermesLabTool, chatWithHermesAgent, LabToolType } from '../herme
 import { getRecentWorkEvents, recordWorkEvent } from '../../lib/workLedger';
 import { listWorkTasks, getWorkTask, requiresWorkTaskApproval, canExecutorClaimWorkTask } from '../../lib/workTasks';
 import { analyzeCampaignPerformance } from '../../lib/campaignAnomaly';
+import { classifyHermesToolResult } from '../../lib/hermesExecution';
 
 export const HAL_MCP_TOOLS: McpToolDefinition[] = [
   {
@@ -393,16 +394,28 @@ export async function executeMcpTool(
                     const toolResult = await executeMcpTool(toolName, toolArgs, contractorId, {
                       actorType: 'agent', actorId: 'hermes_agent', sourceModule: 'hermes_studio'
                     });
+                    const outcome = classifyHermesToolResult(toolResult);
                     try {
                       await recordWorkEvent(pgDb, {
-                        contractorId, eventType: 'agent.tool_succeeded', entityType: 'work_task', entityId: taskId,
+                        contractorId,
+                        eventType: outcome === 'succeeded' ? 'agent.tool_succeeded' : outcome === 'unavailable' ? 'agent.tool_unavailable' : 'agent.tool_failed',
+                        entityType: 'work_task', entityId: taskId,
                         actorType: 'agent', actorId: 'hermes_agent', sourceModule: 'hermes_studio',
                         correlationId: task.correlationId || taskId,
-                        summary: `Hermes inspected workspace data using ${toolName}.`,
-                        payload: { toolName, success: true }
+                        summary: outcome === 'succeeded'
+                          ? `Hermes completed workspace inspection using ${toolName}.`
+                          : outcome === 'unavailable'
+                            ? `Hermes requested ${toolName}, but the capability reported it was unavailable.`
+                            : `Hermes tool ${toolName} returned a failed result.`,
+                        payload: {
+                          toolName,
+                          outcome,
+                          resultStatus: typeof toolResult?.status === 'string' ? toolResult.status : null,
+                          executionEnabled: typeof toolResult?.executionEnabled === 'boolean' ? toolResult.executionEnabled : null
+                        }
                       });
                     } catch (ledgerError) {
-                      console.error('[Hermes Work History] Could not append tool success event:', ledgerError);
+                      console.error('[Hermes Work History] Could not append tool result event:', ledgerError);
                     }
                     return toolResult;
                   } catch (toolError: any) {
@@ -436,7 +449,9 @@ export async function executeMcpTool(
               updatedArtifactId: (result as any).updatedArtifact?.id || null,
               toolCalls: ((result as any).toolCalls || []).map((call: any) => ({
                 name: call.name,
-                success: call.result?.success !== false
+                outcome: classifyHermesToolResult(call.result),
+                success: classifyHermesToolResult(call.result) === 'succeeded',
+                resultStatus: typeof call.result?.status === 'string' ? call.result.status : null
               }))
             };
         const [completed] = await pgDb.update(workTasks).set({
