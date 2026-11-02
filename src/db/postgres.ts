@@ -417,7 +417,7 @@ export async function bootstrapPostgresTables(poolInstance?: Pool): Promise<void
       CREATE TABLE IF NOT EXISTS communications_outbox (
         id TEXT PRIMARY KEY,
         contractor_id TEXT NOT NULL,
-        lead_id TEXT NOT NULL,
+        lead_id TEXT,
         channel TEXT NOT NULL,
         provider TEXT NOT NULL,
         recipient_encrypted TEXT NOT NULL,
@@ -436,6 +436,8 @@ export async function bootstrapPostgresTables(poolInstance?: Pool): Promise<void
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
       );
+
+      ALTER TABLE communications_outbox ALTER COLUMN lead_id DROP NOT NULL;
 
       CREATE TABLE IF NOT EXISTS communications_delivery_events (
         id TEXT PRIMARY KEY,
