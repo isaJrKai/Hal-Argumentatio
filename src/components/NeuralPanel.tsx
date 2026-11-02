@@ -400,15 +400,7 @@ export default function NeuralPanel() {
         });
         localStorage.setItem('hal_neural_layout', JSON.stringify(layout));
         
-        // Also fire off background persist to DB API
-        fetch('/api/neural/network/layout', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${localStorage.getItem('halbiz_auth_token') || localStorage.getItem('token')}`
-          },
-          body: JSON.stringify({ layout })
-        }).catch(err => console.warn('Background layout sync failed', err));
+        // Layout is intentionally device-local until a tenant-scoped layout store is implemented.
       });
       
     d3.select(canvas).call(drag);
