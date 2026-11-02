@@ -38,7 +38,7 @@ git clone https://github.com/isaJrKai/Hal-Argumentatio.git
 cd Hal-Argumentatio
 
 # 2. Install dependencies with locked versions
-npm ci
+bun install --frozen-lockfile
 
 # 3. Create local environment configuration
 cp .env.example .env
