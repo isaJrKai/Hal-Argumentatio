@@ -5763,7 +5763,7 @@ app.get('/api/outreach/bridges/status', authenticate, async (req, res) => {
         deliveredCount: emailDelivered,
         submittedCount: userLogs.filter(l => l.channel === 'email' && l.status === 'submitted').length,
         openRate: null,
-        status: process.env.RESEND_API_KEY && process.env.HAL_SENDER_EMAIL ? 'configured_unverified' : 'not_configured'
+        status: cfg.email.provider === 'resend' && cfg.email.apiKey && cfg.email.senderEmail ? 'configured_unverified' : 'not_configured'
       },
       sms: {
         enabled: false,
