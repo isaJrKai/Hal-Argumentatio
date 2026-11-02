@@ -2926,6 +2926,7 @@ app.post('/api/leads/ingest', authenticate, async (req, res) => {
 
   try {
     const addedItems = [];
+    let queuedTasks = 0;
     for (const hl of newLeads) {
       const id = crypto.randomUUID();
       const rawEmail = hl.email ? String(hl.email) : null;
@@ -3003,6 +3004,50 @@ app.post('/api/leads/ingest', authenticate, async (req, res) => {
       });
 
       addedItems.push(addedLead);
+
+      // Every imported prospect gets a human follow-up assignment in the durable queue.
+      // This is intentionally a review task: discovery/import does not verify a prospect
+      // or authorize outreach. The same lead/task pair is protected against active duplicates.
+      const [activeTask] = await pgDb.select({ id: workTasks.id }).from(workTasks).where(and(
+        eq(workTasks.contractorId, contractorId),
+        eq(workTasks.taskType, 'lead_follow_up'),
+        eq(workTasks.entityType, 'lead'),
+        eq(workTasks.entityId, addedLead.id),
+        eq(workTasks.assignedWorker, 'human'),
+        inArray(workTasks.status, ['queued', 'running', 'awaiting_approval'])
+      )).limit(1);
+
+      if (!activeTask) {
+        const taskId = 'task_' + crypto.randomUUID();
+        const correlationId = taskId;
+        const taskTitle = `Review and qualify: ${addedLead.businessName}`;
+        await pgDb.transaction(async tx => {
+          await tx.insert(workTasks).values({
+            id: taskId, contractorId, taskType: 'lead_follow_up',
+            title: taskTitle,
+            description: 'Review this Maps/territory prospect, confirm its business details and verification evidence, then record the next step in the lead workspace. Do not contact the prospect until the outreach verification gate passes.',
+            status: 'queued', priority: 'normal', assignedWorker: 'human',
+            entityType: 'lead', entityId: addedLead.id, correlationId,
+            input: { source: 'maps_territory_harvest', verificationStatus: addedLead.verificationStatus || 'UNVERIFIED_STAGING' },
+            requiresApproval: false, createdAt: new Date(), updatedAt: new Date()
+          });
+          await tx.insert(workEvents).values({
+            id: 'evt_' + crypto.randomUUID(), contractorId,
+            eventType: 'task.created', entityType: 'work_task', entityId: taskId,
+            actorType: 'system', actorId: 'territory_harvester', sourceModule: 'lead_ingestion',
+            correlationId, summary: `Created qualification task for ${addedLead.businessName}.`,
+            payload: { taskType: 'lead_follow_up', assignedWorker: 'human', priority: 'normal', status: 'queued', leadId: addedLead.id }
+          });
+          await tx.insert(workEvents).values({
+            id: 'evt_' + crypto.randomUUID(), contractorId,
+            eventType: 'lead.queued_for_review', entityType: 'lead', entityId: addedLead.id,
+            actorType: 'system', actorId: 'territory_harvester', sourceModule: 'lead_ingestion',
+            correlationId, summary: `${addedLead.businessName} was added to the human review queue.`,
+            payload: { taskId, verificationStatus: addedLead.verificationStatus || 'UNVERIFIED_STAGING' }
+          });
+        });
+        queuedTasks++;
+      }
     }
 
     // 4. Log Audit Action
@@ -3021,7 +3066,7 @@ app.post('/api/leads/ingest', authenticate, async (req, res) => {
       `Imported ${addedItems.length} business records. Review verification status before contacting them.`
     );
 
-    res.json({ success: true, count: addedItems.length, leads: addedItems });
+    res.json({ success: true, count: addedItems.length, queuedTasks, leads: addedItems });
   } catch (err: any) {
     console.error('Failed to ingest leads:', err);
     res.status(500).json({ error: err.message });
