@@ -196,8 +196,14 @@ export async function generateForecastNarrative(
   historicalData: any[],
   preferredAI?: string
 ): Promise<{ predicted: number; assumptions: string; confidenceScore: number; source?: string }> {
-  const dataString = JSON.stringify(historicalData);
-  
+  const validObservations = Array.isArray(historicalData)
+    ? historicalData.filter(record => Number.isFinite(Number(record?.value)))
+    : [];
+  if (!validObservations.length) {
+    throw new Error('Forecast unavailable: no valid historical observations exist for this metric.');
+  }
+  const dataString = JSON.stringify(validObservations);
+
   const prompt = `Analyze this 90-day historical trend for the metric "${metric}":
 ${dataString}
 
@@ -307,12 +313,12 @@ Return your response in a raw JSON object format (no markdown blocks, no code bl
   if (!Array.isArray(historicalData) || historicalData.length === 0) {
     throw new Error('Forecast unavailable: no historical snapshots exist for this metric.');
   }
-  const values = historicalData.map(h => h.value);
+  const values = validObservations.map(h => Number(h.value));
   const avg = values.reduce((sum, v) => sum + v, 0) / values.length;
   return {
     source: 'fallback_heuristic',
     predicted: Math.round(avg * 10) / 10,
-    assumptions: `[Fallback Baseline - Model Offline] Historical mean across ${historicalData.length} records; this is a simple baseline, not a validated prediction.`,
+    assumptions: `[Fallback Baseline - Model Offline] Historical mean across ${validObservations.length} records; this is a simple baseline, not a validated prediction.`,
     confidenceScore: 0 // Uncalibrated; no validated model confidence is available
   };
 }
