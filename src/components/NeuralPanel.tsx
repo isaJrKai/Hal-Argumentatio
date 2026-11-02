@@ -776,16 +776,16 @@ export default function NeuralPanel() {
             
             {/* Recent Territory Outcomes (Bottom Left) */}
             <div className="flex-1 max-w-xl bg-bg-overlay border border-border-dim rounded-lg p-3 shadow-sm hover:bg-bg-base transition-colors h-full flex flex-col justify-center">
-              <h4 className="text-[10px] font-mono font-bold text-text-secondary uppercase mb-2 flex items-center gap-1.5"><Code2 className="w-3.5 h-3.5 text-text-tertiary" /> Recorded Outcome Log</h4>
+              <h4 className="text-[10px] font-mono font-bold text-text-secondary uppercase mb-2 flex items-center gap-1.5"><Code2 className="w-3.5 h-3.5 text-text-tertiary" /> Work History</h4>
               <div className="font-mono text-[9px] text-accent/90 space-y-1 h-10 overflow-hidden leading-relaxed">
                 {(networkData.nodes || [])
-                  .filter(n => n.type === 'win' || n.type === 'loss')
+                  .filter(n => n.type === 'work_event')
                   .slice(0, 2)
                   .map((node, i) => (
-                  <p key={i} className="truncate">{">"} {node.type === 'win' ? '[WON]' : '[LOST]'} {node.detail}</p>
+                  <p key={i} className="truncate">{">"} [{node.label}] {node.detail}</p>
                 ))}
-                {!(networkData.nodes || []).some(n => n.type === 'win' || n.type === 'loss') && (
-                  <p className="text-text-tertiary">No recorded win/loss outcomes in this territory.</p>
+                {!(networkData.nodes || []).some(n => n.type === 'work_event') && (
+                  <p className="text-text-tertiary">No recorded work events in this graph scope.</p>
                 )}
               </div>
             </div>
