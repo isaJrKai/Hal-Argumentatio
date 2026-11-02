@@ -39,6 +39,26 @@ A workflow is considered connected only when its data is persisted in the author
 - Added durable JWT revocation on logout.
 - Extended schema invariant tests for Work Queue, Hermes and revocation tables.
 
+- Connected published landing-page form submissions to tenant-scoped lead creation and human review queue assignments; the public form only resolves a published Hermes artifact and never trusts a browser-supplied contractor ID.
+- Corrected the Intelligence chat deletion route and removed unsupported neural mutation claims.
+- Removed the neural layout API no-op; device-local layout persistence is labelled as local behavior.
+- Reconciled Hermes diagnostics to actual Google Ads evidence and corrected connector webhook URLs.
+
+## Frontend/backend contract reconciliation
+
+The route inventory was expanded to include the full 11k-line server file and `app.all` handlers. Several routes initially suspected missing were present in later sections: Hermes Lab, the authenticated MCP gateway, Revenue Outcomes, Phase 3 outbox, and Phase 4 arbitrage evaluation. They are not counted as missing-route defects.
+
+Additional confirmed fixes on this branch:
+
+1. **Intelligence chat deletion:** the UI called singular `/api/intelligence/chat/message/:id`; the tenant-authenticated backend route is plural `/api/intelligence/chat/messages/:id`. The caller now uses the registered route and URL-encodes the ID.
+2. **Neural pruning:** the backend explicitly disables manual pruning until learned weights are tenant-scoped and validated, while the UI previously removed nodes optimistically and called an unregistered endpoint. The UI control is now disabled; it no longer claims a graph mutation occurred.
+3. **Neural layout persistence:** the backend returned HTTP 200 without storing layout data. That no-op endpoint and its call were removed. Node layout remains browser-local via localStorage and is not represented as cross-device persistence.
+4. **Hermes diagnostics:** the prior scan checked aggregate Google Ads rows but reported four surfaces scanned and asserted an unverified GCLID root cause. It now reports the actual evidence-row count, records only a qualified screening signal, deduplicates open incidents, and explicitly states that tags, webhooks and delivery providers were not probed. The diagnostics status no longer claims active background supervision.
+5. **Connector webhook setup:** the displayed WhatsApp webhook URL now matches the registered signed route `/api/outreach/whatsapp/webhook`. The UI no longer advertises a nonexistent Twilio inbound route; SMS inbound remains unimplemented/simulation-only.
+6. **Form Builder embed:** the previous iframe pointed to an unregistered route. The embed now requires a published Hermes landing-page ID and uses a published-page form route. Form submissions are parsed as URL-encoded data, ownership is resolved from the published artifact, and lead creation, lead event, human review task and work-ledger events are committed together in PostgreSQL.
+
+These are code-level changes. They do not substitute for live browser, provider, or production database verification.
+
 ## Remaining work — do not mark complete yet
 
 ### Persistence and data contracts
