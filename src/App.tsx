@@ -79,6 +79,7 @@ const HermesLabPanel = lazy(() => import('./components/HermesLabPanel'));
 const BlueprintViewerPanel = lazy(() => import('./components/BlueprintViewerPanel').then(module => ({ default: module.BlueprintViewerPanel })));
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { parseCachedContractor, safeStorageGet, safeStorageSet, safeStorageRemove } from './lib/sessionStorage';
+import { readApiResponse } from './lib/apiResponse';
 
 // 4-Zone Workstation Shell & Tools
 import { InspectorProvider } from './context/InspectorContext';
@@ -584,14 +585,25 @@ export default function App() {
       const headers = { 'Authorization': `Bearer ${token}` };
       const results = await Promise.allSettled(endpoints.map(async endpoint => {
         const response = await fetch(endpoint.url, { headers });
-        if (!response.ok) throw new Error(`${endpoint.url} returned HTTP ${response.status}`);
-        return response.json();
+        const payload = await readApiResponse<unknown>(response, endpoint.label);
+        if (payload === null || payload === undefined) {
+          throw new Error(`${endpoint.label}: API returned no data.`);
+        }
+        return payload;
       }));
 
       const failedEndpoints: string[] = [];
+      const failureDetails: string[] = [];
       results.forEach((result, index) => {
-        if (result.status === 'fulfilled') endpoints[index].apply(result.value);
-        else failedEndpoints.push(endpoints[index].label);
+        if (result.status === 'fulfilled') {
+          endpoints[index].apply(result.value);
+        } else {
+          failedEndpoints.push(endpoints[index].label);
+          failureDetails.push(result.reason instanceof Error
+            ? result.reason.message
+            : `${endpoints[index].label}: unknown synchronization error.`);
+          console.warn(`HAL data sync failed for ${endpoints[index].url}:`, result.reason);
+        }
       });
 
       if (failedEndpoints.length > 0) {
@@ -600,8 +612,8 @@ export default function App() {
           id: 'data-sync',
           title: exhaustedRetries ? 'Partial Sync Failure' : 'Sync Delayed',
           message: exhaustedRetries
-            ? `Could not refresh ${failedEndpoints.join(', ')}. Some displayed data may be stale.`
-            : `Could not refresh ${failedEndpoints.join(', ')}. Retrying while keeping the last available data.`,
+            ? `Could not refresh ${failedEndpoints.join(', ')}. ${failureDetails.join(' | ')} Last successful data is retained; displayed values may be stale.`
+            : `Could not refresh ${failedEndpoints.join(', ')}. Retrying. ${failureDetails.join(' | ')}`,
           type: 'system'
         });
         if (!exhaustedRetries) {
