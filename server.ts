@@ -5761,7 +5761,7 @@ app.put('/api/projects/:id', authenticate, async (req, res) => {
 
     // Accept only fields used by the delivery workflow; tenant ownership and
     // immutable identifiers can never be changed by a client-supplied payload.
-    const safeUpdates: Record<string, unknown> = { updatedAt: new Date() };
+    const safeUpdates: Partial<typeof clientProjects.$inferInsert> = { updatedAt: new Date() };
     if (Array.isArray(updates.milestones)) safeUpdates.milestones = updates.milestones;
     if (Array.isArray(updates.assets)) safeUpdates.assets = updates.assets;
     if (typeof updates.status === 'string' && ['onboarding', 'active_delivery', 'review', 'completed'].includes(updates.status)) {
