@@ -5637,108 +5637,169 @@ app.post('/api/proposals/generate', authenticate, (req, res) => {
 app.get('/api/projects', authenticate, async (req, res) => {
   const contractorId = (req as any).contractorId;
   try {
-    const projects = await pgDb.select().from(clientProjects).where(eq(clientProjects.contractorId, contractorId)).orderBy(desc(clientProjects.createdAt));
-    res.json(projects);
+    // One-time compatibility migration: older releases wrote delivery projects to
+    // the local JSON store while the client portal and financials read PostgreSQL.
+    // Copy only this authenticated tenant's legacy records; never overwrite PG rows.
+    const legacyProjects = db.getClientProjects(contractorId);
+    if (legacyProjects.length > 0) {
+      await pgDb.insert(clientProjects).values(legacyProjects.map(project => ({
+        id: project.id,
+        contractorId,
+        leadId: project.leadId || '',
+        clientName: project.clientName || 'Business Owner',
+        businessName: project.businessName,
+        city: project.city,
+        serviceType: project.serviceType,
+        packageTier: project.packageTier,
+        monthlyRetainerUsd: project.monthlyRetainerUsd,
+        startDate: new Date(project.startDate),
+        status: project.status,
+        initialAuditScore: project.initialAuditScore,
+        currentScore: project.currentScore,
+        targetScore: project.targetScore,
+        milestones: project.milestones || [],
+        assets: project.assets || [],
+        notes: project.notes || null,
+        portalAccessToken: project.portalAccessToken,
+        createdAt: new Date(project.createdAt),
+        updatedAt: new Date(project.updatedAt)
+      }))).onConflictDoNothing();
+    }
+
+    const projects = await pgDb.select().from(clientProjects)
+      .where(eq(clientProjects.contractorId, contractorId))
+      .orderBy(desc(clientProjects.createdAt));
+    return res.json(projects);
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    console.error('[Client Projects] PostgreSQL list/migration failed:', err);
+    return res.status(503).json({ error: 'Client projects are temporarily unavailable. No unsaved project data was substituted.' });
   }
 });
 
 app.post('/api/projects', authenticate, async (req, res) => {
   const contractorId = (req as any).contractorId;
-  const { leadId, clientName, businessName, city, serviceType, packageTier, monthlyRetainerUsd, initialAuditScore } = req.body;
+  const { leadId, clientName, businessName, city, serviceType, packageTier, monthlyRetainerUsd, initialAuditScore } = req.body || {};
 
-  if (!businessName) {
+  if (typeof businessName !== 'string' || !businessName.trim()) {
     return res.status(400).json({ error: 'Business name is required to create a project' });
   }
 
-  const project = db.createClientProject(contractorId, {
-    id: 'proj_' + crypto.randomBytes(6).toString('hex'),
-    leadId: leadId || '',
-    clientName: clientName || 'Business Owner',
-    businessName,
-    city: city || 'Calgary',
-    serviceType: serviceType || 'General Trade',
-    packageTier: packageTier || 'Dominance',
-    monthlyRetainerUsd: Number(monthlyRetainerUsd) || 2400,
-    startDate: new Date().toISOString().split('T')[0],
-    status: 'onboarding',
-    initialAuditScore: Number(initialAuditScore) || 50,
-    currentScore: Number(initialAuditScore) || 50,
-    targetScore: 95,
-    portalAccessToken: crypto.randomBytes(12).toString('hex'),
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-    assets: [
-      { id: 'ast_' + crypto.randomBytes(4).toString('hex'), name: 'High-Res Brand Logo', category: 'logo', status: 'pending' },
-      { id: 'ast_' + crypto.randomBytes(4).toString('hex'), name: 'Domain Registrar Credentials', category: 'domain_access', status: 'pending' },
-      { id: 'ast_' + crypto.randomBytes(4).toString('hex'), name: 'Google Business Profile Manager Delegation', category: 'analytics_access', status: 'pending' }
-    ],
-    milestones: [
-      { id: 'ms_1', title: 'Onboarding & Asset Intake', description: 'Intake and verify client DNS, assets, and service radius.', status: 'in_progress' },
-      { id: 'ms_2', title: 'Technical Speed & SSL Hardening', description: 'Compress images, configure TLS 1.3, optimize Core Web Vitals.', status: 'pending' },
-      { id: 'ms_3', title: 'Geo-SEO Schema & Map Pack Synchronization', description: 'Inject JSON-LD structured data and align 40+ local citations.', status: 'pending' },
-      { id: 'ms_4', title: 'Autonomous Funnel Activation', description: 'Launch lead capture forms and direct SMS dispatch routing.', status: 'pending' },
-      { id: 'ms_5', title: 'Monthly Executive ROI Review', description: 'Deliver progress comparison report and growth metrics breakdown.', status: 'pending' }
-    ]
-  });
+  try {
+    const now = new Date();
+    const score = Number.isFinite(Number(initialAuditScore)) ? Number(initialAuditScore) : 50;
+    const projectId = 'proj_' + crypto.randomBytes(6).toString('hex');
+    const projectValues = {
+      id: projectId,
+      contractorId,
+      leadId: typeof leadId === 'string' ? leadId : '',
+      clientName: typeof clientName === 'string' && clientName.trim() ? clientName.trim() : 'Business Owner',
+      businessName: businessName.trim(),
+      city: typeof city === 'string' && city.trim() ? city.trim() : 'Calgary',
+      serviceType: typeof serviceType === 'string' && serviceType.trim() ? serviceType.trim() : 'General Trade',
+      packageTier: ['Growth', 'Dominance', 'Enterprise'].includes(packageTier) ? packageTier : 'Dominance',
+      monthlyRetainerUsd: Number.isFinite(Number(monthlyRetainerUsd)) && Number(monthlyRetainerUsd) > 0 ? Math.round(Number(monthlyRetainerUsd)) : 2400,
+      startDate: now,
+      status: 'onboarding',
+      initialAuditScore: score,
+      currentScore: score,
+      targetScore: 95,
+      portalAccessToken: crypto.randomBytes(12).toString('hex'),
+      createdAt: now,
+      updatedAt: now,
+      assets: [
+        { id: 'ast_' + crypto.randomBytes(4).toString('hex'), name: 'High-Res Brand Logo', category: 'logo', status: 'pending' },
+        { id: 'ast_' + crypto.randomBytes(4).toString('hex'), name: 'Domain Registrar Credentials', category: 'domain_access', status: 'pending' },
+        { id: 'ast_' + crypto.randomBytes(4).toString('hex'), name: 'Google Business Profile Manager Delegation', category: 'analytics_access', status: 'pending' }
+      ],
+      milestones: [
+        { id: 'ms_1', title: 'Onboarding & Asset Intake', description: 'Intake and verify client DNS, assets, and service radius.', status: 'in_progress' },
+        { id: 'ms_2', title: 'Technical Speed & SSL Hardening', description: 'Compress images, configure TLS 1.3, optimize Core Web Vitals.', status: 'pending' },
+        { id: 'ms_3', title: 'Geo-SEO Schema & Map Pack Synchronization', description: 'Inject JSON-LD structured data and align 40+ local citations.', status: 'pending' },
+        { id: 'ms_4', title: 'Autonomous Funnel Activation', description: 'Launch lead capture forms and direct SMS dispatch routing.', status: 'pending' },
+        { id: 'ms_5', title: 'Monthly Executive ROI Review', description: 'Deliver progress comparison report and growth metrics breakdown.', status: 'pending' }
+      ]
+    };
+    const [project] = await pgDb.insert(clientProjects).values(projectValues).returning();
 
-  await recordWorkEvent(pgDb, {
-    contractorId, eventType: 'client_project.created', entityType: 'client_project', entityId: project.id,
-    actorType: 'human', actorId: contractorId, sourceModule: 'client_operations', correlationId: project.id,
-    summary: `Created client delivery project for ${businessName}.`,
-    payload: { leadId: leadId || null, status: project.status, packageTier: project.packageTier, monthlyRetainerUsd: project.monthlyRetainerUsd }
-  });
+    await recordWorkEvent(pgDb, {
+      contractorId, eventType: 'client_project.created', entityType: 'client_project', entityId: project.id,
+      actorType: 'human', actorId: contractorId, sourceModule: 'client_operations', correlationId: project.id,
+      summary: `Created client delivery project for ${businessName.trim()}.`,
+      payload: { leadId: leadId || null, status: project.status, packageTier: project.packageTier, monthlyRetainerUsd: project.monthlyRetainerUsd }
+    });
 
-  db.addAuditLog({
-    contractorId,
-    action: 'PROJECT_ONBOARDED',
-    details: `Initiated active delivery project for ${businessName} ($${project.monthlyRetainerUsd}/mo).`
-  });
+    db.addAuditLog({
+      contractorId,
+      action: 'PROJECT_ONBOARDED',
+      details: `Initiated active delivery project for ${businessName.trim()} (${project.monthlyRetainerUsd}/mo).`
+    });
 
-  broadcastNotification(
-    contractorId,
-    'success',
-    'New Client Project Onboarded',
-    `Created delivery workspace for ${businessName}. Client onboarding portal link generated.`
-  );
+    broadcastNotification(
+      contractorId,
+      'success',
+      'New Client Project Onboarded',
+      `Created delivery workspace for ${businessName.trim()}. Client onboarding portal link generated.`
+    );
 
-  res.status(201).json(project);
+    return res.status(201).json(project);
+  } catch (err: any) {
+    console.error('[Client Projects] Create failed:', err);
+    return res.status(503).json({ error: 'Client project could not be saved to the database.' });
+  }
 });
 
 app.put('/api/projects/:id', authenticate, async (req, res) => {
   const contractorId = (req as any).contractorId;
   const { id } = req.params;
-  const updates = req.body;
+  const updates = req.body || {};
 
-  const existingProject = db.getClientProjects(contractorId).find(p => p.id === id);
-  const updated = db.updateClientProject(id, contractorId, updates);
-  if (!updated) {
-    return res.status(404).json({ error: 'Project not found or unauthorized' });
-  }
-  await recordWorkEvent(pgDb, {
-    contractorId, eventType: 'client_project.updated', entityType: 'client_project', entityId: id,
-    actorType: 'human', actorId: contractorId, sourceModule: 'client_operations', correlationId: id,
-    summary: `Updated client project for ${updated.businessName}.`,
-    payload: { previousStatus: existingProject?.status || null, currentStatus: updated.status }
-  });
+  try {
+    const [existingProject] = await pgDb.select().from(clientProjects)
+      .where(and(eq(clientProjects.id, id), eq(clientProjects.contractorId, contractorId)))
+      .limit(1);
+    if (!existingProject) return res.status(404).json({ error: 'Project not found or unauthorized' });
 
-  // Phase 2: Automated Post-Job Referral & Review Engine Trigger
-  if (updates.status === 'completed' && existingProject && existingProject.status !== 'completed') {
-    db.addAuditLog({
-      contractorId,
-      action: 'REVIEW_REQUEST_QUEUED',
-      details: `Project completed for ${updated.businessName}. Automated SMS/Email review and $100 referral incentive queued within 24-hour window.`
+    // Accept only fields used by the delivery workflow; tenant ownership and
+    // immutable identifiers can never be changed by a client-supplied payload.
+    const safeUpdates: Record<string, unknown> = { updatedAt: new Date() };
+    if (Array.isArray(updates.milestones)) safeUpdates.milestones = updates.milestones;
+    if (Array.isArray(updates.assets)) safeUpdates.assets = updates.assets;
+    if (typeof updates.status === 'string' && ['onboarding', 'active_delivery', 'review', 'completed'].includes(updates.status)) {
+      safeUpdates.status = updates.status;
+    }
+    if (typeof updates.notes === 'string') safeUpdates.notes = updates.notes.slice(0, 10000);
+
+    const [updated] = await pgDb.update(clientProjects).set(safeUpdates)
+      .where(and(eq(clientProjects.id, id), eq(clientProjects.contractorId, contractorId)))
+      .returning();
+    if (!updated) return res.status(404).json({ error: 'Project not found or unauthorized' });
+
+    await recordWorkEvent(pgDb, {
+      contractorId, eventType: 'client_project.updated', entityType: 'client_project', entityId: id,
+      actorType: 'human', actorId: contractorId, sourceModule: 'client_operations', correlationId: id,
+      summary: `Updated client project for ${updated.businessName}.`,
+      payload: { previousStatus: existingProject.status, currentStatus: updated.status }
     });
-    broadcastNotification(
-      contractorId,
-      'success',
-      'Post-Job Referral Engine Triggered',
-      `Review request & referral invite dispatched to ${updated.clientName} (${updated.businessName}) to capture 24-hr referral window.`
-    );
-  }
 
-  res.json(updated);
+    if (updates.status === 'completed' && existingProject.status !== 'completed') {
+      db.addAuditLog({
+        contractorId,
+        action: 'REVIEW_REQUEST_QUEUED',
+        details: `Project completed for ${updated.businessName}. Automated SMS/Email review and referral incentive queued for operator review.`
+      });
+      broadcastNotification(
+        contractorId,
+        'success',
+        'Post-Job Referral Engine Triggered',
+        `Project completed for ${updated.clientName} (${updated.businessName}); review-request follow-up is ready for operator review.`
+      );
+    }
+
+    return res.json(updated);
+  } catch (err: any) {
+    console.error('[Client Projects] Update failed:', err);
+    return res.status(503).json({ error: 'Client project update could not be saved.' });
+  }
 });
 
 // ─── CONNECTORS CREDENTIALS & HEALTH API ──────────────────────────────────────
@@ -6768,12 +6829,16 @@ app.post('/api/system/audit-logs', authenticate, (req, res) => {
 
 // ─── SCHEDULER SYSTEM (Core Learning Loops) ──────────────────────────────────
 
-app.get('/api/scheduler/jobs', authenticate, async (req, res) => {
+app.get('/api/scheduler/jobs', authenticate, (req, res) => {
+  const contractorId = (req as any).contractorId;
   try {
-    const jobs = await pgDb.select().from(schedulerJobs).orderBy(desc(schedulerJobs.createdAt));
-    res.json(jobs);
+    // Scheduler execution and status transitions currently persist through the
+    // legacy scheduler store. Read from that same tenant-scoped source so the
+    // dashboard reports the jobs that were actually created and completed.
+    return res.json(db.getSchedulerJobs(contractorId));
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    console.error('[Scheduler] Job list failed:', err);
+    return res.status(503).json({ error: 'Scheduled jobs are temporarily unavailable.' });
   }
 });
 
@@ -6786,6 +6851,7 @@ app.post('/api/scheduler', authenticate, async (req, res) => {
   }
 
   const jobRecord = db.addSchedulerJob({
+    contractorId,
     job,
     status: 'running',
     startedAt: new Date().toISOString()
