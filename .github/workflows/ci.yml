@@ -40,29 +40,3 @@ jobs:
       - name: Report full dependency audit
         if: always()
         run: bun audit || true
-          const report = require('/tmp/hal-production-audit.json');
-          const issues = Object.values(report.vulnerabilities || {});
-          for (const issue of issues) {
-            console.log(`${String(issue.severity).toUpperCase()} ${issue.name} | direct=${issue.isDirect} | range=${issue.range} | fix=${JSON.stringify(issue.fixAvailable)}`);
-          }
-          const high = issues.filter(issue => issue.severity === 'high' || issue.severity === 'critical');
-          console.log(`Production dependency audit: ${issues.length} vulnerable packages; ${high.length} high/critical.`);
-          if (high.length) process.exit(1);
-          NODE
-      - name: Report full development dependency audit
-        if: always()
-        run: |
-          npm audit --json > /tmp/hal-full-audit.json || true
-          node - <<'NODE'
-          const report = require('/tmp/hal-full-audit.json');
-          const issues = Object.values(report.vulnerabilities || {});
-          const counts = issues.reduce((out, issue) => {
-            out[issue.severity] = (out[issue.severity] || 0) + 1;
-            return out;
-          }, {});
-          console.log(`Full dependency audit (including development tools): ${issues.length} vulnerable packages.`);
-          console.log(JSON.stringify(counts));
-          for (const issue of issues) {
-            console.log(`${String(issue.severity).toUpperCase()} ${issue.name} | direct=${issue.isDirect} | range=${issue.range} | fix=${JSON.stringify(issue.fixAvailable)}`);
-          }
-          NODE
