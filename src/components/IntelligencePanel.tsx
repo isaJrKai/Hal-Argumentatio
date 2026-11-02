@@ -277,7 +277,7 @@ export default function IntelligencePanel({
   const handleDeleteMessage = async (id: string) => {
     if (id === 'init') return;
     try {
-      const res = await fetch(`/api/intelligence/chat/message/${id}`, {
+      const res = await fetch(`/api/intelligence/chat/messages/${encodeURIComponent(id)}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`
