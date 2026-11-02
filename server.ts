@@ -9750,7 +9750,7 @@ async function startServer() {
       console.error('[Hermes Diagnostic Scan Error]', err);
       return res.status(500).json({ success: false, error: err.message || 'Diagnostic scan failed.' });
     }
-  });;
+  });
 
   // 7. Get Hermes Lab Chat Messages
   app.get('/api/hermes/chat', authenticate, async (req, res) => {
