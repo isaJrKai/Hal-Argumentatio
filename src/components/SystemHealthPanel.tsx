@@ -114,8 +114,12 @@ export default function SystemHealthPanel({ token }: SystemHealthPanelProps) {
     };
 
     const dbStarted = performance.now();
+    const readinessProbe = requestJson('/api/ready', false).then(
+      result => { setDbLatency(Math.round(performance.now() - dbStarted)); return result; },
+      error => { setDbLatency(Math.round(performance.now() - dbStarted)); throw error; }
+    );
     const [readyResult, aiResult, hermesResult, connectorResult, cryptoResult, schedulerResult, leadsResult, healthResult] = await Promise.allSettled([
-      requestJson('/api/ready', false),
+      readinessProbe,
       requestJson('/api/ai/engine-status'),
       requestJson('/api/hermes/status'),
       requestJson('/api/connectors/health'),
@@ -124,7 +128,6 @@ export default function SystemHealthPanel({ token }: SystemHealthPanelProps) {
       requestJson('/api/leads'),
       requestJson('/api/health', false)
     ]);
-    setDbLatency(Math.round(performance.now() - dbStarted));
 
     const value = (result: PromiseSettledResult<any>) => result.status === 'fulfilled' ? result.value : null;
     const failure = (result: PromiseSettledResult<any>) => result.status === 'rejected'
