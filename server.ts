@@ -5965,7 +5965,8 @@ app.get('/api/neural/network', authenticate, async (req, res) => {
     const lastActivity = [
       ...scopedLeads.map(lead => lead.createdAt),
       ...scopedOutcomes.map(record => record.closedAt),
-      ...scopedAds.map(record => record.date)
+      ...scopedAds.map(record => record.date),
+      ...scopedEvents.map(event => event.occurredAt)
     ].filter(Boolean).map(value => new Date(value as any).getTime()).filter(Number.isFinite);
     const telemetry = {
       scope: { city: cityFilter || null, niche: nicheFilter || null },
