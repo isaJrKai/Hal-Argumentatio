@@ -5823,10 +5823,11 @@ app.get('/api/neural/network', authenticate, async (req, res) => {
     if (!dbInstance) throw new Error('Neon/PostgreSQL is unavailable');
 
     // Every record below is scoped to the authenticated tenant before graph construction.
-    const [allLeads, allOutcomes, adsRows] = await Promise.all([
+    const [allLeads, allOutcomes, adsRows, recentEvents] = await Promise.all([
       dbInstance.select().from(leads).where(eq(leads.contractorId, contractorId)).orderBy(desc(leads.createdAt)).limit(1000),
       dbInstance.select().from(winLossRecords).where(eq(winLossRecords.contractorId, contractorId)).orderBy(desc(winLossRecords.closedAt)).limit(500),
-      dbInstance.select().from(googleAdsDailyPerformance).where(eq(googleAdsDailyPerformance.contractorId, contractorId)).orderBy(desc(googleAdsDailyPerformance.date)).limit(2000)
+      dbInstance.select().from(googleAdsDailyPerformance).where(eq(googleAdsDailyPerformance.contractorId, contractorId)).orderBy(desc(googleAdsDailyPerformance.date)).limit(2000),
+      getRecentWorkEvents(dbInstance, contractorId, 40)
     ]);
 
     const normalizedCity = cityFilter.toLowerCase();
@@ -5843,10 +5844,17 @@ app.get('/api/neural/network', authenticate, async (req, res) => {
       (!nicheFilter || (typeof record.campaignName === 'string' && record.campaignName.trim().length > 0 && record.campaignName.toLowerCase().includes(nicheFilter)))
     );
 
+    const scopedLeadIds = new Set(scopedLeads.map(lead => lead.id));
+    const scopedEvents = recentEvents.filter(event =>
+      !normalizedCity && !nicheFilter
+        ? true
+        : event.entityType === 'lead' && Boolean(event.entityId) && scopedLeadIds.has(event.entityId as string)
+    );
     const nodes: any[] = [
       { id: 'core_leads', label: 'Lead Pipeline', type: 'core', group: 1, size: 22, detail: scopedLeads.length + ' tenant leads in the selected territory and niche.' },
       { id: 'core_outcomes', label: 'Recorded Outcomes', type: 'core', group: 2, size: 22, detail: scopedOutcomes.length + ' recorded win/loss outcomes in this scope.' },
       { id: 'core_ads', label: 'Google Ads Observations', type: 'core', group: 3, size: 22, detail: scopedAds.length + ' tenant-owned Google Ads performance records matched this scope.' },
+      { id: 'core_events', label: 'Work History Events', type: 'core', group: 6, size: 18, detail: scopedEvents.length + ' tenant work-history events in this graph scope.' },
       {
         id: 'core_timesfm',
         label: 'TimesFM 2.5 Adapter',
@@ -5873,6 +5881,23 @@ app.get('/api/neural/network', authenticate, async (req, res) => {
     if (scopedLeads.length) addLink('core_leads', cityNodeId || nicheNodeId || 'core_outcomes', 3);
     if (scopedOutcomes.length) addLink('core_outcomes', nicheNodeId || cityNodeId || 'core_leads', 3);
     if (scopedAds.length) addLink('core_ads', nicheNodeId || cityNodeId || 'core_leads', 3);
+
+    scopedEvents.forEach(event => {
+      const nodeId = 'event_' + event.id;
+      nodes.push({
+        id: nodeId,
+        label: event.eventType,
+        detail: [event.summary, event.actorType + (event.actorId ? ':' + event.actorId : ''), event.sourceModule].filter(Boolean).join(' · '),
+        type: 'work_event',
+        group: 6,
+        size: 5,
+        createdAt: event.occurredAt
+      });
+      addLink('core_events', nodeId, 1);
+      if (event.entityType === 'lead' && event.entityId && scopedLeadIds.has(event.entityId)) {
+        addLink('lead_' + event.entityId, nodeId, 2);
+      }
+    });
 
     const leadIds = new Set(scopedLeads.map(lead => lead.id));
     scopedLeads.forEach(lead => {
@@ -5949,6 +5974,7 @@ app.get('/api/neural/network', authenticate, async (req, res) => {
       wins: totalWins,
       losses: totalLosses,
       googleAdsRecords: scopedAds.length,
+      workEvents: scopedEvents.length,
       campaignNodes: campaignGroups.size,
       totalNodes: nodes.length,
       totalLinks: links.length,
