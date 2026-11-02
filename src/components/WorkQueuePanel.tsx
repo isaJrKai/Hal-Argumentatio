@@ -1,5 +1,6 @@
 import { FormEvent, useCallback, useEffect, useState } from 'react';
 import { Bot, CheckCircle2, ListTodo, Loader2, Play, Plus, RefreshCw, ShieldCheck, XCircle } from 'lucide-react';
+import { readApiResponse } from '../lib/apiResponse';
 
 type WorkerCapability = { id: string; label: string; mode: string; canClaimTasks: boolean; supportedTaskTypes: string[]; description: string; configured?: boolean; };
 
@@ -40,13 +41,13 @@ export default function WorkQueuePanel({ token }: WorkQueuePanelProps) {
     setLoading(true); setError(null);
     try {
       const response = await fetch('/api/work-tasks?limit=100', { headers: { Authorization: `Bearer ${token}` } });
-      const body = await response.json();
+      const body = await readApiResponse<any>(response, 'Work queue request');
       if (!response.ok) throw new Error(body.error || 'Unable to load work queue.');
       setTasks(Array.isArray(body.tasks) ? body.tasks : []);
       try {
         const workerResponse = await fetch('/api/workers', { headers: { Authorization: `Bearer ${token}` } });
         if (workerResponse.ok) {
-          const workerBody = await workerResponse.json();
+          const workerBody = await readApiResponse<any>(workerResponse, 'Worker capability request');
           setWorkerCapabilities(Array.isArray(workerBody.workers) ? workerBody.workers : []);
         }
       } catch {
@@ -79,7 +80,7 @@ export default function WorkQueuePanel({ token }: WorkQueuePanelProps) {
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({ taskType, title: title.trim(), description: description.trim() || undefined, assignedWorker, priority, requiresApproval, ...(taskInput ? { input: taskInput } : {}) })
       });
-      const body = await response.json();
+      const body = await readApiResponse<any>(response, 'Create work item');
       if (!response.ok) throw new Error(body.error || 'Unable to create task.');
       setTitle(''); setDescription(''); setTaskType('research'); setInputJson('{}'); setRequiresApproval(false);
       await loadTasks();
@@ -95,7 +96,7 @@ export default function WorkQueuePanel({ token }: WorkQueuePanelProps) {
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({ status, ...(status === 'failed' ? { errorMessage: 'Marked failed by workspace operator.' } : {}) })
       });
-      const body = await response.json();
+      const body = await readApiResponse<any>(response, 'Update work item');
       if (!response.ok) throw new Error(body.error || 'Task update failed.');
       await loadTasks();
     } catch (err: any) { setError(err?.message || 'Task update failed.'); }
@@ -109,7 +110,7 @@ export default function WorkQueuePanel({ token }: WorkQueuePanelProps) {
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({ jsonrpc: '2.0', id: `work-${task.id}`, method: 'tools/call', params: { name: 'hal_execute_hermes_work_task', arguments: { taskId: task.id } } })
       });
-      const body = await response.json();
+      const body = await readApiResponse<any>(response, 'Hermes execution');
       if (!response.ok) throw new Error(body.error?.message || body.error || 'Hermes execution failed.');
       const result = body.structuredData || body.result?.structuredData;
       if (result?.success === false) throw new Error(result.error || 'Hermes could not complete this task.');
