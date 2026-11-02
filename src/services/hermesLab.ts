@@ -337,6 +337,7 @@ ${promptOverride || toolDef.defaultPrompt}
 Generate the complete, unshortened asset now in valid JSON format.`;
 
   let parsedResponse: any = null;
+  let generationEngine = 'deterministic_fallback';
 
   // Priority 1: OpenRouter (Hermes 3 / Hermes 4)
   if (!parsedResponse && (process.env.OPENROUTER_API_KEY || process.env.OPENROUTER_KEY)) {
@@ -350,6 +351,9 @@ Generate the complete, unshortened asset now in valid JSON format.`;
         true
       );
       parsedResponse = safeExtractJson(rawResult);
+      if (parsedResponse) generationEngine = 'nemotron';
+      if (parsedResponse) generationEngine = 'huggingface';
+      if (parsedResponse) generationEngine = 'openrouter';
     } catch (openRouterErr) {
       console.warn('[Hermes Lab] OpenRouter Hermes generation error, attempting cascade:', openRouterErr);
     }
@@ -386,6 +390,7 @@ Generate the complete, unshortened asset now in valid JSON format.`;
           }
         });
         parsedResponse = safeExtractJson(resp.text || '{}');
+        if (parsedResponse) generationEngine = 'gemini';
         if (parsedResponse) break;
       } catch (geminiErr: any) {
         console.info(`[Hermes Lab] Model ${model} unavailable (${geminiErr?.status || geminiErr?.message || 'error'}), trying fallback...`);
@@ -413,7 +418,10 @@ Generate the complete, unshortened asset now in valid JSON format.`;
   // Fallback 2: Deterministic resilient generator
   if (!parsedResponse || !parsedResponse.title) {
     parsedResponse = generateDeterministicLabFallback(toolId, parameters, contractorName, contractorCity);
+    generationEngine = 'deterministic_fallback';
   }
+
+  const artifactStatus = generationEngine === 'deterministic_fallback' ? 'draft' : 'ready';
 
   const artifactId = crypto.randomUUID();
   const title = parsedResponse.title || `${toolDef.name} - ${contractorName}`;
@@ -429,11 +437,11 @@ Generate the complete, unshortened asset now in valid JSON format.`;
       structuredData: parsedResponse.structuredData || {},
       renderedOutput: parsedResponse.renderedOutput || ''
     },
-    status: 'ready',
+    status: artifactStatus,
     metadata: {
       generatedAt: new Date().toISOString(),
       parameters,
-      engine: 'NousResearch/hermes-agent'
+      engine: generationEngine
     },
     createdBy: 'hermes_agent',
     createdAt: new Date(),
@@ -457,8 +465,8 @@ Generate the complete, unshortened asset now in valid JSON format.`;
       structuredData: parsedResponse.structuredData,
       renderedOutput: parsedResponse.renderedOutput
     },
-    status: 'ready',
-    executionSummary: parsedResponse.summary || `Successfully generated ${toolDef.name} artifact.`
+    status: artifactStatus,
+    executionSummary: parsedResponse.summary || `Generated ${toolDef.name} artifact using ${generationEngine}.`
   };
 }
 
