@@ -6469,12 +6469,6 @@ app.get('/api/financials/overview', authenticate, async (req, res) => {
 
 // ─── NEURAL NETWORK TOPOLOGY API ──────────────────────────────────────────────
 
-app.post('/api/neural/network/layout', authenticate, async (req, res) => {
-  // In a real app this would save to PostgreSQL, but for now we'll accept it and let the client rely on localStorage, 
-  // or we could implement a layout column. We'll return 200 OK to satisfy the client fetch.
-  res.json({ success: true, message: 'Layout sync received' });
-});
-
 // Manual neural-weight pruning is disabled until learned weights are tenant-scoped and independently validated.
 
 app.get('/api/neural/network', authenticate, async (req, res) => {
