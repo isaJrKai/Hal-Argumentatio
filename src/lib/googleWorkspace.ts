@@ -27,26 +27,30 @@ export const isGoogleWorkspaceConfigured = Boolean(
 );
 
 // Never initialize Firebase from the committed placeholder applet configuration.
+// Keep Workspace OAuth separate from the Firebase applet used for HAL account
+// sign-in. Otherwise the first initialized default app can silently override the
+// VITE_FIREBASE_* Workspace project configuration.
+const WORKSPACE_APP_NAME = 'hal-google-workspace';
 const app = isGoogleWorkspaceConfigured
-  ? (getApps().length === 0 ? initializeApp(firebaseConfig) : getApp())
+  ? (
+      getApps().some(existing => existing.name === WORKSPACE_APP_NAME)
+        ? getApp(WORKSPACE_APP_NAME)
+        : initializeApp(firebaseConfig, WORKSPACE_APP_NAME)
+    )
   : null;
 export const auth: Auth | null = app ? getAuth(app) : null;
 
 // Unified Provider with Google Drive, Calendar, and Gmail scopes
 const provider = new GoogleAuthProvider();
 provider.addScope('https://www.googleapis.com/auth/drive');
-provider.addScope('https://www.googleapis.com/auth/drive.file');
-provider.addScope('https://www.googleapis.com/auth/drive.metadata');
-provider.addScope('https://www.googleapis.com/auth/calendar.events');
 provider.addScope('https://www.googleapis.com/auth/calendar.readonly');
 provider.addScope('https://www.googleapis.com/auth/gmail.send');
-provider.addScope('https://www.googleapis.com/auth/gmail.readonly');
 
 let isSigningIn = false;
 let cachedAccessToken: string | null = null;
 
 try {
-  const savedToken = sessionStorage.getItem('google_workspace_access_token') || sessionStorage.getItem('gdrive_access_token');
+  const savedToken = sessionStorage.getItem('google_workspace_access_token');
   if (savedToken) {
     cachedAccessToken = savedToken;
   }
@@ -96,7 +100,6 @@ export const googleWorkspaceSignIn = async (): Promise<{ user: User; accessToken
     cachedAccessToken = credential.accessToken;
     try {
       sessionStorage.setItem('google_workspace_access_token', cachedAccessToken);
-      sessionStorage.setItem('gdrive_access_token', cachedAccessToken);
     } catch (e) {}
     return { user: result.user, accessToken: cachedAccessToken };
   } catch (error: any) {
@@ -156,37 +159,6 @@ export const listCalendarEvents = async (token: string): Promise<CalendarEvent[]
   }
   const data = await res.json();
   return data.items || [];
-};
-
-export const createCalendarEvent = async (
-  token: string, 
-  event: { summary: string; description: string; startTime: string; endTime: string; attendeeEmail?: string }
-): Promise<CalendarEvent> => {
-  const url = 'https://www.googleapis.com/calendar/v3/calendars/primary/events';
-  const body: any = {
-    summary: event.summary,
-    description: event.description,
-    start: { dateTime: event.startTime },
-    end: { dateTime: event.endTime }
-  };
-  if (event.attendeeEmail) {
-    body.attendees = [{ email: event.attendeeEmail }];
-  }
-
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${token}`,
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify(body)
-  });
-
-  if (!res.ok) {
-    const err = await res.json();
-    throw new Error(err.error?.message || 'Failed to create calendar consultation event');
-  }
-  return res.json();
 };
 
 // ─── Gmail Helpers ────────────────────────────────────────────────────────────

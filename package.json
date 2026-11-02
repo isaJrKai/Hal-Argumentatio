@@ -23,17 +23,12 @@
     "@fontsource/jetbrains-mono": "^5.2.8",
     "@google/genai": "^2.4.0",
     "@modelcontextprotocol/sdk": "^1.30.0",
-    "@tailwindcss/vite": "^4.1.14",
-    "@types/bcryptjs": "^3.0.0",
-    "@types/google.maps": "^3.65.2",
     "@vis.gl/react-google-maps": "^1.9.0",
-    "@vitejs/plugin-react": "^5.0.4",
     "bcryptjs": "^3.0.3",
     "d3": "^7.9.0",
     "dotenv": "^17.2.3",
     "drizzle-orm": "^0.45.2",
     "express": "^4.21.2",
-    "firebase": "^13.1.0",
     "leaflet": "^1.9.4",
     "lucide-react": "^0.546.0",
     "motion": "^12.23.24",
@@ -41,7 +36,6 @@
     "react": "^19.0.1",
     "react-dom": "^19.0.1",
     "recharts": "^3.9.2",
-    "vite": "^6.2.3",
     "zod": "^4.6.5"
   },
   "devDependencies": {
@@ -59,11 +53,16 @@
     "typescript": "~5.8.2",
     "vite": "^6.2.3",
     "vitest": "^5.0.0",
-    "drizzle-kit": "^0.31.10"
+    "drizzle-kit": "^0.31.10",
+    "@tailwindcss/vite": "^4.1.14",
+    "@types/bcryptjs": "^3.0.0",
+    "@types/google.maps": "^3.65.2",
+    "@vitejs/plugin-react": "^5.0.4"
   },
   "overrides": {
     "@esbuild-kit/core-utils": {
       "esbuild": "0.25.12"
     }
-  }
+  },
+  "packageManager": "bun@1.4.4"
 }
