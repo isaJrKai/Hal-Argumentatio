@@ -7,6 +7,9 @@ describe('HAL work task state machine', () => {
     expect(requiresWorkTaskApproval('contract', 'Sign agreement')).toBe(true);
     expect(requiresWorkTaskApproval('records', 'Archive client record')).toBe(true);
     expect(requiresWorkTaskApproval('billing', 'Transfer funds')).toBe(true);
+    expect(requiresWorkTaskApproval('outreach', 'Cold email outreach to 40 prospects')).toBe(true);
+    expect(requiresWorkTaskApproval('campaign', 'Launch campaign to selected leads')).toBe(true);
+    expect(requiresWorkTaskApproval('research', 'Draft an email for human review')).toBe(false);
     expect(requiresWorkTaskApproval('research', 'Find competitor pricing')).toBe(false);
     expect(requiresWorkTaskApproval('lead_follow_up', 'Review and follow up')).toBe(false);
   });

@@ -39,19 +39,19 @@ Every stage must preserve the tenant, entity identity and correlation ID. A lead
 - [x] Define shared operating contract.
 - [x] Add tenant-scoped append-only work-event schema and idempotent PostgreSQL bootstrap.
 - [x] Add event recording and tenant-scoped retrieval service.
-- [ ] Add authenticated timeline APIs and connect high-value operations to the ledger.
+- [x] Add authenticated timeline APIs and connect high-value operations to the ledger.
 
 ### Workflow integration
 - [ ] Inventory every module's read/write APIs and canonical entity ownership.
-- [ ] Connect map/prospect discovery to deduplicated CRM intake and bulk actions.
-- [ ] Connect lead audit, landing-page artifacts, outreach, contracts, client projects and revenue through canonical IDs.
+- [x] Connect map prospect selection to tenant-validated lead-linked work queue tasks.
+- [x] Connect lead grounding/audits, landing-page artifacts, outreach, project lifecycle and recorded revenue to canonical IDs (coverage remains incomplete and needs an end-to-end audit).
 - [x] Add an authenticated Work History view for persisted operational events.
 - [ ] Add saved collections, resume-work across modules and export flows.
 
 ### Intelligence and agents
-- [ ] Build shared, permission-filtered business context retrieval for Gemini, Nemotron and specialist agents.
+- [x] Inject bounded tenant-scoped live business context into HAL Assistant, Hermes and the MCP operational-context tool; Gemini/Nemotron standalone agent flows remain to be integrated.
 - [ ] Verify AMIS identity and capabilities against actual source and runtime configuration; do not assume AMIS is Hermes.
-- [ ] Add task assignment, agent execution receipts, retries, cancellation and approval queues.
+- [ ] Add task assignment, full executor claim/heartbeat/receipt protocol, retries, cancellation and approval queues. (A first Hermes-only registered asset task executor is now available; other workers remain assignment-only.)
 - [ ] Make agent telemetry and neural graph views derive from persisted execution events.
 
 ### Verification and release

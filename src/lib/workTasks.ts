@@ -16,7 +16,7 @@ const ALLOWED_TRANSITIONS: Record<WorkTaskStatus, WorkTaskStatus[]> = {
 };
 
 export function requiresWorkTaskApproval(taskType: string, title: string, description?: string | null): boolean {
-  return /(^|[._\s-])(send|dispatch|publish|spend|purchase|charge|refund|sign|execute[_\s]contract|delete|archive|revoke|transfer[_\s]funds|bulk[_\s]outreach)([._\s-]|$)/i.test(`${taskType} ${title} ${description || ''}`);
+  return /(^|[._\s-])(send|dispatch|publish|spend|purchase|charge|refund|sign|execute[_\s]contract|delete|archive|revoke|transfer[_\s]funds|bulk[_\s]outreach|email[_\s]blast|cold[_\s]email|email[_\s]outreach|sms[_\s]campaign|whatsapp[_\s]campaign|launch[_\s]campaign)([._\s-]|$)/i.test(`${taskType} ${title} ${description || ''}`);
 }
 
 export function canTransitionWorkTask(from: string, to: string): boolean {
