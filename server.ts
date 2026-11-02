@@ -2975,158 +2975,202 @@ app.post('/api/leads/harvest', authenticate, async (req, res) => {
 // Clean Additive Ingestion Endpoint: Appends discovered leads to pipeline without destructive purging
 app.post('/api/leads/ingest', authenticate, async (req, res) => {
   const contractorId = (req as any).contractorId;
-  const { leads: newLeads } = req.body;
+  const { leads: newLeads } = req.body || {};
 
-  if (!Array.isArray(newLeads) || newLeads.length === 0) {
-    return res.status(400).json({ error: 'An array of leads is required' });
+  if (!Array.isArray(newLeads) || newLeads.length === 0 || newLeads.length > 100) {
+    return res.status(400).json({ error: 'Provide between 1 and 100 harvested leads per import.' });
   }
 
   try {
-    const addedItems = [];
-    let queuedTasks = 0;
-    for (const hl of newLeads) {
-      const id = crypto.randomUUID();
-      const rawEmail = hl.email ? String(hl.email) : null;
-      const rawPhone = hl.phone ? String(hl.phone) : null;
-      const emailEncrypted = rawEmail ? encrypt(rawEmail) : null;
-      const phoneEncrypted = rawPhone ? encrypt(rawPhone) : null;
+    const existingRows = await pgDb.select({
+      businessName: leads.businessName,
+      city: leads.city,
+      niche: leads.niche
+    }).from(leads).where(eq(leads.contractorId, contractorId));
+    const normalize = (value: any) => String(value || '').trim().toLowerCase().replace(/\s+/g, ' ');
+    const seen = new Set(existingRows.map(row => [normalize(row.businessName), normalize(row.city), normalize(row.niche)].join('|')));
+    const accepted = [];
+    let skippedCount = 0;
 
-      // 1. Ingest into PostgreSQL
-      const [addedLead] = await pgDb.insert(leads).values({
-        id,
-        contractorId,
-        businessName: hl.businessName,
-        ownerName: hl.ownerName || 'Unknown Owner',
-        email: rawEmail ? '[ENCRYPTED]' : '',
-        phone: rawPhone ? '[ENCRYPTED]' : '',
-        emailEncrypted,
-        phoneEncrypted,
-        isSynthetic: Boolean(hl.isSynthetic),
-        sourceType: hl.sourceType || 'unknown',
-        city: hl.city,
-        niche: hl.serviceType,
-        source: 'harvested_intelligence',
-        status: 'new',
-        urgencyScore: null,
-        predictedLtv: null,
-        notes: hl.notes || `Harvested real business profile. Niche: ${hl.serviceType}.`,
-        websiteUrl: hl.websiteUrl,
-        performanceScore: null,
-        sslStatus: null,
-        reviewCount: null,
-        googleRating: null,
-        seoScore: null,
-        sentimentScore: null,
-        verificationStatus: (hl as any).verificationStatus || 'UNVERIFIED_STAGING',
-        dnsVerified: (hl as any).dnsVerified !== undefined ? Boolean((hl as any).dnsVerified) : false,
-        groundingEvidence: (hl as any).groundingEvidence || null,
-      }).returning();
-
-      // 2. Add lead creation event
-      await pgDb.insert(leadEvents).values({
-        id: crypto.randomUUID(),
-        leadId: addedLead.id,
-        eventType: 'LeadCreated',
-        newStage: 'new',
-        notes: `Harvested authentic local business via Live Territory Harvester.`
-      });
-
-      // 3. Keep in-memory store in sync
-      db.addLead({
-        id,
-        contractorId,
-        businessName: hl.businessName,
-        ownerName: hl.ownerName || undefined,
-        email: rawEmail || '',
-        phone: rawPhone || '',
-        city: hl.city,
-        serviceType: hl.serviceType,
-        source: 'harvested_intelligence',
-        status: 'new',
-        urgencyScore: null,
-        predictedLtvUsd: null,
-        notes: hl.notes || `Harvested real business profile. Niche: ${hl.serviceType}.`,
-        websiteUrl: hl.websiteUrl,
-        performanceScore: null,
-        sslStatus: null,
-        reviewCount: null,
-        googleRating: null,
-        seoScore: null,
-        sentimentScore: null,
-        sourceType: hl.sourceType || 'unknown',
-        isSynthetic: Boolean(hl.isSynthetic),
-        verificationStatus: (hl as any).verificationStatus || 'UNVERIFIED_STAGING',
-        dnsVerified: (hl as any).dnsVerified !== undefined ? Boolean((hl as any).dnsVerified) : false,
-        groundingEvidence: (hl as any).groundingEvidence || null,
-      });
-
-      addedItems.push(addedLead);
-
-      // Every imported prospect gets a human follow-up assignment in the durable queue.
-      // This is intentionally a review task: discovery/import does not verify a prospect
-      // or authorize outreach. The same lead/task pair is protected against active duplicates.
-      const [activeTask] = await pgDb.select({ id: workTasks.id }).from(workTasks).where(and(
-        eq(workTasks.contractorId, contractorId),
-        eq(workTasks.taskType, 'lead_follow_up'),
-        eq(workTasks.entityType, 'lead'),
-        eq(workTasks.entityId, addedLead.id),
-        eq(workTasks.assignedWorker, 'human'),
-        inArray(workTasks.status, ['queued', 'running', 'awaiting_approval'])
-      )).limit(1);
-
-      if (!activeTask) {
-        const taskId = 'task_' + crypto.randomUUID();
-        const correlationId = taskId;
-        const taskTitle = `Review and qualify: ${addedLead.businessName}`;
-        await pgDb.transaction(async tx => {
-          await tx.insert(workTasks).values({
-            id: taskId, contractorId, taskType: 'lead_follow_up',
-            title: taskTitle,
-            description: 'Review this Maps/territory prospect, confirm its business details and verification evidence, then record the next step in the lead workspace. Do not contact the prospect until the outreach verification gate passes.',
-            status: 'queued', priority: 'normal', assignedWorker: 'human',
-            entityType: 'lead', entityId: addedLead.id, correlationId,
-            input: { source: 'maps_territory_harvest', verificationStatus: addedLead.verificationStatus || 'UNVERIFIED_STAGING' },
-            requiresApproval: false, createdAt: new Date(), updatedAt: new Date()
-          });
-          await tx.insert(workEvents).values({
-            id: 'evt_' + crypto.randomUUID(), contractorId,
-            eventType: 'task.created', entityType: 'work_task', entityId: taskId,
-            actorType: 'system', actorId: 'territory_harvester', sourceModule: 'lead_ingestion',
-            correlationId, summary: `Created qualification task for ${addedLead.businessName}.`,
-            payload: { taskType: 'lead_follow_up', assignedWorker: 'human', priority: 'normal', status: 'queued', leadId: addedLead.id }
-          });
-          await tx.insert(workEvents).values({
-            id: 'evt_' + crypto.randomUUID(), contractorId,
-            eventType: 'lead.queued_for_review', entityType: 'lead', entityId: addedLead.id,
-            actorType: 'system', actorId: 'territory_harvester', sourceModule: 'lead_ingestion',
-            correlationId, summary: `${addedLead.businessName} was added to the human review queue.`,
-            payload: { taskId, verificationStatus: addedLead.verificationStatus || 'UNVERIFIED_STAGING' }
-          });
-        });
-        queuedTasks++;
+    for (const item of newLeads) {
+      if (!item || typeof item.businessName !== 'string' || !item.businessName.trim() ||
+          typeof item.city !== 'string' || !item.city.trim() ||
+          typeof item.serviceType !== 'string' || !item.serviceType.trim()) {
+        skippedCount++;
+        continue;
       }
+      const key = [normalize(item.businessName), normalize(item.city), normalize(item.serviceType)].join('|');
+      if (seen.has(key)) {
+        skippedCount++;
+        continue;
+      }
+      seen.add(key);
+      accepted.push(item);
     }
 
-    // 4. Log Audit Action
-    await pgDb.insert(auditLogs).values({
-      id: crypto.randomUUID(),
-      contractorId,
-      action: 'LEADS_INGESTED',
-      details: `Imported ${addedItems.length} territory prospect records; verification status is preserved and must pass before outreach.`
+    if (!accepted.length) {
+      return res.json({ success: true, count: 0, queuedTasks: 0, skippedCount, leads: [], message: 'No new unique prospects were found; existing leads were left unchanged.' });
+    }
+
+    const now = new Date();
+    const committed = await pgDb.transaction(async tx => {
+      const addedItems: any[] = [];
+      const legacyMirrors: any[] = [];
+
+      for (const item of accepted) {
+        const id = crypto.randomUUID();
+        const rawEmail = item.email ? String(item.email) : null;
+        const rawPhone = item.phone ? String(item.phone) : null;
+        const emailEncrypted = rawEmail ? encrypt(rawEmail) : null;
+        const phoneEncrypted = rawPhone ? encrypt(rawPhone) : null;
+        const verificationStatus = item.verificationStatus || 'UNVERIFIED_STAGING';
+        const dnsVerified = item.dnsVerified !== undefined ? Boolean(item.dnsVerified) : false;
+        const notes = item.notes || `Harvested business profile. Niche: ${item.serviceType}.`;
+
+        const [addedLead] = await tx.insert(leads).values({
+          id,
+          contractorId,
+          businessName: item.businessName.trim(),
+          ownerName: item.ownerName || 'Unknown Owner',
+          email: rawEmail ? '[ENCRYPTED]' : '',
+          phone: rawPhone ? '[ENCRYPTED]' : '',
+          emailEncrypted,
+          phoneEncrypted,
+          isSynthetic: Boolean(item.isSynthetic),
+          sourceType: item.sourceType || 'unknown',
+          city: item.city.trim(),
+          niche: item.serviceType.trim(),
+          source: 'harvested_intelligence',
+          status: 'new',
+          urgencyScore: null,
+          predictedLtv: null,
+          notes,
+          websiteUrl: item.websiteUrl || null,
+          performanceScore: null,
+          sslStatus: null,
+          reviewCount: null,
+          googleRating: null,
+          seoScore: null,
+          sentimentScore: null,
+          verificationStatus,
+          dnsVerified,
+          groundingEvidence: item.groundingEvidence || null,
+          createdAt: now,
+          updatedAt: now
+        }).returning();
+
+        await tx.insert(leadEvents).values({
+          id: crypto.randomUUID(),
+          leadId: addedLead.id,
+          eventType: 'LeadCreated',
+          newStage: 'new',
+          notes: 'Imported from the live territory harvester. Verification remains a separate step.'
+        });
+
+        const taskId = 'task_' + crypto.randomUUID();
+        const correlationId = taskId;
+        await tx.insert(workTasks).values({
+          id: taskId,
+          contractorId,
+          taskType: 'lead_follow_up',
+          title: `Review and qualify: ${addedLead.businessName}`,
+          description: 'Review this Maps/territory prospect, confirm its business details and verification evidence, then record the next step in the lead workspace. Do not contact the prospect until the outreach verification gate passes.',
+          status: 'queued',
+          priority: 'normal',
+          assignedWorker: 'human',
+          entityType: 'lead',
+          entityId: addedLead.id,
+          correlationId,
+          input: { source: 'maps_territory_harvest', verificationStatus },
+          requiresApproval: false,
+          createdAt: now,
+          updatedAt: now
+        });
+        await tx.insert(workEvents).values({
+          id: 'evt_' + crypto.randomUUID(),
+          contractorId,
+          eventType: 'task.created',
+          entityType: 'work_task',
+          entityId: taskId,
+          actorType: 'system',
+          actorId: 'territory_harvester',
+          sourceModule: 'lead_ingestion',
+          correlationId,
+          summary: `Created qualification task for ${addedLead.businessName}.`,
+          payload: { taskType: 'lead_follow_up', assignedWorker: 'human', priority: 'normal', status: 'queued', leadId: addedLead.id }
+        });
+        await tx.insert(workEvents).values({
+          id: 'evt_' + crypto.randomUUID(),
+          contractorId,
+          eventType: 'lead.queued_for_review',
+          entityType: 'lead',
+          entityId: addedLead.id,
+          actorType: 'system',
+          actorId: 'territory_harvester',
+          sourceModule: 'lead_ingestion',
+          correlationId,
+          summary: `${addedLead.businessName} was added to the human review queue.`,
+          payload: { taskId, verificationStatus }
+        });
+
+        addedItems.push(addedLead);
+        legacyMirrors.push({
+          id,
+          contractorId,
+          businessName: item.businessName.trim(),
+          ownerName: item.ownerName || undefined,
+          email: rawEmail || '',
+          phone: rawPhone || '',
+          city: item.city.trim(),
+          serviceType: item.serviceType.trim(),
+          source: 'harvested_intelligence',
+          status: 'new',
+          urgencyScore: null,
+          predictedLtvUsd: null,
+          notes,
+          websiteUrl: item.websiteUrl,
+          sourceType: item.sourceType || 'unknown',
+          isSynthetic: Boolean(item.isSynthetic),
+          verificationStatus,
+          dnsVerified,
+          groundingEvidence: item.groundingEvidence || null,
+          createdAt: now.toISOString(),
+          updatedAt: now.toISOString()
+        });
+      }
+
+      await tx.insert(auditLogs).values({
+        id: crypto.randomUUID(),
+        contractorId,
+        action: 'LEADS_INGESTED',
+        details: `Imported ${addedItems.length} unique territory prospects and created ${addedItems.length} human qualification tasks. Verification remains required before outreach.`
+      });
+      return { addedItems, legacyMirrors };
     });
 
-    // 5. Broadcast Real-time notification
+    // The JSON store is a temporary compatibility mirror only. A mirror failure
+    // must not undo or misreport the authoritative PostgreSQL transaction.
+    for (const legacyLead of committed.legacyMirrors) {
+      try { db.addLead(legacyLead); }
+      catch (mirrorError) { console.warn('[HAL Lead Ingest] Legacy mirror failed; PostgreSQL lead is committed.', mirrorError); }
+    }
+
     broadcastNotification(
       contractorId,
       'success',
       'Territory Leads Imported',
-      `Imported ${addedItems.length} business records. Review verification status before contacting them.`
+      `Imported ${committed.addedItems.length} unique prospects and created ${committed.addedItems.length} human review tasks. Verify each prospect before outreach.`
     );
-
-    res.json({ success: true, count: addedItems.length, queuedTasks, leads: addedItems });
+    return res.json({
+      success: true,
+      count: committed.addedItems.length,
+      queuedTasks: committed.addedItems.length,
+      skippedCount,
+      leads: committed.addedItems
+    });
   } catch (err: any) {
-    console.error('Failed to ingest leads:', err);
-    res.status(500).json({ error: err.message });
+    console.error('[HAL Lead Ingest] Atomic import failed:', err);
+    return res.status(503).json({ error: err.message || 'Lead import could not be committed. No partial import was reported as successful.' });
   }
 });
 
