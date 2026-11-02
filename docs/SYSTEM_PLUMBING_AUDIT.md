@@ -65,6 +65,28 @@ A workflow is considered connected only when its data is persisted in the author
 - Verify the deployed app's `/api/ready` result, database schema and real tenant workflows after publication.
 - Do not merge or claim live completion solely because CI passes.
 
+## Additional backlog reconciliation
+
+The older `AUDIT.md`, `docs/HAL_OPERATING_LAYER.md`, and sale-readiness notes contain overlapping work. Treat this section as a reconciliation guide, not proof that an item is complete.
+
+### Still outstanding or requiring live evidence
+- **Staff operations:** no named staff roster, employee invitation/onboarding, role-based assignment, or staff workload view is implemented. Current human assignment is a generic `human` worker.
+- **Communications:** SMS and WhatsApp are simulation-only. Resend email submission is implemented, but live sender verification, delivery webhook reconciliation, durable retries/dead-letter handling and production delivery tests still need evidence.
+- **Google Workspace:** Drive, read-only Calendar and Gmail-send flows require real Firebase/Google Cloud project configuration and browser verification. A successful build does not prove OAuth consent, scopes or provider access.
+- **Database consolidation:** connector credentials, scheduler records and other legacy domains still use JSON persistence. Migrate domain-by-domain with backups, reconciliation and rollback.
+- **Forecasting:** the TimesFM adapter and scheduled inference path need a real configured inference run and evidence that the returned forecast is persisted and evaluated. Provider configuration alone is not proof.
+- **Public API hardening:** review rate limits, payload size limits, CORS allowlists and tenant authorization on every public endpoint; add idempotency to ingestion and webhook routes.
+- **Frontend/backend contract:** inventory every frontend API call and verify its server route, authentication requirement, request schema and response shape. Remove or clearly disable controls with no implemented action.
+- **End-to-end acceptance:** test discovery -> lead -> audit -> page -> approved outreach -> close -> client project -> verified revenue, plus Hermes -> artifact -> work ledger, using a real isolated tenant and database.
+- **Release readiness:** run migrations and verify readiness on the deployed instance; complete browser sign-in, database persistence, tenant isolation, communications and recovery checks.
+
+### Previously recorded UI/performance backlog — reconcile before changing
+- Settings basic/advanced grouping, remaining theme-token cleanup, Operating Manual layout, lazy-loading heavy panels, and additional contractor landing templates were listed in the older audit. Re-check each against the current UI before implementing; do not assume the old notes are still accurate.
+- The old audit also mentioned browser-local Postgres URL storage and session-token display. Re-audit the current Settings implementation and remove any exposure of connection strings or bearer tokens before public release.
+
 ## Verification boundary
 
-CI type-check, automated tests and production build have passed on earlier commits in this PR; the newest head is still running its CI workflow. No live production database or browser workflow has been exercised by this audit.
+- Latest PR head: `5040c7f7571f48d4c90c069d8e0abde12b248f99`.
+- GitHub Actions CI run `41544141119` completed successfully: frozen Bun install, TimesFM Python syntax check, TypeScript + automated tests, production build, production dependency audit and full dependency audit report.
+- No live production database, deployed `/api/ready`, browser OAuth flow, real email delivery, or full cross-module end-to-end workflow has been exercised in this audit.
+- CI success is repository-level verification only. Do not merge, publish, or describe the application as production-verified until the live acceptance checks above are completed.
