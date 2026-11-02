@@ -23,7 +23,7 @@ export function analyzeCampaignPerformance(records: CampaignDailyRecord[], thres
 
   if (!valid.length) return { anomalies: [], screeningSignals: [], window: null };
 
-  const anchor = Math.max(...valid.map(record => record.dateValue));
+  const anchor = valid.reduce((latest, record) => Math.max(latest, record.dateValue), 0);
   const currentStart = anchor - 30 * 86400000;
   const previousStart = anchor - 60 * 86400000;
   const current: Record<string, CampaignTotals> = {};
