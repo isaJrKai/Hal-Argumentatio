@@ -109,7 +109,7 @@ export const HERMES_LAB_CATALOG: LabToolCatalogItem[] = [
     name: 'High-Converting Landing Page Studio',
     badge: 'HTML5 + Tailwind',
     category: 'web',
-    description: 'Generates standalone, mobile-responsive local service landing pages with pre-wired HAL GCLID/UTM attribution hooks, emergency click-to-call, and trust badges.',
+    description: 'Drafts standalone, mobile-responsive landing-page assets from supplied business facts. Attribution and click-to-call elements are included only when supported by supplied values; nothing is published automatically.',
     iconName: 'Layout',
     defaultPrompt: "Create a landing page using only the supplied workspace profile and parameters. Do not invent contact details, service areas, offers, licenses, reviews, guarantees, prices, or claims.",
     schemaSample: {
@@ -125,7 +125,7 @@ export const HERMES_LAB_CATALOG: LabToolCatalogItem[] = [
     name: 'Google Search Ads & Copy Studio',
     badge: '15 Headlines + 4 Descriptions',
     category: 'ads',
-    description: 'Generates high-converting Google Search ads tailored to local contractor queries with location insertion and ad waste prevention.',
+    description: 'Drafts Google Search ad variants from supplied campaign details and keywords. It does not create or launch live ad campaigns.',
     iconName: 'FileSpreadsheet',
     defaultPrompt: "Create search ad copy using only supplied business facts and parameters. Mark missing proof or offer details for operator review; do not invent performance claims.",
     schemaSample: {
@@ -139,7 +139,7 @@ export const HERMES_LAB_CATALOG: LabToolCatalogItem[] = [
     name: 'Google Search & Local Business Schema',
     badge: 'Search Rich Snippets',
     category: 'seo',
-    description: 'Produces Google-certified search structured markup so your business displays review star ratings, local service territories, business hours, and map locations directly on Google Search.',
+    description: 'Produces LocalBusiness structured-data markup from supplied verified fields. It omits unknown properties and does not guarantee rich-result display.',
     iconName: 'Code2',
     defaultPrompt: "Generate valid local-business structured data only from supplied verified fields. Omit unknown properties; never fabricate an address, coordinates, hours, ratings, or reviews.",
     schemaSample: {
@@ -154,7 +154,7 @@ export const HERMES_LAB_CATALOG: LabToolCatalogItem[] = [
     name: 'Stalled Quote & Lead Reactivation',
     badge: '3-Step Email + SMS',
     category: 'outreach',
-    description: 'Builds multi-touch follow-up messages for quotes that stalled past 7 days, addressing financing, warranty, and limited seasonal slots.',
+    description: 'Drafts multi-touch follow-up messages from supplied lead and deal context. It does not send messages or invent quote details.',
     iconName: 'Send',
     defaultPrompt: "Draft a follow-up sequence for the supplied lead or deal context. Draft only; do not send messages or invent customer history, quote values, deadlines, or promises.",
     schemaSample: {
@@ -168,7 +168,7 @@ export const HERMES_LAB_CATALOG: LabToolCatalogItem[] = [
     name: 'Automated Post-Job Review Collector',
     badge: 'Automated Review Flow',
     category: 'outreach',
-    description: 'Sends an automated, friendly SMS review prompt after a job is completed with a direct 1-tap Google Review link.',
+    description: 'Drafts a post-job review-request message and workflow. It does not send SMS or invent a review URL.',
     iconName: 'Star',
     defaultPrompt: "Draft a post-job review request flow using supplied job and business details. Draft only; do not send messages or invent a review link, job completion, or customer identity.",
     schemaSample: {
@@ -183,7 +183,7 @@ export const HERMES_LAB_CATALOG: LabToolCatalogItem[] = [
     name: 'Website Speed & Technical Health Audit',
     badge: 'Performance Audit',
     category: 'diagnostics',
-    description: 'Inspects page speed, security certificates (SSL), mobile responsiveness, and image sizes to recommend immediate ranking fixes.',
+    description: 'Evaluates supplied website measurements, audit output, and technical evidence. It does not independently crawl a site or measure live performance.',
     iconName: 'Zap',
     defaultPrompt: "Audit the supplied website measurements and evidence. If no measurements or URL are provided, state what evidence is missing instead of inventing scores or defects.",
     schemaSample: {
@@ -198,7 +198,7 @@ export const HERMES_LAB_CATALOG: LabToolCatalogItem[] = [
     name: 'Local Competitor Pricing & Offer Scanner',
     badge: 'Market Intelligence',
     category: 'reasoning',
-    description: 'Scans top local trade competitors, active promotions, and warranty terms to spot high-margin market opportunities.',
+    description: 'Analyzes supplied competitor records and market evidence, separating verified observations from hypotheses. It does not independently verify live competitor offers.',
     iconName: 'ShieldAlert',
     defaultPrompt: "Analyze competitors only from supplied competitor records or evidence. Separate verified observations from hypotheses; do not invent competitor names, prices, offers, or current promotions.",
     schemaSample: {
@@ -212,7 +212,7 @@ export const HERMES_LAB_CATALOG: LabToolCatalogItem[] = [
     name: 'CRM & Lead Form Data Connector',
     badge: 'Integration Bridge',
     category: 'diagnostics',
-    description: 'Connects Jobber, Housecall Pro, ServiceTitan, or custom website forms into HAL so new leads flow directly into your pipeline.',
+    description: 'Drafts webhook field mappings and adapter code from supplied source payloads and target schemas. It does not connect an external CRM by itself.',
     iconName: 'Cpu',
     defaultPrompt: "Design a CRM/webhook mapping from the supplied source payload and target schema. If either is missing, return the required fields and validation questions rather than inventing a provider payload.",
     schemaSample: {
@@ -226,7 +226,7 @@ export const HERMES_LAB_CATALOG: LabToolCatalogItem[] = [
     name: 'Search Terms Negative Keyword Miner',
     badge: 'Cost Protection',
     category: 'ads',
-    description: 'Analyzes search queries to extract negative keywords (e.g. "free", "diy", "jobs", "salary", "parts only") to prevent wasted Google Ads spend.',
+    description: 'Identifies negative-keyword candidates from supplied search terms and campaign context. Suggestions require operator review before use.',
     iconName: 'Filter',
     defaultPrompt: "Identify negative keyword candidates from supplied search terms and campaign context. Clearly distinguish evidence-backed terms from general suggestions.",
     schemaSample: {
@@ -240,7 +240,7 @@ export const HERMES_LAB_CATALOG: LabToolCatalogItem[] = [
     name: 'Deep Client Case Forensic Reasoner',
     badge: 'Nous Hermes Multi-Step',
     category: 'reasoning',
-    description: 'Executes structured multi-hypothesis forensic investigation on complex revenue decay, stalled deals, or unexplained CPA spikes.',
+    description: 'Analyzes supplied operational records and evidence to investigate business problems, distinguishing recorded facts from hypotheses and proposed tests.',
     iconName: 'BrainCircuit',
     defaultPrompt: "Investigate the supplied business symptom using recorded workspace evidence. Separate facts, hypotheses, and tests; do not invent spend, conversion rates, causes, or outcomes.",
     schemaSample: {
