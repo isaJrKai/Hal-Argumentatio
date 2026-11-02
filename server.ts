@@ -21,7 +21,7 @@ import {
   Recommendation
 } from './src/db/db';
 import { db as pgDb } from './src/db/index.ts';
-import { contractors, auditLogs, leads, leadEvents, revenueRecords, campaigns, winLossRecords, performanceSnapshots, recommendations, forecasts, learningInsights, chatMessages, chatProjects, chatConversations, missions, clientProjects, outreachSequences, apiKeys, notifications, schedulerJobs, leadAttribution, conversionOutbox, googleAdsDailyPerformance, revenueExperiments, revenueRecommendations, revenueRecommendationEvents, revenueSimulations, revenueOutcomes, communicationsOutbox, communicationsDeliveryEvents, halLoops, halLoopEvents, hermesLabArtifacts, hermesDiagnosticIncidents, hermesLabMessages, workEvents } from './src/db/schema.ts';
+import { contractors, auditLogs, leads, leadEvents, revenueRecords, campaigns, winLossRecords, performanceSnapshots, recommendations, forecasts, learningInsights, chatMessages, chatProjects, chatConversations, missions, clientProjects, outreachSequences, apiKeys, notifications, schedulerJobs, leadAttribution, conversionOutbox, googleAdsDailyPerformance, revenueExperiments, revenueRecommendations, revenueRecommendationEvents, revenueSimulations, revenueOutcomes, communicationsOutbox, communicationsDeliveryEvents, halLoops, halLoopEvents, hermesLabArtifacts, hermesDiagnosticIncidents, hermesLabMessages, workEvents, workTasks } from './src/db/schema.ts';
 import { eq, inArray, desc, and, or, like, sql, gte, lte } from 'drizzle-orm';
 import { 
   generateLearningFromOutcome, 
@@ -43,6 +43,7 @@ import { validateCrmTransition, isKnownCrmStage } from './src/lib/crmStateMachin
 import { buildFinancialSnapshotCore } from './src/lib/financialSnapshot';
 import { buildPasswordResetResponse } from './src/lib/passwordResetResponse';
 import { recordWorkEvent, getRecentWorkEvents, getEntityWorkEvents } from './src/lib/workLedger';
+import { canTransitionWorkTask, listWorkTasks, getWorkTask } from './src/lib/workTasks';
 import { resolvePublishedLandingPageOwner } from './src/lib/landingPageOwnership';
 import { validateLoopGate } from './src/lib/loopGating';
 import { 
@@ -483,6 +484,126 @@ app.get('/api/work-ledger', authenticate, async (req, res) => {
   } catch (err) {
     console.error('[HAL Work Ledger] Read failed:', err);
     return res.status(503).json({ error: 'Operational history is temporarily unavailable.' });
+  }
+});
+
+// ─── DURABLE HUMAN / AGENT TASK QUEUE ────────────────────────────────────────
+// Queue records define work ownership; creating a task does not silently execute it.
+app.get('/api/work-tasks', authenticate, async (req, res) => {
+  const contractorId = (req as any).contractorId;
+  const parsedLimit = Number(req.query.limit);
+  const limit = Number.isFinite(parsedLimit) && parsedLimit > 0 ? Math.min(100, Math.floor(parsedLimit)) : 50;
+  try {
+    const tasks = await listWorkTasks(pgDb, contractorId, limit);
+    return res.json({ tasks });
+  } catch (err) {
+    console.error('[HAL Work Tasks] List failed:', err);
+    return res.status(503).json({ error: 'Work queue is temporarily unavailable.' });
+  }
+});
+
+app.post('/api/work-tasks', authenticate, async (req, res) => {
+  const contractorId = (req as any).contractorId;
+  const body = req.body || {};
+  const taskType = typeof body.taskType === 'string' ? body.taskType.trim() : '';
+  const title = typeof body.title === 'string' ? body.title.trim() : '';
+  const description = typeof body.description === 'string' ? body.description.trim() : null;
+  const priority = body.priority || 'normal';
+  const assignedWorker = body.assignedWorker || 'human';
+  const entityType = typeof body.entityType === 'string' ? body.entityType.trim() : null;
+  const entityId = typeof body.entityId === 'string' ? body.entityId.trim() : null;
+  const input = body.input && typeof body.input === 'object' && !Array.isArray(body.input) ? body.input : null;
+  const requiresApproval = body.requiresApproval === true;
+  const allowedWorkers = ['human', 'hal_assistant', 'hermes', 'amis', 'gemini', 'nemotron'];
+  if (!taskType || taskType.length > 80 || !title || title.length > 180 ||
+      (description && description.length > 2000) ||
+      !['low', 'normal', 'high', 'urgent'].includes(priority) ||
+      !(allowedWorkers.includes(assignedWorker) || /^specialist:[a-z0-9_-]{1,60}$/.test(assignedWorker)) ||
+      Boolean(entityType) !== Boolean(entityId) ||
+      (body.input !== undefined && input === null) ||
+      (input && JSON.stringify(input).length > 20000)) {
+    return res.status(400).json({ error: 'Invalid task details. Check task type, title, priority, worker, entity pair and input size.' });
+  }
+
+  const taskId = 'task_' + crypto.randomUUID();
+  const correlationId = typeof body.correlationId === 'string' && body.correlationId.trim()
+    ? body.correlationId.trim().slice(0, 120) : taskId;
+  const initialStatus = requiresApproval ? 'awaiting_approval' : 'queued';
+  try {
+    const [task] = await pgDb.transaction(async tx => {
+      const [created] = await tx.insert(workTasks).values({
+        id: taskId, contractorId, taskType, title, description,
+        status: initialStatus, priority, assignedWorker,
+        entityType, entityId, correlationId, input,
+        requiresApproval, createdAt: new Date(), updatedAt: new Date()
+      }).returning();
+      await tx.insert(workEvents).values({
+        id: 'evt_' + crypto.randomUUID(), contractorId,
+        eventType: 'task.created', entityType: 'work_task', entityId: taskId,
+        actorType: 'human', actorId: contractorId, sourceModule: 'work_queue',
+        correlationId, summary: `Created task: ${title}.`,
+        payload: { taskType, assignedWorker, priority, status: initialStatus, entityType, entityId }
+      });
+      return [created];
+    });
+    return res.status(201).json({ task });
+  } catch (err) {
+    console.error('[HAL Work Tasks] Create failed:', err);
+    return res.status(503).json({ error: 'Unable to create the work task.' });
+  }
+});
+
+app.patch('/api/work-tasks/:id', authenticate, async (req, res) => {
+  const contractorId = (req as any).contractorId;
+  const taskId = String(req.params.id || '');
+  const nextStatus = typeof req.body?.status === 'string' ? req.body.status : '';
+  const output = req.body?.output && typeof req.body.output === 'object' && !Array.isArray(req.body.output) ? req.body.output : undefined;
+  const errorMessage = typeof req.body?.errorMessage === 'string' ? req.body.errorMessage.slice(0, 1000) : undefined;
+  try {
+    const current = await getWorkTask(pgDb, contractorId, taskId);
+    if (!current) return res.status(404).json({ error: 'Work task not found.' });
+    if (!canTransitionWorkTask(current.status, nextStatus)) {
+      return res.status(409).json({ error: `Task cannot move from ${current.status} to ${nextStatus || 'unknown'}.`, currentStatus: current.status });
+    }
+    if (nextStatus === 'running' && current.requiresApproval && !current.approvedAt) {
+      return res.status(403).json({ error: 'This task requires approval before execution.' });
+    }
+    const now = new Date();
+    const update: Record<string, any> = { status: nextStatus, updatedAt: now };
+    if (nextStatus === 'running') {
+      update.startedAt = current.startedAt || now;
+      update.attemptCount = current.attemptCount + 1;
+      update.errorMessage = null;
+    }
+    if (nextStatus === 'completed') update.completedAt = now;
+    if (nextStatus === 'failed') update.errorMessage = errorMessage || 'Task failed without a supplied reason.';
+    if (output !== undefined) {
+      if (JSON.stringify(output).length > 20000) return res.status(400).json({ error: 'Task output exceeds the 20 KB limit.' });
+      update.output = output;
+    }
+    if (current.status === 'awaiting_approval' && nextStatus === 'queued') {
+      update.approvedBy = contractorId;
+      update.approvedAt = now;
+    }
+    const updated = await pgDb.transaction(async tx => {
+      const [saved] = await tx.update(workTasks).set(update)
+        .where(and(eq(workTasks.id, taskId), eq(workTasks.contractorId, contractorId), eq(workTasks.status, current.status)))
+        .returning();
+      if (!saved) throw new Error('Task changed before this update could be committed.');
+      await tx.insert(workEvents).values({
+        id: 'evt_' + crypto.randomUUID(), contractorId,
+        eventType: 'task.status_changed', entityType: 'work_task', entityId: taskId,
+        actorType: 'human', actorId: contractorId, sourceModule: 'work_queue',
+        correlationId: current.correlationId || taskId,
+        summary: `Moved task "${current.title}" from ${current.status} to ${nextStatus}.`,
+        payload: { previousStatus: current.status, status: nextStatus, assignedWorker: current.assignedWorker }
+      });
+      return saved;
+    });
+    return res.json({ task: updated });
+  } catch (err: any) {
+    console.error('[HAL Work Tasks] Update failed:', err);
+    return res.status(409).json({ error: err?.message || 'Unable to update work task.' });
   }
 });
 
