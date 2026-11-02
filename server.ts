@@ -559,54 +559,37 @@ app.get('/api/staff', authenticate, async (req, res) => {
   try {
     const [members, assignedTasks] = await Promise.all([
       pgDb.select().from(staffMembers).where(eq(staffMembers.contractorId, contractorId)).orderBy(staffMembers.name),
-      pgDb.select({ assignedStaffId: workTasks.assignedStaffId, status: workTasks.status }).from(workTasks)
-        .where(and(eq(workTasks.contractorId, contractorId), inArray(workTasks.status, ['queued', 'running', 'awaiting_approval'])))
+      pgDb.select({ assignedStaffId: workTasks.assignedStaffId, status: workTasks.status }).from(workTasks).where(and(eq(workTasks.contractorId, contractorId), inArray(workTasks.status, ['queued', 'running', 'awaiting_approval'])))
     ]);
     const activeCounts = new Map<string, number>();
     for (const task of assignedTasks) if (task.assignedStaffId) activeCounts.set(task.assignedStaffId, (activeCounts.get(task.assignedStaffId) || 0) + 1);
-    return res.json({ staff: members.map(member => {
-      const activeTaskCount = activeCounts.get(member.id) || 0;
-      return { ...member, activeTaskCount, effectiveAvailability: getEffectiveStaffAvailability(member, activeTaskCount) };
-    }) });
+    return res.json({ staff: members.map(member => { const activeTaskCount = activeCounts.get(member.id) || 0; return { ...member, activeTaskCount, effectiveAvailability: getEffectiveStaffAvailability(member, activeTaskCount) }; }) });
   } catch (err) { console.error('[HAL Staff] List failed:', err); return res.status(503).json({ error: 'Staff directory is temporarily unavailable.' }); }
 });
-
 app.post('/api/staff', authenticate, async (req, res) => {
-  const contractorId = (req as any).contractorId;
-  const parsed = validateStaffInput(req.body);
+  const contractorId = (req as any).contractorId; const parsed = validateStaffInput(req.body);
   if (parsed.valid === false) return res.status(400).json({ error: parsed.error });
   try {
-    if (parsed.value.email) {
-      const [duplicate] = await pgDb.select({ id: staffMembers.id }).from(staffMembers).where(and(eq(staffMembers.contractorId, contractorId), eq(staffMembers.email, parsed.value.email))).limit(1);
-      if (duplicate) return res.status(409).json({ error: 'A staff member with this email already exists in this workspace.' });
-    }
+    if (parsed.value.email) { const [duplicate] = await pgDb.select({ id: staffMembers.id }).from(staffMembers).where(and(eq(staffMembers.contractorId, contractorId), eq(staffMembers.email, parsed.value.email))).limit(1); if (duplicate) return res.status(409).json({ error: 'A staff member with this email already exists in this workspace.' }); }
     const now = new Date();
     const [member] = await pgDb.transaction(async tx => {
       const [created] = await tx.insert(staffMembers).values({ id: 'staff_' + crypto.randomUUID(), contractorId, ...parsed.value, createdAt: now, updatedAt: now }).returning();
-      await tx.insert(workEvents).values({ id: 'evt_' + crypto.randomUUID(), contractorId, eventType: 'staff.created', entityType: 'staff_member', entityId: created.id, actorType: 'human', actorId: contractorId, sourceModule: 'staff_directory', correlationId: created.id, summary: `Added staff member ${created.name} (${created.role}).`, payload: { role: created.role, status: created.status, availability: created.availability } });
-      return [created];
+      await tx.insert(workEvents).values({ id: 'evt_' + crypto.randomUUID(), contractorId, eventType: 'staff.created', entityType: 'staff_member', entityId: created.id, actorType: 'human', actorId: contractorId, sourceModule: 'staff_directory', correlationId: created.id, summary: `Added staff member ${created.name} (${created.role}).`, payload: { role: created.role, status: created.status, availability: created.availability } }); return [created];
     });
     return res.status(201).json({ staff: member });
   } catch (err) { console.error('[HAL Staff] Create failed:', err); return res.status(503).json({ error: 'Unable to create staff record.' }); }
 });
-
 app.patch('/api/staff/:id', authenticate, async (req, res) => {
-  const contractorId = (req as any).contractorId;
-  const staffId = String(req.params.id || '');
-  const parsed = validateStaffInput(req.body);
+  const contractorId = (req as any).contractorId; const staffId = String(req.params.id || ''); const parsed = validateStaffInput(req.body);
   if (parsed.valid === false) return res.status(400).json({ error: parsed.error });
   try {
     const [current] = await pgDb.select().from(staffMembers).where(and(eq(staffMembers.id, staffId), eq(staffMembers.contractorId, contractorId))).limit(1);
     if (!current) return res.status(404).json({ error: 'Staff member not found.' });
-    if (parsed.value.email) {
-      const [duplicate] = await pgDb.select({ id: staffMembers.id }).from(staffMembers).where(and(eq(staffMembers.contractorId, contractorId), eq(staffMembers.email, parsed.value.email))).limit(1);
-      if (duplicate && duplicate.id !== staffId) return res.status(409).json({ error: 'A staff member with this email already exists in this workspace.' });
-    }
+    if (parsed.value.email) { const [duplicate] = await pgDb.select({ id: staffMembers.id }).from(staffMembers).where(and(eq(staffMembers.contractorId, contractorId), eq(staffMembers.email, parsed.value.email))).limit(1); if (duplicate && duplicate.id !== staffId) return res.status(409).json({ error: 'A staff member with this email already exists in this workspace.' }); }
     const now = new Date();
     const updated = await pgDb.transaction(async tx => {
       const [saved] = await tx.update(staffMembers).set({ ...parsed.value, updatedAt: now }).where(and(eq(staffMembers.id, staffId), eq(staffMembers.contractorId, contractorId))).returning();
-      await tx.insert(workEvents).values({ id: 'evt_' + crypto.randomUUID(), contractorId, eventType: 'staff.updated', entityType: 'staff_member', entityId: staffId, actorType: 'human', actorId: contractorId, sourceModule: 'staff_directory', correlationId: staffId, summary: `Updated staff member ${saved.name}.`, payload: { previousRole: current.role, role: saved.role, previousStatus: current.status, status: saved.status, availability: saved.availability } });
-      return saved;
+      await tx.insert(workEvents).values({ id: 'evt_' + crypto.randomUUID(), contractorId, eventType: 'staff.updated', entityType: 'staff_member', entityId: staffId, actorType: 'human', actorId: contractorId, sourceModule: 'staff_directory', correlationId: staffId, summary: `Updated staff member ${saved.name}.`, payload: { previousRole: current.role, role: saved.role, previousStatus: current.status, status: saved.status, availability: saved.availability } }); return saved;
     });
     return res.json({ staff: updated });
   } catch (err) { console.error('[HAL Staff] Update failed:', err); return res.status(503).json({ error: 'Unable to update staff record.' }); }
@@ -717,16 +700,14 @@ app.post('/api/work-tasks', authenticate, async (req, res) => {
 });
 
 app.patch('/api/work-tasks/:id', authenticate, async (req, res) => {
-  const contractorId = (req as any).contractorId;
-  const taskId = String(req.params.id || '');
+  const contractorId = (req as any).contractorId; const taskId = String(req.params.id || '');
   const nextStatus = typeof req.body?.status === 'string' ? req.body.status : '';
   const hasAssignmentChange = Object.prototype.hasOwnProperty.call(req.body || {}, 'assignedStaffId');
   const nextStaffId = req.body?.assignedStaffId === null || req.body?.assignedStaffId === '' ? null : typeof req.body?.assignedStaffId === 'string' ? req.body.assignedStaffId.trim() : undefined;
   const output = req.body?.output && typeof req.body.output === 'object' && !Array.isArray(req.body.output) ? req.body.output : undefined;
   const errorMessage = typeof req.body?.errorMessage === 'string' ? req.body.errorMessage.slice(0, 1000) : undefined;
   try {
-    const current = await getWorkTask(pgDb, contractorId, taskId);
-    if (!current) return res.status(404).json({ error: 'Work task not found.' });
+    const current = await getWorkTask(pgDb, contractorId, taskId); if (!current) return res.status(404).json({ error: 'Work task not found.' });
     if (hasAssignmentChange) {
       if (nextStaffId === undefined) return res.status(400).json({ error: 'assignedStaffId must be a staff ID or null.' });
       if (current.assignedWorker !== 'human') return res.status(409).json({ error: 'Named staff ownership applies only to human-assigned tasks.' });
@@ -748,8 +729,7 @@ app.patch('/api/work-tasks/:id', authenticate, async (req, res) => {
     const now = new Date(); const update: Record<string, any> = { updatedAt: now };
     if (nextStatus) update.status = nextStatus; if (hasAssignmentChange) update.assignedStaffId = nextStaffId;
     if (nextStatus === 'running') { update.startedAt = current.startedAt || now; update.attemptCount = current.attemptCount + 1; update.errorMessage = null; }
-    if (nextStatus === 'completed') update.completedAt = now;
-    if (nextStatus === 'failed') update.errorMessage = errorMessage || 'Task failed without a supplied reason.';
+    if (nextStatus === 'completed') update.completedAt = now; if (nextStatus === 'failed') update.errorMessage = errorMessage || 'Task failed without a supplied reason.';
     if (output !== undefined) { if (JSON.stringify(output).length > 20000) return res.status(400).json({ error: 'Task output exceeds the 20 KB limit.' }); update.output = output; }
     if (current.status === 'awaiting_approval' && nextStatus === 'queued') { update.approvedBy = contractorId; update.approvedAt = now; }
     const updated = await pgDb.transaction(async tx => {
@@ -10597,7 +10577,7 @@ async function startServer() {
     try {
       const sequences = db.getOutreachSequences(contractorId);
       const outbox = await pgDb.select().from(conversionOutbox).where(eq(conversionOutbox.contractorId, contractorId));
-      const jobs = db.getSchedulerJobs(contractorId);
+      const jobs = await pgDb.select().from(schedulerJobs).where(eq(schedulerJobs.contractorId, contractorId)).orderBy(desc(schedulerJobs.createdAt));
       const verification = verifyPhase3Pillars(sequences, outbox, jobs);
 
       const auditBlock = db.recordLedgerEntry({
