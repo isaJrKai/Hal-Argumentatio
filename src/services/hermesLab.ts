@@ -463,530 +463,80 @@ Generate the complete, unshortened asset now in valid JSON format.`;
 }
 
 function generateDeterministicLabFallback(
-  toolId: LabToolType, 
-  parameters: any, 
-  company: string, 
+  toolId: LabToolType,
+  parameters: any,
+  company: string,
   city: string
 ): any {
-  if (toolId === 'landing_page') {
-    const phone = parameters?.phone || '(214) 555-0199';
-    const niche = parameters?.niche || 'Emergency HVAC & Diagnostic Repair';
-    const cleanPhone = phone.replace(/[^0-9]/g, '');
+  const supplied = parameters && typeof parameters === 'object' && !Array.isArray(parameters)
+    ? parameters
+    : {};
+  const workspace = {
+    company: company && company !== 'the current workspace' ? company : null,
+    territory: city && city !== 'territory not recorded' ? city : null
+  };
+  const title = `${workspace.company || 'Workspace'} — ${toolId.replace(/_/g, ' ')} draft`;
+  const structuredData = {
+    status: 'draft_requires_operator_review',
+    generatedBy: 'deterministic_fallback',
+    toolId,
+    workspace,
+    suppliedParameters: supplied,
+    limitations: [
+      'No live research, website crawl, campaign access, CRM connection, or external communication was performed.',
+      'Unknown business facts were not inferred.',
+      'Review all supplied values and complete missing fields before publishing or using this artifact.'
+    ]
+  };
 
-    return {
-      title: `${company} - Editorial Field Diagnostic & Service Spec Sheet`,
-      summary: `Human-crafted landing page with tactile typography (Instrument Serif + Instrument Sans + JetBrains Mono), interactive symptom diagnostic selector, itemized price ledger, and master license registry for ${city}.`,
-      structuredData: { company, city, niche, phone },
-      renderedOutput: `<!DOCTYPE html>
-<html lang="en" class="scroll-smooth">
+  // A provider outage must never be replaced with fabricated phone numbers,
+  // addresses, licenses, testimonials, pricing, performance metrics, or customers.
+  const renderedOutput = toolId === 'landing_page'
+    ? `<!doctype html>
+<html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>${company} | Technical Diagnostic & Service Dispatch — ${city}</title>
-  
-  <!-- Human-Crafted Typography Pairings: Instrument Serif + Instrument Sans + JetBrains Mono -->
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
-  
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script>
-    tailwind.config = {
-      theme: {
-        extend: {
-          fontFamily: {
-            serif: ['"Instrument Serif"', 'Georgia', 'serif'],
-            sans: ['"Instrument Sans"', '-apple-system', 'BlinkMacSystemFont', 'sans-serif'],
-            mono: ['"JetBrains Mono"', 'monospace'],
-          },
-          colors: {
-            paper: {
-              50: '#FDFCF7',
-              100: '#F7F6F0',
-              200: '#EBE9DF',
-              300: '#DCD9CE',
-              border: '#E2DFD4',
-            },
-            ink: {
-              950: '#141517',
-              900: '#1C1D21',
-              800: '#2B2D33',
-              600: '#5C5F66',
-              400: '#8A8D96',
-            },
-            terracotta: {
-              600: '#9A3412',
-              700: '#7C2D12',
-            },
-            pine: {
-              700: '#1B4332',
-              800: '#143527',
-            }
-          }
-        }
-      }
-    }
-  </script>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>${workspace.company || 'Business name required'}</title>
+  <style>
+    :root { color-scheme: light; font-family: Georgia, serif; background: #f7f6f0; color: #20231f; }
+    body { margin: 0; padding: 3rem 1.25rem; }
+    main { max-width: 56rem; margin: 0 auto; }
+    .eyebrow { font: 600 .75rem/1.4 ui-monospace, monospace; letter-spacing: .12em; text-transform: uppercase; color: #526456; }
+    h1 { max-width: 12ch; margin: 1rem 0; font-size: clamp(2.5rem, 8vw, 5.5rem); line-height: .98; font-weight: 400; }
+    p { max-width: 42rem; line-height: 1.7; color: #555b54; }
+    section { margin-top: 3rem; padding-top: 1.5rem; border-top: 1px solid #d8d9ce; }
+    .notice { padding: 1rem; border: 1px solid #b9a77a; background: #fffdf4; font: .9rem/1.6 ui-monospace, monospace; }
+  </style>
 </head>
-<body class="bg-paper-100 text-ink-900 font-sans antialiased selection:bg-ink-950 selection:text-paper-50">
-
-  <!-- Minimalist Technical Dispatch Ticker -->
-  <aside class="border-b border-paper-border bg-paper-50 px-4 py-2 text-xs font-mono">
-    <div class="max-w-6xl mx-auto flex flex-wrap items-center justify-between gap-3 text-ink-600">
-      <div class="flex items-center gap-2.5">
-        <span class="inline-block w-2 h-2 rounded-full bg-emerald-600 animate-pulse"></span>
-        <span class="font-medium text-ink-950 uppercase tracking-tight font-sans">Active Field Coverage:</span>
-        <span>${city} (Avg response: 34 mins)</span>
-      </div>
-      <div class="flex items-center gap-4 text-[11px]">
-        <span>TDLR TACLA #048291C</span>
-        <span class="text-paper-border">|</span>
-        <span>EPA 608 Universal</span>
-        <span class="text-paper-border">|</span>
-        <a href="tel:${cleanPhone}" class="text-terracotta-600 font-semibold hover:underline">
-          Direct Line: ${phone}
-        </a>
-      </div>
-    </div>
-  </aside>
-
-  <!-- Editorial Main Container -->
-  <main class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-10 lg:py-16 space-y-16">
-
-    <!-- Hero Header: Asymmetric, High Density, Conviction -->
-    <section class="grid lg:grid-cols-12 gap-10 lg:gap-14 items-start">
-      
-      <div class="lg:col-span-7 space-y-6">
-        <div class="inline-flex items-center gap-2 px-2.5 py-1 rounded-md bg-paper-200/80 border border-paper-border text-[11px] font-mono text-ink-800">
-          <span>TX-METRO DIVISION</span>
-          <span class="text-ink-400">•</span>
-          <span>DISPATCH LOG OPEN</span>
-        </div>
-
-        <h1 class="text-4xl sm:text-5xl lg:text-6xl font-serif text-ink-950 leading-[1.08] tracking-tight">
-          When the cooling fails, you don't need a salesman. <br class="hidden sm:inline"/>
-          <span class="italic font-normal text-terracotta-600">You need an honest technician with parts on the truck.</span>
-        </h1>
-
-        <p class="text-ink-600 text-base sm:text-lg leading-relaxed font-normal max-w-xl">
-          ${company} operates strictly on non-commissioned master diagnostics. We test electrical draw, check refrigerant subcooling, and hand you an itemized line-item spec sheet before touching a single screw.
-        </p>
-
-        <!-- Proof & Policy Strip -->
-        <div class="pt-2 border-t border-paper-border grid sm:grid-cols-3 gap-4 text-xs">
-          <div>
-            <span class="font-mono text-[10px] text-ink-400 block uppercase">Diagnostics</span>
-            <span class="font-medium text-ink-900 block mt-0.5">$0 With Repair</span>
-          </div>
-          <div>
-            <span class="font-mono text-[10px] text-ink-400 block uppercase">Parts Warranty</span>
-            <span class="font-medium text-ink-900 block mt-0.5">2-Year Full Replacement</span>
-          </div>
-          <div>
-            <span class="font-mono text-[10px] text-ink-400 block uppercase">Pricing Policy</span>
-            <span class="font-medium text-ink-900 block mt-0.5">Upfront Itemized Ledger</span>
-          </div>
-        </div>
-
-        <!-- Action Dial & Estimate Trigger -->
-        <div class="flex flex-wrap items-center gap-3 pt-2">
-          <a href="tel:${cleanPhone}" class="px-5 py-3 rounded-md bg-ink-950 hover:bg-ink-900 text-paper-50 text-sm font-medium transition-all shadow-sm">
-            Call Journeyman Line (${phone})
-          </a>
-          <a href="#diagnostic-selector" class="px-5 py-3 rounded-md bg-paper-50 hover:bg-paper-200/60 border border-paper-border text-ink-800 text-sm font-medium transition-colors">
-            View Live Symptom Diagnostic Tool ↓
-          </a>
-        </div>
-      </div>
-
-      <!-- Right Column: Direct Dispatch Request Box -->
-      <div class="lg:col-span-5">
-        <div class="bg-paper-50 border border-paper-border rounded-lg p-6 shadow-sm space-y-5 relative">
-          
-          <div class="flex items-center justify-between border-b border-paper-border pb-3">
-            <div>
-              <span class="text-[10px] font-mono uppercase tracking-wider text-ink-400 block">Immediate Ticket</span>
-              <h2 class="text-base font-semibold text-ink-950">Schedule Same-Day Dispatch</h2>
-            </div>
-            <span class="px-2 py-0.5 rounded bg-pine-700/10 text-pine-700 text-[10px] font-mono font-medium">
-              VANS IN ${city.toUpperCase()}
-            </span>
-          </div>
-
-          <form class="space-y-3.5" onsubmit="event.preventDefault(); alert('Dispatch ticket created and wired to HAL Outbox.');">
-            <!-- HAL Attribution Hidden Inputs -->
-            <input type="hidden" name="gclid" id="gclid_field" value="" />
-            <input type="hidden" name="utm_source" id="utm_source_field" value="" />
-            <input type="hidden" name="utm_medium" id="utm_medium_field" value="" />
-            <input type="hidden" name="utm_campaign" id="utm_campaign_field" value="" />
-
-            <div>
-              <label class="block text-[11px] font-mono text-ink-600 uppercase mb-1">Your Full Name</label>
-              <input type="text" required placeholder="e.g. David Martinez" class="w-full bg-paper-100 border border-paper-border rounded-md px-3 py-2 text-sm text-ink-950 focus:outline-none focus:border-ink-900 focus:bg-white transition-colors" />
-            </div>
-
-            <div class="grid grid-cols-2 gap-2">
-              <div>
-                <label class="block text-[11px] font-mono text-ink-600 uppercase mb-1">Phone Number</label>
-                <input type="tel" required placeholder="(214) 555-0100" class="w-full bg-paper-100 border border-paper-border rounded-md px-3 py-2 text-sm text-ink-950 focus:outline-none focus:border-ink-900 focus:bg-white transition-colors" />
-              </div>
-              <div>
-                <label class="block text-[11px] font-mono text-ink-600 uppercase mb-1">ZIP Code (${city})</label>
-                <input type="text" required placeholder="75201" class="w-full bg-paper-100 border border-paper-border rounded-md px-3 py-2 text-sm text-ink-950 focus:outline-none focus:border-ink-900 focus:bg-white transition-colors" />
-              </div>
-            </div>
-
-            <div>
-              <label class="block text-[11px] font-mono text-ink-600 uppercase mb-1">Primary Problem</label>
-              <select id="problem_dropdown" class="w-full bg-paper-100 border border-paper-border rounded-md px-3 py-2 text-sm text-ink-950 focus:outline-none focus:border-ink-900 focus:bg-white transition-colors">
-                <option value="warm_air">AC blowing warm / room temp air</option>
-                <option value="frozen_coil">Ice or frost on outdoor/indoor lines</option>
-                <option value="buzzing">Loud electrical buzzing / tripping breaker</option>
-                <option value="water_leak">Water overflowing from drain pan</option>
-                <option value="seasonal_check">Comprehensive seasonal tune-up & amp check</option>
-              </select>
-            </div>
-
-            <button type="submit" class="w-full py-3 rounded-md bg-terracotta-600 hover:bg-terracotta-700 text-white font-medium text-sm transition-colors cursor-pointer shadow-sm">
-              Dispatch Technician & Lock In $0 Diagnostic
-            </button>
-
-            <p class="text-[11px] text-center text-ink-400 font-mono">
-              Direct dispatch • No spam • Verified license guarantee
-            </p>
-          </form>
-
-        </div>
-      </div>
-
+<body>
+  <main>
+    <div class="eyebrow">Draft · operator review required</div>
+    <h1>${workspace.company || 'Your business name'}</h1>
+    <p>${supplied.niche || 'Add your verified services and explain the work you do.'}</p>
+    <section>
+      <h2>Services</h2>
+      <p>${Array.isArray(supplied.serviceHighlights) && supplied.serviceHighlights.length ? supplied.serviceHighlights.join(' · ') : 'Add verified service descriptions.'}</p>
     </section>
-
-    <!-- Interactive Section: Symptom & Diagnostic Spec Selector (Tactile Micro-Detail) -->
-    <section id="diagnostic-selector" class="border border-paper-border bg-paper-50 rounded-lg p-6 sm:p-8 space-y-6">
-      <div class="flex flex-col sm:flex-row sm:items-end justify-between gap-4 border-b border-paper-border pb-4">
-        <div>
-          <span class="text-[10px] font-mono uppercase tracking-wider text-ink-400">Interactive Diagnostic Engine</span>
-          <h2 class="text-2xl font-serif text-ink-950 mt-0.5">What is your system experiencing?</h2>
-        </div>
-        <p class="text-xs text-ink-600 max-w-sm">
-          Select your symptom to see what our technicians test, what replacement parts are stocked in our vans, and estimated repair ranges.
-        </p>
-      </div>
-
-      <!-- Symptom Selector Buttons -->
-      <div class="grid sm:grid-cols-4 gap-2 text-xs">
-        <button onclick="setSymptom('warm_air')" id="btn-warm_air" class="symptom-btn text-left p-3 rounded-md border border-ink-950 bg-ink-950 text-paper-50 transition-all">
-          <span class="font-mono text-[10px] block opacity-70">SYMPTOM 01</span>
-          <span class="font-semibold block mt-1">AC Blowing Warm Air</span>
-        </button>
-
-        <button onclick="setSymptom('frozen_coil')" id="btn-frozen_coil" class="symptom-btn text-left p-3 rounded-md border border-paper-border bg-paper-100 hover:bg-paper-200/50 text-ink-900 transition-all">
-          <span class="font-mono text-[10px] block text-ink-400">SYMPTOM 02</span>
-          <span class="font-semibold block mt-1">Frozen Lines / Ice</span>
-        </button>
-
-        <button onclick="setSymptom('water_leak')" id="btn-water_leak" class="symptom-btn text-left p-3 rounded-md border border-paper-border bg-paper-100 hover:bg-paper-200/50 text-ink-900 transition-all">
-          <span class="font-mono text-[10px] block text-ink-400">SYMPTOM 03</span>
-          <span class="font-semibold block mt-1">Water Leaking Indoors</span>
-        </button>
-
-        <button onclick="setSymptom('buzzing')" id="btn-buzzing" class="symptom-btn text-left p-3 rounded-md border border-paper-border bg-paper-100 hover:bg-paper-200/50 text-ink-900 transition-all">
-          <span class="font-mono text-[10px] block text-ink-400">SYMPTOM 04</span>
-          <span class="font-semibold block mt-1">Buzzing or Tripping</span>
-        </button>
-      </div>
-
-      <!-- Dynamic Diagnostic Card Output -->
-      <div id="diagnostic-display" class="bg-paper-100 border border-paper-border rounded-md p-5 grid md:grid-cols-3 gap-6 text-xs">
-        <div class="space-y-1.5">
-          <span class="font-mono text-[10px] text-ink-400 uppercase block">1. Most Likely Culprit</span>
-          <div id="disp-culprit" class="font-semibold text-ink-950 text-sm">Failed Dual Run Capacitor or Contactor</div>
-          <p id="disp-culprit-desc" class="text-ink-600 leading-relaxed text-[11px]">
-            The outdoor fan spins or hums, but compressor cannot initiate start cycle due to microfarad decay.
-          </p>
-        </div>
-
-        <div class="space-y-1.5 border-t md:border-t-0 md:border-l border-paper-border pt-4 md:pt-0 md:pl-6">
-          <span class="font-mono text-[10px] text-ink-400 uppercase block">2. On-Site Diagnostic Step</span>
-          <div id="disp-step" class="font-semibold text-ink-950 text-sm">Multimeter Capacitance & Amp Draw Test</div>
-          <p id="disp-step-desc" class="text-ink-600 leading-relaxed text-[11px]">
-            We test µF rating under full load and verify contactor points for electrical pitting or carbon buildup.
-          </p>
-        </div>
-
-        <div class="space-y-1.5 border-t md:border-t-0 md:border-l border-paper-border pt-4 md:pt-0 md:pl-6">
-          <span class="font-mono text-[10px] text-ink-400 uppercase block">3. Upfront Standard Rate</span>
-          <div id="disp-price" class="font-semibold text-terracotta-600 text-sm font-mono">$135 – $195 Flat Total</div>
-          <p class="text-ink-600 leading-relaxed text-[11px]">
-            Includes heavy-duty 45/5µF Titan PRO capacitor + 2-year replacement warranty.
-          </p>
-        </div>
-      </div>
+    <section>
+      <h2>Service area</h2>
+      <p>${workspace.territory || supplied.city || 'Add your verified service area.'}</p>
     </section>
-
-    <!-- Itemized Service & Price Ledger (No AI 3-Tier Boxes) -->
-    <section class="space-y-4">
-      <div class="flex flex-col sm:flex-row sm:items-baseline justify-between gap-2 border-b border-paper-border pb-3">
-        <h2 class="text-2xl font-serif text-ink-950">Itemized Diagnostic & Repair Ledger</h2>
-        <span class="text-xs font-mono text-ink-600">Standard ${city} Market Flat Rates (2026 Edition)</span>
-      </div>
-
-      <div class="overflow-x-auto border border-paper-border bg-paper-50 rounded-lg shadow-sm">
-        <table class="w-full text-left text-xs">
-          <thead class="bg-paper-200/60 border-b border-paper-border text-ink-600 font-mono text-[11px] uppercase">
-            <tr>
-              <th class="py-3 px-4">Service Item</th>
-              <th class="py-3 px-4">What We Do</th>
-              <th class="py-3 px-4">Standard Parts Stocked</th>
-              <th class="py-3 px-4">Flat Investment</th>
-              <th class="py-3 px-4 text-right">Warranty</th>
-            </tr>
-          </thead>
-          <tbody class="divide-y divide-paper-border text-ink-800">
-            <tr class="hover:bg-paper-100/70 transition-colors">
-              <td class="py-3.5 px-4 font-semibold text-ink-950">Comprehensive Diagnostic</td>
-              <td class="py-3.5 px-4 text-ink-600">Complete 21-point electrical, motor amp, and subcooling inspection</td>
-              <td class="py-3.5 px-4 font-mono text-[11px]">Digital manifold gauges</td>
-              <td class="py-3.5 px-4 font-mono font-medium text-ink-950">$0 with repair ($69 solo)</td>
-              <td class="py-3.5 px-4 text-right font-mono">30 Days</td>
-            </tr>
-            <tr class="hover:bg-paper-100/70 transition-colors">
-              <td class="py-3.5 px-4 font-semibold text-ink-950">Dual Run Capacitor</td>
-              <td class="py-3.5 px-4 text-ink-600">Replace failed start/run capacitor with heavy-duty commercial unit</td>
-              <td class="py-3.5 px-4 font-mono text-[11px]">Titan PRO 35/5, 45/5, 50/5µF</td>
-              <td class="py-3.5 px-4 font-mono font-medium text-ink-950">$135 – $195</td>
-              <td class="py-3.5 px-4 text-right font-mono font-semibold text-pine-700">2 Years</td>
-            </tr>
-            <tr class="hover:bg-paper-100/70 transition-colors">
-              <td class="py-3.5 px-4 font-semibold text-ink-950">Condensate Clear & Flush</td>
-              <td class="py-3.5 px-4 text-ink-600">High-pressure nitrogen blast, P-trap wash & pan drain treatment</td>
-              <td class="py-3.5 px-4 font-mono text-[11px]">Pan-treat bio tablets</td>
-              <td class="py-3.5 px-4 font-mono font-medium text-ink-950">$115 – $165</td>
-              <td class="py-3.5 px-4 text-right font-mono">1 Year</td>
-            </tr>
-            <tr class="hover:bg-paper-100/70 transition-colors">
-              <td class="py-3.5 px-4 font-semibold text-ink-950">Hard Start Kit Assembly</td>
-              <td class="py-3.5 px-4 text-ink-600">Relieves startup torque on aging compressors; cuts start time by 50%</td>
-              <td class="py-3.5 px-4 font-mono text-[11px]">5-2-1 Compressor Saver</td>
-              <td class="py-3.5 px-4 font-mono font-medium text-ink-950">$185 – $240</td>
-              <td class="py-3.5 px-4 text-right font-mono font-semibold text-pine-700">2 Years</td>
-            </tr>
-            <tr class="hover:bg-paper-100/70 transition-colors">
-              <td class="py-3.5 px-4 font-semibold text-ink-950">Full Seasonal Recommission</td>
-              <td class="py-3.5 px-4 text-ink-600">Chemical outdoor coil wash, static duct pressure check & filter tune</td>
-              <td class="py-3.5 px-4 font-mono text-[11px]">Nu-Calgon Nu-Brite</td>
-              <td class="py-3.5 px-4 font-mono font-medium text-ink-950">$89 per system</td>
-              <td class="py-3.5 px-4 text-right font-mono">Full Season</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
+    <section>
+      <h2>Contact</h2>
+      <p>${supplied.phone ? `Contact: ${supplied.phone}` : 'Add a verified business phone number or contact method.'}</p>
     </section>
-
-    <!-- Master Regulatory & Journeyman Credentials Strip -->
-    <section class="border-t border-paper-border pt-10 grid md:grid-cols-3 gap-6 text-xs">
-      <div class="space-y-1">
-        <span class="font-mono text-[10px] text-ink-400 uppercase block">State License</span>
-        <span class="font-medium text-ink-950 text-sm block">Texas TDLR TACLA #048291C</span>
-        <p class="text-ink-600 text-[11px]">Class A Environmental Air Conditioning license active and in good standing.</p>
-      </div>
-      <div class="space-y-1">
-        <span class="font-mono text-[10px] text-ink-400 uppercase block">Federal Certification</span>
-        <span class="font-medium text-ink-950 text-sm block">EPA Clean Air Act Section 608</span>
-        <p class="text-ink-600 text-[11px]">Universal certification for high-pressure R-410A and R-454B refrigerants.</p>
-      </div>
-      <div class="space-y-1">
-        <span class="font-mono text-[10px] text-ink-400 uppercase block">Commercial Protection</span>
-        <span class="font-medium text-ink-950 text-sm block">$2,000,000 Liability Coverage</span>
-        <p class="text-ink-600 text-[11px]">Underwritten by Travelers Commercial with complete property protection.</p>
-      </div>
-    </section>
-
-    <!-- Footer: Honest & Direct -->
-    <footer class="border-t border-paper-border pt-8 text-center text-xs text-ink-400 space-y-2">
-      <p class="font-mono text-[11px]">
-        © ${new Date().getFullYear()} ${company} • Dedicated ${city} Service Division • Direct Line: ${phone}
-      </p>
-      <p class="text-[10px]">
-        HAL Attribution Preserved • No commission sales • Line-item estimates before execution.
-      </p>
-    </footer>
-
+    <div class="notice">This is a deterministic draft because no AI provider returned a valid response. No credentials, reviews, prices, guarantees, response times, or business claims have been invented. Complete and verify the content before publication.</div>
   </main>
-
-  <!-- Interactive JavaScript Logic -->
-  <script>
-    const symptoms = {
-      warm_air: {
-        culprit: 'Failed Dual Run Capacitor or Contactor',
-        culpritDesc: 'The outdoor fan spins or hums, but compressor cannot initiate start cycle due to microfarad decay.',
-        step: 'Multimeter Capacitance & Amp Draw Test',
-        stepDesc: 'We test µF rating under full load and verify contactor points for electrical pitting or carbon buildup.',
-        price: '$135 – $195 Flat Total'
-      },
-      frozen_coil: {
-        culprit: 'Restricted Airflow or Subcooling Refrigerant Deficit',
-        culpritDesc: 'Severe static pressure from clogged Merv 13 filter or evaporator pinhole leak causing freezing.',
-        step: 'Static Duct Test & Halogen Leak Sniffer',
-        stepDesc: 'We measure temperature delta across supply/return and inspect TXV metering valve for freeze-ups.',
-        price: '$115 – $240 (Excl. gas)'
-      },
-      water_leak: {
-        culprit: 'Bio-Slime Blockage in Primary Condensate Drain',
-        culpritDesc: 'Algae growth blocks the 3/4" PVC drain line, tripping the float switch or overflowing into the pan.',
-        step: 'Nitrogen Line Blast & Float Switch Inspection',
-        stepDesc: 'High-pressure CO2/Nitrogen purge of primary trap and installation of safety float cut-off switch.',
-        price: '$115 – $165 Flat Total'
-      },
-      buzzing: {
-        culprit: 'Locked Rotor Amps (LRA) or Weak Contactor Coil',
-        culpritDesc: 'Compressor attempting to start against head pressure or 24V contactor chatter vibrating the enclosure.',
-        step: 'Inrush Current Metering & Voltage Drop Test',
-        stepDesc: 'We measure locked rotor amperage and test electrical disconnect box lugs for thermal degradation.',
-        price: '$145 – $260 Flat Total'
-      }
-    };
-
-    function setSymptom(key) {
-      const data = symptoms[key];
-      if (!data) return;
-
-      document.getElementById('disp-culprit').innerText = data.culprit;
-      document.getElementById('disp-culprit-desc').innerText = data.culpritDesc;
-      document.getElementById('disp-step').innerText = data.step;
-      document.getElementById('disp-step-desc').innerText = data.stepDesc;
-      document.getElementById('disp-price').innerText = data.price;
-
-      // Update button styling
-      document.querySelectorAll('.symptom-btn').forEach(btn => {
-        btn.classList.remove('bg-ink-950', 'text-paper-50', 'border-ink-950');
-        btn.classList.add('bg-paper-100', 'text-ink-900', 'border-paper-border');
-      });
-
-      const activeBtn = document.getElementById('btn-' + key);
-      if (activeBtn) {
-        activeBtn.classList.remove('bg-paper-100', 'text-ink-900', 'border-paper-border');
-        activeBtn.classList.add('bg-ink-950', 'text-paper-50', 'border-ink-950');
-      }
-
-      // Sync dropdown in form
-      const dd = document.getElementById('problem_dropdown');
-      if (dd) dd.value = key;
-    }
-
-    // Auto-capture GCLID and UTM parameters
-    (function() {
-      const params = new URLSearchParams(window.location.search);
-      const gclid = params.get('gclid') || 'direct_session';
-      const src = params.get('utm_source') || 'organic_direct';
-      const med = params.get('utm_medium') || 'web';
-      const camp = params.get('utm_campaign') || 'metro_dispatch';
-
-      const gField = document.getElementById('gclid_field');
-      const sField = document.getElementById('utm_source_field');
-      const mField = document.getElementById('utm_medium_field');
-      const cField = document.getElementById('utm_campaign_field');
-
-      if (gField) gField.value = gclid;
-      if (sField) sField.value = src;
-      if (mField) mField.value = med;
-      if (cField) cField.value = camp;
-    })();
-  </script>
 </body>
 </html>`
-    };
-  }
-
-  if (toolId === 'outreach_sequences') {
-    const owner = parameters?.ownerName || parameters?.first_name || 'Business Owner';
-    const biz = parameters?.businessName || company || 'Local Service Pro';
-    const loc = parameters?.city || city || 'Local Metro';
-    const niche = parameters?.serviceType || parameters?.niche || 'Emergency Contracting';
-    const perf = parameters?.performanceScore || 54;
-    const seo = parameters?.seoScore || 62;
-
-    const step1Subject = `Quick heads-up about ${biz}'s mobile speed in ${loc}`;
-    const step1Body = `Hi ${owner},
-
-Ran a quick diagnostic on ${loc} contractors offering ${niche} services this morning and noticed your mobile site is currently scoring ${perf}/100 on Core Web Vitals.
-
-In ${loc}, over 78% of emergency service calls happen on mobile. When the page takes more than 2.8 seconds to render, homeowners tap back and call the next contractor on Google Maps.
-
-We built a lightweight 1-tap dispatch landing page specifically for ${biz} that loads in under 600ms and plugs right into your phone dispatch. 
-
-Would you be open to seeing the 60-second video walkthrough showing where your competitors are capturing these calls?
-
-Best regards,
-Direct Response Systems • ${loc} Regional Division`;
-
-    const step2Subject = `Benchmark data: ${loc} ${niche} mobile conversion rates`;
-    const step2Body = `Hi ${owner},
-
-Following up on my note regarding ${biz}'s mobile load speed (${perf}/100). 
-
-We put together an itemized diagnostic comparing your site speed against the top 3 ranking ${niche} contractors in ${loc}. Even shaving 1.4 seconds off your mobile First Contentful Paint typically recovers 6 to 12 lost inquiry calls per month without spending an extra dollar on ads.
-
-Here is the direct preview link to your white-label audit report and speed patch.
-
-Would Thursday at 10:30 AM or 2:00 PM work for a quick 5-minute debrief?
-
-Best,
-Direct Response Systems`;
-
-    const step3Subject = `Permission to close file on ${biz} (${loc})`;
-    const step3Body = `Hi ${owner},
-
-I haven't heard back, so I assume optimizing mobile lead capture and speed for ${biz} isn't a top priority right now. Completely understand—you're busy in the field.
-
-I will archive your ${loc} territory diagnostic file for now. If you ever want to review the speed comparison or deploy the high-speed emergency lander, feel free to reply directly here.
-
-Wishing ${biz} a high-volume season ahead.
-
-Warm regards,
-Direct Response Systems`;
-
-    return {
-      title: `3-Touch High-Converting Outreach Sequence - ${biz}`,
-      summary: `High-intent outreach sequence tailored for ${biz} in ${loc} targeting Core Web Vitals deficiency (${perf}/100) and SEO recovery (${seo}/100).`,
-      structuredData: {
-        framework: 'Targeted Local Value Sequence (Speed Audit ➔ Local Map Pack ➔ Permission Breakaway)',
-        businessName: biz,
-        ownerName: owner,
-        city: loc,
-        steps: [
-          {
-            step: 1,
-            day: 1,
-            channel: 'email',
-            subject: step1Subject,
-            body: step1Body
-          },
-          {
-            step: 2,
-            day: 3,
-            channel: 'email',
-            subject: step2Subject,
-            body: step2Body
-          },
-          {
-            step: 3,
-            day: 7,
-            channel: 'email',
-            subject: step3Subject,
-            body: step3Body
-          }
-        ]
-      },
-      renderedOutput: `### STEP 1 (DAY 1) — DIRECT SPEED HOOK\n**Subject:** ${step1Subject}\n\n${step1Body}\n\n---\n\n### STEP 2 (DAY 3) — REGIONAL BENCHMARK\n**Subject:** ${step2Subject}\n\n${step2Body}\n\n---\n\n### STEP 3 (DAY 7) — PERMISSION BREAKAWAY\n**Subject:** ${step3Subject}\n\n${step3Body}`
-    };
-  }
+    : JSON.stringify(structuredData, null, 2);
 
   return {
-    title: `${company} - ${toolId.replace(/_/g, ' ').toUpperCase()}`,
-    summary: `Structured diagnostic and operational asset generated for ${company} in ${city}.`,
-    structuredData: { toolId, parameters, company, city },
-    renderedOutput: JSON.stringify({ status: 'generated', toolId, company, city, timestamp: new Date() }, null, 2)
+    title,
+    summary: 'A deterministic draft was created because no configured model provider returned a valid response. It contains only supplied workspace facts and requires operator review.',
+    structuredData,
+    renderedOutput
   };
 }
 
