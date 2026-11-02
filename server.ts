@@ -692,7 +692,7 @@ app.patch('/api/work-tasks/:id', authenticate, async (req, res) => {
         actorType: 'human', actorId: contractorId, sourceModule: 'work_queue',
         correlationId: current.correlationId || taskId,
         summary: `Moved task "${current.title}" from ${current.status} to ${nextStatus}.`,
-        payload: { previousStatus: current.status, status: nextStatus, assignedWorker: current.assignedWorker }
+        payload: { previousStatus: current.status, status: nextStatus, assignedWorker: current.assignedWorker, ...(output !== undefined ? { output } : {}) }
       });
       return saved;
     });
