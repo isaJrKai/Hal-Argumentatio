@@ -41,14 +41,6 @@ export function getWorkerCapabilities(env: NodeJS.ProcessEnv = process.env): Wor
       description: 'Verified executor for registered Hermes Lab asset-generation tasks only; not a general-purpose worker.'
     },
     {
-      id: 'amis',
-      label: 'AMIS',
-      mode: 'unverified',
-      canClaimTasks: false,
-      supportedTaskTypes: [],
-      description: 'No AMIS implementation or runtime executor has been verified in this repository.'
-    },
-    {
       id: 'gemini',
       label: 'Gemini',
       mode: 'provider_only',
