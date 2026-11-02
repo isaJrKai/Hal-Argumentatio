@@ -3723,10 +3723,11 @@ app.get('/api/forecasts', authenticate, async (req, res) => {
 });
 
 app.get('/api/learning-insights', authenticate, async (req, res) => {
+  const contractorId = (req as any).contractorId;
   try {
-    const insights = await pgDb.select().from(learningInsights).orderBy(desc(learningInsights.createdAt));
-    
-    // Map back to expected client structure
+    const insights = await pgDb.select().from(learningInsights)
+      .where(eq(learningInsights.contractorId, contractorId))
+      .orderBy(desc(learningInsights.createdAt));
     const mappedInsights = insights.map(i => ({
       id: i.id,
       category: i.metric,
@@ -3735,10 +3736,10 @@ app.get('/api/learning-insights', authenticate, async (req, res) => {
       observedCount: 1,
       createdAt: i.createdAt.toISOString()
     }));
-    
-    res.json(mappedInsights);
+    return res.json(mappedInsights);
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    console.error('[HAL Learning] Tenant insights unavailable:', err);
+    return res.status(503).json({ error: 'Learning insights are temporarily unavailable.' });
   }
 });
 
@@ -7219,12 +7220,13 @@ app.get('/api/scheduler/jobs', authenticate, (req, res) => {
 
 app.post('/api/scheduler', authenticate, async (req, res) => {
   const contractorId = (req as any).contractorId;
-  const { job } = req.body;
-
-  if (!job) {
-    return res.status(400).json({ error: 'Job name is required' });
+  const { job } = req.body || {};
+  if (typeof job !== 'string' || !job.trim()) {
+    return res.status(400).json({ error: 'Job name is required.' });
   }
 
+  // Scheduler run history remains in its existing tenant-scoped store. The
+  // business data consumed and produced by each job is PostgreSQL-authoritative.
   const jobRecord = db.addSchedulerJob({
     contractorId,
     job,
@@ -7235,176 +7237,211 @@ app.post('/api/scheduler', authenticate, async (req, res) => {
   try {
     let resultMessage = '';
 
-    // ─── 3.5 Forecast Evaluator (HIGHEST LEVERAGE LOOP) ───
     if (job === 'evaluate_forecasts') {
-      const forecasts = db.getForecasts();
-      const expiredUnevaluated = forecasts.filter(f => !f.evaluated && new Date(f.targetDate) <= new Date());
-      let evaluatedCount = 0;
+      const now = new Date();
+      const expiredUnevaluated = await pgDb.select().from(forecasts).where(and(
+        eq(forecasts.contractorId, contractorId),
+        eq(forecasts.evaluated, false),
+        lte(forecasts.targetDate, now)
+      )).orderBy(desc(forecasts.targetDate));
 
-      for (const fc of expiredUnevaluated) {
-        // Compare the forecast against observations from its own target window,
-        // not lifetime totals or a different period.
-        const targetEnd = new Date(fc.targetDate);
-        const targetStart = fc.createdAt
-          ? new Date(fc.createdAt)
-          : new Date(targetEnd.getTime() - 7 * 24 * 60 * 60 * 1000);
-        if (!Number.isFinite(targetStart.getTime()) || !Number.isFinite(targetEnd.getTime()) || targetStart >= targetEnd) {
-          continue;
-        }
-        const inTargetWindow = (value: any) => {
+      const [tenantLeads, tenantCampaigns, tenantRevenues] = await Promise.all([
+        pgDb.select().from(leads).where(eq(leads.contractorId, contractorId)),
+        pgDb.select({ id: campaigns.id }).from(campaigns).where(eq(campaigns.contractorId, contractorId)),
+        pgDb.select().from(revenueRecords).where(eq(revenueRecords.contractorId, contractorId))
+      ]);
+      const campaignIds = tenantCampaigns.map(row => row.id);
+      const snapshots = campaignIds.length
+        ? await pgDb.select().from(performanceSnapshots).where(inArray(performanceSnapshots.campaignId, campaignIds))
+        : [];
+      const tenantLeadIds = tenantLeads.map(row => row.id);
+      const closedWonEvents = tenantLeadIds.length
+        ? await pgDb.select().from(leadEvents).where(and(
+            inArray(leadEvents.leadId, tenantLeadIds),
+            eq(leadEvents.eventType, 'ClosedWon')
+          ))
+        : [];
+
+      let evaluatedCount = 0;
+      for (const forecast of expiredUnevaluated) {
+        const targetEnd = new Date(forecast.targetDate);
+        const targetStart = new Date(forecast.createdAt);
+        if (!Number.isFinite(targetStart.getTime()) || !Number.isFinite(targetEnd.getTime()) || targetStart >= targetEnd) continue;
+        const inWindow = (value: any) => {
           const timestamp = new Date(value).getTime();
           return Number.isFinite(timestamp) && timestamp >= targetStart.getTime() && timestamp <= targetEnd.getTime();
         };
 
-        let actualVal: number | null = null;
-        if (fc.metric === 'lead_volume') {
-          const leads = db.getLeads(fc.contractorId);
-          actualVal = leads.length
-            ? leads.filter((lead: any) => inTargetWindow(lead.createdAt)).length
+        let actualValue: number | null = null;
+        if (forecast.metric === 'lead_volume') {
+          actualValue = tenantLeads.length
+            ? tenantLeads.filter(lead => inWindow(lead.createdAt)).length
             : null;
-        } else if (fc.metric === 'cpl') {
-          const campaigns = db.getCampaigns(fc.contractorId);
-          const campaignIds = campaigns.map(c => c.id);
-          const snaps = db.getPerformanceSnapshots(campaignIds).filter((snapshot: any) => inTargetWindow(snapshot.date));
-          const aggregateSpend = snaps.reduce((sum: number, snapshot: any) => sum + Number(snapshot.spend || 0), 0);
-          const aggregateLeads = snaps.reduce((sum: number, snapshot: any) => sum + Number(snapshot.leads || 0), 0);
-          actualVal = aggregateLeads > 0 ? aggregateSpend / aggregateLeads : null;
-        } else if (fc.metric === 'revenue') {
-          const revenues = db.getRevenues(fc.contractorId).filter((revenue: any) => inTargetWindow(revenue.createdAt));
-          actualVal = revenues.length
-            ? revenues.reduce((sum: number, revenue: any) => sum + Number(revenue.amountUsd || 0), 0)
+        } else if (forecast.metric === 'cpl') {
+          const windowSnapshots = snapshots.filter(snapshot => inWindow(snapshot.date));
+          const spend = windowSnapshots.reduce((sum, snapshot) => sum + Number(snapshot.spend || 0), 0);
+          const leadCount = windowSnapshots.reduce((sum, snapshot) => sum + Number(snapshot.leads || 0), 0);
+          actualValue = windowSnapshots.length && leadCount > 0 ? spend / leadCount : null;
+        } else if (forecast.metric === 'revenue') {
+          actualValue = tenantRevenues.length
+            ? tenantRevenues.filter(revenue => inWindow(revenue.createdAt)).reduce((sum, revenue) => sum + Number(revenue.amountUsd || 0), 0)
+            : null;
+        } else if (forecast.metric === 'conversions') {
+          actualValue = closedWonEvents.length
+            ? closedWonEvents.filter(event => inWindow(event.createdAt)).length
             : null;
         }
 
-        // Missing measurements are not zero. Leave the forecast unevaluated until
-        // the relevant source has observations for its target window.
-        if (actualVal === null || !Number.isFinite(actualVal)) continue;
-        const deviation = fc.predicted > 0 ? (actualVal - fc.predicted) / fc.predicted : 0;
-        
-        // Save Prediction Outcome
-        db.addPredictionOutcome({
-          forecastId: fc.id,
-          predicted: fc.predicted,
-          actual: actualVal,
-          deviation
-        });
-
-        // Generate Learning Insight via Gemini (or fallback)
+        // A missing measurement is not a zero. Keep the forecast unevaluated.
+        if (actualValue === null || !Number.isFinite(actualValue)) continue;
+        const deviation = forecast.predicted !== 0 ? (actualValue - forecast.predicted) / forecast.predicted : 0;
         const learning = await generateLearningFromOutcome(
-          fc.metric,
-          fc.predicted,
-          actualVal,
+          forecast.metric,
+          forecast.predicted,
+          actualValue,
           deviation,
-          fc.assumptions || ''
+          forecast.assumptions || ''
         );
+        const confidenceShift = Number.isFinite(Number(learning.confidence)) ? Number(learning.confidence) : 0;
+        const evaluatedAt = new Date();
 
-        db.addLearningInsight({
-          category: learning.category,
-          insight: learning.insight,
-          confidence: learning.confidence,
-          sourceForecastId: fc.id,
-          observedCount: 1
+        await pgDb.transaction(async tx => {
+          await tx.insert(predictionOutcomes).values({
+            id: crypto.randomUUID(),
+            forecastId: forecast.id,
+            predicted: forecast.predicted,
+            actual: actualValue as number,
+            deviation,
+            evaluatedAt
+          });
+          await tx.insert(learningInsights).values({
+            id: crypto.randomUUID(),
+            contractorId,
+            metric: forecast.metric,
+            lesson: learning.insight,
+            confidenceShift,
+            createdAt: evaluatedAt
+          });
+          await tx.update(forecasts).set({ evaluated: true, updatedAt: evaluatedAt })
+            .where(and(eq(forecasts.id, forecast.id), eq(forecasts.contractorId, contractorId), eq(forecasts.evaluated, false)));
+          await tx.insert(workEvents).values({
+            id: 'evt_' + crypto.randomUUID(),
+            contractorId,
+            eventType: 'forecast.evaluated',
+            entityType: 'forecast',
+            entityId: forecast.id,
+            actorType: 'system',
+            actorId: 'forecast_evaluator',
+            sourceModule: 'intelligence',
+            correlationId: forecast.id,
+            summary: `Evaluated ${forecast.metric} forecast against recorded observations.`,
+            payload: { predicted: forecast.predicted, actual: actualValue, deviation, learningInsight: learning.insight }
+          });
         });
 
-        // Also save as Lesson DB (Phase 2)
+        // Legacy lesson history is retained for older screens during migration.
         db.addLesson({
           category: learning.category,
-          title: `Forecast Deviation Lesson (${fc.metric.toUpperCase()})`,
+          title: `Forecast Deviation Lesson (${forecast.metric.toUpperCase()})`,
           description: learning.insight,
-          confidence: learning.confidence,
+          confidence: confidenceShift,
           timesObserved: 1,
-          lastObserved: new Date().toISOString()
+          lastObserved: evaluatedAt.toISOString()
         });
-
         evaluatedCount++;
       }
 
-      resultMessage = `Evaluated ${evaluatedCount} expired forecasts. Closed the intelligence loop. LearningInsights populated.`;
-      broadcastNotification(
-        contractorId,
-        'info',
-        'Forecast Evaluation Completed',
-        `Evaluated ${evaluatedCount} expired hypotheses. Generated fresh strategic learning lessons.`
-      );
+      resultMessage = evaluatedCount
+        ? `Evaluated ${evaluatedCount} expired forecasts using tenant PostgreSQL observations; prediction outcomes and learning insights were persisted.`
+        : 'No expired forecasts had sufficient recorded observations to evaluate. No synthetic measurements were substituted.';
+      broadcastNotification(contractorId, 'info', 'Forecast Evaluation Completed', resultMessage);
 
-    // ─── 3.6 Auto-Forecaster ───
     } else if (job === 'auto_forecaster') {
-      const campaigns = db.getCampaigns(contractorId);
-      const campaignIds = campaigns.map(c => c.id);
-      const snaps = db.getPerformanceSnapshots(campaignIds);
-      
-      // Use only the trailing 90 days of recorded campaign snapshots.
-      const historyCutoff = Date.now() - 90 * 24 * 60 * 60 * 1000;
-      const historicalData = snaps
+      const tenantCampaigns = await pgDb.select({ id: campaigns.id }).from(campaigns)
+        .where(eq(campaigns.contractorId, contractorId));
+      const campaignIds = tenantCampaigns.map(row => row.id);
+      const snapshots = campaignIds.length
+        ? await pgDb.select().from(performanceSnapshots).where(inArray(performanceSnapshots.campaignId, campaignIds))
+        : [];
+      const cutoff = Date.now() - 90 * 24 * 60 * 60 * 1000;
+      const historicalData = snapshots
         .filter(snapshot => {
           const timestamp = new Date(snapshot.date).getTime();
-          return Number.isFinite(timestamp) && timestamp >= historyCutoff;
+          return Number.isFinite(timestamp) && timestamp >= cutoff;
         })
-        .map(snapshot => ({
-          date: snapshot.date,
-          value: snapshot.leads
-        }));
+        .map(snapshot => ({ date: snapshot.date, value: Number(snapshot.leads || 0) }))
+        .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
-      const forecastResult = await generateForecastNarrative('lead_volume', historicalData, req.body.preferredAI);
+      if (!historicalData.length) {
+        resultMessage = 'No campaign performance observations exist for this tenant in the last 90 days. No forecast was fabricated.';
+      } else {
+        const forecastResult = await generateForecastNarrative('lead_volume', historicalData, req.body?.preferredAI);
+        const [newForecast] = await pgDb.insert(forecasts).values({
+          id: crypto.randomUUID(),
+          contractorId,
+          metric: 'lead_volume',
+          predicted: Number(forecastResult.predicted),
+          confidenceScore: Number(forecastResult.confidenceScore),
+          targetDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+          modelVersion: forecastResult.source || 'unverified',
+          evaluated: false,
+          assumptions: forecastResult.assumptions || '',
+          createdAt: new Date(),
+          updatedAt: new Date()
+        }).returning();
 
-      const newFc = db.addForecast({
-        contractorId,
-        metric: 'lead_volume',
-        predicted: forecastResult.predicted,
-        confidenceScore: forecastResult.confidenceScore,
-        targetDate: new Date(Date.now() + 7 * 24 * 3600 * 1000).toISOString(), // Target next week
-        modelVersion: forecastResult.source || 'unknown',
-        evaluated: false,
-        assumptions: forecastResult.assumptions
-      });
-
-      resultMessage = `Created a 7-day lead-volume estimate using ${forecastResult.source || 'an unverified source'}. Estimate: ${newFc.predicted} leads. Confidence: ${newFc.confidenceScore}. Assumptions: ${newFc.assumptions}`;
-      broadcastNotification(
-        contractorId,
-        'info',
-        'Lead-volume estimate created',
-        `Created a 7-day estimate using ${forecastResult.source || 'an unverified source'}. Model-reported confidence: ${newFc.confidenceScore}.`
-      );
-
-    // ─── 3.8 Revenue LTV Correction ───
-    } else if (job === 'ltv_correction') {
-      const leads = db.getLeads(contractorId);
-      const revenues = db.getRevenues(contractorId);
-      
-      // Correcting LTV heuristic factor: compute actual vs predicted LTV
-      const convertedLeads = leads.filter(l => l.status === 'converted');
-      let matchesCount = 0;
-      let totalPredicted = 0;
-      let totalActual = 0;
-
-      for (const cl of convertedLeads) {
-        const rev = revenues.find(r => r.leadId === cl.id);
-        if (rev) {
-          matchesCount++;
-          totalPredicted += cl.predictedLtvUsd;
-          totalActual += rev.amountUsd;
-        }
+        await recordWorkEvent(pgDb, {
+          contractorId,
+          eventType: 'forecast.created',
+          entityType: 'forecast',
+          entityId: newForecast.id,
+          actorType: 'system',
+          actorId: 'auto_forecaster',
+          sourceModule: 'intelligence',
+          correlationId: newForecast.id,
+          summary: 'Created a seven-day lead-volume forecast from recorded campaign observations.',
+          payload: { modelVersion: newForecast.modelVersion, predicted: newForecast.predicted, historyPoints: historicalData.length }
+        });
+        resultMessage = `Created a 7-day lead-volume forecast from ${historicalData.length} recorded campaign observations using ${newForecast.modelVersion}. Estimate: ${newForecast.predicted} leads.`;
+        broadcastNotification(contractorId, 'info', 'Lead-volume forecast created', resultMessage);
       }
 
-      const multiplier = totalPredicted > 0 ? totalActual / totalPredicted : 1.0;
-      resultMessage = `LTV assessment finished on ${matchesCount} samples. Heuristic correction multiplier computed: ${multiplier.toFixed(3)}.`;
-      
-      broadcastNotification(
-        contractorId,
-        'success',
-        'LTV Correction Realized',
-        `LTV calibration completed. Correction multiplier: ${multiplier.toFixed(3)} based on real closed revenues.`
-      );
+    } else if (job === 'ltv_correction') {
+      const [tenantLeads, tenantRevenues] = await Promise.all([
+        pgDb.select().from(leads).where(eq(leads.contractorId, contractorId)),
+        pgDb.select().from(revenueRecords).where(eq(revenueRecords.contractorId, contractorId))
+      ]);
+      const closedWon = tenantLeads.filter(lead => ['closed_won', 'converted', 'customer'].includes(String(lead.status).toLowerCase()));
+      const revenueByLead = new Map<string, number>();
+      for (const revenue of tenantRevenues) {
+        if (!revenue.leadId) continue;
+        revenueByLead.set(revenue.leadId, (revenueByLead.get(revenue.leadId) || 0) + Number(revenue.amountUsd || 0));
+      }
+      let matched = 0, predictedTotal = 0, actualTotal = 0;
+      for (const lead of closedWon) {
+        const actual = revenueByLead.get(lead.id);
+        if (actual === undefined) continue;
+        matched++;
+        predictedTotal += Number(lead.predictedLtv || 0);
+        actualTotal += actual;
+      }
+      const multiplier = predictedTotal > 0 ? actualTotal / predictedTotal : null;
+      resultMessage = multiplier === null
+        ? `LTV calibration has insufficient matched closed-won lead and revenue records (${matched} matched).`
+        : `LTV calibration used ${matched} closed-won records. Actual-to-predicted revenue multiplier: ${multiplier.toFixed(3)}.`;
+      broadcastNotification(contractorId, 'info', 'LTV Calibration Completed', resultMessage);
 
-    // ─── 5.7 Weekly Intelligence Summary ───
     } else if (job === 'weekly_summary') {
-      resultMessage = 'Weekly marketing intelligence summary generated. Budget optimization triggers updated.';
-      broadcastNotification(
-        contractorId,
-        'info',
-        'Weekly Summary Compiled',
-        'HAL has synchronized active accounts with high-level campaign targets.'
-      );
+      const [tenantLeads, tenantCampaigns, tenantRevenues] = await Promise.all([
+        pgDb.select().from(leads).where(eq(leads.contractorId, contractorId)),
+        pgDb.select().from(campaigns).where(eq(campaigns.contractorId, contractorId)),
+        pgDb.select().from(revenueRecords).where(eq(revenueRecords.contractorId, contractorId))
+      ]);
+      const totalRevenue = tenantRevenues.reduce((sum, revenue) => sum + Number(revenue.amountUsd || 0), 0);
+      const closedWonCount = tenantLeads.filter(lead => ['closed_won', 'converted', 'customer'].includes(String(lead.status).toLowerCase())).length;
+      resultMessage = `Operating summary: ${tenantLeads.length} leads, ${closedWonCount} closed-won leads, ${tenantCampaigns.length} campaigns, ${tenantRevenues.length} revenue records, and $${totalRevenue.toFixed(2)} recorded revenue. No budget or external campaign changes were made.`;
+      broadcastNotification(contractorId, 'info', 'Operating Summary Compiled', resultMessage);
+
     } else {
       throw new Error(`Job type "${job}" is unrecognised`);
     }
@@ -7414,16 +7451,15 @@ app.post('/api/scheduler', authenticate, async (req, res) => {
       completedAt: new Date().toISOString(),
       result: resultMessage
     });
-
-    res.json({ success: true, result: resultMessage });
-
+    return res.json({ success: true, result: resultMessage });
   } catch (err: any) {
     db.updateSchedulerJob(jobRecord.id, {
       status: 'failed',
       completedAt: new Date().toISOString(),
       error: err.message
     });
-    res.status(500).json({ error: err.message });
+    console.error('[HAL Scheduler] Job failed:', err);
+    return res.status(503).json({ error: err.message || 'Scheduled job failed.' });
   }
 });
 
