@@ -1,7 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { canTransitionWorkTask, listWorkTasks } from '../../src/lib/workTasks';
+import { canTransitionWorkTask, listWorkTasks, requiresWorkTaskApproval } from '../../src/lib/workTasks';
 
 describe('HAL work task state machine', () => {
+  it('requires approval for consequential task descriptions', () => {
+    expect(requiresWorkTaskApproval('outreach', 'Send email to prospect')).toBe(true);
+    expect(requiresWorkTaskApproval('contract', 'Sign agreement')).toBe(true);
+    expect(requiresWorkTaskApproval('research', 'Find competitor pricing')).toBe(false);
+    expect(requiresWorkTaskApproval('lead_follow_up', 'Review and follow up')).toBe(false);
+  });
+
   it('allows queued work to start, request approval, or be cancelled', () => {
     expect(canTransitionWorkTask('queued', 'running')).toBe(true);
     expect(canTransitionWorkTask('queued', 'awaiting_approval')).toBe(true);

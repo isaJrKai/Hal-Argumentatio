@@ -28,7 +28,7 @@ import {
 } from './types.ts';
 import { executeHermesLabTool, LabToolType } from '../hermesLab.ts';
 import { getRecentWorkEvents } from '../../lib/workLedger';
-import { listWorkTasks, getWorkTask } from '../../lib/workTasks';
+import { listWorkTasks, getWorkTask, requiresWorkTaskApproval } from '../../lib/workTasks';
 
 export const HAL_MCP_TOOLS: McpToolDefinition[] = [
   {
@@ -234,7 +234,7 @@ export async function executeMcpTool(
       const entityType = typeof rawParams?.entityType === 'string' ? rawParams.entityType.trim() : null;
       const entityId = typeof rawParams?.entityId === 'string' ? rawParams.entityId.trim() : null;
       const input = rawParams?.input && typeof rawParams.input === 'object' && !Array.isArray(rawParams.input) ? rawParams.input : null;
-      const approvalRequiredByPolicy = /(^|[._\\s-])(send|dispatch|publish|spend|purchase|charge|refund|sign|delete|bulk_outreach)([._\\s-]|$)/i.test(`${taskType} ${title} ${description || ''}`);
+      const approvalRequiredByPolicy = requiresWorkTaskApproval(taskType, title, description);
       const requiresApproval = rawParams?.requiresApproval === true || approvalRequiredByPolicy;
       const workers = ['human', 'hal_assistant', 'hermes', 'amis', 'gemini', 'nemotron'];
       if (!taskType || taskType.length > 80 || !title || title.length > 180 ||
