@@ -58,6 +58,11 @@ describe('Database: Schema Drift & Table Invariant Tests', () => {
     expect(Object.keys(table)).toContain('confidenceShift');
   });
 
+  it('allows direct-recipient communications history without a lead foreign key', () => {
+    expect(schema.communicationsOutbox.leadId.notNull).toBe(false);
+    expect(schema.communicationsOutbox.contractorId.notNull).toBe(true);
+  });
+
   it('requires encrypted tenant-scoped connector credential storage', () => {
     const table = schema.connectorCredentials;
     expect(table).toBeDefined();
