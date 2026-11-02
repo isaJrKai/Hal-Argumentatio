@@ -73,6 +73,6 @@ describe('Nemotron authenticated function calling', () => {
     expect(execute).toHaveBeenCalledTimes(1);
     expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(result.toolCalls).toHaveLength(1);
-    expect(result.text).toContain('no additional actions were retried');
+    expect(result.text).toContain('no tool was retried automatically');
   });
 });
