@@ -6682,7 +6682,9 @@ app.post('/api/scheduler', authenticate, async (req, res) => {
         let actualVal: number | null = null;
         if (fc.metric === 'lead_volume') {
           const leads = db.getLeads(fc.contractorId);
-          actualVal = leads.filter((lead: any) => inTargetWindow(lead.createdAt)).length;
+          actualVal = leads.length
+            ? leads.filter((lead: any) => inTargetWindow(lead.createdAt)).length
+            : null;
         } else if (fc.metric === 'cpl') {
           const campaigns = db.getCampaigns(fc.contractorId);
           const campaignIds = campaigns.map(c => c.id);
