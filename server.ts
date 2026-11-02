@@ -5668,7 +5668,7 @@ async function getBridgesForContractor(contractorId: string): Promise<ChannelBri
   const emailProvider: ChannelBridgeSettings['email']['provider'] =
     credentials.resend ? 'resend' : credentials.sendgrid ? 'sendgrid' : defaults.email.provider;
   const emailApiKey = credentials.resend || credentials.sendgrid || defaults.email.apiKey;
-  const savedEmail = saved.email || {};
+  const savedEmail = (saved.email || {}) as Partial<ChannelBridgeSettings['email']>;
   const email = {
     ...defaults.email,
     provider: emailProvider,
