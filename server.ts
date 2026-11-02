@@ -290,6 +290,12 @@ app.get('/api/ready', async (_req, res) => {
         to_regclass('public.work_events') IS NOT NULL AS work_events,
         to_regclass('public.hermes_lab_artifacts') IS NOT NULL AS hermes_lab_artifacts,
         to_regclass('public.communications_outbox') IS NOT NULL AS communications_outbox,
+        to_regclass('public.communications_delivery_events') IS NOT NULL AS communications_delivery_events,
+        to_regclass('public.forecasts') IS NOT NULL AS forecasts,
+        to_regclass('public.prediction_outcomes') IS NOT NULL AS prediction_outcomes,
+        to_regclass('public.learning_insights') IS NOT NULL AS learning_insights,
+        to_regclass('public.outreach_sequences') IS NOT NULL AS outreach_sequences,
+        to_regclass('public.revoked_tokens') IS NOT NULL AS revoked_tokens,
         to_regclass('public.hal_loops') IS NOT NULL AS hal_loops
     `);
     const checks = result.rows[0] || {};
