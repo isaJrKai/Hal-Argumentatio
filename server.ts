@@ -4712,29 +4712,67 @@ app.get('/api/outreach/sequences', authenticate, async (req, res) => {
   }
 });
 
-app.post('/api/outreach/sequences', authenticate, (req, res) => {
+app.post('/api/outreach/sequences', authenticate, async (req, res) => {
   const contractorId = (req as any).contractorId;
-  const { id, name, niche, steps } = req.body;
+  const { id, name, niche, steps } = req.body || {};
 
-  if (!name || !steps || !Array.isArray(steps)) {
-    return res.status(400).json({ error: 'Sequence name and steps array are required' });
+  if (typeof name !== 'string' || !name.trim() || !Array.isArray(steps) || steps.length === 0) {
+    return res.status(400).json({ error: 'A sequence name and non-empty steps array are required.' });
+  }
+  if (steps.some((step: any) => !step || typeof step !== 'object' || Array.isArray(step))) {
+    return res.status(400).json({ error: 'Every outreach step must be a structured object.' });
   }
 
-  const seq = db.saveOutreachSequence(contractorId, {
-    id: id || 'seq_' + crypto.randomBytes(6).toString('hex'),
-    name,
-    niche: niche || 'General',
-    steps,
-    createdAt: new Date().toISOString()
-  });
+  try {
+    const sequenceId = typeof id === 'string' && id.trim() ? id.trim() : 'seq_' + crypto.randomUUID();
+    const [existing] = await pgDb.select().from(outreachSequences)
+      .where(eq(outreachSequences.id, sequenceId)).limit(1);
+    if (existing && existing.contractorId !== contractorId) {
+      return res.status(404).json({ error: 'Outreach sequence not found or inaccessible.' });
+    }
 
-  db.addAuditLog({
-    contractorId,
-    action: 'OUTREACH_SEQUENCE_SAVED',
-    details: `Saved multi-touch cadence "${name}" with ${steps.length} touchpoints.`
-  });
+    const now = new Date();
+    const values = {
+      name: name.trim(),
+      niche: typeof niche === 'string' && niche.trim() ? niche.trim() : 'General',
+      steps,
+      updatedAt: now
+    };
+    const saved = existing
+      ? (await pgDb.update(outreachSequences).set(values)
+          .where(and(eq(outreachSequences.id, sequenceId), eq(outreachSequences.contractorId, contractorId)))
+          .returning())[0]
+      : (await pgDb.insert(outreachSequences).values({
+          id: sequenceId, contractorId, ...values, createdAt: now
+        }).returning())[0];
 
-  res.status(201).json(seq);
+    await pgDb.transaction(async tx => {
+      await tx.insert(auditLogs).values({
+        id: crypto.randomUUID(),
+        contractorId,
+        action: existing ? 'OUTREACH_SEQUENCE_UPDATED' : 'OUTREACH_SEQUENCE_SAVED',
+        details: `${existing ? 'Updated' : 'Saved'} multi-touch cadence "${name.trim()}" with ${steps.length} touchpoints.`
+      });
+      await tx.insert(workEvents).values({
+        id: 'evt_' + crypto.randomUUID(),
+        contractorId,
+        eventType: existing ? 'outreach.sequence_updated' : 'outreach.sequence_created',
+        entityType: 'outreach_sequence',
+        entityId: sequenceId,
+        actorType: 'human',
+        actorId: contractorId,
+        sourceModule: 'outreach',
+        correlationId: sequenceId,
+        summary: `${existing ? 'Updated' : 'Created'} outreach sequence "${name.trim()}".`,
+        payload: { niche: values.niche, stepCount: steps.length }
+      });
+    });
+
+    return res.status(existing ? 200 : 201).json(saved);
+  } catch (err: any) {
+    console.error('[HAL Outreach] Sequence save failed:', err);
+    return res.status(503).json({ error: 'Outreach sequence could not be saved to the application database.' });
+  }
 });
 
 // ─── CAMPAIGN OUTREACH & WEBHOOK RELAY ENGINE ────────────────────────────────
