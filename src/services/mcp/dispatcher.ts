@@ -32,6 +32,7 @@ import {
 import { executeHermesLabTool, chatWithHermesAgent, LabToolType } from '../hermesLab.ts';
 import { getRecentWorkEvents } from '../../lib/workLedger';
 import { listWorkTasks, getWorkTask, requiresWorkTaskApproval, canExecutorClaimWorkTask } from '../../lib/workTasks';
+import { analyzeCampaignPerformance } from '../../lib/campaignAnomaly';
 
 export const HAL_MCP_TOOLS: McpToolDefinition[] = [
   {
@@ -91,7 +92,7 @@ export const HAL_MCP_TOOLS: McpToolDefinition[] = [
   },
   {
     name: 'hal_inspect_campaign_anomalies',
-    description: 'Scans all active Google Ads and revenue campaigns for statistically significant ROAS drops, CPA spikes, or lead decay.',
+    description: 'Compares recorded campaign conversion rates and cost per conversion across adjacent 30-day windows using stored Google Ads rows. Also returns screening signals for spend above $500 with zero recorded conversions; these are not proof of a tracking fault.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -496,49 +497,37 @@ export async function executeMcpTool(
     case 'hal_inspect_campaign_anomalies': {
       const parsed = validateInspectAnomaliesInput(rawParams || {});
       const adsRecords = await pgDb
-        .select()
+        .select({
+          campaignName: googleAdsDailyPerformance.campaignName,
+          date: googleAdsDailyPerformance.date,
+          cost: googleAdsDailyPerformance.cost,
+          clicks: googleAdsDailyPerformance.clicks,
+          conversions: googleAdsDailyPerformance.conversions
+        })
         .from(googleAdsDailyPerformance)
         .where(eq(googleAdsDailyPerformance.contractorId, contractorId))
         .orderBy(desc(googleAdsDailyPerformance.date));
 
-      const anomalies: Array<any> = [];
-
-      const campaignTotals: Record<string, { spend: number; conversions: number }> = {};
-      for (const r of adsRecords) {
-        if (!campaignTotals[r.campaignName]) {
-          campaignTotals[r.campaignName] = { spend: 0, conversions: 0 };
-        }
-        campaignTotals[r.campaignName].spend += Number(r.cost) || 0;
-        campaignTotals[r.campaignName].conversions += Number(r.conversions) || 0;
-      }
-
-      for (const [name, data] of Object.entries(campaignTotals)) {
-        if (data.spend > 500 && data.conversions === 0) {
-          anomalies.push({
-            campaignId: name.toLowerCase().replace(/\s+/g, '_'),
-            campaignName: name,
-            severity: 'CRITICAL',
-            metric: 'CONVERSION_RATE',
-            baselineValue: 3.5,
-            currentValue: 0.0,
-            percentageDelta: -100,
-            timeWindow: 'last_30_days',
-            suggestedInvestigation: 'Audit landing page SSL, tracking script integrity, and negative keywords.'
-          });
-        }
-      }
-
+      const analysis = analyzeCampaignPerformance(adsRecords, parsed.thresholdDropPct);
       await pgDb.insert(auditLogs).values({
         id: auditId,
         contractorId,
         action: 'HERMES_MCP_ANOMALIES_INSPECTED',
-        details: JSON.stringify({ anomaliesFound: anomalies.length, threshold: parsed.thresholdDropPct }),
+        details: JSON.stringify({
+          anomaliesFound: analysis.anomalies.length,
+          screeningSignals: analysis.screeningSignals.length,
+          thresholdDropPct: parsed.thresholdDropPct,
+          comparisonWindow: analysis.window
+        }),
         timestamp: new Date()
       });
 
       return {
-        anomaliesDetected: anomalies.length,
-        anomalies
+        comparisonWindow: analysis.window,
+        anomaliesDetected: analysis.anomalies.length,
+        anomalies: analysis.anomalies,
+        screeningSignals: analysis.screeningSignals,
+        evidenceRows: adsRecords.length
       };
     }
 
