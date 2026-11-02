@@ -545,6 +545,7 @@ app.post('/api/work-tasks', authenticate, async (req, res) => {
     const [activeDuplicate] = await pgDb.select().from(workTasks).where(and(
       eq(workTasks.contractorId, contractorId), eq(workTasks.taskType, taskType),
       eq(workTasks.entityType, entityType), eq(workTasks.entityId, entityId),
+      eq(workTasks.assignedWorker, assignedWorker),
       inArray(workTasks.status, ['queued', 'running', 'awaiting_approval'])
     )).limit(1);
     if (activeDuplicate) return res.status(200).json({ task: activeDuplicate, duplicate: true });

@@ -13,7 +13,7 @@ import {
   workTasks,
   hermesLabArtifacts
 } from '../../db/schema.ts';
-import { eq, and, desc, gte } from 'drizzle-orm';
+import { eq, and, desc, gte, inArray } from 'drizzle-orm';
 import crypto from 'crypto';
 import {
   McpToolDefinition,
@@ -243,6 +243,15 @@ export async function executeMcpTool(
           throw new Error('Unsupported entity type. Link tasks to a lead, mission, artifact or work task.');
         }
         if (!entityExists) throw new Error('The linked business record was not found in this workspace.');
+      }
+      if (entityType && entityId) {
+        const [activeDuplicate] = await pgDb.select().from(workTasks).where(and(
+          eq(workTasks.contractorId, contractorId), eq(workTasks.taskType, taskType),
+          eq(workTasks.entityType, entityType), eq(workTasks.entityId, entityId),
+          eq(workTasks.assignedWorker, assignedWorker),
+          inArray(workTasks.status, ['queued', 'running', 'awaiting_approval'])
+        )).limit(1);
+        if (activeDuplicate) return { task: activeDuplicate, duplicate: true, executionStarted: false };
       }
       const taskId = 'task_' + crypto.randomUUID();
       const correlationId = typeof rawParams?.correlationId === 'string' && rawParams.correlationId.trim()

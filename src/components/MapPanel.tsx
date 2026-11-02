@@ -429,6 +429,7 @@ export default function MapPanel({ leads, token, onOpenWorkQueue }: MapPanelProp
     setIsQueueingSelected(true);
     setQueueFeedback(null);
     let created = 0;
+    let alreadyActive = 0;
     try {
       for (const leadId of selectedLeadIds) {
         const lead = displayLeads.find(item => item.id === leadId);
@@ -443,16 +444,15 @@ export default function MapPanel({ leads, token, onOpenWorkQueue }: MapPanelProp
             assignedWorker: 'human', priority: 'normal', entityType: 'lead', entityId: lead.id, requiresApproval: false
           })
         });
-        if (!response.ok) {
-          const body = await response.json().catch(() => ({}));
-          throw new Error(body.error || `Could not queue ${lead.businessName}.`);
-        }
-        created++;
+        const body = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(body.error || `Could not queue ${lead.businessName}.`);
+        if (body.duplicate) alreadyActive++;
+        else created++;
       }
       setSelectedLeadIds([]);
-      setQueueFeedback(`Added ${created} prospect task${created === 1 ? '' : 's'} to the Work Queue.`);
+      setQueueFeedback(`Queued ${created} new task${created === 1 ? '' : 's'}; ${alreadyActive} already active.`);
     } catch (err: any) {
-      setQueueFeedback(`Added ${created} of ${selectedLeadIds.length} tasks. ${err?.message || 'Some tasks could not be queued.'}`);
+      setQueueFeedback(`Queued ${created} new tasks; ${alreadyActive} were already active. ${err?.message || 'Some tasks could not be queued.'}`);
     } finally { setIsQueueingSelected(false); }
   };
 
