@@ -1,19 +1,27 @@
 name: One-time dependency security refresh
 
 on:
-  push:
-    branches: [fix/google-auth-identity-verification]
+  pull_request:
+    branches: [main]
 
 permissions:
   contents: write
 
 jobs:
   refresh:
-    if: ${{ !startsWith(github.event.head_commit.message, 'chore: patch vulnerable dependencies') }}
+    if: ${{ github.head_ref == 'fix/google-auth-identity-verification' }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+      - name: Skip after the lockfile refresh commit
+        run: |
+          if [ "$(git log -1 --pretty=%s)" = "chore: patch vulnerable dependencies" ]; then
+            echo "Dependency refresh already committed."
+            exit 0
+          fi
       - uses: actions/setup-node@v4
         with:
           node-version: 22
