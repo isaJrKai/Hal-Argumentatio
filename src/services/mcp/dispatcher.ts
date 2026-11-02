@@ -16,7 +16,7 @@ import {
   workTasks,
   hermesLabArtifacts
 } from '../../db/schema.ts';
-import { eq, and, desc, gte, inArray } from 'drizzle-orm';
+import { eq, and, desc, gte, inArray, or, isNotNull } from 'drizzle-orm';
 import crypto from 'crypto';
 import {
   McpToolDefinition,
@@ -312,7 +312,7 @@ export async function executeMcpTool(
       if (!task) throw new Error('Work task not found in this workspace.');
       if (task.assignedWorker !== 'hermes') throw new Error('This task is not assigned to Hermes.');
       if (!['hermes_lab_asset', 'hermes_agent_task'].includes(task.taskType)) throw new Error('Hermes cannot execute this task type. Supported types: hermes_lab_asset, hermes_agent_task.');
-      if (task.requiresApproval || task.status === 'awaiting_approval') throw new Error('This task is blocked pending human approval.');
+      if (task.status === 'awaiting_approval' || (task.requiresApproval && !task.approvedAt)) throw new Error('This task is blocked pending human approval.');
       if (task.status !== 'queued') throw new Error(`Task is ${task.status}; only queued tasks can be claimed.`);
       if (task.attemptCount >= task.maxAttempts) throw new Error('Task has reached its maximum execution attempts.');
       const input = task.input && typeof task.input === 'object' && !Array.isArray(task.input) ? task.input as Record<string, any> : {};
@@ -341,7 +341,7 @@ export async function executeMcpTool(
         }).where(and(
           eq(workTasks.id, taskId), eq(workTasks.contractorId, contractorId),
           eq(workTasks.assignedWorker, 'hermes'), eq(workTasks.status, 'queued'),
-          eq(workTasks.requiresApproval, false)
+          or(eq(workTasks.requiresApproval, false), isNotNull(workTasks.approvedAt))
         )).returning();
         if (!running) return null;
         await tx.insert(workEvents).values({
