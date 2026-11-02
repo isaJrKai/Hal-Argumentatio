@@ -7459,16 +7459,39 @@ app.post('/api/system/audit-logs', authenticate, async (req, res) => {
 
 // ─── SCHEDULER SYSTEM (Core Learning Loops) ──────────────────────────────────
 
-app.get('/api/scheduler/jobs', authenticate, (req, res) => {
+app.get('/api/scheduler/jobs', authenticate, async (req, res) => {
   const contractorId = (req as any).contractorId;
   try {
-    // Scheduler execution and status transitions currently persist through the
-    // legacy scheduler store. Read from that same tenant-scoped source so the
-    // dashboard reports the jobs that were actually created and completed.
-    return res.json(db.getSchedulerJobs(contractorId));
+    // One-time compatibility migration from the old tenant-local JSON store.
+    // PostgreSQL is authoritative after this read; legacy rows are never
+    // returned directly and cannot overwrite an existing durable record.
+    const legacyJobs = db.getSchedulerJobs(contractorId) || [];
+    const toDate = (value: any, fallback?: Date) => {
+      if (!value) return fallback || null;
+      const parsed = new Date(value);
+      return Number.isFinite(parsed.getTime()) ? parsed : fallback || null;
+    };
+    for (const legacy of legacyJobs) {
+      if (!legacy?.id || !legacy?.job) continue;
+      await pgDb.insert(schedulerJobs).values({
+        id: String(legacy.id),
+        contractorId,
+        job: String(legacy.job),
+        status: String(legacy.status || 'failed'),
+        startedAt: toDate(legacy.startedAt),
+        completedAt: toDate(legacy.completedAt),
+        error: legacy.error ? String(legacy.error) : null,
+        result: typeof legacy.result === 'string' ? legacy.result : legacy.result == null ? null : JSON.stringify(legacy.result),
+        createdAt: toDate(legacy.createdAt, new Date()) as Date
+      }).onConflictDoNothing();
+    }
+    const jobs = await pgDb.select().from(schedulerJobs)
+      .where(eq(schedulerJobs.contractorId, contractorId))
+      .orderBy(desc(schedulerJobs.createdAt)).limit(100);
+    return res.json(jobs);
   } catch (err: any) {
-    console.error('[Scheduler] Job list failed:', err);
-    return res.status(503).json({ error: 'Scheduled jobs are temporarily unavailable.' });
+    console.error('[Scheduler] Durable job list failed:', err);
+    return res.status(503).json({ error: 'Scheduled jobs are temporarily unavailable from PostgreSQL.' });
   }
 });
 
@@ -7479,14 +7502,15 @@ app.post('/api/scheduler', authenticate, async (req, res) => {
     return res.status(400).json({ error: 'Job name is required.' });
   }
 
-  // Scheduler run history remains in its existing tenant-scoped store. The
-  // business data consumed and produced by each job is PostgreSQL-authoritative.
-  const jobRecord = db.addSchedulerJob({
+  const startedAt = new Date();
+  const [jobRecord] = await pgDb.insert(schedulerJobs).values({
+    id: 'job_' + crypto.randomUUID(),
     contractorId,
     job,
     status: 'running',
-    startedAt: new Date().toISOString()
-  });
+    startedAt,
+    createdAt: startedAt
+  }).returning();
 
   try {
     let resultMessage = '';
@@ -7707,18 +7731,18 @@ app.post('/api/scheduler', authenticate, async (req, res) => {
       throw new Error(`Job type "${job}" is unrecognised`);
     }
 
-    db.updateSchedulerJob(jobRecord.id, {
+    await pgDb.update(schedulerJobs).set({
       status: 'completed',
-      completedAt: new Date().toISOString(),
+      completedAt: new Date(),
       result: resultMessage
-    });
-    return res.json({ success: true, result: resultMessage });
+    }).where(and(eq(schedulerJobs.id, jobRecord.id), eq(schedulerJobs.contractorId, contractorId)));
+    return res.json({ success: true, result: resultMessage, jobId: jobRecord.id });
   } catch (err: any) {
-    db.updateSchedulerJob(jobRecord.id, {
+    await pgDb.update(schedulerJobs).set({
       status: 'failed',
-      completedAt: new Date().toISOString(),
-      error: err.message
-    });
+      completedAt: new Date(),
+      error: String(err.message || 'Scheduled job failed.')
+    }).where(and(eq(schedulerJobs.id, jobRecord.id), eq(schedulerJobs.contractorId, contractorId)));
     console.error('[HAL Scheduler] Job failed:', err);
     return res.status(503).json({ error: err.message || 'Scheduled job failed.' });
   }
@@ -10473,7 +10497,7 @@ async function startServer() {
       const sequences = db.getOutreachSequences(contractorId);
       const sequenceTemplates = getDefaultCadenceSequences();
       const outbox = await pgDb.select().from(conversionOutbox).where(eq(conversionOutbox.contractorId, contractorId));
-      const jobs = db.getSchedulerJobs(contractorId);
+      const jobs = await pgDb.select().from(schedulerJobs).where(eq(schedulerJobs.contractorId, contractorId)).orderBy(desc(schedulerJobs.createdAt));
       const schedulerTemplates = getDefaultSchedulerRules();
 
       const verification = verifyPhase3Pillars(sequences, outbox, jobs);
@@ -10669,14 +10693,17 @@ async function startServer() {
       const templates = getDefaultSchedulerRules();
       const configuredRules: any[] = [];
       const now = new Date().toISOString();
-      const jobRecord = db.addSchedulerJob({
+      const jobTime = new Date(now);
+      const [jobRecord] = await pgDb.insert(schedulerJobs).values({
+        id: 'job_' + crypto.randomUUID(),
         contractorId,
         job: 'phase3_scheduler_configuration_check',
         status: 'completed',
-        startedAt: now,
-        completedAt: now,
-        result: 'No persisted scheduler rules are configured; no calendar or outreach triggers were executed.'
-      });
+        startedAt: jobTime,
+        completedAt: jobTime,
+        result: 'No persisted scheduler rules are configured; no calendar or outreach triggers were executed.',
+        createdAt: jobTime
+      }).returning();
 
       const auditBlock = db.recordLedgerEntry({
         contractorId,
