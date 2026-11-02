@@ -156,6 +156,15 @@ export const HAL_MCP_TOOLS: McpToolDefinition[] = [
     }
   },
   {
+    name: 'hal_execute_hermes_work_task',
+    description: 'Executes one queued, non-approval-blocked Hermes asset-generation task assigned to Hermes. It claims the task atomically, records execution events, and stores a success or failure receipt. It does not send messages, spend money, publish externally, or execute arbitrary task types.',
+    inputSchema: {
+      type: 'object',
+      properties: { taskId: { type: 'string' } },
+      required: ['taskId']
+    }
+  },
+  {
     name: 'hermes_synthesize_lab_asset',
     description: 'Executes specialized Hermes Intelligence Lab tool to generate landing pages, ad copies, SEO schemas, or diagnostic repair adapters.',
     inputSchema: {
@@ -296,6 +305,90 @@ export async function executeMcpTool(
       const limit = Number.isFinite(requested) && requested > 0 ? Math.min(100, Math.floor(requested)) : 50;
       return { tasks: await listWorkTasks(pgDb, contractorId, limit) };
     }
+    case 'hal_execute_hermes_work_task': {
+      const taskId = typeof rawParams?.taskId === 'string' ? rawParams.taskId.trim() : '';
+      if (!taskId || taskId.length > 160) throw new Error('A valid taskId is required.');
+      const task = await getWorkTask(pgDb, contractorId, taskId);
+      if (!task) throw new Error('Work task not found in this workspace.');
+      if (task.assignedWorker !== 'hermes') throw new Error('This task is not assigned to Hermes.');
+      if (task.taskType !== 'hermes_lab_asset') throw new Error('Hermes can only execute registered hermes_lab_asset tasks through this tool.');
+      if (task.requiresApproval || task.status === 'awaiting_approval') throw new Error('This task is blocked pending human approval.');
+      if (task.status !== 'queued') throw new Error(`Task is ${task.status}; only queued tasks can be claimed.`);
+      if (task.attemptCount >= task.maxAttempts) throw new Error('Task has reached its maximum execution attempts.');
+      const input = task.input && typeof task.input === 'object' && !Array.isArray(task.input) ? task.input as Record<string, any> : {};
+      const allowedToolIds: LabToolType[] = ['landing_page', 'ad_copy_studio', 'seo_schema_generator', 'outreach_sequences', 'sms_review_booster', 'speed_vitals_optimizer', 'competitor_intel_scout', 'webhook_resilience_fixer', 'negative_keyword_miner', 'deep_case_reasoner'];
+      const toolId = input.toolId as LabToolType;
+      const parameters = input.parameters && typeof input.parameters === 'object' && !Array.isArray(input.parameters) ? input.parameters : null;
+      const promptOverride = typeof input.promptOverride === 'string' ? input.promptOverride.slice(0, 12000) : undefined;
+      if (!allowedToolIds.includes(toolId) || !parameters || JSON.stringify(parameters).length > 20000) {
+        throw new Error('Hermes task input must contain a registered toolId and a parameters object within 20 KB.');
+      }
+
+      const claimed = await pgDb.transaction(async tx => {
+        const [running] = await tx.update(workTasks).set({
+          status: 'running', startedAt: task.startedAt || new Date(),
+          attemptCount: task.attemptCount + 1, errorMessage: null, updatedAt: new Date()
+        }).where(and(
+          eq(workTasks.id, taskId), eq(workTasks.contractorId, contractorId),
+          eq(workTasks.assignedWorker, 'hermes'), eq(workTasks.status, 'queued'),
+          eq(workTasks.requiresApproval, false)
+        )).returning();
+        if (!running) return null;
+        await tx.insert(workEvents).values({
+          id: 'evt_' + crypto.randomUUID(), contractorId,
+          eventType: 'task.execution_started', entityType: 'work_task', entityId: taskId,
+          actorType: 'agent', actorId: 'hermes_agent', sourceModule: 'hermes_work_executor',
+          correlationId: task.correlationId || taskId,
+          summary: `Hermes started: ${task.title}.`,
+          payload: { taskType: task.taskType, toolId, attempt: running.attemptCount }
+        });
+        return running;
+      });
+      if (!claimed) throw new Error('Task was claimed or changed by another worker. Refresh the queue.');
+
+      try {
+        const result = await executeHermesLabTool(toolId, parameters, contractorId, promptOverride);
+        const receipt = {
+          artifactId: result.artifactId, title: result.title, category: result.category,
+          status: result.status, executionSummary: result.executionSummary
+        };
+        const [completed] = await pgDb.transaction(async tx => {
+          const [saved] = await tx.update(workTasks).set({
+            status: 'completed', output: receipt, completedAt: new Date(), updatedAt: new Date()
+          }).where(and(
+            eq(workTasks.id, taskId), eq(workTasks.contractorId, contractorId),
+            eq(workTasks.status, 'running'), eq(workTasks.assignedWorker, 'hermes')
+          )).returning();
+          if (!saved) throw new Error('Task state changed before Hermes could record its execution receipt.');
+          await tx.insert(workEvents).values({
+            id: 'evt_' + crypto.randomUUID(), contractorId,
+            eventType: 'task.execution_completed', entityType: 'work_task', entityId: taskId,
+            actorType: 'agent', actorId: 'hermes_agent', sourceModule: 'hermes_work_executor',
+            correlationId: task.correlationId || taskId,
+            summary: `Hermes completed: ${task.title}.`,
+            payload: { artifactId: result.artifactId, artifactTitle: result.title, toolId }
+          });
+          return [saved];
+        });
+        return { success: true, task: completed, receipt, executionStarted: true };
+      } catch (executionError: any) {
+        const message = String(executionError?.message || 'Hermes execution failed.').slice(0, 1000);
+        await pgDb.transaction(async tx => {
+          await tx.update(workTasks).set({ status: 'failed', errorMessage: message, updatedAt: new Date() })
+            .where(and(eq(workTasks.id, taskId), eq(workTasks.contractorId, contractorId), eq(workTasks.status, 'running')));
+          await tx.insert(workEvents).values({
+            id: 'evt_' + crypto.randomUUID(), contractorId,
+            eventType: 'task.execution_failed', entityType: 'work_task', entityId: taskId,
+            actorType: 'agent', actorId: 'hermes_agent', sourceModule: 'hermes_work_executor',
+            correlationId: task.correlationId || taskId,
+            summary: `Hermes failed: ${task.title}.`,
+            payload: { toolId, error: message }
+          });
+        });
+        return { success: false, taskId, status: 'failed', error: message, retryAvailable: claimed.attemptCount < claimed.maxAttempts };
+      }
+    }
+
     case 'hal_get_financial_health': {
       const parsed = validateFinancialHealthInput(rawParams || {});
       
