@@ -60,10 +60,11 @@ Return your response strictly as a raw JSON object matching this structure:
 
   // Helper to calibrate confidence: clamp between 0.10 and 0.95 and account for extreme unexplained variance
   const calibrateConfidence = (rawScore: number): number => {
-    const parsed = typeof rawScore === 'number' && !isNaN(rawScore) ? rawScore : 0.65;
-    // Penalty if deviation is extreme (>60%) indicating high unpredictability
+    const parsed = typeof rawScore === 'number' && Number.isFinite(rawScore) ? rawScore : 0;
+    // This is a model-reported score with a simple variance penalty, not a
+    // statistically validated probability of causal correctness.
     const variancePenalty = Math.abs(deviation) > 0.6 ? 0.15 : Math.abs(deviation) > 0.3 ? 0.08 : 0;
-    const bounded = Math.min(0.92, Math.max(0.18, parsed - variancePenalty));
+    const bounded = Math.min(0.95, Math.max(0, parsed - variancePenalty));
     return Math.round(bounded * 100) / 100;
   };
 
@@ -173,16 +174,14 @@ Return your response strictly as a raw JSON object matching this structure:
     }
   }
 
-  // 3. Fallback heuristics if all AI APIs fail - transparently flagged as unverified heuristic
-  const direction = actual > predicted ? 'higher' : 'lower';
+  // A provider outage can report the measured deviation, but it cannot infer a
+  // cause from one observation. Do not manufacture a causal recommendation.
+  const direction = actual > predicted ? 'higher' : actual < predicted ? 'lower' : 'equal to';
   const absDev = Math.abs(deviation);
-  const magnitude = absDev > 0.2 ? 'significant' : 'minor';
-  const fallbackInsight = `[Fallback Heuristic - Model Offline]: Observed actual ${metric} is ${direction} than predicted by ${Math.round(absDev * 100)}%. This ${magnitude} deviation suggests manual review of initial bid premiums during event hours.`;
-  // Honest mathematically bounded confidence based on deviation magnitude (lower deviation = higher baseline reliability)
-  const heuristicConfidence = Math.max(0.20, Math.min(0.48, 0.50 - absDev * 0.25));
+  const fallbackInsight = `[Unverified heuristic — model offline] Recorded actual ${metric} was ${direction} the forecast by ${Math.round(absDev * 100)}%. This records the deviation only; the cause is not established by the available observation. Review the source data and original assumptions before changing strategy.`;
   return {
     insight: fallbackInsight,
-    confidence: Math.round(heuristicConfidence * 100) / 100,
+    confidence: 0,
     category,
     source: 'fallback_heuristic'
   };
