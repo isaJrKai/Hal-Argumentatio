@@ -34,13 +34,21 @@ jobs:
         run: bun install --frozen-lockfile
       - name: Apply compatible security updates
         run: bun audit fix || true
-      - name: Verify the updated lockfile
+      - name: Verify the updated Bun lockfile
         run: bun install --frozen-lockfile
+      - name: Regenerate and repair the npm lockfile for Google AI Studio
+        run: |
+          npm install --package-lock-only --ignore-scripts --no-audit --no-fund
+          npm audit fix --package-lock-only --ignore-scripts --no-fund
+      - name: Verify npm's frozen install path
+        run: npm ci --no-audit --no-fund
       - name: Run type checks and automated tests
         run: npm run test:ci
       - name: Build production artifacts
         run: npm run build
-      - name: Require a clean production dependency audit
+      - name: Require a clean production npm dependency audit
+        run: npm audit --omit=dev --audit-level=high
+      - name: Require a clean production Bun dependency audit
         run: bun audit --prod --audit-level=high
       - name: Commit the reviewed lockfile update
         run: |
@@ -50,6 +58,6 @@ jobs:
           fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add bun.lock package.json
+          git add bun.lock package-lock.json package.json
           git commit -m "chore: patch vulnerable dependencies"
           git push origin "HEAD:${GITHUB_HEAD_REF}"
