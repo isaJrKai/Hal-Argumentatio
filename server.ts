@@ -20,7 +20,7 @@ import {
   Recommendation
 } from './src/db/db';
 import { db as pgDb, createPool as getApplicationPostgresPool } from './src/db/index.ts';
-import { contractors, auditLogs, leads, leadEvents, revenueRecords, campaigns, winLossRecords, performanceSnapshots, recommendations, forecasts, predictionOutcomes, learningInsights, chatMessages, chatProjects, chatConversations, missions, clientProjects, outreachSequences, apiKeys, notifications, schedulerJobs, leadAttribution, conversionOutbox, googleAdsDailyPerformance, revenueExperiments, revenueRecommendations, revenueRecommendationEvents, revenueSimulations, revenueOutcomes, communicationsOutbox, communicationsDeliveryEvents, halLoops, halLoopEvents, hermesLabArtifacts, hermesDiagnosticIncidents, hermesLabMessages, workEvents, workTasks, revokedTokens } from './src/db/schema.ts';
+import { contractors, auditLogs, leads, leadEvents, revenueRecords, campaigns, winLossRecords, performanceSnapshots, recommendations, forecasts, predictionOutcomes, learningInsights, chatMessages, chatProjects, chatConversations, missions, clientProjects, outreachSequences, apiKeys, connectorCredentials, notifications, schedulerJobs, leadAttribution, conversionOutbox, googleAdsDailyPerformance, revenueExperiments, revenueRecommendations, revenueRecommendationEvents, revenueSimulations, revenueOutcomes, communicationsOutbox, communicationsDeliveryEvents, halLoops, halLoopEvents, hermesLabArtifacts, hermesDiagnosticIncidents, hermesLabMessages, workEvents, workTasks, revokedTokens } from './src/db/schema.ts';
 import { eq, inArray, desc, and, or, like, sql, gte, lte, gt } from 'drizzle-orm';
 import { 
   generateLearningFromOutcome, 
@@ -6516,10 +6516,31 @@ app.put('/api/projects/:id', authenticate, async (req, res) => {
 
 // ─── CONNECTORS CREDENTIALS & HEALTH API ──────────────────────────────────────
 
-app.get('/api/connectors/credentials', authenticate, (req, res) => {
+async function getTenantConnectorCredentials(contractorId: string): Promise<Record<string, string>> {
+  // Import existing encrypted JSON-store values once. PostgreSQL becomes the
+  // durable source after first read; conflicts never overwrite newer DB values.
+  const legacyCredentials = db.getConnectorCredentials(contractorId) || {};
+  for (const [service, value] of Object.entries(legacyCredentials)) {
+    if (typeof value !== 'string' || !value) continue;
+    const id = 'conn_' + crypto.createHash('sha256').update(`${contractorId}:${service}`).digest('hex');
+    await pgDb.insert(connectorCredentials).values({
+      id, contractorId, service, encryptedValue: encrypt(value), updatedAt: new Date()
+    }).onConflictDoNothing();
+  }
+  const rows = await pgDb.select().from(connectorCredentials)
+    .where(eq(connectorCredentials.contractorId, contractorId));
+  const credentials: Record<string, string> = {};
+  for (const row of rows) {
+    const value = decrypt(row.encryptedValue);
+    if (value) credentials[row.service] = value;
+  }
+  return credentials;
+}
+
+app.get('/api/connectors/credentials', authenticate, async (req, res) => {
   const contractorId = (req as any).contractorId;
   try {
-    const creds = db.getConnectorCredentials(contractorId);
+    const creds = await getTenantConnectorCredentials(contractorId);
     const configured = Object.fromEntries(
       Object.entries(creds).map(([service, value]) => [service, Boolean(value)])
     );
@@ -6530,7 +6551,7 @@ app.get('/api/connectors/credentials', authenticate, (req, res) => {
   }
 });
 
-app.post('/api/connectors/credentials', authenticate, (req, res) => {
+app.post('/api/connectors/credentials', authenticate, async (req, res) => {
   const contractorId = (req as any).contractorId;
   const { service, keyVal } = req.body || {};
   const allowedServices = new Set([
@@ -6545,13 +6566,34 @@ app.post('/api/connectors/credentials', authenticate, (req, res) => {
     return res.status(400).json({ error: 'A non-empty connector credential is required.' });
   }
   try {
-    db.saveConnectorCredential(contractorId, service, keyVal.trim());
-    db.addAuditLog({
+    const id = 'conn_' + crypto.createHash('sha256').update(`${contractorId}:${service}`).digest('hex');
+    const encryptedValue = encrypt(keyVal.trim());
+    await pgDb.insert(connectorCredentials).values({
+      id, contractorId, service, encryptedValue, updatedAt: new Date()
+    }).onConflictDoUpdate({
+      target: connectorCredentials.id,
+      set: { encryptedValue, updatedAt: new Date() }
+    });
+    await pgDb.insert(auditLogs).values({
+      id: crypto.randomUUID(),
       contractorId,
       action: 'CONNECTOR_KEY_UPDATED',
-      details: `Updated API credentials for connector service: ${service}`
+      details: `Updated encrypted API credentials for connector service: ${service}`
     });
-    res.json({ success: true, service, configured: true });
+    await pgDb.insert(workEvents).values({
+      id: 'evt_' + crypto.randomUUID(),
+      contractorId,
+      eventType: 'connector.credential_updated',
+      entityType: 'connector_credential',
+      entityId: id,
+      actorType: 'human',
+      actorId: contractorId,
+      sourceModule: 'connectors',
+      correlationId: id,
+      summary: `Updated encrypted credentials for ${service}.`,
+      payload: { service, configured: true }
+    });
+    return res.json({ success: true, service, configured: true });
   } catch (err: any) {
     res.status(500).json({ error: 'Unable to securely save connector credentials.' });
   }
