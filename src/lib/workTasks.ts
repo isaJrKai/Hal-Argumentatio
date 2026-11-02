@@ -19,6 +19,13 @@ export function requiresWorkTaskApproval(taskType: string, title: string, descri
   return /(^|[._\s-])(send|dispatch|publish|spend|purchase|charge|refund|sign|execute[_\s]contract|delete|archive|revoke|transfer[_\s]funds|bulk[_\s]outreach|email[_\s]blast|cold[_\s]email|email[_\s]outreach|sms[_\s]campaign|whatsapp[_\s]campaign|launch[_\s]campaign)([._\s-]|$)/i.test(`${taskType} ${title} ${description || ''}`);
 }
 
+export function canHumanUpdateWorkTask(assignedWorker: string, nextStatus: string): boolean {
+  // Agent work can only be started/completed/failed by its registered executor receipt path.
+  // Human operators may still approve or cancel agent-assigned work.
+  if (assignedWorker !== 'human' && ['running', 'completed', 'failed'].includes(nextStatus)) return false;
+  return true;
+}
+
 export function canTransitionWorkTask(from: string, to: string): boolean {
   return WORK_TASK_STATUSES.includes(from as WorkTaskStatus) &&
     WORK_TASK_STATUSES.includes(to as WorkTaskStatus) &&

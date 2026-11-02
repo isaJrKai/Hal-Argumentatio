@@ -43,7 +43,7 @@ import { validateCrmTransition, isKnownCrmStage } from './src/lib/crmStateMachin
 import { buildFinancialSnapshotCore } from './src/lib/financialSnapshot';
 import { buildPasswordResetResponse } from './src/lib/passwordResetResponse';
 import { recordWorkEvent, getRecentWorkEvents, getEntityWorkEvents } from './src/lib/workLedger';
-import { canTransitionWorkTask, listWorkTasks, getWorkTask, requiresWorkTaskApproval } from './src/lib/workTasks';
+import { canHumanUpdateWorkTask, canTransitionWorkTask, listWorkTasks, getWorkTask, requiresWorkTaskApproval } from './src/lib/workTasks';
 import { resolvePublishedLandingPageOwner } from './src/lib/landingPageOwnership';
 import { validateLoopGate } from './src/lib/loopGating';
 import { 
@@ -591,6 +591,9 @@ app.patch('/api/work-tasks/:id', authenticate, async (req, res) => {
     if (!current) return res.status(404).json({ error: 'Work task not found.' });
     if (current.status === 'failed' && nextStatus === 'queued' && current.attemptCount >= current.maxAttempts) {
       return res.status(409).json({ error: 'Task has reached its maximum retry count.', attempts: current.attemptCount, maxAttempts: current.maxAttempts });
+    }
+    if (!canHumanUpdateWorkTask(current.assignedWorker, nextStatus)) {
+      return res.status(403).json({ error: 'Agent-assigned tasks must be started and completed through their registered executor receipt path. You may approve or cancel them here.' });
     }
     if (!canTransitionWorkTask(current.status, nextStatus)) {
       return res.status(409).json({ error: `Task cannot move from ${current.status} to ${nextStatus || 'unknown'}.`, currentStatus: current.status });

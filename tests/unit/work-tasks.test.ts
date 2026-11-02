@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { canTransitionWorkTask, listWorkTasks, requiresWorkTaskApproval } from '../../src/lib/workTasks';
+import { canHumanUpdateWorkTask, canTransitionWorkTask, listWorkTasks, requiresWorkTaskApproval } from '../../src/lib/workTasks';
 
 describe('HAL work task state machine', () => {
   it('requires approval for consequential task descriptions', () => {
@@ -12,6 +12,15 @@ describe('HAL work task state machine', () => {
     expect(requiresWorkTaskApproval('research', 'Draft an email for human review')).toBe(false);
     expect(requiresWorkTaskApproval('research', 'Find competitor pricing')).toBe(false);
     expect(requiresWorkTaskApproval('lead_follow_up', 'Review and follow up')).toBe(false);
+  });
+
+  it('prevents humans from marking agent-assigned tasks as executed', () => {
+    expect(canHumanUpdateWorkTask('hermes', 'running')).toBe(false);
+    expect(canHumanUpdateWorkTask('gemini', 'completed')).toBe(false);
+    expect(canHumanUpdateWorkTask('amis', 'failed')).toBe(false);
+    expect(canHumanUpdateWorkTask('hermes', 'cancelled')).toBe(true);
+    expect(canHumanUpdateWorkTask('human', 'running')).toBe(true);
+    expect(canHumanUpdateWorkTask('human', 'completed')).toBe(true);
   });
 
   it('allows queued work to start, request approval, or be cancelled', () => {
