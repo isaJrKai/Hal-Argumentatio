@@ -14,6 +14,7 @@ describe('HAL work task state machine', () => {
     expect(requiresWorkTaskApproval('lead_follow_up', 'Review and follow up')).toBe(false);
     expect(requiresWorkTaskApproval('hermes_agent_task', 'Prepare task', undefined, { message: 'Send the campaign to all prospects' })).toBe(true);
     expect(requiresWorkTaskApproval('hermes_agent_task', 'Prepare task', undefined, { message: 'Review the campaign draft only' })).toBe(false);
+    expect(requiresWorkTaskApproval('hermes_lab_asset', 'Hermes landing page', 'Create a local draft artifact. External actions are out of scope.', {})).toBe(false);
   });
 
   it('prevents humans from marking agent-assigned tasks as executed', () => {
