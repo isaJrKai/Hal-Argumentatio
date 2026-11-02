@@ -6737,11 +6737,17 @@ app.post('/api/scheduler', authenticate, async (req, res) => {
       const campaignIds = campaigns.map(c => c.id);
       const snaps = db.getPerformanceSnapshots(campaignIds);
       
-      // Compute lead volume historical daily values
-      const historicalData = snaps.map(s => ({
-        date: s.date,
-        value: s.leads
-      }));
+      // Use only the trailing 90 days of recorded campaign snapshots.
+      const historyCutoff = Date.now() - 90 * 24 * 60 * 60 * 1000;
+      const historicalData = snaps
+        .filter(snapshot => {
+          const timestamp = new Date(snapshot.date).getTime();
+          return Number.isFinite(timestamp) && timestamp >= historyCutoff;
+        })
+        .map(snapshot => ({
+          date: snapshot.date,
+          value: snapshot.leads
+        }));
 
       const forecastResult = await generateForecastNarrative('lead_volume', historicalData, req.body.preferredAI);
 
