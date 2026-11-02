@@ -9676,10 +9676,11 @@ async function startServer() {
         success: true,
         incidents,
         overseerStatus: {
-          active: true,
-          mode: 'ACTIVE_SUPERVISION',
-          lastScanAt: new Date().toISOString(),
-          monitoredSurfaces: ['GCLID Attribution Outbox', 'Webhook Payloads', 'SSL & Tag Integrity', 'ROAS Anomalies']
+          active: false,
+          mode: 'ON_DEMAND_DIAGNOSTIC_ONLY',
+          lastScanAt: incidents[0]?.createdAt || null,
+          monitoredSurfaces: ['Google Ads daily performance observations'],
+          providerReachabilityVerified: false
         }
       });
     } catch (err: any) {
@@ -9691,43 +9692,65 @@ async function startServer() {
   app.post('/api/hermes/diagnostics/scan', authenticate, async (req, res) => {
     const contractorId = (req as any).contractorId;
     try {
-      // Check contractor lead conversion rate and ad anomalies
-      const ads = await pgDb
-        .select()
-        .from(googleAdsDailyPerformance)
+      // This endpoint checks stored Google Ads observations only. It does not
+      // probe landing-page tags, webhooks, or provider delivery reachability.
+      const ads = await pgDb.select().from(googleAdsDailyPerformance)
         .where(eq(googleAdsDailyPerformance.contractorId, contractorId));
-
+      const totalSpend = ads.reduce((sum, row) => sum + (Number(row.cost) || 0), 0);
+      const totalConversions = ads.reduce((sum, row) => sum + (Number(row.conversions) || 0), 0);
       const detectedIssues: any[] = [];
-      const totalSpend = ads.reduce((acc, a) => acc + (Number(a.cost) || 0), 0);
-      const totalConv = ads.reduce((acc, a) => acc + (Number(a.conversions) || 0), 0);
 
-      if (totalSpend > 400 && totalConv === 0) {
-        const incidentId = crypto.randomUUID();
-        await pgDb.insert(hermesDiagnosticIncidents).values({
-          id: incidentId,
-          contractorId,
-          title: 'Zero Conversion Leak Detected in Google Ads Traffic',
-          severity: 'HIGH',
-          category: 'TRACKING_TAG',
-          rootCause: 'Traffic is landing on destination URL without active GCLID attribution form listener.',
-          evidence: { spend: totalSpend, conversions: 0 },
-          proposedFix: 'Inject HAL GCLID capture script and deploy pre-wired emergency landing page from Hermes Lab.',
-          status: 'open',
-          createdAt: new Date()
-        });
-        detectedIssues.push({ id: incidentId, title: 'Zero Conversion Leak Detected' });
+      if (ads.length > 0 && totalSpend > 400 && totalConversions === 0) {
+        const title = 'Spend recorded without conversions in Google Ads observations';
+        const [existing] = await pgDb.select({ id: hermesDiagnosticIncidents.id })
+          .from(hermesDiagnosticIncidents)
+          .where(and(
+            eq(hermesDiagnosticIncidents.contractorId, contractorId),
+            eq(hermesDiagnosticIncidents.title, title),
+            eq(hermesDiagnosticIncidents.status, 'open')
+          )).limit(1);
+        if (!existing) {
+          const incidentId = crypto.randomUUID();
+          await pgDb.insert(hermesDiagnosticIncidents).values({
+            id: incidentId,
+            contractorId,
+            title,
+            severity: 'MEDIUM',
+            category: 'CAMPAIGN_DECAY',
+            rootCause: 'Stored Google Ads observations show spend above the screening threshold and zero recorded conversions. This does not establish whether tracking is broken or whether no conversions occurred.',
+            evidence: {
+              spend: totalSpend,
+              conversions: totalConversions,
+              observationRows: ads.length,
+              source: 'google_ads_daily_performance',
+              interpretation: 'Screening signal only; validate attribution and conversion tracking independently.'
+            },
+            proposedFix: 'Review the Google Ads conversion configuration and reconcile it against verified landing-page and CRM events before changing campaign budgets or deploying code.',
+            status: 'open',
+            createdAt: new Date()
+          });
+          detectedIssues.push({ id: incidentId, title });
+        }
       }
 
-      res.json({
+      return res.json({
         success: true,
-        scannedSurfaces: 4,
+        scanMode: 'on_demand',
+        scannedSurfaces: ads.length ? ['Google Ads daily performance observations'] : [],
+        evidenceRows: ads.length,
+        totalSpend,
+        totalConversions,
         newIncidentsFound: detectedIssues.length,
-        detectedIssues
+        detectedIssues,
+        message: ads.length
+          ? 'Google Ads observations were reviewed. No external tracking-tag, webhook, or delivery-provider health checks were performed.'
+          : 'No Google Ads performance observations are stored for this workspace; no diagnostic conclusion was generated.'
       });
     } catch (err: any) {
-      res.status(500).json({ success: false, error: err.message });
+      console.error('[Hermes Diagnostic Scan Error]', err);
+      return res.status(500).json({ success: false, error: err.message || 'Diagnostic scan failed.' });
     }
-  });
+  });;
 
   // 7. Get Hermes Lab Chat Messages
   app.get('/api/hermes/chat', authenticate, async (req, res) => {
