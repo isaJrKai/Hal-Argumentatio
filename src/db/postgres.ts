@@ -826,13 +826,14 @@ export async function bootstrapPostgresTables(poolInstance?: Pool): Promise<void
             count(*) FILTER (WHERE table_schema = 'public') AS public_table_count,
             to_regclass('public.work_tasks') IS NOT NULL AS has_work_tasks,
             to_regclass('public.staff_members') IS NOT NULL AS has_staff_members,
+            EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'work_tasks' AND column_name = 'assigned_staff_id') AS has_work_task_staff_owner,
             to_regclass('public.work_events') IS NOT NULL AS has_work_events
           FROM information_schema.tables
           WHERE table_schema = 'public';
         `);
         const schemaState = check.rows[0];
         const count = Number(schemaState?.public_table_count || 0);
-        if (count > 0 && schemaState?.has_work_tasks && schemaState?.has_work_events && schemaState?.has_staff_members) {
+        if (count > 0 && schemaState?.has_work_tasks && schemaState?.has_work_events && schemaState?.has_staff_members && schemaState?.has_work_task_staff_owner) {
           console.log(`[HAL PostgreSQL] Managed schema active (${count} public tables; operating-layer tables verified).`);
           return;
         }
@@ -888,12 +889,13 @@ export async function testPostgresConnection(customUrl?: string): Promise<{
         to_regclass('public.leads') IS NOT NULL AS has_leads,
         to_regclass('public.work_tasks') IS NOT NULL AS has_work_tasks,
         to_regclass('public.staff_members') IS NOT NULL AS has_staff_members,
+        EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'work_tasks' AND column_name = 'assigned_staff_id') AS has_work_task_staff_owner,
         to_regclass('public.work_events') IS NOT NULL AS has_work_events
       FROM information_schema.tables
       WHERE table_schema = 'public';
     `);
     const schemaState = tablesRes.rows[0] || {};
-    const schemaReady = Boolean(schemaState.has_contractors && schemaState.has_leads && schemaState.has_work_tasks && schemaState.has_work_events && schemaState.has_staff_members);
+    const schemaReady = Boolean(schemaState.has_contractors && schemaState.has_leads && schemaState.has_work_tasks && schemaState.has_work_events && schemaState.has_staff_members && schemaState.has_work_task_staff_owner);
     const latencyMs = Date.now() - startTime;
     const versionStr = result.rows[0]?.version || 'PostgreSQL';
     const provider = (customUrl || activeConnectionString || process.env.DATABASE_URL || process.env.NEON_DATABASE_URL || '').includes('neon.tech') || versionStr.toLowerCase().includes('neon')
