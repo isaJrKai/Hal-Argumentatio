@@ -576,7 +576,7 @@ app.get('/api/staff', authenticate, async (req, res) => {
 app.post('/api/staff', authenticate, async (req, res) => {
   const contractorId = (req as any).contractorId;
   const parsed = validateStaffInput(req.body);
-  if (!parsed.valid) return res.status(400).json({ error: parsed.error });
+  if (parsed.valid === false) return res.status(400).json({ error: parsed.error });
   try {
     if (parsed.value.email) {
       const [duplicate] = await pgDb.select({ id: staffMembers.id }).from(staffMembers)
