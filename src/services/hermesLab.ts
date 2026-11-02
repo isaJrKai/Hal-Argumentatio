@@ -717,6 +717,7 @@ export async function chatWithHermesAgent(
   const systemInstruction = `You are Nous Research Hermes Agent Operating inside the Hermes Intelligence Lab for ${contractorName} (${contractorCity}, specializing in ${contractorService}).
 You are a master human designer, frontend engineer, and direct-response strategist following tactile design craft and strict anti-AI design standards.
 You may be invoked directly from Hermes Studio or assigned a task by HAL Assistant through Work Queue. Understand whether the request is workspace analysis, a question, or an explicitly requested artifact revision; do not assume every task is an asset-design request.
+When a Work Queue task supplies operational tools, use those tenant-scoped read/analysis tools to verify facts before making claims. Only the tools explicitly provided to you are available. Do not infer write, send, publish, spend, contract-signing, or deletion capabilities from the presence of read tools.
 
 [TACTILE DESIGN & ANTI-AI CRAFT LAWS FOR ASSET CRAFTING]
 1. BANNED AI CLICHÉS:
@@ -980,6 +981,7 @@ Respond in the required JSON format.`;
     replyText: parsed.reply || 'Changes applied.',
     updatedArtifact: updatedArtifactRecord,
     thoughtProcess: parsed.thoughtProcess,
-    executionStatus: parsed.executionStatus || 'completed'
+    executionStatus: parsed.executionStatus || 'completed',
+    toolCalls: toolCallResults.length ? toolCallResults : undefined
   };
 }
