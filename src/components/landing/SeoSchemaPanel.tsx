@@ -133,31 +133,31 @@ export const SeoSchemaPanel: React.FC<SeoSchemaPanelProps> = ({ config, onChange
         </div>
       </div>
 
-      {/* Human-Readable Local Search & Google Rich Results Verification Card */}
+      {/* Local SEO Structured Data Preview */}
       <div className="p-5 rounded-2xl bg-bg-raised border border-border-dim space-y-4">
         <div className="flex items-center justify-between pb-3 border-b border-border-dim">
           <div className="flex items-center gap-2">
             <ShieldCheck className="w-4 h-4 text-emerald-400" />
             <h4 className="text-xs font-bold uppercase tracking-wider text-text-primary">
-              Local Pack & Rich Results Status
+              Local SEO Schema Preview
             </h4>
           </div>
-          <span className="px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-500 text-[10px] font-bold uppercase">
-            Active · Google Search Validated
+          <span className="px-2 py-0.5 rounded-full bg-zinc-500/15 text-zinc-500 text-[10px] font-bold uppercase">
+            Preview only · Not validated
           </span>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
           <div className="p-3 rounded-xl bg-bg-base border border-border-dim space-y-1">
-            <span className="text-[10px] uppercase tracking-wider text-text-secondary font-mono">Business & Entity Match</span>
+            <span className="text-[10px] uppercase tracking-wider text-text-secondary font-mono">Business details</span>
             <div className="font-semibold text-text-primary truncate">{config.businessName}</div>
-            <div className="text-[11px] text-emerald-600 dark:text-emerald-400 font-mono">✓ Verified NAP Identity</div>
+            <div className="text-[11px] text-emerald-600 dark:text-emerald-400 font-mono">Configured here · Not externally verified</div>
           </div>
 
           <div className="p-3 rounded-xl bg-bg-base border border-border-dim space-y-1">
-            <span className="text-[10px] uppercase tracking-wider text-text-secondary font-mono">Direct Contact Dispatch</span>
-            <div className="font-semibold text-text-primary font-mono">{config.phone || 'Direct line active'}</div>
-            <div className="text-[11px] text-emerald-600 dark:text-emerald-400 font-mono">✓ Click-to-call mobile trigger</div>
+            <span className="text-[10px] uppercase tracking-wider text-text-secondary font-mono">Contact link preview</span>
+            <div className="font-semibold text-text-primary font-mono">{config.phone || 'No phone configured'}</div>
+            <div className="text-[11px] text-emerald-600 dark:text-emerald-400 font-mono">Phone number shown · No dispatch connection</div>
           </div>
 
           <div className="p-3 rounded-xl bg-bg-base border border-border-dim space-y-1">
@@ -167,11 +167,15 @@ export const SeoSchemaPanel: React.FC<SeoSchemaPanelProps> = ({ config, onChange
           </div>
 
           <div className="p-3 rounded-xl bg-bg-base border border-border-dim space-y-1">
-            <span className="text-[10px] uppercase tracking-wider text-text-secondary font-mono">Availability Specification</span>
-            <div className="font-semibold text-text-primary">24/7 Emergency Dispatch</div>
-            <div className="text-[11px] text-text-secondary font-mono">Monday – Sunday · Continuous</div>
+            <span className="text-[10px] uppercase tracking-wider text-text-secondary font-mono">Operating hours</span>
+            <div className="font-semibold text-text-primary">Not configured</div>
+            <div className="text-[11px] text-text-secondary font-mono">No live availability verification</div>
           </div>
         </div>
+
+        <p className="text-[11px] text-text-secondary leading-relaxed">
+          This panel previews the structured business details HAL can publish. It does not confirm Google indexing, Local Pack eligibility, business identity, operating hours, or rich-result validation.
+        </p>
 
         {/* Optional Collapsible Technical Payload */}
         <details className="pt-2 text-xs">
