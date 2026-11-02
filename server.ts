@@ -4676,6 +4676,7 @@ app.post('/api/learning/winloss', authenticate, async (req, res) => {
     // Add automatic system lesson
     await pgDb.insert(learningInsights).values({
       id: 'li_' + crypto.randomBytes(8).toString('hex'),
+      contractorId,
       metric: outcome === 'won' ? 'conversion_strategy' : 'objection_handling',
       lesson: keyLesson || `Deal ${outcome}. Reason: ${primaryReason}. Channel: ${outreachChannelUsed}.`,
       confidenceShift: 0.92
