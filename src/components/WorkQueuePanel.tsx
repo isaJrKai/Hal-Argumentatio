@@ -1,5 +1,5 @@
 import { FormEvent, useCallback, useEffect, useState } from 'react';
-import { Bot, CheckCircle2, Clock3, ListTodo, Loader2, Plus, RefreshCw, ShieldCheck, XCircle } from 'lucide-react';
+import { Bot, CheckCircle2, ListTodo, Loader2, Plus, RefreshCw, ShieldCheck, XCircle } from 'lucide-react';
 
 type WorkerCapability = { id: string; label: string; mode: string; canClaimTasks: boolean; supportedTaskTypes: string[]; description: string; configured?: boolean; };
 
@@ -13,7 +13,6 @@ type WorkTask = {
 
 interface WorkQueuePanelProps { token: string; }
 
-const workers = ['human', 'hal_assistant', 'hermes', 'amis', 'gemini', 'nemotron'];
 const statusTone: Record<string, string> = {
   queued: 'text-sky-400 border-sky-400/30 bg-sky-400/5',
   running: 'text-amber-400 border-amber-400/30 bg-amber-400/5',
