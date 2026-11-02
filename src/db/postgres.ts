@@ -823,7 +823,6 @@ export async function bootstrapPostgresTables(poolInstance?: Pool): Promise<void
           SELECT
             count(*) FILTER (WHERE table_schema = 'public') AS public_table_count,
             to_regclass('public.work_tasks') IS NOT NULL AS has_work_tasks,
-        to_regclass('public.staff_members') IS NOT NULL AS has_staff_members,
             to_regclass('public.staff_members') IS NOT NULL AS has_staff_members,
             to_regclass('public.work_events') IS NOT NULL AS has_work_events
           FROM information_schema.tables
@@ -886,6 +885,7 @@ export async function testPostgresConnection(customUrl?: string): Promise<{
         to_regclass('public.contractors') IS NOT NULL AS has_contractors,
         to_regclass('public.leads') IS NOT NULL AS has_leads,
         to_regclass('public.work_tasks') IS NOT NULL AS has_work_tasks,
+        to_regclass('public.staff_members') IS NOT NULL AS has_staff_members,
         to_regclass('public.work_events') IS NOT NULL AS has_work_events
       FROM information_schema.tables
       WHERE table_schema = 'public';
