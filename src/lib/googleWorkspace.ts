@@ -27,8 +27,16 @@ export const isGoogleWorkspaceConfigured = Boolean(
 );
 
 // Never initialize Firebase from the committed placeholder applet configuration.
+// Keep Workspace OAuth separate from the Firebase applet used for HAL account
+// sign-in. Otherwise the first initialized default app can silently override the
+// VITE_FIREBASE_* Workspace project configuration.
+const WORKSPACE_APP_NAME = 'hal-google-workspace';
 const app = isGoogleWorkspaceConfigured
-  ? (getApps().length === 0 ? initializeApp(firebaseConfig) : getApp())
+  ? (
+      getApps().some(existing => existing.name === WORKSPACE_APP_NAME)
+        ? getApp(WORKSPACE_APP_NAME)
+        : initializeApp(firebaseConfig, WORKSPACE_APP_NAME)
+    )
   : null;
 export const auth: Auth | null = app ? getAuth(app) : null;
 
