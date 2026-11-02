@@ -1,4 +1,4 @@
-export type WorkerExecutionMode = 'human' | 'context_only' | 'partial_executor' | 'provider_only' | 'unverified';
+export type WorkerExecutionMode = 'human' | 'orchestrator' | 'context_only' | 'partial_executor' | 'provider_only' | 'unverified';
 
 export interface WorkerCapability {
   id: string;
@@ -27,10 +27,10 @@ export function getWorkerCapabilities(env: NodeJS.ProcessEnv = process.env): Wor
     {
       id: 'hal_assistant',
       label: 'HAL Assistant',
-      mode: 'context_only',
+      mode: 'orchestrator',
       canClaimTasks: false,
       supportedTaskTypes: [],
-      description: 'Can read shared operational context; conversational tool execution and approval orchestration are not yet connected.'
+      description: 'Central conversational orchestrator with tenant-authenticated MCP tool calling, shared workspace context, and approval-aware task creation. It coordinates tools but does not claim queue tasks as an independent worker.'
     },
     {
       id: 'hermes',
