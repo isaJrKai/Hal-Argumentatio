@@ -25,7 +25,7 @@ const statusTone: Record<string, string> = {
 
 export default function WorkQueuePanel({ token }: WorkQueuePanelProps) {
   const [tasks, setTasks] = useState<WorkTask[]>([]);
-  const [workers, setWorkers] = useState<WorkerCapability[]>([]);
+  const [workerCapabilities, setWorkerCapabilities] = useState<WorkerCapability[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -47,7 +47,7 @@ export default function WorkQueuePanel({ token }: WorkQueuePanelProps) {
         const workerResponse = await fetch('/api/workers', { headers: { Authorization: `Bearer ${token}` } });
         if (workerResponse.ok) {
           const workerBody = await workerResponse.json();
-          setWorkers(Array.isArray(workerBody.workers) ? workerBody.workers : []);
+          setWorkerCapabilities(Array.isArray(workerBody.workers) ? workerBody.workers : []);
         }
       } catch {
         // Queue remains usable if capability metadata is temporarily unavailable.
@@ -118,7 +118,7 @@ export default function WorkQueuePanel({ token }: WorkQueuePanelProps) {
           <span className="text-[10px] text-text-tertiary font-mono">Verified execution boundaries</span>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-2">
-          {workers.map(worker => (
+          {workerCapabilities.map(worker => (
             <div key={worker.id} className="rounded-lg border border-border-default bg-bg-base p-3">
               <div className="flex items-center justify-between gap-2">
                 <span className="text-xs font-semibold text-text-primary">{worker.label}</span>
@@ -143,7 +143,7 @@ export default function WorkQueuePanel({ token }: WorkQueuePanelProps) {
           <label className="text-[10px] text-text-tertiary font-mono uppercase">Assigned worker
             <select value={assignedWorker} onChange={e => setAssignedWorker(e.target.value)} className="mt-1 w-full rounded-md bg-bg-base border border-border-default p-2.5 text-sm text-text-primary">
               {['human', 'hal_assistant', 'hermes', 'amis', 'gemini', 'nemotron'].map(workerId => {
-                const worker = workers.find(item => item.id === workerId);
+                const worker = workerCapabilities.find(item => item.id === workerId);
                 return <option key={workerId} value={workerId}>{worker?.label || workerId} — {worker?.mode || 'status unavailable'}</option>;
               })}
             </select>
@@ -178,7 +178,7 @@ export default function WorkQueuePanel({ token }: WorkQueuePanelProps) {
                   <div className="flex flex-wrap gap-x-3 gap-y-1 mt-3 text-[10px] text-text-tertiary font-mono"><span className="inline-flex items-center gap-1"><Bot className="w-3 h-3" />{task.assignedWorker}</span><span>{task.taskType}</span><span>{task.attemptCount}/{task.maxAttempts} attempts</span><span>{new Date(task.createdAt).toLocaleString()}</span>{task.requiresApproval && <span className="inline-flex items-center gap-1"><ShieldCheck className="w-3 h-3" />{task.approvedAt ? 'approved' : 'approval required'}</span>}</div>
                   {task.assignedWorker !== 'human' && task.status === 'running' && <p className="text-[10px] text-amber-300 mt-2">Execution is owned by {task.assignedWorker}; a human cannot mark agent work complete. The registered executor must submit its receipt.</p>}
                   {task.assignedWorker !== 'human' && task.status === 'queued' && (() => {
-                    const worker = workers.find(item => item.id === task.assignedWorker);
+                    const worker = workerCapabilities.find(item => item.id === task.assignedWorker);
                     const supported = worker?.supportedTaskTypes.includes(task.taskType) || false;
                     return <p className="text-[10px] text-text-tertiary mt-2">{supported ? 'A registered executor supports this task type.' : 'No verified executor currently supports this worker/task combination. It remains queued, not running.'}</p>;
                   })()}
