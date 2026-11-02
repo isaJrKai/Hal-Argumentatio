@@ -10560,7 +10560,7 @@ async function startServer() {
     const contractorId = (req as any).contractorId;
 
     try {
-      const sequences = db.getOutreachSequences(contractorId);
+      const sequences = await getTenantOutreachSequences(contractorId);
       const outbox = await pgDb.select().from(conversionOutbox).where(eq(conversionOutbox.contractorId, contractorId));
       const jobs = await pgDb.select().from(schedulerJobs).where(eq(schedulerJobs.contractorId, contractorId)).orderBy(desc(schedulerJobs.createdAt));
       const verification = verifyPhase3Pillars(sequences, outbox, jobs);
