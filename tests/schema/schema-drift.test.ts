@@ -57,6 +57,14 @@ describe('Database: Schema Drift & Table Invariant Tests', () => {
     expect(Object.keys(table)).toContain('confidenceShift');
   });
 
+  it('requires tenant ownership and durable execution fields on scheduler jobs', () => {
+    const table = schema.schedulerJobs;
+    expect(table).toBeDefined();
+    for (const column of ['id', 'contractorId', 'job', 'status', 'startedAt', 'completedAt', 'error', 'result', 'createdAt']) {
+      expect(Object.keys(table)).toContain(column);
+    }
+  });
+
   it('validates durable hashed-token revocation storage', () => {
     const table = schema.revokedTokens;
     expect(table).toBeDefined();
