@@ -14,7 +14,7 @@ export async function readApiResponse<T = any>(response: Response, context: stri
     try {
       payload = JSON.parse(raw);
     } catch {
-      const preview = raw.replace(/\\s+/g, ' ').trim().slice(0, 160);
+      const preview = raw.replace(/\s+/g, ' ').trim().slice(0, 160);
       const suffix = preview ? ` Response begins: "${preview}"` : '';
       throw new Error(`${context}: expected JSON but received ${contentType} (HTTP ${response.status}).${suffix}`);
     }
