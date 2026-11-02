@@ -575,7 +575,7 @@ export const hermesLabMessages = pgTable('hermes_lab_messages', {
 
 
 
-/** Durable task queue for human and agent work assignment. */
+/** Tenant-scoped staff roster for named human task ownership. */
 export const staffMembers = pgTable('staff_members', {
   id: text('id').primaryKey(),
   contractorId: text('contractor_id').notNull(),
