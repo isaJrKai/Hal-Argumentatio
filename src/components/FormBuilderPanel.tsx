@@ -40,6 +40,7 @@ export const FormBuilderPanel: React.FC = () => {
   const [copiedEmbed, setCopiedEmbed] = useState(false);
   const [viewMode, setViewMode] = useState<'preview' | 'embed'>('preview');
   const [showFieldsDrawer, setShowFieldsDrawer] = useState(false);
+  const [landingPageId, setLandingPageId] = useState('');
 
   const [fields, setFields] = useState<FormField[]>([
     { id: '1', label: 'Full Name', type: 'text', required: true, placeholder: 'e.g. John Doe' },
@@ -64,16 +65,27 @@ export const FormBuilderPanel: React.FC = () => {
     setFields(fields.filter(f => f.id !== id));
   };
 
-  const embedCode = `<!-- HAL Emergency Intake Widget -->
-<iframe 
-  src="${window.location.origin}/api/public/form/dispatch" 
-  width="100%" 
-  height="480" 
-  frameborder="0" 
-  style="border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.15);"
-></iframe>`;
+  const embedCode = landingPageId.trim()
+    ? `<!-- HAL published landing-page lead capture -->
+<iframe
+  src="${window.location.origin}/api/public/form/dispatch?landingPageId=${encodeURIComponent(landingPageId.trim())}"
+  title="Request service"
+  width="100%"
+  height="520"
+  loading="lazy"
+  style="border:0;border-radius:12px;width:100%;max-width:640px"
+></iframe>`
+    : '<!-- Enter a published Hermes landing-page ID to generate a working lead-capture embed. -->';
 
   const handleCopyEmbed = () => {
+    if (!landingPageId.trim()) {
+      showToast({
+        title: 'Published landing page required',
+        message: 'Enter the ID of a published Hermes landing page before copying a lead-capture embed.',
+        type: 'error'
+      });
+      return;
+    }
     navigator.clipboard.writeText(embedCode);
     setCopiedEmbed(true);
     showToast({
@@ -94,7 +106,7 @@ export const FormBuilderPanel: React.FC = () => {
           </div>
           <div>
             <h2 className="text-sm font-bold text-text-primary leading-tight font-display">Form Builder Studio</h2>
-            <p className="text-[11px] text-text-secondary">Lead capture intake forms with instant SMS alerts and lead attribution</p>
+            <p className="text-[11px] text-text-secondary">Lead-capture preview with a working embed for published landing pages</p>
           </div>
         </div>
 
@@ -131,7 +143,9 @@ export const FormBuilderPanel: React.FC = () => {
 
           <button
             onClick={handleCopyEmbed}
-            className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs font-sans transition-all cursor-pointer flex items-center gap-1.5 shadow-xs"
+            disabled={!landingPageId.trim()}
+            title="Enter a published landing-page ID in the Embed Code tab first."
+            className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs font-sans transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5 shadow-xs"
           >
             {copiedEmbed ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
             <span className="hidden sm:inline">{copiedEmbed ? 'Copied' : 'Get Snippet'}</span>
@@ -234,7 +248,16 @@ export const FormBuilderPanel: React.FC = () => {
             </div>
           ) : (
             <div className="w-full max-w-2xl bg-bg-base border border-border-dim rounded-xl p-6 font-mono text-xs text-emerald-500 space-y-3">
-              <span className="text-text-secondary text-[11px] block">Copy and paste this snippet directly into your landing page or client site:</span>
+              <label className="block text-text-secondary text-[11px]">
+                Published Hermes landing-page ID
+                <input
+                  value={landingPageId}
+                  onChange={event => setLandingPageId(event.target.value)}
+                  placeholder="Paste the artifact ID of a published landing page"
+                  className="mt-2 w-full rounded-lg border border-border-dim bg-bg-subtle px-3 py-2 text-xs text-text-primary"
+                />
+              </label>
+              <span className="text-text-secondary text-[11px] block">The embed captures a name, phone number and service details. Submissions create a lead and a human review task in HAL.</span>
               <pre className="bg-bg-subtle p-4 rounded-lg border border-border-dim overflow-x-auto text-text-primary">{embedCode}</pre>
             </div>
           )}
