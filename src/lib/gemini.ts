@@ -632,7 +632,7 @@ RESPONSE STANDARD
                   result = { success: false, error: String(toolError?.message || 'Tool execution failed.').slice(0, 500) };
                   toolCalls.push({ name: call.name, result });
                 }
-                functionResponses.push({ functionResponse: { name: call.name, response: { result } } });
+                functionResponses.push({ functionResponse: { name: call.name, ...(call.id ? { id: call.id } : {}), response: { result } } });
               }
               if (!functionResponses.length) break;
               contents.push({ role: 'user', parts: functionResponses });
