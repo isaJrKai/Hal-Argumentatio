@@ -5666,7 +5666,7 @@ async function getBridgesForContractor(contractorId: string): Promise<ChannelBri
     console.warn('[Connectors] Ignoring invalid persisted bridge settings for workspace', contractorId);
   }
   const emailProvider: ChannelBridgeSettings['email']['provider'] =
-    credentials.sendgrid ? 'sendgrid' : credentials.resend ? 'resend' : defaults.email.provider;
+    credentials.resend ? 'resend' : credentials.sendgrid ? 'sendgrid' : defaults.email.provider;
   const emailApiKey = credentials.resend || credentials.sendgrid || defaults.email.apiKey;
   const savedEmail = saved.email || {};
   const email = {
