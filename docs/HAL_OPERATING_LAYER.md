@@ -79,3 +79,18 @@ A configured Gemini or NVIDIA API key does not mean that provider can claim queu
 - Do not migrate all existing domain data into a new generic entity table.
 - Do not claim autonomous execution where only a draft or simulation exists.
 - Do not send external communications or spend money without required approval.
+
+## Hermes Lab task execution and provenance
+
+Hermes Lab generation must enter the durable work queue as a `hermes_lab_asset` task before the existing Hermes executor is called through the authenticated MCP gateway. The task completion receipt records the generated artifact ID; the artifact metadata also records the originating work-task ID and correlation ID so the operator can trace the task to its output.
+
+The executor currently supports the ten registered Hermes Lab tool IDs only. It does not imply general-purpose execution of lead, audit, outreach, contract, finance, publishing, or external communication workflows.
+
+If no configured model provider returns a valid structured result, the deterministic fallback must:
+- Never fabricate public business facts, contact details, credentials, prices, guarantees, customer proof, performance metrics, or completed work.
+- Mark the artifact as a draft requiring operator review.
+- Record `deterministic_fallback` as the engine in artifact metadata.
+- Keep the task receipt truthful about the artifact's draft status.
+
+A generated artifact is not the same as a published asset, a sent communication, a connected CRM, or a completed external action.
+
