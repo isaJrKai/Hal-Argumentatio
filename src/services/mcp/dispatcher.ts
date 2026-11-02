@@ -170,7 +170,7 @@ export const HAL_MCP_TOOLS: McpToolDefinition[] = [
   },
   {
     name: 'hermes_synthesize_lab_asset',
-    description: 'Executes specialized Hermes Intelligence Lab tool to generate landing pages, ad copies, SEO schemas, or diagnostic repair adapters.',
+    description: 'Queues and executes a registered Hermes Intelligence Lab draft through the durable Work Queue. Returns the task ID and persisted execution receipt; may return awaiting approval. Does not publish externally or send communications.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -710,18 +710,55 @@ export async function executeMcpTool(
 
     case 'hermes_synthesize_lab_asset': {
       const toolId = rawParams?.toolId as LabToolType;
-      if (!toolId) {
-        throw new Error('Missing required parameter: toolId');
-      }
-      const parameters = rawParams?.parameters || {};
-      const promptOverride = rawParams?.promptOverride;
+      const allowedToolIds: LabToolType[] = [
+        'landing_page', 'ad_copy_studio', 'seo_schema_generator', 'outreach_sequences',
+        'sms_review_booster', 'speed_vitals_optimizer', 'competitor_intel_scout',
+        'webhook_resilience_fixer', 'negative_keyword_miner', 'deep_case_reasoner'
+      ];
+      const parameters = rawParams?.parameters && typeof rawParams.parameters === 'object' && !Array.isArray(rawParams.parameters)
+        ? rawParams.parameters as Record<string, any>
+        : {};
+      const promptOverride = typeof rawParams?.promptOverride === 'string'
+        ? rawParams.promptOverride.slice(0, 12000)
+        : undefined;
 
-      const result = await executeHermesLabTool(toolId, parameters, contractorId, promptOverride);
-      return {
-        success: true,
-        toolId,
-        ...result
-      };
+      if (!allowedToolIds.includes(toolId) || JSON.stringify(parameters).length > 20000) {
+        throw new Error('A registered Hermes Lab tool and parameters object within 20 KB are required.');
+      }
+
+      // Keep the legacy MCP tool compatible, but never let it bypass the durable
+      // queue, approval policy, atomic claim, or persisted execution receipt.
+      const created = await executeMcpTool('hal_create_work_task', {
+        taskType: 'hermes_lab_asset',
+        title: `Hermes: ${toolId.replace(/_/g, ' ')}`,
+        description: 'Create a local draft Hermes Lab artifact from supplied parameters. External actions are out of scope.',
+        assignedWorker: 'hermes',
+        priority: 'normal',
+        input: { toolId, parameters, ...(promptOverride ? { promptOverride } : {}) }
+      }, contractorId, { actorType: 'agent', actorId: 'mcp_client', sourceModule: 'hermes_lab' });
+
+      const task = created?.task;
+      if (!task?.id) throw new Error('Hermes work task could not be created.');
+      if (task.status === 'awaiting_approval') {
+        return { success: false, pendingApproval: true, taskId: task.id, status: task.status, message: 'Human approval is required before Hermes can execute this task.' };
+      }
+
+      const execution = await executeMcpTool('hal_execute_hermes_work_task', { taskId: task.id }, contractorId, {
+        actorType: 'agent', actorId: 'mcp_client', sourceModule: 'hermes_lab'
+      });
+      if (!execution?.success || !execution?.receipt?.artifactId) {
+        return { success: false, taskId: task.id, status: execution?.status || execution?.task?.status || 'failed', error: execution?.error || 'Hermes did not return a verified artifact receipt.' };
+      }
+
+      const [artifact] = await pgDb.select().from(hermesLabArtifacts).where(and(
+        eq(hermesLabArtifacts.id, execution.receipt.artifactId),
+        eq(hermesLabArtifacts.contractorId, contractorId)
+      )).limit(1);
+      if (!artifact) {
+        throw new Error('Hermes execution completed, but its saved artifact could not be reloaded.');
+      }
+
+      return { success: true, taskId: task.id, toolId, receipt: execution.receipt, artifact };
     }
 
     default:
