@@ -14,7 +14,10 @@ import {
   missions,
   workEvents,
   workTasks,
-  hermesLabArtifacts
+  hermesLabArtifacts,
+  leadEvents,
+  winLossRecords,
+  revenueOutcomes
 } from '../../db/schema.ts';
 import { eq, and, desc, gte, inArray, or, isNotNull } from 'drizzle-orm';
 import crypto from 'crypto';
@@ -207,7 +210,7 @@ export async function executeMcpTool(
     case 'hal_get_operational_context': {
       const requested = Number(rawParams?.limit);
       const limit = Number.isFinite(requested) && requested > 0 ? Math.min(20, Math.floor(requested)) : 10;
-      const [events, recentLeads, recentMissions, tasks, recentCampaigns, recentRevenue, recentProjects, recentMessages] = await Promise.all([
+      const [events, recentLeads, recentMissions, tasks, recentCampaigns, recentRevenue, recentProjects, recentMessages, recentLeadEvents, recentWinLoss, recentRevenueOutcomes] = await Promise.all([
         getRecentWorkEvents(pgDb, contractorId, limit),
         pgDb.select({ id: leads.id, businessName: leads.businessName, city: leads.city, niche: leads.niche, status: leads.status, websiteUrl: leads.websiteUrl, updatedAt: leads.updatedAt })
           .from(leads).where(eq(leads.contractorId, contractorId)).orderBy(desc(leads.updatedAt)).limit(limit),
@@ -221,7 +224,13 @@ export async function executeMcpTool(
         pgDb.select({ id: clientProjects.id, leadId: clientProjects.leadId, businessName: clientProjects.businessName, status: clientProjects.status, monthlyRetainerUsd: clientProjects.monthlyRetainerUsd })
           .from(clientProjects).where(eq(clientProjects.contractorId, contractorId)).orderBy(desc(clientProjects.updatedAt)).limit(limit),
         pgDb.select({ id: communicationsOutbox.id, leadId: communicationsOutbox.leadId, channel: communicationsOutbox.channel, provider: communicationsOutbox.provider, status: communicationsOutbox.status, submittedAt: communicationsOutbox.submittedAt, deliveredAt: communicationsOutbox.deliveredAt })
-          .from(communicationsOutbox).where(eq(communicationsOutbox.contractorId, contractorId)).orderBy(desc(communicationsOutbox.createdAt)).limit(limit)
+          .from(communicationsOutbox).where(eq(communicationsOutbox.contractorId, contractorId)).orderBy(desc(communicationsOutbox.createdAt)).limit(limit),
+        pgDb.select({ leadId: leadEvents.leadId, eventType: leadEvents.eventType, previousStage: leadEvents.previousStage, newStage: leadEvents.newStage, dealValue: leadEvents.dealValue, occurredAt: leadEvents.occurredAt, createdAt: leadEvents.createdAt })
+          .from(leadEvents).innerJoin(leads, eq(leadEvents.leadId, leads.id)).where(eq(leads.contractorId, contractorId)).orderBy(desc(leadEvents.createdAt)).limit(limit),
+        pgDb.select({ id: winLossRecords.id, leadId: winLossRecords.leadId, businessName: winLossRecords.businessName, outcome: winLossRecords.outcome, closedValueUsd: winLossRecords.closedValueUsd, primaryReason: winLossRecords.primaryReason, keyLesson: winLossRecords.keyLesson, closedAt: winLossRecords.closedAt })
+          .from(winLossRecords).where(eq(winLossRecords.contractorId, contractorId)).orderBy(desc(winLossRecords.closedAt)).limit(limit),
+        pgDb.select({ id: revenueOutcomes.id, outcomeStatus: revenueOutcomes.outcomeStatus, outcomeClassification: revenueOutcomes.outcomeClassification, predictionAccuracy: revenueOutcomes.predictionAccuracy, confidenceScore: revenueOutcomes.confidenceScore, observationStart: revenueOutcomes.observationStart, observationEnd: revenueOutcomes.observationEnd, updatedAt: revenueOutcomes.updatedAt })
+          .from(revenueOutcomes).where(eq(revenueOutcomes.contractorId, contractorId)).orderBy(desc(revenueOutcomes.updatedAt)).limit(limit)
       ]);
       return {
         generatedAt: new Date().toISOString(),
@@ -233,7 +242,10 @@ export async function executeMcpTool(
         recentCampaigns,
         recentRevenue,
         recentClientProjects: recentProjects,
-        recentOutboundMessages: recentMessages
+        recentOutboundMessages: recentMessages,
+        recentLeadLifecycleEvents: recentLeadEvents,
+        recentWinLossOutcomes: recentWinLoss,
+        measuredRevenueOutcomes: recentRevenueOutcomes
       };
     }
 
