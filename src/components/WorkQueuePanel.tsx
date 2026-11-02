@@ -1,6 +1,8 @@
 import { FormEvent, useCallback, useEffect, useState } from 'react';
 import { Bot, CheckCircle2, Clock3, ListTodo, Loader2, Plus, RefreshCw, ShieldCheck, XCircle } from 'lucide-react';
 
+type WorkerCapability = { id: string; label: string; mode: string; canClaimTasks: boolean; supportedTaskTypes: string[]; description: string; configured?: boolean; };
+
 type WorkTask = {
   id: string; taskType: string; title: string; description: string | null;
   status: string; priority: string; assignedWorker: string; entityType: string | null;
@@ -23,6 +25,7 @@ const statusTone: Record<string, string> = {
 
 export default function WorkQueuePanel({ token }: WorkQueuePanelProps) {
   const [tasks, setTasks] = useState<WorkTask[]>([]);
+  const [workers, setWorkers] = useState<WorkerCapability[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -40,6 +43,15 @@ export default function WorkQueuePanel({ token }: WorkQueuePanelProps) {
       const body = await response.json();
       if (!response.ok) throw new Error(body.error || 'Unable to load work queue.');
       setTasks(Array.isArray(body.tasks) ? body.tasks : []);
+      try {
+        const workerResponse = await fetch('/api/workers', { headers: { Authorization: `Bearer ${token}` } });
+        if (workerResponse.ok) {
+          const workerBody = await workerResponse.json();
+          setWorkers(Array.isArray(workerBody.workers) ? workerBody.workers : []);
+        }
+      } catch {
+        // Queue remains usable if capability metadata is temporarily unavailable.
+      }
     } catch (err: any) { setError(err?.message || 'Work queue unavailable.'); }
     finally { setLoading(false); }
   }, [token]);
@@ -100,6 +112,25 @@ export default function WorkQueuePanel({ token }: WorkQueuePanelProps) {
         ))}
       </div>
 
+      <section className="border border-border-default bg-bg-raised rounded-xl p-4 space-y-3">
+        <div className="flex items-center justify-between gap-2">
+          <h2 className="text-sm font-semibold text-text-primary">Worker readiness</h2>
+          <span className="text-[10px] text-text-tertiary font-mono">Verified execution boundaries</span>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-2">
+          {workers.map(worker => (
+            <div key={worker.id} className="rounded-lg border border-border-default bg-bg-base p-3">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-xs font-semibold text-text-primary">{worker.label}</span>
+                <span className="text-[9px] uppercase tracking-wide text-text-tertiary font-mono">{worker.mode.replace('_', ' ')}</span>
+              </div>
+              <p className="text-[10px] leading-relaxed text-text-secondary mt-1">{worker.description}</p>
+              {worker.configured !== undefined && <p className="text-[9px] text-text-tertiary mt-2">Provider key: {worker.configured ? 'configured' : 'not configured'}</p>}
+            </div>
+          ))}
+        </div>
+      </section>
+
       <form onSubmit={createTask} className="border border-border-default bg-bg-raised rounded-xl p-4 space-y-3">
         <div className="flex items-center gap-2 text-sm font-semibold text-text-primary"><Plus className="w-4 h-4 text-accent" /> Create work item</div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -111,7 +142,10 @@ export default function WorkQueuePanel({ token }: WorkQueuePanelProps) {
           </label>
           <label className="text-[10px] text-text-tertiary font-mono uppercase">Assigned worker
             <select value={assignedWorker} onChange={e => setAssignedWorker(e.target.value)} className="mt-1 w-full rounded-md bg-bg-base border border-border-default p-2.5 text-sm text-text-primary">
-              {workers.map(worker => <option key={worker} value={worker}>{worker}</option>)}
+              {['human', 'hal_assistant', 'hermes', 'amis', 'gemini', 'nemotron'].map(workerId => {
+                const worker = workers.find(item => item.id === workerId);
+                return <option key={workerId} value={workerId}>{worker?.label || workerId} — {worker?.mode || 'status unavailable'}</option>;
+              })}
             </select>
           </label>
           <label className="text-[10px] text-text-tertiary font-mono uppercase">Priority
@@ -142,13 +176,19 @@ export default function WorkQueuePanel({ token }: WorkQueuePanelProps) {
                   <div className="flex flex-wrap items-center gap-2"><h3 className="text-sm font-semibold text-text-primary">{task.title}</h3><span className={`text-[9px] px-2 py-0.5 border rounded font-mono uppercase ${statusTone[task.status] || ''}`}>{task.status.replace('_', ' ')}</span><span className="text-[9px] text-text-tertiary font-mono uppercase">{task.priority}</span></div>
                   {task.description && <p className="text-xs text-text-secondary mt-2 whitespace-pre-wrap">{task.description}</p>}
                   <div className="flex flex-wrap gap-x-3 gap-y-1 mt-3 text-[10px] text-text-tertiary font-mono"><span className="inline-flex items-center gap-1"><Bot className="w-3 h-3" />{task.assignedWorker}</span><span>{task.taskType}</span><span>{task.attemptCount}/{task.maxAttempts} attempts</span><span>{new Date(task.createdAt).toLocaleString()}</span>{task.requiresApproval && <span className="inline-flex items-center gap-1"><ShieldCheck className="w-3 h-3" />{task.approvedAt ? 'approved' : 'approval required'}</span>}</div>
+                  {task.assignedWorker !== 'human' && task.status === 'running' && <p className="text-[10px] text-amber-300 mt-2">Execution is owned by {task.assignedWorker}; a human cannot mark agent work complete. The registered executor must submit its receipt.</p>}
+                  {task.assignedWorker !== 'human' && task.status === 'queued' && (() => {
+                    const worker = workers.find(item => item.id === task.assignedWorker);
+                    const supported = worker?.supportedTaskTypes.includes(task.taskType) || false;
+                    return <p className="text-[10px] text-text-tertiary mt-2">{supported ? 'A registered executor supports this task type.' : 'No verified executor currently supports this worker/task combination. It remains queued, not running.'}</p>;
+                  })()}
                   {task.errorMessage && <p className="text-xs text-red-400 mt-2">{task.errorMessage}</p>}
                 </div>
                 <div className="flex flex-wrap gap-1.5 shrink-0">
                   {task.status === 'awaiting_approval' && <button onClick={() => void transition(task, 'queued')} className="px-2.5 py-1.5 rounded border border-orange-400/30 text-orange-300 text-[10px] font-mono">Approve</button>}
                   {task.status === 'queued' && task.assignedWorker === 'human' && <button onClick={() => void transition(task, 'running')} className="px-2.5 py-1.5 rounded border border-border-default text-text-secondary text-[10px] font-mono">Start</button>}
-                  {task.status === 'running' && <button onClick={() => void transition(task, 'failed')} className="px-2.5 py-1.5 rounded border border-red-400/30 text-red-300 text-[10px] font-mono">Fail</button>}
-                  {task.status === 'running' && <button onClick={() => void transition(task, 'completed')} className="px-2.5 py-1.5 rounded border border-emerald-400/30 text-emerald-300 text-[10px] font-mono inline-flex items-center gap-1"><CheckCircle2 className="w-3 h-3" /> Complete</button>}
+                  {task.status === 'running' && task.assignedWorker === 'human' && <button onClick={() => void transition(task, 'failed')} className="px-2.5 py-1.5 rounded border border-red-400/30 text-red-300 text-[10px] font-mono">Fail</button>}
+                  {task.status === 'running' && task.assignedWorker === 'human' && <button onClick={() => void transition(task, 'completed')} className="px-2.5 py-1.5 rounded border border-emerald-400/30 text-emerald-300 text-[10px] font-mono inline-flex items-center gap-1"><CheckCircle2 className="w-3 h-3" /> Complete</button>}
                   {['queued', 'awaiting_approval', 'running', 'failed'].includes(task.status) && <button onClick={() => void transition(task, 'cancelled')} className="px-2.5 py-1.5 rounded border border-border-default text-text-tertiary text-[10px] font-mono inline-flex items-center gap-1"><XCircle className="w-3 h-3" /> Cancel</button>}
                   {task.status === 'failed' && task.attemptCount < task.maxAttempts && <button onClick={() => void transition(task, 'queued')} className="px-2.5 py-1.5 rounded border border-border-default text-text-secondary text-[10px] font-mono">Retry</button>}
                 </div>
