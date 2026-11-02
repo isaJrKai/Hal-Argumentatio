@@ -6751,12 +6751,12 @@ app.post('/api/scheduler', authenticate, async (req, res) => {
         predicted: forecastResult.predicted,
         confidenceScore: forecastResult.confidenceScore,
         targetDate: new Date(Date.now() + 7 * 24 * 3600 * 1000).toISOString(), // Target next week
-        modelVersion: 'v2-auto',
+        modelVersion: forecastResult.source || 'unknown',
         evaluated: false,
         assumptions: forecastResult.assumptions
       });
 
-      resultMessage = `Generated fresh trend forecast for Lead Volume. Target: ${newFc.predicted} leads. Assumptions: ${newFc.assumptions}`;
+      resultMessage = `Created a 7-day lead-volume estimate using ${forecastResult.source || 'an unverified source'}. Estimate: ${newFc.predicted} leads. Confidence: ${newFc.confidenceScore}. Assumptions: ${newFc.assumptions}`;
       broadcastNotification(
         contractorId,
         'info',
