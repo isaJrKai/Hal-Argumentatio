@@ -701,8 +701,11 @@ export default function NeuralPanel() {
             <h3 className="text-xs font-mono font-bold text-text-tertiary uppercase tracking-wider mb-3">Core Systems</h3>
             <div className="space-y-2">
               {SUBSYSTEMS.map(sys => {
-                const nodeCount = (networkData.nodes || []).filter(n => 
-                  n.id === sys.id || (networkData.links || []).some(l => ((typeof l.source === 'string' ? l.source : l.source.id) === sys.id && (typeof l.target === 'string' ? l.target : l.target.id) === n.id) || ((typeof l.target === 'string' ? l.target : l.target.id) === sys.id && (typeof l.source === 'string' ? l.source : l.source.id) === n.id))
+                const nodeCount = (networkData.nodes || []).filter(n =>
+                  (networkData.links || []).some(l =>
+                    ((typeof l.source === 'string' ? l.source : l.source.id) === sys.id && (typeof l.target === 'string' ? l.target : l.target.id) === n.id) ||
+                    ((typeof l.target === 'string' ? l.target : l.target.id) === sys.id && (typeof l.source === 'string' ? l.source : l.source.id) === n.id)
+                  )
                 ).length;
                 return (
                   <button key={sys.id} onClick={() => setActiveSubsystem(sys.id)} className={`w-full flex items-center gap-3 p-3 rounded-lg border transition-all text-left ${activeSubsystem === sys.id ? 'bg-bg-raised border-border-dim shadow-sm' : 'border-transparent hover:bg-bg-base text-text-secondary'}`}>
