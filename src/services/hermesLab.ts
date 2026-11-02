@@ -489,6 +489,9 @@ function generateDeterministicLabFallback(
     territory: city && city !== 'territory not recorded' ? city : null
   };
   const title = `${workspace.company || 'Workspace'} — ${toolId.replace(/_/g, ' ')} draft`;
+  const escapeHtml = (value: unknown) => String(value ?? '').replace(/[&<>"']/g, character => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+  })[character] || character);
   const structuredData = {
     status: 'draft_requires_operator_review',
     generatedBy: 'deterministic_fallback',
@@ -510,7 +513,7 @@ function generateDeterministicLabFallback(
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>${workspace.company || 'Business name required'}</title>
+  <title>${escapeHtml(workspace.company || 'Business name required')}</title>
   <style>
     :root { color-scheme: light; font-family: Georgia, serif; background: #f7f6f0; color: #20231f; }
     body { margin: 0; padding: 3rem 1.25rem; }
@@ -525,19 +528,19 @@ function generateDeterministicLabFallback(
 <body>
   <main>
     <div class="eyebrow">Draft · operator review required</div>
-    <h1>${workspace.company || 'Your business name'}</h1>
-    <p>${supplied.niche || 'Add your verified services and explain the work you do.'}</p>
+    <h1>${escapeHtml(workspace.company || 'Your business name')}</h1>
+    <p>${escapeHtml(supplied.niche || 'Add your verified services and explain the work you do.')}</p>
     <section>
       <h2>Services</h2>
-      <p>${Array.isArray(supplied.serviceHighlights) && supplied.serviceHighlights.length ? supplied.serviceHighlights.join(' · ') : 'Add verified service descriptions.'}</p>
+      <p>${escapeHtml(Array.isArray(supplied.serviceHighlights) && supplied.serviceHighlights.length ? supplied.serviceHighlights.join(' · ') : 'Add verified service descriptions.')}</p>
     </section>
     <section>
       <h2>Service area</h2>
-      <p>${workspace.territory || supplied.city || 'Add your verified service area.'}</p>
+      <p>${escapeHtml(workspace.territory || supplied.city || 'Add your verified service area.')}</p>
     </section>
     <section>
       <h2>Contact</h2>
-      <p>${supplied.phone ? `Contact: ${supplied.phone}` : 'Add a verified business phone number or contact method.'}</p>
+      <p>${escapeHtml(supplied.phone ? `Contact: ${supplied.phone}` : 'Add a verified business phone number or contact method.')}</p>
     </section>
     <div class="notice">This is a deterministic draft because no AI provider returned a valid response. No credentials, reviews, prices, guarantees, response times, or business claims have been invented. Complete and verify the content before publication.</div>
   </main>
