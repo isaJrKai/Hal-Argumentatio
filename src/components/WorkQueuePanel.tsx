@@ -180,8 +180,8 @@ export default function WorkQueuePanel({ token }: WorkQueuePanelProps) {
           </label>
           {assignedWorker === 'hermes' && (
             <label className="text-[10px] text-text-tertiary font-mono uppercase md:col-span-2">Hermes task input (JSON)
-              <textarea value={inputJson} onChange={e => setInputJson(e.target.value)} rows={4} spellCheck={false} placeholder={'{ "toolId": "landing_page", "parameters": { "businessName": "Example Co" } }'} className="mt-1 w-full rounded-md bg-bg-base border border-border-default p-2.5 text-xs font-mono text-text-primary outline-none focus:border-accent normal-case resize-y" />
-              <span className="block mt-1 text-[9px] text-text-tertiary normal-case">For hermes_lab_asset, include a registered toolId and its parameters. Other task types are not executable by the current queue runner.</span>
+              <textarea value={inputJson} onChange={e => setInputJson(e.target.value)} rows={4} spellCheck={false} placeholder={'{ "message": "Review the current lead pipeline and identify missing evidence." }' } className="mt-1 w-full rounded-md bg-bg-base border border-border-default p-2.5 text-xs font-mono text-text-primary outline-none focus:border-accent normal-case resize-y" />
+              <span className="block mt-1 text-[9px] text-text-tertiary normal-case">Use task type hermes_lab_asset with a registered toolId and parameters to generate an asset, or hermes_agent_task with a message and optional artifactId to ask the existing Hermes Studio agent to analyze workspace context or revise that artifact.</span>
             </label>
           )}
           <label className="text-[10px] text-text-tertiary font-mono uppercase">Priority
@@ -222,7 +222,7 @@ export default function WorkQueuePanel({ token }: WorkQueuePanelProps) {
                 </div>
                 <div className="flex flex-wrap gap-1.5 shrink-0">
                   {task.status === 'awaiting_approval' && <button onClick={() => void transition(task, 'queued')} className="px-2.5 py-1.5 rounded border border-orange-400/30 text-orange-300 text-[10px] font-mono">Approve</button>}
-                  {task.status === 'queued' && task.assignedWorker === 'hermes' && task.taskType === 'hermes_lab_asset' && workerCapabilities.find(item => item.id === 'hermes')?.supportedTaskTypes.includes(task.taskType) && <button onClick={() => void executeWithHermes(task)} className="px-2.5 py-1.5 rounded border border-accent/40 text-accent text-[10px] font-mono inline-flex items-center gap-1"><Play className="w-3 h-3" /> Run with Hermes</button>}
+                  {task.status === 'queued' && task.assignedWorker === 'hermes' && workerCapabilities.find(item => item.id === 'hermes')?.supportedTaskTypes.includes(task.taskType) && <button onClick={() => void executeWithHermes(task)} className="px-2.5 py-1.5 rounded border border-accent/40 text-accent text-[10px] font-mono inline-flex items-center gap-1"><Play className="w-3 h-3" /> Run with Hermes</button>}
                   {task.status === 'queued' && task.assignedWorker === 'human' && <button onClick={() => void transition(task, 'running')} className="px-2.5 py-1.5 rounded border border-border-default text-text-secondary text-[10px] font-mono">Start</button>}
                   {task.status === 'running' && task.assignedWorker === 'human' && <button onClick={() => void transition(task, 'failed')} className="px-2.5 py-1.5 rounded border border-red-400/30 text-red-300 text-[10px] font-mono">Fail</button>}
                   {task.status === 'running' && task.assignedWorker === 'human' && <button onClick={() => void transition(task, 'completed')} className="px-2.5 py-1.5 rounded border border-emerald-400/30 text-emerald-300 text-[10px] font-mono inline-flex items-center gap-1"><CheckCircle2 className="w-3 h-3" /> Complete</button>}
