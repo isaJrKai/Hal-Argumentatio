@@ -36,9 +36,10 @@ jobs:
       - name: Build production artifacts
         run: npm run build
       - name: Audit production dependency advisories
-        run: |
-          npm audit --omit=dev --json > /tmp/hal-production-audit.json || true
-          node - <<'NODE'
+        run: bun audit --prod --audit-level=high
+      - name: Report full dependency audit
+        if: always()
+        run: bun audit || true
           const report = require('/tmp/hal-production-audit.json');
           const issues = Object.values(report.vulnerabilities || {});
           for (const issue of issues) {
