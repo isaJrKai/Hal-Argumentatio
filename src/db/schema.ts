@@ -564,3 +564,21 @@ export const hermesLabMessages = pgTable('hermes_lab_messages', {
 
 
 
+
+
+/** Append-only, tenant-scoped timeline shared by workflows and authorized agents. */
+export const workEvents = pgTable('work_events', {
+  id: text('id').primaryKey(),
+  contractorId: text('contractor_id').notNull(),
+  eventType: text('event_type').notNull(),
+  entityType: text('entity_type').notNull(),
+  entityId: text('entity_id'),
+  actorType: text('actor_type').notNull(),
+  actorId: text('actor_id'),
+  sourceModule: text('source_module').notNull(),
+  correlationId: text('correlation_id'),
+  summary: text('summary').notNull(),
+  payload: jsonb('payload'),
+  occurredAt: timestamp('occurred_at').defaultNow().notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+});
