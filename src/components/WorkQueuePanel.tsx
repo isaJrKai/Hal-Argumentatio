@@ -1,5 +1,5 @@
 import { FormEvent, useCallback, useEffect, useState } from 'react';
-import { Bot, CheckCircle2, ListTodo, Loader2, Plus, RefreshCw, ShieldCheck, XCircle } from 'lucide-react';
+import { Bot, CheckCircle2, ListTodo, Loader2, Play, Plus, RefreshCw, ShieldCheck, XCircle } from 'lucide-react';
 
 type WorkerCapability = { id: string; label: string; mode: string; canClaimTasks: boolean; supportedTaskTypes: string[]; description: string; configured?: boolean; };
 
@@ -31,6 +31,7 @@ export default function WorkQueuePanel({ token }: WorkQueuePanelProps) {
   const [title, setTitle] = useState('');
   const [taskType, setTaskType] = useState('research');
   const [description, setDescription] = useState('');
+  const [inputJson, setInputJson] = useState('{}');
   const [assignedWorker, setAssignedWorker] = useState('human');
   const [priority, setPriority] = useState('normal');
   const [requiresApproval, setRequiresApproval] = useState(false);
@@ -60,16 +61,27 @@ export default function WorkQueuePanel({ token }: WorkQueuePanelProps) {
   const createTask = async (event: FormEvent) => {
     event.preventDefault();
     if (!title.trim()) return;
+    let taskInput: Record<string, unknown> | undefined;
+    if (assignedWorker === 'hermes') {
+      try {
+        const parsed = JSON.parse(inputJson || '{}');
+        if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw new Error('Input must be a JSON object.');
+        taskInput = parsed as Record<string, unknown>;
+      } catch (err: any) {
+        setError(err?.message || 'Hermes input must be valid JSON.');
+        return;
+      }
+    }
     setSaving(true); setError(null);
     try {
       const response = await fetch('/api/work-tasks', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ taskType, title: title.trim(), description: description.trim() || undefined, assignedWorker, priority, requiresApproval })
+        body: JSON.stringify({ taskType, title: title.trim(), description: description.trim() || undefined, assignedWorker, priority, requiresApproval, ...(taskInput ? { input: taskInput } : {}) })
       });
       const body = await response.json();
       if (!response.ok) throw new Error(body.error || 'Unable to create task.');
-      setTitle(''); setDescription(''); setTaskType('research'); setRequiresApproval(false);
+      setTitle(''); setDescription(''); setTaskType('research'); setInputJson('{}'); setRequiresApproval(false);
       await loadTasks();
     } catch (err: any) { setError(err?.message || 'Unable to create task.'); }
     finally { setSaving(false); }
@@ -87,6 +99,25 @@ export default function WorkQueuePanel({ token }: WorkQueuePanelProps) {
       if (!response.ok) throw new Error(body.error || 'Task update failed.');
       await loadTasks();
     } catch (err: any) { setError(err?.message || 'Task update failed.'); }
+  };
+
+  const executeWithHermes = async (task: WorkTask) => {
+    setError(null);
+    try {
+      const response = await fetch('/api/mcp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ jsonrpc: '2.0', id: `work-${task.id}`, method: 'tools/call', params: { name: 'hal_execute_hermes_work_task', arguments: { taskId: task.id } } })
+      });
+      const body = await response.json();
+      if (!response.ok) throw new Error(body.error?.message || body.error || 'Hermes execution failed.');
+      const result = body.structuredData || body.result?.structuredData;
+      if (result?.success === false) throw new Error(result.error || 'Hermes could not complete this task.');
+      await loadTasks();
+    } catch (err: any) {
+      setError(err?.message || 'Unable to execute this task with Hermes.');
+      await loadTasks();
+    }
   };
 
   const counts = tasks.reduce((acc, task) => { acc[task.status] = (acc[task.status] || 0) + 1; return acc; }, {} as Record<string, number>);
@@ -147,6 +178,12 @@ export default function WorkQueuePanel({ token }: WorkQueuePanelProps) {
               })}
             </select>
           </label>
+          {assignedWorker === 'hermes' && (
+            <label className="text-[10px] text-text-tertiary font-mono uppercase md:col-span-2">Hermes task input (JSON)
+              <textarea value={inputJson} onChange={e => setInputJson(e.target.value)} rows={4} spellCheck={false} placeholder={'{ "toolId": "landing_page", "parameters": { "businessName": "Example Co" } }'} className="mt-1 w-full rounded-md bg-bg-base border border-border-default p-2.5 text-xs font-mono text-text-primary outline-none focus:border-accent normal-case resize-y" />
+              <span className="block mt-1 text-[9px] text-text-tertiary normal-case">For hermes_lab_asset, include a registered toolId and its parameters. Other task types are not executable by the current queue runner.</span>
+            </label>
+          )}
           <label className="text-[10px] text-text-tertiary font-mono uppercase">Priority
             <select value={priority} onChange={e => setPriority(e.target.value)} className="mt-1 w-full rounded-md bg-bg-base border border-border-default p-2.5 text-sm text-text-primary">
               {['low', 'normal', 'high', 'urgent'].map(value => <option key={value} value={value}>{value}</option>)}
@@ -185,6 +222,7 @@ export default function WorkQueuePanel({ token }: WorkQueuePanelProps) {
                 </div>
                 <div className="flex flex-wrap gap-1.5 shrink-0">
                   {task.status === 'awaiting_approval' && <button onClick={() => void transition(task, 'queued')} className="px-2.5 py-1.5 rounded border border-orange-400/30 text-orange-300 text-[10px] font-mono">Approve</button>}
+                  {task.status === 'queued' && task.assignedWorker === 'hermes' && task.taskType === 'hermes_lab_asset' && workerCapabilities.find(item => item.id === 'hermes')?.supportedTaskTypes.includes(task.taskType) && <button onClick={() => void executeWithHermes(task)} className="px-2.5 py-1.5 rounded border border-accent/40 text-accent text-[10px] font-mono inline-flex items-center gap-1"><Play className="w-3 h-3" /> Run with Hermes</button>}
                   {task.status === 'queued' && task.assignedWorker === 'human' && <button onClick={() => void transition(task, 'running')} className="px-2.5 py-1.5 rounded border border-border-default text-text-secondary text-[10px] font-mono">Start</button>}
                   {task.status === 'running' && task.assignedWorker === 'human' && <button onClick={() => void transition(task, 'failed')} className="px-2.5 py-1.5 rounded border border-red-400/30 text-red-300 text-[10px] font-mono">Fail</button>}
                   {task.status === 'running' && task.assignedWorker === 'human' && <button onClick={() => void transition(task, 'completed')} className="px-2.5 py-1.5 rounded border border-emerald-400/30 text-emerald-300 text-[10px] font-mono inline-flex items-center gap-1"><CheckCircle2 className="w-3 h-3" /> Complete</button>}
