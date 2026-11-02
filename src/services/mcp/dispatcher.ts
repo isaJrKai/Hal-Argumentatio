@@ -391,15 +391,17 @@ export async function executeMcpTool(
               replyText: (result as any).replyText,
               updatedArtifactId: (result as any).updatedArtifact?.id || null
             };
-        const [completed] = await pgDb.transaction(async tx => {
-          const [saved] = await tx.update(workTasks).set({
-            status: 'completed', output: receipt, completedAt: new Date(), updatedAt: new Date()
-          }).where(and(
-            eq(workTasks.id, taskId), eq(workTasks.contractorId, contractorId),
-            eq(workTasks.status, 'running'), eq(workTasks.assignedWorker, 'hermes')
-          )).returning();
-          if (!saved) throw new Error('Task state changed before Hermes could record its execution receipt.');
-          await tx.insert(workEvents).values({
+        const [completed] = await pgDb.update(workTasks).set({
+          status: 'completed', output: receipt, completedAt: new Date(), updatedAt: new Date()
+        }).where(and(
+          eq(workTasks.id, taskId), eq(workTasks.contractorId, contractorId),
+          eq(workTasks.status, 'running'), eq(workTasks.assignedWorker, 'hermes')
+        )).returning();
+        if (!completed) throw new Error('Task state changed before Hermes could record its execution receipt.');
+        // The task receipt is the authoritative completion record. A secondary
+        // timeline append must not roll it back or make a completed action retryable.
+        try {
+          await pgDb.insert(workEvents).values({
             id: 'evt_' + crypto.randomUUID(), contractorId,
             eventType: 'task.execution_completed', entityType: 'work_task', entityId: taskId,
             actorType: 'agent', actorId: 'hermes_agent', sourceModule: 'hermes_work_executor',
@@ -409,15 +411,16 @@ export async function executeMcpTool(
               ? { artifactId: (result as any).artifactId, artifactTitle: (result as any).title, toolId }
               : { replyMessageId: (result as any).replyMessageId, updatedArtifactId: (result as any).updatedArtifact?.id || null }
           });
-          return [saved];
-        });
+        } catch (ledgerError) {
+          console.error('[Hermes Work History] Task completed but completion event append failed:', ledgerError);
+        }
         return { success: true, task: completed, receipt, executionStarted: true };
       } catch (executionError: any) {
         const message = String(executionError?.message || 'Hermes execution failed.').slice(0, 1000);
-        await pgDb.transaction(async tx => {
-          await tx.update(workTasks).set({ status: 'failed', errorMessage: message, updatedAt: new Date() })
-            .where(and(eq(workTasks.id, taskId), eq(workTasks.contractorId, contractorId), eq(workTasks.status, 'running')));
-          await tx.insert(workEvents).values({
+        await pgDb.update(workTasks).set({ status: 'failed', errorMessage: message, updatedAt: new Date() })
+          .where(and(eq(workTasks.id, taskId), eq(workTasks.contractorId, contractorId), eq(workTasks.status, 'running')));
+        try {
+          await pgDb.insert(workEvents).values({
             id: 'evt_' + crypto.randomUUID(), contractorId,
             eventType: 'task.execution_failed', entityType: 'work_task', entityId: taskId,
             actorType: 'agent', actorId: 'hermes_agent', sourceModule: 'hermes_work_executor',
@@ -425,7 +428,9 @@ export async function executeMcpTool(
             summary: `Hermes failed: ${task.title}.`,
             payload: { toolId, error: message }
           });
-        });
+        } catch (ledgerError) {
+          console.error('[Hermes Work History] Could not append failed execution event:', ledgerError);
+        }
         return { success: false, taskId, status: 'failed', error: message, retryAvailable: claimed.attemptCount < claimed.maxAttempts };
       }
     }
