@@ -690,7 +690,7 @@ RESPONSE STANDARD
       } catch (err: any) {
         if (toolCalls.length) {
           return {
-            text: 'HAL completed some tool calls before the Gemini response failed. Their confirmed results are recorded in Work Queue and Work History; no duplicate tool execution was attempted.',
+            text: 'HAL processed tool calls before the Gemini response failed. Check each recorded success or failure in Work Queue and Work History; no tool was retried automatically.',
             toolCalls
           };
         }
