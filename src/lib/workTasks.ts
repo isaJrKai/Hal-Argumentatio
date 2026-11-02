@@ -1,3 +1,4 @@
+import { randomUUID } from 'crypto';
 import { and, desc, eq, inArray } from 'drizzle-orm';
 import { workEvents, workTasks } from '../db/schema';
 
@@ -60,7 +61,7 @@ export async function ensureLeadReviewTask(
   if (activeTask) return { taskId: activeTask.id, created: false };
 
   const now = new Date();
-  const taskId = 'task_' + crypto.randomUUID();
+  const taskId = 'task_' + randomUUID();
   const correlationId = taskId;
   await db.insert(workTasks).values({
     id: taskId,
@@ -80,7 +81,7 @@ export async function ensureLeadReviewTask(
     updatedAt: now
   });
   await db.insert(workEvents).values({
-    id: 'evt_' + crypto.randomUUID(),
+    id: 'evt_' + randomUUID(),
     contractorId,
     eventType: 'task.created',
     entityType: 'work_task',
@@ -93,7 +94,7 @@ export async function ensureLeadReviewTask(
     payload: { taskType: 'lead_follow_up', assignedWorker: 'human', priority: 'normal', status: 'queued', leadId: lead.id }
   });
   await db.insert(workEvents).values({
-    id: 'evt_' + crypto.randomUUID(),
+    id: 'evt_' + randomUUID(),
     contractorId,
     eventType: 'lead.queued_for_review',
     entityType: 'lead',
