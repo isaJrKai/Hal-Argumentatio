@@ -1,101 +1,17 @@
-import { signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut, User } from '@firebase/auth';
-import { auth, isGoogleWorkspaceConfigured } from './googleWorkspace';
+import { User } from '@firebase/auth';
+import {
+  isGoogleWorkspaceConfigured,
+  initGoogleWorkspaceAuth,
+  googleWorkspaceSignIn,
+  getGoogleWorkspaceToken,
+  googleWorkspaceLogout
+} from './googleWorkspace';
 
-const provider = new GoogleAuthProvider();
-// Add all Google Drive scopes requested by the user
-provider.addScope('https://www.googleapis.com/auth/drive');
-provider.addScope('https://www.googleapis.com/auth/drive.file');
-provider.addScope('https://www.googleapis.com/auth/drive.metadata');
-
-let isSigningIn = false;
-let cachedAccessToken: string | null = null;
-
-// Handle in-memory access token cache or state recovery from sessionStorage for usability
-try {
-  const savedToken = sessionStorage.getItem('gdrive_access_token');
-  if (savedToken) {
-    cachedAccessToken = savedToken;
-  }
-} catch (e) {
-  console.warn('Session storage not accessible for token caching', e);
-}
-
-export const initAuth = (
-  onAuthSuccess?: (user: User, token: string) => void,
-  onAuthFailure?: () => void
-) => {
-  if (!auth || !isGoogleWorkspaceConfigured) {
-    onAuthFailure?.();
-    return () => {};
-  }
-  return onAuthStateChanged(auth, async (user: User | null) => {
-    if (user) {
-      if (cachedAccessToken) {
-        if (onAuthSuccess) onAuthSuccess(user, cachedAccessToken);
-      } else if (!isSigningIn) {
-        cachedAccessToken = null;
-        if (onAuthFailure) onAuthFailure();
-      }
-    } else {
-      cachedAccessToken = null;
-      try {
-        sessionStorage.removeItem('gdrive_access_token');
-      } catch (e) {}
-      if (onAuthFailure) onAuthFailure();
-    }
-  });
-};
-
-export const googleSignIn = async (): Promise<{ user: User; accessToken: string } | null> => {
-  if (!auth || !isGoogleWorkspaceConfigured) {
-    throw new Error('Google Drive is not configured. A real Firebase project is required; no placeholder project will be used.');
-  }
-  try {
-    isSigningIn = true;
-    const result = await signInWithPopup(auth, provider);
-    const credential = GoogleAuthProvider.credentialFromResult(result);
-    if (!credential?.accessToken) {
-      throw new Error('Failed to get access token from Google Sign-In');
-    }
-
-    cachedAccessToken = credential.accessToken;
-    try {
-      sessionStorage.setItem('gdrive_access_token', cachedAccessToken);
-    } catch (e) {}
-    return { user: result.user, accessToken: cachedAccessToken };
-  } catch (error: any) {
-    if (
-      error?.code === 'auth/popup-closed-by-user' ||
-      error?.message?.includes('popup-closed-by-user') ||
-      error?.code === 'auth/cancelled-popup-request' ||
-      error?.message?.includes('cancelled-popup-request')
-    ) {
-      console.info('Google Drive sign-in popup was closed by the user.');
-      return null;
-    }
-
-    if (error?.code === 'auth/popup-blocked' || error?.message?.includes('popup-blocked')) {
-      throw new Error('Google Sign-In popup was blocked by your browser. Please allow popups or open the app in a new tab to authenticate.');
-    }
-
-    console.error('Google Auth Error:', error);
-    throw error;
-  } finally {
-    isSigningIn = false;
-  }
-};
-
-export const getAccessToken = async (): Promise<string | null> => {
-  return auth && isGoogleWorkspaceConfigured ? cachedAccessToken : null;
-};
-
-export const logout = async () => {
-  if (auth) await signOut(auth);
-  cachedAccessToken = null;
-  try {
-    sessionStorage.removeItem('gdrive_access_token');
-  } catch (e) {}
-};
+export { isGoogleWorkspaceConfigured };
+export const initAuth = initGoogleWorkspaceAuth;
+export const googleSignIn = googleWorkspaceSignIn;
+export const getAccessToken = getGoogleWorkspaceToken;
+export const logout = googleWorkspaceLogout;
 
 // Drive API File Model
 export interface DriveFile {
