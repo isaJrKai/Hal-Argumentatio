@@ -18,7 +18,8 @@ const ALLOWED_TRANSITIONS: Record<WorkTaskStatus, WorkTaskStatus[]> = {
 export function requiresWorkTaskApproval(taskType: string, title: string, description?: string | null, input?: unknown): boolean {
   let inputText = '';
   try { inputText = input === undefined ? '' : JSON.stringify(input); } catch { inputText = '[unserializable task input]'; }
-  return /(^|[._\\s-])(send|dispatch|publish|spend|purchase|charge|refund|sign|execute[_\\s]contract|delete|archive|revoke|transfer[_\\s]funds|bulk[_\\s]outreach|email[_\\s]blast|cold[_\\s]email|email[_\\s]outreach|sms[_\\s]campaign|whatsapp[_\\s]campaign|launch[_\\s]campaign)([._\\s-]|$)/i.test(`${taskType} ${title} ${description || ''} ${inputText}`);
+  const actionPattern = /\\b(send|sending|dispatch|publish|publishing|spend|purchase|charge|refund|sign|signing|execute\\s+contract|delete|deletion|archive|revoke|transfer\\s+funds|bulk\\s+outreach|email\\s+blast|cold\\s+email|email\\s+outreach|sms\\s+campaign|whatsapp\\s+campaign|launch\\s+campaign)\\b/i;
+  return actionPattern.test(`${taskType} ${title} ${description || ''} ${inputText}`);
 }
 
 export function canHumanUpdateWorkTask(assignedWorker: string, nextStatus: string): boolean {
