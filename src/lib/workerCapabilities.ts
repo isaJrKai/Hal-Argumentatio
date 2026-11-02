@@ -37,7 +37,7 @@ export function getWorkerCapabilities(env: NodeJS.ProcessEnv = process.env): Wor
       label: 'Hermes',
       mode: 'partial_executor',
       canClaimTasks: true,
-      supportedTaskTypes: ['hermes_lab_asset'],
+      supportedTaskTypes: ['hermes_lab_asset', 'hermes_agent_task'],
       description: 'Existing Hermes Studio specialist agent with shared workspace context. The durable queue executor supports all ten registered Hermes Lab asset tools through the hermes_lab_asset task type; it does not publish externally or send communications.'
     },
     {
