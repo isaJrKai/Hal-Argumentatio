@@ -4722,7 +4722,7 @@ app.post('/api/missions', authenticate, async (req, res) => {
           contractorId, eventType: 'mission.completed', entityType: 'mission', entityId: mission.id,
           actorType: 'agent', actorId: 'territory_harvester', sourceModule: 'mission_control',
           correlationId: mission.id, summary: `Completed territory mission for ${city} / ${niche}.`,
-          payload: { prospectsDiscovered: createdLeads.length, outreachDraftsCreated: draftsCreated, messagesSent: 0 }
+          payload: { prospectsDiscovered: createdLeads.length, queuedReviewTasks: queuedTasks, outreachDraftsCreated: draftsCreated, messagesSent: 0 }
         });
 
         // Log & Broadcast SSE Notification
