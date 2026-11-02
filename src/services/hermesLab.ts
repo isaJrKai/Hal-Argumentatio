@@ -627,7 +627,7 @@ export async function chatWithHermesAgent(
     'Recent events:', ...recentEvents.map(e => `- ${e.eventType} | ${e.entityType}:${e.entityId || 'n/a'} | ${e.summary}`),
     'Recent leads:', ...recentLeads.map(l => `- ${l.businessName} | ${l.city} | ${l.niche} | stage=${l.status} | website=${l.websiteUrl || 'not recorded'} | id=${l.id}`),
     'Recent missions:', ...recentMissions.map(m => `- ${m.title} | ${m.status} | ${m.city}/${m.niche} | id=${m.id}`),
-    'Work queue (payloads omitted):', ...recentTasks.map(t => `- ${t.title} | ${t.status} | assigned=${t.assignedWorker} | priority=${t.priority} | id=${t.id}`),
+    'Work queue (payloads omitted):', ...recentTasks.map(t => `- ${t.title} | ${t.status} | assigned=${t.assignedWorker} | priority=${t.priority} | result=${typeof t.output?.replyText === 'string' ? t.output.replyText.slice(0, 500) : t.output?.artifactId || 'not recorded'} | id=${t.id}`),
     'Recent campaigns:', ...recentCampaigns.map(c => `- ${c.name} | ${c.status} | leads=${c.leadsCount} | budgetUSD=${c.budgetUsd} | id=${c.id}`),
     'Recent recorded revenue (not forecasts):', ...recentRevenue.map(r => `- ${r.amountUsd} USD | source=${r.source} | leadId=${r.leadId || 'unlinked'} | ${r.createdAt.toISOString()}`),
     'Client projects:', ...recentProjects.map(p => `- ${p.businessName} | status=${p.status} | retainerUSD=${p.monthlyRetainerUsd} | leadId=${p.leadId} | id=${p.id}`),
