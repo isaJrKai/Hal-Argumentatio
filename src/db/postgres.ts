@@ -690,6 +690,35 @@ export async function bootstrapPostgresTables(poolInstance?: Pool): Promise<void
       ALTER TABLE lead_events ADD COLUMN IF NOT EXISTS occurred_at TIMESTAMP;
       ALTER TABLE lead_events ALTER COLUMN type DROP NOT NULL;
 
+      CREATE TABLE IF NOT EXISTS work_tasks (
+        id TEXT PRIMARY KEY,
+        contractor_id TEXT NOT NULL,
+        task_type TEXT NOT NULL,
+        title TEXT NOT NULL,
+        description TEXT,
+        status TEXT DEFAULT 'queued' NOT NULL,
+        priority TEXT DEFAULT 'normal' NOT NULL,
+        assigned_worker TEXT DEFAULT 'human' NOT NULL,
+        entity_type TEXT,
+        entity_id TEXT,
+        correlation_id TEXT,
+        input JSONB,
+        output JSONB,
+        attempt_count INTEGER DEFAULT 0 NOT NULL,
+        max_attempts INTEGER DEFAULT 3 NOT NULL,
+        error_message TEXT,
+        requires_approval BOOLEAN DEFAULT false NOT NULL,
+        approved_by TEXT,
+        approved_at TIMESTAMP,
+        started_at TIMESTAMP,
+        completed_at TIMESTAMP,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS work_tasks_tenant_status_idx ON work_tasks (contractor_id, status, priority, created_at);
+      CREATE INDEX IF NOT EXISTS work_tasks_assignee_idx ON work_tasks (contractor_id, assigned_worker, status, created_at);
+      CREATE INDEX IF NOT EXISTS work_tasks_entity_idx ON work_tasks (contractor_id, entity_type, entity_id, created_at DESC);
+
       CREATE TABLE IF NOT EXISTS work_events (
         id TEXT PRIMARY KEY,
         contractor_id TEXT NOT NULL,
