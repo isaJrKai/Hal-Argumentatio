@@ -28,7 +28,7 @@ import {
 } from './types.ts';
 import { executeHermesLabTool, chatWithHermesAgent, LabToolType } from '../hermesLab.ts';
 import { getRecentWorkEvents } from '../../lib/workLedger';
-import { listWorkTasks, getWorkTask, requiresWorkTaskApproval } from '../../lib/workTasks';
+import { listWorkTasks, getWorkTask, requiresWorkTaskApproval, canExecutorClaimWorkTask } from '../../lib/workTasks';
 
 export const HAL_MCP_TOOLS: McpToolDefinition[] = [
   {
@@ -312,8 +312,10 @@ export async function executeMcpTool(
       if (!task) throw new Error('Work task not found in this workspace.');
       if (task.assignedWorker !== 'hermes') throw new Error('This task is not assigned to Hermes.');
       if (!['hermes_lab_asset', 'hermes_agent_task'].includes(task.taskType)) throw new Error('Hermes cannot execute this task type. Supported types: hermes_lab_asset, hermes_agent_task.');
-      if (task.status === 'awaiting_approval' || (task.requiresApproval && !task.approvedAt)) throw new Error('This task is blocked pending human approval.');
-      if (task.status !== 'queued') throw new Error(`Task is ${task.status}; only queued tasks can be claimed.`);
+      if (!canExecutorClaimWorkTask(task)) {
+        if (task.status === 'awaiting_approval' || (task.requiresApproval && !task.approvedAt)) throw new Error('This task is blocked pending human approval.');
+        throw new Error(`Task is ${task.status}; only queued tasks can be claimed.`);
+      }
       if (task.attemptCount >= task.maxAttempts) throw new Error('Task has reached its maximum execution attempts.');
       const input = task.input && typeof task.input === 'object' && !Array.isArray(task.input) ? task.input as Record<string, any> : {};
       const allowedToolIds: LabToolType[] = ['landing_page', 'ad_copy_studio', 'seo_schema_generator', 'outreach_sequences', 'sms_review_booster', 'speed_vitals_optimizer', 'competitor_intel_scout', 'webhook_resilience_fixer', 'negative_keyword_miner', 'deep_case_reasoner'];
