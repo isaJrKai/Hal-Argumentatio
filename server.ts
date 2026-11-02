@@ -2461,6 +2461,13 @@ app.post('/api/leads/bulk', authenticate, async (req, res) => {
         notes: notes || 'Imported via bulk spreadsheet upload.'
       }).returning();
 
+      await recordWorkEvent(pgDb, {
+        contractorId, eventType: 'lead.created', entityType: 'lead', entityId: lead.id,
+        actorType: 'human', actorId: contractorId, sourceModule: 'bulk_import', correlationId: lead.id,
+        summary: `Imported ${lead.businessName} from a spreadsheet into the lead workspace.`,
+        payload: { city: lead.city, niche: lead.niche, source: 'spreadsheet_import' }
+      });
+
       await pgDb.insert(leadEvents).values({
         id: crypto.randomUUID(),
         leadId: lead.id,
@@ -2533,6 +2540,11 @@ app.delete('/api/leads/:id', authenticate, async (req, res) => {
     if (deleted.length === 0) {
       return res.status(404).json({ error: 'Lead not found or inaccessible' });
     }
+    await recordWorkEvent(pgDb, {
+      contractorId, eventType: 'lead.deleted', entityType: 'lead', entityId: id,
+      actorType: 'human', actorId: contractorId, sourceModule: 'lead_desk', correlationId: id,
+      summary: 'Deleted a lead record from the workspace.', payload: { recordDeleted: true }
+    });
     res.json({ success: true, message: 'Lead deleted successfully', id });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
