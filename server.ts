@@ -7340,14 +7340,18 @@ app.post('/api/scheduler', authenticate, async (req, res) => {
         });
 
         // Legacy lesson history is retained for older screens during migration.
-        db.addLesson({
-          category: learning.category,
-          title: `Forecast Deviation Lesson (${forecast.metric.toUpperCase()})`,
-          description: learning.insight,
-          confidence: confidenceShift,
-          timesObserved: 1,
-          lastObserved: evaluatedAt.toISOString()
-        });
+        try {
+          db.addLesson({
+            category: learning.category,
+            title: `Forecast Deviation Lesson (${forecast.metric.toUpperCase()})`,
+            description: learning.insight,
+            confidence: confidenceShift,
+            timesObserved: 1,
+            lastObserved: evaluatedAt.toISOString()
+          });
+        } catch (legacyError) {
+          console.warn('[HAL Learning] Legacy lesson mirror failed; PostgreSQL insight remains authoritative.', legacyError);
+        }
         evaluatedCount++;
       }
 
@@ -7376,31 +7380,34 @@ app.post('/api/scheduler', authenticate, async (req, res) => {
         resultMessage = 'No campaign performance observations exist for this tenant in the last 90 days. No forecast was fabricated.';
       } else {
         const forecastResult = await generateForecastNarrative('lead_volume', historicalData, req.body?.preferredAI);
-        const [newForecast] = await pgDb.insert(forecasts).values({
-          id: crypto.randomUUID(),
-          contractorId,
-          metric: 'lead_volume',
-          predicted: Number(forecastResult.predicted),
-          confidenceScore: Number(forecastResult.confidenceScore),
-          targetDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
-          modelVersion: forecastResult.source || 'unverified',
-          evaluated: false,
-          assumptions: forecastResult.assumptions || '',
-          createdAt: new Date(),
-          updatedAt: new Date()
-        }).returning();
-
-        await recordWorkEvent(pgDb, {
-          contractorId,
-          eventType: 'forecast.created',
-          entityType: 'forecast',
-          entityId: newForecast.id,
-          actorType: 'system',
-          actorId: 'auto_forecaster',
-          sourceModule: 'intelligence',
-          correlationId: newForecast.id,
-          summary: 'Created a seven-day lead-volume forecast from recorded campaign observations.',
-          payload: { modelVersion: newForecast.modelVersion, predicted: newForecast.predicted, historyPoints: historicalData.length }
+        const newForecast = await pgDb.transaction(async tx => {
+          const [created] = await tx.insert(forecasts).values({
+            id: crypto.randomUUID(),
+            contractorId,
+            metric: 'lead_volume',
+            predicted: Number(forecastResult.predicted),
+            confidenceScore: Number(forecastResult.confidenceScore),
+            targetDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+            modelVersion: forecastResult.source || 'unverified',
+            evaluated: false,
+            assumptions: forecastResult.assumptions || '',
+            createdAt: new Date(),
+            updatedAt: new Date()
+          }).returning();
+          await tx.insert(workEvents).values({
+            id: 'evt_' + crypto.randomUUID(),
+            contractorId,
+            eventType: 'forecast.created',
+            entityType: 'forecast',
+            entityId: created.id,
+            actorType: 'system',
+            actorId: 'auto_forecaster',
+            sourceModule: 'intelligence',
+            correlationId: created.id,
+            summary: 'Created a seven-day lead-volume forecast from recorded campaign observations.',
+            payload: { modelVersion: created.modelVersion, predicted: created.predicted, historyPoints: historicalData.length }
+          });
+          return created;
         });
         resultMessage = `Created a 7-day lead-volume forecast from ${historicalData.length} recorded campaign observations using ${newForecast.modelVersion}. Estimate: ${newForecast.predicted} leads.`;
         broadcastNotification(contractorId, 'info', 'Lead-volume forecast created', resultMessage);
