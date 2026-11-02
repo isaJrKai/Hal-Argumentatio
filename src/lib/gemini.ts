@@ -576,7 +576,7 @@ RESPONSE STANDARD
       })
     }));
 
-  if (activeAI === 'gemini' || (toolRuntime && geminiTools.length > 0)) {
+  if (activeAI === 'gemini' || activeAI === 'dual') {
     // 1. Try Gemini first (Strictly 3.5)
     const ai = getAIClient();
     if (ai) {
@@ -697,6 +697,20 @@ RESPONSE STANDARD
         }
         messages.push({ role: "user", content: message });
 
+        if (toolRuntime && geminiTools.length) {
+          const result = await callNemotronWithTools(
+            messages,
+            toolRuntime.tools.filter(tool => tool.name !== 'hermes_synthesize_lab_asset'),
+            toolRuntime.execute,
+            0.3
+          );
+          return {
+            text: result.text || (result.toolCalls.length
+              ? 'I processed the available tool calls, but the model did not return a final explanation. Review Work Queue and Work History for their results.'
+              : 'Nemotron returned no response.'),
+            toolCalls: result.toolCalls.length ? result.toolCalls : undefined
+          };
+        }
         if (toolRuntime && geminiTools.length) {
           const result = await callNemotronWithTools(
             messages,
