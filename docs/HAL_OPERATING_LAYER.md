@@ -64,9 +64,12 @@ A configured Gemini or NVIDIA API key does not mean that provider can claim queu
 
 ### Intelligence and agents
 - [x] Inject bounded tenant-scoped live business context into HAL Assistant, Hermes and the MCP operational-context tool.
-- [x] Connect HAL Assistant Gemini function calling to the authenticated MCP dispatcher; tool execution is tenant-scoped by the verified session, recorded in Work History and returned to the model for a final answer.
+- [x] Connect HAL Assistant Gemini and Nemotron function calling to the authenticated MCP dispatcher; tool execution is tenant-scoped by the verified session, recorded in Work History and returned to the model for a final answer.
+- [x] Extend HAL Assistant, Hermes and MCP operational context with lead lifecycle events, recorded won/lost outcomes and measured revenue outcomes so agents can distinguish pipeline movement from booked revenue and forecasts.
+- [x] Replace hard-coded campaign anomaly baselines with measured adjacent 30-day conversion-rate and cost-per-conversion comparisons; return zero-conversion spend as a screening signal when no prior baseline exists.
 - [x] Expose a truthful worker capability registry and authenticated readiness endpoint; Hermes is the existing specialist agent and must be extended through its actual runtime rather than duplicated.
 - [x] Extend the existing Hermes executor to support Hermes Lab asset generation and Hermes Studio analysis or explicitly requested artifact revisions, with atomic claims and persisted receipts.
+- [x] Add Gemini and Nemotron function-calling loops with bounded rounds, authenticated tool execution, tool-result hand-back, and retry protection against repeating already executed actions.
 - [x] Record Hermes tool calls, success/failure and artifact provenance in Work History; keep provider failures visibly failed instead of reporting a successful execution.
 - [ ] Complete executor claim/heartbeat/receipt protocol for all remaining specialist workflows. Gemini and Nemotron remain model providers, not standalone queue executors.
 - [ ] Make agent telemetry and neural graph views derive from persisted execution events.
