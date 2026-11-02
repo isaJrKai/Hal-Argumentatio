@@ -1769,6 +1769,13 @@ app.post('/api/leads/create', authenticate, async (req, res) => {
       notes
     }).returning();
 
+    await recordWorkEvent(pgDb, {
+      contractorId, eventType: 'lead.created', entityType: 'lead', entityId: lead.id,
+      actorType: 'human', actorId: contractorId, sourceModule: 'lead_intake', correlationId: lead.id,
+      summary: `Captured ${businessName} in ${city} through the lead intake form.`,
+      payload: { city, niche: serviceType, source: gclid || gbraid || wbraid ? 'google_ads' : (utmSource || 'direct') }
+    });
+
     if (gclid || gbraid || wbraid || utmSource || utmCampaign) {
       await pgDb.insert(leadAttribution).values({
         id: crypto.randomUUID(),
@@ -1865,6 +1872,13 @@ app.post('/api/leads/:id/verify-grounding', authenticate, async (req, res) => {
       groundingEvidence: verification.evidence,
       updatedAt: new Date()
     }).where(and(eq(leads.id, leadId), eq(leads.contractorId, contractorId))).returning();
+
+    await recordWorkEvent(pgDb, {
+      contractorId, eventType: 'lead.grounding_verified', entityType: 'lead', entityId: lead.id,
+      actorType: 'system', actorId: 'network_verification', sourceModule: 'lead_verification',
+      correlationId: lead.id, summary: `Updated grounding status for ${lead.businessName} to ${verification.status}.`,
+      payload: { verificationStatus: verification.status, dnsResolved: verification.evidence.dnsResolved, phoneValid: verification.evidence.phoneValid }
+    });
 
     await pgDb.insert(leadEvents).values({
       id: crypto.randomUUID(),
