@@ -851,35 +851,29 @@ export default function ConnectorsPanel() {
                         WhatsApp Inbound Webhook
                       </span>
                       <button 
-                        onClick={() => handleCopyUrl('/api/webhooks/whatsapp')}
+                        onClick={() => handleCopyUrl('/api/outreach/whatsapp/webhook')}
                         className="text-xs text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100 flex items-center gap-1"
                       >
-                        {copiedUrl === '/api/webhooks/whatsapp' ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
+                        {copiedUrl === '/api/outreach/whatsapp/webhook' ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
                         Copy URL
                       </button>
                     </div>
                     <code className="text-[11px] font-mono text-zinc-600 dark:text-zinc-400 break-all block">
-                      {window.location.origin}/api/webhooks/whatsapp
+                      {window.location.origin}/api/outreach/whatsapp/webhook
                     </code>
                   </div>
 
-                  <div className="p-3 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-800/50">
+                  <div className="p-3 rounded-lg border border-dashed border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-800/50">
                     <div className="flex items-center justify-between text-xs mb-1.5">
                       <span className="font-semibold text-blue-600 dark:text-blue-400 flex items-center gap-1.5">
                         <Radio className="w-3.5 h-3.5" />
                         SMS Inbound Webhook
                       </span>
-                      <button 
-                        onClick={() => handleCopyUrl('/api/webhooks/twilio')}
-                        className="text-xs text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100 flex items-center gap-1"
-                      >
-                        {copiedUrl === '/api/webhooks/twilio' ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
-                        Copy URL
-                      </button>
+                      <span className="text-[10px] font-mono text-zinc-500">NOT IMPLEMENTED</span>
                     </div>
-                    <code className="text-[11px] font-mono text-zinc-600 dark:text-zinc-400 break-all block">
-                      {window.location.origin}/api/webhooks/twilio
-                    </code>
+                    <p className="text-[11px] text-zinc-600 dark:text-zinc-400">
+                      No Twilio inbound webhook route is registered. SMS remains simulation-only until a signed provider callback is implemented and verified.
+                    </p>
                   </div>
                 </div>
               </div>
