@@ -1,4 +1,4 @@
-import { Pool } from 'pg';
+import { Pool, PoolClient } from 'pg';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import * as schema from './schema.ts';
 
@@ -831,7 +831,7 @@ export async function testPostgresConnection(customUrl?: string): Promise<{
   }
 
   const start = Date.now();
-  let client: Awaited<ReturnType<Pool['connect']>> | null = null;
+  let client: PoolClient | null = null;
   try {
     client = await p.connect();
     const result = await client.query('SELECT version(), current_database(), current_user;');
