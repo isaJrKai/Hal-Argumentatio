@@ -269,7 +269,7 @@ app.use((req, res, next) => {
 
 // Liveness: confirms the HTTP process is responding.
 app.get('/api/health', (_req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+  res.json({ status: 'ok', uptimeSeconds: Math.floor(process.uptime()), timestamp: new Date().toISOString() });
 });
 
 // Readiness: confirms the same PostgreSQL pool used by application queries is usable
@@ -6950,6 +6950,22 @@ app.get('/api/system/postgres-status', authenticate, async (req, res) => {
     }
   } catch (err: any) {
     res.json({ connected: false, message: err.message });
+  }
+});
+
+// Non-destructive cryptographic self-test. The probe is generated in memory and never persisted.
+app.get('/api/system/diagnostics/crypto', authenticate, (_req, res) => {
+  try {
+    const probe = `hal-crypto-probe:${crypto.randomBytes(32).toString('hex')}`;
+    const ciphertext = encrypt(probe);
+    const verified = Boolean(ciphertext && ciphertext !== probe && decrypt(ciphertext) === probe);
+    if (!verified) {
+      return res.status(503).json({ status: 'failed', algorithm: 'AES-256-GCM', error: 'Encryption round-trip verification failed.' });
+    }
+    return res.json({ status: 'verified', algorithm: 'AES-256-GCM', roundTrip: true });
+  } catch (error: any) {
+    console.error('[HAL crypto diagnostics] Self-test failed:', error?.message || error);
+    return res.status(503).json({ status: 'failed', error: 'Encryption self-test failed.' });
   }
 });
 
