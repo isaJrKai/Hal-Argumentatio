@@ -4960,7 +4960,7 @@ async function getTenantOutreachSequences(contractorId: string) {
       niche: typeof legacy.niche === 'string' ? legacy.niche : 'General',
       steps: legacy.steps,
       createdAt: toDate(legacy.createdAt, now),
-      updatedAt: toDate(legacy.updatedAt || legacy.createdAt, now)
+      updatedAt: toDate(legacy.createdAt, now)
     }).onConflictDoNothing();
   }
   return pgDb.select().from(outreachSequences)
@@ -10615,7 +10615,7 @@ async function startServer() {
             conversionRatePct: null,
             templateOnly: false,
             createdAt: savedSequence.createdAt,
-            steps: savedSequence.steps.map((step, index) => ({
+            steps: (Array.isArray(savedSequence.steps) ? savedSequence.steps as any[] : []).map((step, index) => ({
               id: `${savedSequence.id}_step_${index + 1}`,
               stepNumber: index + 1,
               dayOffset: step.day,
