@@ -5992,33 +5992,24 @@ app.post('/api/outreach/whatsapp/webhook', (req, res) => {
 
   const body = req.body;
   try {
-    if (body.object === 'whatsapp_business_account') {
-      for (const entry of body.entry || []) {
-        for (const change of entry.changes || []) {
-          const value = change.value;
-          if (value?.messages?.length > 0) {
-            for (const msg of value.messages) {
-              const fromPhone = msg.from;
-              const text = msg.text?.body || '[Interactive Message]';
-              console.log(`[Inbound WhatsApp from +${fromPhone}]: ${text}`);
-
-              for (const [cid] of contractorBridges.entries()) {
-                broadcastNotification(
-                  cid,
-                  'lead_captured',
-                  '💬 Inbound WhatsApp Reply!',
-                  `From +${fromPhone}: "${text.slice(0, 80)}"`
-                );
-              }
-            }
-          }
-        }
+    if (body?.object === 'whatsapp_business_account') {
+      const hasInboundMessages = (body.entry || []).some((entry: any) =>
+        (entry.changes || []).some((change: any) => Array.isArray(change.value?.messages) && change.value.messages.length > 0)
+      );
+      if (hasInboundMessages) {
+        // Never fan out an inbound message to every connected workspace. A
+        // verified signature authenticates Meta, not the tenant that owns the
+        // destination phone number. Tenant routing must be configured first.
+        console.warn('[WhatsApp Webhook] Signed inbound message received without a verified phone-number-to-tenant mapping.');
+        return res.status(503).json({
+          error: 'WhatsApp signature verified, but tenant routing is not configured. The message was not exposed to any workspace.'
+        });
       }
     }
-    res.sendStatus(200);
+    return res.sendStatus(200);
   } catch (err) {
     console.error('[WhatsApp Webhook Error]', err);
-    res.sendStatus(500);
+    return res.sendStatus(500);
   }
 });
 
