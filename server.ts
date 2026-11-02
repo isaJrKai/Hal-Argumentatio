@@ -541,6 +541,15 @@ app.post('/api/work-tasks', authenticate, async (req, res) => {
     if (!entityExists) return res.status(404).json({ error: 'The linked business record was not found in this workspace.' });
   }
 
+  if (entityType && entityId) {
+    const [activeDuplicate] = await pgDb.select().from(workTasks).where(and(
+      eq(workTasks.contractorId, contractorId), eq(workTasks.taskType, taskType),
+      eq(workTasks.entityType, entityType), eq(workTasks.entityId, entityId),
+      inArray(workTasks.status, ['queued', 'running', 'awaiting_approval'])
+    )).limit(1);
+    if (activeDuplicate) return res.status(200).json({ task: activeDuplicate, duplicate: true });
+  }
+
   const taskId = 'task_' + crypto.randomUUID();
   const correlationId = typeof body.correlationId === 'string' && body.correlationId.trim()
     ? body.correlationId.trim().slice(0, 120) : taskId;
