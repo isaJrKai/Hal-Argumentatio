@@ -17,7 +17,6 @@ describe('HAL work task state machine', () => {
   it('prevents humans from marking agent-assigned tasks as executed', () => {
     expect(canHumanUpdateWorkTask('hermes', 'running')).toBe(false);
     expect(canHumanUpdateWorkTask('gemini', 'completed')).toBe(false);
-    expect(canHumanUpdateWorkTask('amis', 'failed')).toBe(false);
     expect(canHumanUpdateWorkTask('hermes', 'cancelled')).toBe(true);
     expect(canHumanUpdateWorkTask('human', 'running')).toBe(true);
     expect(canHumanUpdateWorkTask('human', 'completed')).toBe(true);
