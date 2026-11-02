@@ -8,7 +8,7 @@ export default function NeuralPanel() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   
-  const [activeSubsystem, setActiveSubsystem] = useState('core_bayes');
+  const [activeSubsystem, setActiveSubsystem] = useState('core_leads');
   const [isSyncing, setIsSyncing] = useState(false);
   const [networkData, setNetworkData] = useState<{ nodes: any[], links: any[], telemetry: any }>({ nodes: [], links: [], telemetry: null });
   const [learningMetrics, setLearningMetrics] = useState<any>(null);
