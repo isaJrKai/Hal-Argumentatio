@@ -861,6 +861,9 @@ export default function ConnectorsPanel() {
                     <code className="text-[11px] font-mono text-zinc-600 dark:text-zinc-400 break-all block">
                       {window.location.origin}/api/outreach/whatsapp/webhook
                     </code>
+                    <p className="mt-2 text-[10px] text-amber-700 dark:text-amber-300">
+                      Signature validation is implemented. Inbound messages are not yet routed to a specific workspace; tenant mapping must be configured before message processing is enabled.
+                    </p>
                   </div>
 
                   <div className="p-3 rounded-lg border border-dashed border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-800/50">
