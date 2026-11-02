@@ -10,7 +10,8 @@ import {
   revenueSimulations,
   missions,
   workEvents,
-  workTasks
+  workTasks,
+  hermesLabArtifacts
 } from '../../db/schema.ts';
 import { eq, and, desc, gte } from 'drizzle-orm';
 import crypto from 'crypto';
@@ -24,7 +25,7 @@ import {
 } from './types.ts';
 import { executeHermesLabTool, LabToolType } from '../hermesLab.ts';
 import { getRecentWorkEvents } from '../../lib/workLedger';
-import { listWorkTasks } from '../../lib/workTasks';
+import { listWorkTasks, getWorkTask } from '../../lib/workTasks';
 
 export const HAL_MCP_TOOLS: McpToolDefinition[] = [
   {
@@ -227,6 +228,21 @@ export async function executeMcpTool(
           (rawParams?.input !== undefined && input === null) ||
           (input && JSON.stringify(input).length > 20000)) {
         throw new Error('Invalid work task parameters.');
+      }
+      if (entityType) {
+        let entityExists = false;
+        if (entityType === 'lead') {
+          entityExists = (await pgDb.select({ id: leads.id }).from(leads).where(and(eq(leads.id, entityId!), eq(leads.contractorId, contractorId))).limit(1)).length > 0;
+        } else if (entityType === 'mission') {
+          entityExists = (await pgDb.select({ id: missions.id }).from(missions).where(and(eq(missions.id, entityId!), eq(missions.contractorId, contractorId))).limit(1)).length > 0;
+        } else if (entityType === 'artifact') {
+          entityExists = (await pgDb.select({ id: hermesLabArtifacts.id }).from(hermesLabArtifacts).where(and(eq(hermesLabArtifacts.id, entityId!), eq(hermesLabArtifacts.contractorId, contractorId))).limit(1)).length > 0;
+        } else if (entityType === 'work_task') {
+          entityExists = (await getWorkTask(pgDb, contractorId, entityId!)) !== null;
+        } else {
+          throw new Error('Unsupported entity type. Link tasks to a lead, mission, artifact or work task.');
+        }
+        if (!entityExists) throw new Error('The linked business record was not found in this workspace.');
       }
       const taskId = 'task_' + crypto.randomUUID();
       const correlationId = typeof rawParams?.correlationId === 'string' && rawParams.correlationId.trim()
