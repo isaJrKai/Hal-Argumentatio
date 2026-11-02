@@ -7,7 +7,10 @@ import {
   halLoops, 
   halLoopEvents, 
   auditLogs,
-  revenueSimulations
+  revenueSimulations,
+  missions,
+  workEvents,
+  workTasks
 } from '../../db/schema.ts';
 import { eq, and, desc, gte } from 'drizzle-orm';
 import crypto from 'crypto';
@@ -20,8 +23,50 @@ import {
   validateAttachLoopIntelligenceInput
 } from './types.ts';
 import { executeHermesLabTool, LabToolType } from '../hermesLab.ts';
+import { getRecentWorkEvents } from '../../lib/workLedger';
+import { listWorkTasks } from '../../lib/workTasks';
 
 export const HAL_MCP_TOOLS: McpToolDefinition[] = [
+  {
+    name: 'hal_get_operational_context',
+    description: 'Retrieves a bounded, tenant-scoped snapshot of recent work events, leads, missions and assigned tasks so HAL agents can understand current business activity. Facts are authoritative only for the returned records; missing data must not be guessed.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        limit: { type: 'number', description: 'Maximum recent records per category, from 1 to 20 (default 10).' }
+      }
+    }
+  },
+  {
+    name: 'hal_create_work_task',
+    description: 'Creates a durable work item assigned to a human or specialist worker. This queues work only; it does not execute the task. External communications, spend, contracts and destructive actions must require human approval.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        taskType: { type: 'string' },
+        title: { type: 'string' },
+        description: { type: 'string' },
+        assignedWorker: { type: 'string', enum: ['human', 'hal_assistant', 'hermes', 'amis', 'gemini', 'nemotron'] },
+        priority: { type: 'string', enum: ['low', 'normal', 'high', 'urgent'] },
+        entityType: { type: 'string' },
+        entityId: { type: 'string' },
+        correlationId: { type: 'string' },
+        input: { type: 'object' },
+        requiresApproval: { type: 'boolean' }
+      },
+      required: ['taskType', 'title', 'assignedWorker']
+    }
+  },
+  {
+    name: 'hal_list_work_tasks',
+    description: 'Lists the authenticated tenant work queue. Use it to inspect queued, running, approval-blocked, completed and failed tasks before assigning duplicate work.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        limit: { type: 'number' }
+      }
+    }
+  },
   {
     name: 'hal_get_financial_health',
     description: 'Calculates deterministic business financials (CPL, CAC, ROAS, LTV, Net Margin, Payback Period) across a given timeframe.',
@@ -143,6 +188,73 @@ export async function executeMcpTool(
   const auditId = crypto.randomUUID();
   
   switch (toolName) {
+    case 'hal_get_operational_context': {
+      const requested = Number(rawParams?.limit);
+      const limit = Number.isFinite(requested) && requested > 0 ? Math.min(20, Math.floor(requested)) : 10;
+      const [events, recentLeads, recentMissions, tasks] = await Promise.all([
+        getRecentWorkEvents(pgDb, contractorId, limit),
+        pgDb.select({ id: leads.id, businessName: leads.businessName, city: leads.city, niche: leads.niche, status: leads.status, websiteUrl: leads.websiteUrl, updatedAt: leads.updatedAt })
+          .from(leads).where(eq(leads.contractorId, contractorId)).orderBy(desc(leads.updatedAt)).limit(limit),
+        pgDb.select({ id: missions.id, title: missions.title, status: missions.status, city: missions.city, niche: missions.niche, updatedAt: missions.updatedAt })
+          .from(missions).where(eq(missions.contractorId, contractorId)).orderBy(desc(missions.updatedAt)).limit(limit),
+        listWorkTasks(pgDb, contractorId, limit)
+      ]);
+      return {
+        generatedAt: new Date().toISOString(),
+        tenantScope: 'authenticated contractor only',
+        recentEvents: events,
+        recentLeads,
+        recentMissions,
+        workTasks: tasks
+      };
+    }
+
+    case 'hal_create_work_task': {
+      const taskType = typeof rawParams?.taskType === 'string' ? rawParams.taskType.trim() : '';
+      const title = typeof rawParams?.title === 'string' ? rawParams.title.trim() : '';
+      const description = typeof rawParams?.description === 'string' ? rawParams.description.trim() : null;
+      const assignedWorker = rawParams?.assignedWorker;
+      const priority = rawParams?.priority || 'normal';
+      const entityType = typeof rawParams?.entityType === 'string' ? rawParams.entityType.trim() : null;
+      const entityId = typeof rawParams?.entityId === 'string' ? rawParams.entityId.trim() : null;
+      const input = rawParams?.input && typeof rawParams.input === 'object' && !Array.isArray(rawParams.input) ? rawParams.input : null;
+      const requiresApproval = rawParams?.requiresApproval === true;
+      const workers = ['human', 'hal_assistant', 'hermes', 'amis', 'gemini', 'nemotron'];
+      if (!taskType || taskType.length > 80 || !title || title.length > 180 ||
+          (description && description.length > 2000) || !workers.includes(assignedWorker) ||
+          !['low', 'normal', 'high', 'urgent'].includes(priority) ||
+          Boolean(entityType) !== Boolean(entityId) ||
+          (rawParams?.input !== undefined && input === null) ||
+          (input && JSON.stringify(input).length > 20000)) {
+        throw new Error('Invalid work task parameters.');
+      }
+      const taskId = 'task_' + crypto.randomUUID();
+      const correlationId = typeof rawParams?.correlationId === 'string' && rawParams.correlationId.trim()
+        ? rawParams.correlationId.trim().slice(0, 120) : taskId;
+      const status = requiresApproval ? 'awaiting_approval' : 'queued';
+      const [task] = await pgDb.transaction(async tx => {
+        const [created] = await tx.insert(workTasks).values({
+          id: taskId, contractorId, taskType, title, description, assignedWorker,
+          priority, entityType, entityId, correlationId, input, requiresApproval,
+          status, createdAt: new Date(), updatedAt: new Date()
+        }).returning();
+        await tx.insert(workEvents).values({
+          id: 'evt_' + crypto.randomUUID(), contractorId, eventType: 'task.created',
+          entityType: 'work_task', entityId: taskId, actorType: 'agent', actorId: 'mcp_agent',
+          sourceModule: 'mcp_work_queue', correlationId,
+          summary: `Agent queued task: ${title}.`,
+          payload: { taskType, assignedWorker, priority, status, entityType, entityId }
+        });
+        return [created];
+      });
+      return { task, executionStarted: false, message: 'Task queued. No work has been executed yet.' };
+    }
+
+    case 'hal_list_work_tasks': {
+      const requested = Number(rawParams?.limit);
+      const limit = Number.isFinite(requested) && requested > 0 ? Math.min(100, Math.floor(requested)) : 50;
+      return { tasks: await listWorkTasks(pgDb, contractorId, limit) };
+    }
     case 'hal_get_financial_health': {
       const parsed = validateFinancialHealthInput(rawParams || {});
       
