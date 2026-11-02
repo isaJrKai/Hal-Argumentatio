@@ -45,7 +45,8 @@ Every stage must preserve the tenant, entity identity and correlation ID. A lead
 - [ ] Inventory every module's read/write APIs and canonical entity ownership.
 - [ ] Connect map/prospect discovery to deduplicated CRM intake and bulk actions.
 - [ ] Connect lead audit, landing-page artifacts, outreach, contracts, client projects and revenue through canonical IDs.
-- [ ] Add recent work, saved collections, resume-work and export flows.
+- [x] Add an authenticated Work History view for persisted operational events.
+- [ ] Add saved collections, resume-work across modules and export flows.
 
 ### Intelligence and agents
 - [ ] Build shared, permission-filtered business context retrieval for Gemini, Nemotron and specialist agents.
