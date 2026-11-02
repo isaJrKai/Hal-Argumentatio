@@ -8,7 +8,7 @@ type WorkTask = {
   status: string; priority: string; assignedWorker: string; entityType: string | null;
   entityId: string | null; correlationId: string | null; requiresApproval: boolean;
   approvedAt: string | null; attemptCount: number; maxAttempts: number;
-  errorMessage: string | null; createdAt: string; updatedAt: string;
+  errorMessage: string | null; output?: Record<string, any> | null; createdAt: string; updatedAt: string;
 };
 
 interface WorkQueuePanelProps { token: string; }
@@ -218,6 +218,8 @@ export default function WorkQueuePanel({ token }: WorkQueuePanelProps) {
                     const supported = worker?.supportedTaskTypes.includes(task.taskType) || false;
                     return <p className="text-[10px] text-text-tertiary mt-2">{supported ? 'A registered executor supports this task type.' : 'No verified executor currently supports this worker/task combination. It remains queued, not running.'}</p>;
                   })()}
+                  {task.output?.replyText && <div className="mt-3 rounded-md border border-border-default bg-bg-base p-3"><div className="text-[9px] font-mono uppercase tracking-wider text-text-tertiary mb-1">Hermes result</div><p className="text-xs leading-relaxed text-text-secondary whitespace-pre-wrap">{task.output.replyText}</p>{task.output.updatedArtifactId && <p className="text-[10px] text-text-tertiary mt-2">Updated artifact: {task.output.updatedArtifactId}</p>}</div>}
+                  {task.output?.artifactId && <p className="text-[10px] text-text-tertiary mt-2">Artifact receipt: {task.output.artifactId} · {task.output.status || 'saved'}</p>}
                   {task.errorMessage && <p className="text-xs text-red-400 mt-2">{task.errorMessage}</p>}
                 </div>
                 <div className="flex flex-wrap gap-1.5 shrink-0">
