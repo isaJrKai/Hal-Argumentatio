@@ -459,8 +459,10 @@ export default function HermesLabPanel({ token }: { token: string | null }) {
       }
 
       toast({
-        title: 'Hermes task completed',
-        message: `${selectedTool.name} completed and recorded in Work Queue.`,
+        title: savedArtifact.status === 'draft' ? 'Draft created — review required' : 'Hermes task completed',
+        message: savedArtifact.status === 'draft'
+          ? 'A safe draft was saved without a verified model response. Review its missing fields before using it.'
+          : `${selectedTool.name} completed and its artifact receipt is recorded in Work Queue.`,
         type: 'success'
       });
       setActiveArtifact(savedArtifact);
