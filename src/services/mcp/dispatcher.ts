@@ -26,7 +26,7 @@ import {
   validateGetLoopContextInput,
   validateAttachLoopIntelligenceInput
 } from './types.ts';
-import { executeHermesLabTool, LabToolType } from '../hermesLab.ts';
+import { executeHermesLabTool, chatWithHermesAgent, LabToolType } from '../hermesLab.ts';
 import { getRecentWorkEvents } from '../../lib/workLedger';
 import { listWorkTasks, getWorkTask, requiresWorkTaskApproval } from '../../lib/workTasks';
 
@@ -157,7 +157,7 @@ export const HAL_MCP_TOOLS: McpToolDefinition[] = [
   },
   {
     name: 'hal_execute_hermes_work_task',
-    description: 'Executes one queued, non-approval-blocked Hermes asset-generation task assigned to Hermes. It claims the task atomically, records execution events, and stores a success or failure receipt. It does not send messages, spend money, publish externally, or execute arbitrary task types.',
+    description: 'Executes one queued, non-approval-blocked task assigned to the existing Hermes agent. Supports hermes_lab_asset (registered Lab artifact generation) and hermes_agent_task (Hermes Studio analysis or an explicitly requested artifact revision). It claims the task atomically and stores a receipt. It does not send messages, spend money, publish externally, or execute arbitrary task types.',
     inputSchema: {
       type: 'object',
       properties: { taskId: { type: 'string' } },
@@ -311,7 +311,7 @@ export async function executeMcpTool(
       const task = await getWorkTask(pgDb, contractorId, taskId);
       if (!task) throw new Error('Work task not found in this workspace.');
       if (task.assignedWorker !== 'hermes') throw new Error('This task is not assigned to Hermes.');
-      if (task.taskType !== 'hermes_lab_asset') throw new Error('Hermes can only execute registered hermes_lab_asset tasks through this tool.');
+      if (!['hermes_lab_asset', 'hermes_agent_task'].includes(task.taskType)) throw new Error('Hermes cannot execute this task type. Supported types: hermes_lab_asset, hermes_agent_task.');
       if (task.requiresApproval || task.status === 'awaiting_approval') throw new Error('This task is blocked pending human approval.');
       if (task.status !== 'queued') throw new Error(`Task is ${task.status}; only queued tasks can be claimed.`);
       if (task.attemptCount >= task.maxAttempts) throw new Error('Task has reached its maximum execution attempts.');
@@ -320,8 +320,18 @@ export async function executeMcpTool(
       const toolId = input.toolId as LabToolType;
       const parameters = input.parameters && typeof input.parameters === 'object' && !Array.isArray(input.parameters) ? input.parameters : null;
       const promptOverride = typeof input.promptOverride === 'string' ? input.promptOverride.slice(0, 12000) : undefined;
-      if (!allowedToolIds.includes(toolId) || !parameters || JSON.stringify(parameters).length > 20000) {
-        throw new Error('Hermes task input must contain a registered toolId and a parameters object within 20 KB.');
+      const agentMessage = typeof input.message === 'string' ? input.message.trim() : '';
+      const artifactId = typeof input.artifactId === 'string' ? input.artifactId : undefined;
+      if (task.taskType === 'hermes_lab_asset' && (!allowedToolIds.includes(toolId) || !parameters || JSON.stringify(parameters).length > 20000)) {
+        throw new Error('Hermes Lab task input must contain a registered toolId and a parameters object within 20 KB.');
+      }
+      if (task.taskType === 'hermes_agent_task' && (!agentMessage || agentMessage.length > 8000 || JSON.stringify(input).length > 12000)) {
+        throw new Error('Hermes agent task input must contain a message up to 8,000 characters.');
+      }
+      if (task.taskType === 'hermes_agent_task' && artifactId) {
+        const [artifact] = await pgDb.select({ id: hermesLabArtifacts.id }).from(hermesLabArtifacts)
+          .where(and(eq(hermesLabArtifacts.id, artifactId), eq(hermesLabArtifacts.contractorId, contractorId))).limit(1);
+        if (!artifact) throw new Error('The target Hermes artifact was not found in this workspace.');
       }
 
       const claimed = await pgDb.transaction(async tx => {
@@ -347,11 +357,19 @@ export async function executeMcpTool(
       if (!claimed) throw new Error('Task was claimed or changed by another worker. Refresh the queue.');
 
       try {
-        const result = await executeHermesLabTool(toolId, parameters, contractorId, promptOverride, { workTaskId: taskId, correlationId: task.correlationId || taskId });
-        const receipt = {
-          artifactId: result.artifactId, title: result.title, category: result.category,
-          status: result.status, executionSummary: result.executionSummary
-        };
+        const result = task.taskType === 'hermes_lab_asset'
+          ? await executeHermesLabTool(toolId, parameters, contractorId, promptOverride, { workTaskId: taskId, correlationId: task.correlationId || taskId })
+          : await chatWithHermesAgent(contractorId, agentMessage, artifactId);
+        const receipt = task.taskType === 'hermes_lab_asset'
+          ? {
+              artifactId: (result as any).artifactId, title: (result as any).title, category: (result as any).category,
+              status: (result as any).status, executionSummary: (result as any).executionSummary
+            }
+          : {
+              replyMessageId: (result as any).replyMessageId,
+              replyText: (result as any).replyText,
+              updatedArtifactId: (result as any).updatedArtifact?.id || null
+            };
         const [completed] = await pgDb.transaction(async tx => {
           const [saved] = await tx.update(workTasks).set({
             status: 'completed', output: receipt, completedAt: new Date(), updatedAt: new Date()
@@ -366,7 +384,9 @@ export async function executeMcpTool(
             actorType: 'agent', actorId: 'hermes_agent', sourceModule: 'hermes_work_executor',
             correlationId: task.correlationId || taskId,
             summary: `Hermes completed: ${task.title}.`,
-            payload: { artifactId: result.artifactId, artifactTitle: result.title, toolId }
+            payload: task.taskType === 'hermes_lab_asset'
+              ? { artifactId: (result as any).artifactId, artifactTitle: (result as any).title, toolId }
+              : { replyMessageId: (result as any).replyMessageId, updatedArtifactId: (result as any).updatedArtifact?.id || null }
           });
           return [saved];
         });
