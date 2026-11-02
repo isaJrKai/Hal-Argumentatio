@@ -47,19 +47,23 @@ interface SystemHealthPanelProps {
 export default function SystemHealthPanel({ token }: SystemHealthPanelProps) {
   const { toast } = useToast();
   const [refreshing, setRefreshing] = useState(false);
-  const [healthScore, setHealthScore] = useState(99);
+  const [healthScore, setHealthScore] = useState(0);
   const [lastCheck, setLastCheck] = useState('Never');
   const [uptime, setUptime] = useState('Loading...');
   const [logs, setLogs] = useState<AuditLog[]>([]);
   const [dbLatency, setDbLatency] = useState<number | null>(null);
+  const [aiEngineLabel, setAiEngineLabel] = useState('Not yet verified');
+  const [aiEngineDetail, setAiEngineDetail] = useState('Waiting for a live configuration check.');
+  const [cryptoLabel, setCryptoLabel] = useState('Not yet verified');
+  const [cryptoDetail, setCryptoDetail] = useState('Waiting for an encryption round-trip test.');
   
   const [checks, setChecks] = useState<HealthCheck[]>([
-    { name: 'Gemini Pro SDK Core', category: 'ai', status: 'healthy', details: 'Checking key availability...', metric: 'PENDING' },
-    { name: 'Google Maps Key Config', category: 'core', status: 'healthy', details: 'Verifying GOOGLE_MAPS_PLATFORM_KEY...', metric: 'PENDING' },
-    { name: 'Durable Local DB Integrity', category: 'database', status: 'healthy', details: 'Awaiting latency diagnostic sweep...', metric: 'PENDING' },
-    { name: 'AES-256 Field Encryption', category: 'security', status: 'healthy', details: 'Validating PII encryption vectors...', metric: 'PENDING' },
-    { name: 'SSE Event Stream Socket', category: 'core', status: 'healthy', details: 'Heartbeat connection listening on port 3000', metric: 'ACTIVE' },
-    { name: 'Cron Forecast Scheduler', category: 'background', status: 'healthy', details: 'Awaiting scheduler trigger confirmation', metric: 'ACTIVE' }
+    { name: 'Application database readiness', category: 'database', status: 'warning', details: 'Not yet checked.', metric: 'PENDING' },
+    { name: 'AI provider configuration', category: 'ai', status: 'warning', details: 'Not yet checked.', metric: 'PENDING' },
+    { name: 'Hermes provider configuration', category: 'ai', status: 'warning', details: 'Not yet checked.', metric: 'PENDING' },
+    { name: 'Google Maps connector', category: 'core', status: 'warning', details: 'Not yet checked.', metric: 'PENDING' },
+    { name: 'AES-256-GCM round-trip', category: 'security', status: 'warning', details: 'Not yet checked.', metric: 'PENDING' },
+    { name: 'Scheduler activity', category: 'background', status: 'warning', details: 'Not yet checked.', metric: 'PENDING' }
   ]);
 
   // Fetch real audit logs from the API with resilient token resolution
@@ -89,147 +93,169 @@ export default function SystemHealthPanel({ token }: SystemHealthPanelProps) {
     }
   };
 
-  // Live diagnostics scanner
+  // Live diagnostics: only mark a subsystem healthy when a real probe proves it.
   const runDiagnostics = async (silent = false) => {
     if (!silent) {
       setRefreshing(true);
       toast({
         variant: 'info',
-        title: 'Diagnosing HAL Heartbeat',
-        description: 'Running hardware latency, API connection & cryptographic vector validations...',
+        title: 'Diagnosing HAL Services',
+        description: 'Checking database readiness, provider configuration, encryption and scheduler records...'
       });
     }
 
-    const startTime = performance.now();
-    let leadsSuccess = false;
-    let leadsCount = 0;
-    let decryptionVerified = false;
+    const activeToken = token || localStorage.getItem('halbiz_auth_token') || localStorage.getItem('token') || '';
+    const headers = activeToken ? { Authorization: `Bearer ${activeToken}` } : {};
+    const requestJson = async (url: string, authenticated = true) => {
+      const response = await fetch(url, { headers: authenticated ? headers : {} });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(payload?.error || `${url} returned HTTP ${response.status}`);
+      return payload;
+    };
 
-    try {
-      const activeToken = token || localStorage.getItem('halbiz_auth_token') || localStorage.getItem('token') || '';
-      // Fetch leads to gauge DB latency and verify decryption
-      const leadsRes = await fetch('/api/leads', {
-        headers: activeToken ? { 'Authorization': `Bearer ${activeToken}` } : {}
-      });
-      if (leadsRes.ok) {
-        leadsSuccess = true;
-        const leadsData = await leadsRes.json();
-        leadsCount = Array.isArray(leadsData) ? leadsData.length : 0;
-        // Verify decryption has worked (i.e. check if unencrypted email/phone are present)
-        const sampleWithCredentials = Array.isArray(leadsData) && leadsData.find((l: any) => l.email || l.phone);
-        if (sampleWithCredentials) {
-          decryptionVerified = true;
-        }
-      }
-    } catch (e) {
-      console.warn('Diagnostic database latency check encountered brief delay:', e);
-    }
+    const dbStarted = performance.now();
+    const [readyResult, aiResult, hermesResult, connectorResult, cryptoResult, schedulerResult, leadsResult, healthResult] = await Promise.allSettled([
+      requestJson('/api/ready', false),
+      requestJson('/api/ai/engine-status'),
+      requestJson('/api/hermes/status'),
+      requestJson('/api/connectors/health'),
+      requestJson('/api/system/diagnostics/crypto'),
+      requestJson('/api/scheduler/jobs'),
+      requestJson('/api/leads'),
+      requestJson('/api/health', false)
+    ]);
+    setDbLatency(Math.round(performance.now() - dbStarted));
 
-    const endTime = performance.now();
-    const latency = Math.round(endTime - startTime);
-    setDbLatency(latency);
+    const value = (result: PromiseSettledResult<any>) => result.status === 'fulfilled' ? result.value : null;
+    const failure = (result: PromiseSettledResult<any>) => result.status === 'rejected'
+      ? (result.reason instanceof Error ? result.reason.message : 'Probe failed.')
+      : '';
+    const ready = value(readyResult);
+    const ai = value(aiResult);
+    const hermes = value(hermesResult);
+    const connectorData = value(connectorResult);
+    const cryptoData = value(cryptoResult);
+    const schedulerJobs = value(schedulerResult);
+    const leadsData = value(leadsResult);
+    const health = value(healthResult);
 
-    // Google Maps Key Check
-    const MAPS_KEY =
-      process.env.GOOGLE_MAPS_PLATFORM_KEY ||
-      (import.meta as any).env?.VITE_GOOGLE_MAPS_PLATFORM_KEY ||
-      (globalThis as any).GOOGLE_MAPS_PLATFORM_KEY ||
-      '';
-    const hasMapsKey = Boolean(MAPS_KEY) && MAPS_KEY !== 'YOUR_API_KEY';
+    const dbReady = ready?.status === 'ready';
+    const missingTables = Array.isArray(ready?.missingTables) ? ready.missingTables : [];
+    const dbDetails = dbReady
+      ? `Application PostgreSQL pool is reachable; ${Array.isArray(ready.checkedTables) ? ready.checkedTables.length : 0} required tables verified.`
+      : ready?.database === 'connected'
+        ? `Database responds, but required tables are missing: ${missingTables.join(', ') || 'schema check incomplete'}.`
+        : failure(readyResult) || 'Application database is not ready.';
+    
+    const activeEngine = typeof ai?.activeEngine === 'string' ? ai.activeEngine : 'unavailable';
+    const configuredProviders = ['gemini', 'nemotron'].filter(key => ai?.engines?.[key]?.configured);
+    const aiDetails = configuredProviders.length
+      ? `Configured: ${configuredProviders.join(', ')}. Provider keys are configured, but live inference has not been verified by this scan.`
+      : failure(aiResult) || 'No AI provider is configured.';
+    setAiEngineLabel(activeEngine === 'unavailable' ? 'Unavailable' : activeEngine);
+    setAiEngineDetail(configuredProviders.length ? 'Configured · inference unverified' : 'No configured provider');
 
-    // Update state based on checks
+    const hermesProvider = typeof hermes?.provider === 'string' ? hermes.provider : 'unknown';
+    const hermesDetails = hermesProvider === 'fallback'
+      ? 'Hermes is using its deterministic fallback. No live model provider is configured.'
+      : `Provider ${hermesProvider} is configured; this status endpoint does not prove a successful model request.`;
+
+    const mapsConnector = Array.isArray(connectorData?.connectors)
+      ? connectorData.connectors.find((item: any) => item.id === 'googleMaps')
+      : null;
+    const mapsConfigured = Boolean(mapsConnector?.configured);
+    const mapsDetails = mapsConfigured
+      ? 'Google Maps credential is saved. A successful live Maps request has not been verified by this scan.'
+      : failure(connectorResult) || 'Google Maps connector is not configured in the saved connector credentials.';
+
+    const cryptoVerified = cryptoData?.status === 'verified' && cryptoData?.roundTrip === true;
+    setCryptoLabel(cryptoVerified ? 'AES-256-GCM verified' : 'Verification failed');
+    setCryptoDetail(cryptoVerified ? 'Live encrypt/decrypt round-trip succeeded.' : failure(cryptoResult) || cryptoData?.error || 'Encryption round-trip did not pass.');
+
+    const jobs = Array.isArray(schedulerJobs) ? schedulerJobs : [];
+    const failedJobs = jobs.filter((job: any) => job.status === 'failed').length;
+    const schedulerDetails = failure(schedulerResult)
+      || (failedJobs ? `${failedJobs} of ${jobs.length} persisted scheduler jobs are marked failed.`
+        : jobs.length ? `${jobs.length} scheduler records found. A record does not prove an external cron trigger is running.`
+        : 'No persisted scheduler jobs were found; scheduled execution is not verified.');
+
+    const leadsCount = Array.isArray(leadsData) ? leadsData.length : null;
     const updatedChecks: HealthCheck[] = [
       {
-        name: 'Gemini Pro SDK Core',
-        category: 'ai',
-        status: 'healthy',
-        details: 'API Connection stable. Context-retention algorithms calibrated.',
-        metric: '100% READY'
-      },
-      {
-        name: 'Google Maps Key Config',
-        category: 'core',
-        status: hasMapsKey ? 'healthy' : 'warning',
-        details: hasMapsKey 
-          ? 'GOOGLE_MAPS_PLATFORM_KEY successfully loaded into browser.' 
-          : 'GOOGLE_MAPS_PLATFORM_KEY missing. Conquest mapping deactivated.',
-        metric: hasMapsKey ? 'ACTIVE' : 'DEACTIVATED'
-      },
-      {
-        name: 'Durable DB Integrity',
+        name: 'Application database readiness',
         category: 'database',
-        status: leadsSuccess ? 'healthy' : 'critical',
-        details: leadsSuccess 
-          ? `Connection verified. Latency: ${latency}ms. Verified ${leadsCount} records.`
-          : 'Failed to establish persistent connection to database store.',
-        metric: leadsSuccess ? `${latency}ms` : 'OFFLINE'
+        status: dbReady ? 'healthy' : 'critical',
+        details: dbDetails,
+        metric: dbReady ? 'READY' : 'NOT READY'
       },
       {
-        name: 'AES-256 Field Encryption',
-        category: 'security',
-        status: decryptionVerified ? 'healthy' : 'warning',
-        details: decryptionVerified 
-          ? 'Cryptographic handshake validated. AES-256-GCM block decrypted successfully.' 
-          : 'Encryption active. No manual lead fields currently in ledger to decrypt.',
-        metric: decryptionVerified ? 'VERIFIED' : 'ACTIVE'
+        name: 'AI provider configuration',
+        category: 'ai',
+        status: configuredProviders.length ? 'warning' : 'critical',
+        details: aiDetails,
+        metric: configuredProviders.length ? 'CONFIGURED' : 'UNAVAILABLE'
       },
       {
-        name: 'SSE Event Stream Socket',
+        name: 'Hermes provider configuration',
+        category: 'ai',
+        status: hermesResult.status === 'fulfilled' ? 'warning' : 'critical',
+        details: hermesResult.status === 'fulfilled' ? hermesDetails : failure(hermesResult),
+        metric: hermesResult.status === 'fulfilled' ? hermesProvider.toUpperCase() : 'ERROR'
+      },
+      {
+        name: 'Google Maps connector',
         category: 'core',
-        status: 'healthy',
-        details: 'Real-time pipeline push connection active on port 3000.',
-        metric: 'ACTIVE'
+        status: mapsConfigured ? 'warning' : 'critical',
+        details: mapsDetails,
+        metric: mapsConfigured ? 'CONFIGURED' : 'MISSING'
       },
       {
-        name: 'Cron Forecast Scheduler',
+        name: 'AES-256-GCM round-trip',
+        category: 'security',
+        status: cryptoVerified ? 'healthy' : 'critical',
+        details: cryptoVerified ? 'The server encrypted and decrypted a one-time in-memory probe successfully.' : failure(cryptoResult) || cryptoData?.error || 'Cryptographic self-test failed.',
+        metric: cryptoVerified ? 'VERIFIED' : 'FAILED'
+      },
+      {
+        name: 'Scheduler activity',
         category: 'background',
-        status: 'healthy',
-        details: 'Predictive modeling cron triggering at specified 12-hour intervals.',
-        metric: 'ACTIVE'
+        status: failedJobs ? 'critical' : 'warning',
+        details: schedulerDetails,
+        metric: jobs.length ? `${jobs.length} RECORDS` : 'UNVERIFIED'
       }
     ];
 
     setChecks(updatedChecks);
     setLastCheck(new Date().toLocaleTimeString());
 
-    // Calculate dynamic health score
-    let score = 100;
-    updatedChecks.forEach(c => {
-      if (c.status === 'warning') score -= 5;
-      if (c.status === 'critical') score -= 15;
-    });
-    setHealthScore(Math.max(score, 0));
+    if (health?.uptimeSeconds != null) {
+      const total = Math.max(0, Number(health.uptimeSeconds));
+      const days = Math.floor(total / 86400);
+      const hours = Math.floor((total % 86400) / 3600);
+      const mins = Math.floor((total % 3600) / 60);
+      setUptime(`${days}d ${hours}h ${mins}m`);
+    }
+    if (leadsResult.status === 'fulfilled' && leadsCount !== null) {
+      // Endpoint reachability is recorded separately from database readiness.
+      console.info(`[HAL diagnostics] Lead API returned ${leadsCount} tenant records.`);
+    }
 
-    // Retrieve fresh system logs
+    const criticalCount = updatedChecks.filter(check => check.status === 'critical').length;
+    const warningCount = updatedChecks.filter(check => check.status === 'warning').length;
+    const score = Math.max(0, 100 - criticalCount * 15 - warningCount * 5);
+    setHealthScore(score);
     await fetchAuditLogs();
 
     if (!silent) {
       setRefreshing(false);
       toast({
-        variant: 'success',
-        title: 'Diagnostic Audit Completed',
-        description: 'All system parameters, cryptographic handlers, and database channels scanned.',
-        whatNext: `System Health Score: ${score}% — Status Operational.`
+        variant: criticalCount ? 'warning' : warningCount ? 'info' : 'success',
+        title: criticalCount ? 'Diagnostics Found Critical Issues' : warningCount ? 'Diagnostics Complete — Some Services Unverified' : 'Diagnostics Passed',
+        description: `${criticalCount} critical, ${warningCount} unverified/warning checks. Configured credentials are not treated as proof of live provider execution.`,
+        whatNext: `System integrity score: ${score}%.`
       });
     }
   };
-
-  // Uptime Calculator
-  useEffect(() => {
-    const launchTime = new Date('2026-07-13T09:00:00');
-    const updateUptime = () => {
-      const diff = new Date().getTime() - launchTime.getTime();
-      const days = Math.floor(diff / (24 * 3600 * 1000));
-      const hours = Math.floor((diff % (24 * 3600 * 1000)) / (3600 * 1000));
-      const mins = Math.floor((diff % (3600 * 1000)) / (60 * 1000));
-      const secs = Math.floor((diff % (60 * 1000)) / 1000);
-      setUptime(`${days}d ${hours}h ${mins}m ${secs}s`);
-    };
-
-    updateUptime();
-    const interval = setInterval(updateUptime, 1000);
-    return () => clearInterval(interval);
-  }, []);
 
   // Run on mount
   useEffect(() => {
@@ -300,8 +326,8 @@ export default function SystemHealthPanel({ token }: SystemHealthPanelProps) {
             <Cpu className="w-4 h-4 text-accent" />
           </div>
           <div className="mt-2.5">
-            <span className="text-sm font-bold text-text-primary uppercase font-sans">Gemini-3.5-Flash</span>
-            <div className="text-[10px] text-accent font-mono mt-0.5 uppercase tracking-wide">Multi-Agent Council online</div>
+            <span className="text-sm font-bold text-text-primary uppercase font-sans">{aiEngineLabel}</span>
+            <div className="text-[10px] text-accent font-mono mt-0.5 uppercase tracking-wide">{aiEngineDetail}</div>
           </div>
         </div>
 
@@ -312,8 +338,8 @@ export default function SystemHealthPanel({ token }: SystemHealthPanelProps) {
             <ShieldCheck className="w-4 h-4 text-positive" />
           </div>
           <div className="mt-2.5">
-            <span className="text-sm font-bold text-text-primary uppercase font-mono">AES-256-GCM / CTR</span>
-            <div className="text-[10px] text-positive font-mono mt-0.5 uppercase tracking-wide">Crypt Handshake Safe</div>
+            <span className="text-sm font-bold text-text-primary uppercase font-mono">{cryptoLabel}</span>
+            <div className="text-[10px] text-text-secondary font-mono mt-0.5 uppercase tracking-wide">{cryptoDetail}</div>
           </div>
         </div>
 
