@@ -5614,55 +5614,111 @@ interface ChannelBridgeSettings {
   };
 }
 
-const contractorBridges = new Map<string, ChannelBridgeSettings>();
+function getDefaultBridgeSettings(): ChannelBridgeSettings {
+  const emailProvider: ChannelBridgeSettings['email']['provider'] =
+    process.env.SENDGRID_API_KEY ? 'sendgrid' : process.env.SMTP_HOST ? 'smtp' : 'resend';
+  const calendarProvider: ChannelBridgeSettings['calendar']['provider'] =
+    process.env.CALCOM_BOOKING_URL ? 'cal_com' : 'google_calendar';
+  return {
+    whatsapp: {
+      enabled: Boolean(process.env.WHATSAPP_ACCESS_TOKEN && process.env.WHATSAPP_PHONE_NUMBER_ID),
+      phoneNumberId: process.env.WHATSAPP_PHONE_NUMBER_ID || '',
+      displayNumber: process.env.WHATSAPP_DISPLAY_NUMBER || '',
+      webhookActive: Boolean(process.env.WHATSAPP_VERIFY_TOKEN),
+      verifiedBusiness: false,
+      accessToken: process.env.WHATSAPP_ACCESS_TOKEN
+    },
+    email: {
+      enabled: Boolean(process.env.RESEND_API_KEY || process.env.SENDGRID_API_KEY || (process.env.SMTP_HOST && process.env.SMTP_PORT && process.env.SMTP_USER && process.env.SMTP_PASSWORD && process.env.HAL_SENDER_EMAIL)),
+      provider: emailProvider,
+      senderEmail: process.env.HAL_SENDER_EMAIL || '',
+      senderName: process.env.HAL_SENDER_NAME || 'HAL',
+      smtpHost: process.env.SMTP_HOST || undefined,
+      smtpPort: process.env.SMTP_PORT ? Number(process.env.SMTP_PORT) : undefined,
+      smtpUser: process.env.SMTP_USER || undefined,
+      smtpPassword: process.env.SMTP_PASSWORD || undefined,
+      apiKey: process.env.RESEND_API_KEY || process.env.SENDGRID_API_KEY
+    },
+    sms: {
+      enabled: Boolean(process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN && process.env.TWILIO_PHONE_NUMBER),
+      provider: 'twilio',
+      accountSid: process.env.TWILIO_ACCOUNT_SID || '',
+      authToken: process.env.TWILIO_AUTH_TOKEN,
+      virtualNumber: process.env.TWILIO_PHONE_NUMBER || ''
+    },
+    calendar: {
+      enabled: Boolean(process.env.CALCOM_BOOKING_URL || process.env.GOOGLE_CALENDAR_ID),
+      provider: calendarProvider,
+      bookingUrl: process.env.CALCOM_BOOKING_URL || '',
+      timezone: process.env.TZ || 'UTC'
+    }
+  };
+}
 
-function getBridgesForContractor(contractorId: string): ChannelBridgeSettings {
-  if (!contractorBridges.has(contractorId)) {
-    const emailProvider: ChannelBridgeSettings['email']['provider'] =
-      process.env.SENDGRID_API_KEY ? 'sendgrid' : process.env.SMTP_HOST ? 'smtp' : 'resend';
-    const calendarProvider: ChannelBridgeSettings['calendar']['provider'] =
-      process.env.CALCOM_BOOKING_URL ? 'cal_com' : 'google_calendar';
-    contractorBridges.set(contractorId, {
-      whatsapp: {
-        enabled: Boolean(process.env.WHATSAPP_ACCESS_TOKEN && process.env.WHATSAPP_PHONE_NUMBER_ID),
-        phoneNumberId: process.env.WHATSAPP_PHONE_NUMBER_ID || '',
-        displayNumber: process.env.WHATSAPP_DISPLAY_NUMBER || '',
-        webhookActive: Boolean(process.env.WHATSAPP_VERIFY_TOKEN),
-        verifiedBusiness: false,
-        accessToken: process.env.WHATSAPP_ACCESS_TOKEN
-      },
-      email: {
-        enabled: Boolean(process.env.RESEND_API_KEY || process.env.SENDGRID_API_KEY || (process.env.SMTP_HOST && process.env.SMTP_PORT && process.env.SMTP_USER && process.env.SMTP_PASSWORD && process.env.HAL_SENDER_EMAIL)),
-        provider: emailProvider,
-        senderEmail: process.env.HAL_SENDER_EMAIL || '',
-        senderName: process.env.HAL_SENDER_NAME || 'HAL',
-        smtpHost: process.env.SMTP_HOST || undefined,
-        smtpPort: process.env.SMTP_PORT ? Number(process.env.SMTP_PORT) : undefined,
-        smtpUser: process.env.SMTP_USER || undefined,
-        smtpPassword: process.env.SMTP_PASSWORD || undefined,
-        apiKey: process.env.RESEND_API_KEY || process.env.SENDGRID_API_KEY
-      },
-      sms: {
-        enabled: Boolean(process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN && process.env.TWILIO_PHONE_NUMBER),
-        provider: 'twilio',
-        accountSid: process.env.TWILIO_ACCOUNT_SID || '',
-        authToken: process.env.TWILIO_AUTH_TOKEN,
-        virtualNumber: process.env.TWILIO_PHONE_NUMBER || ''
-      },
-      calendar: {
-        enabled: Boolean(process.env.CALCOM_BOOKING_URL || process.env.GOOGLE_CALENDAR_ID),
-        provider: calendarProvider,
-        bookingUrl: process.env.CALCOM_BOOKING_URL || '',
-        timezone: process.env.TZ || 'UTC'
-      }
-    });
+async function getBridgesForContractor(contractorId: string): Promise<ChannelBridgeSettings> {
+  const defaults = getDefaultBridgeSettings();
+  const credentials = await getTenantConnectorCredentials(contractorId);
+  let saved: Partial<ChannelBridgeSettings> = {};
+  try {
+    const parsed = credentials.bridgeSettings ? JSON.parse(credentials.bridgeSettings) : {};
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) saved = parsed;
+  } catch {
+    console.warn('[Connectors] Ignoring invalid persisted bridge settings for workspace', contractorId);
   }
-  return contractorBridges.get(contractorId)!;
+  return {
+    whatsapp: { ...defaults.whatsapp, ...(saved.whatsapp || {}) },
+    email: { ...defaults.email, ...(saved.email || {}) },
+    sms: { ...defaults.sms, ...(saved.sms || {}) },
+    calendar: { ...defaults.calendar, ...(saved.calendar || {}) }
+  };
+}
+
+function sanitizeBridgeSettings(channel: keyof ChannelBridgeSettings, input: any): Record<string, any> {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) throw new Error('Bridge settings must be an object.');
+  const output: Record<string, any> = {};
+  const booleanKeys = ['enabled', 'webhookActive', 'verifiedBusiness'];
+  for (const key of booleanKeys) if (key in input) {
+    if (typeof input[key] !== 'boolean') throw new Error(`${key} must be a boolean.`);
+    output[key] = input[key];
+  }
+  const stringKeys: Record<keyof ChannelBridgeSettings, string[]> = {
+    whatsapp: ['phoneNumberId', 'displayNumber', 'accessToken'],
+    email: ['senderEmail', 'senderName', 'smtpHost', 'smtpUser', 'smtpPassword', 'apiKey'],
+    sms: ['accountSid', 'authToken', 'virtualNumber'],
+    calendar: ['bookingUrl', 'timezone']
+  };
+  for (const key of stringKeys[channel]) if (key in input) {
+    if (typeof input[key] !== 'string' || input[key].length > 8192) throw new Error(`${key} must be a string no longer than 8,192 characters.`);
+    output[key] = input[key].trim();
+  }
+  if (channel === 'email' && 'provider' in input) {
+    if (!['smtp', 'resend', 'sendgrid'].includes(input.provider)) throw new Error('Unsupported email provider.');
+    output.provider = input.provider;
+  }
+  if (channel === 'sms' && 'provider' in input) {
+    if (!['twilio', 'virtual_carrier'].includes(input.provider)) throw new Error('Unsupported SMS provider.');
+    output.provider = input.provider;
+  }
+  if (channel === 'calendar' && 'provider' in input) {
+    if (!['google_calendar', 'cal_com', 'direct_booking'].includes(input.provider)) throw new Error('Unsupported calendar provider.');
+    output.provider = input.provider;
+  }
+  if (channel === 'email' && 'smtpPort' in input) {
+    const port = Number(input.smtpPort);
+    if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error('SMTP port must be between 1 and 65535.');
+    output.smtpPort = port;
+  }
+  if (channel === 'calendar' && output.bookingUrl) {
+    let parsed: URL;
+    try { parsed = new URL(output.bookingUrl); } catch { throw new Error('Booking URL must be a valid HTTPS URL.'); }
+    if (parsed.protocol !== 'https:') throw new Error('Booking URL must use HTTPS.');
+  }
+  return output;
 }
 
 app.get('/api/outreach/bridges/status', authenticate, async (req, res) => {
   const contractorId = (req as any).contractorId;
-  const cfg = getBridgesForContractor(contractorId);
+  const cfg = await getBridgesForContractor(contractorId);
   const userLogs = await pgDb.select().from(communicationsOutbox)
     .where(eq(communicationsOutbox.contractorId, contractorId))
     .orderBy(desc(communicationsOutbox.createdAt)).limit(500);
@@ -5674,7 +5730,9 @@ app.get('/api/outreach/bridges/status', authenticate, async (req, res) => {
     success: true,
     bridges: {
       whatsapp: {
-        enabled: cfg.whatsapp.enabled,
+        enabled: false,
+        configured: Boolean(cfg.whatsapp.accessToken && cfg.whatsapp.phoneNumberId),
+        liveInboundSupported: false,
         phoneNumberId: cfg.whatsapp.phoneNumberId,
         displayNumber: cfg.whatsapp.displayNumber,
         webhookActive: cfg.whatsapp.webhookActive,
@@ -5685,24 +5743,28 @@ app.get('/api/outreach/bridges/status', authenticate, async (req, res) => {
         status: cfg.whatsapp.enabled ? 'configured_unverified' : 'not_configured'
       },
       email: {
-        enabled: Boolean(process.env.RESEND_API_KEY && process.env.HAL_SENDER_EMAIL),
-        provider: 'resend',
-        senderEmail: process.env.HAL_SENDER_EMAIL || '',
-        senderName: process.env.HAL_SENDER_NAME || 'HAL',
+        enabled: cfg.email.enabled,
+        configured: cfg.email.enabled,
+        liveDispatchSupported: Boolean(process.env.RESEND_API_KEY && process.env.HAL_SENDER_EMAIL),
+        provider: cfg.email.provider,
+        senderEmail: cfg.email.senderEmail,
+        senderName: cfg.email.senderName,
         deliveredCount: emailDelivered,
         submittedCount: userLogs.filter(l => l.channel === 'email' && l.status === 'submitted').length,
         openRate: null,
         status: process.env.RESEND_API_KEY && process.env.HAL_SENDER_EMAIL ? 'configured_unverified' : 'not_configured'
       },
       sms: {
-        enabled: cfg.sms.enabled,
+        enabled: false,
+        configured: cfg.sms.enabled,
+        liveDispatchSupported: false,
         provider: cfg.sms.provider,
         virtualNumber: cfg.sms.virtualNumber,
         accountSid: cfg.sms.accountSid ? '••••••••' : undefined,
         authToken: cfg.sms.authToken ? '••••••••' : undefined,
         deliveredCount: smsDelivered,
         slaResponseSec: null,
-        status: cfg.sms.enabled ? 'configured_unverified' : 'not_configured'
+        status: cfg.sms.enabled ? 'simulation_only' : 'not_configured'
       },
       calendar: {
         enabled: cfg.calendar.enabled,
@@ -5716,28 +5778,40 @@ app.get('/api/outreach/bridges/status', authenticate, async (req, res) => {
   });
 });
 
-app.post('/api/outreach/bridges/configure', authenticate, (req, res) => {
+app.post('/api/outreach/bridges/configure', authenticate, async (req, res) => {
   const contractorId = (req as any).contractorId;
-  const { channel, settings } = req.body;
-  if (!channel || !settings) {
-    return res.status(400).json({ error: 'Channel and settings are required' });
+  const { channel, settings } = req.body || {};
+  if (!['whatsapp', 'email', 'sms', 'calendar'].includes(channel)) {
+    return res.status(400).json({ error: 'A supported channel is required.' });
   }
-
-  const current = getBridgesForContractor(contractorId);
-  if (channel in current) {
-    (current as any)[channel] = {
-      ...(current as any)[channel],
-      ...settings
-    };
+  try {
+    const current = await getBridgesForContractor(contractorId);
+    const sanitized = sanitizeBridgeSettings(channel as keyof ChannelBridgeSettings, settings);
+    const next = { ...current, [channel]: { ...current[channel as keyof ChannelBridgeSettings], ...sanitized } };
+    const id = 'conn_' + crypto.createHash('sha256').update(`${contractorId}:bridgeSettings`).digest('hex');
+    const encryptedValue = encrypt(JSON.stringify(next));
+    await pgDb.insert(connectorCredentials).values({
+      id, contractorId, service: 'bridgeSettings', encryptedValue, updatedAt: new Date()
+    }).onConflictDoUpdate({
+      target: connectorCredentials.id,
+      set: { encryptedValue, updatedAt: new Date() }
+    });
+    await pgDb.insert(auditLogs).values({
+      id: crypto.randomUUID(), contractorId, action: 'BRIDGE_CONFIGURED',
+      details: `Persisted bridge settings for channel: ${channel}`
+    });
+    await pgDb.insert(workEvents).values({
+      id: 'evt_' + crypto.randomUUID(), contractorId,
+      eventType: 'connector.bridge_configured', entityType: 'connector_bridge',
+      entityId: String(channel), actorType: 'human', actorId: contractorId,
+      sourceModule: 'connectors', correlationId: id,
+      summary: `Persisted settings for the ${channel} bridge.`,
+      payload: { channel, enabled: Boolean(sanitized.enabled), settingsPersisted: true }
+    });
+    return res.json({ success: true, channel, persisted: true, message: `Updated and saved ${channel} bridge settings.` });
+  } catch (error: any) {
+    return res.status(400).json({ success: false, error: error.message || 'Bridge settings could not be saved.' });
   }
-
-  db.addAuditLog({
-    contractorId,
-    action: 'BRIDGE_CONFIGURED',
-    details: `Updated bridge settings for channel: ${channel}`
-  });
-
-  res.json({ success: true, message: `Updated ${channel} bridge settings` });
 });
 
 app.post('/api/outreach/draft-ai', authenticate, async (req, res) => {
