@@ -5685,6 +5685,13 @@ app.post('/api/projects', authenticate, async (req, res) => {
   }
 
   try {
+    if (typeof leadId === 'string' && leadId.trim()) {
+      const [linkedLead] = await pgDb.select({ id: leads.id }).from(leads)
+        .where(and(eq(leads.id, leadId.trim()), eq(leads.contractorId, contractorId)))
+        .limit(1);
+      if (!linkedLead) return res.status(400).json({ error: 'The selected lead does not belong to this workspace.' });
+    }
+
     const now = new Date();
     const score = Number.isFinite(Number(initialAuditScore)) ? Number(initialAuditScore) : 50;
     const projectId = 'proj_' + crypto.randomBytes(6).toString('hex');
@@ -5721,12 +5728,18 @@ app.post('/api/projects', authenticate, async (req, res) => {
     };
     const [project] = await pgDb.insert(clientProjects).values(projectValues).returning();
 
-    await recordWorkEvent(pgDb, {
-      contractorId, eventType: 'client_project.created', entityType: 'client_project', entityId: project.id,
-      actorType: 'human', actorId: contractorId, sourceModule: 'client_operations', correlationId: project.id,
-      summary: `Created client delivery project for ${businessName.trim()}.`,
-      payload: { leadId: leadId || null, status: project.status, packageTier: project.packageTier, monthlyRetainerUsd: project.monthlyRetainerUsd }
-    });
+    try {
+      await recordWorkEvent(pgDb, {
+        contractorId, eventType: 'client_project.created', entityType: 'client_project', entityId: project.id,
+        actorType: 'human', actorId: contractorId, sourceModule: 'client_operations', correlationId: project.id,
+        summary: `Created client delivery project for ${businessName.trim()}.`,
+        payload: { leadId: leadId || null, status: project.status, packageTier: project.packageTier, monthlyRetainerUsd: project.monthlyRetainerUsd }
+      });
+    } catch (ledgerError) {
+      // The project row is already durable. A secondary ledger outage must not
+      // tell the operator creation failed and invite a duplicate retry.
+      console.error('[Client Projects] Creation ledger event failed:', ledgerError);
+    }
 
     db.addAuditLog({
       contractorId,
@@ -5774,12 +5787,16 @@ app.put('/api/projects/:id', authenticate, async (req, res) => {
       .returning();
     if (!updated) return res.status(404).json({ error: 'Project not found or unauthorized' });
 
-    await recordWorkEvent(pgDb, {
-      contractorId, eventType: 'client_project.updated', entityType: 'client_project', entityId: id,
-      actorType: 'human', actorId: contractorId, sourceModule: 'client_operations', correlationId: id,
-      summary: `Updated client project for ${updated.businessName}.`,
-      payload: { previousStatus: existingProject.status, currentStatus: updated.status }
-    });
+    try {
+      await recordWorkEvent(pgDb, {
+        contractorId, eventType: 'client_project.updated', entityType: 'client_project', entityId: id,
+        actorType: 'human', actorId: contractorId, sourceModule: 'client_operations', correlationId: id,
+        summary: `Updated client project for ${updated.businessName}.`,
+        payload: { previousStatus: existingProject.status, currentStatus: updated.status }
+      });
+    } catch (ledgerError) {
+      console.error('[Client Projects] Update ledger event failed:', ledgerError);
+    }
 
     if (updates.status === 'completed' && existingProject.status !== 'completed') {
       db.addAuditLog({
