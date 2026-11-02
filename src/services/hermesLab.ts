@@ -298,9 +298,9 @@ You are a master human designer, frontend engineer, and direct-response architec
    - ✅ Restrained, tactile color palette: Architectural warm paper (#F7F6F1, #FAF9F6), rich soot ink (#18181B, #121316), warm charcoal, deep hunter olive (#1B4332), or muted terracotta (#9A3412), with razor-sharp 1px hairline borders (#E5E2D9 or #27272A).
    - ✅ Asymmetric, dense, intentional layouts:
      * Interactive Symptom & Diagnostic Spec Selector (clicking a fault symptom updates diagnostic steps, culprit parts, and labor range).
-     * Itemized Service & Price Ledger (tabular breakdown with diagnostic fees, capacitor replacement, refrigerant recharge per lb, warranty duration).
-     * Real Technician Certification & TDLR/State Master License verification badge.
-     * Authentic neighborhood field service logs with timestamps, neighborhood tags, system models, and real part fixes.
+     * Itemized service and price ledgers only when real services, prices, parts, and warranty terms are supplied; otherwise identify missing details.
+     * Certification and license details only when verified identifiers are supplied; never invent credentials or registration numbers.
+     * Field-service logs only when actual timestamps, locations, equipment, and repair records are supplied.
    - ✅ Visible care in micro-details:
      * Mathematical border-radius nesting (innerRadius = outerRadius - padding).
      * Monospaced timestamps, state license IDs, and technical specs.
@@ -310,12 +310,12 @@ You are a master human designer, frontend engineer, and direct-response architec
      * Preserves \`gclid\`, \`utm_source\`, \`utm_medium\`, \`utm_campaign\` in hidden inputs.
      * Direct click-to-call links with phone preservation.
 
-Always respond in strictly formatted JSON:
+Never invent business facts, customer testimonials, credentials, license numbers, addresses, prices, offers, guarantees, performance metrics, or completed work. Separate recorded facts from assumptions and identify missing inputs.\n\nAlways respond in strictly formatted JSON:
 {
   "title": "Clean, descriptive human-crafted title",
   "summary": "2-sentence executive summary explaining the architectural layout, typography choice, and conversion mechanics",
   "structuredData": { ... relevant parameters and data ... },
-  "renderedOutput": "Complete, production-ready, unshortened HTML5 document with full inline Tailwind config, Google Fonts, interactive scripts, and zero placeholders"
+  "renderedOutput": "Complete, production-ready, unshortened HTML5 document with full inline Tailwind config, Google Fonts, interactive scripts, and no invented business facts; identify missing inputs for operator review"
 }`;
 
   const userPrompt = `
@@ -556,9 +556,9 @@ export async function chatWithHermesAgent(
     .from(contractors)
     .where(eq(contractors.id, contractorId));
 
-  const contractorName = contractorRecord?.companyName || 'Apex Service Solutions';
-  const contractorCity = contractorRecord?.city || 'Dallas, TX';
-  const contractorService = contractorRecord?.serviceType || 'HVAC & Home Services';
+  const contractorName = contractorRecord?.companyName || 'the current workspace';
+  const contractorCity = contractorRecord?.city || 'territory not recorded';
+  const contractorService = contractorRecord?.serviceType || 'service niche not recorded';
 
   // Save User message
   const userMsgId = crypto.randomUUID();
