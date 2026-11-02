@@ -1140,6 +1140,7 @@ export default function App() {
                     <MapPanel 
                       leads={leads}
                       token={token}
+                      onOpenWorkQueue={() => setActiveTab('work-queue')}
                     />
                   )}
 
