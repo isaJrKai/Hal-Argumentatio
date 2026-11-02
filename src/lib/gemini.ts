@@ -513,8 +513,12 @@ export async function askHalBot(
   message: string,
   history: Array<{ role: 'user' | 'model'; parts: { text: string }[] }>,
   enableGrounding?: boolean,
-  preferredAI?: string
-): Promise<{ text: string; sources?: Array<{ title: string; uri: string }> }> {
+  preferredAI?: string,
+  toolRuntime?: {
+    tools: Array<{ name: string; description: string; inputSchema: { type: 'object'; properties: Record<string, any>; required?: string[] } }>;
+    execute: (name: string, args: Record<string, any>) => Promise<any>;
+  }
+): Promise<{ text: string; sources?: Array<{ title: string; uri: string }>; toolCalls?: Array<{ name: string; result: any }> }> {
   const systemInstruction = `You are HAL, the central business operating assistant inside HAL (Human Augmentation Layer).
 
 Your job is to understand the operator's business situation, connect related work across the application, explain the next useful step, and help the operator make sound decisions. Do not behave like a generic chatbot or pretend to be an autonomous employee when the required execution path is not connected.
@@ -546,7 +550,25 @@ RESPONSE STANDARD
 
   const activeAI = getActiveAI(preferredAI);
 
-  if (activeAI === 'gemini') {
+  // When the authenticated server supplies its MCP runtime, HAL can call the
+  // same tenant-scoped tools exposed to connected agents. Only the server may
+  // provide this callback; no model-supplied tenant or contractor ID is trusted.
+  const geminiTools = (toolRuntime?.tools || [])
+    .filter(tool => tool.name !== 'hermes_synthesize_lab_asset')
+    .map(tool => ({
+      name: tool.name,
+      description: tool.description,
+      parameters: {
+        type: 'OBJECT',
+        properties: Object.fromEntries(Object.entries(tool.inputSchema.properties || {}).map(([key, value]: [string, any]) => [
+          key,
+          { ...value, type: typeof value.type === 'string' ? value.type.toUpperCase() : value.type }
+        ])),
+        ...(tool.inputSchema.required?.length ? { required: tool.inputSchema.required } : {})
+      }
+    }));
+
+  if (activeAI === 'gemini' || (toolRuntime && geminiTools.length > 0)) {
     // 1. Try Gemini first (Strictly 3.5)
     const ai = getAIClient();
     if (ai) {
@@ -569,43 +591,61 @@ RESPONSE STANDARD
           { role: 'user', parts: [{ text: message }] }
         ];
 
+        if (geminiTools.length) config.tools = [{ functionDeclarations: geminiTools }];
+
         const candidateModels = ["gemini-3.8-flash", "gemini-flash-latest", "gemini-3.1-flash-lite"];
         let response: any = null;
         let lastError: any = null;
+        let selectedModel = candidateModels[0];
+        const toolCalls: Array<{ name: string; result: any }> = [];
 
         for (const model of candidateModels) {
           try {
-            response = await ai.models.generateContent({
-              model,
-              contents,
-              config
-            });
-            if (response?.text) break;
+            selectedModel = model;
+            let round = 0;
+            response = await ai.models.generateContent({ model, contents, config });
+            while (response?.functionCalls?.length && toolRuntime && round < 5) {
+              const calls = response.functionCalls.slice(0, 4);
+              const modelContent = response.candidates?.[0]?.content;
+              if (modelContent) contents.push(modelContent);
+              const functionResponses: any[] = [];
+              for (const call of calls) {
+                if (!call.name) continue;
+                let result: any;
+                try {
+                  result = await toolRuntime.execute(call.name, (call.args || {}) as Record<string, any>);
+                  toolCalls.push({ name: call.name, result });
+                } catch (toolError: any) {
+                  result = { success: false, error: String(toolError?.message || 'Tool execution failed.').slice(0, 500) };
+                  toolCalls.push({ name: call.name, result });
+                }
+                functionResponses.push({ functionResponse: { name: call.name, response: { result } } });
+              }
+              if (!functionResponses.length) break;
+              contents.push({ role: 'user', parts: functionResponses });
+              round += 1;
+              response = await ai.models.generateContent({ model, contents, config });
+            }
+            if (response?.text || response?.functionCalls?.length === 0) break;
           } catch (err: any) {
             lastError = err;
             if (usedGrounding) {
-              console.warn(`[HAL Gemini] Search Grounding failed on ${model}, retrying without tools...`);
+              console.warn(`[HAL Gemini] Search Grounding failed on ${model}, retrying without Google Search...`);
               try {
                 const ungroundedConfig = { ...config };
-                delete ungroundedConfig.tools;
-                response = await ai.models.generateContent({
-                  model,
-                  contents,
-                  config: ungroundedConfig
-                });
+                if (usedGrounding) delete ungroundedConfig.tools;
+                if (geminiTools.length) ungroundedConfig.tools = [{ functionDeclarations: geminiTools }];
+                response = await ai.models.generateContent({ model, contents, config: ungroundedConfig });
                 if (response?.text) break;
-              } catch (innerErr) {
-                lastError = innerErr;
-              }
+              } catch (innerErr) { lastError = innerErr; }
             }
           }
         }
 
-        if (!response?.text && lastError) {
-          throw lastError;
-        }
-
-        const text = response.text || "No response received from HAL Core.";
+        if (!response?.text && !toolCalls.length && lastError) throw lastError;
+        const text = response?.text || (toolCalls.length
+          ? 'I completed the available tool calls, but the model did not return a final explanation. Review the Work Queue and Work History for their recorded results.'
+          : "No response received from HAL Core.");
         const chunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks;
         const sources: Array<{ title: string; uri: string }> = [];
         if (usedGrounding && chunks) {
@@ -621,7 +661,8 @@ RESPONSE STANDARD
 
         return {
           text,
-          sources: sources.length > 0 ? sources : undefined
+          sources: sources.length > 0 ? sources : undefined,
+          toolCalls: toolCalls.length ? toolCalls : undefined
         };
       } catch (err: any) {
         console.error("Gemini chatbot error, trying Nemotron fallback:", err);
@@ -754,54 +795,11 @@ RESPONSE STANDARD
     }
   }
 
-  // Ultimate Swiss Heuristic Fallback Answer
-  const lower = message.toLowerCase();
-  let reply = "I am operating in standalone diagnostic mode. I am fully trained on HAL from A to Z.\n\n";
-  if (lower.includes("step by step") || lower.includes("what to do") || lower.includes("how to start") || lower.includes("dont know") || lower.includes("don't know")) {
-    reply = `Here is your exact step-by-step operating roadmap to start winning commercial contractor contracts right now:
-
-### Step 1: Lock In Your Target Niche & Territory
-Navigate to **Mission Control** or **Territory Radar**. Choose a high-ticket, emergency-driven trade (e.g., *Commercial Sump Pump & Basement Waterproofing* or *Custom Home Builders*) in your target city. High urgency trades convert fastest because a flooded basement or commercial leak cannot wait.
-
-### Step 2: Harvest Real-World Leads
-Go to the **Leads** panel and run a harvest for your target market. HAL pulls real verified contractors, audits their websites for technical deficits (slow load speeds >5s, missing SSL, zero tap-to-call mobile buttons, and weak Google reviews).
-
-### Step 3: Pick the 5 Highest-Deficit Prospects
-Filter by lowest speed score (<40) or missing mobile response. These contractors are actively losing $10,000–$30,000/mo because paid clicks are bouncing before the page even loads.
-
-### Step 4: Dispatch the Cold Pitch Deck / Speed Deficit Report
-In the **Outreach Studio** or **Document Studio**, select the prospect and generate a personalized *Speed Deficit Audit*. It shows them the exact milliseconds their competitors beat them by, and offers your *0.3s Emergency Intake System* as the immediate fix.
-
-### Step 5: Close on a Performance or Setup Retainer
-Offer to replace their slow funnel or set up their emergency call-capture pipeline with a $2,500–$5,000 setup plus a monthly retainer.
-
-Tell me which city or niche you want to tackle right now and I will pull up the exact numbers!`;
-  } else if (lower.includes("constitution") || lower.includes("principle")) {
-    reply += "Our guiding Constitution has five pillars:\n1. **Ready beats perfect** — High-value shipping beats theory.\n2. **Preserve architecture** — Avoid modifying core db/encryption.\n3. **Modularity** — Build components as isolated services.\n4. **Evidence-based** — No fabricated insights. Real audits only.\n5. **Continuous learning** — Automatic calibration of forecast weights.";
-  } else if (lower.includes("connector") || lower.includes("integration")) {
-    reply += "Under our structured architecture, **Connectors** have a single responsibility: connecting HAL to external services, APIs, and data providers (like GA4, Google Search Console, GBP, Google Drive, Gemini, Stripe). Core configurations like profiles, themes, and avatars belong strictly under **Settings**.";
-  } else if (lower.includes("skills") || lower.includes("add skill")) {
-    reply += "The **Skills Engine** executes modular business actions like website auditing, outreach sheet generation, **Talent Arbitrage Scoping** ('talent_arbitrage_bridge'), **Verified Lead List Compilation** ('verified_lead_lists'), **Automation Ops Scoping** ('automation_ops_product'), **Pricing & Margin Calculations** ('pricing_margin_calculator'), **Ad Spend Breakeven Analysis** ('ad_spend_breakeven'), or **List Subscription Pricing** ('list_subscription_pricing').";
-  } else if (lower.includes("talent") || lower.includes("va business") || lower.includes("arbitrage") || lower.includes("remote")) {
-    reply += "Our **Talent Arbitrage & Bridge Scoper** ('talent_arbitrage_bridge') frames a managed business model connecting highly skilled, affordable remote talent (e.g., from Uganda or East Africa) with small overseas businesses (e.g., North America). The focus is on selling quality control, trust, and managed accountability rather than just cheap labor. Start with a narrow service category and micro-pilot offers to mitigate client risk.";
-  } else if (lower.includes("prospect list") || lower.includes("lead list") || lower.includes("verify") || lower.includes("leads")) {
-    reply += "Our **Verified Lead List Packager** ('verified_lead_lists') compiles, verifies, and enriches high-intent contact lists for specific niches and geographies (e.g., custom home building in Calgary or mowers in Winnipeg). No email or phone goes on a list unless it is found on a real live source—no domain pattern guessing. Lists are enriched with review counts, ad active status, and pre-tiered under the Territory scoring model to sell directly as a data product.";
-  } else if (lower.includes("automation") || lower.includes("ops product") || lower.includes("missed call") || lower.includes("text-back")) {
-    reply += "Our **Automation Ops Product Scoper** ('automation_ops_product') packages high-margin, recurring-revenue systems (like missed-call text-back, review requests, and booking triggers) for local businesses. It utilizes robust APIs (such as Twilio and Zapier) to secure small monthly retainers by plugging immediate lead leaks, bypassing high-friction ad spend negotiations.";
-  } else if (lower.includes("pricing") || lower.includes("margin") || lower.includes("calculator") || lower.includes("overhead")) {
-    reply += "Our **Pricing & Margin Calculator** ('pricing_margin_calculator') maps operating costs, direct VA agent overhead, target gross margin metrics, and models precise retainer options to build a highly optimized local agency framework.";
-  } else if (lower.includes("breakeven") || lower.includes("ad spend") || lower.includes("unit economics")) {
-    reply += "Our **Ad Spend & Breakeven Optimizer** ('ad_spend_breakeven') models the search volume parameters and click pricing dynamics of Google Ads. It defines the required contract close rates, landing page conversion percentages, and CPA thresholds to operate above the breakeven mark.";
-  } else if (lower.includes("subscription") || lower.includes("saas") || lower.includes("data product")) {
-    reply += "Our **List Subscription Pricing** ('list_subscription_pricing') outlines scalable monthly and annual subscription tiers for our verified local lead list data product. It structures packages based on the volume of leads processed, review counts, and active ad visibility metrics.";
-  } else if (lower.includes("health") || lower.includes("system health")) {
-    reply += "The **System Health** dashboard acts as HAL's live heartbeat. It aggregates AI routing status (Gemini latency), SQLite integrity, background daemons, security encryption flags, and overall score parameters.";
-  } else if (lower.includes("mission") || lower.includes("conquest")) {
-    reply += "A **Territory Conquest Mission** coordinates automated workflows to harvest active niche services in specific cities, audit their page speed, and output targeted cold-pitch decks instantly.";
-  } else {
-    reply += "HAL is designed around a Mission → Goals → Planner → Memory → Knowledge → World Model → Agents pipeline. Actual feature availability depends on the configured deployment, database, credentials, and integrations. Verify each workflow in the current environment before treating it as production-ready.";
-  }
-  return { text: reply };
+  // Fail honestly when providers are unavailable. Never replace a failed model
+  // call with fabricated metrics, lead claims, pricing, credentials, or workflow status.
+  return {
+    text: "HAL's configured AI providers are currently unavailable, so I cannot give a verified business analysis or execute tools in this reply. Your existing records remain unchanged. Check the AI provider status and try again; I can only report facts available from confirmed workspace records."
+  };
 }
 
 /**
