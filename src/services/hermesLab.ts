@@ -556,7 +556,8 @@ function generateDeterministicLabFallback(
 export async function chatWithHermesAgent(
   contractorId: string,
   userMessage: string,
-  targetArtifactId?: string
+  targetArtifactId?: string,
+  executionContext?: { workTaskId: string; correlationId: string }
 ): Promise<{
   replyMessageId: string;
   replyText: string;
@@ -835,9 +836,9 @@ Respond in the required JSON format.`;
     await recordWorkEvent(pgDb, {
       contractorId, eventType: currentArtifact ? 'artifact.updated' : 'artifact.created',
       entityType: 'artifact', entityId: updatedArtifactRecord.id, actorType: 'agent', actorId: 'hermes_agent',
-      sourceModule: 'hermes_studio', correlationId: updatedArtifactRecord.id,
+      sourceModule: 'hermes_studio', correlationId: executionContext?.correlationId || updatedArtifactRecord.id,
       summary: `${currentArtifact ? 'Updated' : 'Created'} artifact: ${updatedArtifactRecord.title}.`,
-      payload: { toolId: updatedArtifactRecord.toolId }
+      payload: { toolId: updatedArtifactRecord.toolId, workTaskId: executionContext?.workTaskId || null }
     });
   }
 
@@ -858,14 +859,15 @@ Respond in the required JSON format.`;
     eventType: parsed.executionStatus === 'provider_unavailable' ? 'agent.execution_failed' : 'agent.responded',
     entityType: 'agent_session', entityId: assistantMsgId,
     actorType: 'agent', actorId: 'hermes_agent', sourceModule: 'hermes_studio',
-    correlationId: targetArtifactId || assistantMsgId,
+    correlationId: executionContext?.correlationId || targetArtifactId || assistantMsgId,
     summary: parsed.executionStatus === 'provider_unavailable'
       ? 'Hermes could not complete the request because no configured provider returned a valid response.'
       : 'Hermes completed a response using shared HAL workspace context.',
     payload: {
       executionStatus: parsed.executionStatus || 'completed',
       artifactUpdated: Boolean(updatedArtifactRecord),
-      artifactId: updatedArtifactRecord?.id || targetArtifactId || null
+      artifactId: updatedArtifactRecord?.id || targetArtifactId || null,
+      workTaskId: executionContext?.workTaskId || null
     }
   });
 
