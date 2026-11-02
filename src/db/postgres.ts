@@ -831,7 +831,7 @@ export async function testPostgresConnection(customUrl?: string): Promise<{
   }
 
   const start = Date.now();
-  let client: ReturnType<Pool['connect']> extends Promise<infer T> ? T : never;
+  let client: Awaited<ReturnType<Pool['connect']>> | null = null;
   try {
     client = await p.connect();
     const result = await client.query('SELECT version(), current_database(), current_user;');
@@ -870,6 +870,6 @@ export async function testPostgresConnection(customUrl?: string): Promise<{
       message: `PostgreSQL connection error: ${err.message}`,
     };
   } finally {
-    if (client!) client.release();
+    client?.release();
   }
 }
