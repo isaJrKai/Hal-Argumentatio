@@ -506,7 +506,8 @@ export async function executeMcpTool(
         })
         .from(googleAdsDailyPerformance)
         .where(eq(googleAdsDailyPerformance.contractorId, contractorId))
-        .orderBy(desc(googleAdsDailyPerformance.date));
+        .orderBy(desc(googleAdsDailyPerformance.date))
+        .limit(5000);
 
       const analysis = analyzeCampaignPerformance(adsRecords, parsed.thresholdDropPct);
       await pgDb.insert(auditLogs).values({
