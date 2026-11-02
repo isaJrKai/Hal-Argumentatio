@@ -30,7 +30,7 @@ import {
   validateAttachLoopIntelligenceInput
 } from './types.ts';
 import { executeHermesLabTool, chatWithHermesAgent, LabToolType } from '../hermesLab.ts';
-import { getRecentWorkEvents } from '../../lib/workLedger';
+import { getRecentWorkEvents, recordWorkEvent } from '../../lib/workLedger';
 import { listWorkTasks, getWorkTask, requiresWorkTaskApproval, canExecutorClaimWorkTask } from '../../lib/workTasks';
 import { analyzeCampaignPerformance } from '../../lib/campaignAnomaly';
 
@@ -377,7 +377,51 @@ export async function executeMcpTool(
       try {
         const result = task.taskType === 'hermes_lab_asset'
           ? await executeHermesLabTool(toolId, parameters, contractorId, promptOverride, { workTaskId: taskId, correlationId: task.correlationId || taskId })
-          : await chatWithHermesAgent(contractorId, agentMessage, artifactId, { workTaskId: taskId, correlationId: task.correlationId || taskId });
+          : await chatWithHermesAgent(contractorId, agentMessage, artifactId, {
+              workTaskId: taskId,
+              correlationId: task.correlationId || taskId,
+              toolRuntime: {
+                tools: HAL_MCP_TOOLS.filter(tool => [
+                  'hal_get_operational_context',
+                  'hal_get_financial_health',
+                  'hal_inspect_campaign_anomalies',
+                  'hal_run_what_if_simulation',
+                  'hal_get_loop_context'
+                ].includes(tool.name)),
+                execute: async (toolName, toolArgs) => {
+                  try {
+                    const toolResult = await executeMcpTool(toolName, toolArgs, contractorId, {
+                      actorType: 'agent', actorId: 'hermes_agent', sourceModule: 'hermes_studio'
+                    });
+                    try {
+                      await recordWorkEvent(pgDb, {
+                        contractorId, eventType: 'agent.tool_succeeded', entityType: 'work_task', entityId: taskId,
+                        actorType: 'agent', actorId: 'hermes_agent', sourceModule: 'hermes_studio',
+                        correlationId: task.correlationId || taskId,
+                        summary: `Hermes inspected workspace data using ${toolName}.`,
+                        payload: { toolName, success: true }
+                      });
+                    } catch (ledgerError) {
+                      console.error('[Hermes Work History] Could not append tool success event:', ledgerError);
+                    }
+                    return toolResult;
+                  } catch (toolError: any) {
+                    try {
+                      await recordWorkEvent(pgDb, {
+                        contractorId, eventType: 'agent.tool_failed', entityType: 'work_task', entityId: taskId,
+                        actorType: 'agent', actorId: 'hermes_agent', sourceModule: 'hermes_studio',
+                        correlationId: task.correlationId || taskId,
+                        summary: `Hermes could not complete workspace inspection using ${toolName}.`,
+                        payload: { toolName, success: false, error: String(toolError?.message || 'Tool failed.').slice(0, 500) }
+                      });
+                    } catch (ledgerError) {
+                      console.error('[Hermes Work History] Could not append tool failure event:', ledgerError);
+                    }
+                    throw toolError;
+                  }
+                }
+              }
+            });
         if (task.taskType === 'hermes_agent_task' && (result as any).executionStatus === 'provider_unavailable') {
           throw new Error('Hermes providers are unavailable. No analysis or artifact update was completed.');
         }
