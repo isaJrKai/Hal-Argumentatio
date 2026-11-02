@@ -2272,29 +2272,29 @@ app.post('/api/webhooks/crm', async (req, res) => {
     return res.status(400).json({ error: 'Missing required idempotency identifier (eventId / X-Event-ID)' });
   }
 
-  // 1. Idempotency Check
-  try {
-    const existingEvent = await pgDb.select().from(leadEvents).where(eq(leadEvents.externalEventId, resolvedEventId));
-    if (existingEvent.length > 0) {
-      return res.status(200).json({ success: true, duplicate: true, message: 'Event already processed idempotently', eventId: resolvedEventId });
-    }
-  } catch (err) {
-    // Continue if column/table check fails
+  // 1. Tenant resolution must be explicit. Never attach an external event to
+  // whichever contractor happens to be first in the database.
+  const resolvedContractorId = contractorId || (leadData ? leadData.contractorId : null);
+  if (typeof resolvedContractorId !== 'string' || !resolvedContractorId.trim()) {
+    return res.status(400).json({ error: 'A valid contractorId is required for tenant-scoped CRM webhook routing.' });
+  }
+  const contractorCheck = await pgDb.select({ id: contractors.id }).from(contractors)
+    .where(eq(contractors.id, resolvedContractorId)).limit(1);
+  if (contractorCheck.length === 0) {
+    return res.status(403).json({ error: 'Forbidden: Invalid tenant contractor ID' });
   }
 
-  // 2. Tenant Isolation / Contractor resolution
-  let resolvedContractorId = contractorId || (leadData ? leadData.contractorId : null);
-  if (!resolvedContractorId) {
-    const allContractors = await pgDb.select().from(contractors).limit(1);
-    if (allContractors.length > 0) {
-      resolvedContractorId = allContractors[0].id;
-    } else {
-      return res.status(400).json({ error: 'Contractor ID could not be established for tenant isolation' });
-    }
-  } else {
-    const contractorCheck = await pgDb.select().from(contractors).where(eq(contractors.id, resolvedContractorId));
-    if (contractorCheck.length === 0) {
-      return res.status(403).json({ error: 'Forbidden: Invalid tenant contractor ID' });
+  // 2. Idempotency is tenant-scoped through the lead that owns the event.
+  const existingEvents = await pgDb.select({ leadId: leadEvents.leadId }).from(leadEvents)
+    .where(eq(leadEvents.externalEventId, resolvedEventId));
+  if (existingEvents.length) {
+    const eventLeadIds = existingEvents.map(event => event.leadId);
+    const existingTenantLead = await pgDb.select({ id: leads.id }).from(leads).where(and(
+      eq(leads.contractorId, resolvedContractorId),
+      inArray(leads.id, eventLeadIds)
+    )).limit(1);
+    if (existingTenantLead.length) {
+      return res.status(200).json({ success: true, duplicate: true, message: 'Event already processed idempotently for this workspace.', eventId: resolvedEventId });
     }
   }
 
@@ -2326,25 +2326,30 @@ app.post('/api/webhooks/crm', async (req, res) => {
       }
     }
 
+    // Load tenant records once for contact matching. PII is encrypted at rest,
+    // so comparisons must use decrypted values in memory, never placeholder columns.
+    const allTenantLeads = (!matchedLead && (normalizedEmail || normalizedPhone))
+      ? await pgDb.select().from(leads).where(eq(leads.contractorId, resolvedContractorId))
+      : [];
+
     // Priority 3: Normalized Email
     if (!matchedLead && normalizedEmail) {
-      const byEmail = await pgDb.select().from(leads).where(and(eq(leads.email, normalizedEmail), eq(leads.contractorId, resolvedContractorId)));
-      if (byEmail.length === 1) {
-        matchedLead = byEmail[0];
-      } else if (byEmail.length > 1) {
-        return res.status(409).json({ error: 'Conflict: Multiple leads match email address. Ambiguous reconciliation.' });
-      }
+      const byEmail = allTenantLeads.filter(lead => {
+        const emailValue = lead.emailEncrypted ? decrypt(lead.emailEncrypted) : (lead.email === '[ENCRYPTED]' ? '' : lead.email || '');
+        return String(emailValue).toLowerCase().trim() === normalizedEmail;
+      });
+      if (byEmail.length === 1) matchedLead = byEmail[0];
+      else if (byEmail.length > 1) return res.status(409).json({ error: 'Conflict: Multiple leads match email address. Ambiguous reconciliation.' });
     }
 
     // Priority 4: Normalized Phone
     if (!matchedLead && normalizedPhone) {
-      const allTenantLeads = await pgDb.select().from(leads).where(eq(leads.contractorId, resolvedContractorId));
-      const phoneMatches = allTenantLeads.filter(l => l.phone && l.phone.replace(/\D/g, '') === normalizedPhone);
-      if (phoneMatches.length === 1) {
-        matchedLead = phoneMatches[0];
-      } else if (phoneMatches.length > 1) {
-        return res.status(409).json({ error: 'Conflict: Multiple leads match phone number. Ambiguous reconciliation.' });
-      }
+      const phoneMatches = allTenantLeads.filter(lead => {
+        const phoneValue = lead.phoneEncrypted ? decrypt(lead.phoneEncrypted) : (lead.phone === '[ENCRYPTED]' ? '' : lead.phone || '');
+        return String(phoneValue).replace(/\D/g, '') === normalizedPhone;
+      });
+      if (phoneMatches.length === 1) matchedLead = phoneMatches[0];
+      else if (phoneMatches.length > 1) return res.status(409).json({ error: 'Conflict: Multiple leads match phone number. Ambiguous reconciliation.' });
     }
 
     if (!matchedLead) {
@@ -2405,10 +2410,24 @@ app.post('/api/webhooks/crm', async (req, res) => {
       newStage: newOperationalStatus,
       dealValue: newDealValue,
       currency: currency || 'USD',
-      metadata: { source: source || 'crm_webhook', rawPayload: req.body },
+      metadata: { source: source || 'crm_webhook', matchedBy: targetLeadId ? 'lead_id' : externalId ? 'external_crm_id' : normalizedEmail ? 'email' : 'phone', eventType: canonicalEventType },
       notes: `Inbound CRM event (${source || 'external'}) mapped to canonical "${canonicalEventType}"`,
       createdBy: source || 'external_webhook',
       occurredAt: parsedOccurredAt
+    });
+
+    await pgDb.insert(workEvents).values({
+      id: 'evt_' + crypto.randomUUID(),
+      contractorId: resolvedContractorId,
+      eventType: 'crm.webhook_reconciled',
+      entityType: 'lead',
+      entityId: matchedLead.id,
+      actorType: 'integration',
+      actorId: source || 'crm_webhook',
+      sourceModule: 'crm_webhook',
+      correlationId: resolvedEventId,
+      summary: `Reconciled external CRM event "${canonicalEventType}" to ${matchedLead.businessName}.`,
+      payload: { externalEventId: resolvedEventId, previousStatus: oldStatus, status: newOperationalStatus, dealValue: newDealValue }
     });
 
     if (newDealValue !== oldDealValue && canonicalEventType !== 'RevenueUpdated') {
@@ -2438,13 +2457,14 @@ app.post('/api/webhooks/crm', async (req, res) => {
       let hashedEmail: string | null = null;
       let hashedPhone: string | null = null;
 
-      if (matchedLead.email) {
-        const cleanEmail = matchedLead.email.toLowerCase().trim();
+      const rawMatchedEmail = matchedLead.emailEncrypted ? decrypt(matchedLead.emailEncrypted) : (matchedLead.email === '[ENCRYPTED]' ? '' : matchedLead.email || '');
+      const rawMatchedPhone = matchedLead.phoneEncrypted ? decrypt(matchedLead.phoneEncrypted) : (matchedLead.phone === '[ENCRYPTED]' ? '' : matchedLead.phone || '');
+      if (rawMatchedEmail) {
+        const cleanEmail = String(rawMatchedEmail).toLowerCase().trim();
         hashedEmail = crypto.createHash('sha256').update(cleanEmail).digest('hex');
       }
-
-      if (matchedLead.phone) {
-        const cleanPhone = matchedLead.phone.replace(/\D/g, '');
+      if (rawMatchedPhone) {
+        const cleanPhone = String(rawMatchedPhone).replace(/\D/g, '');
         hashedPhone = crypto.createHash('sha256').update(cleanPhone).digest('hex');
       }
 
