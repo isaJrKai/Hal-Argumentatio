@@ -647,10 +647,11 @@ export default function NeuralPanel() {
   };
 
   const SUBSYSTEMS = [
-    { id: 'core_bayes', label: 'Outcome Analysis', icon: Network, color: 'text-amber-500', bg: 'bg-amber-500/10' },
-    { id: 'core_objection', label: 'Lead Signals', icon: Shield, color: 'text-amber-500', bg: 'bg-amber-500/10' },
-    { id: 'core_niche', label: 'Niche Calibration', icon: Database, color: 'text-amber-500', bg: 'bg-amber-500/10' },
-    { id: 'core_timesfm', label: 'TimesFM 2.5 Adapter', icon: TrendingUp, color: 'text-amber-500', bg: 'bg-amber-500/10' }
+    { id: 'core_leads', label: 'Lead Pipeline', icon: Network, color: 'text-amber-500', bg: 'bg-amber-500/10' },
+    { id: 'core_outcomes', label: 'Recorded Outcomes', icon: Shield, color: 'text-amber-500', bg: 'bg-amber-500/10' },
+    { id: 'core_ads', label: 'Google Ads Evidence', icon: TrendingUp, color: 'text-amber-500', bg: 'bg-amber-500/10' },
+    { id: 'core_events', label: 'Work History', icon: Database, color: 'text-amber-500', bg: 'bg-amber-500/10' },
+    { id: 'core_timesfm', label: 'TimesFM 2.5 Adapter', icon: Brain, color: 'text-amber-500', bg: 'bg-amber-500/10' }
   ];
 
   return (
