@@ -8,13 +8,13 @@ describe('HAL worker capability registry', () => {
     expect(workers.find(worker => worker.id === 'nemotron')).toMatchObject({ mode: 'provider_only', canClaimTasks: false, configured: true });
   });
 
-  it('limits Hermes to its verified registered task type', () => {
+  it('limits Hermes to its two verified registered task types', () => {
     const hermes = getWorkerCapabilities({} as NodeJS.ProcessEnv).find(worker => worker.id === 'hermes');
-    expect(hermes).toMatchObject({ mode: 'partial_executor', canClaimTasks: true, supportedTaskTypes: ['hermes_lab_asset'] });
+    expect(hermes).toMatchObject({ mode: 'partial_executor', canClaimTasks: true, supportedTaskTypes: ['hermes_lab_asset', 'hermes_agent_task'] });
   });
 
-  it('does not pretend HAL Assistant can execute queued work', () => {
+  it('reports HAL Assistant as an orchestrator, not a queue worker', () => {
     const workers = getWorkerCapabilities({} as NodeJS.ProcessEnv);
-    expect(workers.find(worker => worker.id === 'hal_assistant')).toMatchObject({ mode: 'context_only', canClaimTasks: false });
+    expect(workers.find(worker => worker.id === 'hal_assistant')).toMatchObject({ mode: 'orchestrator', canClaimTasks: false });
   });
 });
