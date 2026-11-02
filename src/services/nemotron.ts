@@ -111,8 +111,9 @@ export async function callNemotronWithTools(
           return { text, toolCalls };
         }
 
-        conversation.push(assistantMessage);
-        for (const toolCall of assistantMessage.tool_calls.slice(0, 4)) {
+        const selectedToolCalls = assistantMessage.tool_calls.slice(0, 4);
+        conversation.push({ ...assistantMessage, tool_calls: selectedToolCalls });
+        for (const toolCall of selectedToolCalls) {
           const name = toolCall.function?.name;
           const callId = toolCall.id;
           if (typeof name !== 'string' || typeof callId !== 'string') continue;
@@ -144,6 +145,12 @@ export async function callNemotronWithTools(
         toolCalls
       };
     } catch (err: any) {
+      if (toolCalls.length) {
+        return {
+          text: 'Some tool calls were completed before the model connection failed. Their confirmed results are recorded in Work Queue and Work History; no additional actions were retried.',
+          toolCalls
+        };
+      }
       lastError = err;
       console.warn(`[Nemotron function calling] ${model} unavailable:`, err?.message || err);
     }
