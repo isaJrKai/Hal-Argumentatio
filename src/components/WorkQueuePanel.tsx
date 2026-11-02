@@ -141,7 +141,7 @@ export default function WorkQueuePanel({ token }: WorkQueuePanelProps) {
           </label>
           <label className="text-[10px] text-text-tertiary font-mono uppercase">Assigned worker
             <select value={assignedWorker} onChange={e => setAssignedWorker(e.target.value)} className="mt-1 w-full rounded-md bg-bg-base border border-border-default p-2.5 text-sm text-text-primary">
-              {['human', 'hal_assistant', 'hermes', 'amis', 'gemini', 'nemotron'].map(workerId => {
+              {['human', 'hal_assistant', 'hermes', 'gemini', 'nemotron'].map(workerId => {
                 const worker = workerCapabilities.find(item => item.id === workerId);
                 return <option key={workerId} value={workerId}>{worker?.label || workerId} — {worker?.mode || 'status unavailable'}</option>;
               })}
