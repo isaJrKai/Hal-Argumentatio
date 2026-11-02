@@ -677,18 +677,6 @@ app.post('/api/work-tasks', authenticate, async (req, res) => {
     return res.status(400).json({ error: 'Invalid task details. Check task type, title, priority, worker, entity pair and input size.' });
   }
 
-  if (assignedStaffId) {
-    const [member] = await pgDb.select().from(staffMembers).where(and(
-      eq(staffMembers.id, assignedStaffId), eq(staffMembers.contractorId, contractorId)
-    )).limit(1);
-    if (!member) return res.status(404).json({ error: 'Assigned staff member was not found in this workspace.' });
-    if (member.status !== 'active' || member.availability !== 'available') return res.status(409).json({ error: 'Staff member is not available for new assignments.' });
-    const [existing] = await pgDb.select({ id: workTasks.id }).from(workTasks).where(and(
-      eq(workTasks.contractorId, contractorId), eq(workTasks.assignedStaffId, assignedStaffId),
-      inArray(workTasks.status, ['queued', 'running', 'awaiting_approval'])
-    )).limit(1);
-    if (existing) return res.status(409).json({ error: 'Staff member already owns active work. Reassign or finish that work before assigning another task.' });
-  }
 
   if (entityType) {
     let entityExists = false;
@@ -715,6 +703,20 @@ app.post('/api/work-tasks', authenticate, async (req, res) => {
     )).limit(1);
     if (activeDuplicate) return res.status(200).json({ task: activeDuplicate, duplicate: true });
   }
+
+  if (assignedStaffId) {
+    const [member] = await pgDb.select().from(staffMembers).where(and(
+      eq(staffMembers.id, assignedStaffId), eq(staffMembers.contractorId, contractorId)
+    )).limit(1);
+    if (!member) return res.status(404).json({ error: 'Assigned staff member was not found in this workspace.' });
+    if (member.status !== 'active' || member.availability !== 'available') return res.status(409).json({ error: 'Staff member is not available for new assignments.' });
+    const [existing] = await pgDb.select({ id: workTasks.id }).from(workTasks).where(and(
+      eq(workTasks.contractorId, contractorId), eq(workTasks.assignedStaffId, assignedStaffId),
+      inArray(workTasks.status, ['queued', 'running', 'awaiting_approval'])
+    )).limit(1);
+    if (existing) return res.status(409).json({ error: 'Staff member already owns active work. Reassign or finish that work before assigning another task.' });
+  }
+
 
   const taskId = 'task_' + crypto.randomUUID();
   const correlationId = typeof body.correlationId === 'string' && body.correlationId.trim()
