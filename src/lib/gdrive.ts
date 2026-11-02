@@ -1,4 +1,3 @@
-import { User } from '@firebase/auth';
 import {
   isGoogleWorkspaceConfigured,
   initGoogleWorkspaceAuth,
