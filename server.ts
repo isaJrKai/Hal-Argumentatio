@@ -557,7 +557,7 @@ app.patch('/api/staff/:id', authenticate, async (req, res) => {
   const contractorId = (req as any).contractorId;
   const staffId = String(req.params.id || '');
   const parsed = validateStaffInput(req.body);
-  if (!parsed.valid) return res.status(400).json({ error: parsed.error });
+  if (parsed.valid === false) return res.status(400).json({ error: parsed.error });
   try {
     const [current] = await pgDb.select().from(staffMembers)
       .where(and(eq(staffMembers.id, staffId), eq(staffMembers.contractorId, contractorId))).limit(1);
