@@ -80,6 +80,12 @@ A configured Gemini or NVIDIA API key does not mean that provider can claim queu
 - [ ] Test tenant isolation, duplicate prevention, retry safety, event ordering and failure recovery.
 - [ ] Run CI, merge only green changes, then deploy through the configured publishing path and verify production.
 
+## Neural graph and forecast provenance
+
+The Territory Intelligence Graph is a live relationship graph built from tenant-scoped leads, recorded win/loss outcomes, Google Ads daily records and persisted work-history events. Its territory and niche filters scope the underlying records; the historical scrubber reveals timestamped records chronologically. It is not a visualization of learned neural-network weights. Learning epoch and global model confidence remain explicitly unmeasured until a validated training/calibration pipeline exists.
+
+The TimesFM adapter is shown as configured-but-unverified until an inference request succeeds. A scheduled forecast node is added only when a real forecast response is returned. The separate scheduler lead-volume estimate is limited to recorded trailing 90-day snapshots, stores its actual source, and labels the simple historical-mean fallback with zero confidence. Forecast evaluation compares observations within the forecast's own target window and skips missing measurements rather than recording them as zero.
+
 ## Non-goals
 
 - Do not rewrite every module at once.
