@@ -65,7 +65,7 @@ export default function NeuralPanel() {
       });
       setLearningMetrics({
         epoch: null,
-        outcomesDigested: Number(data.telemetry?.matchedOutcomeCount ?? 0),
+        outcomesDigested: Number(data.telemetry?.recordedOutcomes ?? 0),
         confidenceGlobal: null
       });
 
