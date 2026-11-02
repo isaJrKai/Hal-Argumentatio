@@ -52,6 +52,7 @@ export async function listWorkTasks(db: any, contractorId: string, limit = 50) {
     status: workTasks.status,
     priority: workTasks.priority,
     assignedWorker: workTasks.assignedWorker,
+    assignedStaffId: workTasks.assignedStaffId,
     entityType: workTasks.entityType,
     entityId: workTasks.entityId,
     correlationId: workTasks.correlationId,
