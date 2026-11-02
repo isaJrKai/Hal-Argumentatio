@@ -513,6 +513,98 @@ IMPORTANT: Output ONLY a valid JSON array of objects with the keys above inside 
 /**
  * Ask HAL Chatbot - A-Z Knowledge Base Responder
  */
+export async function callGeminiWithTools(
+  prompt: string,
+  systemInstruction: string,
+  tools: Array<{ name: string; description: string; inputSchema: { type: 'object'; properties: Record<string, any>; required?: string[] } }>,
+  execute: (name: string, args: Record<string, any>) => Promise<any>,
+  responseMimeType: 'application/json' | 'text/plain' = 'application/json'
+): Promise<{ text: string; toolCalls: Array<{ name: string; result: any }> }> {
+  const ai = getAIClient();
+  if (!ai) throw new Error('Gemini provider is not configured.');
+  const normalizeSchema = (schema: any): any => {
+    if (!schema || typeof schema !== 'object') return schema;
+    const normalized: Record<string, any> = { ...schema };
+    if (typeof normalized.type === 'string') normalized.type = normalized.type.toUpperCase();
+    if (normalized.properties && typeof normalized.properties === 'object') {
+      normalized.properties = Object.fromEntries(Object.entries(normalized.properties).map(([key, value]) => [key, normalizeSchema(value)]));
+    }
+    if (normalized.items) normalized.items = normalizeSchema(normalized.items);
+    return normalized;
+  };
+  const declarations = tools.map(tool => ({
+    name: tool.name,
+    description: tool.description,
+    parameters: normalizeSchema({
+      type: 'object',
+      properties: tool.inputSchema.properties || {},
+      ...(tool.inputSchema.required?.length ? { required: tool.inputSchema.required } : {})
+    })
+  }));
+  const toolCalls: Array<{ name: string; result: any }> = [];
+  const contents: any[] = [{ role: 'user', parts: [{ text: prompt }] }];
+  let lastError: any = null;
+
+  for (const model of ['gemini-3.8-flash', 'gemini-flash-latest', 'gemini-3.1-flash-lite']) {
+    try {
+      const config: any = {
+        systemInstruction,
+        temperature: 0.4,
+        responseMimeType,
+        tools: [{ functionDeclarations: declarations }]
+      };
+      let response: any = await ai.models.generateContent({ model, contents, config });
+      for (let round = 0; round < 5 && response?.functionCalls?.length; round += 1) {
+        const modelContent = response.candidates?.[0]?.content;
+        if (modelContent) contents.push(modelContent);
+        const functionResponses: any[] = [];
+        for (const [index, call] of response.functionCalls.entries()) {
+          if (!call.name) continue;
+          let result: any;
+          if (index >= 4) {
+            result = { success: false, error: 'The per-round tool limit is four; retry remaining work in a later turn.' };
+          } else {
+            try {
+              result = await execute(call.name, (call.args || {}) as Record<string, any>);
+              toolCalls.push({ name: call.name, result });
+            } catch (error: any) {
+              result = { success: false, error: String(error?.message || 'Tool execution failed.').slice(0, 500) };
+              toolCalls.push({ name: call.name, result });
+            }
+          }
+          functionResponses.push({
+            functionResponse: {
+              name: call.name,
+              ...(call.id ? { id: call.id } : {}),
+              response: { result }
+            }
+          });
+        }
+        if (!functionResponses.length) break;
+        contents.push({ role: 'user', parts: functionResponses });
+        response = await ai.models.generateContent({ model, contents, config });
+      }
+      if (response?.text) return { text: response.text, toolCalls };
+      if (toolCalls.length) {
+        return {
+          text: 'Hermes processed operational tool calls but the model did not return a final structured response. Review the recorded tool results in Work History.',
+          toolCalls
+        };
+      }
+      lastError = new Error(`Gemini ${model} returned no final response.`);
+    } catch (error: any) {
+      if (toolCalls.length) {
+        return {
+          text: 'Hermes processed operational tool calls before the provider response failed. Review each recorded success or failure in Work History; no tool was retried automatically.',
+          toolCalls
+        };
+      }
+      lastError = error;
+    }
+  }
+  throw lastError || new Error('Gemini tool-calling models are unavailable.');
+}
+
 export async function askHalBot(
   message: string,
   history: Array<{ role: 'user' | 'model'; parts: { text: string }[] }>,
