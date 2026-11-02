@@ -3176,144 +3176,227 @@ app.post('/api/leads/ingest', authenticate, async (req, res) => {
 
 app.post('/api/leads/purge-and-replace', authenticate, async (req, res) => {
   const contractorId = (req as any).contractorId;
-  const { leads: harvestedLeads } = req.body;
-
-  if (!Array.isArray(harvestedLeads) || harvestedLeads.length === 0) {
-    return res.status(400).json({ error: 'An array of harvested leads is required' });
+  const { leads: harvestedLeads } = req.body || {};
+  if (!Array.isArray(harvestedLeads) || harvestedLeads.length > 100) {
+    return res.status(400).json({ error: 'Provide an array of up to 100 harvested leads.' });
   }
 
   try {
-    let queuedTasks = 0;
-    // 1. Purge all mock leads and mock revenues from local DB
-    await pgDb.delete(leads).where(and(eq(leads.contractorId, contractorId), like(leads.id, 'lead_seed_%')));
-    await pgDb.delete(revenueRecords).where(and(eq(revenueRecords.contractorId, contractorId), like(revenueRecords.id, 'rev_seed_%')));
-    db.purgeMockLeads(contractorId);
+    const now = new Date();
+    const committed = await pgDb.transaction(async tx => {
+      const seedRows = await tx.select({ id: leads.id }).from(leads)
+        .where(and(eq(leads.contractorId, contractorId), like(leads.id, 'lead_seed_%')));
+      const seedIds = seedRows.map(row => row.id);
+      if (seedIds.length) {
+        await tx.update(workTasks).set({
+          status: 'cancelled',
+          errorMessage: 'Cancelled because the mock seed lead was removed during a real-data replacement.',
+          updatedAt: now
+        }).where(and(
+          eq(workTasks.contractorId, contractorId),
+          eq(workTasks.entityType, 'lead'),
+          inArray(workTasks.entityId, seedIds),
+          inArray(workTasks.status, ['queued', 'running', 'awaiting_approval', 'failed'])
+        ));
+        await tx.delete(leadEvents).where(inArray(leadEvents.leadId, seedIds));
+        await tx.delete(leadAttribution).where(inArray(leadAttribution.leadId, seedIds));
+      }
+      await tx.delete(revenueRecords).where(and(eq(revenueRecords.contractorId, contractorId), like(revenueRecords.id, 'rev_seed_%')));
+      await tx.delete(leads).where(and(eq(leads.contractorId, contractorId), like(leads.id, 'lead_seed_%')));
 
-    // 2. Add each harvested lead as actual business data
-    for (const hl of harvestedLeads) {
-      const id = crypto.randomUUID();
-      const rawEmail = hl.email ? String(hl.email) : null;
-      const rawPhone = hl.phone ? String(hl.phone) : null;
-      const emailEncrypted = rawEmail ? encrypt(rawEmail) : null;
-      const phoneEncrypted = rawPhone ? encrypt(rawPhone) : null;
+      const existingRows = await tx.select({
+        id: leads.id,
+        businessName: leads.businessName,
+        city: leads.city,
+        niche: leads.niche
+      }).from(leads).where(eq(leads.contractorId, contractorId));
+      const normalize = (value: any) => String(value || '').trim().toLowerCase().replace(/\s+/g, ' ');
+      const seen = new Set(existingRows.map(row => [normalize(row.businessName), normalize(row.city), normalize(row.niche)].join('|')));
+      const addedItems: any[] = [];
+      const legacyMirrors: any[] = [];
+      let skippedCount = 0;
 
-      const [addedLead] = await pgDb.insert(leads).values({
-        id,
-        contractorId,
-        businessName: hl.businessName,
-        ownerName: hl.ownerName || 'Unknown Owner',
-        email: rawEmail ? '[ENCRYPTED]' : '',
-        phone: rawPhone ? '[ENCRYPTED]' : '',
-        emailEncrypted,
-        phoneEncrypted,
-        isSynthetic: Boolean(hl.isSynthetic),
-        sourceType: hl.sourceType || 'unknown',
-        city: hl.city,
-        niche: hl.serviceType,
-        source: 'harvested_intelligence',
-        status: 'new',
-        urgencyScore: null,
-        predictedLtv: null,
-        notes: hl.notes || `Harvested real business profile. Niche: ${hl.serviceType}.`,
-        websiteUrl: hl.websiteUrl,
-        performanceScore: null,
-        sslStatus: null,
-        reviewCount: null,
-        googleRating: null,
-        seoScore: null,
-        sentimentScore: null,
-        verificationStatus: (hl as any).verificationStatus || 'UNVERIFIED_STAGING',
-        dnsVerified: (hl as any).dnsVerified !== undefined ? Boolean((hl as any).dnsVerified) : false,
-        groundingEvidence: (hl as any).groundingEvidence || null,
-      }).returning();
+      for (const item of harvestedLeads) {
+        if (!item || typeof item.businessName !== 'string' || !item.businessName.trim() ||
+            typeof item.city !== 'string' || !item.city.trim() ||
+            typeof item.serviceType !== 'string' || !item.serviceType.trim()) {
+          skippedCount++;
+          continue;
+        }
+        const key = [normalize(item.businessName), normalize(item.city), normalize(item.serviceType)].join('|');
+        if (seen.has(key)) {
+          skippedCount++;
+          continue;
+        }
+        seen.add(key);
 
-      db.addLead({
-        id,
-        contractorId,
-        businessName: hl.businessName,
-        ownerName: hl.ownerName || undefined,
-        email: rawEmail || '',
-        phone: rawPhone || '',
-        city: hl.city,
-        serviceType: hl.serviceType,
-        source: 'harvested_intelligence',
-        status: 'new',
-        urgencyScore: null,
-        predictedLtvUsd: null,
-        sourceType: hl.sourceType || 'unknown',
-        isSynthetic: Boolean(hl.isSynthetic),
-        notes: hl.notes || `Harvested real business profile. Niche: ${hl.serviceType}.`,
-        websiteUrl: hl.websiteUrl,
-        performanceScore: null,
-        sslStatus: null,
-        reviewCount: null,
-        googleRating: null,
-        seoScore: null,
-        sentimentScore: null,
-        verificationStatus: (hl as any).verificationStatus || 'UNVERIFIED_STAGING',
-        dnsVerified: (hl as any).dnsVerified !== undefined ? Boolean((hl as any).dnsVerified) : false,
-        groundingEvidence: (hl as any).groundingEvidence || null,
-      });
+        const id = crypto.randomUUID();
+        const rawEmail = item.email ? String(item.email) : null;
+        const rawPhone = item.phone ? String(item.phone) : null;
+        const emailEncrypted = rawEmail ? encrypt(rawEmail) : null;
+        const phoneEncrypted = rawPhone ? encrypt(rawPhone) : null;
+        const verificationStatus = item.verificationStatus || 'UNVERIFIED_STAGING';
+        const dnsVerified = item.dnsVerified !== undefined ? Boolean(item.dnsVerified) : false;
+        const notes = item.notes || `Imported prospect profile. Niche: ${item.serviceType}.`;
 
-      // Add a creation event for the newly harvested lead
-      await pgDb.insert(leadEvents).values({
-        id: crypto.randomUUID(),
-        leadId: addedLead.id,
-        eventType: 'LeadCreated',
-        newStage: 'new',
-        notes: `Imported prospect profile; website performance and reputation metrics have not been measured by this import.`
-      });
+        const [addedLead] = await tx.insert(leads).values({
+          id,
+          contractorId,
+          businessName: item.businessName.trim(),
+          ownerName: item.ownerName || 'Unknown Owner',
+          email: rawEmail ? '[ENCRYPTED]' : '',
+          phone: rawPhone ? '[ENCRYPTED]' : '',
+          emailEncrypted,
+          phoneEncrypted,
+          isSynthetic: Boolean(item.isSynthetic),
+          sourceType: item.sourceType || 'unknown',
+          city: item.city.trim(),
+          niche: item.serviceType.trim(),
+          source: 'harvested_intelligence',
+          status: 'new',
+          urgencyScore: null,
+          predictedLtv: null,
+          notes,
+          websiteUrl: item.websiteUrl || null,
+          performanceScore: null,
+          sslStatus: null,
+          reviewCount: null,
+          googleRating: null,
+          seoScore: null,
+          sentimentScore: null,
+          verificationStatus,
+          dnsVerified,
+          groundingEvidence: item.groundingEvidence || null,
+          createdAt: now,
+          updatedAt: now
+        }).returning();
 
-      const taskId = 'task_' + crypto.randomUUID();
-      const correlationId = taskId;
-      await pgDb.transaction(async tx => {
+        await tx.insert(leadEvents).values({
+          id: crypto.randomUUID(),
+          leadId: addedLead.id,
+          eventType: 'LeadCreated',
+          newStage: 'new',
+          notes: 'Imported from the live territory harvester. Verification remains a separate step.'
+        });
+
+        const taskId = 'task_' + crypto.randomUUID();
+        const correlationId = taskId;
         await tx.insert(workTasks).values({
-          id: taskId, contractorId, taskType: 'lead_follow_up',
+          id: taskId,
+          contractorId,
+          taskType: 'lead_follow_up',
           title: `Review and qualify: ${addedLead.businessName}`,
-          description: 'Review this imported territory prospect, confirm its business details and verification evidence, then record the next step. Do not contact the prospect until the outreach verification gate passes.',
-          status: 'queued', priority: 'normal', assignedWorker: 'human',
-          entityType: 'lead', entityId: addedLead.id, correlationId,
-          input: { source: 'maps_territory_harvest', verificationStatus: addedLead.verificationStatus || 'UNVERIFIED_STAGING' },
-          requiresApproval: false, createdAt: new Date(), updatedAt: new Date()
+          description: 'Review this Maps/territory prospect, confirm its business details and verification evidence, then record the next step in the lead workspace. Do not contact the prospect until the outreach verification gate passes.',
+          status: 'queued',
+          priority: 'normal',
+          assignedWorker: 'human',
+          entityType: 'lead',
+          entityId: addedLead.id,
+          correlationId,
+          input: { source: 'maps_territory_harvest', verificationStatus },
+          requiresApproval: false,
+          createdAt: now,
+          updatedAt: now
         });
         await tx.insert(workEvents).values({
-          id: 'evt_' + crypto.randomUUID(), contractorId,
-          eventType: 'task.created', entityType: 'work_task', entityId: taskId,
-          actorType: 'system', actorId: 'territory_harvester', sourceModule: 'lead_ingestion',
-          correlationId, summary: `Created qualification task for ${addedLead.businessName}.`,
-          payload: { taskType: 'lead_follow_up', assignedWorker: 'human', priority: 'normal', status: 'queued', entityType: 'lead', entityId: addedLead.id }
+          id: 'evt_' + crypto.randomUUID(),
+          contractorId,
+          eventType: 'task.created',
+          entityType: 'work_task',
+          entityId: taskId,
+          actorType: 'system',
+          actorId: 'territory_harvester',
+          sourceModule: 'lead_ingestion',
+          correlationId,
+          summary: `Created qualification task for ${addedLead.businessName}.`,
+          payload: { taskType: 'lead_follow_up', assignedWorker: 'human', priority: 'normal', status: 'queued', leadId: addedLead.id }
         });
         await tx.insert(workEvents).values({
-          id: 'evt_' + crypto.randomUUID(), contractorId,
-          eventType: 'lead.queued_for_review', entityType: 'lead', entityId: addedLead.id,
-          actorType: 'system', actorId: 'territory_harvester', sourceModule: 'lead_ingestion',
-          correlationId, summary: `${addedLead.businessName} was added to the human review queue.`,
-          payload: { taskId, verificationStatus: addedLead.verificationStatus || 'UNVERIFIED_STAGING' }
+          id: 'evt_' + crypto.randomUUID(),
+          contractorId,
+          eventType: 'lead.queued_for_review',
+          entityType: 'lead',
+          entityId: addedLead.id,
+          actorType: 'system',
+          actorId: 'territory_harvester',
+          sourceModule: 'lead_ingestion',
+          correlationId,
+          summary: `${addedLead.businessName} was added to the human review queue.`,
+          payload: { taskId, verificationStatus }
         });
-      });
-      queuedTasks++;
-    }
 
-    // 3. Log Audit Action
-    await pgDb.insert(auditLogs).values({
-      id: crypto.randomUUID(),
-      contractorId,
-      action: 'BUSINESS_RECORDS_IMPORTED',
-      details: `Removed identified seed records and imported ${harvestedLeads.length} business records; import does not itself verify authenticity.`
+        addedItems.push(addedLead);
+        legacyMirrors.push({
+          id,
+          contractorId,
+          businessName: item.businessName.trim(),
+          ownerName: item.ownerName || undefined,
+          email: rawEmail || '',
+          phone: rawPhone || '',
+          city: item.city.trim(),
+          serviceType: item.serviceType.trim(),
+          source: 'harvested_intelligence',
+          status: 'new',
+          urgencyScore: null,
+          predictedLtvUsd: null,
+          notes,
+          websiteUrl: item.websiteUrl,
+          sourceType: item.sourceType || 'unknown',
+          isSynthetic: Boolean(item.isSynthetic),
+          verificationStatus,
+          dnsVerified,
+          groundingEvidence: item.groundingEvidence || null,
+          createdAt: now.toISOString(),
+          updatedAt: now.toISOString()
+        });
+      }
+
+      await tx.insert(auditLogs).values({
+        id: crypto.randomUUID(),
+        contractorId,
+        action: 'BUSINESS_RECORDS_REPLACED',
+        details: `Removed ${seedIds.length} mock seed leads and imported ${addedItems.length} unique real-source prospects with matching human review tasks.`
+      });
+      await tx.insert(workEvents).values({
+        id: 'evt_' + crypto.randomUUID(),
+        contractorId,
+        eventType: 'lead.seed_replacement_completed',
+        entityType: 'workspace',
+        entityId: contractorId,
+        actorType: 'human',
+        actorId: contractorId,
+        sourceModule: 'lead_ingestion',
+        correlationId: crypto.randomUUID(),
+        summary: `Replaced ${seedIds.length} mock seed leads with ${addedItems.length} unique imported prospects.`,
+        payload: { removedSeedLeads: seedIds.length, importedLeads: addedItems.length, queuedTasks: addedItems.length, skippedCount }
+      });
+      return { addedItems, legacyMirrors, removedSeedCount: seedIds.length, skippedCount };
     });
 
-    // 4. Broadcast Real-time notification
+    try { db.purgeMockLeads(contractorId); }
+    catch (mirrorError) { console.warn('[HAL Lead Replace] Legacy seed purge mirror failed.', mirrorError); }
+    for (const legacyLead of committed.legacyMirrors) {
+      try { db.addLead(legacyLead); }
+      catch (mirrorError) { console.warn('[HAL Lead Replace] Legacy lead mirror failed; PostgreSQL lead is committed.', mirrorError); }
+    }
+
     broadcastNotification(
       contractorId,
       'success',
-      'Business Records Imported',
-      `Imported ${harvestedLeads.length} records. Verification must be performed separately.`
+      'Business Records Replaced',
+      `Removed ${committed.removedSeedCount} mock seeds and imported ${committed.addedItems.length} unique prospects. Each imported lead has a human review task.`
     );
-
-    res.json({ success: true, count: harvestedLeads.length, queuedTasks });
+    return res.json({
+      success: true,
+      count: committed.addedItems.length,
+      queuedTasks: committed.addedItems.length,
+      removedSeedCount: committed.removedSeedCount,
+      skippedCount: committed.skippedCount,
+      leads: committed.addedItems
+    });
   } catch (err: any) {
-    console.error('Failed to replace mock data:', err);
-    res.status(500).json({ error: err.message });
+    console.error('[HAL Lead Replace] Atomic replacement failed:', err);
+    return res.status(503).json({ error: err.message || 'Seed replacement could not be committed.' });
   }
 });
 
