@@ -42,6 +42,7 @@ import { generateLandingPageHtml } from './src/components/landing/htmlGenerator'
 import { validateCrmTransition, isKnownCrmStage } from './src/lib/crmStateMachine';
 import { buildFinancialSnapshotCore } from './src/lib/financialSnapshot';
 import { buildPasswordResetResponse } from './src/lib/passwordResetResponse';
+import { verifyFirebaseGoogleIdToken } from './src/lib/firebaseGoogleIdentity';
 import { recordWorkEvent, getRecentWorkEvents, getEntityWorkEvents } from './src/lib/workLedger';
 import { canHumanUpdateWorkTask, canTransitionWorkTask, listWorkTasks, getWorkTask, requiresWorkTaskApproval } from './src/lib/workTasks';
 import { getWorkerCapabilities } from './src/lib/workerCapabilities';
@@ -847,69 +848,117 @@ app.post('/api/auth/login', async (req, res) => {
   });
 });
 
-// Google Workspace Sign-In Endpoint (100% Free OAuth Authentication)
+// Google sign-in: verify Firebase's signed ID token before trusting any identity claim.
+function getFirebaseWebApiKey(): string {
+  const configured = process.env.FIREBASE_WEB_API_KEY || process.env.VITE_FIREBASE_API_KEY;
+  if (configured && configured.trim()) return configured.trim();
+
+  // Google AI Studio's generated Firebase applet config contains a public web API key.
+  // The key is not a server secret; Firebase still verifies the submitted ID token.
+  try {
+    const configPath = path.join(process.cwd(), 'firebase-applet-config.json');
+    if (fs.existsSync(configPath)) {
+      const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+      if (typeof config.apiKey === 'string' && config.apiKey.trim()) return config.apiKey.trim();
+    }
+  } catch (error) {
+    console.warn('[HAL Google auth] Firebase applet config could not be read.');
+  }
+  return '';
+}
+
 app.post('/api/auth/google', async (req, res) => {
-  const { email, name, idToken } = req.body || {};
-  if (!email || typeof email !== 'string' || !email.includes('@')) {
-    return res.status(400).json({ error: 'A valid Google email address is required.' });
+  const { email, idToken } = req.body || {};
+  const attemptedEmail = typeof email === 'string' ? email.toLowerCase().trim().slice(0, 254) : 'google-sign-in';
+  if (!checkRateLimit(req, res, attemptedEmail)) return;
+
+  if (
+    typeof idToken !== 'string' ||
+    idToken.length < 20 ||
+    idToken.length > 12_000
+  ) {
+    recordAuthFailure(req, attemptedEmail);
+    return res.status(401).json({ error: 'Google sign-in could not be verified. Please try again.' });
   }
 
-  const cleanEmail = email.toLowerCase().trim();
-  let contractor: any = null;
+  const firebaseApiKey = getFirebaseWebApiKey();
+  if (!firebaseApiKey) {
+    console.error('[HAL Google auth] Firebase web API key is not configured.');
+    return res.status(503).json({ error: 'Google sign-in is not configured on this server.' });
+  }
 
+  let identity;
+  try {
+    identity = await verifyFirebaseGoogleIdToken(idToken, firebaseApiKey);
+  } catch (error) {
+    console.error('[HAL Google auth] Firebase identity verification unavailable:', error);
+    return res.status(503).json({ error: 'Google identity verification is temporarily unavailable. Please try again.' });
+  }
+
+  if (!identity) {
+    recordAuthFailure(req, attemptedEmail);
+    return res.status(401).json({ error: 'Google sign-in could not be verified. Please use a verified Google account.' });
+  }
+
+  const cleanEmail = identity.email;
+  if (
+    !cleanEmail ||
+    (typeof email === 'string' && email.trim() && email.toLowerCase().trim() !== cleanEmail)
+  ) {
+    recordAuthFailure(req, cleanEmail || attemptedEmail);
+    return res.status(401).json({ error: 'The Google account identity did not match the submitted account.' });
+  }
+
+  let contractor: any = null;
   try {
     const result = await pgDb.select().from(contractors).where(eq(contractors.email, cleanEmail)).limit(1);
-    if (result && result.length > 0) {
-      contractor = result[0];
-    }
-  } catch (e) {}
-
-  if (!contractor) {
-    const local = db.getContractorByEmail(cleanEmail);
-    if (local) {
-      contractor = {
-        id: local.id,
-        companyName: local.name,
-        email: local.email,
-        role: local.role,
-        marketId: local.marketId || 'market_default'
-      };
-    }
+    contractor = result[0] || null;
+  } catch (error) {
+    console.error('[HAL Google auth] PostgreSQL account lookup failed:', error);
+    return res.status(503).json({ error: 'Authentication service unavailable. Please try again later.' });
   }
 
-  // Provision new user if signing in via Google for the first time
   if (!contractor) {
-    const id = crypto.randomUUID();
-    const displayName = (typeof name === 'string' && name.trim()) ? name.trim() : cleanEmail.split('@')[0];
-    const isFirstAccount = db.getContractors().length === 0;
-    const role: 'admin' | 'user' = (isFirstAccount || cleanEmail === 'admin@kaislead.com') ? 'admin' : 'user';
+    // Reconcile a legacy local-only account using its existing ID and role. New
+    // Google registrations are always ordinary users; administrator privilege
+    // must be granted explicitly in the persisted database.
+    const local = db.getContractorByEmail(cleanEmail);
+    const accountId = local?.id || crypto.randomUUID();
+    const displayName = identity.displayName || local?.name || cleanEmail.split('@')[0];
+    const role: 'admin' | 'user' = local?.role === 'admin' ? 'admin' : 'user';
+    const passwordHash = local?.passwordHash || hashPassword(crypto.randomBytes(48).toString('hex'));
 
     try {
       await pgDb.insert(contractors).values({
-        id,
+        id: accountId,
         companyName: displayName,
         email: cleanEmail,
-        passwordHash: hashPassword(crypto.randomBytes(32).toString('hex')),
+        passwordHash,
         city: 'Unspecified',
         serviceType: 'Unspecified',
+        role
       });
-    } catch (e) {}
-
-    const newCon = db.addContractor({
-      email: cleanEmail,
-      passwordHash: hashPassword(crypto.randomBytes(32).toString('hex')),
-      name: displayName,
-      role,
-      marketId: 'market_default'
-    });
-
-    contractor = {
-      id: newCon.id,
-      companyName: newCon.name,
-      email: newCon.email,
-      role: newCon.role,
-      marketId: 'market_default'
-    };
+      contractor = {
+        id: accountId,
+        companyName: displayName,
+        email: cleanEmail,
+        role,
+        marketId: 'market_default'
+      };
+    } catch (insertError) {
+      // A concurrent first sign-in may have created the account. Re-read rather
+      // than generating a second ID or falling back to an unpersisted identity.
+      try {
+        const raced = await pgDb.select().from(contractors).where(eq(contractors.email, cleanEmail)).limit(1);
+        contractor = raced[0] || null;
+      } catch (lookupError) {
+        console.error('[HAL Google auth] Account creation reconciliation failed:', lookupError);
+      }
+      if (!contractor) {
+        console.error('[HAL Google auth] Account provisioning failed:', insertError);
+        return res.status(503).json({ error: 'HAL could not create your workspace account. Please try again later.' });
+      }
+    }
   }
 
   const role: 'admin' | 'user' = contractor.role === 'admin' ? 'admin' : 'user';
@@ -917,12 +966,23 @@ app.post('/api/auth/google', async (req, res) => {
   db.addSession(contractor.id, token, new Date(Date.now() + 30 * 24 * 3600 * 1000));
   recordAuthSuccess(req, cleanEmail);
 
+  try {
+    await pgDb.insert(auditLogs).values({
+      id: crypto.randomUUID(),
+      contractorId: contractor.id,
+      action: 'GOOGLE_LOGIN_SUCCESS',
+      details: `Verified Google sign-in completed for ${cleanEmail} from IP: ${req.ip}`
+    });
+  } catch (auditError) {
+    // Authentication must not fail because the optional audit insert failed.
+  }
+
   return res.json({
     token,
     contractor: {
       id: contractor.id,
       email: cleanEmail,
-      name: contractor.companyName || contractor.name || 'Workspace',
+      name: contractor.companyName || contractor.name || identity.displayName || 'Workspace',
       role,
       marketId: contractor.marketId || 'market_default'
     }
