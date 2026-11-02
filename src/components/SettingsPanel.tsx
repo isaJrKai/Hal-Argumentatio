@@ -1129,42 +1129,12 @@ export default function SettingsPanel({
               <span className="text-[11px] text-inherit opacity-60 block">Key: SLACK_WEBHOOK_URL</span>
             </div>
 
-            {/* Google Drive */}
-            <div className={`border p-3.5 rounded space-y-2 ${innerBg} ${borderCol}`}>
-              <div className="flex justify-between items-center">
-                <span className="font-bold uppercase font-mono text-[11px] text-accent">Google Drive Asset Cloud</span>
-                <span className={`text-[11px] font-mono px-1.5 py-0.5 rounded font-bold uppercase ${connectorKeys.googleDrive ? 'bg-positive/20 text-positive' : 'bg-warning-dim text-warning'}`}>
-                  {connectorConfigured.googleDrive || connectorKeys.googleDrive ? 'Configured' : 'Unconfigured'}
-                </span>
-              </div>
-              <input
-                type="password"
-                value={connectorKeys.googleDrive}
-                onChange={(e) => setConnectorKeys(prev => ({ ...prev, googleDrive: e.target.value }))}
-                onBlur={() => handleSaveConnectorKey('googleDrive', connectorKeys.googleDrive)}
-                placeholder="OAuth Client ID / Secret"
-                className={`w-full border rounded p-2 focus:outline-none focus:border-accent text-inherit font-mono text-xs ${innerBg} ${borderCol}`}
-              />
-              <span className="text-[11px] text-inherit opacity-60 block">Key: GOOGLE_DRIVE_CLIENT_ID</span>
-            </div>
-
-            {/* Google Drive Asset Cloud */}
-            <div className={`border p-3.5 rounded space-y-2 ${innerBg} ${borderCol}`}>
-              <div className="flex justify-between items-center">
-                <span className="font-bold uppercase font-mono text-[11px] text-accent">Google Drive & Workspace</span>
-                <span className={`text-[11px] font-mono px-1.5 py-0.5 rounded font-bold uppercase ${connectorKeys.googleDrive ? 'bg-positive/20 text-positive' : 'bg-warning-dim text-warning'}`}>
-                  {connectorConfigured.googleDrive || connectorKeys.googleDrive ? 'Configured' : 'Unconfigured'}
-                </span>
-              </div>
-              <input
-                type="password"
-                value={connectorKeys.googleDrive}
-                onChange={(e) => setConnectorKeys(prev => ({ ...prev, googleDrive: e.target.value }))}
-                onBlur={() => handleSaveConnectorKey('googleDrive', connectorKeys.googleDrive)}
-                placeholder="Google Workspace OAuth / Service Key"
-                className={`w-full border rounded p-2 focus:outline-none focus:border-accent text-inherit font-mono text-xs ${innerBg} ${borderCol}`}
-              />
-              <span className="text-[11px] text-inherit opacity-60 block">Key: GOOGLE_DRIVE_CLIENT_ID</span>
+            {/* Workspace OAuth is configured in deployment settings, not through a pasted key here. */}
+            <div className={`border p-4 rounded space-y-2 ${innerBg} ${borderCol}`}>
+              <span className="font-bold uppercase font-mono text-[11px] text-accent">Google Workspace OAuth</span>
+              <p className="text-[11px] text-inherit opacity-70 leading-relaxed">
+                Configure the Firebase web app and Google provider in the deployment environment using VITE_FIREBASE_API_KEY, VITE_FIREBASE_AUTH_DOMAIN, VITE_FIREBASE_PROJECT_ID, and VITE_FIREBASE_APP_ID. Then authorize Drive, Calendar, and Gmail from Connectors → Workspace. Do not paste OAuth secrets into this settings field.
+              </p>
             </div>
           </div>
         </div>
