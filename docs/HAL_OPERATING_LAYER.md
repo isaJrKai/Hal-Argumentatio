@@ -29,12 +29,12 @@ The authenticated `GET /api/workers` endpoint reports execution capability separ
 | Worker | Current verified role | Task execution |
 | --- | --- | --- |
 | Human operator | Manual work | Can perform and record human-owned tasks |
-| HAL Assistant | Shared-context reader | Conversational tool execution is not yet connected |
-| Hermes | Partial executor | Only registered `hermes_lab_asset` tasks |
+| HAL Assistant | Conversational orchestrator | Tenant-authenticated MCP tool calling and approval-aware task creation; does not claim queue tasks itself |
+| Hermes | Partial executor | Ten registered `hermes_lab_asset` tools plus `hermes_agent_task` through the existing Hermes Studio runtime |
 | Gemini | Model provider | No standalone task executor registered |
 | Nemotron | Model provider | No standalone task executor registered |
 
-A configured Gemini or NVIDIA API key does not mean that provider can claim queue tasks. The Work Queue must show this distinction and must not offer human completion controls for agent-owned running tasks. It accepts a validated JSON input for Hermes Lab asset tasks and exposes a direct authenticated “Run with Hermes” action for that registered task type. Unsupported worker/task combinations remain visibly queued; they must never be represented as executing.
+A configured Gemini or NVIDIA API key does not mean that provider can claim queue tasks. The Work Queue must show this distinction and must not offer human completion controls for agent-owned running tasks. It accepts validated JSON inputs for Hermes Lab asset generation and Hermes Studio agent tasks, and exposes “Run with Hermes” for both registered task types. The legacy Hermes execute endpoint also enters the same durable queue rather than bypassing it. Unsupported worker/task combinations remain visibly queued; they must never be represented as executing.
 
 ## Work ledger event envelope
 
@@ -63,9 +63,12 @@ A configured Gemini or NVIDIA API key does not mean that provider can claim queu
 - [ ] Add saved collections, resume-work across modules and export flows.
 
 ### Intelligence and agents
-- [x] Inject bounded tenant-scoped live business context into HAL Assistant, Hermes and the MCP operational-context tool; Gemini/Nemotron standalone agent flows remain to be integrated.
+- [x] Inject bounded tenant-scoped live business context into HAL Assistant, Hermes and the MCP operational-context tool.
+- [x] Connect HAL Assistant Gemini function calling to the authenticated MCP dispatcher; tool execution is tenant-scoped by the verified session, recorded in Work History and returned to the model for a final answer.
 - [x] Expose a truthful worker capability registry and authenticated readiness endpoint; Hermes is the existing specialist agent and must be extended through its actual runtime rather than duplicated.
-- [ ] Complete the executor claim/heartbeat/receipt protocol for all supported workers. The first Hermes-only registered asset executor and bounded retry/cancellation/approval transitions exist; Gemini and Nemotron remain model providers until registered as task executors.
+- [x] Extend the existing Hermes executor to support Hermes Lab asset generation and Hermes Studio analysis or explicitly requested artifact revisions, with atomic claims and persisted receipts.
+- [x] Record Hermes tool calls, success/failure and artifact provenance in Work History; keep provider failures visibly failed instead of reporting a successful execution.
+- [ ] Complete executor claim/heartbeat/receipt protocol for all remaining specialist workflows. Gemini and Nemotron remain model providers, not standalone queue executors.
 - [ ] Make agent telemetry and neural graph views derive from persisted execution events.
 
 ### Verification and release
@@ -84,7 +87,7 @@ A configured Gemini or NVIDIA API key does not mean that provider can claim queu
 
 Hermes Lab generation must enter the durable work queue as a `hermes_lab_asset` task before the existing Hermes executor is called through the authenticated MCP gateway. The task completion receipt records the generated artifact ID; the artifact metadata also records the originating work-task ID and correlation ID so the operator can trace the task to its output.
 
-The executor currently supports the ten registered Hermes Lab tool IDs only. It does not imply general-purpose execution of lead, audit, outreach, contract, finance, publishing, or external communication workflows.
+The queue executor supports two task types: (1) `hermes_lab_asset`, limited to the ten registered Hermes Lab tools; and (2) `hermes_agent_task`, which invokes the existing Hermes Studio conversational agent with its bounded tenant-scoped operational context and may revise a specifically selected artifact when requested. It does not imply general-purpose execution of lead, audit, outreach delivery, contract, finance, publishing, or external communication workflows.
 
 If no configured model provider returns a valid structured result, the deterministic fallback must:
 - Never fabricate public business facts, contact details, credentials, prices, guarantees, customer proof, performance metrics, or completed work.
@@ -92,5 +95,5 @@ If no configured model provider returns a valid structured result, the determini
 - Record `deterministic_fallback` as the engine in artifact metadata.
 - Keep the task receipt truthful about the artifact's draft status.
 
-A generated artifact is not the same as a published asset, a sent communication, a connected CRM, or a completed external action.
+A generated artifact is not the same as a published asset, a sent communication, a connected CRM, or a completed external action. The legacy `POST /api/hermes/execute` endpoint now creates and executes a durable Hermes task through the same queue path. Listing artifacts is read-only and no longer auto-generates starter assets for an empty workspace.
 
