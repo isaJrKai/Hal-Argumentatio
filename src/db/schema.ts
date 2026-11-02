@@ -564,3 +564,48 @@ export const hermesLabMessages = pgTable('hermes_lab_messages', {
 
 
 
+
+
+/** Durable task queue for human and agent work assignment. */
+export const workTasks = pgTable('work_tasks', {
+  id: text('id').primaryKey(),
+  contractorId: text('contractor_id').notNull(),
+  taskType: text('task_type').notNull(),
+  title: text('title').notNull(),
+  description: text('description'),
+  status: text('status').default('queued').notNull(), // queued | running | awaiting_approval | completed | failed | cancelled
+  priority: text('priority').default('normal').notNull(), // low | normal | high | urgent
+  assignedWorker: text('assigned_worker').default('human').notNull(), // human | hal_assistant | hermes | gemini | nemotron | specialist:<id>
+  entityType: text('entity_type'),
+  entityId: text('entity_id'),
+  correlationId: text('correlation_id'),
+  input: jsonb('input'),
+  output: jsonb('output'),
+  attemptCount: integer('attempt_count').default(0).notNull(),
+  maxAttempts: integer('max_attempts').default(3).notNull(),
+  errorMessage: text('error_message'),
+  requiresApproval: boolean('requires_approval').default(false).notNull(),
+  approvedBy: text('approved_by'),
+  approvedAt: timestamp('approved_at'),
+  startedAt: timestamp('started_at'),
+  completedAt: timestamp('completed_at'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+});
+
+/** Append-only, tenant-scoped timeline shared by workflows and authorized agents. */
+export const workEvents = pgTable('work_events', {
+  id: text('id').primaryKey(),
+  contractorId: text('contractor_id').notNull(),
+  eventType: text('event_type').notNull(),
+  entityType: text('entity_type').notNull(),
+  entityId: text('entity_id'),
+  actorType: text('actor_type').notNull(),
+  actorId: text('actor_id'),
+  sourceModule: text('source_module').notNull(),
+  correlationId: text('correlation_id'),
+  summary: text('summary').notNull(),
+  payload: jsonb('payload'),
+  occurredAt: timestamp('occurred_at').defaultNow().notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+});

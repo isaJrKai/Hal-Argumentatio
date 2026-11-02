@@ -15,6 +15,7 @@ import {
   Download,
   LogOut,
   Activity,
+  ListTodo,
   Plus,
   Phone,
   Mail,
@@ -98,6 +99,8 @@ export const TopTelemetryBar: React.FC<TopTelemetryBarProps> = ({
   // Top Workspace Tabs (AutoCAD Master Panels)
   const topNavTabs = [
     { id: 'overview', label: 'Mission Control', icon: Sparkles },
+    { id: 'work-history', label: 'Work History', icon: Activity },
+    { id: 'work-queue', label: 'Work Queue', icon: ListTodo },
     { id: 'leads', label: 'Prospect Finder', icon: Compass },
     { id: 'board', label: 'Sales Pipeline', icon: Users },
     { id: 'map', label: 'Map Intelligence', icon: Map },

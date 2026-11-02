@@ -63,6 +63,7 @@ const hasValidKey = isValidGoogleMapsKey(API_KEY);
 interface MapPanelProps {
   leads: Lead[];
   token: string | null;
+  onOpenWorkQueue?: () => void;
 }
 
 // Helper for realistic neighborhood coordinate distribution based on lead ID hash
@@ -84,11 +85,14 @@ function getDeterministicLeadCoords(leadId: string, cityName: string) {
   };
 }
 
-export default function MapPanel({ leads, token }: MapPanelProps) {
+export default function MapPanel({ leads, token, onOpenWorkQueue }: MapPanelProps) {
   const [cityFilter, setCityFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
+  const [selectedLeadIds, setSelectedLeadIds] = useState<string[]>([]);
+  const [isQueueingSelected, setIsQueueingSelected] = useState(false);
+  const [queueFeedback, setQueueFeedback] = useState<string | null>(null);
   const [isInitializingMap, setIsInitializingMap] = useState<boolean>(true);
   const [activeOverlay, setActiveOverlay] = useState<string>('none');
 
@@ -414,6 +418,43 @@ export default function MapPanel({ leads, token }: MapPanelProps) {
   const convertedCount = filteredLeads.filter(l => l.status === 'converted').length;
   const conversionRate = totalCount > 0 ? Math.round((convertedCount / totalCount) * 100) : 0;
   const totalValue = filteredLeads.reduce((sum, l) => sum + (l.predictedLtvUsd || 0), 0);
+
+  const toggleLeadForQueue = (leadId: string) => {
+    setSelectedLeadIds(current => current.includes(leadId) ? current.filter(id => id !== leadId) : [...current, leadId]);
+    setQueueFeedback(null);
+  };
+
+  const handleQueueSelectedLeads = async () => {
+    if (!token || selectedLeadIds.length === 0) return;
+    setIsQueueingSelected(true);
+    setQueueFeedback(null);
+    let created = 0;
+    let alreadyActive = 0;
+    try {
+      for (const leadId of selectedLeadIds) {
+        const lead = displayLeads.find(item => item.id === leadId);
+        if (!lead) continue;
+        const response = await fetch('/api/work-tasks', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify({
+            taskType: 'lead_follow_up',
+            title: `Review and follow up: ${lead.businessName}`,
+            description: 'Continue work on this prospect from Map Intelligence. Confirm evidence, choose the appropriate next step, and record the outcome in the lead workspace.',
+            assignedWorker: 'human', priority: 'normal', entityType: 'lead', entityId: lead.id, requiresApproval: false
+          })
+        });
+        const body = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(body.error || `Could not queue ${lead.businessName}.`);
+        if (body.duplicate) alreadyActive++;
+        else created++;
+      }
+      setSelectedLeadIds([]);
+      setQueueFeedback(`Queued ${created} new task${created === 1 ? '' : 's'}; ${alreadyActive} already active.`);
+    } catch (err: any) {
+      setQueueFeedback(`Queued ${created} new tasks; ${alreadyActive} were already active. ${err?.message || 'Some tasks could not be queued.'}`);
+    } finally { setIsQueueingSelected(false); }
+  };
 
   const handleSelectLead = (id: string | null) => {
     setSelectedLeadId(id);
@@ -757,6 +798,19 @@ export default function MapPanel({ leads, token }: MapPanelProps) {
             </span>
           </div>
 
+          {selectedLeadIds.length > 0 && (
+            <div className="p-2.5 border-b border-border-dim bg-accent/5 space-y-2 shrink-0">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-[10px] font-mono text-text-secondary">{selectedLeadIds.length} SELECTED</span>
+                <div className="flex items-center gap-1.5">
+                  <button onClick={() => setSelectedLeadIds([])} className="px-2 py-1 text-[9px] font-mono text-text-tertiary hover:text-text-primary">Clear</button>
+                  <button onClick={() => void handleQueueSelectedLeads()} disabled={isQueueingSelected || !token} className="px-2.5 py-1.5 rounded-sm bg-brand text-black text-[9px] font-mono font-bold disabled:opacity-50">{isQueueingSelected ? 'ADDING…' : 'ADD TO WORK QUEUE'}</button>
+                </div>
+              </div>
+              {queueFeedback && <p className="text-[10px] text-text-secondary">{queueFeedback}</p>}
+              {onOpenWorkQueue && <button onClick={onOpenWorkQueue} className="text-[9px] text-brand font-mono underline underline-offset-2">Open Work Queue</button>}
+            </div>
+          )}
           <div className="flex-1 overflow-y-auto divide-y divide-border-dim/40">
             {filteredLeads.length === 0 ? (
               <div className="p-8 text-center text-text-dim font-mono text-[11px] uppercase tracking-wider">
@@ -765,6 +819,7 @@ export default function MapPanel({ leads, token }: MapPanelProps) {
             ) : (
               filteredLeads.map((lead) => {
                 const isSelected = selectedLeadId === lead.id;
+                const isQueuedSelected = selectedLeadIds.includes(lead.id);
                 
                 let urgencyColor = 'text-text-dim border-border-dim bg-bg-subtle';
                 if ((lead.urgencyScore || 0) >= 7.5) {
@@ -786,13 +841,16 @@ export default function MapPanel({ leads, token }: MapPanelProps) {
                     }`}
                   >
                     <div className="flex justify-between items-start gap-2">
-                      <div>
+                      <div className="flex items-start gap-2 min-w-0">
+                        <input type="checkbox" checked={isQueuedSelected} onClick={event => event.stopPropagation()} onChange={() => toggleLeadForQueue(lead.id)} aria-label={`Select ${lead.businessName} for Work Queue`} className="mt-0.5 accent-[var(--color-brand)] shrink-0" />
+                        <div className="min-w-0">
                         <h4 className="text-[11px] font-mono font-bold text-text-primary line-clamp-1">
                           {lead.businessName}
                         </h4>
                         <div className="flex items-center gap-1.5 mt-0.5">
                           <span className={`w-1.5 h-1.5 rounded-full ${statusBullet}`} />
                           <span className="text-[9px] font-mono text-text-secondary uppercase">{lead.status}</span>
+                        </div>
                         </div>
                       </div>
 

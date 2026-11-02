@@ -1,4 +1,4 @@
-import { Pool } from 'pg';
+import { Pool, PoolClient } from 'pg';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import * as schema from './schema.ts';
 
@@ -690,6 +690,53 @@ export async function bootstrapPostgresTables(poolInstance?: Pool): Promise<void
       ALTER TABLE lead_events ADD COLUMN IF NOT EXISTS occurred_at TIMESTAMP;
       ALTER TABLE lead_events ALTER COLUMN type DROP NOT NULL;
 
+      CREATE TABLE IF NOT EXISTS work_tasks (
+        id TEXT PRIMARY KEY,
+        contractor_id TEXT NOT NULL,
+        task_type TEXT NOT NULL,
+        title TEXT NOT NULL,
+        description TEXT,
+        status TEXT DEFAULT 'queued' NOT NULL,
+        priority TEXT DEFAULT 'normal' NOT NULL,
+        assigned_worker TEXT DEFAULT 'human' NOT NULL,
+        entity_type TEXT,
+        entity_id TEXT,
+        correlation_id TEXT,
+        input JSONB,
+        output JSONB,
+        attempt_count INTEGER DEFAULT 0 NOT NULL,
+        max_attempts INTEGER DEFAULT 3 NOT NULL,
+        error_message TEXT,
+        requires_approval BOOLEAN DEFAULT false NOT NULL,
+        approved_by TEXT,
+        approved_at TIMESTAMP,
+        started_at TIMESTAMP,
+        completed_at TIMESTAMP,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS work_tasks_tenant_status_idx ON work_tasks (contractor_id, status, priority, created_at);
+      CREATE INDEX IF NOT EXISTS work_tasks_assignee_idx ON work_tasks (contractor_id, assigned_worker, status, created_at);
+      CREATE INDEX IF NOT EXISTS work_tasks_entity_idx ON work_tasks (contractor_id, entity_type, entity_id, created_at DESC);
+
+      CREATE TABLE IF NOT EXISTS work_events (
+        id TEXT PRIMARY KEY,
+        contractor_id TEXT NOT NULL,
+        event_type TEXT NOT NULL,
+        entity_type TEXT NOT NULL,
+        entity_id TEXT,
+        actor_type TEXT NOT NULL,
+        actor_id TEXT,
+        source_module TEXT NOT NULL,
+        correlation_id TEXT,
+        summary TEXT NOT NULL,
+        payload JSONB,
+        occurred_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS work_events_tenant_time_idx ON work_events (contractor_id, occurred_at DESC);
+      CREATE INDEX IF NOT EXISTS work_events_entity_idx ON work_events (contractor_id, entity_type, entity_id, occurred_at DESC);
+
       CREATE TABLE IF NOT EXISTS hermes_lab_artifacts (
         id TEXT PRIMARY KEY,
         contractor_id TEXT NOT NULL,
@@ -742,12 +789,24 @@ export async function bootstrapPostgresTables(poolInstance?: Pool): Promise<void
     // If running in a managed Cloud SQL environment where DDL is provisioned via drizzle-kit / admin runner
     if (err?.code === '42501' || err?.routine === 'aclcheck_error') {
       try {
-        const check = await client.query("SELECT count(*) as count FROM information_schema.tables WHERE table_schema = 'public';");
-        const count = parseInt(check.rows[0]?.count || '0', 10);
-        if (count > 0) {
-          console.log(`[HAL PostgreSQL] Managed schema active (${count} public tables verified).`);
+        const check = await client.query(`
+          SELECT
+            count(*) FILTER (WHERE table_schema = 'public') AS public_table_count,
+            to_regclass('public.work_tasks') IS NOT NULL AS has_work_tasks,
+            to_regclass('public.work_events') IS NOT NULL AS has_work_events
+          FROM information_schema.tables
+          WHERE table_schema = 'public';
+        `);
+        const schemaState = check.rows[0];
+        const count = Number(schemaState?.public_table_count || 0);
+        if (count > 0 && schemaState?.has_work_tasks && schemaState?.has_work_events) {
+          console.log(`[HAL PostgreSQL] Managed schema active (${count} public tables; operating-layer tables verified).`);
           return;
         }
+        throw new Error(
+          'Database role cannot apply schema changes and the managed schema is incomplete. ' +
+          'Provision public.work_tasks and public.work_events with the database owner, then restart HAL.'
+        );
       } catch (_) {
         // Fall through to rethrow original error
       }
@@ -770,40 +829,47 @@ export async function testPostgresConnection(customUrl?: string): Promise<{
   if (!p) {
     return { connected: false, message: 'DATABASE_URL or NEON_DATABASE_URL is not configured.' };
   }
-  
+
   const start = Date.now();
+  let client: PoolClient | null = null;
   try {
-    const client = await p.connect();
+    client = await p.connect();
     const result = await client.query('SELECT version(), current_database(), current_user;');
-    
-    // Auto bootstrap tables
+
+    // Apply idempotent bootstrap or prove that the managed schema is complete.
     await bootstrapPostgresTables(p);
 
     const tablesRes = await client.query(`
-      SELECT count(*) as count 
-      FROM information_schema.tables 
+      SELECT
+        count(*) as count,
+        to_regclass('public.work_tasks') IS NOT NULL AS has_work_tasks,
+        to_regclass('public.work_events') IS NOT NULL AS has_work_events
+      FROM information_schema.tables
       WHERE table_schema = 'public';
     `);
+    const schemaState = tablesRes.rows[0];
+    if (!schemaState?.has_work_tasks || !schemaState?.has_work_events) {
+      throw new Error('Database connection succeeded, but the HAL operating-layer schema is incomplete (work_tasks/work_events missing).');
+    }
 
-    client.release();
     const latencyMs = Date.now() - start;
-
     const versionStr = result.rows[0]?.version || 'PostgreSQL';
     const isNeon = (activeConnectionString || '').includes('neon.tech') || versionStr.toLowerCase().includes('neon');
 
     return {
       connected: true,
-      message: `Successfully connected to ${isNeon ? 'Neon Serverless PostgreSQL' : 'PostgreSQL database'}. Schema verified.`,
+      message: `Successfully connected to ${isNeon ? 'Neon Serverless PostgreSQL' : 'PostgreSQL database'}. Required operating-layer schema verified.`,
       version: versionStr.split(' on ')[0] || versionStr,
       provider: isNeon ? 'Neon PostgreSQL' : 'Self-Hosted PostgreSQL',
       latencyMs,
-      tablesCount: parseInt(tablesRes.rows[0]?.count || '0', 10)
+      tablesCount: parseInt(schemaState.count || '0', 10)
     };
   } catch (err: any) {
     return {
       connected: false,
       message: `PostgreSQL connection error: ${err.message}`,
     };
+  } finally {
+    client?.release();
   }
 }
-

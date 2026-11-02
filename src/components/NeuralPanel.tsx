@@ -8,7 +8,7 @@ export default function NeuralPanel() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   
-  const [activeSubsystem, setActiveSubsystem] = useState('core_bayes');
+  const [activeSubsystem, setActiveSubsystem] = useState('core_leads');
   const [isSyncing, setIsSyncing] = useState(false);
   const [networkData, setNetworkData] = useState<{ nodes: any[], links: any[], telemetry: any }>({ nodes: [], links: [], telemetry: null });
   const [learningMetrics, setLearningMetrics] = useState<any>(null);
@@ -29,11 +29,18 @@ export default function NeuralPanel() {
   // Refs for animation loop without dependency closure issues
   const nodesRef = useRef<any[]>([]);
   const linksRef = useRef<any[]>([]);
+  const staticNodeCountRef = useRef(0);
   const particlesRef = useRef<any[]>([]);
   const scrubRef = useRef(100);
   const influenceRef = useRef(false);
   const drawRef = useRef<() => void>(() => {});
   const networkRequestIdRef = useRef(0);
+
+  const getTimelineVisibleNodes = () => {
+    const temporalCount = Math.max(0, nodesRef.current.length - staticNodeCountRef.current);
+    const visibleTemporalCount = Math.ceil(temporalCount * (scrubRef.current / 100));
+    return nodesRef.current.slice(0, staticNodeCountRef.current + visibleTemporalCount);
+  };
 
   const fetchNetwork = async () => {
     const requestId = ++networkRequestIdRef.current;
@@ -65,7 +72,7 @@ export default function NeuralPanel() {
       });
       setLearningMetrics({
         epoch: null,
-        outcomesDigested: Number(data.telemetry?.matchedOutcomeCount ?? 0),
+        outcomesDigested: Number(data.telemetry?.recordedOutcomes ?? 0),
         confidenceGlobal: null
       });
 
@@ -211,7 +218,19 @@ export default function NeuralPanel() {
     canvas.width = width;
     canvas.height = height;
 
-    const nodes = rawNodes.map(d => ({ ...d }));
+    const copiedNodes = rawNodes.map(d => ({ ...d }));
+    const staticNodes = copiedNodes.filter(node => {
+      const timestamp = node.createdAt ? new Date(node.createdAt).getTime() : NaN;
+      return node.type === 'forecast' || !Number.isFinite(timestamp);
+    });
+    const historicalNodes = copiedNodes
+      .filter(node => {
+        const timestamp = node.createdAt ? new Date(node.createdAt).getTime() : NaN;
+        return node.type !== 'forecast' && Number.isFinite(timestamp);
+      })
+      .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+    const nodes = [...staticNodes, ...historicalNodes];
+    staticNodeCountRef.current = staticNodes.length;
     const links = rawLinks.map(d => ({ ...d }));
 
     // Reapply saved positions from localStorage
@@ -286,8 +305,7 @@ export default function NeuralPanel() {
       const sy = transform.invertY(my);
       
       // Only find visible nodes based on timeline scrub
-      const maxNodes = Math.max(1, Math.ceil(nodesRef.current.length * (scrubRef.current / 100)));
-      const visibleNodes = nodesRef.current.slice(0, maxNodes);
+      const visibleNodes = getTimelineVisibleNodes();
       
       let closestNode = null;
       let minDist = Infinity;
@@ -319,8 +337,7 @@ export default function NeuralPanel() {
       const sx = transform.invertX(mx);
       const sy = transform.invertY(my);
       
-      const maxNodes = Math.max(1, Math.ceil(nodesRef.current.length * (scrubRef.current / 100)));
-      const visibleNodes = nodesRef.current.slice(0, maxNodes);
+      const visibleNodes = getTimelineVisibleNodes();
       
       let closestNode = null;
       let minDist = Infinity;
@@ -425,8 +442,7 @@ export default function NeuralPanel() {
       ctx.fillText("PREDICTION", width * 0.75, height * 0.8);
     }
 
-    const timelineCount = Math.max(1, Math.ceil(nodesRef.current.length * (scrubRef.current / 100)));
-    const visibleNodesMap = new Set(nodesRef.current.slice(0, timelineCount).map(n => n.id));
+    const visibleNodesMap = new Set(getTimelineVisibleNodes().map(n => n.id));
 
     linksRef.current.forEach(link => {
       if (!visibleNodesMap.has(link.source.id) || !visibleNodesMap.has(link.target.id)) return;
@@ -631,10 +647,11 @@ export default function NeuralPanel() {
   };
 
   const SUBSYSTEMS = [
-    { id: 'core_bayes', label: 'Outcome Analysis', icon: Network, color: 'text-amber-500', bg: 'bg-amber-500/10' },
-    { id: 'core_objection', label: 'Lead Signals', icon: Shield, color: 'text-amber-500', bg: 'bg-amber-500/10' },
-    { id: 'core_niche', label: 'Niche Calibration', icon: Database, color: 'text-amber-500', bg: 'bg-amber-500/10' },
-    { id: 'core_timesfm', label: 'TimesFM 2.5 Adapter', icon: TrendingUp, color: 'text-amber-500', bg: 'bg-amber-500/10' }
+    { id: 'core_leads', label: 'Lead Pipeline', icon: Network, color: 'text-amber-500', bg: 'bg-amber-500/10' },
+    { id: 'core_outcomes', label: 'Recorded Outcomes', icon: Shield, color: 'text-amber-500', bg: 'bg-amber-500/10' },
+    { id: 'core_ads', label: 'Google Ads Evidence', icon: TrendingUp, color: 'text-amber-500', bg: 'bg-amber-500/10' },
+    { id: 'core_events', label: 'Work History', icon: Database, color: 'text-amber-500', bg: 'bg-amber-500/10' },
+    { id: 'core_timesfm', label: 'TimesFM 2.5 Adapter', icon: Brain, color: 'text-amber-500', bg: 'bg-amber-500/10' }
   ];
 
   return (
@@ -684,8 +701,11 @@ export default function NeuralPanel() {
             <h3 className="text-xs font-mono font-bold text-text-tertiary uppercase tracking-wider mb-3">Core Systems</h3>
             <div className="space-y-2">
               {SUBSYSTEMS.map(sys => {
-                const nodeCount = (networkData.nodes || []).filter(n => 
-                  n.id === sys.id || (networkData.links || []).some(l => ((typeof l.source === 'string' ? l.source : l.source.id) === sys.id && (typeof l.target === 'string' ? l.target : l.target.id) === n.id) || ((typeof l.target === 'string' ? l.target : l.target.id) === sys.id && (typeof l.source === 'string' ? l.source : l.source.id) === n.id))
+                const nodeCount = (networkData.nodes || []).filter(n =>
+                  (networkData.links || []).some(l =>
+                    ((typeof l.source === 'string' ? l.source : l.source.id) === sys.id && (typeof l.target === 'string' ? l.target : l.target.id) === n.id) ||
+                    ((typeof l.target === 'string' ? l.target : l.target.id) === sys.id && (typeof l.source === 'string' ? l.source : l.source.id) === n.id)
+                  )
                 ).length;
                 return (
                   <button key={sys.id} onClick={() => setActiveSubsystem(sys.id)} className={`w-full flex items-center gap-3 p-3 rounded-lg border transition-all text-left ${activeSubsystem === sys.id ? 'bg-bg-raised border-border-dim shadow-sm' : 'border-transparent hover:bg-bg-base text-text-secondary'}`}>
@@ -700,9 +720,9 @@ export default function NeuralPanel() {
             <h3 className="text-xs font-mono font-bold text-text-tertiary uppercase tracking-wider">Territory Data</h3>
             <div className="bg-bg-base border border-border-dim rounded-lg p-4 space-y-3">
               <div className="flex justify-between items-center"><span className="text-[10px] font-mono text-text-secondary" >Learning Epoch</span><span className="text-xs font-mono font-bold text-text-primary">{learningMetrics?.epoch ?? 'Not measured'}</span></div>
-              <div className="flex justify-between items-center"><span className="text-[10px] font-mono text-text-secondary" >Matched Outcomes</span><span className="text-xs font-mono font-bold text-accent">{learningMetrics?.outcomesDigested ?? '0'}</span></div>
+              <div className="flex justify-between items-center"><span className="text-[10px] font-mono text-text-secondary" >Recorded Outcomes</span><span className="text-xs font-mono font-bold text-accent">{learningMetrics?.outcomesDigested ?? '0'}</span></div>
               <div className="flex justify-between items-center"><span className="text-[10px] font-mono text-text-secondary" >Model Confidence</span><span className="text-xs font-mono font-bold text-green-400">{learningMetrics?.confidenceGlobal == null ? 'Not measured' : `${Number(learningMetrics.confidenceGlobal).toFixed(1)}%`}</span></div>
-              <div className="flex justify-between items-center"><span className="text-[10px] font-mono text-text-secondary">Total Active Nodes</span><span className="text-xs font-mono font-bold text-text-primary">{(networkData.nodes || []).length}</span></div>
+              <div className="flex justify-between items-center"><span className="text-[10px] font-mono text-text-secondary">Graph Nodes</span><span className="text-xs font-mono font-bold text-text-primary">{(networkData.nodes || []).length}</span></div>
             </div>
           </div>
         </div>
@@ -734,16 +754,18 @@ export default function NeuralPanel() {
                 className={`pointer-events-auto px-3 py-1.5 backdrop-blur-md border rounded text-[10px] font-mono uppercase flex items-center gap-2 transition-colors w-fit ${showInfluence ? 'bg-purple-900/40 border-purple-500/50 text-purple-300 shadow-[0_0_15px_rgba(168,85,247,0.3)]' : 'bg-black/60 border-white/10 text-white/70 hover:bg-white/5'}`}
               >
                 <Activity className={`w-3.5 h-3.5 ${showInfluence ? 'text-purple-400' : ''}`} />
-                Global Influence Mode
+                Cross-Domain Links
               </button>
             </div>
             
             {networkData.telemetry
-              && Number(networkData.telemetry.matchedLeadCount || 0) === 0
-              && Number(networkData.telemetry.matchedOutcomeCount || 0) === 0 && (
+              && Number(networkData.telemetry.leadsInScope || 0) === 0
+              && Number(networkData.telemetry.recordedOutcomes || 0) === 0
+              && Number(networkData.telemetry.googleAdsRecords || 0) === 0
+              && Number(networkData.telemetry.workEvents || 0) === 0 && (
                 <div className="absolute inset-x-6 top-6 z-10 mx-auto max-w-md rounded-lg border border-border-dim bg-bg-raised/95 px-4 py-3 text-center shadow-sm pointer-events-none">
                   <p className="text-sm font-semibold text-text-primary">No territory evidence yet</p>
-                  <p className="mt-1 text-xs text-text-secondary">No matching leads or recorded outcomes for {activeNiche} in {activeCity}. The core systems shown are architecture, not learned connections.</p>
+                  <p className="mt-1 text-xs text-text-secondary">No matching leads, outcomes, Google Ads observations or linked work events for {activeNiche} in {activeCity}. Core systems are architecture, not learned connections.</p>
                 </div>
               )}
             <canvas ref={canvasRef} className="absolute inset-0 outline-none block cursor-grab active:cursor-grabbing" style={{ filter: 'contrast(1.2) brightness(1.1)' }} />
@@ -754,14 +776,17 @@ export default function NeuralPanel() {
             
             {/* Recent Territory Outcomes (Bottom Left) */}
             <div className="flex-1 max-w-xl bg-bg-overlay border border-border-dim rounded-lg p-3 shadow-sm hover:bg-bg-base transition-colors h-full flex flex-col justify-center">
-              <h4 className="text-[10px] font-mono font-bold text-text-secondary uppercase mb-2 flex items-center gap-1.5"><Code2 className="w-3.5 h-3.5 text-text-tertiary" /> Matrix Event Log</h4>
+              <h4 className="text-[10px] font-mono font-bold text-text-secondary uppercase mb-2 flex items-center gap-1.5"><Code2 className="w-3.5 h-3.5 text-text-tertiary" /> Work History</h4>
               <div className="font-mono text-[9px] text-accent/90 space-y-1 h-10 overflow-hidden leading-relaxed">
                 {(networkData.nodes || [])
-                  .filter(n => n.type === 'win' || n.type === 'loss' || n.type === 'forecast')
+                  .filter(n => n.type === 'work_event')
                   .slice(0, 2)
                   .map((node, i) => (
-                  <p key={i} className="truncate">{">"} {node.type === 'win' ? '[WON]' : node.type === 'loss' ? '[LOST]' : '[TIMESFM]'} {node.detail}</p>
+                  <p key={i} className="truncate">{">"} [{node.label}] {node.detail}</p>
                 ))}
+                {!(networkData.nodes || []).some(n => n.type === 'work_event') && (
+                  <p className="text-text-tertiary">No recorded work events in this graph scope.</p>
+                )}
               </div>
             </div>
 

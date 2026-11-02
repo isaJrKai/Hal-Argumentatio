@@ -55,6 +55,110 @@ export function cleanJSONResponse(text: string): string {
 }
 
 /**
+ * OpenAI-compatible Nemotron function-calling loop for authenticated HAL tools.
+ * The caller supplies only tenant-scoped server callbacks; model arguments never
+ * choose a tenant or bypass the dispatcher.
+ */
+export async function callNemotronWithTools(
+  messages: Array<{ role: string; content: string }>,
+  tools: Array<{ name: string; description: string; inputSchema: any }>,
+  execute: (name: string, args: Record<string, any>) => Promise<any>,
+  temperature: number = 0.3
+): Promise<{ text: string; toolCalls: Array<{ name: string; result: any }> }> {
+  const apiKey = process.env.NVIDIA_API_KEY;
+  if (!apiKey) throw new Error('NVIDIA_API_KEY is not configured.');
+  const declarations = tools.map(tool => ({
+    type: 'function',
+    function: {
+      name: tool.name,
+      description: tool.description,
+      parameters: tool.inputSchema
+    }
+  }));
+  const candidates = [
+    'nvidia/nemotron-3.5-lightning-30b-a3b',
+    'nvidia/nemotron-3-nano-omni-30b-a3b-reasoning',
+    'nvidia/nemotron-3-super-120b-a12b',
+    'openai/gpt-oss-20b'
+  ];
+  let lastError: any = null;
+
+  for (const model of candidates) {
+    const conversation: any[] = messages.map(message => ({ ...message }));
+    const toolCalls: Array<{ name: string; result: any }> = [];
+    try {
+      for (let round = 0; round < 5; round += 1) {
+        const response = await fetch('https://integrate.api.nvidia.com/v1/chat/completions', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
+          body: JSON.stringify({
+            model,
+            messages: conversation,
+            temperature,
+            tools: declarations,
+            tool_choice: 'auto'
+          })
+        });
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(`Nemotron tool call failed on ${model} (${response.status}): ${errorText.slice(0, 500)}`);
+        }
+        const data = await response.json();
+        const assistantMessage = data.choices?.[0]?.message;
+        if (!assistantMessage) throw new Error(`Nemotron ${model} returned no message.`);
+        if (!Array.isArray(assistantMessage.tool_calls) || assistantMessage.tool_calls.length === 0) {
+          const text = typeof assistantMessage.content === 'string' ? assistantMessage.content : '';
+          return { text, toolCalls };
+        }
+
+        const selectedToolCalls = assistantMessage.tool_calls.slice(0, 4);
+        conversation.push({ ...assistantMessage, tool_calls: selectedToolCalls });
+        for (const toolCall of selectedToolCalls) {
+          const name = toolCall.function?.name;
+          const callId = toolCall.id;
+          if (typeof name !== 'string' || typeof callId !== 'string') continue;
+          let args: Record<string, any> = {};
+          try {
+            const parsed = JSON.parse(toolCall.function?.arguments || '{}');
+            if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) args = parsed;
+          } catch {
+            args = {};
+          }
+          let result: any;
+          try {
+            result = await execute(name, args);
+          } catch (toolError: any) {
+            result = { success: false, error: String(toolError?.message || 'Tool execution failed.').slice(0, 500) };
+          }
+          toolCalls.push({ name, result });
+          conversation.push({
+            role: 'tool',
+            tool_call_id: callId,
+            content: JSON.stringify(result ?? null).slice(0, 16000)
+          });
+        }
+      }
+      return {
+        text: toolCalls.length
+          ? 'The available tool calls were processed, but the model did not return a final explanation.'
+          : '',
+        toolCalls
+      };
+    } catch (err: any) {
+      if (toolCalls.length) {
+        return {
+          text: 'Tool calls were processed before the model connection failed. Check each recorded success or failure in Work Queue and Work History; no tool was retried automatically.',
+          toolCalls
+        };
+      }
+      lastError = err;
+      console.warn(`[Nemotron function calling] ${model} unavailable:`, err?.message || err);
+    }
+  }
+  throw lastError || new Error('All Nemotron function-calling models failed.');
+}
+
+/**
  * Query the NVIDIA Nemotron API (and Meta Llama NIM fallbacks) using OpenAI compatible protocol
  */
 export async function callNemotron(

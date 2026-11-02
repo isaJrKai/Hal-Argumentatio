@@ -51,6 +51,8 @@ import {
 
 import AuthPage from './components/AuthPage';
 const OverviewPanel = lazy(() => import('./components/OverviewPanel'));
+const WorkLedgerPanel = lazy(() => import('./components/WorkLedgerPanel'));
+const WorkQueuePanel = lazy(() => import('./components/WorkQueuePanel'));
 const LeadsPanel = lazy(() => import('./components/LeadsPanel'));
 const BoardPanel = lazy(() => import('./components/BoardPanel'));
 const CampaignsPanel = lazy(() => import('./components/CampaignsPanel'));
@@ -1092,6 +1094,9 @@ export default function App() {
                         Loading workspace module…
                       </div>
                     }>
+                    {activeTab === 'work-history' && <WorkLedgerPanel token={token || ''} />}
+                    {activeTab === 'work-queue' && <WorkQueuePanel token={token || ''} />}
+
                     {activeTab === 'overview' && (
                     <OverviewPanel 
                       leads={leads}
@@ -1135,6 +1140,7 @@ export default function App() {
                     <MapPanel 
                       leads={leads}
                       token={token}
+                      onOpenWorkQueue={() => setActiveTab('work-queue')}
                     />
                   )}
 

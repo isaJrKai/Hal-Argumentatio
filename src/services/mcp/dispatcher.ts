@@ -7,9 +7,19 @@ import {
   halLoops, 
   halLoopEvents, 
   auditLogs,
-  revenueSimulations
+  revenueSimulations,
+  campaigns,
+  clientProjects,
+  communicationsOutbox,
+  missions,
+  workEvents,
+  workTasks,
+  hermesLabArtifacts,
+  leadEvents,
+  winLossRecords,
+  revenueOutcomes
 } from '../../db/schema.ts';
-import { eq, and, desc, gte } from 'drizzle-orm';
+import { eq, and, desc, gte, inArray, or, isNotNull } from 'drizzle-orm';
 import crypto from 'crypto';
 import {
   McpToolDefinition,
@@ -19,9 +29,52 @@ import {
   validateGetLoopContextInput,
   validateAttachLoopIntelligenceInput
 } from './types.ts';
-import { executeHermesLabTool, LabToolType } from '../hermesLab.ts';
+import { executeHermesLabTool, chatWithHermesAgent, LabToolType } from '../hermesLab.ts';
+import { getRecentWorkEvents, recordWorkEvent } from '../../lib/workLedger';
+import { listWorkTasks, getWorkTask, requiresWorkTaskApproval, canExecutorClaimWorkTask } from '../../lib/workTasks';
+import { analyzeCampaignPerformance } from '../../lib/campaignAnomaly';
 
 export const HAL_MCP_TOOLS: McpToolDefinition[] = [
+  {
+    name: 'hal_get_operational_context',
+    description: 'Retrieves a bounded, tenant-scoped snapshot of recent work events, leads, missions and assigned tasks so HAL agents can understand current business activity. Facts are authoritative only for the returned records; missing data must not be guessed.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        limit: { type: 'number', description: 'Maximum recent records per category, from 1 to 20 (default 10).' }
+      }
+    }
+  },
+  {
+    name: 'hal_create_work_task',
+    description: 'Creates a durable work item assigned to a human or specialist worker. This queues work only; it does not execute the task. For the existing Hermes agent use taskType hermes_agent_task with input.message (and optional artifactId) for Hermes Studio analysis or an explicitly requested artifact revision, or hermes_lab_asset with input.toolId and input.parameters for a registered Lab tool. External communications, spend, contracts and destructive actions require human approval.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        taskType: { type: 'string' },
+        title: { type: 'string' },
+        description: { type: 'string' },
+        assignedWorker: { type: 'string', enum: ['human', 'hal_assistant', 'hermes', 'gemini', 'nemotron'] },
+        priority: { type: 'string', enum: ['low', 'normal', 'high', 'urgent'] },
+        entityType: { type: 'string' },
+        entityId: { type: 'string' },
+        correlationId: { type: 'string' },
+        input: { type: 'object' },
+        requiresApproval: { type: 'boolean' }
+      },
+      required: ['taskType', 'title', 'assignedWorker']
+    }
+  },
+  {
+    name: 'hal_list_work_tasks',
+    description: 'Lists the authenticated tenant work queue. Use it to inspect queued, running, approval-blocked, completed and failed tasks before assigning duplicate work.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        limit: { type: 'number' }
+      }
+    }
+  },
   {
     name: 'hal_get_financial_health',
     description: 'Calculates deterministic business financials (CPL, CAC, ROAS, LTV, Net Margin, Payback Period) across a given timeframe.',
@@ -39,13 +92,13 @@ export const HAL_MCP_TOOLS: McpToolDefinition[] = [
   },
   {
     name: 'hal_inspect_campaign_anomalies',
-    description: 'Scans all active Google Ads and revenue campaigns for statistically significant ROAS drops, CPA spikes, or lead decay.',
+    description: 'Compares recorded campaign conversion rates and cost per conversion across adjacent 30-day windows using stored Google Ads rows. Also returns screening signals for spend above $500 with zero recorded conversions; these are not proof of a tracking fault.',
     inputSchema: {
       type: 'object',
       properties: {
         thresholdDropPct: {
           type: 'number',
-          description: 'Minimum percentage drop in ROAS or conversion rate to qualify as an anomaly (default: 20).'
+          description: 'Minimum percentage change threshold for a conversion-rate decline or cost-per-conversion increase between adjacent 30-day windows (default: 20).'
         }
       }
     }
@@ -107,8 +160,17 @@ export const HAL_MCP_TOOLS: McpToolDefinition[] = [
     }
   },
   {
+    name: 'hal_execute_hermes_work_task',
+    description: 'Executes one queued, non-approval-blocked task assigned to the existing Hermes agent. Supports hermes_lab_asset (registered Lab artifact generation) and hermes_agent_task (Hermes Studio analysis or an explicitly requested artifact revision). It claims the task atomically and stores a receipt. It does not send messages, spend money, publish externally, or execute arbitrary task types.',
+    inputSchema: {
+      type: 'object',
+      properties: { taskId: { type: 'string' } },
+      required: ['taskId']
+    }
+  },
+  {
     name: 'hermes_synthesize_lab_asset',
-    description: 'Executes specialized Hermes Intelligence Lab tool to generate landing pages, ad copies, SEO schemas, or diagnostic repair adapters.',
+    description: 'Queues and executes a registered Hermes Intelligence Lab draft through the durable Work Queue. Returns the task ID and persisted execution receipt; may return awaiting approval. Does not publish externally or send communications.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -136,13 +198,291 @@ export const HAL_MCP_TOOLS: McpToolDefinition[] = [
 ];
 
 export async function executeMcpTool(
-  toolName: string, 
-  rawParams: any, 
-  contractorId: string
+  toolName: string,
+  rawParams: any,
+  contractorId: string,
+  actor: { actorType: 'human' | 'agent' | 'system' | 'integration'; actorId: string; sourceModule?: string } = {
+    actorType: 'agent', actorId: 'mcp_client', sourceModule: 'mcp_gateway'
+  }
 ): Promise<any> {
   const auditId = crypto.randomUUID();
   
   switch (toolName) {
+    case 'hal_get_operational_context': {
+      const requested = Number(rawParams?.limit);
+      const limit = Number.isFinite(requested) && requested > 0 ? Math.min(20, Math.floor(requested)) : 10;
+      const [events, recentLeads, recentMissions, tasks, recentCampaigns, recentRevenue, recentProjects, recentMessages, recentLeadEvents, recentWinLoss, recentRevenueOutcomes] = await Promise.all([
+        getRecentWorkEvents(pgDb, contractorId, limit),
+        pgDb.select({ id: leads.id, businessName: leads.businessName, city: leads.city, niche: leads.niche, status: leads.status, websiteUrl: leads.websiteUrl, updatedAt: leads.updatedAt })
+          .from(leads).where(eq(leads.contractorId, contractorId)).orderBy(desc(leads.updatedAt)).limit(limit),
+        pgDb.select({ id: missions.id, title: missions.title, status: missions.status, city: missions.city, niche: missions.niche, updatedAt: missions.updatedAt })
+          .from(missions).where(eq(missions.contractorId, contractorId)).orderBy(desc(missions.updatedAt)).limit(limit),
+        listWorkTasks(pgDb, contractorId, limit),
+        pgDb.select({ id: campaigns.id, name: campaigns.name, status: campaigns.status, leadsCount: campaigns.leadsCount, budgetUsd: campaigns.budgetUsd })
+          .from(campaigns).where(eq(campaigns.contractorId, contractorId)).orderBy(desc(campaigns.createdAt)).limit(limit),
+        pgDb.select({ id: revenueRecords.id, leadId: revenueRecords.leadId, amountUsd: revenueRecords.amountUsd, source: revenueRecords.source, createdAt: revenueRecords.createdAt })
+          .from(revenueRecords).where(eq(revenueRecords.contractorId, contractorId)).orderBy(desc(revenueRecords.createdAt)).limit(limit),
+        pgDb.select({ id: clientProjects.id, leadId: clientProjects.leadId, businessName: clientProjects.businessName, status: clientProjects.status, monthlyRetainerUsd: clientProjects.monthlyRetainerUsd })
+          .from(clientProjects).where(eq(clientProjects.contractorId, contractorId)).orderBy(desc(clientProjects.updatedAt)).limit(limit),
+        pgDb.select({ id: communicationsOutbox.id, leadId: communicationsOutbox.leadId, channel: communicationsOutbox.channel, provider: communicationsOutbox.provider, status: communicationsOutbox.status, submittedAt: communicationsOutbox.submittedAt, deliveredAt: communicationsOutbox.deliveredAt })
+          .from(communicationsOutbox).where(eq(communicationsOutbox.contractorId, contractorId)).orderBy(desc(communicationsOutbox.createdAt)).limit(limit),
+        pgDb.select({ leadId: leadEvents.leadId, eventType: leadEvents.eventType, previousStage: leadEvents.previousStage, newStage: leadEvents.newStage, dealValue: leadEvents.dealValue, occurredAt: leadEvents.occurredAt, createdAt: leadEvents.createdAt })
+          .from(leadEvents).innerJoin(leads, eq(leadEvents.leadId, leads.id)).where(eq(leads.contractorId, contractorId)).orderBy(desc(leadEvents.createdAt)).limit(limit),
+        pgDb.select({ id: winLossRecords.id, leadId: winLossRecords.leadId, businessName: winLossRecords.businessName, outcome: winLossRecords.outcome, closedValueUsd: winLossRecords.closedValueUsd, primaryReason: winLossRecords.primaryReason, keyLesson: winLossRecords.keyLesson, closedAt: winLossRecords.closedAt })
+          .from(winLossRecords).where(eq(winLossRecords.contractorId, contractorId)).orderBy(desc(winLossRecords.closedAt)).limit(limit),
+        pgDb.select({ id: revenueOutcomes.id, outcomeStatus: revenueOutcomes.outcomeStatus, outcomeClassification: revenueOutcomes.outcomeClassification, predictionAccuracy: revenueOutcomes.predictionAccuracy, confidenceScore: revenueOutcomes.confidenceScore, observationStart: revenueOutcomes.observationStart, observationEnd: revenueOutcomes.observationEnd, updatedAt: revenueOutcomes.updatedAt })
+          .from(revenueOutcomes).where(eq(revenueOutcomes.contractorId, contractorId)).orderBy(desc(revenueOutcomes.updatedAt)).limit(limit)
+      ]);
+      return {
+        generatedAt: new Date().toISOString(),
+        tenantScope: 'authenticated contractor only',
+        recentEvents: events,
+        recentLeads,
+        recentMissions,
+        workTasks: tasks.map(task => ({ id: task.id, taskType: task.taskType, title: task.title, status: task.status, assignedWorker: task.assignedWorker, priority: task.priority, entityType: task.entityType, entityId: task.entityId })),
+        recentCampaigns,
+        recentRevenue,
+        recentClientProjects: recentProjects,
+        recentOutboundMessages: recentMessages,
+        recentLeadLifecycleEvents: recentLeadEvents,
+        recentWinLossOutcomes: recentWinLoss,
+        measuredRevenueOutcomes: recentRevenueOutcomes
+      };
+    }
+
+    case 'hal_create_work_task': {
+      const taskType = typeof rawParams?.taskType === 'string' ? rawParams.taskType.trim() : '';
+      const title = typeof rawParams?.title === 'string' ? rawParams.title.trim() : '';
+      const description = typeof rawParams?.description === 'string' ? rawParams.description.trim() : null;
+      const assignedWorker = rawParams?.assignedWorker;
+      const priority = rawParams?.priority || 'normal';
+      const entityType = typeof rawParams?.entityType === 'string' ? rawParams.entityType.trim() : null;
+      const entityId = typeof rawParams?.entityId === 'string' ? rawParams.entityId.trim() : null;
+      const input = rawParams?.input && typeof rawParams.input === 'object' && !Array.isArray(rawParams.input) ? rawParams.input : null;
+      const approvalRequiredByPolicy = requiresWorkTaskApproval(taskType, title, description, input);
+      const requiresApproval = rawParams?.requiresApproval === true || approvalRequiredByPolicy;
+      const workers = ['human', 'hal_assistant', 'hermes', 'gemini', 'nemotron'];
+      if (!taskType || taskType.length > 80 || !title || title.length > 180 ||
+          (description && description.length > 2000) || !workers.includes(assignedWorker) ||
+          !['low', 'normal', 'high', 'urgent'].includes(priority) ||
+          Boolean(entityType) !== Boolean(entityId) ||
+          (rawParams?.input !== undefined && input === null) ||
+          (input && JSON.stringify(input).length > 20000)) {
+        throw new Error('Invalid work task parameters.');
+      }
+      if (entityType) {
+        let entityExists = false;
+        if (entityType === 'lead') {
+          entityExists = (await pgDb.select({ id: leads.id }).from(leads).where(and(eq(leads.id, entityId!), eq(leads.contractorId, contractorId))).limit(1)).length > 0;
+        } else if (entityType === 'mission') {
+          entityExists = (await pgDb.select({ id: missions.id }).from(missions).where(and(eq(missions.id, entityId!), eq(missions.contractorId, contractorId))).limit(1)).length > 0;
+        } else if (entityType === 'artifact') {
+          entityExists = (await pgDb.select({ id: hermesLabArtifacts.id }).from(hermesLabArtifacts).where(and(eq(hermesLabArtifacts.id, entityId!), eq(hermesLabArtifacts.contractorId, contractorId))).limit(1)).length > 0;
+        } else if (entityType === 'work_task') {
+          entityExists = (await getWorkTask(pgDb, contractorId, entityId!)) !== null;
+        } else {
+          throw new Error('Unsupported entity type. Link tasks to a lead, mission, artifact or work task.');
+        }
+        if (!entityExists) throw new Error('The linked business record was not found in this workspace.');
+      }
+      if (entityType && entityId) {
+        const [activeDuplicate] = await pgDb.select().from(workTasks).where(and(
+          eq(workTasks.contractorId, contractorId), eq(workTasks.taskType, taskType),
+          eq(workTasks.entityType, entityType), eq(workTasks.entityId, entityId),
+          eq(workTasks.assignedWorker, assignedWorker),
+          inArray(workTasks.status, ['queued', 'running', 'awaiting_approval'])
+        )).limit(1);
+        if (activeDuplicate) return { task: activeDuplicate, duplicate: true, executionStarted: false };
+      }
+      const taskId = 'task_' + crypto.randomUUID();
+      const correlationId = typeof rawParams?.correlationId === 'string' && rawParams.correlationId.trim()
+        ? rawParams.correlationId.trim().slice(0, 120) : taskId;
+      const status = requiresApproval ? 'awaiting_approval' : 'queued';
+      const [task] = await pgDb.transaction(async tx => {
+        const [created] = await tx.insert(workTasks).values({
+          id: taskId, contractorId, taskType, title, description, assignedWorker,
+          priority, entityType, entityId, correlationId, input, requiresApproval,
+          status, createdAt: new Date(), updatedAt: new Date()
+        }).returning();
+        await tx.insert(workEvents).values({
+          id: 'evt_' + crypto.randomUUID(), contractorId, eventType: 'task.created',
+          entityType: 'work_task', entityId: taskId, actorType: 'agent', actorId: 'mcp_agent',
+          sourceModule: 'mcp_work_queue', correlationId,
+          summary: `Agent queued task: ${title}.`,
+          payload: { taskType, assignedWorker, priority, status, entityType, entityId }
+        });
+        return [created];
+      });
+      return { task, executionStarted: false, message: 'Task queued. No work has been executed yet.' };
+    }
+
+    case 'hal_list_work_tasks': {
+      const requested = Number(rawParams?.limit);
+      const limit = Number.isFinite(requested) && requested > 0 ? Math.min(100, Math.floor(requested)) : 50;
+      return { tasks: await listWorkTasks(pgDb, contractorId, limit) };
+    }
+    case 'hal_execute_hermes_work_task': {
+      const taskId = typeof rawParams?.taskId === 'string' ? rawParams.taskId.trim() : '';
+      if (!taskId || taskId.length > 160) throw new Error('A valid taskId is required.');
+      const task = await getWorkTask(pgDb, contractorId, taskId);
+      if (!task) throw new Error('Work task not found in this workspace.');
+      if (task.assignedWorker !== 'hermes') throw new Error('This task is not assigned to Hermes.');
+      if (!['hermes_lab_asset', 'hermes_agent_task'].includes(task.taskType)) throw new Error('Hermes cannot execute this task type. Supported types: hermes_lab_asset, hermes_agent_task.');
+      if (!canExecutorClaimWorkTask(task)) {
+        if (task.status === 'awaiting_approval' || (task.requiresApproval && !task.approvedAt)) throw new Error('This task is blocked pending human approval.');
+        throw new Error(`Task is ${task.status}; only queued tasks can be claimed.`);
+      }
+      if (task.attemptCount >= task.maxAttempts) throw new Error('Task has reached its maximum execution attempts.');
+      const input = task.input && typeof task.input === 'object' && !Array.isArray(task.input) ? task.input as Record<string, any> : {};
+      const allowedToolIds: LabToolType[] = ['landing_page', 'ad_copy_studio', 'seo_schema_generator', 'outreach_sequences', 'sms_review_booster', 'speed_vitals_optimizer', 'competitor_intel_scout', 'webhook_resilience_fixer', 'negative_keyword_miner', 'deep_case_reasoner'];
+      const toolId = input.toolId as LabToolType;
+      const parameters = input.parameters && typeof input.parameters === 'object' && !Array.isArray(input.parameters) ? input.parameters : null;
+      const promptOverride = typeof input.promptOverride === 'string' ? input.promptOverride.slice(0, 12000) : undefined;
+      const agentMessage = typeof input.message === 'string' ? input.message.trim() : '';
+      const artifactId = typeof input.artifactId === 'string' ? input.artifactId : undefined;
+      if (task.taskType === 'hermes_lab_asset' && (!allowedToolIds.includes(toolId) || !parameters || JSON.stringify(parameters).length > 20000)) {
+        throw new Error('Hermes Lab task input must contain a registered toolId and a parameters object within 20 KB.');
+      }
+      if (task.taskType === 'hermes_agent_task' && (!agentMessage || agentMessage.length > 8000 || JSON.stringify(input).length > 12000)) {
+        throw new Error('Hermes agent task input must contain a message up to 8,000 characters.');
+      }
+      if (task.taskType === 'hermes_agent_task' && artifactId) {
+        const [artifact] = await pgDb.select({ id: hermesLabArtifacts.id }).from(hermesLabArtifacts)
+          .where(and(eq(hermesLabArtifacts.id, artifactId), eq(hermesLabArtifacts.contractorId, contractorId))).limit(1);
+        if (!artifact) throw new Error('The target Hermes artifact was not found in this workspace.');
+      }
+
+      const claimed = await pgDb.transaction(async tx => {
+        const [running] = await tx.update(workTasks).set({
+          status: 'running', startedAt: task.startedAt || new Date(),
+          attemptCount: task.attemptCount + 1, errorMessage: null, updatedAt: new Date()
+        }).where(and(
+          eq(workTasks.id, taskId), eq(workTasks.contractorId, contractorId),
+          eq(workTasks.assignedWorker, 'hermes'), eq(workTasks.status, 'queued'),
+          or(eq(workTasks.requiresApproval, false), isNotNull(workTasks.approvedAt))
+        )).returning();
+        if (!running) return null;
+        await tx.insert(workEvents).values({
+          id: 'evt_' + crypto.randomUUID(), contractorId,
+          eventType: 'task.execution_started', entityType: 'work_task', entityId: taskId,
+          actorType: 'agent', actorId: 'hermes_agent', sourceModule: 'hermes_work_executor',
+          correlationId: task.correlationId || taskId,
+          summary: `Hermes started: ${task.title}.`,
+          payload: { taskType: task.taskType, toolId, attempt: running.attemptCount }
+        });
+        return running;
+      });
+      if (!claimed) throw new Error('Task was claimed or changed by another worker. Refresh the queue.');
+
+      try {
+        const result = task.taskType === 'hermes_lab_asset'
+          ? await executeHermesLabTool(toolId, parameters, contractorId, promptOverride, { workTaskId: taskId, correlationId: task.correlationId || taskId })
+          : await chatWithHermesAgent(contractorId, agentMessage, artifactId, {
+              workTaskId: taskId,
+              correlationId: task.correlationId || taskId,
+              toolRuntime: {
+                tools: HAL_MCP_TOOLS.filter(tool => [
+                  'hal_get_operational_context',
+                  'hal_get_financial_health',
+                  'hal_inspect_campaign_anomalies',
+                  'hal_run_what_if_simulation',
+                  'hal_get_loop_context'
+                ].includes(tool.name)),
+                execute: async (toolName, toolArgs) => {
+                  try {
+                    const toolResult = await executeMcpTool(toolName, toolArgs, contractorId, {
+                      actorType: 'agent', actorId: 'hermes_agent', sourceModule: 'hermes_studio'
+                    });
+                    try {
+                      await recordWorkEvent(pgDb, {
+                        contractorId, eventType: 'agent.tool_succeeded', entityType: 'work_task', entityId: taskId,
+                        actorType: 'agent', actorId: 'hermes_agent', sourceModule: 'hermes_studio',
+                        correlationId: task.correlationId || taskId,
+                        summary: `Hermes inspected workspace data using ${toolName}.`,
+                        payload: { toolName, success: true }
+                      });
+                    } catch (ledgerError) {
+                      console.error('[Hermes Work History] Could not append tool success event:', ledgerError);
+                    }
+                    return toolResult;
+                  } catch (toolError: any) {
+                    try {
+                      await recordWorkEvent(pgDb, {
+                        contractorId, eventType: 'agent.tool_failed', entityType: 'work_task', entityId: taskId,
+                        actorType: 'agent', actorId: 'hermes_agent', sourceModule: 'hermes_studio',
+                        correlationId: task.correlationId || taskId,
+                        summary: `Hermes could not complete workspace inspection using ${toolName}.`,
+                        payload: { toolName, success: false, error: String(toolError?.message || 'Tool failed.').slice(0, 500) }
+                      });
+                    } catch (ledgerError) {
+                      console.error('[Hermes Work History] Could not append tool failure event:', ledgerError);
+                    }
+                    throw toolError;
+                  }
+                }
+              }
+            });
+        if (task.taskType === 'hermes_agent_task' && (result as any).executionStatus === 'provider_unavailable') {
+          throw new Error('Hermes providers are unavailable. No analysis or artifact update was completed.');
+        }
+        const receipt = task.taskType === 'hermes_lab_asset'
+          ? {
+              artifactId: (result as any).artifactId, title: (result as any).title, category: (result as any).category,
+              status: (result as any).status, executionSummary: (result as any).executionSummary
+            }
+          : {
+              replyMessageId: (result as any).replyMessageId,
+              replyText: (result as any).replyText,
+              updatedArtifactId: (result as any).updatedArtifact?.id || null,
+              toolCalls: ((result as any).toolCalls || []).map((call: any) => ({
+                name: call.name,
+                success: call.result?.success !== false
+              }))
+            };
+        const [completed] = await pgDb.update(workTasks).set({
+          status: 'completed', output: receipt, completedAt: new Date(), updatedAt: new Date()
+        }).where(and(
+          eq(workTasks.id, taskId), eq(workTasks.contractorId, contractorId),
+          eq(workTasks.status, 'running'), eq(workTasks.assignedWorker, 'hermes')
+        )).returning();
+        if (!completed) throw new Error('Task state changed before Hermes could record its execution receipt.');
+        // The task receipt is the authoritative completion record. A secondary
+        // timeline append must not roll it back or make a completed action retryable.
+        try {
+          await pgDb.insert(workEvents).values({
+            id: 'evt_' + crypto.randomUUID(), contractorId,
+            eventType: 'task.execution_completed', entityType: 'work_task', entityId: taskId,
+            actorType: 'agent', actorId: 'hermes_agent', sourceModule: 'hermes_work_executor',
+            correlationId: task.correlationId || taskId,
+            summary: `Hermes completed: ${task.title}.`,
+            payload: task.taskType === 'hermes_lab_asset'
+              ? { artifactId: (result as any).artifactId, artifactTitle: (result as any).title, toolId }
+              : { replyMessageId: (result as any).replyMessageId, updatedArtifactId: (result as any).updatedArtifact?.id || null }
+          });
+        } catch (ledgerError) {
+          console.error('[Hermes Work History] Task completed but completion event append failed:', ledgerError);
+        }
+        return { success: true, task: completed, receipt, executionStarted: true };
+      } catch (executionError: any) {
+        const message = String(executionError?.message || 'Hermes execution failed.').slice(0, 1000);
+        await pgDb.update(workTasks).set({ status: 'failed', errorMessage: message, updatedAt: new Date() })
+          .where(and(eq(workTasks.id, taskId), eq(workTasks.contractorId, contractorId), eq(workTasks.status, 'running')));
+        try {
+          await pgDb.insert(workEvents).values({
+            id: 'evt_' + crypto.randomUUID(), contractorId,
+            eventType: 'task.execution_failed', entityType: 'work_task', entityId: taskId,
+            actorType: 'agent', actorId: 'hermes_agent', sourceModule: 'hermes_work_executor',
+            correlationId: task.correlationId || taskId,
+            summary: `Hermes failed: ${task.title}.`,
+            payload: { toolId, error: message }
+          });
+        } catch (ledgerError) {
+          console.error('[Hermes Work History] Could not append failed execution event:', ledgerError);
+        }
+        return { success: false, taskId, status: 'failed', error: message, retryAvailable: claimed.attemptCount < claimed.maxAttempts };
+      }
+    }
+
     case 'hal_get_financial_health': {
       const parsed = validateFinancialHealthInput(rawParams || {});
       
@@ -210,49 +550,38 @@ export async function executeMcpTool(
     case 'hal_inspect_campaign_anomalies': {
       const parsed = validateInspectAnomaliesInput(rawParams || {});
       const adsRecords = await pgDb
-        .select()
+        .select({
+          campaignName: googleAdsDailyPerformance.campaignName,
+          date: googleAdsDailyPerformance.date,
+          cost: googleAdsDailyPerformance.cost,
+          clicks: googleAdsDailyPerformance.clicks,
+          conversions: googleAdsDailyPerformance.conversions
+        })
         .from(googleAdsDailyPerformance)
         .where(eq(googleAdsDailyPerformance.contractorId, contractorId))
-        .orderBy(desc(googleAdsDailyPerformance.date));
+        .orderBy(desc(googleAdsDailyPerformance.date))
+        .limit(5000);
 
-      const anomalies: Array<any> = [];
-
-      const campaignTotals: Record<string, { spend: number; conversions: number }> = {};
-      for (const r of adsRecords) {
-        if (!campaignTotals[r.campaignName]) {
-          campaignTotals[r.campaignName] = { spend: 0, conversions: 0 };
-        }
-        campaignTotals[r.campaignName].spend += Number(r.cost) || 0;
-        campaignTotals[r.campaignName].conversions += Number(r.conversions) || 0;
-      }
-
-      for (const [name, data] of Object.entries(campaignTotals)) {
-        if (data.spend > 500 && data.conversions === 0) {
-          anomalies.push({
-            campaignId: name.toLowerCase().replace(/\s+/g, '_'),
-            campaignName: name,
-            severity: 'CRITICAL',
-            metric: 'CONVERSION_RATE',
-            baselineValue: 3.5,
-            currentValue: 0.0,
-            percentageDelta: -100,
-            timeWindow: 'last_30_days',
-            suggestedInvestigation: 'Audit landing page SSL, tracking script integrity, and negative keywords.'
-          });
-        }
-      }
-
+      const analysis = analyzeCampaignPerformance(adsRecords, parsed.thresholdDropPct);
       await pgDb.insert(auditLogs).values({
         id: auditId,
         contractorId,
         action: 'HERMES_MCP_ANOMALIES_INSPECTED',
-        details: JSON.stringify({ anomaliesFound: anomalies.length, threshold: parsed.thresholdDropPct }),
+        details: JSON.stringify({
+          anomaliesFound: analysis.anomalies.length,
+          screeningSignals: analysis.screeningSignals.length,
+          thresholdDropPct: parsed.thresholdDropPct,
+          comparisonWindow: analysis.window
+        }),
         timestamp: new Date()
       });
 
       return {
-        anomaliesDetected: anomalies.length,
-        anomalies
+        comparisonWindow: analysis.window,
+        anomaliesDetected: analysis.anomalies.length,
+        anomalies: analysis.anomalies,
+        screeningSignals: analysis.screeningSignals,
+        evidenceRows: adsRecords.length
       };
     }
 
@@ -381,18 +710,55 @@ export async function executeMcpTool(
 
     case 'hermes_synthesize_lab_asset': {
       const toolId = rawParams?.toolId as LabToolType;
-      if (!toolId) {
-        throw new Error('Missing required parameter: toolId');
-      }
-      const parameters = rawParams?.parameters || {};
-      const promptOverride = rawParams?.promptOverride;
+      const allowedToolIds: LabToolType[] = [
+        'landing_page', 'ad_copy_studio', 'seo_schema_generator', 'outreach_sequences',
+        'sms_review_booster', 'speed_vitals_optimizer', 'competitor_intel_scout',
+        'webhook_resilience_fixer', 'negative_keyword_miner', 'deep_case_reasoner'
+      ];
+      const parameters = rawParams?.parameters && typeof rawParams.parameters === 'object' && !Array.isArray(rawParams.parameters)
+        ? rawParams.parameters as Record<string, any>
+        : {};
+      const promptOverride = typeof rawParams?.promptOverride === 'string'
+        ? rawParams.promptOverride.slice(0, 12000)
+        : undefined;
 
-      const result = await executeHermesLabTool(toolId, parameters, contractorId, promptOverride);
-      return {
-        success: true,
-        toolId,
-        ...result
-      };
+      if (!allowedToolIds.includes(toolId) || JSON.stringify(parameters).length > 20000) {
+        throw new Error('A registered Hermes Lab tool and parameters object within 20 KB are required.');
+      }
+
+      // Keep the legacy MCP tool compatible, but never let it bypass the durable
+      // queue, approval policy, atomic claim, or persisted execution receipt.
+      const created = await executeMcpTool('hal_create_work_task', {
+        taskType: 'hermes_lab_asset',
+        title: `Hermes: ${toolId.replace(/_/g, ' ')}`,
+        description: 'Create a local draft Hermes Lab artifact from supplied parameters. External actions are out of scope.',
+        assignedWorker: 'hermes',
+        priority: 'normal',
+        input: { toolId, parameters, ...(promptOverride ? { promptOverride } : {}) }
+      }, contractorId, { actorType: 'agent', actorId: 'mcp_client', sourceModule: 'hermes_lab' });
+
+      const task = created?.task;
+      if (!task?.id) throw new Error('Hermes work task could not be created.');
+      if (task.status === 'awaiting_approval') {
+        return { success: false, pendingApproval: true, taskId: task.id, status: task.status, message: 'Human approval is required before Hermes can execute this task.' };
+      }
+
+      const execution = await executeMcpTool('hal_execute_hermes_work_task', { taskId: task.id }, contractorId, {
+        actorType: 'agent', actorId: 'mcp_client', sourceModule: 'hermes_lab'
+      });
+      if (!execution?.success || !execution?.receipt?.artifactId) {
+        return { success: false, taskId: task.id, status: execution?.status || execution?.task?.status || 'failed', error: execution?.error || 'Hermes did not return a verified artifact receipt.' };
+      }
+
+      const [artifact] = await pgDb.select().from(hermesLabArtifacts).where(and(
+        eq(hermesLabArtifacts.id, execution.receipt.artifactId),
+        eq(hermesLabArtifacts.contractorId, contractorId)
+      )).limit(1);
+      if (!artifact) {
+        throw new Error('Hermes execution completed, but its saved artifact could not be reloaded.');
+      }
+
+      return { success: true, taskId: task.id, toolId, receipt: execution.receipt, artifact };
     }
 
     default:

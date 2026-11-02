@@ -374,63 +374,103 @@ export default function HermesLabPanel({ token }: { token: string | null }) {
   };
 
   const handleExecuteTool = async () => {
-    if (!selectedTool) return;
+    if (!selectedTool || executing) return;
     setExecuting(true);
 
     let effectiveParams = toolParameters;
     try {
-      if (rawParamsText.trim()) {
-        effectiveParams = JSON.parse(rawParamsText);
-      }
+      if (rawParamsText.trim()) effectiveParams = JSON.parse(rawParamsText);
     } catch (_) {
-      // Keep existing parameters if raw text has syntax error
+      toast({ title: 'Invalid parameters', message: 'Correct the JSON parameters before queueing this Hermes task.', type: 'error' });
+      setExecuting(false);
+      return;
     }
 
     try {
-      const res = await fetch('/api/hermes/execute', {
+      // Every Lab generation now enters the durable queue before Hermes executes it.
+      const queueResponse = await fetch('/api/work-tasks', {
         method: 'POST',
-        headers: getAuthHeaders({
-          'Content-Type': 'application/json'
-        }),
+        headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({
-          toolId: selectedTool.id,
-          parameters: effectiveParams,
-          promptOverride: promptOverride || selectedTool.defaultPrompt
+          taskType: 'hermes_lab_asset',
+          title: `Hermes: ${selectedTool.name}`,
+          description: 'Create a local draft artifact from supplied parameters. External actions are out of scope.',
+          assignedWorker: 'hermes',
+          priority: 'normal',
+          input: {
+            toolId: selectedTool.id,
+            parameters: effectiveParams,
+            promptOverride: promptOverride || selectedTool.defaultPrompt
+          }
         })
       });
-
-      if (res.ok) {
-        const data = await res.json();
-        toast({
-          title: 'Lab Artifact Generated',
-          message: `${selectedTool.name} successfully synthesized by Hermes Agent.`,
-          type: 'success'
-        });
-        await fetchArtifacts();
-        const newArt: LabArtifact = {
-          id: data.artifactId || `art-${Date.now()}`,
-          contractorId: '',
-          toolId: selectedTool.id,
-          title: data.title || selectedTool.name,
-          category: data.category || selectedTool.category,
-          content: data.content || { summary: '', renderedOutput: '' },
-          status: 'ready',
-          createdAt: new Date().toISOString()
-        };
-        setActiveArtifact(newArt);
-        setActiveSubTab('artifacts');
-      } else {
-        const err = await res.json().catch(() => ({}));
-        toast({
-          title: 'Synthesis Failed',
-          message: err.error || 'Failed to synthesize artifact.',
-          type: 'error'
-        });
+      const queued = await queueResponse.json().catch(() => ({}));
+      if (!queueResponse.ok || !queued.task?.id) {
+        throw new Error(queued.error || 'Could not create the Hermes work task.');
       }
+      if (queued.task.status === 'awaiting_approval') {
+        toast({
+          title: 'Human approval required',
+          message: 'This task contains a consequential action. Review and approve it in Work Queue before running Hermes.',
+          type: 'info'
+        });
+        return;
+      }
+      if (queued.task.status !== 'queued') {
+        toast({
+          title: 'Hermes task not started',
+          message: `The existing task is currently ${queued.task.status}. Check Work Queue for its execution state.`,
+          type: 'info'
+        });
+        return;
+      }
+
+      const executionResponse = await fetch('/api/mcp', {
+        method: 'POST',
+        headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify({
+          jsonrpc: '2.0',
+          id: `hermes-lab-${queued.task.id}`,
+          method: 'tools/call',
+          params: {
+            name: 'hal_execute_hermes_work_task',
+            arguments: { taskId: queued.task.id }
+          }
+        })
+      });
+      const execution = await executionResponse.json().catch(() => ({}));
+      if (!executionResponse.ok || execution.error) {
+        throw new Error(execution.error?.message || 'Hermes could not execute the queued task. Check Work Queue for its current state.');
+      }
+
+      const result = execution.result?.structuredData;
+      if (!result?.success || !result?.receipt?.artifactId) {
+        throw new Error('Hermes returned no verified artifact receipt. Check Work Queue before retrying.');
+      }
+
+      await fetchArtifacts();
+      const artifactResponse = await fetch('/api/hermes/artifacts', { headers: getAuthHeaders() });
+      const artifactData = await artifactResponse.json().catch(() => ({}));
+      const savedArtifact = Array.isArray(artifactData.artifacts)
+        ? artifactData.artifacts.find((artifact: LabArtifact) => artifact.id === result.receipt.artifactId)
+        : null;
+      if (!savedArtifact) {
+        throw new Error('Hermes completed the task, but the saved artifact could not be reloaded. The execution receipt is in Work Queue.');
+      }
+
+      toast({
+        title: savedArtifact.status === 'draft' ? 'Draft created — review required' : 'Hermes task completed',
+        message: savedArtifact.status === 'draft'
+          ? 'A safe draft was saved without a verified model response. Review its missing fields before using it.'
+          : `${selectedTool.name} completed and its artifact receipt is recorded in Work Queue.`,
+        type: 'success'
+      });
+      setActiveArtifact(savedArtifact);
+      setActiveSubTab('artifacts');
     } catch (err: any) {
       toast({
-        title: 'Network Error',
-        message: err.message || 'Network error during synthesis.',
+        title: 'Hermes task not completed',
+        message: err.message || 'Check Work Queue for the task status and execution receipt.',
         type: 'error'
       });
     } finally {
