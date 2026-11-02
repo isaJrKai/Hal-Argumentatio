@@ -4642,6 +4642,14 @@ app.post('/api/dispatch/campaign-batch', authenticate, async (req, res) => {
     details: `Recorded ${simulated} simulated outreach attempts out of ${targetLeads.length} leads; ${failed} were blocked or skipped. No external messages were sent.`
   });
 
+  const batchEventId = 'batch_' + crypto.randomUUID();
+  await recordWorkEvent(pgDb, {
+    contractorId, eventType: 'outreach.batch_simulated', entityType: 'campaign_dispatch', entityId: batchEventId,
+    actorType: 'human', actorId: contractorId, sourceModule: 'campaign_outreach', correlationId: batchEventId,
+    summary: `Recorded ${simulated} simulated outreach attempts; ${failed} were blocked or skipped. No external messages were sent.`,
+    payload: { campaignId: campaignId || null, channel, simulated, failed, totalTargeted: targetLeads.length, providerContacted: false }
+  });
+
   const auditBlock = db.recordLedgerEntry({
     contractorId,
     eventType: 'conversion_outbox',
@@ -5519,6 +5527,12 @@ app.put('/api/projects/:id', authenticate, (req, res) => {
   if (!updated) {
     return res.status(404).json({ error: 'Project not found or unauthorized' });
   }
+  await recordWorkEvent(pgDb, {
+    contractorId, eventType: 'client_project.updated', entityType: 'client_project', entityId: id,
+    actorType: 'human', actorId: contractorId, sourceModule: 'client_operations', correlationId: id,
+    summary: `Updated client project for ${updated.businessName}.`,
+    payload: { previousStatus: existingProject?.status || null, currentStatus: updated.status }
+  });
 
   // Phase 2: Automated Post-Job Referral & Review Engine Trigger
   if (updates.status === 'completed' && existingProject && existingProject.status !== 'completed') {
