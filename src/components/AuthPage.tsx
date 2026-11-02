@@ -128,7 +128,7 @@ export default function AuthPage({ onAuthSuccess }: AuthPageProps) {
       const googleEmail = authResult.user.email;
       const googleName = authResult.user.displayName;
       if (!googleEmail) {
-        throw new Error('No verified email returned from Google Workspace.');
+        throw new Error('Google did not return an email address for this account.');
       }
 
       const res = await fetch('/api/auth/google', {
@@ -143,7 +143,7 @@ export default function AuthPage({ onAuthSuccess }: AuthPageProps) {
 
       const data = await parseApiResponse(res);
       if (!res.ok) {
-        throw new Error(data.error || 'Google Workspace sign-in failed.');
+        throw new Error(data.error || 'Google sign-in failed.');
       }
 
       if (!data.token || !data.contractor) {
@@ -156,7 +156,7 @@ export default function AuthPage({ onAuthSuccess }: AuthPageProps) {
 
       onAuthSuccess(data.token, data.contractor);
     } catch (err: any) {
-      console.error('[Google Workspace Auth Error]', err);
+      console.error('[Google Auth Error]', err);
       if (err?.code === 'auth/popup-closed-by-user') {
         setError('Sign-in popup closed before completion. Please try again.');
       } else {
@@ -358,7 +358,7 @@ export default function AuthPage({ onAuthSuccess }: AuthPageProps) {
               <div className="flex-1 border-t border-border-dark" />
             </div>
 
-            {/* Google Workspace Sign-In Button (100% Free OAuth Authentication) */}
+            {/* Google account sign-in */}
             <button
               type="button"
               disabled={loading}
