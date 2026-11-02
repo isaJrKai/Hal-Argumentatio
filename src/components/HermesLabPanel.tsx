@@ -408,6 +408,22 @@ export default function HermesLabPanel({ token }: { token: string | null }) {
       if (!queueResponse.ok || !queued.task?.id) {
         throw new Error(queued.error || 'Could not create the Hermes work task.');
       }
+      if (queued.task.status === 'awaiting_approval') {
+        toast({
+          title: 'Human approval required',
+          message: 'This task contains a consequential action. Review and approve it in Work Queue before running Hermes.',
+          type: 'info'
+        });
+        return;
+      }
+      if (queued.task.status !== 'queued') {
+        toast({
+          title: 'Hermes task not started',
+          message: `The existing task is currently ${queued.task.status}. Check Work Queue for its execution state.`,
+          type: 'info'
+        });
+        return;
+      }
 
       const executionResponse = await fetch('/api/mcp', {
         method: 'POST',
