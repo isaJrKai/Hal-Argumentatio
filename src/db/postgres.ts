@@ -789,12 +789,24 @@ export async function bootstrapPostgresTables(poolInstance?: Pool): Promise<void
     // If running in a managed Cloud SQL environment where DDL is provisioned via drizzle-kit / admin runner
     if (err?.code === '42501' || err?.routine === 'aclcheck_error') {
       try {
-        const check = await client.query("SELECT count(*) as count FROM information_schema.tables WHERE table_schema = 'public';");
-        const count = parseInt(check.rows[0]?.count || '0', 10);
-        if (count > 0) {
-          console.log(`[HAL PostgreSQL] Managed schema active (${count} public tables verified).`);
+        const check = await client.query(`
+          SELECT
+            count(*) FILTER (WHERE table_schema = 'public') AS public_table_count,
+            to_regclass('public.work_tasks') IS NOT NULL AS has_work_tasks,
+            to_regclass('public.work_events') IS NOT NULL AS has_work_events
+          FROM information_schema.tables
+          WHERE table_schema = 'public';
+        `);
+        const schemaState = check.rows[0];
+        const count = Number(schemaState?.public_table_count || 0);
+        if (count > 0 && schemaState?.has_work_tasks && schemaState?.has_work_events) {
+          console.log(`[HAL PostgreSQL] Managed schema active (${count} public tables; operating-layer tables verified).`);
           return;
         }
+        throw new Error(
+          'Database role cannot apply schema changes and the managed schema is incomplete. ' +
+          'Provision public.work_tasks and public.work_events with the database owner, then restart HAL.'
+        );
       } catch (_) {
         // Fall through to rethrow original error
       }
@@ -817,40 +829,47 @@ export async function testPostgresConnection(customUrl?: string): Promise<{
   if (!p) {
     return { connected: false, message: 'DATABASE_URL or NEON_DATABASE_URL is not configured.' };
   }
-  
+
   const start = Date.now();
+  let client: ReturnType<Pool['connect']> extends Promise<infer T> ? T : never;
   try {
-    const client = await p.connect();
+    client = await p.connect();
     const result = await client.query('SELECT version(), current_database(), current_user;');
-    
-    // Auto bootstrap tables
+
+    // Apply idempotent bootstrap or prove that the managed schema is complete.
     await bootstrapPostgresTables(p);
 
     const tablesRes = await client.query(`
-      SELECT count(*) as count 
-      FROM information_schema.tables 
+      SELECT
+        count(*) as count,
+        to_regclass('public.work_tasks') IS NOT NULL AS has_work_tasks,
+        to_regclass('public.work_events') IS NOT NULL AS has_work_events
+      FROM information_schema.tables
       WHERE table_schema = 'public';
     `);
+    const schemaState = tablesRes.rows[0];
+    if (!schemaState?.has_work_tasks || !schemaState?.has_work_events) {
+      throw new Error('Database connection succeeded, but the HAL operating-layer schema is incomplete (work_tasks/work_events missing).');
+    }
 
-    client.release();
     const latencyMs = Date.now() - start;
-
     const versionStr = result.rows[0]?.version || 'PostgreSQL';
     const isNeon = (activeConnectionString || '').includes('neon.tech') || versionStr.toLowerCase().includes('neon');
 
     return {
       connected: true,
-      message: `Successfully connected to ${isNeon ? 'Neon Serverless PostgreSQL' : 'PostgreSQL database'}. Schema verified.`,
+      message: `Successfully connected to ${isNeon ? 'Neon Serverless PostgreSQL' : 'PostgreSQL database'}. Required operating-layer schema verified.`,
       version: versionStr.split(' on ')[0] || versionStr,
       provider: isNeon ? 'Neon PostgreSQL' : 'Self-Hosted PostgreSQL',
       latencyMs,
-      tablesCount: parseInt(tablesRes.rows[0]?.count || '0', 10)
+      tablesCount: parseInt(schemaState.count || '0', 10)
     };
   } catch (err: any) {
     return {
       connected: false,
       message: `PostgreSQL connection error: ${err.message}`,
     };
+  } finally {
+    if (client!) client.release();
   }
 }
-
