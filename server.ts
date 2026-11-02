@@ -6823,8 +6823,8 @@ app.post('/api/scheduler', authenticate, async (req, res) => {
       broadcastNotification(
         contractorId,
         'info',
-        'Auto-Forecaster Active',
-        `HAL compiled a new 7-day trend prediction. Estimated lead count: ${newFc.predicted}.`
+        'Lead-volume estimate created',
+        `Created a 7-day estimate using ${forecastResult.source || 'an unverified source'}. Model-reported confidence: ${newFc.confidenceScore}.`
       );
 
     // ─── 3.8 Revenue LTV Correction ───
