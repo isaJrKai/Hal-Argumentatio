@@ -20,8 +20,8 @@ import {
   Recommendation
 } from './src/db/db';
 import { db as pgDb, createPool as getApplicationPostgresPool } from './src/db/index.ts';
-import { contractors, auditLogs, leads, leadEvents, revenueRecords, campaigns, winLossRecords, performanceSnapshots, recommendations, forecasts, learningInsights, chatMessages, chatProjects, chatConversations, missions, clientProjects, outreachSequences, apiKeys, notifications, schedulerJobs, leadAttribution, conversionOutbox, googleAdsDailyPerformance, revenueExperiments, revenueRecommendations, revenueRecommendationEvents, revenueSimulations, revenueOutcomes, communicationsOutbox, communicationsDeliveryEvents, halLoops, halLoopEvents, hermesLabArtifacts, hermesDiagnosticIncidents, hermesLabMessages, workEvents, workTasks } from './src/db/schema.ts';
-import { eq, inArray, desc, and, or, like, sql, gte, lte } from 'drizzle-orm';
+import { contractors, auditLogs, leads, leadEvents, revenueRecords, campaigns, winLossRecords, performanceSnapshots, recommendations, forecasts, learningInsights, chatMessages, chatProjects, chatConversations, missions, clientProjects, outreachSequences, apiKeys, notifications, schedulerJobs, leadAttribution, conversionOutbox, googleAdsDailyPerformance, revenueExperiments, revenueRecommendations, revenueRecommendationEvents, revenueSimulations, revenueOutcomes, communicationsOutbox, communicationsDeliveryEvents, halLoops, halLoopEvents, hermesLabArtifacts, hermesDiagnosticIncidents, hermesLabMessages, workEvents, workTasks, revokedTokens } from './src/db/schema.ts';
+import { eq, inArray, desc, and, or, like, sql, gte, lte, gt } from 'drizzle-orm';
 import { 
   generateLearningFromOutcome, 
   generateForecastNarrative,
@@ -475,10 +475,18 @@ async function authenticate(req: express.Request, res: express.Response, next: e
     return res.status(401).json({ error: 'Invalid or expired authentication token' });
   }
 
-  // JWT claims can become stale after an account is deleted or its role changes.
-  // Always resolve the current account and privileges from PostgreSQL; fail closed
-  // if the account cannot be verified instead of trusting token/email fallbacks.
+  // Logout revocation is durable and tenant-scoped. Hash the bearer token so the
+  // raw credential is never stored in the database.
   try {
+    const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+    const revoked = await pgDb.select({ tokenHash: revokedTokens.tokenHash })
+      .from(revokedTokens)
+      .where(and(eq(revokedTokens.tokenHash, tokenHash), gt(revokedTokens.expiresAt, new Date())))
+      .limit(1);
+    if (revoked.length) return res.status(401).json({ error: 'Authentication token has been revoked. Please sign in again.' });
+
+    // JWT claims can become stale after an account is deleted or its role changes.
+    // Always resolve the current account and privileges from PostgreSQL.
     const result = await pgDb.select().from(contractors).where(eq(contractors.id, decoded.contractorId)).limit(1);
     const contractor = result[0];
     if (!contractor) {
@@ -755,7 +763,7 @@ app.post('/api/auth/register', async (req, res) => {
     });
 
     const token = signToken({ contractorId: id, email: cleanEmail, role: 'user' });
-    db.addSession(id, token, new Date(Date.now() + 30 * 24 * 3600 * 1000));
+
     recordAuthSuccess(req, cleanEmail);
 
     try {
@@ -817,7 +825,7 @@ app.post('/api/auth/login', async (req, res) => {
 
     const role: 'admin' | 'user' = contractor.role === 'admin' ? 'admin' : 'user';
     const token = signToken({ contractorId: contractor.id, email: cleanEmail, role });
-    db.addSession(contractor.id, token, new Date(Date.now() + 30 * 24 * 3600 * 1000));
+
     recordAuthSuccess(req, cleanEmail);
 
     try {
@@ -963,7 +971,7 @@ app.post('/api/auth/google', async (req, res) => {
 
   const role: 'admin' | 'user' = contractor.role === 'admin' ? 'admin' : 'user';
   const token = signToken({ contractorId: contractor.id, email: cleanEmail, role });
-  db.addSession(contractor.id, token, new Date(Date.now() + 30 * 24 * 3600 * 1000));
+
   recordAuthSuccess(req, cleanEmail);
 
   try {
@@ -993,16 +1001,25 @@ app.post('/api/auth/logout', authenticate, async (req, res) => {
   const authHeader = req.headers.authorization!;
   const token = authHeader.split(' ')[1];
   
-  db.deleteSession(token);
-  
+  const decoded = verifyToken(token);
+  if (!decoded) return res.status(401).json({ error: 'Invalid or expired authentication token.' });
   try {
+    const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+    await pgDb.insert(revokedTokens).values({
+      tokenHash,
+      contractorId: (req as any).contractorId,
+      expiresAt: new Date(decoded.exp * 1000)
+    }).onConflictDoNothing();
     await pgDb.insert(auditLogs).values({
       id: crypto.randomUUID(),
       contractorId: (req as any).contractorId,
       action: 'LOGOUT_SUCCESS',
       details: `Logout from IP: ${req.ip}`
     });
-  } catch (err) {}
+  } catch (err) {
+    console.error('[HAL auth] Token revocation failed:', err);
+    return res.status(503).json({ error: 'Logout could not be completed securely. Please retry.' });
+  }
 
   res.json({ success: true });
 });
