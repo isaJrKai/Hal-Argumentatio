@@ -104,6 +104,7 @@ app.use(express.json({
     (req as any).rawBody = Buffer.from(buffer);
   }
 }));
+app.use(express.urlencoded({ extended: false, limit: '100kb' }));
 
 
 
@@ -1628,6 +1629,41 @@ app.post('/api/landing-pages/save', authenticate, async (req, res) => {
   }
 });
 
+app.get('/api/public/form/dispatch', async (req, res) => {
+  const landingPageId = typeof req.query.landingPageId === 'string' ? req.query.landingPageId.trim() : '';
+  if (!landingPageId || landingPageId.length > 128) {
+    return res.status(400).type('html').send('<!doctype html><html><body><h1>Form setup required</h1><p>A published landing page ID is required.</p></body></html>');
+  }
+  try {
+    const [artifact] = await pgDb.select().from(hermesLabArtifacts).where(and(
+      eq(hermesLabArtifacts.id, landingPageId),
+      eq(hermesLabArtifacts.toolId, 'landing_page')
+    )).limit(1);
+    const owner = resolvePublishedLandingPageOwner(artifact);
+    if (!owner.valid) {
+      return res.status(404).type('html').send('<!doctype html><html><body><h1>Form unavailable</h1><p>This landing page has not been published or is no longer available.</p></body></html>');
+    }
+    const escapeHtml = (value: unknown) => String(value ?? '').replace(/[&<>"']/g, char => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+    }[char] || char));
+    const title = escapeHtml(artifact.title || 'Request a service');
+    const safeId = escapeHtml(landingPageId);
+    res.type('html').send(`<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${title}</title>
+<style>body{margin:0;padding:20px;background:#f7f6f1;color:#18181b;font:15px/1.5 system-ui,sans-serif}form{max-width:520px;margin:auto;background:#fff;padding:22px;border:1px solid #e5e2d9;border-radius:10px}h1{font-size:21px;margin:0 0 16px}label{display:block;font-size:13px;font-weight:600;margin:12px 0 5px}input,textarea{box-sizing:border-box;width:100%;padding:11px;border:1px solid #d4d4d8;border-radius:6px;font:inherit}button{margin-top:16px;padding:12px 18px;border:0;border-radius:6px;background:#1b4332;color:#fff;font-weight:700;cursor:pointer}.hint{color:#71717a;font-size:12px}</style></head>
+<body><form method="post" action="/api/public/landing-leads">
+<input type="hidden" name="landingPageId" value="${safeId}">
+<h1>${title}</h1><p class="hint">Send your details and the business will review your inquiry.</p>
+<label for="name">Your name</label><input id="name" name="name" autocomplete="name" maxlength="120" required>
+<label for="phone">Phone number</label><input id="phone" name="phone" type="tel" autocomplete="tel" maxlength="40" required>
+<label for="serviceDetails">Service details</label><textarea id="serviceDetails" name="serviceDetails" rows="4" maxlength="2000" placeholder="Describe what you need"></textarea>
+<button type="submit">Send request</button></form></body></html>`);
+  } catch (error: any) {
+    console.error('[Public Form Render Error]', error);
+    return res.status(503).type('html').send('<!doctype html><html><body><h1>Form temporarily unavailable</h1><p>Please try again later.</p></body></html>');
+  }
+});
+
 app.post('/api/public/landing-leads', async (req, res) => {
   const { landingPageId, name, phone, serviceDetails } = req.body || {};
 
@@ -1696,7 +1732,63 @@ app.post('/api/public/landing-leads', async (req, res) => {
       notes: `Landing Page: ${landingPageId.trim()} | Details: ${normalizedDetails || 'No additional details supplied'}`
     };
 
-    await pgDb.insert(leads).values(leadValues);
+    const taskId = 'task_' + crypto.randomUUID();
+    const correlationId = taskId;
+    const createdAt = new Date();
+    await pgDb.transaction(async tx => {
+      await tx.insert(leads).values(leadValues);
+      await tx.insert(leadEvents).values({
+        id: crypto.randomUUID(),
+        leadId,
+        eventType: 'LeadCreated',
+        newStage: 'new',
+        notes: 'New inbound inquiry received from a published HAL landing page.',
+        createdAt
+      });
+      await tx.insert(workTasks).values({
+        id: taskId,
+        contractorId: targetContractorId,
+        taskType: 'lead_follow_up',
+        title: `Review inbound inquiry: ${normalizedName}`,
+        description: 'Review the inbound service inquiry, confirm its details and verification evidence, then record the next step. Contact only after the required verification checks pass.',
+        status: 'queued',
+        priority: 'normal',
+        assignedWorker: 'human',
+        entityType: 'lead',
+        entityId: leadId,
+        correlationId,
+        input: { source: 'published_landing_page', landingPageId: landingPageId.trim() },
+        requiresApproval: false,
+        createdAt,
+        updatedAt: createdAt
+      });
+      await tx.insert(workEvents).values({
+        id: 'evt_' + crypto.randomUUID(),
+        contractorId: targetContractorId,
+        eventType: 'task.created',
+        entityType: 'work_task',
+        entityId: taskId,
+        actorType: 'system',
+        actorId: 'public_landing_form',
+        sourceModule: 'landing_page_ingestion',
+        correlationId,
+        summary: `Created human review task for inbound inquiry from ${normalizedName}.`,
+        payload: { taskType: 'lead_follow_up', assignedWorker: 'human', priority: 'normal', status: 'queued', leadId }
+      });
+      await tx.insert(workEvents).values({
+        id: 'evt_' + crypto.randomUUID(),
+        contractorId: targetContractorId,
+        eventType: 'lead.queued_for_review',
+        entityType: 'lead',
+        entityId: leadId,
+        actorType: 'system',
+        actorId: 'public_landing_form',
+        sourceModule: 'landing_page_ingestion',
+        correlationId,
+        summary: `Inbound inquiry from ${normalizedName} was added to the human review queue.`,
+        payload: { taskId, landingPageId: landingPageId.trim() }
+      });
+    });
 
     try {
       db.addLead({
@@ -1736,10 +1828,14 @@ app.post('/api/public/landing-leads', async (req, res) => {
       );
     } catch (_) {}
 
+    if (req.is('application/x-www-form-urlencoded')) {
+      return res.status(201).type('html').send('<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Request received</title></head><body style="font:16px system-ui,sans-serif;padding:32px;color:#18181b"><h1>Request received</h1><p>Thank you. The business has received your inquiry and will review it before contacting you.</p></body></html>');
+    }
     return res.status(201).json({
       success: true,
       leadId,
-      message: 'Your request has been received. The business will contact you using the details you provided.'
+      taskId,
+      message: 'Your request has been received and added to the business review queue.'
     });
   } catch (err: any) {
     console.error('[Public Landing Lead Ingest Error]', err);
