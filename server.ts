@@ -3304,53 +3304,108 @@ app.post('/api/system/campaign-reset', authenticate, async (req, res) => {
 
 app.post('/api/revenues', authenticate, async (req, res) => {
   const contractorId = (req as any).contractorId;
-  const { leadId, amountUsd, source } = req.body;
+  const { leadId, amountUsd, source } = req.body || {};
+  const amount = Number(amountUsd);
 
-  if (!leadId || !amountUsd) {
-    return res.status(400).json({ error: 'leadId and amountUsd are required' });
+  if (typeof leadId !== 'string' || !leadId.trim() || !Number.isFinite(amount) || amount <= 0) {
+    return res.status(400).json({ error: 'A valid leadId and a positive finite amountUsd are required.' });
   }
 
   try {
-    // Verify lead belongs to contractor
-    const existingLead = await pgDb.select().from(leads).where(eq(leads.id, leadId));
-    if (existingLead.length === 0 || existingLead[0].contractorId !== contractorId) {
-      return res.status(404).json({ error: 'Lead not found or inaccessible' });
+    const [existingLead] = await pgDb.select().from(leads)
+      .where(and(eq(leads.id, leadId), eq(leads.contractorId, contractorId)))
+      .limit(1);
+    if (!existingLead) return res.status(404).json({ error: 'Lead not found or inaccessible.' });
+
+    if (['closed_won', 'converted', 'won', 'customer'].includes(String(existingLead.status).toLowerCase())) {
+      return res.status(409).json({ error: 'This lead is already marked as closed-won. Record a separate payment workflow rather than closing the same deal again.' });
     }
 
-    const [rev] = await pgDb.insert(revenueRecords).values({
-      id: crypto.randomUUID(),
-      leadId,
-      contractorId,
-      amountUsd: Number(amountUsd),
-      source: source || 'manual_entry'
-    }).returning();
+    const transition = validateCrmTransition(existingLead.status, 'closed_won');
+    if (!transition.valid) {
+      return res.status(409).json({
+        error: 'Move this lead through qualification and proposal before recording a closed deal.',
+        currentStage: existingLead.status,
+        requiredNextSteps: existingLead.status === 'new' ? ['contacted', 'qualified', 'proposal'] :
+          existingLead.status === 'contacted' ? ['qualified', 'proposal'] :
+          existingLead.status === 'qualified' ? ['proposal'] : []
+      });
+    }
 
-    await recordWorkEvent(pgDb, {
-      contractorId, eventType: 'revenue.recorded', entityType: 'lead', entityId: leadId,
-      actorType: 'human', actorId: contractorId, sourceModule: 'financial_intelligence', correlationId: rev.id,
-      summary: `Recorded ${Number(amountUsd)} USD revenue for ${existingLead[0].businessName}.`,
-      payload: { amountUsd: Number(amountUsd), source: source || 'manual_entry', revenueRecordId: rev.id }
-    });
+    const now = new Date();
+    const revenueId = crypto.randomUUID();
+    const updated = await pgDb.transaction(async tx => {
+      const [updatedLead] = await tx.update(leads).set({ status: 'closed_won', updatedAt: now })
+        .where(and(
+          eq(leads.id, leadId),
+          eq(leads.contractorId, contractorId),
+          eq(leads.status, existingLead.status)
+        )).returning();
+      if (!updatedLead) throw new Error('Lead changed before the close could be committed. Refresh and try again.');
 
-    await pgDb.insert(leadEvents).values({
-      id: crypto.randomUUID(),
-      leadId,
-      eventType: 'RevenueRecorded',
-      newStage: 'customer',
-      dealValue: Number(amountUsd),
-      notes: `Revenue recorded: $${amountUsd} via ${source || 'manual_entry'}`
+      const [revenue] = await tx.insert(revenueRecords).values({
+        id: revenueId,
+        leadId,
+        contractorId,
+        amountUsd: amount,
+        source: typeof source === 'string' && source.trim() ? source.trim() : 'manual_entry',
+        createdAt: now
+      }).returning();
+
+      await tx.insert(leadEvents).values({
+        id: crypto.randomUUID(),
+        leadId,
+        eventType: 'ClosedWon',
+        previousStage: existingLead.status,
+        newStage: 'closed_won',
+        dealValue: amount,
+        currency: 'USD',
+        notes: `Deal closed and revenue of $${amount} recorded via ${source || 'manual_entry'}.`,
+        createdBy: 'revenue_conversion'
+      });
+      await tx.insert(leadEvents).values({
+        id: crypto.randomUUID(),
+        leadId,
+        eventType: 'RevenueRecorded',
+        previousStage: existingLead.status,
+        newStage: 'closed_won',
+        dealValue: amount,
+        currency: 'USD',
+        notes: `Revenue record ${revenue.id} created.`,
+        createdBy: 'revenue_conversion'
+      });
+      await tx.insert(workEvents).values({
+        id: 'evt_' + crypto.randomUUID(),
+        contractorId,
+        eventType: 'lead.closed_won',
+        entityType: 'lead',
+        entityId: leadId,
+        actorType: 'human',
+        actorId: contractorId,
+        sourceModule: 'financial_intelligence',
+        correlationId: revenue.id,
+        summary: `Closed ${existingLead.businessName} and recorded $${amount} USD.`,
+        payload: { amountUsd: amount, source: revenue.source, revenueRecordId: revenue.id, previousStage: existingLead.status, currentStage: 'closed_won' }
+      });
+      await tx.insert(auditLogs).values({
+        id: crypto.randomUUID(),
+        contractorId,
+        action: 'REVENUE_RECORDED_AND_LEAD_CLOSED',
+        details: `Closed ${existingLead.businessName} at $${amount} USD.`
+      });
+      return { revenue, lead: updatedLead };
     });
 
     broadcastNotification(
       contractorId,
       'success',
-      'Revenue Conversion Recorded!',
-      `Closed $${amountUsd} on "${existingLead[0].businessName}". Status updated to CONVERTED.`
+      'Deal Closed',
+      `Closed $${amount} on "${existingLead.businessName}". The lead and revenue ledger were updated together.`
     );
-
-    res.status(201).json(rev);
+    return res.status(201).json({ ...updated.revenue, leadStatus: updated.lead.status });
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    console.error('[HAL Revenue Conversion] Transaction failed:', err);
+    return res.status(503).json({ error: err.message || 'Revenue conversion could not be committed.' });
   }
 });
 
