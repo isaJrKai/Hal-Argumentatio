@@ -134,7 +134,7 @@ export async function callNemotronWithTools(
           conversation.push({
             role: 'tool',
             tool_call_id: callId,
-            content: JSON.stringify(result).slice(0, 16000)
+            content: JSON.stringify(result ?? null).slice(0, 16000)
           });
         }
       }
