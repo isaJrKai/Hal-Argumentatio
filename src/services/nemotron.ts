@@ -84,7 +84,7 @@ export async function callNemotronWithTools(
   let lastError: any = null;
 
   for (const model of candidates) {
-    const conversation = messages.map(message => ({ ...message }));
+    const conversation: any[] = messages.map(message => ({ ...message }));
     const toolCalls: Array<{ name: string; result: any }> = [];
     try {
       for (let round = 0; round < 5; round += 1) {
