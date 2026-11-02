@@ -580,6 +580,7 @@ RESPONSE STANDARD
     // 1. Try Gemini first (Strictly 3.5)
     const ai = getAIClient();
     if (ai) {
+      const toolCalls: Array<{ name: string; result: any }> = [];
       try {
         const config: any = {
           systemInstruction,
@@ -610,7 +611,7 @@ RESPONSE STANDARD
         let response: any = null;
         let lastError: any = null;
         let selectedModel = candidateModels[0];
-        const toolCalls: Array<{ name: string; result: any }> = [];
+
 
         for (const model of candidateModels) {
           try {
@@ -678,6 +679,12 @@ RESPONSE STANDARD
           toolCalls: toolCalls.length ? toolCalls : undefined
         };
       } catch (err: any) {
+        if (toolCalls.length) {
+          return {
+            text: 'HAL completed some tool calls before the Gemini response failed. Their confirmed results are recorded in Work Queue and Work History; no duplicate tool execution was attempted.',
+            toolCalls
+          };
+        }
         console.error("Gemini chatbot error, trying Nemotron fallback:", err);
       }
     }
