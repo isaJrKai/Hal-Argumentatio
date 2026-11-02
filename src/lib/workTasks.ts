@@ -24,7 +24,29 @@ export function canTransitionWorkTask(from: string, to: string): boolean {
 export async function listWorkTasks(db: any, contractorId: string, limit = 50) {
   if (!contractorId) throw new Error('Tenant ID is required.');
   const safeLimit = Math.max(1, Math.min(100, Math.floor(limit)));
-  return db.select().from(workTasks)
+  return db.select({
+    id: workTasks.id,
+    contractorId: workTasks.contractorId,
+    taskType: workTasks.taskType,
+    title: workTasks.title,
+    description: workTasks.description,
+    status: workTasks.status,
+    priority: workTasks.priority,
+    assignedWorker: workTasks.assignedWorker,
+    entityType: workTasks.entityType,
+    entityId: workTasks.entityId,
+    correlationId: workTasks.correlationId,
+    attemptCount: workTasks.attemptCount,
+    maxAttempts: workTasks.maxAttempts,
+    errorMessage: workTasks.errorMessage,
+    requiresApproval: workTasks.requiresApproval,
+    approvedBy: workTasks.approvedBy,
+    approvedAt: workTasks.approvedAt,
+    startedAt: workTasks.startedAt,
+    completedAt: workTasks.completedAt,
+    createdAt: workTasks.createdAt,
+    updatedAt: workTasks.updatedAt
+  }).from(workTasks)
     .where(eq(workTasks.contractorId, contractorId))
     .orderBy(desc(workTasks.createdAt))
     .limit(safeLimit);
