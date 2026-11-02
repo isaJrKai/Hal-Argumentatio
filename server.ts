@@ -3668,6 +3668,13 @@ app.post('/api/missions', authenticate, async (req, res) => {
           }).returning();
           createdLeads.push(addedLead);
 
+          await recordWorkEvent(pgDb, {
+            contractorId, eventType: 'lead.discovered', entityType: 'lead', entityId: addedLead.id,
+            actorType: 'agent', actorId: 'territory_harvester', sourceModule: 'prospect_finder',
+            correlationId: mission.id, summary: `Discovered ${addedLead.businessName} in ${city}.`,
+            payload: { city, niche, sourceType: addedLead.sourceType, verificationStatus: addedLead.verificationStatus }
+          });
+
           await pgDb.insert(leadEvents).values({
             id: crypto.randomUUID(),
             leadId: addedLead.id,
@@ -3733,6 +3740,12 @@ app.post('/api/missions', authenticate, async (req, res) => {
 
         // Complete the overall Mission
         await pgDb.update(missions).set({ status: 'completed', updatedAt: new Date() }).where(and(eq(missions.id, mission.id), eq(missions.contractorId, contractorId)));
+        await recordWorkEvent(pgDb, {
+          contractorId, eventType: 'mission.completed', entityType: 'mission', entityId: mission.id,
+          actorType: 'agent', actorId: 'territory_harvester', sourceModule: 'mission_control',
+          correlationId: mission.id, summary: `Completed territory mission for ${city} / ${niche}.`,
+          payload: { prospectsDiscovered: createdLeads.length, outreachDraftsCreated: draftsCreated, messagesSent: 0 }
+        });
 
         // Log & Broadcast SSE Notification
         await pgDb.insert(auditLogs).values({
@@ -3756,6 +3769,12 @@ app.post('/api/missions', authenticate, async (req, res) => {
         (steps[0] as any).result = err.message;
         steps[0].updatedAt = new Date().toISOString();
         await pgDb.update(missions).set({ steps, status: 'failed', updatedAt: new Date() }).where(and(eq(missions.id, mission.id), eq(missions.contractorId, contractorId)));
+        await recordWorkEvent(pgDb, {
+          contractorId, eventType: 'mission.failed', entityType: 'mission', entityId: mission.id,
+          actorType: 'agent', actorId: 'territory_harvester', sourceModule: 'mission_control',
+          correlationId: mission.id, summary: `Territory mission failed for ${city} / ${niche}.`,
+          payload: { error: String(err?.message || 'Unknown execution error').slice(0, 500) }
+        });
 
         broadcastNotification(
           contractorId,
@@ -3853,6 +3872,13 @@ app.post('/api/audit/website', authenticate, async (req, res) => {
       recommendedFixes,
       generatedAt
     };
+
+    await recordWorkEvent(pgDb, {
+      contractorId, eventType: 'website_audit.completed', entityType: 'website_audit', entityId: crypto.randomUUID(),
+      actorType: 'human', actorId: contractorId, sourceModule: 'website_audit',
+      summary: `Completed DNS/HTTP/TLS connectivity check for ${report.businessName || formattedUrl}.`,
+      payload: { targetUrl: formattedUrl, measurementStatus: report.measurementStatus, dnsResolved: report.dnsResolved, httpReachable: report.httpReachable, sslStatus: report.sslStatus, pageSpeedStatus: report.pageSpeedStatus }
+    });
 
     db.addAuditLog({
       contractorId,
@@ -3980,6 +4006,22 @@ app.post('/api/learning/winloss', authenticate, async (req, res) => {
         newStage: targetStatus,
         dealValue: Number(closedValueUsd) > 0 ? Number(closedValueUsd) : targetLead.predictedLtv,
         notes: primaryReason || `Deal marked as ${outcome} via win/loss learning system`
+      });
+    }
+
+    await recordWorkEvent(pgDb, {
+      contractorId, eventType: outcome === 'won' ? 'deal.won' : 'deal.lost',
+      entityType: leadId ? 'lead' : 'deal', entityId: leadId || record.id,
+      actorType: 'human', actorId: contractorId, sourceModule: 'sales_pipeline',
+      correlationId: record.id, summary: `${outcome === 'won' ? 'Won' : 'Lost'} ${businessName}; recorded value ${Number(closedValueUsd) || 0} USD.`,
+      payload: { outcome, valueUsd: Number(closedValueUsd) || 0, channel: outreachChannelUsed || 'Email + Audit' }
+    });
+    if (targetLead && leadId && outcome === 'won' && Number(closedValueUsd) > 0) {
+      await recordWorkEvent(pgDb, {
+        contractorId, eventType: 'revenue.recorded', entityType: 'revenue_record', entityId: record.id,
+        actorType: 'system', actorId: 'win_loss_calibration', sourceModule: 'financial_intelligence',
+        correlationId: record.id, summary: `Recorded closed-won revenue of ${Number(closedValueUsd)} USD for ${businessName}.`,
+        payload: { leadId, amountUsd: Number(closedValueUsd), source: 'conquest_deal_closed' }
       });
     }
 
