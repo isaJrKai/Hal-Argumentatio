@@ -22,6 +22,21 @@ Every stage must preserve the tenant, entity identity and correlation ID. A lead
 8. **Guidance:** contextual help explains the next valid action and destination. Guidance can be dismissed; security and approval prompts cannot be disabled.
 9. **Observability:** every execution records inputs (redacted), tool, worker, duration, result, error and correlation ID. Neural graphs and agent activity displays must be derived from these records, never fixtures.
 
+## Verified worker capability contract
+
+The authenticated `GET /api/workers` endpoint reports execution capability separately from provider configuration:
+
+| Worker | Current verified role | Task execution |
+| --- | --- | --- |
+| Human operator | Manual work | Can perform and record human-owned tasks |
+| HAL Assistant | Shared-context reader | Conversational tool execution is not yet connected |
+| Hermes | Partial executor | Only registered `hermes_lab_asset` tasks |
+| AMIS | Unverified | No implementation/runtime executor verified |
+| Gemini | Model provider | No standalone task executor registered |
+| Nemotron | Model provider | No standalone task executor registered |
+
+A configured Gemini or NVIDIA API key does not mean that provider can claim queue tasks. The Work Queue must show this distinction and must not offer human completion controls for agent-owned running tasks. Unsupported worker/task combinations remain visibly queued; they must never be represented as executing.
+
 ## Work ledger event envelope
 
 - `contractorId`: tenant boundary, mandatory.
@@ -50,8 +65,8 @@ Every stage must preserve the tenant, entity identity and correlation ID. A lead
 
 ### Intelligence and agents
 - [x] Inject bounded tenant-scoped live business context into HAL Assistant, Hermes and the MCP operational-context tool; Gemini/Nemotron standalone agent flows remain to be integrated.
-- [ ] Verify AMIS identity and capabilities against actual source and runtime configuration; do not assume AMIS is Hermes.
-- [ ] Add task assignment, full executor claim/heartbeat/receipt protocol, retries, cancellation and approval queues. (A first Hermes-only registered asset task executor is now available; other workers remain assignment-only.)
+- [x] Expose a truthful worker capability registry and authenticated readiness endpoint; AMIS identity and runtime executor remain unverified and must not be inferred from Hermes.
+- [ ] Complete the executor claim/heartbeat/receipt protocol for all supported workers. The first Hermes-only registered asset executor and bounded retry/cancellation/approval transitions exist; AMIS, Gemini and Nemotron remain non-executors.
 - [ ] Make agent telemetry and neural graph views derive from persisted execution events.
 
 ### Verification and release
