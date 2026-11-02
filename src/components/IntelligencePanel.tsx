@@ -337,12 +337,19 @@ export default function IntelligencePanel({
         })
       });
 
-      if (res.ok) {
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data.success) {
         onRefresh();
         toast({
           variant: 'success',
-          title: 'Auto-Forecast Executed',
-          description: 'Successfully aggregated 90-day trend lines and compiled forecasts.'
+          title: 'Forecast job completed',
+          description: data.result || 'The forecast record was created. Review its source and assumptions before using it.'
+        });
+      } else {
+        toast({
+          variant: 'error',
+          title: 'Forecast unavailable',
+          description: data.error || 'HAL could not create a forecast from the available records.'
         });
       }
     } catch (err) {
