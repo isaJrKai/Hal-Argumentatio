@@ -824,65 +824,14 @@ app.post('/api/auth/logout', authenticate, async (req, res) => {
   res.json({ success: true });
 });
 
-// ─── INSTANT AUTO-LOGIN FOR WORKSPACE OWNER ──────────────────────────────────
-// Automatically provisions an authenticated session for the owner/administrator
-app.all('/api/auth/auto-login', async (req, res) => {
-  try {
-    let contractor: any = null;
-    try {
-      const candidates = await pgDb.select().from(contractors).where(
-        or(
-          eq(contractors.email, 'admin@company.com'),
-          eq(contractors.email, 'admin@kaislead.com'),
-          eq(contractors.role, 'admin')
-        )
-      ).limit(1);
-      if (candidates && candidates.length > 0) {
-        contractor = candidates[0];
-      }
-    } catch (_) {}
-
-    if (!contractor) {
-      const localCon = db.getContractorByEmail('admin@company.com') || 
-                       db.getContractorByEmail('admin@kaislead.com') || 
-                       db.getContractors()[0];
-      if (localCon) {
-        contractor = {
-          id: localCon.id,
-          email: localCon.email,
-          companyName: localCon.name || 'Operator',
-          role: 'admin'
-        };
-      }
-    }
-
-    if (!contractor) {
-      return res.status(404).json({ error: 'No workspace administrator account available for auto-login.' });
-    }
-
-    const role: 'admin' | 'user' = contractor.role === 'admin' ? 'admin' : 'user';
-    const token = signToken({
-      contractorId: contractor.id,
-      email: contractor.email,
-      role
-    });
-
-    db.addSession(contractor.id, token, new Date(Date.now() + 30 * 24 * 3600 * 1000));
-
-    return res.json({
-      token,
-      contractor: {
-        id: contractor.id,
-        email: contractor.email,
-        name: contractor.companyName || 'Operator (Administrator)',
-        role,
-        marketId: 'market_default'
-      }
-    });
-  } catch (err: any) {
-    console.error('[HAL Auth] Auto-login error:', err);
-    return res.status(500).json({ error: 'Auto-login failed: ' + err.message });
-  }
+// ─── RETIRED AUTO-LOGIN ENDPOINT ─────────────────────────────────────────────
+// This legacy endpoint previously minted an administrator JWT without verifying
+// a password or an existing session. It is intentionally disabled in every
+// environment; normal authentication uses /api/auth/login.
+app.all('/api/auth/auto-login', (_req, res) => {
+  return res.status(410).json({
+    error: 'Auto-login is permanently disabled. Use the authenticated sign-in flow.'
+  });
 });
 
 // Password reset triggers
