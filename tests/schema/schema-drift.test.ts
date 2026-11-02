@@ -37,7 +37,8 @@ describe('Database: Schema Drift & Table Invariant Tests', () => {
     'hermesDiagnosticIncidents',
     'hermesLabMessages',
     'workTasks',
-    'workEvents'
+    'workEvents',
+    'revokedTokens'
   ];
 
   it('verifies that all critical business tables are defined in Drizzle schema', () => {
@@ -45,6 +46,14 @@ describe('Database: Schema Drift & Table Invariant Tests', () => {
       expect(schema).toHaveProperty(tableName);
       expect((schema as any)[tableName]).toBeDefined();
     }
+  });
+
+  it('validates durable hashed-token revocation storage', () => {
+    const table = schema.revokedTokens;
+    expect(table).toBeDefined();
+    expect(Object.keys(table)).toContain('tokenHash');
+    expect(Object.keys(table)).toContain('contractorId');
+    expect(Object.keys(table)).toContain('expiresAt');
   });
 
   it('validates the durable work queue and shared work ledger schema', () => {
