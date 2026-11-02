@@ -2636,46 +2636,107 @@ app.post('/api/webhooks/test-inbound', authenticate, async (req, res) => {
 app.post('/api/system/purge-fake-data', authenticate, async (req, res) => {
   const contractorId = (req as any).contractorId;
   try {
-    const beforeCount = db.getLeads().length;
-    
-    // Purge from db.ts memory & persistence
-    db.purgeAllMockData();
+    const committed = await pgDb.transaction(async tx => {
+      const seedLeadRows = await tx.select({ id: leads.id }).from(leads).where(and(
+        eq(leads.contractorId, contractorId),
+        or(like(leads.id, 'lead_seed_%'), like(leads.businessName, 'Apex Commercial%'))
+      ));
+      const seedLeadIds = seedLeadRows.map(row => row.id);
+      const tenantCampaignRows = await tx.select({ id: campaigns.id }).from(campaigns).where(and(
+        eq(campaigns.contractorId, contractorId),
+        or(like(campaigns.id, 'camp_seed_%'), like(campaigns.id, 'camp_isaac_%'))
+      ));
+      const campaignIds = tenantCampaignRows.map(row => row.id);
 
-    // Purge from PostgreSQL
-    try {
-      await pgDb.delete(leads).where(like(leads.id, 'lead_seed_%'));
-      await pgDb.delete(revenueRecords).where(or(like(revenueRecords.id, 'rev_seed_%'), like(revenueRecords.id, 'rev_isaac_%')));
-      await pgDb.delete(campaigns).where(or(like(campaigns.id, 'camp_seed_%'), like(campaigns.id, 'camp_isaac_%')));
-      await pgDb.delete(forecasts).where(or(like(forecasts.id, 'fc_seed_%'), like(forecasts.id, 'fc_isaac_%')));
-      await pgDb.delete(recommendations).where(or(like(recommendations.id, 'rec_seed_%'), like(recommendations.id, 'rec_isaac_%')));
-      // Delete test audit leads
-      await pgDb.delete(leads).where(like(leads.businessName, 'Apex Commercial%'));
-      // Clean up test audit contractors
-      await pgDb.delete(contractors).where(or(like(contractors.email, 'audit_%'), eq(contractors.email, 'guest@demo.halbiz')));
-    } catch (pe) {
-      console.warn('Postgres mock data deletion error:', pe);
-    }
+      if (seedLeadIds.length) {
+        await tx.update(workTasks).set({
+          status: 'cancelled',
+          errorMessage: 'Cancelled because the linked mock lead was removed by the workspace operator.',
+          updatedAt: new Date()
+        }).where(and(
+          eq(workTasks.contractorId, contractorId),
+          eq(workTasks.entityType, 'lead'),
+          inArray(workTasks.entityId, seedLeadIds),
+          inArray(workTasks.status, ['queued', 'running', 'awaiting_approval', 'failed'])
+        ));
+        await tx.delete(leadEvents).where(inArray(leadEvents.leadId, seedLeadIds));
+        await tx.delete(leadAttribution).where(inArray(leadAttribution.leadId, seedLeadIds));
+        await tx.delete(leads).where(and(eq(leads.contractorId, contractorId), inArray(leads.id, seedLeadIds)));
+      }
+      if (campaignIds.length) {
+        await tx.delete(performanceSnapshots).where(inArray(performanceSnapshots.campaignId, campaignIds));
+        await tx.delete(campaigns).where(and(eq(campaigns.contractorId, contractorId), inArray(campaigns.id, campaignIds)));
+      }
 
-    const remainingLeads = db.getLeads();
-    const mockRemaining = remainingLeads.filter(l => l.id.startsWith('lead_seed_')).length;
-    const realRemaining = remainingLeads.filter(l => !l.id.startsWith('lead_seed_')).length;
+      const [deletedRevenue] = await tx.delete(revenueRecords).where(and(
+        eq(revenueRecords.contractorId, contractorId),
+        or(like(revenueRecords.id, 'rev_seed_%'), like(revenueRecords.id, 'rev_isaac_%'))
+      )).returning({ id: revenueRecords.id });
+      const deletedForecasts = await tx.delete(forecasts).where(and(
+        eq(forecasts.contractorId, contractorId),
+        or(like(forecasts.id, 'fc_seed_%'), like(forecasts.id, 'fc_isaac_%'))
+      )).returning({ id: forecasts.id });
+      const deletedRecommendations = await tx.delete(recommendations).where(and(
+        eq(recommendations.contractorId, contractorId),
+        or(like(recommendations.id, 'rec_seed_%'), like(recommendations.id, 'rec_isaac_%'))
+      )).returning({ id: recommendations.id });
 
-    db.addAuditLog({
-      contractorId,
-      action: 'PURGE_MOCK_SEEDS',
-      details: `Purged all mock seed templates and fake data. HAL is initialized as a clean, new production app.`
+      await tx.insert(auditLogs).values({
+        id: crypto.randomUUID(),
+        contractorId,
+        action: 'PURGE_MOCK_SEEDS',
+        details: `Workspace operator removed ${seedLeadIds.length} mock leads, ${campaignIds.length} mock campaigns, and associated seed revenue/forecast/recommendation records.`
+      });
+      await tx.insert(workEvents).values({
+        id: 'evt_' + crypto.randomUUID(),
+        contractorId,
+        eventType: 'workspace.mock_data_purged',
+        entityType: 'workspace',
+        entityId: contractorId,
+        actorType: 'human',
+        actorId: contractorId,
+        sourceModule: 'settings',
+        correlationId: crypto.randomUUID(),
+        summary: 'Workspace mock seed data was removed.',
+        payload: {
+          purgedLeads: seedLeadIds.length,
+          purgedCampaigns: campaignIds.length,
+          purgedRevenueRecords: deletedRevenue ? 1 : 0,
+          purgedForecasts: deletedForecasts.length,
+          purgedRecommendations: deletedRecommendations.length
+        }
+      });
+      return {
+        purgedLeadCount: seedLeadIds.length,
+        purgedCampaignCount: campaignIds.length,
+        purgedRevenueCount: deletedRevenue ? 1 : 0,
+        purgedForecastCount: deletedForecasts.length,
+        purgedRecommendationCount: deletedRecommendations.length
+      };
     });
 
-    res.json({
+    // Best-effort cleanup of this workspace's legacy lead mirror only. Never
+    // invoke the old global purge method from an authenticated tenant route.
+    try { db.purgeMockLeads(contractorId); }
+    catch (mirrorError) { console.warn('[HAL Purge] Legacy tenant lead mirror cleanup failed.', mirrorError); }
+
+    const remaining = await pgDb.select({ id: leads.id }).from(leads).where(eq(leads.contractorId, contractorId));
+    const remainingRealLeads = remaining.filter(row => !row.id.startsWith('lead_seed_')).length;
+    return res.json({
       success: true,
-      beforeCount,
-      purgedCount: beforeCount - remainingLeads.length,
-      remainingRealLeads: realRemaining,
-      mockRemaining,
-      message: 'All mock templates, seed campaigns, fake revenues, and forecasts successfully removed.'
+      beforeCount: committed.purgedLeadCount + remaining.length,
+      purgedCount: committed.purgedLeadCount,
+      remainingRealLeads,
+      mockRemaining: remaining.filter(row => row.id.startsWith('lead_seed_')).length,
+      purgedCampaignCount: committed.purgedCampaignCount,
+      purgedRevenueCount: committed.purgedRevenueCount,
+      purgedForecastCount: committed.purgedForecastCount,
+      purgedRecommendationCount: committed.purgedRecommendationCount,
+      message: 'Mock seed data was removed from this workspace only. Other workspaces were not changed.'
     });
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    console.error('[HAL Workspace Mock Purge Error]', err);
+    return res.status(503).json({ success: false, error: err.message || 'Workspace mock data could not be removed.' });
   }
 });
 
