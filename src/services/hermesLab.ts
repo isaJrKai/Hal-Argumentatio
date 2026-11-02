@@ -16,7 +16,7 @@ import {
   winLossRecords,
   revenueOutcomes
 } from '../db/schema.ts';
-import { eq, and, desc } from 'drizzle-orm';
+import { eq, and, desc, sql } from 'drizzle-orm';
 import crypto from 'crypto';
 import { callNemotron } from './nemotron.ts';
 import { callHuggingFaceHermes } from './huggingface.ts';
@@ -279,6 +279,25 @@ export async function executeHermesLabTool(
   const toolDef = HERMES_LAB_CATALOG.find(t => t.id === toolId);
   if (!toolDef) {
     throw new Error(`Unrecognized Hermes Lab Tool: ${toolId}`);
+  }
+
+  // Recover a previously saved artifact if a queue retry follows a partial
+  // completion. This prevents generating duplicate assets for one work task.
+  if (executionContext?.workTaskId) {
+    const [existingArtifact] = await pgDb.select().from(hermesLabArtifacts).where(and(
+      eq(hermesLabArtifacts.contractorId, contractorId),
+      sql`${hermesLabArtifacts.metadata}->'executionContext'->>'workTaskId' = ${executionContext.workTaskId}`
+    )).limit(1);
+    if (existingArtifact) {
+      return {
+        artifactId: existingArtifact.id,
+        title: existingArtifact.title,
+        category: existingArtifact.category,
+        content: existingArtifact.content,
+        status: existingArtifact.status,
+        executionSummary: 'Recovered the artifact already saved for this Hermes work task; no duplicate was generated.'
+      };
+    }
   }
 
   // Fetch contractor context
