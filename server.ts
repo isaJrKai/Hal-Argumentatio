@@ -2668,7 +2668,7 @@ app.post('/api/system/purge-fake-data', authenticate, async (req, res) => {
         await tx.delete(campaigns).where(and(eq(campaigns.contractorId, contractorId), inArray(campaigns.id, campaignIds)));
       }
 
-      const [deletedRevenue] = await tx.delete(revenueRecords).where(and(
+      const deletedRevenueRows = await tx.delete(revenueRecords).where(and(
         eq(revenueRecords.contractorId, contractorId),
         or(like(revenueRecords.id, 'rev_seed_%'), like(revenueRecords.id, 'rev_isaac_%'))
       )).returning({ id: revenueRecords.id });
@@ -2701,7 +2701,7 @@ app.post('/api/system/purge-fake-data', authenticate, async (req, res) => {
         payload: {
           purgedLeads: seedLeadIds.length,
           purgedCampaigns: campaignIds.length,
-          purgedRevenueRecords: deletedRevenue ? 1 : 0,
+          purgedRevenueRecords: deletedRevenueRows.length,
           purgedForecasts: deletedForecasts.length,
           purgedRecommendations: deletedRecommendations.length
         }
@@ -2709,7 +2709,7 @@ app.post('/api/system/purge-fake-data', authenticate, async (req, res) => {
       return {
         purgedLeadCount: seedLeadIds.length,
         purgedCampaignCount: campaignIds.length,
-        purgedRevenueCount: deletedRevenue ? 1 : 0,
+        purgedRevenueCount: deletedRevenueRows.length,
         purgedForecastCount: deletedForecasts.length,
         purgedRecommendationCount: deletedRecommendations.length
       };
