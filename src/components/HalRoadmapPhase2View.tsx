@@ -199,13 +199,13 @@ export const HalRoadmapPhase2View: React.FC = () => {
           purgeMock: purgeMockSeeds
         })
       });
-      if (res.ok) {
-        const data = await res.json();
-        setHarvestResult(data);
-        await fetchPhase2Status();
-      }
-    } catch (err) {
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.success) throw new Error(data.error || `Territory harvest failed (HTTP ${res.status}).`);
+      setHarvestResult(data);
+      await fetchPhase2Status();
+    } catch (err: any) {
       console.error('Harvest execution failed:', err);
+      setHarvestError(err?.message || 'Territory harvest failed. No success was recorded.');
     } finally {
       setIsHarvesting(false);
     }
@@ -594,7 +594,7 @@ export const HalRoadmapPhase2View: React.FC = () => {
                   <span>Discovery complete: {harvestResult.harvestedCount} candidates processed.</span>
                 </div>
                 <div className="text-[11px] text-text-secondary">
-                  Independently verified: {harvestResult.verifiedCount ?? 0}. Unverified staging: {harvestResult.unverifiedCount ?? 0}. Synthetic: {harvestResult.syntheticCount ?? 0}. Mock seeds removed: {harvestResult.purgedCount ?? 0}. Ledger block ID: {harvestResult.block?.id || 'not recorded'}.
+                  Independently verified: {harvestResult.verifiedCount ?? 0}. Unverified staging: {harvestResult.unverifiedCount ?? 0}. Synthetic: {harvestResult.syntheticCount ?? 0}. Human review tasks queued: {harvestResult.queuedTasks ?? 0}. Mock seeds removed: {harvestResult.purgedCount ?? 0}. Ledger block ID: {harvestResult.block?.id || 'not recorded'}.
                 </div>
               </div>
             )}
