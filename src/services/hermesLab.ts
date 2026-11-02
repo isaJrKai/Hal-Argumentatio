@@ -271,9 +271,9 @@ export async function executeHermesLabTool(
     .from(contractors)
     .where(eq(contractors.id, contractorId));
 
-  const contractorName = contractorRecord?.companyName || 'Apex Service Solutions';
-  const contractorCity = contractorRecord?.city || 'Dallas, TX';
-  const contractorService = contractorRecord?.serviceType || 'HVAC & Home Services';
+  const contractorName = contractorRecord?.companyName || 'the current workspace';
+  const contractorCity = contractorRecord?.city || 'territory not recorded';
+  const contractorService = contractorRecord?.serviceType || 'service niche not recorded';
 
   const systemInstruction = `You are Nous Research Hermes Agent operating inside the HAL Cognitive Lab.
 You are a master human designer, frontend engineer, and direct-response architect following tactile product engineering and strict anti-AI design principles.
