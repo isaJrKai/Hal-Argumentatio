@@ -605,6 +605,31 @@ export async function chatWithHermesAgent(
   const contractorCity = contractorRecord?.city || 'territory not recorded';
   const contractorService = contractorRecord?.serviceType || 'service niche not recorded';
 
+  // Recover an artifact revision already committed by an earlier attempt of this
+  // same task, rather than applying the revision twice after a receipt failure.
+  if (executionContext?.workTaskId) {
+    const [recoveredArtifact] = await pgDb.select().from(hermesLabArtifacts).where(and(
+      eq(hermesLabArtifacts.contractorId, contractorId),
+      sql`${hermesLabArtifacts.metadata}->'lastWorkTask'->>'workTaskId' = ${executionContext.workTaskId}`
+    )).limit(1);
+    if (recoveredArtifact) {
+      const [recoveredMessage] = await pgDb.select().from(hermesLabMessages).where(and(
+        eq(hermesLabMessages.contractorId, contractorId),
+        eq(hermesLabMessages.artifactId, recoveredArtifact.id),
+        eq(hermesLabMessages.role, 'assistant')
+      )).orderBy(desc(hermesLabMessages.createdAt)).limit(1);
+      const metadata = recoveredArtifact.metadata && typeof recoveredArtifact.metadata === 'object'
+        ? recoveredArtifact.metadata as Record<string, any>
+        : {};
+      return {
+        replyMessageId: recoveredMessage?.id || `recovered-${executionContext.workTaskId}`,
+        replyText: metadata.lastWorkTask?.replyText || recoveredMessage?.content || 'Recovered the artifact revision already saved for this task.',
+        updatedArtifact: recoveredArtifact,
+        executionStatus: 'recovered'
+      };
+    }
+  }
+
   // Save User message
   const userMsgId = crypto.randomUUID();
   await pgDb.insert(hermesLabMessages).values({
@@ -821,6 +846,10 @@ Respond in the required JSON format.`;
         .set({
           title: parsed.artifactUpdate.title || currentArtifact.title,
           content: newContent,
+          metadata: {
+            ...(currentArtifact.metadata && typeof currentArtifact.metadata === 'object' ? currentArtifact.metadata : {}),
+            ...(executionContext ? { lastWorkTask: { workTaskId: executionContext.workTaskId, correlationId: executionContext.correlationId, replyText: parsed.reply || 'Artifact revision recovered.' } } : {})
+          },
           updatedAt: new Date()
         })
         .where(eq(hermesLabArtifacts.id, currentArtifact.id));
@@ -848,6 +877,9 @@ Respond in the required JSON format.`;
         category: 'web',
         content: newContent,
         status: 'ready',
+        metadata: executionContext ? {
+          lastWorkTask: { workTaskId: executionContext.workTaskId, correlationId: executionContext.correlationId, replyText: parsed.reply || 'Artifact created.' }
+        } : null,
         createdBy: 'hermes_agent',
         createdAt: new Date(),
         updatedAt: new Date()
