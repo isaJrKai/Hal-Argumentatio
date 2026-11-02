@@ -49,7 +49,7 @@ let isSigningIn = false;
 let cachedAccessToken: string | null = null;
 
 try {
-  const savedToken = sessionStorage.getItem('google_workspace_access_token') || sessionStorage.getItem('gdrive_access_token');
+  const savedToken = sessionStorage.getItem('google_workspace_access_token');
   if (savedToken) {
     cachedAccessToken = savedToken;
   }
@@ -99,7 +99,6 @@ export const googleWorkspaceSignIn = async (): Promise<{ user: User; accessToken
     cachedAccessToken = credential.accessToken;
     try {
       sessionStorage.setItem('google_workspace_access_token', cachedAccessToken);
-      sessionStorage.setItem('gdrive_access_token', cachedAccessToken);
     } catch (e) {}
     return { user: result.user, accessToken: cachedAccessToken };
   } catch (error: any) {
