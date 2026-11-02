@@ -230,6 +230,7 @@ export const notifications = pgTable('notifications', {
 
 export const schedulerJobs = pgTable('scheduler_jobs', {
   id: text('id').primaryKey(),
+  contractorId: text('contractor_id'),
   job: text('job').notNull(),
   status: text('status').notNull(), // 'pending' | 'running' | 'completed' | 'failed'
   startedAt: timestamp('started_at'),
@@ -577,16 +578,10 @@ export const hermesLabMessages = pgTable('hermes_lab_messages', {
 
 /** Tenant-scoped staff roster for named human task ownership. */
 export const staffMembers = pgTable('staff_members', {
-  id: text('id').primaryKey(),
-  contractorId: text('contractor_id').notNull(),
-  name: text('name').notNull(),
-  email: text('email'),
-  phone: text('phone'),
-  role: text('role').notNull(),
-  status: text('status').default('active').notNull(), // active | inactive
-  availability: text('availability').default('available').notNull(), // available | unavailable; busy is derived from active assignments
-  createdAt: timestamp('created_at').defaultNow().notNull(),
-  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+  id: text('id').primaryKey(), contractorId: text('contractor_id').notNull(), name: text('name').notNull(),
+  email: text('email'), phone: text('phone'), role: text('role').notNull(),
+  status: text('status').default('active').notNull(), availability: text('availability').default('available').notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(), updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });
 
 /** Durable task queue for human and agent work assignment. */
