@@ -10076,8 +10076,11 @@ async function startServer() {
       const encryptionPass = ivDifferent && decryptMatch && tamperFailsClosed;
 
       // Test 3: Basic Pipeline Lead & CRM Invariants
-      const leadsList = db.getLeads(contractorId);
-      const pipelinePass = Array.isArray(leadsList);
+      const leadsList = await pgDb.select().from(leads).where(eq(leads.contractorId, contractorId));
+      const pipelinePass =
+        leadsList.every(lead => isKnownCrmStage(lead.status)) &&
+        validateCrmTransition('new', 'contacted').valid &&
+        !validateCrmTransition('unknown_stage', 'contacted').valid;
 
       const tests = [
         {
@@ -10099,7 +10102,7 @@ async function startServer() {
           name: 'Pillar 3: Basic Pipeline Flow & CRM State Invariants',
           status: pipelinePass ? 'PASSED' : 'FAILED',
           latencyMs: 2,
-          details: `Verified lead ingestion, CRM stage machine, and tenant isolation across ${leadsList.length} entities.`
+          details: `Inspected ${leadsList.length} tenant-scoped PostgreSQL leads; all stored stages recognized: ${leadsList.every(lead => isKnownCrmStage(lead.status))}; CRM transition guard checks passed: ${pipelinePass}.`
         }
       ];
 
@@ -10327,8 +10330,9 @@ async function startServer() {
       // 2. Harvest actual active businesses
       const harvested = await harvestRealBusinesses(city, niche);
 
-      // 3. Save each with AES-GCM-256 encrypted PII
+      // 3. Save each with AES-GCM-256 encrypted PII and create a human review assignment.
       const savedLeads = [];
+      let queuedTasks = 0;
       for (const hl of harvested) {
         const id = crypto.randomUUID();
         const rawEmail = hl.email ? String(hl.email) : null;
@@ -10386,6 +10390,44 @@ async function startServer() {
           metadata: { city: addedLead.city, niche: addedLead.niche, source: 'harvested_intelligence' }
         });
 
+        const [activeReviewTask] = await pgDb.select({ id: workTasks.id }).from(workTasks).where(and(
+          eq(workTasks.contractorId, contractorId),
+          eq(workTasks.taskType, 'lead_follow_up'),
+          eq(workTasks.entityType, 'lead'),
+          eq(workTasks.entityId, addedLead.id),
+          eq(workTasks.assignedWorker, 'human'),
+          inArray(workTasks.status, ['queued', 'running', 'awaiting_approval'])
+        )).limit(1);
+        if (!activeReviewTask) {
+          const taskId = 'task_' + crypto.randomUUID();
+          const correlationId = taskId;
+          await pgDb.transaction(async tx => {
+            await tx.insert(workTasks).values({
+              id: taskId, contractorId, taskType: 'lead_follow_up',
+              title: `Review and qualify: ${addedLead.businessName}`,
+              description: 'Review this Phase 2 territory discovery candidate, verify its details and evidence, then record the next step. Do not contact the prospect until outreach verification checks pass.',
+              status: 'queued', priority: 'normal', assignedWorker: 'human',
+              entityType: 'lead', entityId: addedLead.id, correlationId,
+              input: { source: 'phase2_territory_harvest', verificationStatus: addedLead.verificationStatus || 'UNVERIFIED_STAGING' },
+              requiresApproval: false, createdAt: new Date(), updatedAt: new Date()
+            });
+            await tx.insert(workEvents).values({
+              id: 'evt_' + crypto.randomUUID(), contractorId,
+              eventType: 'task.created', entityType: 'work_task', entityId: taskId,
+              actorType: 'system', actorId: 'phase2_territory_harvester', sourceModule: 'phase2_territory_harvest',
+              correlationId, summary: `Created human qualification task for ${addedLead.businessName}.`,
+              payload: { taskType: 'lead_follow_up', assignedWorker: 'human', status: 'queued', leadId: addedLead.id }
+            });
+            await tx.insert(workEvents).values({
+              id: 'evt_' + crypto.randomUUID(), contractorId,
+              eventType: 'lead.queued_for_review', entityType: 'lead', entityId: addedLead.id,
+              actorType: 'system', actorId: 'phase2_territory_harvester', sourceModule: 'phase2_territory_harvest',
+              correlationId, summary: `${addedLead.businessName} was added to the human review queue.`,
+              payload: { taskId, verificationStatus: addedLead.verificationStatus || 'UNVERIFIED_STAGING' }
+            });
+          });
+          queuedTasks++;
+        }
         savedLeads.push(addedLead);
       }
 
@@ -10403,6 +10445,7 @@ async function startServer() {
       res.json({
         success: true,
         harvestedCount: savedLeads.length,
+        queuedTasks,
         verifiedCount: savedLeads.filter(lead => lead.verificationStatus === 'VERIFIED' && !lead.isSynthetic).length,
         unverifiedCount: savedLeads.filter(lead => lead.verificationStatus !== 'VERIFIED' || lead.isSynthetic).length,
         syntheticCount: savedLeads.filter(lead => lead.isSynthetic).length,
