@@ -255,7 +255,8 @@ export async function executeHermesLabTool(
   toolId: LabToolType,
   parameters: Record<string, any>,
   contractorId: string,
-  promptOverride?: string
+  promptOverride?: string,
+  executionContext?: { workTaskId: string; correlationId: string }
 ): Promise<{
   artifactId: string;
   title: string;
@@ -441,7 +442,8 @@ Generate the complete, unshortened asset now in valid JSON format.`;
     metadata: {
       generatedAt: new Date().toISOString(),
       parameters,
-      engine: generationEngine
+      engine: generationEngine,
+      executionContext: executionContext || null
     },
     createdBy: 'hermes_agent',
     createdAt: new Date(),
@@ -452,7 +454,7 @@ Generate the complete, unshortened asset now in valid JSON format.`;
     id: crypto.randomUUID(),
     contractorId,
     action: 'HERMES_LAB_ARTIFACT_GENERATED',
-    details: JSON.stringify({ toolId, artifactId, title }),
+    details: JSON.stringify({ toolId, artifactId, title, workTaskId: executionContext?.workTaskId || null, correlationId: executionContext?.correlationId || null }),
     timestamp: new Date()
   });
 
