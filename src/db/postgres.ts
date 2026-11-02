@@ -323,6 +323,7 @@ export async function bootstrapPostgresTables(poolInstance?: Pool): Promise<void
 
       CREATE TABLE IF NOT EXISTS scheduler_jobs (
         id TEXT PRIMARY KEY,
+        contractor_id TEXT,
         job TEXT NOT NULL,
         status TEXT NOT NULL,
         started_at TIMESTAMP,
@@ -331,6 +332,9 @@ export async function bootstrapPostgresTables(poolInstance?: Pool): Promise<void
         result TEXT,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
       );
+
+      ALTER TABLE scheduler_jobs ADD COLUMN IF NOT EXISTS contractor_id TEXT;
+      CREATE INDEX IF NOT EXISTS scheduler_jobs_tenant_created_idx ON scheduler_jobs (contractor_id, created_at DESC);
 
       CREATE TABLE IF NOT EXISTS lead_events (
         id TEXT PRIMARY KEY,
