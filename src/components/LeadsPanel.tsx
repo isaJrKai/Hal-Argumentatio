@@ -269,6 +269,7 @@ export default function LeadsPanel({ leads, token, onRefresh }: LeadsPanelProps)
   // Record revenue conversion form state
   const [showRevenueModal, setShowRevenueModal] = useState(false);
   const [revenueAmount, setRevenueAmount] = useState('');
+  const [revenueError, setRevenueError] = useState<string | null>(null);
   const [revenueSource, setRevenueSource] = useState('manual_entry');
 
   // Search & Filter
@@ -432,11 +433,11 @@ export default function LeadsPanel({ leads, token, onRefresh }: LeadsPanelProps)
   const handleRecordRevenue = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedLead || !revenueAmount) return;
-
+    setRevenueError(null);
     try {
       const res = await fetch('/api/revenues', {
         method: 'POST',
-        headers: { 
+        headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
@@ -446,18 +447,18 @@ export default function LeadsPanel({ leads, token, onRefresh }: LeadsPanelProps)
           source: revenueSource
         })
       });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || `Revenue conversion failed (HTTP ${res.status}).`);
 
-      if (res.ok) {
-        setShowRevenueModal(false);
-        setRevenueAmount('');
-        // Update selected lead status locally
-        const updatedLead = { ...selectedLead, status: 'converted' as const };
-        setSelectedLead(updatedLead);
-        fetchLeadEvents(selectedLead.id);
-        onRefresh();
-      }
-    } catch (err) {
-      console.error(err);
+      setShowRevenueModal(false);
+      setRevenueAmount('');
+      setRevenueError(null);
+      setSelectedLead({ ...selectedLead, status: 'closed_won' });
+      await fetchLeadEvents(selectedLead.id);
+      onRefresh();
+    } catch (err: any) {
+      console.error('[HAL revenue conversion]', err);
+      setRevenueError(err?.message || 'Revenue could not be recorded. No lead status change was applied.');
     }
   };
 
@@ -1767,33 +1768,39 @@ Next-Gen Waterproofing	Calgary	Waterproofing	Jane Smith	jane@nextgen.ca	403-555-
                 </button>
               </div>
 
-              <div className="flex gap-2">
-                {selectedLead.status !== 'converted' && (
-                  <button
-                    onClick={() => setShowRevenueModal(true)}
-                    className="flex-1 bg-brand text-black hover:bg-brand-dim py-1.5 px-3 rounded-sm text-xs font-mono font-bold flex items-center justify-center gap-1 uppercase tracking-wider transition-colors"
-                  >
-                    <DollarSign className="w-3.5 h-3.5 stroke-[2.5]" /> Close Deal
-                  </button>
-                )}
-                
+              <div className="flex flex-wrap gap-2">
                 {selectedLead.status === 'new' && (
                   <button
                     onClick={() => updateLeadStatus(selectedLead, 'contacted')}
                     className="flex-1 bg-card-highlight text-text-secondary hover:text-text-primary py-1.5 px-3 rounded-sm text-xs font-mono border border-border-dark font-bold uppercase tracking-wider transition-colors"
-                  >
-                    Mark Engaged
-                  </button>
+                  >Mark Contacted</button>
                 )}
-
                 {selectedLead.status === 'contacted' && (
                   <button
-                    onClick={() => updateLeadStatus(selectedLead, 'dead')}
-                    className="flex-1 bg-card-inner text-text-dim hover:text-red-400 py-1.5 px-3 rounded-sm text-xs font-mono border border-border-dark font-bold uppercase tracking-wider transition-colors"
-                  >
-                    Mark Dead
-                  </button>
+                    onClick={() => updateLeadStatus(selectedLead, 'qualified')}
+                    className="flex-1 bg-card-highlight text-text-secondary hover:text-text-primary py-1.5 px-3 rounded-sm text-xs font-mono border border-border-dark font-bold uppercase tracking-wider transition-colors"
+                  >Mark Qualified</button>
                 )}
+                {selectedLead.status === 'qualified' && (
+                  <button
+                    onClick={() => updateLeadStatus(selectedLead, 'proposal')}
+                    className="flex-1 bg-card-highlight text-text-secondary hover:text-text-primary py-1.5 px-3 rounded-sm text-xs font-mono border border-border-dark font-bold uppercase tracking-wider transition-colors"
+                  >Move to Proposal</button>
+                )}
+                {selectedLead.status === 'proposal' && (
+                  <button
+                    onClick={() => { setRevenueError(null); setShowRevenueModal(true); }}
+                    className="flex-1 bg-brand text-black hover:bg-brand-dim py-1.5 px-3 rounded-sm text-xs font-mono font-bold flex items-center justify-center gap-1 uppercase tracking-wider transition-colors"
+                  ><DollarSign className="w-3.5 h-3.5 stroke-[2.5]" /> Close Deal</button>
+                )}
+                {['new', 'contacted', 'qualified', 'proposal'].includes(selectedLead.status) && (
+                  <button
+                    onClick={() => updateLeadStatus(selectedLead, 'dead')}
+                    className="bg-card-inner text-text-dim hover:text-red-400 py-1.5 px-3 rounded-sm text-xs font-mono border border-border-dark font-bold uppercase tracking-wider transition-colors"
+                  >Mark Lost</button>
+                )}
+                {selectedLead.status === 'closed_won' && <span className="text-[10px] font-mono text-positive uppercase tracking-wider self-center">Closed won · revenue recorded</span>}
+                {selectedLead.status === 'closed_lost' && <span className="text-[10px] font-mono text-text-dim uppercase tracking-wider self-center">Closed lost</span>}
               </div>
             </div>
 
@@ -1986,6 +1993,7 @@ Next-Gen Waterproofing	Calgary	Waterproofing	Jane Smith	jane@nextgen.ca	403-555-
               Record real transactional revenue realized on lead conversion for <strong>{selectedLead.businessName}</strong>. This updates status to Converted and calibrates LTV multiplier.
             </p>
 
+            {revenueError && <p role="alert" className="text-[11px] text-red-400 border border-red-400/30 bg-red-400/5 rounded-sm p-2">{revenueError}</p>}
             <form onSubmit={handleRecordRevenue} className="space-y-4 text-xs">
               <div>
                 <label className="block text-[10px] font-mono text-text-secondary uppercase tracking-wider mb-1 font-bold">Conversion Revenue (USD) *</label>
