@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { canTransitionWorkTask } from '../../src/lib/workTasks';
+import { canTransitionWorkTask, listWorkTasks } from '../../src/lib/workTasks';
 
 describe('HAL work task state machine', () => {
   it('allows queued work to start, request approval, or be cancelled', () => {
@@ -22,6 +22,25 @@ describe('HAL work task state machine', () => {
     expect(canTransitionWorkTask('failed', 'queued')).toBe(true);
     expect(canTransitionWorkTask('failed', 'cancelled')).toBe(true);
     expect(canTransitionWorkTask('failed', 'completed')).toBe(false);
+  });
+
+
+  it('returns a bounded task summary without exposing raw input/output payloads', async () => {
+    const limit = vi.fn().mockResolvedValue([]);
+    const orderBy = vi.fn().mockReturnValue({ limit });
+    const where = vi.fn().mockReturnValue({ orderBy });
+    const from = vi.fn().mockReturnValue({ where });
+    const select = vi.fn().mockReturnValue({ from });
+    const db = { select };
+
+    await listWorkTasks(db, 'tenant_1', 500);
+
+    const projection = select.mock.calls[0][0];
+    expect(projection).toHaveProperty('title');
+    expect(projection).toHaveProperty('assignedWorker');
+    expect(projection).not.toHaveProperty('input');
+    expect(projection).not.toHaveProperty('output');
+    expect(limit).toHaveBeenCalledWith(100);
   });
 
   it('rejects unknown statuses and invalid transitions', () => {
