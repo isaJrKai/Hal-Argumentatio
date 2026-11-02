@@ -11,7 +11,7 @@ export function validateStaffInput(value: unknown): { valid: true; value: StaffI
   const status = body.status === undefined ? 'active' : body.status;
   const availability = body.availability === undefined ? 'available' : body.availability;
   if (!name || name.length > 120 || !role || role.length > 80) return { valid: false, error: 'A staff name (max 120 characters) and role (max 80 characters) are required.' };
-  if (email === '__invalid__' || (email && (email.length > 254 || !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email)))) return { valid: false, error: 'Enter a valid email address.' };
+  if (email === '__invalid__' || (email && (email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)))) return { valid: false, error: 'Enter a valid email address.' };
   if (phone === '__invalid__' || (phone && phone.length > 40)) return { valid: false, error: 'Phone number must be 40 characters or fewer.' };
   if (!['active', 'inactive'].includes(String(status))) return { valid: false, error: 'Staff status must be active or inactive.' };
   if (!['available', 'unavailable'].includes(String(availability))) return { valid: false, error: 'Availability must be available or unavailable.' };
