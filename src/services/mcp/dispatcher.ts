@@ -50,7 +50,7 @@ export const HAL_MCP_TOOLS: McpToolDefinition[] = [
         taskType: { type: 'string' },
         title: { type: 'string' },
         description: { type: 'string' },
-        assignedWorker: { type: 'string', enum: ['human', 'hal_assistant', 'hermes', 'amis', 'gemini', 'nemotron'] },
+        assignedWorker: { type: 'string', enum: ['human', 'hal_assistant', 'hermes', 'gemini', 'nemotron'] },
         priority: { type: 'string', enum: ['low', 'normal', 'high', 'urgent'] },
         entityType: { type: 'string' },
         entityId: { type: 'string' },
@@ -245,7 +245,7 @@ export async function executeMcpTool(
       const input = rawParams?.input && typeof rawParams.input === 'object' && !Array.isArray(rawParams.input) ? rawParams.input : null;
       const approvalRequiredByPolicy = requiresWorkTaskApproval(taskType, title, description);
       const requiresApproval = rawParams?.requiresApproval === true || approvalRequiredByPolicy;
-      const workers = ['human', 'hal_assistant', 'hermes', 'amis', 'gemini', 'nemotron'];
+      const workers = ['human', 'hal_assistant', 'hermes', 'gemini', 'nemotron'];
       if (!taskType || taskType.length > 80 || !title || title.length > 180 ||
           (description && description.length > 2000) || !workers.includes(assignedWorker) ||
           !['low', 'normal', 'high', 'urgent'].includes(priority) ||
