@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { FormEvent, useCallback, useEffect, useState } from 'react';
 import { Bot, CheckCircle2, Clock3, ListTodo, Loader2, Plus, RefreshCw, ShieldCheck, XCircle } from 'lucide-react';
 
 type WorkTask = {
@@ -46,7 +46,7 @@ export default function WorkQueuePanel({ token }: WorkQueuePanelProps) {
 
   useEffect(() => { void loadTasks(); }, [loadTasks]);
 
-  const createTask = async (event: React.FormEvent) => {
+  const createTask = async (event: FormEvent) => {
     event.preventDefault();
     if (!title.trim()) return;
     setSaving(true); setError(null);
@@ -147,6 +147,7 @@ export default function WorkQueuePanel({ token }: WorkQueuePanelProps) {
                 <div className="flex flex-wrap gap-1.5 shrink-0">
                   {task.status === 'awaiting_approval' && <button onClick={() => void transition(task, 'queued')} className="px-2.5 py-1.5 rounded border border-orange-400/30 text-orange-300 text-[10px] font-mono">Approve</button>}
                   {task.status === 'queued' && task.assignedWorker === 'human' && <button onClick={() => void transition(task, 'running')} className="px-2.5 py-1.5 rounded border border-border-default text-text-secondary text-[10px] font-mono">Start</button>}
+                  {task.status === 'running' && <button onClick={() => void transition(task, 'failed')} className="px-2.5 py-1.5 rounded border border-red-400/30 text-red-300 text-[10px] font-mono">Fail</button>}
                   {task.status === 'running' && <button onClick={() => void transition(task, 'completed')} className="px-2.5 py-1.5 rounded border border-emerald-400/30 text-emerald-300 text-[10px] font-mono inline-flex items-center gap-1"><CheckCircle2 className="w-3 h-3" /> Complete</button>}
                   {['queued', 'awaiting_approval', 'running', 'failed'].includes(task.status) && <button onClick={() => void transition(task, 'cancelled')} className="px-2.5 py-1.5 rounded border border-border-default text-text-tertiary text-[10px] font-mono inline-flex items-center gap-1"><XCircle className="w-3 h-3" /> Cancel</button>}
                   {task.status === 'failed' && task.attemptCount < task.maxAttempts && <button onClick={() => void transition(task, 'queued')} className="px-2.5 py-1.5 rounded border border-border-default text-text-secondary text-[10px] font-mono">Retry</button>}
