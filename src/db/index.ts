@@ -43,20 +43,22 @@ export const createPool = () => {
           password: '',
           database: 'postgres',
           max: 10,
-          connectionTimeoutMillis: 15000,
+          connectionTimeoutMillis: 2000,
         });
       }
     }
 
     // Prevent unhandled pool-level errors from crashing the application
     global._postgresPool.on('error', (err) => {
-      console.error('Unexpected error on idle SQL pool client:', err);
+      console.warn('PostgreSQL pool connection note:', err.message);
     });
 
-    // Automatically bootstrap tables on pool creation
-    bootstrapPostgresTables(global._postgresPool).catch((err) => {
-      console.warn('[HAL PostgreSQL] Auto-bootstrap warning on pool creation:', err.message);
-    });
+    // Automatically bootstrap tables on pool creation only when a database is configured
+    if (process.env.DATABASE_URL || process.env.NEON_DATABASE_URL || process.env.SQL_HOST) {
+      bootstrapPostgresTables(global._postgresPool).catch((err) => {
+        console.warn('[HAL PostgreSQL] Auto-bootstrap warning on pool creation:', err.message);
+      });
+    }
   }
   return global._postgresPool;
 };

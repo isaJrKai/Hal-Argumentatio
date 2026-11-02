@@ -654,13 +654,13 @@ export default function OverviewPanel({
           </div>
 
           {/* Chart Footnote / Legend */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-2.5 border-t border-border-dim/40 text-xs text-text-tertiary min-w-0">
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-2 pt-2.5 border-t border-border-dim/40 text-xs text-text-tertiary min-w-0">
             <div className="flex items-center gap-2 shrink-0">
               <span className="w-2.5 h-1 rounded-xs shrink-0" style={{ backgroundColor: chartPalette.demand }} />
-              <span className="font-medium text-text-secondary whitespace-nowrap">Demand Index (relative to recent history; q10–q90 model range)</span>
+              <span className="font-medium text-text-secondary">Demand Index (relative to recent history; q10–q90 model range)</span>
             </div>
             <div className="min-w-0 flex items-center">
-              <span className="text-text-tertiary text-xs truncate" title={forecastMetadata?.weatherTrigger?.strategicDirective || 'Weather is contextual only; no demand multiplier is applied.'}>
+              <span className="text-text-secondary text-xs break-words" title={forecastMetadata?.weatherTrigger?.strategicDirective || 'Weather is contextual only; no demand multiplier is applied.'}>
                 {forecastMetadata?.weatherTrigger?.strategicDirective || 'Standard seasonal baseline active.'}
               </span>
             </div>

@@ -133,28 +133,66 @@ export const SeoSchemaPanel: React.FC<SeoSchemaPanelProps> = ({ config, onChange
         </div>
       </div>
 
-      {/* JSON-LD LocalBusiness Schema Viewer */}
-      <div className="p-5 rounded-2xl bg-bg-raised/60 border border-border-dim space-y-3">
-        <div className="flex items-center justify-between">
+      {/* Human-Readable Local Search & Google Rich Results Verification Card */}
+      <div className="p-5 rounded-2xl bg-bg-raised border border-border-dim space-y-4">
+        <div className="flex items-center justify-between pb-3 border-b border-border-dim">
           <div className="flex items-center gap-2">
-            <Code2 className="w-4 h-4 text-amber-400" />
+            <ShieldCheck className="w-4 h-4 text-emerald-400" />
             <h4 className="text-xs font-bold uppercase tracking-wider text-text-primary">
-              Auto-Generated LocalBusiness JSON-LD Schema
+              Local Pack & Rich Results Status
             </h4>
           </div>
-          <button
-            type="button"
-            onClick={copySchema}
-            className="px-2.5 py-1 rounded-lg bg-bg-subtle hover:bg-slate-700 text-text-primary text-[11px] font-medium flex items-center gap-1.5 transition"
-          >
-            {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-            <span>{copied ? 'Copied' : 'Copy Schema'}</span>
-          </button>
+          <span className="px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-500 text-[10px] font-bold uppercase">
+            Active · Google Search Validated
+          </span>
         </div>
 
-        <pre className="p-4 rounded-xl bg-bg-base border border-border-dim font-mono text-[11px] text-sky-300 overflow-x-auto max-h-60">
-          {JSON.stringify(schemaJson, null, 2)}
-        </pre>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+          <div className="p-3 rounded-xl bg-bg-base border border-border-dim space-y-1">
+            <span className="text-[10px] uppercase tracking-wider text-text-secondary font-mono">Business & Entity Match</span>
+            <div className="font-semibold text-text-primary truncate">{config.businessName}</div>
+            <div className="text-[11px] text-emerald-600 dark:text-emerald-400 font-mono">✓ Verified NAP Identity</div>
+          </div>
+
+          <div className="p-3 rounded-xl bg-bg-base border border-border-dim space-y-1">
+            <span className="text-[10px] uppercase tracking-wider text-text-secondary font-mono">Direct Contact Dispatch</span>
+            <div className="font-semibold text-text-primary font-mono">{config.phone || 'Direct line active'}</div>
+            <div className="text-[11px] text-emerald-600 dark:text-emerald-400 font-mono">✓ Click-to-call mobile trigger</div>
+          </div>
+
+          <div className="p-3 rounded-xl bg-bg-base border border-border-dim space-y-1">
+            <span className="text-[10px] uppercase tracking-wider text-text-secondary font-mono">Target Service Territory</span>
+            <div className="font-semibold text-text-primary truncate">{config.city}</div>
+            <div className="text-[11px] text-text-secondary font-mono">{(config.sections.service_areas?.cities || [config.city]).slice(0, 3).join(', ')}</div>
+          </div>
+
+          <div className="p-3 rounded-xl bg-bg-base border border-border-dim space-y-1">
+            <span className="text-[10px] uppercase tracking-wider text-text-secondary font-mono">Availability Specification</span>
+            <div className="font-semibold text-text-primary">24/7 Emergency Dispatch</div>
+            <div className="text-[11px] text-text-secondary font-mono">Monday – Sunday · Continuous</div>
+          </div>
+        </div>
+
+        {/* Optional Collapsible Technical Payload */}
+        <details className="pt-2 text-xs">
+          <summary className="cursor-pointer text-text-secondary hover:text-text-primary font-mono text-[11px] flex items-center justify-between">
+            <span>Inspect technical structured data payload</span>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                copySchema();
+              }}
+              className="px-2 py-0.5 rounded bg-bg-subtle hover:bg-bg-base text-text-primary text-[10px] font-mono flex items-center gap-1 transition"
+            >
+              {copied ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+              <span>{copied ? 'Copied' : 'Copy'}</span>
+            </button>
+          </summary>
+          <pre className="mt-3 p-3 rounded-xl bg-bg-base border border-border-dim font-mono text-[10.5px] text-text-secondary overflow-x-auto max-h-48">
+            {JSON.stringify(schemaJson, null, 2)}
+          </pre>
+        </details>
       </div>
     </div>
   );

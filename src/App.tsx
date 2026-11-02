@@ -760,9 +760,9 @@ export default function App() {
     );
   }
 
-  // Public Community Sandbox indicator for shared link (ais-pre) or Reddit visitors
+  // Public Community Sandbox indicator for explicit shared demo link or Reddit visitors
   const isSharedPreview = typeof window !== 'undefined' && (
-    window.location.hostname.includes('ais-pre-') ||
+    window.location.hostname.includes('ais-pre-yhe6kkyk2vea7llaamk5bi') ||
     document.referrer.toLowerCase().includes('reddit.com') ||
     document.referrer.toLowerCase().includes('redd.it')
   );

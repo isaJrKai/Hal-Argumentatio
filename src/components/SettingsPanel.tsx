@@ -1148,99 +1148,23 @@ export default function SettingsPanel({
               <span className="text-[11px] text-inherit opacity-60 block">Key: GOOGLE_DRIVE_CLIENT_ID</span>
             </div>
 
-            {/* LinkedIn */}
+            {/* Google Drive Asset Cloud */}
             <div className={`border p-3.5 rounded space-y-2 ${innerBg} ${borderCol}`}>
               <div className="flex justify-between items-center">
-                <span className="font-bold uppercase font-mono text-[11px] text-accent">LinkedIn Sales Integrator</span>
-                <span className={`text-[11px] font-mono px-1.5 py-0.5 rounded font-bold uppercase ${connectorKeys.linkedin ? 'bg-positive/20 text-positive' : 'bg-warning-dim text-warning'}`}>
-                  {connectorConfigured.linkedin || connectorKeys.linkedin ? 'Configured' : 'Unconfigured'}
+                <span className="font-bold uppercase font-mono text-[11px] text-accent">Google Drive & Workspace</span>
+                <span className={`text-[11px] font-mono px-1.5 py-0.5 rounded font-bold uppercase ${connectorKeys.googleDrive ? 'bg-positive/20 text-positive' : 'bg-warning-dim text-warning'}`}>
+                  {connectorConfigured.googleDrive || connectorKeys.googleDrive ? 'Configured' : 'Unconfigured'}
                 </span>
               </div>
               <input
                 type="password"
-                value={connectorKeys.linkedin}
-                onChange={(e) => setConnectorKeys(prev => ({ ...prev, linkedin: e.target.value }))}
-                onBlur={() => handleSaveConnectorKey('linkedin', connectorKeys.linkedin)}
-                placeholder="AQV..."
+                value={connectorKeys.googleDrive}
+                onChange={(e) => setConnectorKeys(prev => ({ ...prev, googleDrive: e.target.value }))}
+                onBlur={() => handleSaveConnectorKey('googleDrive', connectorKeys.googleDrive)}
+                placeholder="Google Workspace OAuth / Service Key"
                 className={`w-full border rounded p-2 focus:outline-none focus:border-accent text-inherit font-mono text-xs ${innerBg} ${borderCol}`}
               />
-              <span className="text-[11px] text-inherit opacity-60 block">Key: LINKEDIN_API_TOKEN</span>
-            </div>
-
-            {/* Salesforce */}
-            <div className={`border p-3.5 rounded space-y-2 ${innerBg} ${borderCol}`}>
-              <div className="flex justify-between items-center">
-                <span className="font-bold uppercase font-mono text-[11px] text-accent">Salesforce CRM Bridge</span>
-                <span className={`text-[11px] font-mono px-1.5 py-0.5 rounded font-bold uppercase ${connectorKeys.salesforce ? 'bg-positive/20 text-positive' : 'bg-warning-dim text-warning'}`}>
-                  {connectorConfigured.salesforce || connectorKeys.salesforce ? 'Configured' : 'Unconfigured'}
-                </span>
-              </div>
-              <input
-                type="password"
-                value={connectorKeys.salesforce}
-                onChange={(e) => setConnectorKeys(prev => ({ ...prev, salesforce: e.target.value }))}
-                onBlur={() => handleSaveConnectorKey('salesforce', connectorKeys.salesforce)}
-                placeholder="3MVG9..."
-                className={`w-full border rounded p-2 focus:outline-none focus:border-accent text-inherit font-mono text-xs ${innerBg} ${borderCol}`}
-              />
-              <span className="text-[11px] text-inherit opacity-60 block">Key: SALESFORCE_CONSUMER_KEY</span>
-            </div>
-
-            {/* HubSpot */}
-            <div className={`border p-3.5 rounded space-y-2 ${innerBg} ${borderCol}`}>
-              <div className="flex justify-between items-center">
-                <span className="font-bold uppercase font-mono text-[11px] text-accent">HubSpot Marketing Sync</span>
-                <span className={`text-[11px] font-mono px-1.5 py-0.5 rounded font-bold uppercase ${connectorKeys.hubspot ? 'bg-positive/20 text-positive' : 'bg-warning-dim text-warning'}`}>
-                  {connectorConfigured.hubspot || connectorKeys.hubspot ? 'Configured' : 'Unconfigured'}
-                </span>
-              </div>
-              <input
-                type="password"
-                value={connectorKeys.hubspot}
-                onChange={(e) => setConnectorKeys(prev => ({ ...prev, hubspot: e.target.value }))}
-                onBlur={() => handleSaveConnectorKey('hubspot', connectorKeys.hubspot)}
-                placeholder="pat-na1-..."
-                className={`w-full border rounded p-2 focus:outline-none focus:border-accent text-inherit font-mono text-xs ${innerBg} ${borderCol}`}
-              />
-              <span className="text-[11px] text-inherit opacity-60 block">Key: HUBSPOT_ACCESS_TOKEN</span>
-            </div>
-
-            {/* Mailchimp */}
-            <div className={`border p-3.5 rounded space-y-2 ${innerBg} ${borderCol}`}>
-              <div className="flex justify-between items-center">
-                <span className="font-bold uppercase font-mono text-[11px] text-accent">Mailchimp Newsletter API</span>
-                <span className={`text-[11px] font-mono px-1.5 py-0.5 rounded font-bold uppercase ${connectorKeys.mailchimp ? 'bg-positive/20 text-positive' : 'bg-warning-dim text-warning'}`}>
-                  {connectorConfigured.mailchimp || connectorKeys.mailchimp ? 'Configured' : 'Unconfigured'}
-                </span>
-              </div>
-              <input
-                type="password"
-                value={connectorKeys.mailchimp}
-                onChange={(e) => setConnectorKeys(prev => ({ ...prev, mailchimp: e.target.value }))}
-                onBlur={() => handleSaveConnectorKey('mailchimp', connectorKeys.mailchimp)}
-                placeholder="...-us20"
-                className={`w-full border rounded p-2 focus:outline-none focus:border-accent text-inherit font-mono text-xs ${innerBg} ${borderCol}`}
-              />
-              <span className="text-[11px] text-inherit opacity-60 block">Key: MAILCHIMP_API_KEY</span>
-            </div>
-
-            {/* Notion */}
-            <div className={`border p-3.5 rounded space-y-2 ${innerBg} ${borderCol}`}>
-              <div className="flex justify-between items-center">
-                <span className="font-bold uppercase font-mono text-[11px] text-accent">Notion Workspace Sync</span>
-                <span className={`text-[11px] font-mono px-1.5 py-0.5 rounded font-bold uppercase ${connectorKeys.notion ? 'bg-positive/20 text-positive' : 'bg-warning-dim text-warning'}`}>
-                  {connectorConfigured.notion || connectorKeys.notion ? 'Configured' : 'Unconfigured'}
-                </span>
-              </div>
-              <input
-                type="password"
-                value={connectorKeys.notion}
-                onChange={(e) => setConnectorKeys(prev => ({ ...prev, notion: e.target.value }))}
-                onBlur={() => handleSaveConnectorKey('notion', connectorKeys.notion)}
-                placeholder="ntn_..."
-                className={`w-full border rounded p-2 focus:outline-none focus:border-accent text-inherit font-mono text-xs ${innerBg} ${borderCol}`}
-              />
-              <span className="text-[11px] text-inherit opacity-60 block">Key: NOTION_INTEGRATION_SECRET</span>
+              <span className="text-[11px] text-inherit opacity-60 block">Key: GOOGLE_DRIVE_CLIENT_ID</span>
             </div>
           </div>
         </div>

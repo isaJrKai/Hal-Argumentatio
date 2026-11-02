@@ -588,18 +588,18 @@ class Database {
     console.log('Purging all mock items across the system...');
     // Keep only true authorized contractors
     this.data.contractors = this.data.contractors.filter(c => 
-      c.email === 'kaisoisaac@gmail.com' || c.email === 'admin@kaislead.com' || c.id === 'con_isaac_seed' || c.id === 'con_admin_seed'
+      c.email === 'admin@kaislead.com' || c.id === 'con_admin_seed'
     );
     // Purge mock leads
     this.data.leads = this.data.leads.filter(l => !l.id.startsWith('lead_seed_'));
     // Purge mock campaigns
-    this.data.campaigns = this.data.campaigns.filter(c => !c.id.startsWith('camp_seed_') && !c.id.startsWith('camp_isaac_'));
+    this.data.campaigns = this.data.campaigns.filter(c => !c.id.startsWith('camp_seed_'));
     // Purge mock revenues
-    this.data.revenues = this.data.revenues.filter(r => !r.id.startsWith('rev_seed_') && !r.id.startsWith('rev_isaac_'));
+    this.data.revenues = this.data.revenues.filter(r => !r.id.startsWith('rev_seed_'));
     // Purge mock forecasts
-    this.data.forecasts = this.data.forecasts.filter(f => !f.id.startsWith('fc_seed_') && !f.id.startsWith('fc_isaac_'));
+    this.data.forecasts = this.data.forecasts.filter(f => !f.id.startsWith('fc_seed_'));
     // Purge mock recommendations
-    this.data.recommendations = this.data.recommendations.filter(re => !re.id.startsWith('rec_seed_') && !re.id.startsWith('rec_isaac_'));
+    this.data.recommendations = this.data.recommendations.filter(re => !re.id.startsWith('rec_seed_'));
     // Purge mock missions
     this.data.missions = this.data.missions.filter(m => !m.id.startsWith('mis_seed_'));
     // Purge mock learning insights
@@ -640,8 +640,8 @@ class Database {
   public getLeads(contractorId?: string): Lead[] {
     let rawLeads = this.data.leads;
     if (contractorId) {
-      if (contractorId === 'con_isaac_seed' || contractorId === 'con_admin_seed') {
-        rawLeads = rawLeads.filter(l => l.contractorId === 'con_admin_seed' || l.contractorId === 'con_isaac_seed');
+      if (contractorId === 'con_admin_seed') {
+        rawLeads = rawLeads.filter(l => l.contractorId === 'con_admin_seed');
       } else {
         rawLeads = rawLeads.filter(l => l.contractorId === contractorId);
       }
@@ -1058,8 +1058,8 @@ class Database {
   // Campaigns
   public getCampaigns(contractorId?: string): Campaign[] {
     if (contractorId) {
-      if (contractorId === 'con_isaac_seed' || contractorId === 'con_admin_seed') {
-        return this.data.campaigns.filter(c => c.contractorId === 'con_admin_seed' || c.contractorId === 'con_isaac_seed');
+      if (contractorId === 'con_admin_seed') {
+        return this.data.campaigns.filter(c => c.contractorId === 'con_admin_seed');
       }
       return this.data.campaigns.filter(c => c.contractorId === contractorId);
     }
@@ -1118,8 +1118,8 @@ class Database {
   // Revenues
   public getRevenues(contractorId?: string): Revenue[] {
     if (contractorId) {
-      if (contractorId === 'con_isaac_seed' || contractorId === 'con_admin_seed') {
-        return this.data.revenues.filter(r => r.contractorId === 'con_admin_seed' || r.contractorId === 'con_isaac_seed');
+      if (contractorId === 'con_admin_seed') {
+        return this.data.revenues.filter(r => r.contractorId === 'con_admin_seed');
       }
       return this.data.revenues.filter(r => r.contractorId === contractorId);
     }
@@ -1149,8 +1149,8 @@ class Database {
   // Forecasts & Outcomes
   public getForecasts(contractorId?: string): Forecast[] {
     if (contractorId) {
-      if (contractorId === 'con_isaac_seed' || contractorId === 'con_admin_seed') {
-        return this.data.forecasts.filter(f => f.contractorId === 'con_admin_seed' || f.contractorId === 'con_isaac_seed');
+      if (contractorId === 'con_admin_seed') {
+        return this.data.forecasts.filter(f => f.contractorId === 'con_admin_seed');
       }
       return this.data.forecasts.filter(f => f.contractorId === contractorId);
     }
@@ -1223,8 +1223,8 @@ class Database {
   // Recommendations
   public getRecommendations(contractorId?: string): Recommendation[] {
     if (contractorId) {
-      if (contractorId === 'con_isaac_seed' || contractorId === 'con_admin_seed') {
-        return this.data.recommendations.filter(r => r.contractorId === 'con_admin_seed' || r.contractorId === 'con_isaac_seed');
+      if (contractorId === 'con_admin_seed') {
+        return this.data.recommendations.filter(r => r.contractorId === 'con_admin_seed');
       }
       return this.data.recommendations.filter(r => r.contractorId === contractorId);
     }

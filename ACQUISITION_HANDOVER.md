@@ -139,8 +139,8 @@ A green CI run verifies the checked repository revision. It does not by itself v
 
 ## 6. Commercial Asset Assignment & Closing
 
-The commercial transaction and transfer of ownership are separate from the technical verification described above. Upon receipt of the agreed purchase price ($3,000 USD), the proposed closing steps are:
+The commercial transaction and transfer of ownership are separate from the technical verification described above. The proposed closing steps are:
 
-1. **GitHub Repository Transfer:** Transfer administrative ownership of `https://github.com/isaJrKai/Hal-Argumentatio` to the buyer's GitHub username or organization.
+1. **GitHub Repository Transfer:** Transfer administrative ownership of the codebase repository to the buyer's GitHub username or organization.
 2. **Proprietary Rights Transfer:** Execute the agreed transfer of source code, intellectual property, brand, and associated commercial rights.
 3. **Delivery Condition:** The software is delivered as-is, with CI green at handover. Post-handover hosting, operational maintenance, third-party API costs, and any remaining integration or deployment work are the responsibility of the acquiring party unless separately agreed in writing.

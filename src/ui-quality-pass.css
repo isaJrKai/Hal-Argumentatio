@@ -81,22 +81,6 @@ label,
   padding: 3px 8px;
 }
 
-/* Catch overly tiny Tailwind text utilities used throughout legacy panels. */
-[class*="text-[8px]"],
-[class*="text-[8.5px]"],
-[class*="text-[9px]"],
-[class*="text-[9.5px]"],
-[class*="text-[10px]"],
-[class*="text-[10.5px]"] {
-  font-size: 13px !important;
-  line-height: 1.5;
-}
-
-[class*="text-[11px]"] {
-  font-size: 14px !important;
-  line-height: 1.55;
-}
-
 /* Keep panel children shrinkable so long content respects its layout. */
 :where(.flex > *, .inline-flex > *, .grid > *) {
   min-width: 0;

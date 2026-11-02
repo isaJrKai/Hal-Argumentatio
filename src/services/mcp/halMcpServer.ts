@@ -234,6 +234,9 @@ export function buildHalMcpServer(): McpServer {
     annotations: READ_ONLY_ANNOTATIONS
   }, async ({ limit = 25, offset = 0, contains }) => {
     try {
+      if (!isPostgresConfigured()) {
+        throw new Error('PostgreSQL database environment is not configured');
+      }
       const contractorId = await getEffectiveContractorId();
       let allLeads: any[] = [];
 
@@ -288,6 +291,9 @@ export function buildHalMcpServer(): McpServer {
     annotations: READ_ONLY_ANNOTATIONS
   }, async ({ id }) => {
     try {
+      if (!isPostgresConfigured()) {
+        throw new Error('PostgreSQL database environment is not configured');
+      }
       const contractorId = await getEffectiveContractorId();
       let target: any = null;
 

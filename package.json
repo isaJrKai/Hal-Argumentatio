@@ -17,6 +17,8 @@
     "test:ci": "tsc --noEmit && vitest run"
   },
   "dependencies": {
+    "@firebase/app": "^0.16.2",
+    "@firebase/auth": "^1.13.6",
     "@fontsource/inter": "^5.2.8",
     "@fontsource/jetbrains-mono": "^5.2.8",
     "@google/genai": "^2.4.0",
@@ -31,6 +33,7 @@
     "dotenv": "^17.2.3",
     "drizzle-orm": "^0.45.2",
     "express": "^4.21.2",
+    "firebase": "^13.1.0",
     "leaflet": "^1.9.4",
     "lucide-react": "^0.546.0",
     "motion": "^12.23.24",
@@ -39,9 +42,7 @@
     "react-dom": "^19.0.1",
     "recharts": "^3.9.2",
     "vite": "^6.2.3",
-    "zod": "^4.6.5",
-    "@firebase/app": "^0.16.2",
-    "@firebase/auth": "^1.13.6"
+    "zod": "^4.6.5"
   },
   "devDependencies": {
     "@types/d3": "^7.4.3",
