@@ -765,8 +765,17 @@ app.patch('/api/work-tasks/:id', authenticate, async (req, res) => {
           eventType: 'task.status_changed', entityType: 'work_task', entityId: taskId,
           actorType: 'human', actorId: contractorId, sourceModule: 'work_queue',
           correlationId: current.correlationId || taskId,
-          summary: `Moved task "${current.title}" from ${current.status} to ${nextStatus}.`,
-          payload: { previousStatus: current.status, status: nextStatus, assignedWorker: current.assignedWorker, assignedStaffId: hasAssignmentChange ? nextStaffId : current.assignedStaffId }
+          summary: nextStatus === 'failed'
+            ? `Task "${current.title}" failed: ${errorMessage || 'Task failed without a supplied reason.'}`
+            : `Moved task "${current.title}" from ${current.status} to ${nextStatus}.`,
+          payload: {
+            previousStatus: current.status,
+            status: nextStatus,
+            assignedWorker: current.assignedWorker,
+            assignedStaffId: hasAssignmentChange ? nextStaffId : current.assignedStaffId,
+            errorMessage: nextStatus === 'failed' ? (errorMessage || 'Task failed without a supplied reason.') : null,
+            attemptCount: current.attemptCount
+          }
         });
       }
       return saved;
