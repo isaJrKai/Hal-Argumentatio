@@ -353,7 +353,7 @@ export const conversionOutbox = pgTable('conversion_outbox', {
   nextAttemptAt: timestamp('next_attempt_at'),
   lastAttemptAt: timestamp('last_attempt_at'),
   uploadedAt: timestamp('uploaded_at'),
-  idempotencyKey: text('idempotency_key').notNull().unique(),
+  idempotencyKey: text('idempotency_key').notNull(),
   googleResponse: jsonb('google_response'),
   errorCode: text('error_code'),
   errorMessage: text('error_message'),
