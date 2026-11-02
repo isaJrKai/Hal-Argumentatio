@@ -347,7 +347,7 @@ export async function executeMcpTool(
       if (!claimed) throw new Error('Task was claimed or changed by another worker. Refresh the queue.');
 
       try {
-        const result = await executeHermesLabTool(toolId, parameters, contractorId, promptOverride);
+        const result = await executeHermesLabTool(toolId, parameters, contractorId, promptOverride, { workTaskId: taskId, correlationId: task.correlationId || taskId });
         const receipt = {
           artifactId: result.artifactId, title: result.title, category: result.category,
           status: result.status, executionSummary: result.executionSummary
