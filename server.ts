@@ -3269,34 +3269,116 @@ app.post('/api/leads/purge-and-replace', authenticate, async (req, res) => {
 
 app.post('/api/system/campaign-reset', authenticate, async (req, res) => {
   const contractorId = (req as any).contractorId;
-  const { city, niche, mode } = req.body;
+  const { city, niche, mode } = req.body || {};
 
-  if (!city || !niche || !mode) {
-    return res.status(400).json({ error: 'city, niche, and mode are required' });
+  if (typeof city !== 'string' || !city.trim() || typeof niche !== 'string' || !niche.trim()) {
+    return res.status(400).json({ error: 'A target city and industry niche are required.' });
+  }
+  if (mode !== 'blank') {
+    return res.status(409).json({ error: 'Synthetic campaign seeding is disabled. HAL resets to a clean slate and real data must be imported from verified sources.' });
   }
 
+  const targetCity = city.trim();
+  const targetNiche = niche.trim();
   try {
-    const result = db.resetContractorCampaignData(contractorId, city, niche, mode);
+    // Client delivery projects are durable contracts and must never be orphaned
+    // by a territory reset. Require the operator to resolve them first.
+    const linkedProjects = await pgDb.select({ id: clientProjects.id, businessName: clientProjects.businessName })
+      .from(clientProjects)
+      .where(eq(clientProjects.contractorId, contractorId));
+    if (linkedProjects.length) {
+      return res.status(409).json({
+        error: 'Territory reset is blocked while client delivery projects exist. Complete or archive those projects before resetting the lead pipeline.',
+        protectedProjects: linkedProjects.length
+      });
+    }
 
-    // 3. Log Audit Action
-    db.addAuditLog({
-      contractorId,
-      action: 'CAMPAIGN_RESET',
-      details: `Pivot to city: ${city}, niche: ${niche}, mode: ${mode}`
+    const [tenantLeads, tenantCampaigns, tenantForecasts] = await Promise.all([
+      pgDb.select({ id: leads.id }).from(leads).where(eq(leads.contractorId, contractorId)),
+      pgDb.select({ id: campaigns.id }).from(campaigns).where(eq(campaigns.contractorId, contractorId)),
+      pgDb.select({ id: forecasts.id }).from(forecasts).where(eq(forecasts.contractorId, contractorId))
+    ]);
+    const leadIds = tenantLeads.map(row => row.id);
+    const campaignIds = tenantCampaigns.map(row => row.id);
+    const forecastIds = tenantForecasts.map(row => row.id);
+
+    await pgDb.transaction(async tx => {
+      // Cancel open human/agent tasks that refer to leads being removed. Preserve
+      // the task and work-event history instead of deleting operational evidence.
+      if (leadIds.length) {
+        await tx.update(workTasks).set({
+          status: 'cancelled',
+          errorMessage: 'Cancelled by an authorized territory reset; the linked lead was removed.',
+          updatedAt: new Date()
+        }).where(and(
+          eq(workTasks.contractorId, contractorId),
+          eq(workTasks.entityType, 'lead'),
+          inArray(workTasks.entityId, leadIds),
+          inArray(workTasks.status, ['queued', 'running', 'awaiting_approval', 'failed'])
+        ));
+        await tx.delete(leadAttribution).where(inArray(leadAttribution.leadId, leadIds));
+        await tx.delete(leadEvents).where(inArray(leadEvents.leadId, leadIds));
+      }
+      if (campaignIds.length) {
+        await tx.delete(performanceSnapshots).where(inArray(performanceSnapshots.campaignId, campaignIds));
+      }
+      if (forecastIds.length) {
+        await tx.delete(predictionOutcomes).where(inArray(predictionOutcomes.forecastId, forecastIds));
+      }
+
+      await tx.delete(revenueRecords).where(eq(revenueRecords.contractorId, contractorId));
+      await tx.delete(campaigns).where(eq(campaigns.contractorId, contractorId));
+      await tx.delete(forecasts).where(eq(forecasts.contractorId, contractorId));
+      await tx.delete(recommendations).where(eq(recommendations.contractorId, contractorId));
+      await tx.delete(missions).where(eq(missions.contractorId, contractorId));
+      await tx.delete(chatMessages).where(eq(chatMessages.contractorId, contractorId));
+      await tx.delete(leads).where(eq(leads.contractorId, contractorId));
+      await tx.update(contractors).set({
+        city: targetCity,
+        serviceType: targetNiche,
+        activeTerritories: [targetCity]
+      }).where(eq(contractors.id, contractorId));
+
+      await tx.insert(auditLogs).values({
+        id: crypto.randomUUID(),
+        contractorId,
+        action: 'TERRITORY_PIPELINE_RESET',
+        details: `Reset lead, campaign, revenue, forecast, recommendation, mission and chat-message data for ${targetCity} / ${targetNiche}. Client projects were checked and protected; open linked tasks were cancelled.`
+      });
+      await tx.insert(workEvents).values({
+        id: 'evt_' + crypto.randomUUID(),
+        contractorId,
+        eventType: 'workspace.territory_reset',
+        entityType: 'workspace',
+        entityId: contractorId,
+        actorType: 'human',
+        actorId: contractorId,
+        sourceModule: 'settings',
+        correlationId: crypto.randomUUID(),
+        summary: `Reset the operating territory to ${targetCity} / ${targetNiche}.`,
+        payload: { city: targetCity, niche: targetNiche, mode: 'blank', removedLeadCount: leadIds.length, removedCampaignCount: campaignIds.length, removedForecastCount: forecastIds.length }
+      });
     });
 
-    // 4. Broadcast Real-time notification
     broadcastNotification(
       contractorId,
-      'success',
-      'Campaign Pivot Executed!',
-      `Successfully reset ledger. Target redirected to ${city} (${niche}) in ${mode === 'mock' ? 'Simulated Seeding' : 'Blank Slate'} mode.`
+      'warning',
+      'Territory Pipeline Reset',
+      `The old lead pipeline was cleared. HAL is now configured for ${targetCity} / ${targetNiche}; import real prospects to begin again.`
     );
-
-    res.json({ success: true, ...result });
+    return res.json({
+      success: true,
+      city: targetCity,
+      niche: targetNiche,
+      mode: 'blank',
+      removedLeads: leadIds.length,
+      removedCampaigns: campaignIds.length,
+      removedForecasts: forecastIds.length,
+      message: 'The authoritative PostgreSQL pipeline was reset. No synthetic data was generated.'
+    });
   } catch (err: any) {
-    console.error('Failed to reset campaign data:', err);
-    res.status(500).json({ error: err.message });
+    console.error('[HAL Territory Reset] Transaction failed:', err);
+    return res.status(503).json({ error: err.message || 'Territory reset could not be completed.' });
   }
 });
 
