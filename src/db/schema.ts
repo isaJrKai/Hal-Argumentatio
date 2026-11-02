@@ -566,7 +566,6 @@ export const hermesLabMessages = pgTable('hermes_lab_messages', {
 
 
 
-/** Append-only, tenant-scoped timeline shared by workflows and authorized agents. */
 /** Durable task queue for human and agent work assignment. */
 export const workTasks = pgTable('work_tasks', {
   id: text('id').primaryKey(),
@@ -594,6 +593,7 @@ export const workTasks = pgTable('work_tasks', {
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });
 
+/** Append-only, tenant-scoped timeline shared by workflows and authorized agents. */
 export const workEvents = pgTable('work_events', {
   id: text('id').primaryKey(),
   contractorId: text('contractor_id').notNull(),
