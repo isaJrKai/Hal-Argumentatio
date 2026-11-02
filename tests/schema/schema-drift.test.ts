@@ -32,7 +32,12 @@ describe('Database: Schema Drift & Table Invariant Tests', () => {
     'revenueSimulations',
     'revenueOutcomes',
     'halLoops',
-    'halLoopEvents'
+    'halLoopEvents',
+    'hermesLabArtifacts',
+    'hermesDiagnosticIncidents',
+    'hermesLabMessages',
+    'workTasks',
+    'workEvents'
   ];
 
   it('verifies that all critical business tables are defined in Drizzle schema', () => {
@@ -40,6 +45,28 @@ describe('Database: Schema Drift & Table Invariant Tests', () => {
       expect(schema).toHaveProperty(tableName);
       expect((schema as any)[tableName]).toBeDefined();
     }
+  });
+
+  it('validates the durable work queue and shared work ledger schema', () => {
+    const tasksTable = schema.workTasks;
+    const eventsTable = schema.workEvents;
+    expect(tasksTable).toBeDefined();
+    expect(eventsTable).toBeDefined();
+
+    for (const column of ['id', 'contractorId', 'taskType', 'status', 'assignedWorker', 'entityType', 'entityId', 'correlationId', 'requiresApproval']) {
+      expect(Object.keys(tasksTable)).toContain(column);
+    }
+    for (const column of ['id', 'contractorId', 'eventType', 'entityType', 'entityId', 'sourceModule', 'correlationId', 'payload']) {
+      expect(Object.keys(eventsTable)).toContain(column);
+    }
+  });
+
+  it('validates the Hermes persistence tables used by the specialist agent', () => {
+    expect(schema.hermesLabArtifacts).toBeDefined();
+    expect(schema.hermesDiagnosticIncidents).toBeDefined();
+    expect(schema.hermesLabMessages).toBeDefined();
+    expect(Object.keys(schema.hermesLabArtifacts)).toContain('contractorId');
+    expect(Object.keys(schema.hermesLabArtifacts)).toContain('content');
   });
 
   it('validates critical columns on the leads table including encrypted PII columns', () => {
