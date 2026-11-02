@@ -5740,7 +5740,7 @@ app.get('/api/outreach/bridges/status', authenticate, async (req, res) => {
         accessToken: cfg.whatsapp.accessToken ? '••••••••' : undefined,
         deliveredCount: whatsappDelivered,
         replyRate: null,
-        status: cfg.whatsapp.enabled ? 'configured_unverified' : 'not_configured'
+        status: cfg.whatsapp.enabled ? 'tenant_routing_required' : 'not_configured'
       },
       email: {
         enabled: cfg.email.enabled,
@@ -5785,9 +5785,16 @@ app.post('/api/outreach/bridges/configure', authenticate, async (req, res) => {
     return res.status(400).json({ error: 'A supported channel is required.' });
   }
   try {
-    const current = await getBridgesForContractor(contractorId);
+    const credentials = await getTenantConnectorCredentials(contractorId);
+    let saved: Record<string, any> = {};
+    try {
+      const parsed = credentials.bridgeSettings ? JSON.parse(credentials.bridgeSettings) : {};
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) saved = parsed;
+    } catch {
+      throw new Error('Existing saved bridge settings are invalid and must be repaired before updating.');
+    }
     const sanitized = sanitizeBridgeSettings(channel as keyof ChannelBridgeSettings, settings);
-    const next = { ...current, [channel]: { ...current[channel as keyof ChannelBridgeSettings], ...sanitized } };
+    const next = { ...saved, [channel]: { ...(saved[channel] || {}), ...sanitized } };
     const id = 'conn_' + crypto.createHash('sha256').update(`${contractorId}:bridgeSettings`).digest('hex');
     const encryptedValue = encrypt(JSON.stringify(next));
     await pgDb.insert(connectorCredentials).values({
