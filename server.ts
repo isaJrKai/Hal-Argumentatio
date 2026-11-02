@@ -6599,10 +6599,10 @@ app.post('/api/connectors/credentials', authenticate, async (req, res) => {
   }
 });
 
-app.get('/api/connectors/health', authenticate, (req, res) => {
+app.get('/api/connectors/health', authenticate, async (req, res) => {
   const contractorId = (req as any).contractorId;
   try {
-    const creds = db.getConnectorCredentials(contractorId);
+    const creds = await getTenantConnectorCredentials(contractorId);
 
     const services = [
       { id: 'stripe', name: 'Stripe Billing API', category: 'billing' },
@@ -10924,7 +10924,7 @@ async function startServer() {
         entry.eventType === 'phase3_outbox_inspected' ||
         entry.entityType === 'conversion_outbox'
       );
-      const credentials = db.getConnectorCredentials(contractorId);
+      const credentials = await getTenantConnectorCredentials(contractorId);
 
       const gateways = [
         { id: 'resend_email', name: 'Resend Email API', type: 'email', configured: Boolean(credentials.resend), status: credentials.resend ? 'configured_unverified' : 'not_configured', mode: credentials.resend ? 'Credential saved; provider not verified' : 'No credential configured', latencyMs: null, encryption: 'HTTPS API', deliverability: null, lastHeartbeat: null },
