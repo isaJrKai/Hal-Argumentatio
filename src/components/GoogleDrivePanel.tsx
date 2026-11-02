@@ -132,9 +132,9 @@ export default function GoogleDrivePanel() {
         setIsAuthenticated(true);
         toast({
           variant: 'success',
-          title: 'Google Drive Sync Active',
+          title: 'Google Workspace Connected',
           description: `Successfully authenticated as ${result.user.email}.`,
-          whatNext: 'Ready to manage business documents.'
+          whatNext: 'Drive access is ready. Calendar is read-only, and Gmail send permission is available for explicit HAL actions.'
         });
       }
     } catch (err: any) {
@@ -167,8 +167,8 @@ export default function GoogleDrivePanel() {
       setAiResponse('');
       toast({
         variant: 'info',
-        title: 'Account Disconnected',
-        description: 'Google Drive authorization credentials purged.'
+        title: 'Google Workspace Disconnected',
+        description: 'Workspace access tokens and Firebase session cleared.'
       });
     } catch (err: any) {
       console.error(err);
@@ -464,9 +464,9 @@ Analyze this file according to the User Goal, offering concrete business strateg
           </div>
           
           <div className="space-y-2">
-            <h2 className="text-sm font-mono text-text-primary uppercase font-bold">Authenticate Google Drive</h2>
+            <h2 className="text-sm font-mono text-text-primary uppercase font-bold">Authenticate Google Workspace</h2>
             <p className="text-xs text-text-secondary leading-relaxed">
-              To browse, upload, and utilize technical audits or pitch templates directly from your storage, connect your Google Drive account securely.
+              Connect Google Workspace to browse and manage Drive files. This authorization also requests read-only Calendar access and permission for HAL to send Gmail messages only when you explicitly trigger an email action.
             </p>
           </div>
 
