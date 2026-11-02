@@ -289,6 +289,8 @@ app.get('/api/ready', async (_req, res) => {
         to_regclass('public.revenue_records') IS NOT NULL AS revenue_records,
         to_regclass('public.campaigns') IS NOT NULL AS campaigns,
         to_regclass('public.work_tasks') IS NOT NULL AS work_tasks,
+        to_regclass('public.staff_members') IS NOT NULL AS staff_members,
+        EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'work_tasks' AND column_name = 'assigned_staff_id') AS work_task_staff_owner,
         to_regclass('public.work_events') IS NOT NULL AS work_events,
         to_regclass('public.hermes_lab_artifacts') IS NOT NULL AS hermes_lab_artifacts,
         to_regclass('public.communications_outbox') IS NOT NULL AS communications_outbox,
@@ -740,8 +742,9 @@ app.post('/api/work-tasks', authenticate, async (req, res) => {
       return [created];
     });
     return res.status(201).json({ task });
-  } catch (err) {
+  } catch (err: any) {
     console.error('[HAL Work Tasks] Create failed:', err);
+    if (err?.code === '23505') return res.status(409).json({ error: 'The selected staff member already has active work.' });
     return res.status(503).json({ error: 'Unable to create the work task.' });
   }
 });
