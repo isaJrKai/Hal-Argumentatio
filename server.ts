@@ -3389,8 +3389,8 @@ app.post('/api/revenues', authenticate, async (req, res) => {
   const { leadId, amountUsd, source } = req.body || {};
   const amount = Number(amountUsd);
 
-  if (typeof leadId !== 'string' || !leadId.trim() || !Number.isFinite(amount) || amount <= 0) {
-    return res.status(400).json({ error: 'A valid leadId and a positive finite amountUsd are required.' });
+  if (typeof leadId !== 'string' || !leadId.trim() || !Number.isSafeInteger(amount) || amount <= 0) {
+    return res.status(400).json({ error: 'A valid leadId and a positive whole-dollar amountUsd are required.' });
   }
 
   try {
@@ -4591,8 +4591,8 @@ app.post('/api/learning/winloss', authenticate, async (req, res) => {
   if (typeof businessName !== 'string' || !businessName.trim() || !['won', 'lost'].includes(outcome)) {
     return res.status(400).json({ error: 'Business name and a valid won/lost outcome are required.' });
   }
-  if (!Number.isFinite(closedValue) || closedValue < 0) {
-    return res.status(400).json({ error: 'Closed value must be a finite, non-negative amount.' });
+  if (!Number.isSafeInteger(closedValue) || closedValue < 0) {
+    return res.status(400).json({ error: 'Closed value must be a non-negative whole-dollar amount.' });
   }
 
   try {
