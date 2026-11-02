@@ -32,6 +32,11 @@ export function canTransitionWorkTask(from: string, to: string): boolean {
     ALLOWED_TRANSITIONS[from as WorkTaskStatus].includes(to as WorkTaskStatus);
 }
 
+export function canExecutorClaimWorkTask(task: { status: string; requiresApproval: boolean; approvedAt?: Date | string | null }): boolean {
+  if (task.status !== 'queued') return false;
+  return !task.requiresApproval || Boolean(task.approvedAt);
+}
+
 export async function listWorkTasks(db: any, contractorId: string, limit = 50) {
   if (!contractorId) throw new Error('Tenant ID is required.');
   const safeLimit = Math.max(1, Math.min(100, Math.floor(limit)));
