@@ -206,11 +206,16 @@ export async function bootstrapPostgresTables(poolInstance?: Pool): Promise<void
 
       CREATE TABLE IF NOT EXISTS learning_insights (
         id TEXT PRIMARY KEY,
+        contractor_id TEXT NOT NULL,
         metric TEXT NOT NULL,
         lesson TEXT NOT NULL,
         confidence_shift DOUBLE PRECISION NOT NULL,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
       );
+      ALTER TABLE learning_insights ADD COLUMN IF NOT EXISTS contractor_id TEXT;
+      UPDATE learning_insights SET contractor_id = 'system' WHERE contractor_id IS NULL;
+      ALTER TABLE learning_insights ALTER COLUMN contractor_id SET NOT NULL;
+      CREATE INDEX IF NOT EXISTS learning_insights_tenant_created_idx ON learning_insights (contractor_id, created_at DESC);
 
       CREATE TABLE IF NOT EXISTS chat_projects (
         id TEXT PRIMARY KEY,
