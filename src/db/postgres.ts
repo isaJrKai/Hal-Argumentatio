@@ -438,6 +438,8 @@ export async function bootstrapPostgresTables(poolInstance?: Pool): Promise<void
       );
 
       ALTER TABLE communications_outbox ALTER COLUMN lead_id DROP NOT NULL;
+      ALTER TABLE communications_outbox DROP CONSTRAINT IF EXISTS communications_outbox_idempotency_key_key;
+      CREATE UNIQUE INDEX IF NOT EXISTS communications_outbox_tenant_idempotency_idx ON communications_outbox (contractor_id, idempotency_key);
 
       CREATE TABLE IF NOT EXISTS communications_delivery_events (
         id TEXT PRIMARY KEY,
