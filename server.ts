@@ -4943,10 +4943,35 @@ app.post('/api/learning/winloss', authenticate, async (req, res) => {
 
 // ─── AUTONOMOUS OUTREACH SEQUENCE BUILDER ─────────────────────────────────────
 
+async function getTenantOutreachSequences(contractorId: string) {
+  const legacySequences = db.getOutreachSequences(contractorId) || [];
+  for (const legacy of legacySequences) {
+    if (!legacy?.id || !Array.isArray(legacy.steps)) continue;
+    const toDate = (value: any, fallback: Date) => {
+      if (!value) return fallback;
+      const parsed = new Date(value);
+      return Number.isFinite(parsed.getTime()) ? parsed : fallback;
+    };
+    const now = new Date();
+    await pgDb.insert(outreachSequences).values({
+      id: String(legacy.id),
+      contractorId,
+      name: String(legacy.name || 'Imported outreach sequence'),
+      niche: typeof legacy.niche === 'string' ? legacy.niche : 'General',
+      steps: legacy.steps,
+      createdAt: toDate(legacy.createdAt, now),
+      updatedAt: toDate(legacy.updatedAt || legacy.createdAt, now)
+    }).onConflictDoNothing();
+  }
+  return pgDb.select().from(outreachSequences)
+    .where(eq(outreachSequences.contractorId, contractorId))
+    .orderBy(desc(outreachSequences.createdAt));
+}
+
 app.get('/api/outreach/sequences', authenticate, async (req, res) => {
   const contractorId = (req as any).contractorId;
   try {
-    const sequences = await pgDb.select().from(outreachSequences).where(eq(outreachSequences.contractorId, contractorId)).orderBy(desc(outreachSequences.createdAt));
+    const sequences = await getTenantOutreachSequences(contractorId);
     res.json(sequences);
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -10494,7 +10519,7 @@ async function startServer() {
 
     try {
       const integrity = db.verifyLedgerIntegrity(contractorId);
-      const sequences = db.getOutreachSequences(contractorId);
+      const sequences = await getTenantOutreachSequences(contractorId);
       const sequenceTemplates = getDefaultCadenceSequences();
       const outbox = await pgDb.select().from(conversionOutbox).where(eq(conversionOutbox.contractorId, contractorId));
       const jobs = await pgDb.select().from(schedulerJobs).where(eq(schedulerJobs.contractorId, contractorId)).orderBy(desc(schedulerJobs.createdAt));
@@ -10577,7 +10602,7 @@ async function startServer() {
     const { sequenceId, businessName, ownerName, city, niche } = req.body || {};
 
     try {
-      const savedSequences = db.getOutreachSequences(contractorId);
+      const savedSequences = await getTenantOutreachSequences(contractorId);
       const savedSequence = savedSequences.find(sequence => sequence.id === sequenceId);
       const templates = getDefaultCadenceSequences();
       const templateSequence = templates.find(sequence => sequence.id === sequenceId) || templates[0];
