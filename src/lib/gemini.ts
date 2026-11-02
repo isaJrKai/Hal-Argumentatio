@@ -718,20 +718,6 @@ RESPONSE STANDARD
             toolCalls: result.toolCalls.length ? result.toolCalls : undefined
           };
         }
-        if (toolRuntime && geminiTools.length) {
-          const result = await callNemotronWithTools(
-            messages,
-            toolRuntime.tools.filter(tool => tool.name !== 'hermes_synthesize_lab_asset'),
-            toolRuntime.execute,
-            0.3
-          );
-          return {
-            text: result.text || (result.toolCalls.length
-              ? 'I processed the available tool calls, but the model did not return a final explanation. Review Work Queue and Work History for their results.'
-              : 'Nemotron returned no response.'),
-            toolCalls: result.toolCalls.length ? result.toolCalls : undefined
-          };
-        }
         const text = await callNemotron(messages, 0.3);
         return { text };
       } catch (err: any) {
@@ -753,6 +739,21 @@ RESPONSE STANDARD
           }
         }
         messages.push({ role: "user", content: message });
+
+        if (toolRuntime && geminiTools.length) {
+          const result = await callNemotronWithTools(
+            messages,
+            toolRuntime.tools.filter(tool => tool.name !== 'hermes_synthesize_lab_asset'),
+            toolRuntime.execute,
+            0.3
+          );
+          return {
+            text: result.text || (result.toolCalls.length
+              ? 'I processed the available tool calls, but the model did not return a final explanation. Review Work Queue and Work History for their results.'
+              : 'Nemotron returned no response.'),
+            toolCalls: result.toolCalls.length ? result.toolCalls : undefined
+          };
+        }
 
         const text = await callNemotron(messages, 0.3);
         return { text };
