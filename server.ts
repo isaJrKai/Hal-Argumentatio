@@ -1,4 +1,4 @@
-import { getDrizzleDb } from './src/db/postgres';
+import { testPostgresConnection, bootstrapPostgresTables } from './src/db/postgres';
 import express from 'express';
 import path from 'path';
 import fs from 'fs';
@@ -19,7 +19,7 @@ import {
   Forecast,
   Recommendation
 } from './src/db/db';
-import { db as pgDb } from './src/db/index.ts';
+import { db as pgDb, createPool as getApplicationPostgresPool } from './src/db/index.ts';
 import { contractors, auditLogs, leads, leadEvents, revenueRecords, campaigns, winLossRecords, performanceSnapshots, recommendations, forecasts, learningInsights, chatMessages, chatProjects, chatConversations, missions, clientProjects, outreachSequences, apiKeys, notifications, schedulerJobs, leadAttribution, conversionOutbox, googleAdsDailyPerformance, revenueExperiments, revenueRecommendations, revenueRecommendationEvents, revenueSimulations, revenueOutcomes, communicationsOutbox, communicationsDeliveryEvents, halLoops, halLoopEvents, hermesLabArtifacts, hermesDiagnosticIncidents, hermesLabMessages, workEvents, workTasks } from './src/db/schema.ts';
 import { eq, inArray, desc, and, or, like, sql, gte, lte } from 'drizzle-orm';
 import { 
@@ -267,9 +267,43 @@ app.use((req, res, next) => {
   next();
 });
 
-// API Health Check
-app.get('/api/health', (req, res) => {
+// Liveness: confirms the HTTP process is responding.
+app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
+// Readiness: confirms the same PostgreSQL pool used by application queries is usable
+// and the core cross-module tables exist. A live process is not necessarily ready.
+app.get('/api/ready', async (_req, res) => {
+  let client: any;
+  try {
+    const pool = getApplicationPostgresPool();
+    client = await pool.connect();
+    const result = await client.query(`
+      SELECT
+        to_regclass('public.contractors') IS NOT NULL AS contractors,
+        to_regclass('public.leads') IS NOT NULL AS leads,
+        to_regclass('public.client_projects') IS NOT NULL AS client_projects,
+        to_regclass('public.revenue_records') IS NOT NULL AS revenue_records,
+        to_regclass('public.campaigns') IS NOT NULL AS campaigns,
+        to_regclass('public.work_tasks') IS NOT NULL AS work_tasks,
+        to_regclass('public.work_events') IS NOT NULL AS work_events,
+        to_regclass('public.hermes_lab_artifacts') IS NOT NULL AS hermes_lab_artifacts,
+        to_regclass('public.communications_outbox') IS NOT NULL AS communications_outbox,
+        to_regclass('public.hal_loops') IS NOT NULL AS hal_loops
+    `);
+    const checks = result.rows[0] || {};
+    const missingTables = Object.entries(checks).filter(([, exists]) => exists !== true).map(([name]) => name);
+    if (missingTables.length) {
+      return res.status(503).json({ status: 'not_ready', database: 'connected', missingTables, timestamp: new Date().toISOString() });
+    }
+    return res.json({ status: 'ready', database: 'connected', checkedTables: Object.keys(checks), timestamp: new Date().toISOString() });
+  } catch (error: any) {
+    console.error('[HAL readiness] Database check failed:', error?.message || error);
+    return res.status(503).json({ status: 'not_ready', database: 'unavailable', error: 'The application database is not ready.', timestamp: new Date().toISOString() });
+  } finally {
+    client?.release();
+  }
 });
 
 // Public Link & Community Sandbox Status & Controls
@@ -6081,8 +6115,7 @@ app.get('/api/neural/network', authenticate, async (req, res) => {
     const cityFilter = String(req.query.city || '').trim();
     const nicheFilter = String(req.query.niche || '').trim().toLowerCase();
     const timesfmConfigured = Boolean(process.env.TIMESFM_SERVICE_URL && (process.env.TIMESFM_API_KEY || '').length >= 32);
-    const dbInstance = getDrizzleDb();
-    if (!dbInstance) throw new Error('Neon/PostgreSQL is unavailable');
+    const dbInstance = pgDb;
 
     // Every record below is scoped to the authenticated tenant before graph construction.
     const [allLeads, allOutcomes, adsRows, recentEvents] = await Promise.all([
@@ -6693,8 +6726,8 @@ app.post('/api/system/postgres-connect', authenticate, requireRole('admin'), asy
   }
 
   try {
-    const { setCustomDatabaseUrl, testPostgresConnection } = await import('./src/db/postgres');
-    setCustomDatabaseUrl(databaseUrl);
+    // This is an isolated connection test only. It must not silently switch
+    // the database pool used by live application queries.
     const result = await testPostgresConnection(databaseUrl);
     
     db.addAuditLog({
@@ -6721,8 +6754,8 @@ app.post('/api/system/postgres-sync', authenticate, requireRole('admin'), async 
   }
   
   try {
-    const { getPostgresPool, bootstrapPostgresTables } = await import('./src/db/postgres');
-    const pool = getPostgresPool();
+    // Sync into the same pool used by the application, not a second settings-only pool.
+    const pool = getApplicationPostgresPool();
     
     if (!pool) {
       return res.status(400).json({ 
@@ -6885,9 +6918,19 @@ app.post('/api/system/postgres-sync', authenticate, requireRole('admin'), async 
 
 app.get('/api/system/postgres-status', authenticate, async (req, res) => {
   try {
-    const { testPostgresConnection } = await import('./src/db/postgres');
-    const result = await testPostgresConnection();
-    res.json(result);
+    const pool = getApplicationPostgresPool();
+    const client = await pool.connect();
+    try {
+      const result = await client.query('SELECT version(), current_database(), current_user;');
+      res.json({
+        connected: true,
+        message: 'Connected to the application PostgreSQL database.',
+        version: String(result.rows[0]?.version || 'PostgreSQL').split(' on ')[0],
+        provider: String(result.rows[0]?.version || '').toLowerCase().includes('neon') ? 'Neon PostgreSQL' : 'PostgreSQL'
+      });
+    } finally {
+      client.release();
+    }
   } catch (err: any) {
     res.json({ connected: false, message: err.message });
   }
@@ -8932,55 +8975,8 @@ async function startServer() {
     }
   });
 
-  app.get('/api/financials/overview', authenticate, async (req, res) => {
-    const contractorId = (req as any).contractorId;
-    try {
-      const records = await pgDb.select().from(revenueRecords).where(eq(revenueRecords.contractorId, contractorId));
-      const projects = await pgDb.select().from(clientProjects).where(eq(clientProjects.contractorId, contractorId));
-
-      let currentMrr = 14500;
-      if (records.length > 0) {
-        currentMrr = records.reduce((sum, r) => sum + Number(r.amountUsd || 0), 0) || 14500;
-      } else if (projects.length > 0) {
-        currentMrr = projects.length * 2400;
-      }
-
-      const activeCount = projects.length > 0 ? projects.length : Math.max(6, Math.floor(currentMrr / 2400));
-      const arr = currentMrr * 12;
-      const blendedCac = 450;
-      const ltv = currentMrr > 0 ? Math.round((currentMrr / Math.max(1, activeCount)) * 14) : 18500;
-      const ltvToCac = Number((ltv / blendedCac).toFixed(1));
-
-      res.json({
-        currentMrrUsd: currentMrr,
-        arrUsd: arr,
-        activeClientCount: activeCount,
-        ltvToCacRatio: ltvToCac > 0 ? ltvToCac : 4.2,
-        blendedCacUsd: blendedCac,
-        averageLtvUsd: ltv,
-        averageContractLengthMonths: 14,
-        churnRatePercent: 1.8,
-        projectedMrr6Months: Math.round(currentMrr * 1.15),
-        projectedMrr12Months: Math.round(currentMrr * 1.35),
-        cashRunwayMonths: 18,
-        mrrHistory: [
-          { month: 'Apr', mrr: Math.round(currentMrr * 0.75) },
-          { month: 'May', mrr: Math.round(currentMrr * 0.82) },
-          { month: 'Jun', mrr: Math.round(currentMrr * 0.90) },
-          { month: 'Jul', mrr: Math.round(currentMrr * 0.95) },
-          { month: 'Aug', mrr: Math.round(currentMrr * 0.98) },
-          { month: 'Sep', mrr: currentMrr },
-        ],
-        tierDistribution: [
-          { tier: 'Enterprise Retainer', count: Math.max(1, Math.floor(activeCount * 0.3)), totalRevenue: Math.round(currentMrr * 0.5) },
-          { tier: 'Growth Acceleration', count: Math.max(2, Math.floor(activeCount * 0.5)), totalRevenue: Math.round(currentMrr * 0.35) },
-          { tier: 'Starter SEO/Ads', count: Math.max(1, Math.floor(activeCount * 0.2)), totalRevenue: Math.round(currentMrr * 0.15) },
-        ]
-      });
-    } catch (err: any) {
-      res.status(500).json({ success: false, error: err.message });
-    }
-  });
+  // The canonical financial overview route is registered above. Do not register a
+  // second handler here: Express would make this dead code and hide stale metrics.
 
   // ─── PHASE 8A: HAL MCP TOOL GATEWAY FOR HERMES AGENT ────────────────────
   app.post('/api/mcp', authenticate, async (req, res) => {
