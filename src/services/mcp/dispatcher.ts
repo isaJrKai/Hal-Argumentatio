@@ -433,7 +433,11 @@ export async function executeMcpTool(
           : {
               replyMessageId: (result as any).replyMessageId,
               replyText: (result as any).replyText,
-              updatedArtifactId: (result as any).updatedArtifact?.id || null
+              updatedArtifactId: (result as any).updatedArtifact?.id || null,
+              toolCalls: ((result as any).toolCalls || []).map((call: any) => ({
+                name: call.name,
+                success: call.result?.success !== false
+              }))
             };
         const [completed] = await pgDb.update(workTasks).set({
           status: 'completed', output: receipt, completedAt: new Date(), updatedAt: new Date()
