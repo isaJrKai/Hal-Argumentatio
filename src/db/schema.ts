@@ -117,6 +117,7 @@ export const predictionOutcomes = pgTable('prediction_outcomes', {
 
 export const learningInsights = pgTable('learning_insights', {
   id: text('id').primaryKey(),
+  contractorId: text('contractor_id').notNull(),
   metric: text('metric').notNull(),
   lesson: text('lesson').notNull(),
   confidenceShift: doublePrecision('confidence_shift').notNull(),
