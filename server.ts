@@ -8791,23 +8791,14 @@ async function startServer() {
   app.get('/api/hermes/artifacts', authenticate, async (req, res) => {
     const contractorId = (req as any).contractorId;
     try {
-      let artifacts = await pgDb
+      const artifacts = await pgDb
         .select()
         .from(hermesLabArtifacts)
         .where(eq(hermesLabArtifacts.contractorId, contractorId))
         .orderBy(desc(hermesLabArtifacts.createdAt));
 
-      // If empty, auto-generate default starter landing page and schema artifact so user can preview immediately
-      if (artifacts.length === 0) {
-        await executeHermesLabTool('landing_page', {}, contractorId);
-        await executeHermesLabTool('seo_schema_generator', {}, contractorId);
-        artifacts = await pgDb
-          .select()
-          .from(hermesLabArtifacts)
-          .where(eq(hermesLabArtifacts.contractorId, contractorId))
-          .orderBy(desc(hermesLabArtifacts.createdAt));
-      }
-
+      // Listing artifacts is read-only. Empty workspaces remain empty until an
+      // operator explicitly queues a generation task through Hermes Work Queue.
       res.json({ success: true, artifacts });
     } catch (err: any) {
       console.error('[Hermes Artifacts Fetch Error]', err);
