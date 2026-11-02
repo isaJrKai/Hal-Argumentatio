@@ -50,6 +50,7 @@ export async function listWorkTasks(db: any, contractorId: string, limit = 50) {
     attemptCount: workTasks.attemptCount,
     maxAttempts: workTasks.maxAttempts,
     errorMessage: workTasks.errorMessage,
+    output: workTasks.output,
     requiresApproval: workTasks.requiresApproval,
     approvedBy: workTasks.approvedBy,
     approvedAt: workTasks.approvedAt,
