@@ -311,6 +311,15 @@ export async function bootstrapPostgresTables(poolInstance?: Pool): Promise<void
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
       );
 
+      CREATE TABLE IF NOT EXISTS connector_credentials (
+        id TEXT PRIMARY KEY,
+        contractor_id TEXT NOT NULL,
+        service TEXT NOT NULL,
+        encrypted_value TEXT NOT NULL,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS connector_credentials_tenant_idx ON connector_credentials (contractor_id, service);
+
       CREATE TABLE IF NOT EXISTS notifications (
         id TEXT PRIMARY KEY,
         contractor_id TEXT NOT NULL,
