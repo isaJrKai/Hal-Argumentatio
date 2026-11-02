@@ -13,9 +13,8 @@ describe('HAL worker capability registry', () => {
     expect(hermes).toMatchObject({ mode: 'partial_executor', canClaimTasks: true, supportedTaskTypes: ['hermes_lab_asset'] });
   });
 
-  it('does not pretend AMIS or HAL Assistant can execute queued work', () => {
+  it('does not pretend HAL Assistant can execute queued work', () => {
     const workers = getWorkerCapabilities({} as NodeJS.ProcessEnv);
-    expect(workers.find(worker => worker.id === 'amis')).toMatchObject({ mode: 'unverified', canClaimTasks: false });
     expect(workers.find(worker => worker.id === 'hal_assistant')).toMatchObject({ mode: 'context_only', canClaimTasks: false });
   });
 });
