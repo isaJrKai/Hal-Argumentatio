@@ -19,9 +19,12 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: npm
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
       - name: Install locked dependencies
-        run: npm ci
+        run: bun install --frozen-lockfile
       - name: Set up Python for inference service syntax check
         uses: actions/setup-python@v5
         with:
