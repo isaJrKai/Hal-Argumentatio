@@ -194,9 +194,12 @@ export const HAL_MCP_TOOLS: McpToolDefinition[] = [
 ];
 
 export async function executeMcpTool(
-  toolName: string, 
-  rawParams: any, 
-  contractorId: string
+  toolName: string,
+  rawParams: any,
+  contractorId: string,
+  actor: { actorType: 'human' | 'agent' | 'system' | 'integration'; actorId: string; sourceModule?: string } = {
+    actorType: 'agent', actorId: 'mcp_client', sourceModule: 'mcp_gateway'
+  }
 ): Promise<any> {
   const auditId = crypto.randomUUID();
   
