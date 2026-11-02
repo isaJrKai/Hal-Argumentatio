@@ -147,7 +147,7 @@ export async function callNemotronWithTools(
     } catch (err: any) {
       if (toolCalls.length) {
         return {
-          text: 'Some tool calls were completed before the model connection failed. Their confirmed results are recorded in Work Queue and Work History; no additional actions were retried.',
+          text: 'Tool calls were processed before the model connection failed. Check each recorded success or failure in Work Queue and Work History; no tool was retried automatically.',
           toolCalls
         };
       }
