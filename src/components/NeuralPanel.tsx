@@ -29,11 +29,18 @@ export default function NeuralPanel() {
   // Refs for animation loop without dependency closure issues
   const nodesRef = useRef<any[]>([]);
   const linksRef = useRef<any[]>([]);
+  const staticNodeCountRef = useRef(0);
   const particlesRef = useRef<any[]>([]);
   const scrubRef = useRef(100);
   const influenceRef = useRef(false);
   const drawRef = useRef<() => void>(() => {});
   const networkRequestIdRef = useRef(0);
+
+  const getTimelineVisibleNodes = () => {
+    const temporalCount = Math.max(0, nodesRef.current.length - staticNodeCountRef.current);
+    const visibleTemporalCount = Math.ceil(temporalCount * (scrubRef.current / 100));
+    return nodesRef.current.slice(0, staticNodeCountRef.current + visibleTemporalCount);
+  };
 
   const fetchNetwork = async () => {
     const requestId = ++networkRequestIdRef.current;
@@ -211,7 +218,19 @@ export default function NeuralPanel() {
     canvas.width = width;
     canvas.height = height;
 
-    const nodes = rawNodes.map(d => ({ ...d }));
+    const copiedNodes = rawNodes.map(d => ({ ...d }));
+    const staticNodes = copiedNodes.filter(node => {
+      const timestamp = node.createdAt ? new Date(node.createdAt).getTime() : NaN;
+      return node.type === 'forecast' || !Number.isFinite(timestamp);
+    });
+    const historicalNodes = copiedNodes
+      .filter(node => {
+        const timestamp = node.createdAt ? new Date(node.createdAt).getTime() : NaN;
+        return node.type !== 'forecast' && Number.isFinite(timestamp);
+      })
+      .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+    const nodes = [...staticNodes, ...historicalNodes];
+    staticNodeCountRef.current = staticNodes.length;
     const links = rawLinks.map(d => ({ ...d }));
 
     // Reapply saved positions from localStorage
@@ -286,8 +305,7 @@ export default function NeuralPanel() {
       const sy = transform.invertY(my);
       
       // Only find visible nodes based on timeline scrub
-      const maxNodes = Math.max(1, Math.ceil(nodesRef.current.length * (scrubRef.current / 100)));
-      const visibleNodes = nodesRef.current.slice(0, maxNodes);
+      const visibleNodes = getTimelineVisibleNodes();
       
       let closestNode = null;
       let minDist = Infinity;
@@ -319,8 +337,7 @@ export default function NeuralPanel() {
       const sx = transform.invertX(mx);
       const sy = transform.invertY(my);
       
-      const maxNodes = Math.max(1, Math.ceil(nodesRef.current.length * (scrubRef.current / 100)));
-      const visibleNodes = nodesRef.current.slice(0, maxNodes);
+      const visibleNodes = getTimelineVisibleNodes();
       
       let closestNode = null;
       let minDist = Infinity;
@@ -425,8 +442,7 @@ export default function NeuralPanel() {
       ctx.fillText("PREDICTION", width * 0.75, height * 0.8);
     }
 
-    const timelineCount = Math.max(1, Math.ceil(nodesRef.current.length * (scrubRef.current / 100)));
-    const visibleNodesMap = new Set(nodesRef.current.slice(0, timelineCount).map(n => n.id));
+    const visibleNodesMap = new Set(getTimelineVisibleNodes().map(n => n.id));
 
     linksRef.current.forEach(link => {
       if (!visibleNodesMap.has(link.source.id) || !visibleNodesMap.has(link.target.id)) return;
@@ -739,8 +755,8 @@ export default function NeuralPanel() {
             </div>
             
             {networkData.telemetry
-              && Number(networkData.telemetry.matchedLeadCount || 0) === 0
-              && Number(networkData.telemetry.matchedOutcomeCount || 0) === 0 && (
+              && Number(networkData.telemetry.leadsInScope || 0) === 0
+              && Number(networkData.telemetry.recordedOutcomes || 0) === 0 && (
                 <div className="absolute inset-x-6 top-6 z-10 mx-auto max-w-md rounded-lg border border-border-dim bg-bg-raised/95 px-4 py-3 text-center shadow-sm pointer-events-none">
                   <p className="text-sm font-semibold text-text-primary">No territory evidence yet</p>
                   <p className="mt-1 text-xs text-text-secondary">No matching leads or recorded outcomes for {activeNiche} in {activeCity}. The core systems shown are architecture, not learned connections.</p>
