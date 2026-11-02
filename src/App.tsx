@@ -51,6 +51,7 @@ import {
 
 import AuthPage from './components/AuthPage';
 const OverviewPanel = lazy(() => import('./components/OverviewPanel'));
+const WorkLedgerPanel = lazy(() => import('./components/WorkLedgerPanel'));
 const LeadsPanel = lazy(() => import('./components/LeadsPanel'));
 const BoardPanel = lazy(() => import('./components/BoardPanel'));
 const CampaignsPanel = lazy(() => import('./components/CampaignsPanel'));
@@ -1092,6 +1093,8 @@ export default function App() {
                         Loading workspace module…
                       </div>
                     }>
+                    {activeTab === 'work-history' && <WorkLedgerPanel token={token || ''} />}
+
                     {activeTab === 'overview' && (
                     <OverviewPanel 
                       leads={leads}
