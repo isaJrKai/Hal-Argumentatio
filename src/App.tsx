@@ -586,8 +586,8 @@ export default function App() {
       const results = await Promise.allSettled(endpoints.map(async endpoint => {
         const response = await fetch(endpoint.url, { headers });
         const payload = await readApiResponse<unknown>(response, endpoint.label);
-        if (payload === null || payload === undefined) {
-          throw new Error(`${endpoint.label}: API returned no data.`);
+        if (!Array.isArray(payload)) {
+          throw new Error(`${endpoint.label}: expected an array response but received ${payload === null ? 'null' : typeof payload}.`);
         }
         return payload;
       }));
