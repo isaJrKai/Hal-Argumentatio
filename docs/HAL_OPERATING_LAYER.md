@@ -31,7 +31,6 @@ The authenticated `GET /api/workers` endpoint reports execution capability separ
 | Human operator | Manual work | Can perform and record human-owned tasks |
 | HAL Assistant | Shared-context reader | Conversational tool execution is not yet connected |
 | Hermes | Partial executor | Only registered `hermes_lab_asset` tasks |
-| AMIS | Unverified | No implementation/runtime executor verified |
 | Gemini | Model provider | No standalone task executor registered |
 | Nemotron | Model provider | No standalone task executor registered |
 
@@ -65,8 +64,8 @@ A configured Gemini or NVIDIA API key does not mean that provider can claim queu
 
 ### Intelligence and agents
 - [x] Inject bounded tenant-scoped live business context into HAL Assistant, Hermes and the MCP operational-context tool; Gemini/Nemotron standalone agent flows remain to be integrated.
-- [x] Expose a truthful worker capability registry and authenticated readiness endpoint; AMIS identity and runtime executor remain unverified and must not be inferred from Hermes.
-- [ ] Complete the executor claim/heartbeat/receipt protocol for all supported workers. The first Hermes-only registered asset executor and bounded retry/cancellation/approval transitions exist; AMIS, Gemini and Nemotron remain non-executors.
+- [x] Expose a truthful worker capability registry and authenticated readiness endpoint; Hermes is the existing specialist agent and must be extended through its actual runtime rather than duplicated.
+- [ ] Complete the executor claim/heartbeat/receipt protocol for all supported workers. The first Hermes-only registered asset executor and bounded retry/cancellation/approval transitions exist; Gemini and Nemotron remain model providers until registered as task executors.
 - [ ] Make agent telemetry and neural graph views derive from persisted execution events.
 
 ### Verification and release
