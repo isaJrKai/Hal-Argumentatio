@@ -522,7 +522,7 @@ app.post('/api/work-tasks', authenticate, async (req, res) => {
   const input = body.input && typeof body.input === 'object' && !Array.isArray(body.input) ? body.input : null;
   const approvalRequiredByPolicy = requiresWorkTaskApproval(taskType, title, description);
   const requiresApproval = body.requiresApproval === true || approvalRequiredByPolicy;
-  const allowedWorkers = ['human', 'hal_assistant', 'hermes', 'amis', 'gemini', 'nemotron'];
+  const allowedWorkers = ['human', 'hal_assistant', 'hermes', 'gemini', 'nemotron'];
   if (!taskType || taskType.length > 80 || !title || title.length > 180 ||
       (description && description.length > 2000) ||
       !['low', 'normal', 'high', 'urgent'].includes(priority) ||
