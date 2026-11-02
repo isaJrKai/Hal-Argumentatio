@@ -29,6 +29,8 @@ jobs:
         with:
           bun-version: latest
       - name: Install the current frozen dependency graph
+        run: bun install --lockfile-only
+      - name: Install the regenerated frozen dependency graph
         run: bun install --frozen-lockfile
       - name: Apply compatible security updates
         run: bun audit fix || true
