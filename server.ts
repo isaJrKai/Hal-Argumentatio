@@ -8828,7 +8828,7 @@ async function startServer() {
       const created = await executeMcpTool('hal_create_work_task', {
         taskType: 'hermes_lab_asset',
         title: `Hermes: ${toolId.replace(/_/g, ' ')}`,
-        description: 'Generate a draft Hermes Lab artifact from supplied parameters. No external publishing or communication.',
+        description: 'Create a local draft Hermes Lab artifact from supplied parameters. External actions are out of scope.',
         assignedWorker: 'hermes',
         priority: 'normal',
         input: { toolId, parameters, ...(typeof promptOverride === 'string' ? { promptOverride } : {}) }
