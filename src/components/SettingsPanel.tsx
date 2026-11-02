@@ -230,7 +230,7 @@ export default function SettingsPanel({
   const [postgresSuccess, setPostgresSuccess] = useState<string | null>(null);
   const [postgresTesting, setPostgresTesting] = useState(false);
   const [postgresSyncing, setPostgresSyncing] = useState(false);
-  const [postgresStatus, setPostgresStatus] = useState<{ connected: boolean; message: string; version?: string; provider?: string; latencyMs?: number } | null>(null);
+  const [postgresStatus, setPostgresStatus] = useState<{ connected: boolean; schemaReady?: boolean; message: string; version?: string; provider?: string; latencyMs?: number } | null>(null);
 
   const handleTestPostgres = async () => {
     setPostgresTesting(true);
@@ -919,12 +919,16 @@ export default function SettingsPanel({
 
           {postgresStatus && (
             <div className={`p-3 border text-xs rounded-sm font-mono leading-relaxed ${
-              postgresStatus.connected 
+              postgresStatus.connected && postgresStatus.schemaReady !== false
                 ? 'bg-positive/10 border-positive/30 text-positive'
-                : 'bg-negative-dim border-negative/30 text-negative'
+                : postgresStatus.connected
+                  ? 'bg-amber-500/10 border-amber-500/30 text-amber-500'
+                  : 'bg-negative-dim border-negative/30 text-negative'
             }`}>
               <div className="flex items-center justify-between font-bold">
-                <span>{postgresStatus.connected ? 'POSTGRESQL ONLINE' : 'CONNECTION TEST RESULT'}</span>
+                <span>{postgresStatus.connected
+                  ? postgresStatus.schemaReady === false ? 'DATABASE REACHABLE · SCHEMA INCOMPLETE' : 'POSTGRESQL ONLINE'
+                  : 'CONNECTION TEST RESULT'}</span>
                 {postgresStatus.latencyMs !== undefined && (
                   <span className="text-[11px] px-1.5 py-0.5 bg-bg-dark rounded border border-border-dim text-text-secondary">{postgresStatus.latencyMs}ms</span>
                 )}
