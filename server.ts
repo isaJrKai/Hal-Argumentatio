@@ -5302,7 +5302,7 @@ app.get('/api/dispatch/history', authenticate, async (req, res) => {
         channel: row.channel,
         recipient: maskedRecipient,
         leadId: row.leadId,
-        leadBusinessName: leadNames.get(row.leadId) || 'Lead no longer available',
+        leadBusinessName: row.leadId ? (leadNames.get(row.leadId) || 'Lead no longer available') : 'Direct Recipient',
         status: row.status,
         mode: row.status === 'simulated' ? 'simulation' : 'live',
         providerId: row.providerMessageId,
@@ -5661,10 +5661,12 @@ function getBridgesForContractor(contractorId: string): ChannelBridgeSettings {
   return contractorBridges.get(contractorId)!;
 }
 
-app.get('/api/outreach/bridges/status', authenticate, (req, res) => {
+app.get('/api/outreach/bridges/status', authenticate, async (req, res) => {
   const contractorId = (req as any).contractorId;
   const cfg = getBridgesForContractor(contractorId);
-  const userLogs = dispatchLogs.filter(l => l.contractorId === contractorId);
+  const userLogs = await pgDb.select().from(communicationsOutbox)
+    .where(eq(communicationsOutbox.contractorId, contractorId))
+    .orderBy(desc(communicationsOutbox.createdAt)).limit(500);
   const whatsappDelivered = userLogs.filter(l => l.channel === 'whatsapp' && l.status === 'delivered').length;
   const emailDelivered = userLogs.filter(l => l.channel === 'email' && l.status === 'delivered').length;
   const smsDelivered = userLogs.filter(l => l.channel === 'sms' && l.status === 'delivered').length;
@@ -5947,7 +5949,6 @@ app.post('/api/outreach/dispatch', authenticate, async (req, res) => {
         subject: customizedSubject,
         preview: customizedMessage.slice(0, 100)
       };
-      dispatchLogs.push(entry);
       await recordWorkEvent(pgDb, {
         contractorId, eventType: 'outreach.email.submitted', entityType: leadId ? 'lead' : 'outreach_dispatch', entityId: leadId || entry.id,
         actorType: 'human', actorId: contractorId, sourceModule: 'outreach_dispatch', correlationId: entry.id,
@@ -6029,57 +6030,83 @@ app.post('/api/outreach/dispatch', authenticate, async (req, res) => {
     });
   }
 
-  const now = new Date().toISOString();
-  const entry: DispatchLogEntry = {
-    id: 'simulation_' + crypto.randomBytes(6).toString('hex'),
-    contractorId,
-    channel,
-    recipient: String(recipient),
-    leadId,
-    leadBusinessName: leadBusinessName || 'Direct Recipient',
-    status: 'simulated',
-    mode: 'simulation',
-    timestamp: now,
-    subject: customizedSubject || undefined,
-    preview: customizedMessage.slice(0, 100)
-  };
-  dispatchLogs.push(entry);
+  let linkedLead: any = null;
+  if (leadId) {
+    const [storedLead] = await pgDb.select().from(leads).where(and(
+      eq(leads.id, String(leadId)),
+      eq(leads.contractorId, contractorId)
+    )).limit(1);
+    if (!storedLead) return res.status(404).json({ success: false, code: 'LEAD_NOT_FOUND', error: 'The selected lead was not found in this workspace.' });
+    linkedLead = storedLead;
+  }
+  const idempotencyKey = String(requestedIdempotencyKey || req.headers['idempotency-key'] || crypto.randomUUID()).trim();
+  if (!idempotencyKey || idempotencyKey.length > 200) {
+    return res.status(400).json({ success: false, code: 'INVALID_IDEMPOTENCY_KEY', error: 'Idempotency key must be 1-200 characters.' });
+  }
+  const [existingSimulation] = await pgDb.select().from(communicationsOutbox).where(and(
+    eq(communicationsOutbox.contractorId, contractorId),
+    eq(communicationsOutbox.idempotencyKey, idempotencyKey)
+  )).limit(1);
+  if (existingSimulation) {
+    return res.status(200).json({ success: true, duplicate: true, dispatchId: existingSimulation.id, status: existingSimulation.status, mode: existingSimulation.status === 'simulated' ? 'simulation' : 'live' });
+  }
+
+  const now = new Date();
+  const dispatchId = 'simulation_' + crypto.randomUUID();
+  const resolvedLeadName = linkedLead?.businessName || leadBusinessName || 'Direct Recipient';
+  try {
+    await pgDb.insert(communicationsOutbox).values({
+      id: dispatchId,
+      contractorId,
+      leadId: linkedLead?.id || null,
+      channel,
+      provider: 'simulation',
+      recipientEncrypted: encrypt(String(recipient)),
+      subjectEncrypted: customizedSubject ? encrypt(customizedSubject) : null,
+      bodyEncrypted: encrypt(customizedMessage),
+      status: 'simulated',
+      idempotencyKey,
+      attempts: 0,
+      createdAt: now,
+      updatedAt: now
+    });
+  } catch (error: any) {
+    console.error('[HAL Dispatch Simulation] Could not persist simulation:', error?.message || error);
+    return res.status(503).json({ success: false, code: 'OUTBOX_UNAVAILABLE', error: 'Simulation history could not be persisted. No dispatch was attempted.' });
+  }
+
   await recordWorkEvent(pgDb, {
-    contractorId, eventType: 'outreach.simulated', entityType: leadId ? 'lead' : 'outreach_dispatch', entityId: leadId || entry.id,
-    actorType: 'human', actorId: contractorId, sourceModule: 'outreach_dispatch', correlationId: entry.id,
-    summary: `Prepared a ${channel} outreach simulation for ${leadBusinessName || 'a direct recipient'}; no message was sent.`,
-    payload: { channel, mode: 'simulation', status: 'simulated', providerContacted: false }
+    contractorId, eventType: 'outreach.simulated', entityType: linkedLead ? 'lead' : 'outreach_dispatch', entityId: linkedLead?.id || dispatchId,
+    actorType: 'human', actorId: contractorId, sourceModule: 'outreach_dispatch', correlationId: dispatchId,
+    summary: `Prepared a ${channel} outreach simulation for ${resolvedLeadName}; no message was sent.`,
+    payload: { channel, mode: 'simulation', status: 'simulated', providerContacted: false, dispatchId }
   });
 
   const auditBlock = db.recordLedgerEntry({
     contractorId,
     eventType: 'phase3_verification_audit',
     entityType: 'outreach_simulation',
-    entityId: entry.id,
+    entityId: dispatchId,
     actor: 'HAL Simulation',
     details: 'Outreach payload prepared in simulation mode. No external message was sent.',
-    metadata: {
-      channel,
-      leadId: leadId || null,
-      mode: 'simulation',
-      status: 'simulated'
-    }
+    metadata: { channel, leadId: linkedLead?.id || null, mode: 'simulation', status: 'simulated' }
   });
 
   broadcastNotification(
     contractorId,
     'info',
     'Outreach Simulation Recorded',
-    `Prepared a ${channel.toUpperCase()} message for ${String(recipient)}. No external message was sent.`
+    `Prepared a ${channel.toUpperCase()} message for ${resolvedLeadName}. No external message was sent.`
   );
 
   return res.json({
     success: true,
-    dispatchId: entry.id,
+    dispatchId,
+    idempotencyKey,
     status: 'simulated',
     mode: 'simulation',
     providerContacted: false,
-    timestamp: now,
+    timestamp: now.toISOString(),
     renderedMessage: customizedMessage,
     renderedSubject: customizedSubject,
     block: auditBlock
@@ -10918,7 +10945,26 @@ async function startServer() {
     try {
       const records = await pgDb.select().from(conversionOutbox)
         .where(eq(conversionOutbox.contractorId, contractorId)).limit(50);
-      const filteredLogs = dispatchLogs.filter(log => log.contractorId === contractorId).slice(-50).reverse();
+      const dispatchRows = await pgDb.select().from(communicationsOutbox)
+        .where(eq(communicationsOutbox.contractorId, contractorId))
+        .orderBy(desc(communicationsOutbox.createdAt)).limit(50);
+      const dispatchLeadIds = [...new Set(dispatchRows.map(row => row.leadId).filter((id): id is string => Boolean(id)))];
+      const dispatchLeadRows = dispatchLeadIds.length
+        ? await pgDb.select({ id: leads.id, businessName: leads.businessName }).from(leads)
+            .where(and(eq(leads.contractorId, contractorId), inArray(leads.id, dispatchLeadIds)))
+        : [];
+      const dispatchLeadNames = new Map(dispatchLeadRows.map(row => [row.id, row.businessName]));
+      const filteredLogs = dispatchRows.map(row => ({
+        id: row.id, contractorId: row.contractorId, channel: row.channel,
+        recipient: row.recipientEncrypted ? decrypt(row.recipientEncrypted) : '',
+        leadId: row.leadId || undefined,
+        leadBusinessName: row.leadId ? (dispatchLeadNames.get(row.leadId) || 'Lead no longer available') : 'Direct Recipient',
+        status: row.status, mode: row.status === 'simulated' ? 'simulation' : 'live',
+        providerId: row.providerMessageId || undefined,
+        timestamp: (row.deliveredAt || row.submittedAt || row.createdAt).toISOString(),
+        subject: row.subjectEncrypted ? decrypt(row.subjectEncrypted) : undefined,
+        preview: row.bodyEncrypted ? decrypt(row.bodyEncrypted).slice(0, 100) : ''
+      }));
       const ledgerHistory = db.getStructuredLedger(contractorId, 20).filter(entry =>
         entry.eventType === 'phase3_live_dispatch' ||
         entry.eventType === 'phase3_outbox_inspected' ||
