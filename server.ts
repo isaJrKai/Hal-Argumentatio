@@ -5,7 +5,6 @@ import fs from 'fs';
 import crypto from 'crypto';
 import { isIP } from 'node:net';
 import { execSync } from 'child_process';
-import { createServer as createViteServer } from 'vite';
 import { sendResendEmail, EmailProviderConfigurationError, EmailProviderRequestError } from './src/services/communications/resendEmail';
 import { verifySvixWebhookSignature } from './src/lib/resendWebhook';
 import { 
@@ -10343,6 +10342,7 @@ async function startServer() {
   // ─── VITE DEV SERVER & STATIC FILES MIDDLEWARE ───────────────────────────
   if (process.env.NODE_ENV !== 'production') {
     // Development Mode: Mount Vite dev server middleware AFTER all API routes
+    const { createServer: createViteServer } = await import('vite');
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: 'spa',
