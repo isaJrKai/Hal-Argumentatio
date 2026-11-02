@@ -224,7 +224,11 @@ Return your response in a raw JSON object format (no markdown blocks, no code bl
     if (!Number.isFinite(predicted) || !Number.isFinite(modelScore) || !assumptions) {
       throw new Error('Forecast model returned incomplete or invalid evidence.');
     }
-    return { predicted, assumptions, confidenceScore: calibrateConfidence(modelScore) };
+    return {
+      predicted,
+      assumptions: `${assumptions} Model-reported confidence is adjusted for sample depth; it is not yet empirically calibrated against historical forecast accuracy.`,
+      confidenceScore: calibrateConfidence(modelScore)
+    };
   };
 
   if (activeAI === 'gemini') {
