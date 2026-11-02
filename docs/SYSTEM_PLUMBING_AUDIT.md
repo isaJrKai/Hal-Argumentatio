@@ -57,6 +57,7 @@ Additional confirmed fixes on this branch:
 5. **Connector webhook setup:** the displayed WhatsApp webhook URL now matches the registered signed route `/api/outreach/whatsapp/webhook`. The UI no longer advertises a nonexistent Twilio inbound route; SMS inbound remains unimplemented/simulation-only.
 6. **Form Builder embed:** the previous iframe pointed to an unregistered route. The embed now requires a published Hermes landing-page ID and uses a published-page form route. Form submissions are parsed as URL-encoded data, ownership is resolved from the published artifact, and lead creation, lead event, human review task and work-ledger events are committed together in PostgreSQL.
 7. **WhatsApp inbound tenant isolation:** the signed webhook previously broadcast every inbound message to every connected contractor session because it had no phone-number-to-tenant resolver. That cross-tenant fan-out is removed. Until a verified workspace mapping is configured, signed inbound messages fail closed with HTTP 503 and are not shown to any workspace. The connector UI now states this limitation.
+8. **Human task completion evidence:** human lead-review tasks previously allowed completion with only a status change. The Work Queue now requires a completion note for `lead_follow_up` tasks and persists that note in both the task output and the correlated work-history event. This records what the operator did without pretending the lead was contacted or qualified automatically.
 
 These are code-level changes. They do not substitute for live browser, provider, or production database verification.
 
@@ -91,7 +92,7 @@ These are code-level changes. They do not substitute for live browser, provider,
 The older `AUDIT.md`, `docs/HAL_OPERATING_LAYER.md`, and sale-readiness notes contain overlapping work. Treat this section as a reconciliation guide, not proof that an item is complete.
 
 ### Still outstanding or requiring live evidence
-- **Staff operations:** no named staff roster, employee invitation/onboarding, role-based assignment, or staff workload view is implemented. Current human assignment is a generic `human` worker.
+- **Staff operations:** no named staff roster, employee invitation/onboarding, role-based assignment, or staff workload view is implemented. Human task completion now records evidence, but assignment remains a generic `human` worker rather than a named employee.
 - **Communications:** SMS remains simulation-only and no Twilio inbound webhook is registered. WhatsApp signature validation exists, but inbound phone-number-to-tenant routing is not configured; signed messages currently fail closed with HTTP 503. Resend email submission is implemented, but live sender verification, delivery webhook reconciliation, durable retries/dead-letter handling and production delivery tests still need evidence.
 - **Google Workspace:** Drive, read-only Calendar and Gmail-send flows require real Firebase/Google Cloud project configuration and browser verification. A successful build does not prove OAuth consent, scopes or provider access.
 - **Database consolidation:** connector credentials, scheduler records and other legacy domains still use JSON persistence. Migrate domain-by-domain with backups, reconciliation and rollback.
