@@ -5676,7 +5676,7 @@ async function getBridgesForContractor(contractorId: string): Promise<ChannelBri
 function sanitizeBridgeSettings(channel: keyof ChannelBridgeSettings, input: any): Record<string, any> {
   if (!input || typeof input !== 'object' || Array.isArray(input)) throw new Error('Bridge settings must be an object.');
   const output: Record<string, any> = {};
-  const booleanKeys = ['enabled', 'webhookActive', 'verifiedBusiness'];
+  const booleanKeys = ['enabled']; // Verification flags are server/provider-derived and cannot be set by a browser client.
   for (const key of booleanKeys) if (key in input) {
     if (typeof input[key] !== 'boolean') throw new Error(`${key} must be a boolean.`);
     output[key] = input[key];
