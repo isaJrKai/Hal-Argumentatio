@@ -394,7 +394,7 @@ export default function HermesLabPanel({ token }: { token: string | null }) {
         body: JSON.stringify({
           taskType: 'hermes_lab_asset',
           title: `Hermes: ${selectedTool.name}`,
-          description: 'Generate a draft artifact in Hermes Lab. This does not publish externally or send communications.',
+          description: 'Create a local draft artifact from supplied parameters. External actions are out of scope.',
           assignedWorker: 'hermes',
           priority: 'normal',
           input: {
