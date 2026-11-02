@@ -6665,24 +6665,41 @@ app.post('/api/scheduler', authenticate, async (req, res) => {
       let evaluatedCount = 0;
 
       for (const fc of expiredUnevaluated) {
-        // Query actual metrics from database
-        let actualVal = 0;
+        // Compare the forecast against observations from its own target window,
+        // not lifetime totals or a different period.
+        const targetEnd = new Date(fc.targetDate);
+        const targetStart = fc.createdAt
+          ? new Date(fc.createdAt)
+          : new Date(targetEnd.getTime() - 7 * 24 * 60 * 60 * 1000);
+        if (!Number.isFinite(targetStart.getTime()) || !Number.isFinite(targetEnd.getTime()) || targetStart >= targetEnd) {
+          continue;
+        }
+        const inTargetWindow = (value: any) => {
+          const timestamp = new Date(value).getTime();
+          return Number.isFinite(timestamp) && timestamp >= targetStart.getTime() && timestamp <= targetEnd.getTime();
+        };
+
+        let actualVal: number | null = null;
         if (fc.metric === 'lead_volume') {
           const leads = db.getLeads(fc.contractorId);
-          // filter leads created around forecast target date window
-          actualVal = leads.length; // baseline simplify
+          actualVal = leads.filter((lead: any) => inTargetWindow(lead.createdAt)).length;
         } else if (fc.metric === 'cpl') {
           const campaigns = db.getCampaigns(fc.contractorId);
           const campaignIds = campaigns.map(c => c.id);
-          const snaps = db.getPerformanceSnapshots(campaignIds);
-          const aggregateSpend = snaps.reduce((s, x) => s + x.spend, 0);
-          const aggregateLeads = snaps.reduce((s, x) => s + x.leads, 0);
-          actualVal = aggregateLeads > 0 ? aggregateSpend / aggregateLeads : aggregateSpend;
+          const snaps = db.getPerformanceSnapshots(campaignIds).filter((snapshot: any) => inTargetWindow(snapshot.date));
+          const aggregateSpend = snaps.reduce((sum: number, snapshot: any) => sum + Number(snapshot.spend || 0), 0);
+          const aggregateLeads = snaps.reduce((sum: number, snapshot: any) => sum + Number(snapshot.leads || 0), 0);
+          actualVal = aggregateLeads > 0 ? aggregateSpend / aggregateLeads : null;
         } else if (fc.metric === 'revenue') {
-          const revenues = db.getRevenues(fc.contractorId);
-          actualVal = revenues.reduce((sum, r) => sum + r.amountUsd, 0);
+          const revenues = db.getRevenues(fc.contractorId).filter((revenue: any) => inTargetWindow(revenue.createdAt));
+          actualVal = revenues.length
+            ? revenues.reduce((sum: number, revenue: any) => sum + Number(revenue.amountUsd || 0), 0)
+            : null;
         }
 
+        // Missing measurements are not zero. Leave the forecast unevaluated until
+        // the relevant source has observations for its target window.
+        if (actualVal === null || !Number.isFinite(actualVal)) continue;
         const deviation = fc.predicted > 0 ? (actualVal - fc.predicted) / fc.predicted : 0;
         
         // Save Prediction Outcome
