@@ -159,6 +159,7 @@ export default function LeadsPanel({ leads, token, onRefresh }: LeadsPanelProps)
   const handlePurgeAndReplace = async () => {
     if (harvestedLeads.length === 0) return;
     setReplacing(true);
+    setIngestFeedback(null);
     try {
       const res = await fetch('/api/leads/purge-and-replace', {
         method: 'POST',
@@ -168,16 +169,17 @@ export default function LeadsPanel({ leads, token, onRefresh }: LeadsPanelProps)
         },
         body: JSON.stringify({ leads: harvestedLeads })
       });
-      const data = await res.json();
-      if (res.ok) {
-        setHarvestedLeads([]);
-        setSelectedIndices(new Set());
-        setShowHarvester(false);
-        setSelectedLead(null);
-        onRefresh();
-      }
-    } catch (err) {
-      console.error(err);
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.success) throw new Error(data.error || `Replacement failed (HTTP ${res.status}).`);
+      setIngestFeedback(`Removed ${data.removedSeedCount ?? 0} mock seeds; imported ${data.count ?? 0} prospects and created ${data.queuedTasks ?? 0} review tasks. Skipped ${data.skippedCount ?? 0} duplicates or invalid records.`);
+      setHarvestedLeads([]);
+      setSelectedIndices(new Set());
+      setShowHarvester(false);
+      setSelectedLead(null);
+      onRefresh();
+    } catch (err: any) {
+      console.error('[HAL lead replacement]', err);
+      setIngestFeedback(err?.message || 'Could not replace mock seeds with the selected prospects.');
     } finally {
       setReplacing(false);
     }
