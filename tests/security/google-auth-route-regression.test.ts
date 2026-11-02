@@ -42,6 +42,7 @@ describe('Authentication route security regressions', () => {
     expect(googleLoginRoute).toContain('verifyFirebaseGoogleIdToken(idToken, firebaseApiKey)');
     expect(googleLoginRoute).toContain('identity.email');
     expect(googleLoginRoute).not.toContain('isFirstAccount');
-    expect(googleLoginRoute).not.toContain("role: 'admin'");
+    expect(googleLoginRoute).not.toContain("isFirstAccount");
+    expect(googleLoginRoute).not.toContain("cleanEmail === 'admin@kaislead.com'");
   });
 });
