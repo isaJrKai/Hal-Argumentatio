@@ -525,6 +525,22 @@ app.post('/api/work-tasks', authenticate, async (req, res) => {
     return res.status(400).json({ error: 'Invalid task details. Check task type, title, priority, worker, entity pair and input size.' });
   }
 
+  if (entityType) {
+    let entityExists = false;
+    if (entityType === 'lead') {
+      entityExists = (await pgDb.select({ id: leads.id }).from(leads).where(and(eq(leads.id, entityId!), eq(leads.contractorId, contractorId))).limit(1)).length > 0;
+    } else if (entityType === 'mission') {
+      entityExists = (await pgDb.select({ id: missions.id }).from(missions).where(and(eq(missions.id, entityId!), eq(missions.contractorId, contractorId))).limit(1)).length > 0;
+    } else if (entityType === 'artifact') {
+      entityExists = (await pgDb.select({ id: hermesLabArtifacts.id }).from(hermesLabArtifacts).where(and(eq(hermesLabArtifacts.id, entityId!), eq(hermesLabArtifacts.contractorId, contractorId))).limit(1)).length > 0;
+    } else if (entityType === 'work_task') {
+      entityExists = (await getWorkTask(pgDb, contractorId, entityId!)) !== null;
+    } else {
+      return res.status(400).json({ error: 'Unsupported entity type. Link tasks to a lead, mission, artifact or work task.' });
+    }
+    if (!entityExists) return res.status(404).json({ error: 'The linked business record was not found in this workspace.' });
+  }
+
   const taskId = 'task_' + crypto.randomUUID();
   const correlationId = typeof body.correlationId === 'string' && body.correlationId.trim()
     ? body.correlationId.trim().slice(0, 120) : taskId;
