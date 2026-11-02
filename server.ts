@@ -3068,6 +3068,13 @@ app.post('/api/revenues', authenticate, async (req, res) => {
       source: source || 'manual_entry'
     }).returning();
 
+    await recordWorkEvent(pgDb, {
+      contractorId, eventType: 'revenue.recorded', entityType: 'lead', entityId: leadId,
+      actorType: 'human', actorId: contractorId, sourceModule: 'financial_intelligence', correlationId: rev.id,
+      summary: `Recorded ${Number(amountUsd)} USD revenue for ${existingLead[0].businessName}.`,
+      payload: { amountUsd: Number(amountUsd), source: source || 'manual_entry', revenueRecordId: rev.id }
+    });
+
     await pgDb.insert(leadEvents).values({
       id: crypto.randomUUID(),
       leadId,
@@ -5040,6 +5047,12 @@ app.post('/api/outreach/dispatch', authenticate, async (req, res) => {
         preview: customizedMessage.slice(0, 100)
       };
       dispatchLogs.push(entry);
+      await recordWorkEvent(pgDb, {
+        contractorId, eventType: 'outreach.email.submitted', entityType: leadId ? 'lead' : 'outreach_dispatch', entityId: leadId || entry.id,
+        actorType: 'human', actorId: contractorId, sourceModule: 'outreach_dispatch', correlationId: entry.id,
+        summary: `Email accepted by Resend for ${leadBusinessName || 'a direct recipient'}; delivery is not confirmed.`,
+        payload: { channel: 'email', provider: result.provider, providerMessageId: result.providerMessageId, status: result.status, deliveryConfirmed: false }
+      });
       const auditBlock = db.recordLedgerEntry({
         contractorId,
         eventType: 'phase3_live_dispatch',
@@ -5130,6 +5143,12 @@ app.post('/api/outreach/dispatch', authenticate, async (req, res) => {
     preview: customizedMessage.slice(0, 100)
   };
   dispatchLogs.push(entry);
+  await recordWorkEvent(pgDb, {
+    contractorId, eventType: 'outreach.simulated', entityType: leadId ? 'lead' : 'outreach_dispatch', entityId: leadId || entry.id,
+    actorType: 'human', actorId: contractorId, sourceModule: 'outreach_dispatch', correlationId: entry.id,
+    summary: `Prepared a ${channel} outreach simulation for ${leadBusinessName || 'a direct recipient'}; no message was sent.`,
+    payload: { channel, mode: 'simulation', status: 'simulated', providerContacted: false }
+  });
 
   const auditBlock = db.recordLedgerEntry({
     contractorId,
@@ -5465,6 +5484,13 @@ app.post('/api/projects', authenticate, (req, res) => {
       { id: 'ms_4', title: 'Autonomous Funnel Activation', description: 'Launch lead capture forms and direct SMS dispatch routing.', status: 'pending' },
       { id: 'ms_5', title: 'Monthly Executive ROI Review', description: 'Deliver progress comparison report and growth metrics breakdown.', status: 'pending' }
     ]
+  });
+
+  await recordWorkEvent(pgDb, {
+    contractorId, eventType: 'client_project.created', entityType: 'client_project', entityId: project.id,
+    actorType: 'human', actorId: contractorId, sourceModule: 'client_operations', correlationId: project.id,
+    summary: `Created client delivery project for ${businessName}.`,
+    payload: { leadId: leadId || null, status: project.status, packageTier: project.packageTier, monthlyRetainerUsd: project.monthlyRetainerUsd }
   });
 
   db.addAuditLog({
