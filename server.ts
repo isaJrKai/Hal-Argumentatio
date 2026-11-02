@@ -4585,25 +4585,27 @@ app.get('/api/learning/winloss', authenticate, async (req, res) => {
 
 app.post('/api/learning/winloss', authenticate, async (req, res) => {
   const contractorId = (req as any).contractorId;
-  const { leadId, businessName, city, niche, outcome, closedValueUsd, primaryReason, keyLesson, outreachChannelUsed } = req.body;
+  const { leadId, businessName, city, niche, outcome, closedValueUsd, primaryReason, keyLesson, outreachChannelUsed } = req.body || {};
+  const closedValue = closedValueUsd === undefined || closedValueUsd === null || closedValueUsd === '' ? 0 : Number(closedValueUsd);
 
-  if (!businessName || !outcome) {
-    return res.status(400).json({ error: 'Business name and outcome (won/lost) are required' });
+  if (typeof businessName !== 'string' || !businessName.trim() || !['won', 'lost'].includes(outcome)) {
+    return res.status(400).json({ error: 'Business name and a valid won/lost outcome are required.' });
+  }
+  if (!Number.isFinite(closedValue) || closedValue < 0) {
+    return res.status(400).json({ error: 'Closed value must be a finite, non-negative amount.' });
   }
 
   try {
-    let targetStatus = outcome === 'won' ? 'closed_won' : 'closed_lost';
+    const targetStatus = outcome === 'won' ? 'closed_won' : 'closed_lost';
     let targetLead: any = null;
-
     if (leadId) {
       const [foundLead] = await pgDb.select().from(leads)
-        .where(and(eq(leads.id, leadId), eq(leads.contractorId, contractorId)));
-      if (!foundLead) {
-        return res.status(404).json({ error: 'Lead not found or inaccessible' });
-      }
+        .where(and(eq(leads.id, leadId), eq(leads.contractorId, contractorId))).limit(1);
+      if (!foundLead) return res.status(404).json({ error: 'Lead not found or inaccessible.' });
       targetLead = foundLead;
-
-      // Validate CRM state transition
+      if (['closed_won', 'closed_lost', 'converted', 'dead', 'won', 'lost'].includes(String(targetLead.status).toLowerCase())) {
+        return res.status(409).json({ error: 'This lead already has a terminal CRM outcome recorded.' });
+      }
       const transitionCheck = validateCrmTransition(targetLead.status, targetStatus);
       if (!transitionCheck.valid) {
         return res.status(409).json({
@@ -4614,91 +4616,98 @@ app.post('/api/learning/winloss', authenticate, async (req, res) => {
       }
     }
 
-    const [record] = await pgDb.insert(winLossRecords).values({
-      id: 'wl_' + crypto.randomBytes(8).toString('hex'),
-      contractorId,
-      leadId: leadId || '',
-      businessName,
-      city: city || 'Territory',
-      niche: niche || 'General',
-      outcome,
-      closedValueUsd: Number(closedValueUsd) || 0,
-      primaryReason: primaryReason || (outcome === 'won' ? 'Speed audit demonstrated clear ROI' : 'Price / Timing'),
-      keyLesson: keyLesson || (outcome === 'won' ? 'Audit-first email with video teardown converts 3x better.' : 'Need to follow up within 24 hours.'),
-      outreachChannelUsed: outreachChannelUsed || 'Email + Audit'
-    }).returning();
+    const now = new Date();
+    const recordId = 'wl_' + crypto.randomBytes(8).toString('hex');
+    const record = await pgDb.transaction(async tx => {
+      const [winLoss] = await tx.insert(winLossRecords).values({
+        id: recordId,
+        contractorId,
+        leadId: leadId || '',
+        businessName: businessName.trim(),
+        city: city || 'Territory',
+        niche: niche || 'General',
+        outcome,
+        closedValueUsd: closedValue,
+        primaryReason: primaryReason || (outcome === 'won' ? 'Reason not supplied' : 'Reason not supplied'),
+        keyLesson: keyLesson || `Deal ${outcome}. Reason: ${primaryReason || 'not supplied'}. Channel: ${outreachChannelUsed || 'not supplied'}.`,
+        outreachChannelUsed: outreachChannelUsed || 'unspecified'
+      }).returning();
 
-    // If lead exists and was validated, update lead status and record event
-    if (targetLead && leadId) {
-      if (outcome === 'won' && Number(closedValueUsd) > 0) {
-        await pgDb.insert(revenueRecords).values({
-          id: 'rev_' + crypto.randomBytes(8).toString('hex'),
-          contractorId,
+      if (targetLead && leadId) {
+        const [updatedLead] = await tx.update(leads).set({
+          status: targetStatus,
+          updatedAt: now
+        }).where(and(
+          eq(leads.id, leadId),
+          eq(leads.contractorId, contractorId),
+          eq(leads.status, targetLead.status)
+        )).returning();
+        if (!updatedLead) throw new Error('Lead changed before the win/loss outcome could be committed. Refresh and retry.');
+
+        if (outcome === 'won' && closedValue > 0) {
+          await tx.insert(revenueRecords).values({
+            id: 'rev_' + crypto.randomBytes(8).toString('hex'),
+            contractorId,
+            leadId,
+            amountUsd: closedValue,
+            source: 'conquest_deal_closed',
+            createdAt: now
+          });
+        }
+
+        await tx.insert(leadEvents).values({
+          id: crypto.randomUUID(),
           leadId,
-          amountUsd: Number(closedValueUsd),
-          source: 'conquest_deal_closed'
+          eventType: outcome === 'won' ? 'ClosedWon' : 'ClosedLost',
+          previousStage: targetLead.status,
+          newStage: targetStatus,
+          dealValue: closedValue > 0 ? closedValue : null,
+          notes: primaryReason || `Deal marked as ${outcome} via win/loss learning system.`,
+          createdBy: 'win_loss_calibration'
         });
       }
 
-      await pgDb.update(leads).set({
-        status: targetStatus,
-        predictedLtv: Number(closedValueUsd) > 0 ? Number(closedValueUsd) : targetLead.predictedLtv,
-        updatedAt: new Date()
-      }).where(and(eq(leads.id, leadId), eq(leads.contractorId, contractorId)));
+      await tx.insert(workEvents).values({
+        id: 'evt_' + crypto.randomUUID(),
+        contractorId,
+        eventType: outcome === 'won' ? 'deal.won' : 'deal.lost',
+        entityType: leadId ? 'lead' : 'deal',
+        entityId: leadId || winLoss.id,
+        actorType: 'human',
+        actorId: contractorId,
+        sourceModule: 'sales_pipeline',
+        correlationId: winLoss.id,
+        summary: `${outcome === 'won' ? 'Won' : 'Lost'} ${businessName.trim()}; recorded value ${closedValue} USD.`,
+        payload: { outcome, valueUsd: closedValue, channel: outreachChannelUsed || 'unspecified', leadId: leadId || null }
+      });
 
-      await pgDb.insert(leadEvents).values({
+      await tx.insert(learningInsights).values({
+        id: 'li_' + crypto.randomBytes(8).toString('hex'),
+        contractorId,
+        metric: outcome === 'won' ? 'conversion_strategy' : 'objection_handling',
+        lesson: keyLesson || `Deal ${outcome}. Reason: ${primaryReason || 'not supplied'}. Channel: ${outreachChannelUsed || 'not supplied'}.`,
+        confidenceShift: 0.92,
+        createdAt: now
+      });
+      await tx.insert(auditLogs).values({
         id: crypto.randomUUID(),
-        leadId,
-        eventType: outcome === 'won' ? 'DealWon' : 'DealLost',
-        previousStage: targetLead.status,
-        newStage: targetStatus,
-        dealValue: Number(closedValueUsd) > 0 ? Number(closedValueUsd) : targetLead.predictedLtv,
-        notes: primaryReason || `Deal marked as ${outcome} via win/loss learning system`
+        contractorId,
+        action: `DEAL_${outcome.toUpperCase()}_LOGGED`,
+        details: `Closed-loop deal logged for ${businessName.trim()}. Value: ${closedValue}. Reason: ${primaryReason || 'not supplied'}.`
       });
-    }
-
-    await recordWorkEvent(pgDb, {
-      contractorId, eventType: outcome === 'won' ? 'deal.won' : 'deal.lost',
-      entityType: leadId ? 'lead' : 'deal', entityId: leadId || record.id,
-      actorType: 'human', actorId: contractorId, sourceModule: 'sales_pipeline',
-      correlationId: record.id, summary: `${outcome === 'won' ? 'Won' : 'Lost'} ${businessName}; recorded value ${Number(closedValueUsd) || 0} USD.`,
-      payload: { outcome, valueUsd: Number(closedValueUsd) || 0, channel: outreachChannelUsed || 'Email + Audit' }
-    });
-    if (targetLead && leadId && outcome === 'won' && Number(closedValueUsd) > 0) {
-      await recordWorkEvent(pgDb, {
-        contractorId, eventType: 'revenue.recorded', entityType: 'revenue_record', entityId: record.id,
-        actorType: 'system', actorId: 'win_loss_calibration', sourceModule: 'financial_intelligence',
-        correlationId: record.id, summary: `Recorded closed-won revenue of ${Number(closedValueUsd)} USD for ${businessName}.`,
-        payload: { leadId, amountUsd: Number(closedValueUsd), source: 'conquest_deal_closed' }
-      });
-    }
-
-    // Add automatic system lesson
-    await pgDb.insert(learningInsights).values({
-      id: 'li_' + crypto.randomBytes(8).toString('hex'),
-      contractorId,
-      metric: outcome === 'won' ? 'conversion_strategy' : 'objection_handling',
-      lesson: keyLesson || `Deal ${outcome}. Reason: ${primaryReason}. Channel: ${outreachChannelUsed}.`,
-      confidenceShift: 0.92
-    });
-
-    await pgDb.insert(auditLogs).values({
-      id: crypto.randomUUID(),
-      contractorId,
-      action: `DEAL_${outcome.toUpperCase()}_LOGGED`,
-      details: `Closed-loop deal logged for ${businessName}. Value: ${closedValueUsd || 0}. Reason: ${primaryReason}.`
+      return winLoss;
     });
 
     broadcastNotification(
       contractorId,
       outcome === 'won' ? 'success' : 'info',
       outcome === 'won' ? 'Deal Won & Closed-Loop Calibrated!' : 'Deal Outcome Logged',
-      `Recorded ${outcome.toUpperCase()} deal for ${businessName}. Autonomous learning model updated.`
+      `Recorded ${outcome.toUpperCase()} deal for ${businessName.trim()}. CRM, revenue (when applicable), work history and tenant learning were committed together.`
     );
-
-    res.status(201).json({ success: true, record });
+    return res.status(201).json({ success: true, record });
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    console.error('[HAL Win/Loss] Transaction failed:', err);
+    return res.status(503).json({ error: err.message || 'Deal outcome could not be committed.' });
   }
 });
 
