@@ -1972,6 +1972,7 @@ app.post('/api/leads', authenticate, async (req, res) => {
       newStage: 'new',
       notes: 'Lead captured on the HALBiz interface.'
     });
+    const reviewTask = await ensureLeadReviewTask(pgDb, contractorId, lead, 'manual_lead_entry');
 
     await recordWorkEvent(pgDb, {
       contractorId, eventType: 'lead.created', entityType: 'lead', entityId: lead.id,
@@ -1997,7 +1998,8 @@ app.post('/api/leads', authenticate, async (req, res) => {
     const decryptedLead = {
       ...lead,
       email: email || lead.email,
-      phone: phone || lead.phone
+      phone: phone || lead.phone,
+      reviewTaskId: reviewTask.taskId
     };
     res.status(201).json(decryptedLead);
   } catch (err: any) {
@@ -2073,13 +2075,14 @@ app.post('/api/leads/create', authenticate, async (req, res) => {
       newStage: 'new',
       notes: `Lead captured with attribution (GCLID: ${gclid ? 'Yes' : 'No'}, Campaign: ${utmCampaign || 'none'})`
     });
+    const reviewTask = await ensureLeadReviewTask(pgDb, contractorId, lead, 'lead_intake_form');
 
     const decryptedLead = {
       ...lead,
       email: email || lead.email,
       phone: phone || lead.phone
     };
-    res.status(201).json({ success: true, lead: decryptedLead, attributionRecorded: !!(gclid || gbraid || wbraid || utmSource) });
+    res.status(201).json({ success: true, lead: decryptedLead, reviewTaskId: reviewTask.taskId, attributionRecorded: !!(gclid || gbraid || wbraid || utmSource) });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
@@ -2796,6 +2799,7 @@ app.post('/api/leads/bulk', authenticate, async (req, res) => {
 
   const addedLeads = [];
   let skippedCount = 0;
+  let queuedTasks = 0;
 
   try {
     for (const item of reqLeads) {
@@ -2854,6 +2858,8 @@ app.post('/api/leads/bulk', authenticate, async (req, res) => {
         newStage: 'new',
         notes: 'Lead imported via bulk spreadsheet upload.'
       });
+      const reviewTask = await ensureLeadReviewTask(pgDb, contractorId, lead, 'spreadsheet_import');
+      if (reviewTask.created) queuedTasks++;
 
       const decrypted = {
         ...lead,
@@ -2883,6 +2889,7 @@ app.post('/api/leads/bulk', authenticate, async (req, res) => {
       success: true, 
       importedCount: addedLeads.length, 
       skippedCount,
+      queuedTasks,
       leads: addedLeads 
     });
   } catch (err: any) {
@@ -4589,6 +4596,7 @@ app.post('/api/missions', authenticate, async (req, res) => {
         // Step 1: Harvest
         const harvested = await harvestRealBusinesses(city, niche);
         const createdLeads: any[] = [];
+        let queuedTasks = 0;
         
         steps[0].status = 'completed';
         (steps[0] as any).result = `Returned ${harvested.length} prospect records. Source and verification status are preserved; no SEO, review, or performance scores are inferred.`;
@@ -4650,6 +4658,8 @@ app.post('/api/missions', authenticate, async (req, res) => {
             newStage: 'new',
             notes: `Prospect profile imported. DNS/HTTP/TLS evidence is stored separately; PageSpeed and reputation metrics were not measured.`
           });
+          const reviewTask = await ensureLeadReviewTask(pgDb, contractorId, addedLead, 'mission_territory_harvest');
+          if (reviewTask.created) queuedTasks++;
         }
 
         // Step 2: summarize the actual DNS / HTTP / TLS evidence collected during harvest.
