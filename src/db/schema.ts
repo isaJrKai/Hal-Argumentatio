@@ -230,6 +230,7 @@ export const notifications = pgTable('notifications', {
 
 export const schedulerJobs = pgTable('scheduler_jobs', {
   id: text('id').primaryKey(),
+  contractorId: text('contractor_id'),
   job: text('job').notNull(),
   status: text('status').notNull(), // 'pending' | 'running' | 'completed' | 'failed'
   startedAt: timestamp('started_at'),
