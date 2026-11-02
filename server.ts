@@ -562,6 +562,9 @@ app.patch('/api/work-tasks/:id', authenticate, async (req, res) => {
   try {
     const current = await getWorkTask(pgDb, contractorId, taskId);
     if (!current) return res.status(404).json({ error: 'Work task not found.' });
+    if (current.status === 'failed' && nextStatus === 'queued' && current.attemptCount >= current.maxAttempts) {
+      return res.status(409).json({ error: 'Task has reached its maximum retry count.', attempts: current.attemptCount, maxAttempts: current.maxAttempts });
+    }
     if (!canTransitionWorkTask(current.status, nextStatus)) {
       return res.status(409).json({ error: `Task cannot move from ${current.status} to ${nextStatus || 'unknown'}.`, currentStatus: current.status });
     }
