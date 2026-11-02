@@ -2577,58 +2577,83 @@ app.all(['/api/webhooks/twilio', '/api/webhooks/whatsapp'], async (req, res) => 
 // Authenticated Webhook Simulator / Test Endpoint for the Operator
 app.post('/api/webhooks/test-inbound', authenticate, async (req, res) => {
   const contractorId = (req as any).contractorId;
-  const { channel = 'whatsapp', from = '+14035550192', body = 'Yes, we received your website audit and want to schedule a review.', leadId } = req.body || {};
+  const { channel = 'whatsapp', from = '', body = '', leadId } = req.body || {};
+  if (typeof from !== 'string' || typeof body !== 'string' || body.length > 4000) {
+    return res.status(400).json({ error: 'A sender number and message body of up to 4,000 characters are required.' });
+  }
 
   try {
     const isWhatsApp = channel === 'whatsapp';
-    const now = new Date().toISOString();
-    let targetLead: any = null;
-
-    if (leadId) {
-      targetLead = db.getLeads(contractorId).find(l => l.id === leadId);
-    }
+    const now = new Date();
+    const tenantLeads = await pgDb.select().from(leads).where(eq(leads.contractorId, contractorId));
+    let targetLead: any = typeof leadId === 'string' ? tenantLeads.find(lead => lead.id === leadId) : null;
 
     if (!targetLead) {
       const cleanDigits = from.replace(/\D/g, '');
-      targetLead = db.getLeads(contractorId).find(l => {
-        const p = (l.phone || '').replace(/\D/g, '');
-        return p.length >= 7 && (p.endsWith(cleanDigits) || cleanDigits.endsWith(p));
+      targetLead = tenantLeads.find(lead => {
+        const rawPhone = lead.phoneEncrypted ? decrypt(lead.phoneEncrypted) : (lead.phone === '[ENCRYPTED]' ? '' : lead.phone || '');
+        const digits = String(rawPhone || '').replace(/\D/g, '');
+        return digits.length >= 7 && cleanDigits.length >= 7 && (digits.endsWith(cleanDigits) || cleanDigits.endsWith(digits));
       });
     }
 
-    // Do not attach a simulated inbound message to an unrelated lead when no match exists.
     if (targetLead) {
-      const newStatus = (targetLead.status === 'new' ? 'contacted' : targetLead.status) as 'new' | 'contacted' | 'converted' | 'dead';
-      const updatedNotes = `${targetLead.notes || ''}\n[Simulated ${isWhatsApp ? 'WhatsApp' : 'SMS'} - ${now.slice(0, 16)}]: ${body}`.trim();
-
-      db.updateLead(targetLead.id, contractorId, {
-        status: newStatus,
-        notes: updatedNotes
+      const newStatus = targetLead.status === 'new' ? 'contacted' : targetLead.status;
+      const updatedNotes = `${targetLead.notes || ''}\n[Simulated ${isWhatsApp ? 'WhatsApp' : 'SMS'} - ${now.toISOString().slice(0, 16)}]: ${body}`.trim();
+      await pgDb.transaction(async tx => {
+        await tx.update(leads).set({ status: newStatus, notes: updatedNotes, updatedAt: now })
+          .where(and(eq(leads.id, targetLead.id), eq(leads.contractorId, contractorId)));
+        await tx.insert(leadEvents).values({
+          id: crypto.randomUUID(),
+          leadId: targetLead.id,
+          eventType: 'InboundMessageReceived',
+          previousStage: targetLead.status,
+          newStage: newStatus,
+          notes: `Simulated inbound ${isWhatsApp ? 'WhatsApp' : 'SMS'} reply received.`,
+          metadata: { channel: isWhatsApp ? 'whatsapp' : 'sms', sender: from, simulated: true },
+          occurredAt: now,
+          createdAt: now
+        });
+        await tx.insert(workEvents).values({
+          id: 'evt_' + crypto.randomUUID(),
+          contractorId,
+          eventType: 'lead.inbound_message_simulated',
+          entityType: 'lead',
+          entityId: targetLead.id,
+          actorType: 'human',
+          actorId: contractorId,
+          sourceModule: 'connector_simulator',
+          correlationId: targetLead.id,
+          summary: `Simulated inbound ${isWhatsApp ? 'WhatsApp' : 'SMS'} reply attached to ${targetLead.businessName}.`,
+          payload: { channel: isWhatsApp ? 'whatsapp' : 'sms', sender: from, body, simulated: true, previousStatus: targetLead.status, status: newStatus }
+        });
       });
+      targetLead.status = newStatus;
+      targetLead.notes = updatedNotes;
     }
 
-    // Trigger instant SSE notification
     const channelName = isWhatsApp ? 'WhatsApp' : 'SMS';
     const leadName = targetLead ? targetLead.businessName : 'Prospect ' + from;
     broadcastNotification(
       contractorId,
       'lead',
-      `💬 Inbound ${channelName}: ${leadName}`,
+      `Inbound ${channelName}: ${leadName}`,
       `"${body}"`
     );
 
-    res.json({
+    return res.json({
       success: true,
       channel,
       from,
       body,
-      leadMatched: targetLead ? { id: targetLead.id, name: targetLead.businessName, status: 'responded' } : null,
+      leadMatched: targetLead ? { id: targetLead.id, name: targetLead.businessName, status: targetLead.status } : null,
       message: targetLead
-        ? `Simulated inbound ${channelName} event attached to the matched lead and operator alerted.`
+        ? `Simulated inbound ${channelName} event attached to the PostgreSQL lead record and work history.`
         : `Simulated inbound ${channelName} event alerted to the operator; no existing lead matched and no lead was created.`
     });
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    console.error('[HAL Inbound Simulator] Failed:', err);
+    return res.status(503).json({ error: 'The simulated inbound event could not be persisted.' });
   }
 });
 
