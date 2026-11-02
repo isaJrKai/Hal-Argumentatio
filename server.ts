@@ -8810,22 +8810,47 @@ async function startServer() {
   app.post('/api/hermes/execute', authenticate, async (req, res) => {
     const contractorId = (req as any).contractorId;
     const { toolId, parameters, promptOverride } = req.body;
-
-    if (!toolId) {
-      return res.status(400).json({ success: false, error: 'toolId is required' });
+    const allowedToolIds: LabToolType[] = [
+      'landing_page', 'ad_copy_studio', 'seo_schema_generator', 'outreach_sequences',
+      'sms_review_booster', 'speed_vitals_optimizer', 'competitor_intel_scout',
+      'webhook_resilience_fixer', 'negative_keyword_miner', 'deep_case_reasoner'
+    ];
+    if (!allowedToolIds.includes(toolId)) {
+      return res.status(400).json({ success: false, error: 'A registered Hermes Lab toolId is required.' });
+    }
+    if (!parameters || typeof parameters !== 'object' || Array.isArray(parameters) || JSON.stringify(parameters).length > 20000) {
+      return res.status(400).json({ success: false, error: 'parameters must be an object within 20 KB.' });
     }
 
     try {
-      const result = await executeHermesLabTool(
-        toolId as LabToolType,
-        parameters || {},
-        contractorId,
-        promptOverride
-      );
+      // Compatibility endpoint: preserve the old route while enforcing the
+      // same durable queue, approval policy, executor and receipts as Work Queue.
+      const created = await executeMcpTool('hal_create_work_task', {
+        taskType: 'hermes_lab_asset',
+        title: `Hermes: ${toolId.replace(/_/g, ' ')}`,
+        description: 'Generate a draft Hermes Lab artifact from supplied parameters. No external publishing or communication.',
+        assignedWorker: 'hermes',
+        priority: 'normal',
+        input: { toolId, parameters, ...(typeof promptOverride === 'string' ? { promptOverride } : {}) }
+      }, contractorId);
+      const task = created?.task;
+      if (!task?.id) throw new Error('Hermes work task could not be created.');
+      if (task.status === 'awaiting_approval') {
+        return res.status(202).json({ success: true, pendingApproval: true, taskId: task.id, task });
+      }
 
-      res.json({ success: true, ...result });
+      const execution = await executeMcpTool('hal_execute_hermes_work_task', { taskId: task.id }, contractorId);
+      if (!execution?.success || !execution?.receipt?.artifactId) {
+        return res.status(502).json({ success: false, taskId: task.id, task: execution?.task || null, error: execution?.error || 'Hermes did not return a verified artifact receipt.' });
+      }
+      const [artifact] = await pgDb.select().from(hermesLabArtifacts).where(and(
+        eq(hermesLabArtifacts.id, execution.receipt.artifactId),
+        eq(hermesLabArtifacts.contractorId, contractorId)
+      )).limit(1);
+      if (!artifact) throw new Error('Hermes execution completed, but its saved artifact could not be reloaded.');
+      res.json({ success: true, taskId: task.id, receipt: execution.receipt, ...artifact });
     } catch (err: any) {
-      console.error('[Hermes Tool Execution Error]', err);
+      console.error('[Hermes Queued Tool Execution Error]', err);
       res.status(500).json({ success: false, error: err.message });
     }
   });
