@@ -246,7 +246,7 @@ export async function executeMcpTool(
       const entityType = typeof rawParams?.entityType === 'string' ? rawParams.entityType.trim() : null;
       const entityId = typeof rawParams?.entityId === 'string' ? rawParams.entityId.trim() : null;
       const input = rawParams?.input && typeof rawParams.input === 'object' && !Array.isArray(rawParams.input) ? rawParams.input : null;
-      const approvalRequiredByPolicy = requiresWorkTaskApproval(taskType, title, description);
+      const approvalRequiredByPolicy = requiresWorkTaskApproval(taskType, title, description, input);
       const requiresApproval = rawParams?.requiresApproval === true || approvalRequiredByPolicy;
       const workers = ['human', 'hal_assistant', 'hermes', 'gemini', 'nemotron'];
       if (!taskType || taskType.length > 80 || !title || title.length > 180 ||
