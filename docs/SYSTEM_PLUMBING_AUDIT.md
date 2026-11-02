@@ -24,6 +24,7 @@ A workflow is considered connected only when its data is persisted in the author
 12. **Outreach sequence reads and writes used different stores.** GET read PostgreSQL while POST saved to the JSON store. The integration branch now saves/updates sequences, audit records and work-ledger events in one PostgreSQL transaction.
 13. **Audit history had a role and persistence mismatch.** The route checked the wrong role property and only read JSON audit records even though core modules wrote PostgreSQL audit rows. The integration branch now uses the authenticated contractor role, reads tenant-scoped PostgreSQL audit rows and merges legacy records during migration; new UI audit entries are persisted to PostgreSQL.
 14. **Forecast evaluation was disconnected from the live business tables.** The scheduler used legacy JSON forecasts, leads, campaign snapshots and revenue while the UI read PostgreSQL. It also wrote learning insights to the legacy store. The integration branch now evaluates tenant PostgreSQL forecasts against tenant PostgreSQL observations, commits outcomes and learning insights together, creates new forecasts from real campaign observations only, and scopes insights to the owning tenant.
+15. **Win/loss close-out was a multi-write partial-failure risk.** Deal outcome, revenue, CRM stage, work history, learning insight and audit rows were written separately; a later failure could leave inconsistent records. The integration branch now commits these related records atomically and rejects repeated terminal outcomes.
 
 ## Changes made on this branch
 
