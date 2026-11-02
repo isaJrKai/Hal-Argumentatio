@@ -218,6 +218,14 @@ export const apiKeys = pgTable('api_keys', {
   createdAt: timestamp('created_at').defaultNow().notNull(),
 });
 
+export const connectorCredentials = pgTable('connector_credentials', {
+  id: text('id').primaryKey(),
+  contractorId: text('contractor_id').notNull(),
+  service: text('service').notNull(),
+  encryptedValue: text('encrypted_value').notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+});
+
 export const notifications = pgTable('notifications', {
   id: text('id').primaryKey(),
   contractorId: text('contractor_id').notNull(),
