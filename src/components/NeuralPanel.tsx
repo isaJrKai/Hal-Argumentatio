@@ -716,9 +716,9 @@ export default function NeuralPanel() {
             <h3 className="text-xs font-mono font-bold text-text-tertiary uppercase tracking-wider">Territory Data</h3>
             <div className="bg-bg-base border border-border-dim rounded-lg p-4 space-y-3">
               <div className="flex justify-between items-center"><span className="text-[10px] font-mono text-text-secondary" >Learning Epoch</span><span className="text-xs font-mono font-bold text-text-primary">{learningMetrics?.epoch ?? 'Not measured'}</span></div>
-              <div className="flex justify-between items-center"><span className="text-[10px] font-mono text-text-secondary" >Matched Outcomes</span><span className="text-xs font-mono font-bold text-accent">{learningMetrics?.outcomesDigested ?? '0'}</span></div>
+              <div className="flex justify-between items-center"><span className="text-[10px] font-mono text-text-secondary" >Recorded Outcomes</span><span className="text-xs font-mono font-bold text-accent">{learningMetrics?.outcomesDigested ?? '0'}</span></div>
               <div className="flex justify-between items-center"><span className="text-[10px] font-mono text-text-secondary" >Model Confidence</span><span className="text-xs font-mono font-bold text-green-400">{learningMetrics?.confidenceGlobal == null ? 'Not measured' : `${Number(learningMetrics.confidenceGlobal).toFixed(1)}%`}</span></div>
-              <div className="flex justify-between items-center"><span className="text-[10px] font-mono text-text-secondary">Total Active Nodes</span><span className="text-xs font-mono font-bold text-text-primary">{(networkData.nodes || []).length}</span></div>
+              <div className="flex justify-between items-center"><span className="text-[10px] font-mono text-text-secondary">Graph Nodes</span><span className="text-xs font-mono font-bold text-text-primary">{(networkData.nodes || []).length}</span></div>
             </div>
           </div>
         </div>
@@ -750,7 +750,7 @@ export default function NeuralPanel() {
                 className={`pointer-events-auto px-3 py-1.5 backdrop-blur-md border rounded text-[10px] font-mono uppercase flex items-center gap-2 transition-colors w-fit ${showInfluence ? 'bg-purple-900/40 border-purple-500/50 text-purple-300 shadow-[0_0_15px_rgba(168,85,247,0.3)]' : 'bg-black/60 border-white/10 text-white/70 hover:bg-white/5'}`}
               >
                 <Activity className={`w-3.5 h-3.5 ${showInfluence ? 'text-purple-400' : ''}`} />
-                Global Influence Mode
+                Cross-Domain Links
               </button>
             </div>
             
@@ -770,7 +770,7 @@ export default function NeuralPanel() {
             
             {/* Recent Territory Outcomes (Bottom Left) */}
             <div className="flex-1 max-w-xl bg-bg-overlay border border-border-dim rounded-lg p-3 shadow-sm hover:bg-bg-base transition-colors h-full flex flex-col justify-center">
-              <h4 className="text-[10px] font-mono font-bold text-text-secondary uppercase mb-2 flex items-center gap-1.5"><Code2 className="w-3.5 h-3.5 text-text-tertiary" /> Matrix Event Log</h4>
+              <h4 className="text-[10px] font-mono font-bold text-text-secondary uppercase mb-2 flex items-center gap-1.5"><Code2 className="w-3.5 h-3.5 text-text-tertiary" /> Recorded Outcome Log</h4>
               <div className="font-mono text-[9px] text-accent/90 space-y-1 h-10 overflow-hidden leading-relaxed">
                 {(networkData.nodes || [])
                   .filter(n => n.type === 'win' || n.type === 'loss' || n.type === 'forecast')
