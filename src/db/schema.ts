@@ -364,7 +364,7 @@ export const conversionOutbox = pgTable('conversion_outbox', {
 export const communicationsOutbox = pgTable('communications_outbox', {
   id: text('id').primaryKey(),
   contractorId: text('contractor_id').notNull(),
-  leadId: text('lead_id').notNull(),
+  leadId: text('lead_id'),
   channel: text('channel').notNull(),
   provider: text('provider').notNull(),
   recipientEncrypted: text('recipient_encrypted').notNull(),
