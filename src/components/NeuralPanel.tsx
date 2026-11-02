@@ -773,11 +773,14 @@ export default function NeuralPanel() {
               <h4 className="text-[10px] font-mono font-bold text-text-secondary uppercase mb-2 flex items-center gap-1.5"><Code2 className="w-3.5 h-3.5 text-text-tertiary" /> Recorded Outcome Log</h4>
               <div className="font-mono text-[9px] text-accent/90 space-y-1 h-10 overflow-hidden leading-relaxed">
                 {(networkData.nodes || [])
-                  .filter(n => n.type === 'win' || n.type === 'loss' || n.type === 'forecast')
+                  .filter(n => n.type === 'win' || n.type === 'loss')
                   .slice(0, 2)
                   .map((node, i) => (
-                  <p key={i} className="truncate">{">"} {node.type === 'win' ? '[WON]' : node.type === 'loss' ? '[LOST]' : '[TIMESFM]'} {node.detail}</p>
+                  <p key={i} className="truncate">{">"} {node.type === 'win' ? '[WON]' : '[LOST]'} {node.detail}</p>
                 ))}
+                {!(networkData.nodes || []).some(n => n.type === 'win' || n.type === 'loss') && (
+                  <p className="text-text-tertiary">No recorded win/loss outcomes in this territory.</p>
+                )}
               </div>
             </div>
 
