@@ -1,5 +1,5 @@
-import { and, desc, eq } from 'drizzle-orm';
-import { workTasks } from '../db/schema';
+import { and, desc, eq, inArray } from 'drizzle-orm';
+import { workEvents, workTasks } from '../db/schema';
 
 export const WORK_TASK_STATUSES = ['queued', 'running', 'awaiting_approval', 'completed', 'failed', 'cancelled'] as const;
 export type WorkTaskStatus = typeof WORK_TASK_STATUSES[number];
@@ -38,6 +38,74 @@ export function canTransitionWorkTask(from: string, to: string): boolean {
 export function canExecutorClaimWorkTask(task: { status: string; requiresApproval: boolean; approvedAt?: Date | string | null }): boolean {
   if (task.status !== 'queued') return false;
   return !task.requiresApproval || Boolean(task.approvedAt);
+}
+
+export async function ensureLeadReviewTask(
+  db: any,
+  contractorId: string,
+  lead: { id: string; businessName: string; verificationStatus?: string | null },
+  sourceModule: string
+): Promise<{ taskId: string; created: boolean }> {
+  if (!contractorId || !lead?.id || !lead?.businessName) {
+    throw new Error('Tenant and lead identifiers are required to create a review task.');
+  }
+  const [activeTask] = await db.select({ id: workTasks.id }).from(workTasks).where(and(
+    eq(workTasks.contractorId, contractorId),
+    eq(workTasks.taskType, 'lead_follow_up'),
+    eq(workTasks.entityType, 'lead'),
+    eq(workTasks.entityId, lead.id),
+    eq(workTasks.assignedWorker, 'human'),
+    inArray(workTasks.status, ['queued', 'running', 'awaiting_approval'])
+  )).limit(1);
+  if (activeTask) return { taskId: activeTask.id, created: false };
+
+  const now = new Date();
+  const taskId = 'task_' + crypto.randomUUID();
+  const correlationId = taskId;
+  await db.insert(workTasks).values({
+    id: taskId,
+    contractorId,
+    taskType: 'lead_follow_up',
+    title: `Review and qualify: ${lead.businessName}`,
+    description: 'Review this lead, confirm its business details and verification evidence, then record the next step. Do not contact the prospect until required outreach verification checks pass.',
+    status: 'queued',
+    priority: 'normal',
+    assignedWorker: 'human',
+    entityType: 'lead',
+    entityId: lead.id,
+    correlationId,
+    input: { source: sourceModule, verificationStatus: lead.verificationStatus || 'UNVERIFIED_STAGING' },
+    requiresApproval: false,
+    createdAt: now,
+    updatedAt: now
+  });
+  await db.insert(workEvents).values({
+    id: 'evt_' + crypto.randomUUID(),
+    contractorId,
+    eventType: 'task.created',
+    entityType: 'work_task',
+    entityId: taskId,
+    actorType: 'system',
+    actorId: sourceModule,
+    sourceModule,
+    correlationId,
+    summary: `Created human review task for ${lead.businessName}.`,
+    payload: { taskType: 'lead_follow_up', assignedWorker: 'human', priority: 'normal', status: 'queued', leadId: lead.id }
+  });
+  await db.insert(workEvents).values({
+    id: 'evt_' + crypto.randomUUID(),
+    contractorId,
+    eventType: 'lead.queued_for_review',
+    entityType: 'lead',
+    entityId: lead.id,
+    actorType: 'system',
+    actorId: sourceModule,
+    sourceModule,
+    correlationId,
+    summary: `${lead.businessName} was added to the human review queue.`,
+    payload: { taskId, verificationStatus: lead.verificationStatus || 'UNVERIFIED_STAGING' }
+  });
+  return { taskId, created: true };
 }
 
 export async function listWorkTasks(db: any, contractorId: string, limit = 50) {
