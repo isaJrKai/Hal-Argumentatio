@@ -19,6 +19,7 @@ describe('Database: Schema Drift & Table Invariant Tests', () => {
     'clientProjects',
     'outreachSequences',
     'apiKeys',
+    'connectorCredentials',
     'notifications',
     'schedulerJobs',
     'leadAttribution',
@@ -55,6 +56,14 @@ describe('Database: Schema Drift & Table Invariant Tests', () => {
     expect(Object.keys(table)).toContain('metric');
     expect(Object.keys(table)).toContain('lesson');
     expect(Object.keys(table)).toContain('confidenceShift');
+  });
+
+  it('requires encrypted tenant-scoped connector credential storage', () => {
+    const table = schema.connectorCredentials;
+    expect(table).toBeDefined();
+    for (const column of ['id', 'contractorId', 'service', 'encryptedValue', 'updatedAt']) {
+      expect(Object.keys(table)).toContain(column);
+    }
   });
 
   it('requires tenant ownership and durable execution fields on scheduler jobs', () => {
