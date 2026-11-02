@@ -15,7 +15,7 @@ Every stage must preserve the tenant, entity identity and correlation ID. A lead
 1. **Canonical business entities:** leads, campaigns, missions, client projects, contracts, messages and revenue records remain authoritative in their existing domain tables until an explicit migration proves safe. Do not create shadow copies.
 2. **Work ledger:** append-only, tenant-scoped events record what happened, where, who/what did it, the affected entity, correlation ID and safe metadata. Events are evidence, not a replacement for domain records.
 3. **Shared agent context:** agents retrieve bounded, tenant-authorized domain records and work events at execution time. Conversation history alone is not business memory.
-4. **Task ownership:** every executable task has a status, assigned worker, inputs, outputs, timestamps, retry policy and failure reason. Agents report execution receipts.
+4. **Task ownership:** every executable task has a status, assigned worker, optional tenant-scoped named staff owner, inputs, outputs, timestamps, retry policy and failure reason. Human work may be assigned to a roster member; agent work continues to use the verified executor registry and receipts.
 5. **Capability registry:** agents can only call registered tools with validated schemas and tenant-scoped authorization.
 6. **Approval gates:** outbound messages, spend, contract execution, destructive actions and external publication require explicit policy-based authorization.
 7. **Truthful status:** planned, queued, running, completed, failed, blocked and awaiting approval are distinct states. A generated artifact is not a sent message; a proposal is not revenue.
@@ -35,6 +35,10 @@ The authenticated `GET /api/workers` endpoint reports execution capability separ
 | Nemotron | Model provider | No standalone task executor registered |
 
 A configured Gemini or NVIDIA API key does not mean that provider can claim queue tasks. The Work Queue must show this distinction and must not offer human completion controls for agent-owned running tasks. It accepts validated JSON inputs for Hermes Lab asset generation and Hermes Studio agent tasks, and exposes “Run with Hermes” for both registered task types. The legacy Hermes execute endpoint also enters the same durable queue rather than bypassing it. Unsupported worker/task combinations remain visibly queued; they must never be represented as executing.
+
+## Staff and human task ownership
+
+The staff directory is tenant-scoped and stores a person's name, role, optional contact details, active/inactive status and declared availability. `work_tasks.assigned_staff_id` links human-owned work to a staff record; legacy human tasks remain valid with a null staff ID. Effective availability is derived: inactive or declared-unavailable staff are unavailable; otherwise a staff member with queued, running or approval-blocked assignments is busy. Only active, available staff with no active assignment can receive a new task. Staff records are operational ownership records, not separate login identities: progress actions are performed by an authenticated workspace operator and recorded as human work-ledger events. Hermes and other registered agent assignments remain unchanged.
 
 ## Work ledger event envelope
 
@@ -57,6 +61,10 @@ A configured Gemini or NVIDIA API key does not mean that provider can claim queu
 
 ### Workflow integration
 - [ ] Inventory every module's read/write APIs and canonical entity ownership.
+- [x] Add tenant-scoped staff records with role, active/inactive status and declared availability.
+- [x] Link human work tasks to a named staff record without changing the existing human/agent executor contract.
+- [x] Derive effective staff availability from active assignments; prevent assigning new work to inactive, unavailable or already-busy staff.
+- [x] Record staff creation/updates and task assignment, unassignment and status changes in the append-only work ledger.
 - [x] Connect map prospect selection to tenant-validated lead-linked work queue tasks.
 - [x] Connect lead grounding/audits, landing-page artifacts, outreach, project lifecycle and recorded revenue to canonical IDs (coverage remains incomplete and needs an end-to-end audit).
 - [x] Add an authenticated Work History view for persisted operational events.
