@@ -5,6 +5,8 @@ describe('HAL work task state machine', () => {
   it('requires approval for consequential task descriptions', () => {
     expect(requiresWorkTaskApproval('outreach', 'Send email to prospect')).toBe(true);
     expect(requiresWorkTaskApproval('contract', 'Sign agreement')).toBe(true);
+    expect(requiresWorkTaskApproval('records', 'Archive client record')).toBe(true);
+    expect(requiresWorkTaskApproval('billing', 'Transfer funds')).toBe(true);
     expect(requiresWorkTaskApproval('research', 'Find competitor pricing')).toBe(false);
     expect(requiresWorkTaskApproval('lead_follow_up', 'Review and follow up')).toBe(false);
   });
