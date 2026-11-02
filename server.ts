@@ -7146,30 +7146,60 @@ app.get('/api/system/diagnostics/crypto', authenticate, (_req, res) => {
   }
 });
 
-app.get('/api/system/audit-logs', authenticate, (req, res) => {
+app.get('/api/system/audit-logs', authenticate, async (req, res) => {
   const contractorId = (req as any).contractorId;
-  const role = (req as any).role;
-  // Admin sees all audit logs; standard user sees their own.
-  const logs = role === 'admin' ? db.getAuditLogs() : db.getAuditLogs(contractorId);
-  res.json(logs);
+  const role = (req as any).contractorRole;
+  try {
+    // PostgreSQL is authoritative for new audit records; include legacy entries
+    // during migration so older modules do not disappear from the activity view.
+    const persisted = role === 'admin'
+      ? await pgDb.select().from(auditLogs).orderBy(desc(auditLogs.timestamp)).limit(500)
+      : await pgDb.select().from(auditLogs)
+          .where(eq(auditLogs.contractorId, contractorId))
+          .orderBy(desc(auditLogs.timestamp)).limit(500);
+    const legacy = role === 'admin' ? db.getAuditLogs() : db.getAuditLogs(contractorId);
+    const merged = new Map<string, any>();
+    for (const item of legacy) merged.set(item.id, item);
+    for (const item of persisted) merged.set(item.id, {
+      id: item.id,
+      contractorId: item.contractorId,
+      action: item.action,
+      details: item.details,
+      createdAt: item.timestamp,
+      source: 'postgres'
+    });
+    return res.json([...merged.values()].sort((a, b) =>
+      new Date(b.createdAt || b.timestamp || 0).getTime() - new Date(a.createdAt || a.timestamp || 0).getTime()
+    ).slice(0, 500));
+  } catch (err: any) {
+    console.error('[HAL Audit] Could not load tenant audit history:', err);
+    return res.status(503).json({ error: 'Audit history is temporarily unavailable.' });
+  }
 });
 
-app.post('/api/system/audit-logs', authenticate, (req, res) => {
+app.post('/api/system/audit-logs', authenticate, async (req, res) => {
   const contractorId = (req as any).contractorId;
-  const { action, details } = req.body;
-  
-  if (!action) {
-    return res.status(400).json({ error: 'Action is required' });
+  const { action, details } = req.body || {};
+
+  if (typeof action !== 'string' || !action.trim()) {
+    return res.status(400).json({ error: 'Action is required.' });
   }
 
-  const log = db.addAuditLog({
-    contractorId,
-    action,
-    details: details || '',
-    ipAddress: req.ip || req.socket.remoteAddress || undefined
-  });
-
-  res.json({ success: true, log });
+  try {
+    const [log] = await pgDb.insert(auditLogs).values({
+      id: crypto.randomUUID(),
+      contractorId,
+      action: action.trim(),
+      details: typeof details === 'string' ? details : ''
+    }).returning();
+    return res.status(201).json({
+      success: true,
+      log: { ...log, createdAt: log.timestamp, ipAddress: req.ip || req.socket.remoteAddress || undefined }
+    });
+  } catch (err: any) {
+    console.error('[HAL Audit] Could not persist audit event:', err);
+    return res.status(503).json({ error: 'Audit event could not be saved.' });
+  }
 });
 
 // ─── SCHEDULER SYSTEM (Core Learning Loops) ──────────────────────────────────
