@@ -513,7 +513,8 @@ app.post('/api/work-tasks', authenticate, async (req, res) => {
   const entityType = typeof body.entityType === 'string' ? body.entityType.trim() : null;
   const entityId = typeof body.entityId === 'string' ? body.entityId.trim() : null;
   const input = body.input && typeof body.input === 'object' && !Array.isArray(body.input) ? body.input : null;
-  const requiresApproval = body.requiresApproval === true;
+  const approvalRequiredByPolicy = /(^|[._\\s-])(send|dispatch|publish|spend|purchase|charge|refund|sign|delete|bulk_outreach)([._\\s-]|$)/i.test(`${taskType} ${title} ${description || ''}`);
+  const requiresApproval = body.requiresApproval === true || approvalRequiredByPolicy;
   const allowedWorkers = ['human', 'hal_assistant', 'hermes', 'amis', 'gemini', 'nemotron'];
   if (!taskType || taskType.length > 80 || !title || title.length > 180 ||
       (description && description.length > 2000) ||
