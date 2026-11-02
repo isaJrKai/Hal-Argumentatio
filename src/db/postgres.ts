@@ -747,6 +747,8 @@ export async function bootstrapPostgresTables(poolInstance?: Pool): Promise<void
       ALTER TABLE work_tasks ADD COLUMN IF NOT EXISTS assigned_staff_id TEXT;
       CREATE INDEX IF NOT EXISTS work_tasks_assignee_idx ON work_tasks (contractor_id, assigned_worker, status, created_at);
       CREATE INDEX IF NOT EXISTS work_tasks_staff_assignee_idx ON work_tasks (contractor_id, assigned_staff_id, status, created_at);
+      CREATE UNIQUE INDEX IF NOT EXISTS work_tasks_one_active_per_staff_idx ON work_tasks (contractor_id, assigned_staff_id)
+        WHERE assigned_staff_id IS NOT NULL AND status IN ('queued', 'running', 'awaiting_approval');
       CREATE INDEX IF NOT EXISTS work_tasks_entity_idx ON work_tasks (contractor_id, entity_type, entity_id, created_at DESC);
 
       CREATE TABLE IF NOT EXISTS work_events (
