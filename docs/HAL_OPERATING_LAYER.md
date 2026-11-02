@@ -34,7 +34,7 @@ The authenticated `GET /api/workers` endpoint reports execution capability separ
 | Gemini | Model provider | No standalone task executor registered |
 | Nemotron | Model provider | No standalone task executor registered |
 
-A configured Gemini or NVIDIA API key does not mean that provider can claim queue tasks. The Work Queue must show this distinction and must not offer human completion controls for agent-owned running tasks. Unsupported worker/task combinations remain visibly queued; they must never be represented as executing.
+A configured Gemini or NVIDIA API key does not mean that provider can claim queue tasks. The Work Queue must show this distinction and must not offer human completion controls for agent-owned running tasks. It accepts a validated JSON input for Hermes Lab asset tasks and exposes a direct authenticated “Run with Hermes” action for that registered task type. Unsupported worker/task combinations remain visibly queued; they must never be represented as executing.
 
 ## Work ledger event envelope
 
