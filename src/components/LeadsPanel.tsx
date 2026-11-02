@@ -812,7 +812,7 @@ export default function LeadsPanel({ leads, token, onRefresh }: LeadsPanelProps)
             </div>
             <div className="px-3.5 py-1.5 border border-border-dim rounded bg-bg-raised text-center min-w-[100px]">
               <span className="block text-[10px] text-text-secondary uppercase">Converted</span>
-              <span className="text-sm font-semibold text-positive mt-0.5 block">{leads.filter(l => l.status === 'converted').length}</span>
+              <span className="text-sm font-semibold text-positive mt-0.5 block">{leads.filter(l => l.status === 'converted' || l.status === 'closed_won').length}</span>
             </div>
           </div>
         </div>
@@ -1474,9 +1474,9 @@ Next-Gen Waterproofing	Calgary	Waterproofing	Jane Smith	jane@nextgen.ca	403-555-
                     <div className="flex items-center gap-4">
                       {/* Status pill */}
                       <span className={`text-[9px] font-mono font-bold px-2.5 py-0.5 rounded-sm uppercase tracking-wider ${
-                        l.status === 'converted' ? 'bg-brand-glow text-brand border border-brand/30' :
+                        (l.status === 'converted' || l.status === 'closed_won') ? 'bg-brand-glow text-brand border border-brand/30' :
                         l.status === 'contacted' ? 'bg-brand-glow text-brand border border-brand/20' :
-                        l.status === 'dead' ? 'bg-card-inner text-text-dim border border-border-dark' :
+                        (l.status === 'dead' || l.status === 'closed_lost') ? 'bg-card-inner text-text-dim border border-border-dark' :
                         'bg-brand-glow text-brand border border-brand/30'
                       }`}>
                         {l.status === 'new' ? 'untouched' : l.status}
