@@ -3721,7 +3721,32 @@ app.post('/api/intelligence/chat', authenticate, async (req, res) => {
     }).returning();
 
     // 3. Ask HAL
-    const result = await askHalBot(message, formattedHistory, !!enableGrounding, activeAi);
+    const result = await askHalBot(message, formattedHistory, !!enableGrounding, activeAi, {
+      // Only the authenticated server supplies this runtime. Tool calls inherit
+      // the contractor ID from the verified session, never from model arguments.
+      tools: HAL_MCP_TOOLS.filter(tool => tool.name !== 'hermes_synthesize_lab_asset'),
+      execute: async (toolName, toolArgs) => {
+        const correlationId = conversationId;
+        try {
+          const toolResult = await executeMcpTool(toolName, toolArgs, contractorId);
+          await recordWorkEvent(pgDb, {
+            contractorId, eventType: 'assistant.tool_succeeded', entityType: 'conversation', entityId: conversationId,
+            actorType: 'agent', actorId: 'hal_assistant', sourceModule: 'hal_assistant',
+            correlationId, summary: `HAL Assistant executed tool: ${toolName}.`,
+            payload: { toolName, success: true }
+          });
+          return toolResult;
+        } catch (toolError: any) {
+          await recordWorkEvent(pgDb, {
+            contractorId, eventType: 'assistant.tool_failed', entityType: 'conversation', entityId: conversationId,
+            actorType: 'agent', actorId: 'hal_assistant', sourceModule: 'hal_assistant',
+            correlationId, summary: `HAL Assistant tool failed: ${toolName}.`,
+            payload: { toolName, success: false, error: String(toolError?.message || 'Tool failed.').slice(0, 500) }
+          });
+          throw toolError;
+        }
+      }
+    });
 
     // 4. Save HAL's reply to the database
     const replyDate = new Date();
@@ -3729,7 +3754,7 @@ app.post('/api/intelligence/chat', authenticate, async (req, res) => {
       contractorId, eventType: 'assistant.responded', entityType: 'conversation', entityId: conversationId,
       actorType: 'agent', actorId: activeAi || 'hal_assistant', sourceModule: 'hal_assistant',
       correlationId: conversationId, summary: 'HAL generated a response using conversation and bounded workspace context.',
-      payload: { groundingEnabled: !!enableGrounding, projectId: conversation.projectId || null, sourcesCount: result.sources?.length || 0 }
+      payload: { groundingEnabled: !!enableGrounding, projectId: conversation.projectId || null, sourcesCount: result.sources?.length || 0, toolNames: result.toolCalls?.map(call => call.name) || [] }
     });
 
     const [modelMsg] = await pgDb.insert(chatMessages).values({
@@ -3755,6 +3780,7 @@ app.post('/api/intelligence/chat', authenticate, async (req, res) => {
     res.json({ 
       reply: result.text, 
       sources: result.sources,
+      toolCalls: result.toolCalls || [],
       userMessage: userMsg,
       modelMessage: modelMsg
     });
