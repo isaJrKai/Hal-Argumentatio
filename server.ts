@@ -5981,7 +5981,7 @@ app.get('/api/neural/network', authenticate, async (req, res) => {
       totalLinks: links.length,
       lastActivityAt: lastActivity.length ? new Date(Math.max(...lastActivity)).toISOString() : null,
       learningStatus: scopedOutcomes.length ? 'Recorded outcomes available; model calibration is not yet validated.' : 'No recorded outcomes in this scope; no learning confidence is claimed.',
-      timesFmStatus: timesfmConfigured ? 'HTTP_CONFIGURED_UNVERIFIED' : 'SCHEDULED_BATCH_SUPPORTED',
+      timesFmStatus: timesfmConfigured ? 'HTTP_CONFIGURED_UNVERIFIED' : 'HTTP_NOT_CONFIGURED',
       timesfmServiceConfigured: timesfmConfigured,
       timesfmInferenceVerified: false
     };
