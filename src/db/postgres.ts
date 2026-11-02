@@ -703,6 +703,20 @@ export async function bootstrapPostgresTables(poolInstance?: Pool): Promise<void
       ALTER TABLE lead_events ADD COLUMN IF NOT EXISTS occurred_at TIMESTAMP;
       ALTER TABLE lead_events ALTER COLUMN type DROP NOT NULL;
 
+      CREATE TABLE IF NOT EXISTS staff_members (
+        id TEXT PRIMARY KEY,
+        contractor_id TEXT NOT NULL,
+        name TEXT NOT NULL,
+        email TEXT,
+        phone TEXT,
+        role TEXT NOT NULL,
+        status TEXT DEFAULT 'active' NOT NULL,
+        availability TEXT DEFAULT 'available' NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS staff_members_tenant_status_idx ON staff_members (contractor_id, status, availability, name);
+
       CREATE TABLE IF NOT EXISTS work_tasks (
         id TEXT PRIMARY KEY,
         contractor_id TEXT NOT NULL,
@@ -712,6 +726,7 @@ export async function bootstrapPostgresTables(poolInstance?: Pool): Promise<void
         status TEXT DEFAULT 'queued' NOT NULL,
         priority TEXT DEFAULT 'normal' NOT NULL,
         assigned_worker TEXT DEFAULT 'human' NOT NULL,
+        assigned_staff_id TEXT,
         entity_type TEXT,
         entity_id TEXT,
         correlation_id TEXT,
@@ -729,7 +744,9 @@ export async function bootstrapPostgresTables(poolInstance?: Pool): Promise<void
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
       );
       CREATE INDEX IF NOT EXISTS work_tasks_tenant_status_idx ON work_tasks (contractor_id, status, priority, created_at);
+      ALTER TABLE work_tasks ADD COLUMN IF NOT EXISTS assigned_staff_id TEXT;
       CREATE INDEX IF NOT EXISTS work_tasks_assignee_idx ON work_tasks (contractor_id, assigned_worker, status, created_at);
+      CREATE INDEX IF NOT EXISTS work_tasks_staff_assignee_idx ON work_tasks (contractor_id, assigned_staff_id, status, created_at);
       CREATE INDEX IF NOT EXISTS work_tasks_entity_idx ON work_tasks (contractor_id, entity_type, entity_id, created_at DESC);
 
       CREATE TABLE IF NOT EXISTS work_events (
@@ -806,19 +823,21 @@ export async function bootstrapPostgresTables(poolInstance?: Pool): Promise<void
           SELECT
             count(*) FILTER (WHERE table_schema = 'public') AS public_table_count,
             to_regclass('public.work_tasks') IS NOT NULL AS has_work_tasks,
+        to_regclass('public.staff_members') IS NOT NULL AS has_staff_members,
+            to_regclass('public.staff_members') IS NOT NULL AS has_staff_members,
             to_regclass('public.work_events') IS NOT NULL AS has_work_events
           FROM information_schema.tables
           WHERE table_schema = 'public';
         `);
         const schemaState = check.rows[0];
         const count = Number(schemaState?.public_table_count || 0);
-        if (count > 0 && schemaState?.has_work_tasks && schemaState?.has_work_events) {
+        if (count > 0 && schemaState?.has_work_tasks && schemaState?.has_work_events && schemaState?.has_staff_members) {
           console.log(`[HAL PostgreSQL] Managed schema active (${count} public tables; operating-layer tables verified).`);
           return;
         }
         throw new Error(
           'Database role cannot apply schema changes and the managed schema is incomplete. ' +
-          'Provision public.work_tasks and public.work_events with the database owner, then restart HAL.'
+          'Provision public.staff_members, public.work_tasks and public.work_events with the database owner, then restart HAL.'
         );
       } catch (_) {
         // Fall through to rethrow original error
@@ -872,7 +891,7 @@ export async function testPostgresConnection(customUrl?: string): Promise<{
       WHERE table_schema = 'public';
     `);
     const schemaState = tablesRes.rows[0] || {};
-    const schemaReady = Boolean(schemaState.has_contractors && schemaState.has_leads && schemaState.has_work_tasks && schemaState.has_work_events);
+    const schemaReady = Boolean(schemaState.has_contractors && schemaState.has_leads && schemaState.has_work_tasks && schemaState.has_work_events && schemaState.has_staff_members);
     const latencyMs = Date.now() - startTime;
     const versionStr = result.rows[0]?.version || 'PostgreSQL';
     const provider = (customUrl || activeConnectionString || process.env.DATABASE_URL || process.env.NEON_DATABASE_URL || '').includes('neon.tech') || versionStr.toLowerCase().includes('neon')
