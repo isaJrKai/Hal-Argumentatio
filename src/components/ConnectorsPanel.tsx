@@ -588,7 +588,7 @@ export default function ConnectorsPanel() {
                     </Badge>
                   </div>
                   <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                    Inspects your schedule to prevent double-booking and schedules consultation review calls automatically when leads accept.
+                    Reads upcoming events so you can review availability. Automatic appointment creation and lead-triggered scheduling are not connected yet.
                   </p>
                 </div>
 
@@ -704,17 +704,17 @@ export default function ConnectorsPanel() {
                   Buyer / New Owner Setup Guide: Real Email API Integration
                 </div>
                 <p className="text-xs text-zinc-600 dark:text-zinc-300 leading-relaxed">
-                  For the buyer tomorrow: Standard web applications require an external email provider to deliver password reset emails directly to user inboxes. HAL provides two seamless, zero-code options:
+                  For production password-reset delivery, HAL currently uses Resend when its API key is configured. Google Workspace is a separate manual Gmail-send connector and is not yet wired into password-reset delivery.
                 </p>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2 text-xs">
                   <div className="p-3 bg-white dark:bg-zinc-800/80 rounded-lg border border-zinc-200 dark:border-zinc-700/60 space-y-1">
-                    <span className="font-semibold text-zinc-900 dark:text-zinc-100 block">Option A: Google Workspace (Gmail API)</span>
+                    <span className="font-semibold text-zinc-900 dark:text-zinc-100 block">Google Workspace (manual Gmail sends)</span>
                     <p className="text-[11px] text-zinc-500 dark:text-zinc-400 leading-relaxed">
-                      Connect Google Workspace to authorize Gmail sending. The connector includes a manual test-send action; automated password resets and prospect campaigns still use their separately configured delivery workflows.
+                      Connect Google Workspace to authorize Gmail sending. The connector includes a manual test-send action; automated password resets and prospect campaigns are not routed through Gmail.
                     </p>
                   </div>
                   <div className="p-3 bg-white dark:bg-zinc-800/80 rounded-lg border border-zinc-200 dark:border-zinc-700/60 space-y-1">
-                    <span className="font-semibold text-zinc-900 dark:text-zinc-100 block">Option B: Resend Email API</span>
+                    <span className="font-semibold text-zinc-900 dark:text-zinc-100 block">Resend (transactional email)</span>
                     <p className="text-[11px] text-zinc-500 dark:text-zinc-400 leading-relaxed">
                       Create an account at Resend.com, generate an API key (re_...), and paste it below. HAL will automatically use high-reputation transactional delivery for all reset requests.
                     </p>
