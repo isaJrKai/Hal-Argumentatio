@@ -18,6 +18,7 @@ A workflow is considered connected only when its data is persisted in the author
 6. **Duplicate financial endpoint existed.** Two GET handlers were registered for `/api/financials/overview`; the later handler contained hard-coded figures and was unreachable behind the earlier route. The duplicate handler has been removed.
 7. **Logout did not revoke JWTs.** The middleware validated JWTs and account existence but did not consult the JSON session list that logout deleted. The integration branch adds hashed, tenant-scoped PostgreSQL token revocations and checks them in authentication middleware.
 8. **Schema tests omitted newer operating tables.** Work queue, work ledger and Hermes tables were not in the schema invariant list. Coverage has been extended, including token revocations.
+9. **System Health showed simulated success states.** AI availability, encryption, Maps and scheduler indicators were hard-coded or inferred from configuration. The integration branch now probes database readiness, provider configuration, Hermes configuration, Maps connector configuration, encryption round-trip and persisted scheduler records; configured providers are explicitly labelled unverified.
 
 ## Changes made on this branch
 
@@ -47,7 +48,7 @@ A workflow is considered connected only when its data is persisted in the author
 - Link completed work back to the source entity and update the relevant business state only after a verified result.
 
 ### Operational truthfulness
-- Replace static System Health claims with live probes; configured credentials must not be shown as verified provider connectivity.
+- Expand live provider probes beyond configuration checks where provider APIs support safe health calls; configured credentials must not be shown as verified provider connectivity.
 - Distinguish liveness, database readiness, provider configuration, provider reachability and successful business execution.
 - Audit every frontend API call against an existing backend route and response contract.
 - Add end-to-end tests across Maps -> Leads -> Work Queue, Lead -> Campaign -> Revenue, Client Project -> Portal -> Financials, and Hermes -> Artifact -> Work Ledger.
