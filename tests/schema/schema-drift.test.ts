@@ -48,6 +48,15 @@ describe('Database: Schema Drift & Table Invariant Tests', () => {
     }
   });
 
+  it('requires tenant ownership on persisted learning insights', () => {
+    const table = schema.learningInsights;
+    expect(table).toBeDefined();
+    expect(Object.keys(table)).toContain('contractorId');
+    expect(Object.keys(table)).toContain('metric');
+    expect(Object.keys(table)).toContain('lesson');
+    expect(Object.keys(table)).toContain('confidenceShift');
+  });
+
   it('validates durable hashed-token revocation storage', () => {
     const table = schema.revokedTokens;
     expect(table).toBeDefined();
