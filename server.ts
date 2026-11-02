@@ -5665,9 +5665,20 @@ async function getBridgesForContractor(contractorId: string): Promise<ChannelBri
   } catch {
     console.warn('[Connectors] Ignoring invalid persisted bridge settings for workspace', contractorId);
   }
+  const emailProvider: ChannelBridgeSettings['email']['provider'] =
+    credentials.sendgrid ? 'sendgrid' : credentials.resend ? 'resend' : defaults.email.provider;
+  const emailApiKey = credentials.resend || credentials.sendgrid || defaults.email.apiKey;
+  const savedEmail = saved.email || {};
+  const email = {
+    ...defaults.email,
+    provider: emailProvider,
+    apiKey: emailApiKey,
+    ...savedEmail,
+    enabled: Boolean(emailApiKey && (savedEmail.senderEmail || defaults.email.senderEmail) && savedEmail.enabled !== false)
+  };
   return {
     whatsapp: { ...defaults.whatsapp, ...(saved.whatsapp || {}) },
-    email: { ...defaults.email, ...(saved.email || {}) },
+    email,
     sms: { ...defaults.sms, ...(saved.sms || {}) },
     calendar: { ...defaults.calendar, ...(saved.calendar || {}) }
   };
@@ -5745,7 +5756,7 @@ app.get('/api/outreach/bridges/status', authenticate, async (req, res) => {
       email: {
         enabled: cfg.email.enabled,
         configured: cfg.email.enabled,
-        liveDispatchSupported: Boolean(process.env.RESEND_API_KEY && process.env.HAL_SENDER_EMAIL),
+        liveDispatchSupported: cfg.email.provider === 'resend' && Boolean(cfg.email.apiKey && cfg.email.senderEmail),
         provider: cfg.email.provider,
         senderEmail: cfg.email.senderEmail,
         senderName: cfg.email.senderName,
@@ -5932,11 +5943,12 @@ app.post('/api/outreach/dispatch', authenticate, async (req, res) => {
       throw gateError;
     }
 
-    if (!process.env.RESEND_API_KEY || !process.env.HAL_SENDER_EMAIL) {
+    const emailBridge = await getBridgesForContractor(contractorId);
+    if (emailBridge.email.provider !== 'resend' || !emailBridge.email.apiKey || !emailBridge.email.senderEmail) {
       return res.status(503).json({
         success: false,
         code: 'EMAIL_PROVIDER_NOT_CONFIGURED',
-        error: 'Resend is not configured. Set RESEND_API_KEY and HAL_SENDER_EMAIL on the server.'
+        error: 'A Resend API key and verified sender address must be configured for this workspace or the platform.'
       });
     }
     const rateNow = Date.now();
@@ -6003,6 +6015,9 @@ app.post('/api/outreach/dispatch', authenticate, async (req, res) => {
         to: String(recipient),
         subject: customizedSubject,
         text: customizedMessage
+      }, {
+        apiKey: emailBridge.email.apiKey,
+        from: emailBridge.email.senderEmail
       });
       const submittedAt = new Date().toISOString();
       await pgDb.update(communicationsOutbox).set({
