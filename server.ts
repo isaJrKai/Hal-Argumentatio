@@ -8848,7 +8848,7 @@ async function startServer() {
         eq(hermesLabArtifacts.contractorId, contractorId)
       )).limit(1);
       if (!artifact) throw new Error('Hermes execution completed, but its saved artifact could not be reloaded.');
-      res.json({ success: true, taskId: task.id, receipt: execution.receipt, ...artifact });
+      res.json({ success: true, taskId: task.id, artifactId: artifact.id, receipt: execution.receipt, ...artifact });
     } catch (err: any) {
       console.error('[Hermes Queued Tool Execution Error]', err);
       res.status(500).json({ success: false, error: err.message });
