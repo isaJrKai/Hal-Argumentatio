@@ -35,7 +35,6 @@ export const auth: Auth | null = app ? getAuth(app) : null;
 // Unified Provider with Google Drive, Calendar, and Gmail scopes
 const provider = new GoogleAuthProvider();
 provider.addScope('https://www.googleapis.com/auth/drive');
-provider.addScope('https://www.googleapis.com/auth/calendar.events');
 provider.addScope('https://www.googleapis.com/auth/gmail.send');
 
 let isSigningIn = false;
@@ -152,37 +151,6 @@ export const listCalendarEvents = async (token: string): Promise<CalendarEvent[]
   }
   const data = await res.json();
   return data.items || [];
-};
-
-export const createCalendarEvent = async (
-  token: string, 
-  event: { summary: string; description: string; startTime: string; endTime: string; attendeeEmail?: string }
-): Promise<CalendarEvent> => {
-  const url = 'https://www.googleapis.com/calendar/v3/calendars/primary/events';
-  const body: any = {
-    summary: event.summary,
-    description: event.description,
-    start: { dateTime: event.startTime },
-    end: { dateTime: event.endTime }
-  };
-  if (event.attendeeEmail) {
-    body.attendees = [{ email: event.attendeeEmail }];
-  }
-
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${token}`,
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify(body)
-  });
-
-  if (!res.ok) {
-    const err = await res.json();
-    throw new Error(err.error?.message || 'Failed to create calendar consultation event');
-  }
-  return res.json();
 };
 
 // ─── Gmail Helpers ────────────────────────────────────────────────────────────
