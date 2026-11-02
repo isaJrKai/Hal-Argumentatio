@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { canHumanUpdateWorkTask, canTransitionWorkTask, listWorkTasks, requiresWorkTaskApproval } from '../../src/lib/workTasks';
+import { canExecutorClaimWorkTask, canHumanUpdateWorkTask, canTransitionWorkTask, listWorkTasks, requiresWorkTaskApproval } from '../../src/lib/workTasks';
 
 describe('HAL work task state machine', () => {
   it('requires approval for consequential task descriptions', () => {
@@ -33,6 +33,14 @@ describe('HAL work task state machine', () => {
     expect(canTransitionWorkTask('awaiting_approval', 'running')).toBe(false);
   });
 
+  it('allows an approved agent task to be claimed but blocks unapproved tasks', () => {
+    expect(canExecutorClaimWorkTask({ status: 'awaiting_approval', requiresApproval: true, approvedAt: null })).toBe(false);
+    expect(canExecutorClaimWorkTask({ status: 'queued', requiresApproval: true, approvedAt: null })).toBe(false);
+    expect(canExecutorClaimWorkTask({ status: 'queued', requiresApproval: true, approvedAt: new Date() })).toBe(true);
+    expect(canExecutorClaimWorkTask({ status: 'queued', requiresApproval: false, approvedAt: null })).toBe(true);
+    expect(canExecutorClaimWorkTask({ status: 'running', requiresApproval: false })).toBe(false);
+  });
+
   it('keeps completed and cancelled tasks terminal', () => {
     expect(canTransitionWorkTask('completed', 'queued')).toBe(false);
     expect(canTransitionWorkTask('cancelled', 'running')).toBe(false);
@@ -45,7 +53,7 @@ describe('HAL work task state machine', () => {
   });
 
 
-  it('returns a bounded task summary without exposing raw input/output payloads', async () => {
+  it('returns a bounded task summary without exposing raw input payloads', async () => {
     const limit = vi.fn().mockResolvedValue([]);
     const orderBy = vi.fn().mockReturnValue({ limit });
     const where = vi.fn().mockReturnValue({ orderBy });
@@ -59,7 +67,7 @@ describe('HAL work task state machine', () => {
     expect(projection).toHaveProperty('title');
     expect(projection).toHaveProperty('assignedWorker');
     expect(projection).not.toHaveProperty('input');
-    expect(projection).not.toHaveProperty('output');
+    expect(projection).toHaveProperty('output');
     expect(limit).toHaveBeenCalledWith(100);
   });
 
