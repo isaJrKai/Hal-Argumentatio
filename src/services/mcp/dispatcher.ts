@@ -377,7 +377,7 @@ export async function executeMcpTool(
       try {
         const result = task.taskType === 'hermes_lab_asset'
           ? await executeHermesLabTool(toolId, parameters, contractorId, promptOverride, { workTaskId: taskId, correlationId: task.correlationId || taskId })
-          : await chatWithHermesAgent(contractorId, agentMessage, artifactId);
+          : await chatWithHermesAgent(contractorId, agentMessage, artifactId, { workTaskId: taskId, correlationId: task.correlationId || taskId });
         if (task.taskType === 'hermes_agent_task' && (result as any).executionStatus === 'provider_unavailable') {
           throw new Error('Hermes providers are unavailable. No analysis or artifact update was completed.');
         }
