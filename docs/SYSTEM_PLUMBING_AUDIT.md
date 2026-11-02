@@ -19,6 +19,7 @@ A workflow is considered connected only when its data is persisted in the author
 7. **Logout did not revoke JWTs.** The middleware validated JWTs and account existence but did not consult the JSON session list that logout deleted. The integration branch adds hashed, tenant-scoped PostgreSQL token revocations and checks them in authentication middleware.
 8. **Schema tests omitted newer operating tables.** Work queue, work ledger and Hermes tables were not in the schema invariant list. Coverage has been extended, including token revocations.
 9. **System Health showed simulated success states.** AI availability, encryption, Maps and scheduler indicators were hard-coded or inferred from configuration. The integration branch now probes database readiness, provider configuration, Hermes configuration, Maps connector configuration, encryption round-trip and persisted scheduler records; configured providers are explicitly labelled unverified.
+10. **Revenue recording did not close the CRM lead.** The endpoint inserted revenue and a revenue event, but left the persisted lead stage unchanged while the UI marked the selected lead converted locally. The integration branch now commits revenue, the closed-won stage, lead events, work-ledger event and audit entry in one transaction, and the UI exposes the qualification -> proposal -> close progression.
 
 ## Changes made on this branch
 
