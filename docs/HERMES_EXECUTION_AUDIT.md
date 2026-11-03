@@ -32,17 +32,18 @@ Work History now records `agent.tool_unavailable` separately, and the persisted 
 - Hermes agent task chat now uses deterministic, task-scoped user/assistant message IDs. A retry reuses the same user message, and if an assistant response was persisted before the task receipt failed, the executor returns that stored response instead of calling providers again. Artifact recovery remains task-scoped as before.
 - The executor's task receipt and Work History event are separate writes. The task receipt is authoritative; Work History append failure is logged and does not undo a persisted completed task.
 - Deterministic Hermes Lab fallback creates a durable `draft`, not a provider-verified `ready` asset. The artifact status and execution summary must remain visible to the operator.
-- Live production database, concurrent-claim behavior under load, provider outage/recovery, and browser end-to-end behavior require verification in the deployed environment.
+- CI now runs the extracted production claim function against an ephemeral PostgreSQL 16 service. Integration tests verify exactly-one-winner concurrent claims, tenant scoping, approval gating, retry-limit enforcement, and attempt increments. This is real PostgreSQL behavior, but not a test against the production database.
+- Live production database, external provider outage/recovery, and browser end-to-end behavior still require verification in the deployed environment.
 
 ## Acceptance evidence required before calling Hermes production-verified
 
 1. Create a tenant-owned Hermes Lab task and inspect its persisted task ID and input.
-2. Execute it twice concurrently; exactly one claim must succeed.
+2. CI integration coverage executes the production claim function twice concurrently against PostgreSQL; exactly one claim must succeed. Repeat in production after deployment.
 3. Confirm one artifact exists with matching `metadata.executionContext.workTaskId` and correlation ID.
 4. Confirm the task output references that persisted artifact and its actual status.
 5. Force provider unavailability; confirm a failed task or explicitly labelled draft, never a false provider-success claim.
 6. Retry after a partial artifact write; confirm the existing artifact is recovered rather than duplicated.
 7. Run a Hermes agent task that invokes a real read tool and one intentionally unavailable tool; confirm Work History and the receipt distinguish their outcomes.
-8. Verify a second tenant cannot read or execute the first tenant's task or artifact.
+8. CI integration coverage verifies a second tenant cannot claim the first tenant's task. Verify full task/artifact read isolation in the deployed application.
 9. Verify attempt limits, approval blocks, cancellation and terminal states against PostgreSQL.
 10. Run CI and then perform a live deployed workflow check. CI alone is not production evidence.
