@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { classifyHermesToolResult } from '../../src/lib/hermesExecution';
+import { classifyHermesToolResult, createHermesTaskMessageId } from '../../src/lib/hermesExecution';
 
 describe('Hermes MCP tool outcome classification', () => {
   it('marks evidence-bearing read results as successful', () => {
@@ -28,5 +28,18 @@ describe('Hermes MCP tool outcome classification', () => {
   it('keeps a completed tool invocation distinct from unavailable business capability', () => {
     const unavailable = { status: 'unavailable', message: 'No validated marginal-response model is connected.' };
     expect(classifyHermesToolResult(unavailable)).not.toBe('succeeded');
+  });
+});
+
+
+describe('Hermes task message idempotency', () => {
+  it('returns stable, role-specific IDs for retries of the same work task', () => {
+    expect(createHermesTaskMessageId('task_123', 'user')).toBe(createHermesTaskMessageId('task_123', 'user'));
+    expect(createHermesTaskMessageId('task_123', 'assistant')).toBe(createHermesTaskMessageId('task_123', 'assistant'));
+    expect(createHermesTaskMessageId('task_123', 'user')).not.toBe(createHermesTaskMessageId('task_123', 'assistant'));
+  });
+
+  it('isolates message IDs between work tasks', () => {
+    expect(createHermesTaskMessageId('task_123', 'user')).not.toBe(createHermesTaskMessageId('task_456', 'user'));
   });
 });
