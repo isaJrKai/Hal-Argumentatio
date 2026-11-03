@@ -584,6 +584,19 @@ export const hermesLabMessages = pgTable('hermes_lab_messages', {
 
 
 
+export const staffMembers = pgTable('staff_members', {
+  id: text('id').primaryKey(),
+  contractorId: text('contractor_id').notNull(),
+  name: text('name').notNull(),
+  email: text('email'),
+  phone: text('phone'),
+  role: text('role').notNull(),
+  status: text('status').default('active').notNull(), // active | inactive
+  availability: text('availability').default('available').notNull(), // available | unavailable; busy is derived from active assignments
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+});
+
 /** Durable task queue for human and agent work assignment. */
 export const workTasks = pgTable('work_tasks', {
   id: text('id').primaryKey(),
@@ -594,6 +607,7 @@ export const workTasks = pgTable('work_tasks', {
   status: text('status').default('queued').notNull(), // queued | running | awaiting_approval | completed | failed | cancelled
   priority: text('priority').default('normal').notNull(), // low | normal | high | urgent
   assignedWorker: text('assigned_worker').default('human').notNull(), // human | hal_assistant | hermes | gemini | nemotron | specialist:<id>
+  assignedStaffId: text('assigned_staff_id'), // tenant-scoped named owner for human work
   entityType: text('entity_type'),
   entityId: text('entity_id'),
   correlationId: text('correlation_id'),
