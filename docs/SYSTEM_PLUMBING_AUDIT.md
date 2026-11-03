@@ -118,7 +118,7 @@ The older `AUDIT.md`, `docs/HAL_OPERATING_LAYER.md`, and sale-readiness notes co
 
 ## Verification boundary
 
-- Latest PR head: `5040c7f7571f48d4c90c069d8e0abde12b248f99`.
-- GitHub Actions CI run `41544141119` completed successfully: frozen Bun install, TimesFM Python syntax check, TypeScript + automated tests, production build, production dependency audit and full dependency audit report.
-- No live production database, deployed `/api/ready`, browser OAuth flow, real email delivery, or full cross-module end-to-end workflow has been exercised in this audit.
-- CI success is repository-level verification only. Do not merge, publish, or describe the application as production-verified until the live acceptance checks above are completed.
+- Current PR head: `5b3e3f68b23929ec4d8ce13794b2d8fe41bee54c`.
+- Latest code-bearing CI run: `41549560278` on commit `0c4e9bf86e7e22eaaf62e996606694bd453620b0` completed successfully. It passed locked dependency installation, TimesFM Python syntax validation, TypeScript and automated tests, production build, and production/full dependency audits. The current PR head adds audit documentation after that code commit.
+- The PR remains open and unmerged. No live production database, deployed `/api/ready`, browser OAuth flow, real email delivery, or full cross-module end-to-end workflow has been exercised in this audit.
+- CI success is repository-level verification only. Do not describe the application as production-verified until the live acceptance checks above are completed.
