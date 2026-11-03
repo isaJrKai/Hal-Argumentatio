@@ -1,4 +1,4 @@
-import { testPostgresConnection, bootstrapPostgresTables } from './src/db/postgres';
+import { testPostgresConnection, bootstrapPostgresTables, getPostgresPool } from './src/db/postgres';
 import express from 'express';
 import path from 'path';
 import fs from 'fs';
@@ -9110,18 +9110,30 @@ app.post('/api/revenue/recommendations/:id/transition', authenticate, async (req
 
 // ─── SERVER STARTUP & BACKGROUND WORKERS ───────────────────────────────
 
-async function startServer() {
-  // Auto-bootstrap PostgreSQL tables on startup
-  try {
-    const { getPostgresPool, bootstrapPostgresTables } = await import('./src/db/postgres');
-    const pool = getPostgresPool();
-    if (pool) {
-      await bootstrapPostgresTables(pool);
-      console.log('[HAL PostgreSQL] Tables automatically bootstrapped successfully.');
+function startServer() {
+  // Database initialization must never hold the HTTP listener hostage. AI Studio
+  // and other preview proxies return their own "Starting Server" HTML page while
+  // the process has not bound its port, which makes every /api request look like
+  // a successful HTML response. Start initialization in the background and let
+  // /api/ready report whether the database is actually ready.
+  void (async () => {
+    try {
+      const pool = getPostgresPool();
+      if (pool) {
+        await bootstrapPostgresTables(pool);
+        console.log('[HAL PostgreSQL] Tables automatically bootstrapped successfully.');
+      }
+    } catch (e: any) {
+      console.warn('[HAL PostgreSQL] Auto-bootstrap note:', e?.message || e);
     }
-  } catch (e: any) {
-    console.warn('[HAL PostgreSQL] Auto-bootstrap note:', e?.message || e);
-  }
+
+    try {
+      await autonomousLearning.initializeFromDb();
+      console.log('[HAL Neural Engine] Bayes Memory core loaded from persistent storage.');
+    } catch (e) {
+      console.warn('Could not initialize Neural Engine from DB', e);
+    }
+  })();
 
   // Phase 4: Start Durable Conversion Worker Background Loop (Runs every 45s with exponential backoff & concurrency locking)
   setInterval(async () => {
@@ -9224,14 +9236,6 @@ async function startServer() {
       console.error('[Conversion Worker Loop Error]:', loopErr);
     }
   }, 45000);
-
-  // Initialize HAL Neural State from Persistent Data Center
-  try {
-    await autonomousLearning.initializeFromDb();
-    console.log('[HAL Neural Engine] Bayes Memory core loaded from persistent storage.');
-  } catch(e) {
-    console.warn('Could not initialize Neural Engine from DB', e);
-  }
 
   // ─── PHASE 6D: OUTCOME TRACKING & LEARNING LOOP ENDPOINTS ───────────────────
 
