@@ -3,10 +3,11 @@ import { Bot, CheckCircle2, ListTodo, Loader2, Play, Plus, RefreshCw, ShieldChec
 import { readApiResponse } from '../lib/apiResponse';
 
 type WorkerCapability = { id: string; label: string; mode: string; canClaimTasks: boolean; supportedTaskTypes: string[]; description: string; configured?: boolean; };
+type StaffMember = { id: string; name: string; role: string; effectiveAvailability: 'available' | 'busy' | 'unavailable'; activeTaskCount: number; };
 
 type WorkTask = {
   id: string; taskType: string; title: string; description: string | null;
-  status: string; priority: string; assignedWorker: string; entityType: string | null;
+  status: string; priority: string; assignedWorker: string; assignedStaffId: string | null; entityType: string | null;
   entityId: string | null; correlationId: string | null; requiresApproval: boolean;
   approvedAt: string | null; attemptCount: number; maxAttempts: number;
   errorMessage: string | null; output?: Record<string, any> | null; createdAt: string; updatedAt: string;
@@ -26,6 +27,8 @@ const statusTone: Record<string, string> = {
 export default function WorkQueuePanel({ token }: WorkQueuePanelProps) {
   const [tasks, setTasks] = useState<WorkTask[]>([]);
   const [workerCapabilities, setWorkerCapabilities] = useState<WorkerCapability[]>([]);
+  const [staff, setStaff] = useState<StaffMember[]>([]);
+  const [assignedStaffId, setAssignedStaffId] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -46,6 +49,11 @@ export default function WorkQueuePanel({ token }: WorkQueuePanelProps) {
       const body = await readApiResponse<any>(response, 'Work queue request');
       if (!response.ok) throw new Error(body.error || 'Unable to load work queue.');
       setTasks(Array.isArray(body.tasks) ? body.tasks : []);
+      try {
+        const staffResponse = await fetch('/api/staff', { headers: { Authorization: `Bearer ${token}` } });
+        const staffBody = await readApiResponse<any>(staffResponse, 'Staff directory request');
+        if (staffResponse.ok) setStaff(Array.isArray(staffBody.staff) ? staffBody.staff : []);
+      } catch { /* Keep existing queue records visible if staff metadata is unavailable. */ }
       try {
         const workerResponse = await fetch('/api/workers', { headers: { Authorization: `Bearer ${token}` } });
         if (workerResponse.ok) {
@@ -80,11 +88,11 @@ export default function WorkQueuePanel({ token }: WorkQueuePanelProps) {
       const response = await fetch('/api/work-tasks', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ taskType, title: title.trim(), description: description.trim() || undefined, assignedWorker, priority, requiresApproval, ...(taskInput ? { input: taskInput } : {}) })
+        body: JSON.stringify({ taskType, title: title.trim(), description: description.trim() || undefined, assignedWorker, ...(assignedWorker === 'human' && assignedStaffId ? { assignedStaffId } : {}), priority, requiresApproval, ...(taskInput ? { input: taskInput } : {}) })
       });
       const body = await readApiResponse<any>(response, 'Create work item');
       if (!response.ok) throw new Error(body.error || 'Unable to create task.');
-      setTitle(''); setDescription(''); setTaskType('research'); setInputJson('{}'); setRequiresApproval(false);
+      setTitle(''); setDescription(''); setTaskType('research'); setInputJson('{}'); setRequiresApproval(false); setAssignedStaffId('');
       await loadTasks();
     } catch (err: any) { setError(err?.message || 'Unable to create task.'); }
     finally { setSaving(false); }
@@ -102,6 +110,20 @@ export default function WorkQueuePanel({ token }: WorkQueuePanelProps) {
       if (!response.ok) throw new Error(body.error || 'Task update failed.');
       await loadTasks();
     } catch (err: any) { setError(err?.message || 'Task update failed.'); }
+  };
+
+  const assignStaff = async (task: WorkTask, staffId: string) => {
+    setError(null);
+    try {
+      const response = await fetch(`/api/work-tasks/${encodeURIComponent(task.id)}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ assignedStaffId: staffId || null })
+      });
+      const body = await readApiResponse<any>(response, 'Assign staff member');
+      if (!response.ok) throw new Error(body.error || 'Unable to assign staff member.');
+      await loadTasks();
+    } catch (err: any) { setError(err?.message || 'Unable to assign staff member.'); }
   };
 
   const completeHumanTask = async (task: WorkTask) => {
@@ -204,6 +226,13 @@ export default function WorkQueuePanel({ token }: WorkQueuePanelProps) {
               })}
             </select>
           </label>
+          {assignedWorker === 'human' && <label className="text-[10px] text-text-tertiary font-mono uppercase">Named staff owner (optional)
+            <select value={assignedStaffId} onChange={e => setAssignedStaffId(e.target.value)} className="mt-1 w-full rounded-md bg-bg-base border border-border-default p-2.5 text-sm text-text-primary">
+              <option value="">Unassigned human work</option>
+              {staff.filter(member => member.effectiveAvailability === 'available').map(member => <option key={member.id} value={member.id}>{member.name} — {member.role}</option>)}
+            </select>
+            {staff.length === 0 && <span className="block mt-1 text-[9px] normal-case">Add employees in Staff Management before assigning named owners.</span>}
+          </label>}
           {assignedWorker === 'hermes' && (
             <label className="text-[10px] text-text-tertiary font-mono uppercase md:col-span-2">Hermes task input (JSON)
               <textarea value={inputJson} onChange={e => setInputJson(e.target.value)} rows={4} spellCheck={false} placeholder={'{ "message": "Review the current lead pipeline and identify missing evidence." }' } className="mt-1 w-full rounded-md bg-bg-base border border-border-default p-2.5 text-xs font-mono text-text-primary outline-none focus:border-accent normal-case resize-y" />
@@ -237,7 +266,8 @@ export default function WorkQueuePanel({ token }: WorkQueuePanelProps) {
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2"><h3 className="text-sm font-semibold text-text-primary">{task.title}</h3><span className={`text-[9px] px-2 py-0.5 border rounded font-mono uppercase ${statusTone[task.status] || ''}`}>{task.status.replace('_', ' ')}</span><span className="text-[9px] text-text-tertiary font-mono uppercase">{task.priority}</span></div>
                   {task.description && <p className="text-xs text-text-secondary mt-2 whitespace-pre-wrap">{task.description}</p>}
-                  <div className="flex flex-wrap gap-x-3 gap-y-1 mt-3 text-[10px] text-text-tertiary font-mono"><span className="inline-flex items-center gap-1"><Bot className="w-3 h-3" />{task.assignedWorker}</span><span>{task.taskType}</span><span>{task.attemptCount}/{task.maxAttempts} attempts</span><span>{new Date(task.createdAt).toLocaleString()}</span>{task.requiresApproval && <span className="inline-flex items-center gap-1"><ShieldCheck className="w-3 h-3" />{task.approvedAt ? 'approved' : 'approval required'}</span>}</div>
+                  <div className="flex flex-wrap gap-x-3 gap-y-1 mt-3 text-[10px] text-text-tertiary font-mono"><span className="inline-flex items-center gap-1"><Bot className="w-3 h-3" />{task.assignedWorker === 'human' ? (staff.find(member => member.id === task.assignedStaffId)?.name || 'Human — unassigned') : task.assignedWorker}</span><span>{task.taskType}</span><span>{task.attemptCount}/{task.maxAttempts} attempts</span><span>{new Date(task.createdAt).toLocaleString()}</span>{task.requiresApproval && <span className="inline-flex items-center gap-1"><ShieldCheck className="w-3 h-3" />{task.approvedAt ? 'approved' : 'approval required'}</span>}</div>
+                  {task.assignedWorker === 'human' && task.assignedStaffId && <p className="text-[10px] text-text-tertiary mt-1">Role: {staff.find(member => member.id === task.assignedStaffId)?.role || 'Staff record'}</p>}
                   {task.assignedWorker !== 'human' && task.status === 'running' && <p className="text-[10px] text-amber-300 mt-2">Execution is owned by {task.assignedWorker}; a human cannot mark agent work complete. The registered executor must submit its receipt.</p>}
                   {task.assignedWorker !== 'human' && task.status === 'queued' && (() => {
                     const worker = workerCapabilities.find(item => item.id === task.assignedWorker);
@@ -259,6 +289,7 @@ export default function WorkQueuePanel({ token }: WorkQueuePanelProps) {
                   {task.errorMessage && <p className="text-xs text-red-400 mt-2">{task.errorMessage}</p>}
                 </div>
                 <div className="flex flex-wrap gap-1.5 shrink-0">
+                  {task.assignedWorker === 'human' && ['queued', 'awaiting_approval', 'failed'].includes(task.status) && <label className="text-[9px] text-text-tertiary font-mono uppercase">Owner<select aria-label={`Assign staff for ${task.title}`} value={task.assignedStaffId || ''} onChange={e => void assignStaff(task, e.target.value)} className="block mt-1 max-w-40 bg-bg-base border border-border-default rounded px-2 py-1.5 text-[10px] text-text-primary"><option value="">Unassigned</option>{staff.filter(member => member.effectiveAvailability === 'available' || member.id === task.assignedStaffId).map(member => <option key={member.id} value={member.id}>{member.name}</option>)}</select></label>}
                   {task.status === 'awaiting_approval' && <button onClick={() => void transition(task, 'queued')} className="px-2.5 py-1.5 rounded border border-orange-400/30 text-orange-300 text-[10px] font-mono">Approve</button>}
                   {task.status === 'queued' && task.assignedWorker === 'hermes' && workerCapabilities.find(item => item.id === 'hermes')?.supportedTaskTypes.includes(task.taskType) && <button onClick={() => void executeWithHermes(task)} className="px-2.5 py-1.5 rounded border border-accent/40 text-accent text-[10px] font-mono inline-flex items-center gap-1"><Play className="w-3 h-3" /> Run with Hermes</button>}
                   {task.status === 'queued' && task.assignedWorker === 'human' && <button onClick={() => void transition(task, 'running')} className="px-2.5 py-1.5 rounded border border-border-default text-text-secondary text-[10px] font-mono">Start</button>}
