@@ -53,6 +53,7 @@ import AuthPage from './components/AuthPage';
 const OverviewPanel = lazy(() => import('./components/OverviewPanel'));
 const WorkLedgerPanel = lazy(() => import('./components/WorkLedgerPanel'));
 const WorkQueuePanel = lazy(() => import('./components/WorkQueuePanel'));
+const StaffPanel = lazy(() => import('./components/StaffPanel'));
 const LeadsPanel = lazy(() => import('./components/LeadsPanel'));
 const BoardPanel = lazy(() => import('./components/BoardPanel'));
 const CampaignsPanel = lazy(() => import('./components/CampaignsPanel'));
@@ -812,6 +813,7 @@ export default function App() {
     {
       group: 'CLIENT & FIELD OPERATIONS',
       items: [
+        { id: 'staff', label: 'Staff Management', icon: Users },
         { id: 'delivery', label: 'Client Work Orders', icon: Briefcase },
         { id: 'contracts', label: 'Contracts & Agreements', icon: FileCheck2 },
         { id: 'whitelabel-reports', label: 'Client Reports', icon: Building2 },
@@ -1108,6 +1110,7 @@ export default function App() {
                     }>
                     {activeTab === 'work-history' && <WorkLedgerPanel token={token || ''} />}
                     {activeTab === 'work-queue' && <WorkQueuePanel token={token || ''} />}
+                    {activeTab === 'staff' && <StaffPanel token={token || ''} />}
 
                     {activeTab === 'overview' && (
                     <OverviewPanel 
