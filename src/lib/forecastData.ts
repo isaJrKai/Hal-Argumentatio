@@ -71,3 +71,26 @@ export function buildWeeklyDemandSeries<T extends {
   }
   return completeWeeks.map(([, bucket]) => bucket.conversions);
 }
+
+
+/**
+ * Scheduled forecasts describe the week immediately following the last
+ * observed week. That target week may already have started when the batch
+ * runs, so compare calendar-week boundaries rather than requiring the
+ * Monday timestamp to be later than the current instant.
+ */
+export function isCurrentOrFutureForecastWeek(
+  targetDate: Date | string,
+  now: Date = new Date()
+): boolean {
+  const target = new Date(targetDate);
+  if (!Number.isFinite(target.getTime()) || !Number.isFinite(now.getTime())) return false;
+
+  const weekStart = (value: Date) => {
+    const start = new Date(Date.UTC(value.getUTCFullYear(), value.getUTCMonth(), value.getUTCDate()));
+    start.setUTCDate(start.getUTCDate() - ((start.getUTCDay() + 6) % 7));
+    return start.getTime();
+  };
+
+  return weekStart(target) >= weekStart(now);
+}
