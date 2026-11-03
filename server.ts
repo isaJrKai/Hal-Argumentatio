@@ -20,7 +20,7 @@ import {
   Recommendation
 } from './src/db/db';
 import { db as pgDb, createPool as getApplicationPostgresPool } from './src/db/index.ts';
-import { contractors, auditLogs, leads, leadEvents, revenueRecords, campaigns, winLossRecords, performanceSnapshots, recommendations, forecasts, predictionOutcomes, learningInsights, chatMessages, chatProjects, chatConversations, missions, clientProjects, outreachSequences, apiKeys, connectorCredentials, notifications, schedulerJobs, leadAttribution, conversionOutbox, googleAdsDailyPerformance, revenueExperiments, revenueRecommendations, revenueRecommendationEvents, revenueSimulations, revenueOutcomes, communicationsOutbox, communicationsDeliveryEvents, halLoops, halLoopEvents, hermesLabArtifacts, hermesDiagnosticIncidents, hermesLabMessages, workEvents, workTasks, revokedTokens } from './src/db/schema.ts';
+import { contractors, auditLogs, leads, leadEvents, revenueRecords, campaigns, winLossRecords, performanceSnapshots, recommendations, forecasts, predictionOutcomes, learningInsights, chatMessages, chatProjects, chatConversations, missions, clientProjects, outreachSequences, apiKeys, connectorCredentials, notifications, schedulerJobs, leadAttribution, conversionOutbox, googleAdsDailyPerformance, revenueExperiments, revenueRecommendations, revenueRecommendationEvents, revenueSimulations, revenueOutcomes, communicationsOutbox, communicationsDeliveryEvents, halLoops, halLoopEvents, hermesLabArtifacts, hermesDiagnosticIncidents, hermesLabMessages, staffMembers, workEvents, workTasks, revokedTokens } from './src/db/schema.ts';
 import { eq, inArray, desc, and, or, like, sql, gte, lte, gt } from 'drizzle-orm';
 import { 
   generateLearningFromOutcome, 
@@ -45,6 +45,7 @@ import { buildPasswordResetResponse } from './src/lib/passwordResetResponse';
 import { verifyFirebaseGoogleIdToken } from './src/lib/firebaseGoogleIdentity';
 import { recordWorkEvent, getRecentWorkEvents, getEntityWorkEvents } from './src/lib/workLedger';
 import { canHumanUpdateWorkTask, canTransitionWorkTask, listWorkTasks, getWorkTask, requiresWorkTaskApproval, ensureLeadReviewTask } from './src/lib/workTasks';
+import { validateStaffInput, getEffectiveStaffAvailability } from './src/lib/staff';
 import { getWorkerCapabilities } from './src/lib/workerCapabilities';
 import { resolvePublishedLandingPageOwner } from './src/lib/landingPageOwnership';
 import { validateLoopGate } from './src/lib/loopGating';
@@ -550,6 +551,92 @@ app.get('/api/work-ledger', authenticate, async (req, res) => {
   }
 });
 
+// ─── TENANT-SCOPED STAFF DIRECTORY ───────────────────────────────────────────
+app.get('/api/staff', authenticate, async (req, res) => {
+  const contractorId = (req as any).contractorId;
+  try {
+    const [members, assignedTasks] = await Promise.all([
+      pgDb.select().from(staffMembers).where(eq(staffMembers.contractorId, contractorId)).orderBy(staffMembers.name),
+      pgDb.select({ assignedStaffId: workTasks.assignedStaffId, status: workTasks.status })
+        .from(workTasks).where(and(eq(workTasks.contractorId, contractorId), inArray(workTasks.status, ['queued', 'running', 'awaiting_approval'])))
+    ]);
+    const activeCounts = new Map<string, number>();
+    for (const task of assignedTasks) if (task.assignedStaffId) activeCounts.set(task.assignedStaffId, (activeCounts.get(task.assignedStaffId) || 0) + 1);
+    return res.json({ staff: members.map(member => {
+      const activeTaskCount = activeCounts.get(member.id) || 0;
+      return { ...member, activeTaskCount, effectiveAvailability: getEffectiveStaffAvailability(member, activeTaskCount) };
+    }) });
+  } catch (err) {
+    console.error('[HAL Staff] List failed:', err);
+    return res.status(503).json({ error: 'Staff directory is temporarily unavailable.' });
+  }
+});
+
+app.post('/api/staff', authenticate, async (req, res) => {
+  const contractorId = (req as any).contractorId;
+  const parsed = validateStaffInput(req.body);
+  if (parsed.valid === false) return res.status(400).json({ error: parsed.error });
+  try {
+    if (parsed.value.email) {
+      const [duplicate] = await pgDb.select({ id: staffMembers.id }).from(staffMembers)
+        .where(and(eq(staffMembers.contractorId, contractorId), eq(staffMembers.email, parsed.value.email))).limit(1);
+      if (duplicate) return res.status(409).json({ error: 'A staff member with this email already exists in this workspace.' });
+    }
+    const now = new Date();
+    const [member] = await pgDb.transaction(async tx => {
+      const [created] = await tx.insert(staffMembers).values({
+        id: 'staff_' + crypto.randomUUID(), contractorId, ...parsed.value, createdAt: now, updatedAt: now
+      }).returning();
+      await tx.insert(workEvents).values({
+        id: 'evt_' + crypto.randomUUID(), contractorId, eventType: 'staff.created',
+        entityType: 'staff_member', entityId: created.id, actorType: 'human', actorId: contractorId,
+        sourceModule: 'staff_directory', correlationId: created.id,
+        summary: `Added staff member ${created.name} (${created.role}).`,
+        payload: { role: created.role, status: created.status, availability: created.availability }
+      });
+      return [created];
+    });
+    return res.status(201).json({ staff: member });
+  } catch (err) {
+    console.error('[HAL Staff] Create failed:', err);
+    return res.status(503).json({ error: 'Unable to create staff record.' });
+  }
+});
+
+app.patch('/api/staff/:id', authenticate, async (req, res) => {
+  const contractorId = (req as any).contractorId;
+  const staffId = String(req.params.id || '');
+  const parsed = validateStaffInput(req.body);
+  if (parsed.valid === false) return res.status(400).json({ error: parsed.error });
+  try {
+    const [current] = await pgDb.select().from(staffMembers)
+      .where(and(eq(staffMembers.id, staffId), eq(staffMembers.contractorId, contractorId))).limit(1);
+    if (!current) return res.status(404).json({ error: 'Staff member not found.' });
+    if (parsed.value.email) {
+      const [duplicate] = await pgDb.select({ id: staffMembers.id }).from(staffMembers)
+        .where(and(eq(staffMembers.contractorId, contractorId), eq(staffMembers.email, parsed.value.email))).limit(1);
+      if (duplicate && duplicate.id !== staffId) return res.status(409).json({ error: 'A staff member with this email already exists in this workspace.' });
+    }
+    const now = new Date();
+    const updated = await pgDb.transaction(async tx => {
+      const [saved] = await tx.update(staffMembers).set({ ...parsed.value, updatedAt: now })
+        .where(and(eq(staffMembers.id, staffId), eq(staffMembers.contractorId, contractorId))).returning();
+      await tx.insert(workEvents).values({
+        id: 'evt_' + crypto.randomUUID(), contractorId, eventType: 'staff.updated',
+        entityType: 'staff_member', entityId: staffId, actorType: 'human', actorId: contractorId,
+        sourceModule: 'staff_directory', correlationId: staffId,
+        summary: `Updated staff member ${saved.name}.`,
+        payload: { previousRole: current.role, role: saved.role, previousStatus: current.status, status: saved.status, availability: saved.availability }
+      });
+      return saved;
+    });
+    return res.json({ staff: updated });
+  } catch (err) {
+    console.error('[HAL Staff] Update failed:', err);
+    return res.status(503).json({ error: 'Unable to update staff record.' });
+  }
+});
+
 // ─── DURABLE HUMAN / AGENT TASK QUEUE ────────────────────────────────────────
 // Queue records define work ownership; creating a task does not silently execute it.
 app.get('/api/work-tasks', authenticate, async (req, res) => {
@@ -573,6 +660,7 @@ app.post('/api/work-tasks', authenticate, async (req, res) => {
   const description = typeof body.description === 'string' ? body.description.trim() : null;
   const priority = body.priority || 'normal';
   const assignedWorker = body.assignedWorker || 'human';
+  const assignedStaffId = typeof body.assignedStaffId === 'string' && body.assignedStaffId.trim() ? body.assignedStaffId.trim() : null;
   const entityType = typeof body.entityType === 'string' ? body.entityType.trim() : null;
   const entityId = typeof body.entityId === 'string' ? body.entityId.trim() : null;
   const input = body.input && typeof body.input === 'object' && !Array.isArray(body.input) ? body.input : null;
@@ -584,10 +672,12 @@ app.post('/api/work-tasks', authenticate, async (req, res) => {
       !['low', 'normal', 'high', 'urgent'].includes(priority) ||
       !(allowedWorkers.includes(assignedWorker) || /^specialist:[a-z0-9_-]{1,60}$/.test(assignedWorker)) ||
       Boolean(entityType) !== Boolean(entityId) ||
+      (assignedStaffId && assignedWorker !== 'human') ||
       (body.input !== undefined && input === null) ||
       (input && JSON.stringify(input).length > 20000)) {
     return res.status(400).json({ error: 'Invalid task details. Check task type, title, priority, worker, entity pair and input size.' });
   }
+
 
   if (entityType) {
     let entityExists = false;
@@ -597,10 +687,12 @@ app.post('/api/work-tasks', authenticate, async (req, res) => {
       entityExists = (await pgDb.select({ id: missions.id }).from(missions).where(and(eq(missions.id, entityId!), eq(missions.contractorId, contractorId))).limit(1)).length > 0;
     } else if (entityType === 'artifact') {
       entityExists = (await pgDb.select({ id: hermesLabArtifacts.id }).from(hermesLabArtifacts).where(and(eq(hermesLabArtifacts.id, entityId!), eq(hermesLabArtifacts.contractorId, contractorId))).limit(1)).length > 0;
+    } else if (entityType === 'client_project') {
+      entityExists = (await pgDb.select({ id: clientProjects.id }).from(clientProjects).where(and(eq(clientProjects.id, entityId!), eq(clientProjects.contractorId, contractorId))).limit(1)).length > 0;
     } else if (entityType === 'work_task') {
       entityExists = (await getWorkTask(pgDb, contractorId, entityId!)) !== null;
     } else {
-      return res.status(400).json({ error: 'Unsupported entity type. Link tasks to a lead, mission, artifact or work task.' });
+      return res.status(400).json({ error: 'Unsupported entity type. Link tasks to a lead, client project, mission, artifact or work task.' });
     }
     if (!entityExists) return res.status(404).json({ error: 'The linked business record was not found in this workspace.' });
   }
@@ -615,6 +707,15 @@ app.post('/api/work-tasks', authenticate, async (req, res) => {
     if (activeDuplicate) return res.status(200).json({ task: activeDuplicate, duplicate: true });
   }
 
+  if (assignedStaffId) {
+    const [member] = await pgDb.select().from(staffMembers).where(and(
+      eq(staffMembers.id, assignedStaffId), eq(staffMembers.contractorId, contractorId)
+    )).limit(1);
+    if (!member) return res.status(404).json({ error: 'Assigned staff member was not found in this workspace.' });
+    if (member.status !== 'active' || member.availability !== 'available') return res.status(409).json({ error: 'Staff member is not available for new assignments.' });
+  }
+
+
   const taskId = 'task_' + crypto.randomUUID();
   const correlationId = typeof body.correlationId === 'string' && body.correlationId.trim()
     ? body.correlationId.trim().slice(0, 120) : taskId;
@@ -623,7 +724,7 @@ app.post('/api/work-tasks', authenticate, async (req, res) => {
     const [task] = await pgDb.transaction(async tx => {
       const [created] = await tx.insert(workTasks).values({
         id: taskId, contractorId, taskType, title, description,
-        status: initialStatus, priority, assignedWorker,
+        status: initialStatus, priority, assignedWorker, assignedStaffId,
         entityType, entityId, correlationId, input,
         requiresApproval, createdAt: new Date(), updatedAt: new Date()
       }).returning();
@@ -632,13 +733,14 @@ app.post('/api/work-tasks', authenticate, async (req, res) => {
         eventType: 'task.created', entityType: 'work_task', entityId: taskId,
         actorType: 'human', actorId: contractorId, sourceModule: 'work_queue',
         correlationId, summary: `Created task: ${title}.`,
-        payload: { taskType, assignedWorker, priority, status: initialStatus, entityType, entityId }
+        payload: { taskType, assignedWorker, assignedStaffId, priority, status: initialStatus, entityType, entityId }
       });
       return [created];
     });
     return res.status(201).json({ task });
-  } catch (err) {
+  } catch (err: any) {
     console.error('[HAL Work Tasks] Create failed:', err);
+    if (err?.code === '23505') return res.status(409).json({ error: 'The selected staff member already has active work.' });
     return res.status(503).json({ error: 'Unable to create the work task.' });
   }
 });
@@ -647,53 +749,85 @@ app.patch('/api/work-tasks/:id', authenticate, async (req, res) => {
   const contractorId = (req as any).contractorId;
   const taskId = String(req.params.id || '');
   const nextStatus = typeof req.body?.status === 'string' ? req.body.status : '';
+  const hasAssignmentChange = Object.prototype.hasOwnProperty.call(req.body || {}, 'assignedStaffId');
+  const nextStaffId = req.body?.assignedStaffId === null || req.body?.assignedStaffId === '' ? null : typeof req.body?.assignedStaffId === 'string' ? req.body.assignedStaffId.trim() : undefined;
   const output = req.body?.output && typeof req.body.output === 'object' && !Array.isArray(req.body.output) ? req.body.output : undefined;
   const errorMessage = typeof req.body?.errorMessage === 'string' ? req.body.errorMessage.slice(0, 1000) : undefined;
   try {
     const current = await getWorkTask(pgDb, contractorId, taskId);
     if (!current) return res.status(404).json({ error: 'Work task not found.' });
-    if (current.status === 'failed' && nextStatus === 'queued' && current.attemptCount >= current.maxAttempts) {
-      return res.status(409).json({ error: 'Task has reached its maximum retry count.', attempts: current.attemptCount, maxAttempts: current.maxAttempts });
+    if (hasAssignmentChange) {
+      if (nextStaffId === undefined) return res.status(400).json({ error: 'assignedStaffId must be a staff ID or null.' });
+      if (current.assignedWorker !== 'human') return res.status(409).json({ error: 'Named staff ownership applies only to human-assigned tasks.' });
+      if (!['queued', 'awaiting_approval', 'failed'].includes(current.status)) return res.status(409).json({ error: 'Reassign work only before it is started or after it has failed.' });
+      if (nextStaffId) {
+        const [member] = await pgDb.select().from(staffMembers).where(and(
+          eq(staffMembers.id, nextStaffId), eq(staffMembers.contractorId, contractorId)
+        )).limit(1);
+        if (!member) return res.status(404).json({ error: 'Assigned staff member was not found in this workspace.' });
+        if (member.status !== 'active' || member.availability !== 'available') return res.status(409).json({ error: 'Staff member is not available for new assignments.' });
+      }
     }
-    if (!canHumanUpdateWorkTask(current.assignedWorker, nextStatus)) {
-      return res.status(403).json({ error: 'Agent-assigned tasks must be started and completed through their registered executor receipt path. You may approve or cancel them here.' });
-    }
-    if (!canTransitionWorkTask(current.status, nextStatus)) {
-      return res.status(409).json({ error: `Task cannot move from ${current.status} to ${nextStatus || 'unknown'}.`, currentStatus: current.status });
-    }
-    if (nextStatus === 'running' && current.requiresApproval && !current.approvedAt) {
-      return res.status(403).json({ error: 'This task requires approval before execution.' });
+    if (nextStatus) {
+      if (current.status === 'failed' && nextStatus === 'queued' && current.attemptCount >= current.maxAttempts) {
+        return res.status(409).json({ error: 'Task has reached its maximum retry count.', attempts: current.attemptCount, maxAttempts: current.maxAttempts });
+      }
+      if (!canHumanUpdateWorkTask(current.assignedWorker, nextStatus)) {
+        return res.status(403).json({ error: 'Agent-assigned tasks must be started and completed through their registered executor receipt path. You may approve or cancel them here.' });
+      }
+      if (!canTransitionWorkTask(current.status, nextStatus)) {
+        return res.status(409).json({ error: `Task cannot move from ${current.status} to ${nextStatus || 'unknown'}.`, currentStatus: current.status });
+      }
+      if (nextStatus === 'running' && current.requiresApproval && !current.approvedAt) return res.status(403).json({ error: 'This task requires approval before execution.' });
+    } else if (!hasAssignmentChange && output === undefined) {
+      return res.status(400).json({ error: 'Provide a status, an assignment change, or task output.' });
     }
     const now = new Date();
-    const update: Record<string, any> = { status: nextStatus, updatedAt: now };
-    if (nextStatus === 'running') {
-      update.startedAt = current.startedAt || now;
-      update.attemptCount = current.attemptCount + 1;
-      update.errorMessage = null;
-    }
+    const update: Record<string, any> = { updatedAt: now };
+    if (nextStatus) update.status = nextStatus;
+    if (hasAssignmentChange) update.assignedStaffId = nextStaffId;
+    if (nextStatus === 'running') { update.startedAt = current.startedAt || now; update.attemptCount = current.attemptCount + 1; update.errorMessage = null; }
     if (nextStatus === 'completed') update.completedAt = now;
     if (nextStatus === 'failed') update.errorMessage = errorMessage || 'Task failed without a supplied reason.';
     if (output !== undefined) {
       if (JSON.stringify(output).length > 20000) return res.status(400).json({ error: 'Task output exceeds the 20 KB limit.' });
       update.output = output;
     }
-    if (current.status === 'awaiting_approval' && nextStatus === 'queued') {
-      update.approvedBy = contractorId;
-      update.approvedAt = now;
-    }
+    if (current.status === 'awaiting_approval' && nextStatus === 'queued') { update.approvedBy = contractorId; update.approvedAt = now; }
     const updated = await pgDb.transaction(async tx => {
       const [saved] = await tx.update(workTasks).set(update)
         .where(and(eq(workTasks.id, taskId), eq(workTasks.contractorId, contractorId), eq(workTasks.status, current.status)))
         .returning();
       if (!saved) throw new Error('Task changed before this update could be committed.');
-      await tx.insert(workEvents).values({
-        id: 'evt_' + crypto.randomUUID(), contractorId,
-        eventType: 'task.status_changed', entityType: 'work_task', entityId: taskId,
-        actorType: 'human', actorId: contractorId, sourceModule: 'work_queue',
-        correlationId: current.correlationId || taskId,
-        summary: `Moved task "${current.title}" from ${current.status} to ${nextStatus}.`,
-        payload: { previousStatus: current.status, status: nextStatus, assignedWorker: current.assignedWorker, ...(output !== undefined ? { output } : {}) }
-      });
+      if (hasAssignmentChange && nextStaffId !== current.assignedStaffId) {
+        await tx.insert(workEvents).values({
+          id: 'evt_' + crypto.randomUUID(), contractorId,
+          eventType: nextStaffId ? 'task.assigned' : 'task.unassigned', entityType: 'work_task', entityId: taskId,
+          actorType: 'human', actorId: contractorId, sourceModule: 'work_queue',
+          correlationId: current.correlationId || taskId,
+          summary: nextStaffId ? `Assigned task "${current.title}" to staff member ${nextStaffId}.` : `Removed staff ownership from task "${current.title}".`,
+          payload: { previousStaffId: current.assignedStaffId || null, assignedStaffId: nextStaffId }
+        });
+      }
+      if (nextStatus && nextStatus !== current.status) {
+        await tx.insert(workEvents).values({
+          id: 'evt_' + crypto.randomUUID(), contractorId,
+          eventType: 'task.status_changed', entityType: 'work_task', entityId: taskId,
+          actorType: 'human', actorId: contractorId, sourceModule: 'work_queue',
+          correlationId: current.correlationId || taskId,
+          summary: nextStatus === 'failed'
+            ? `Task "${current.title}" failed: ${errorMessage || 'Task failed without a supplied reason.'}`
+            : `Moved task "${current.title}" from ${current.status} to ${nextStatus}.`,
+          payload: {
+            previousStatus: current.status,
+            status: nextStatus,
+            assignedWorker: current.assignedWorker,
+            assignedStaffId: hasAssignmentChange ? nextStaffId : current.assignedStaffId,
+            errorMessage: nextStatus === 'failed' ? (errorMessage || 'Task failed without a supplied reason.') : null,
+            attemptCount: current.attemptCount
+          }
+        });
+      }
       return saved;
     });
     return res.json({ task: updated });
