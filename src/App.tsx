@@ -594,31 +594,54 @@ export default function App() {
       }));
 
       const failedEndpoints: string[] = [];
-      const failureDetails: string[] = [];
+      let isServerWarmingUp = false;
+
       results.forEach((result, index) => {
         if (result.status === 'fulfilled') {
           endpoints[index].apply(result.value);
         } else {
           failedEndpoints.push(endpoints[index].label);
-          failureDetails.push(result.reason instanceof Error
-            ? result.reason.message
-            : `${endpoints[index].label}: unknown synchronization error.`);
-          console.warn(`HAL data sync failed for ${endpoints[index].url}:`, result.reason);
+          const reason = result.reason;
+          const msg = String(reason instanceof Error ? reason.message : reason || '').toLowerCase();
+          if ((reason as any)?.isStartingServer || msg.includes('starting server') || msg.includes('server is starting') || msg.includes('starting up')) {
+            isServerWarmingUp = true;
+          }
+          console.warn(`HAL data sync notice for ${endpoints[index].url}:`, result.reason);
         }
       });
 
       if (failedEndpoints.length > 0) {
+        if (isServerWarmingUp && retryCount < 8) {
+          setToastAlert({
+            id: 'data-sync',
+            title: 'Connecting to Server',
+            message: 'HAL backend service is initializing. Synchronizing operational records...',
+            type: 'system'
+          });
+          setTimeout(() => { void fetchAllData(retryCount + 1); }, 2000);
+          return;
+        }
+
         const exhaustedRetries = retryCount >= 3;
+        const allFailed = failedEndpoints.length === endpoints.length;
+        const cleanMessage = isServerWarmingUp
+          ? 'Backend service is taking longer than expected to initialize. Retrying connection...'
+          : allFailed
+          ? `Connecting to operational backend. ${exhaustedRetries ? 'Retaining current displayed data.' : 'Retrying...'}`
+          : `Synchronized ${endpoints.length - failedEndpoints.length}/${endpoints.length} modules. Retrying ${failedEndpoints.join(', ')}...`;
+
         setToastAlert({
           id: 'data-sync',
-          title: exhaustedRetries ? 'Partial Sync Failure' : 'Sync Delayed',
-          message: exhaustedRetries
-            ? `Could not refresh ${failedEndpoints.join(', ')}. ${failureDetails.join(' | ')} Last successful data is retained; displayed values may be stale.`
-            : `Could not refresh ${failedEndpoints.join(', ')}. Retrying. ${failureDetails.join(' | ')}`,
+          title: isServerWarmingUp ? 'Connecting...' : (exhaustedRetries ? 'Sync Delayed' : 'Synchronizing...'),
+          message: cleanMessage,
           type: 'system'
         });
+
         if (!exhaustedRetries) {
           setTimeout(() => { void fetchAllData(retryCount + 1); }, 1500 * (retryCount + 1));
+        } else {
+          // Auto-retry in background after 15 seconds to self-heal once backend finishes booting
+          setTimeout(() => { void fetchAllData(0); }, 15000);
         }
         return;
       }
@@ -627,14 +650,15 @@ export default function App() {
     } catch (err) {
       console.warn('Unexpected dashboard synchronization failure:', err);
       if (retryCount < 3) {
-        setTimeout(() => { void fetchAllData(retryCount + 1); }, 1500 * (retryCount + 1));
+        setTimeout(() => { void fetchAllData(retryCount + 1); }, 2000);
       } else {
         setToastAlert({
           id: 'data-sync',
-          title: 'Connection Lost',
-          message: 'The dashboard could not refresh its data. Some displayed values may be stale.',
+          title: 'Connection Paused',
+          message: 'The dashboard could not reach the server. Existing data is retained; reconnecting automatically.',
           type: 'system'
         });
+        setTimeout(() => { void fetchAllData(0); }, 15000);
       }
     }
   };

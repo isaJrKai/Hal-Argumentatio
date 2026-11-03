@@ -40,4 +40,19 @@ describe('readApiResponse', () => {
       'Leads: Session expired (HTTP 401).'
     );
   });
+
+  it('identifies starting server gateway responses with isStartingServer flag', async () => {
+    const response = new Response('<!doctype html><title>Starting Server</title><body>Starting</body>', {
+      status: 200,
+      headers: { 'content-type': 'text/html' }
+    });
+
+    try {
+      await readApiResponse(response, 'Leads');
+      expect.fail('should have thrown');
+    } catch (err: any) {
+      expect(err.isStartingServer).toBe(true);
+      expect(err.message).toContain('Server is starting up');
+    }
+  });
 });

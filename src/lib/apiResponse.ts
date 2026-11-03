@@ -14,9 +14,17 @@ export async function readApiResponse<T = any>(response: Response, context: stri
     try {
       payload = JSON.parse(raw);
     } catch {
+      const lower = raw.toLowerCase();
+      const isStarting = lower.includes('starting server') || lower.includes('server starting');
       const preview = raw.replace(/\s+/g, ' ').trim().slice(0, 160);
-      const suffix = preview ? ` Response begins: "${preview}"` : '';
-      throw new Error(`${context}: expected JSON but received ${contentType} (HTTP ${response.status}).${suffix}`);
+      const suffix = isStarting
+        ? ' Server is starting up. Reconnecting...'
+        : (preview ? ` Response begins: "${preview}"` : '');
+      const err = new Error(`${context}: expected JSON but received ${contentType} (HTTP ${response.status}).${suffix}`);
+      if (isStarting) {
+        (err as any).isStartingServer = true;
+      }
+      throw err;
     }
   } else if (response.ok) {
     throw new Error(`${context}: server returned an empty response (HTTP ${response.status}).`);

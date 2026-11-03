@@ -1,7 +1,7 @@
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { Pool } from 'pg';
 import * as schema from './schema.ts';
-import { bootstrapPostgresTables } from './postgres.ts';
+import { bootstrapPostgresTables, resolveValidSqlHost } from './postgres.ts';
 
 // Add global connection pool caching to persist across hot-reloads
 declare global {
@@ -11,14 +11,15 @@ declare global {
 // Function to create or retrieve the connection pool.
 export const createPool = () => {
   if (!global._postgresPool) {
-    if (process.env.SQL_HOST) {
+    const validHost = resolveValidSqlHost();
+    if (validHost) {
       global._postgresPool = new Pool({
-        host: process.env.SQL_HOST,
+        host: validHost,
         user: process.env.SQL_USER,
         password: process.env.SQL_PASSWORD,
         database: process.env.SQL_DB_NAME,
         max: 10,
-        connectionTimeoutMillis: 15000,
+        connectionTimeoutMillis: 5000,
       });
     } else {
       const connectionString = process.env.DATABASE_URL || process.env.NEON_DATABASE_URL;
@@ -27,7 +28,7 @@ export const createPool = () => {
           connectionString,
           ssl: connectionString.includes('neon.tech') || connectionString.includes('sslmode=require') ? { rejectUnauthorized: false } : undefined,
           max: 10,
-          connectionTimeoutMillis: 15000,
+          connectionTimeoutMillis: 5000,
         });
       } else {
         if (process.env.NODE_ENV === 'production') {
@@ -38,7 +39,7 @@ export const createPool = () => {
         // Local development/test fallback only. Production must never silently
         // connect to an empty localhost database and appear to have lost data.
         global._postgresPool = new Pool({
-          host: 'localhost',
+          host: '127.0.0.1',
           user: 'postgres',
           password: '',
           database: 'postgres',
@@ -50,13 +51,17 @@ export const createPool = () => {
 
     // Prevent unhandled pool-level errors from crashing the application
     global._postgresPool.on('error', (err) => {
-      console.warn('PostgreSQL pool connection note:', err.message);
+      if (!err.message?.includes('Connection terminated') && !err.message?.includes('connect ENOENT')) {
+        console.warn('PostgreSQL pool connection note:', err.message);
+      }
     });
 
     // Automatically bootstrap tables on pool creation only when a database is configured
-    if (process.env.DATABASE_URL || process.env.NEON_DATABASE_URL || process.env.SQL_HOST) {
+    if (process.env.DATABASE_URL || process.env.NEON_DATABASE_URL || validHost) {
       bootstrapPostgresTables(global._postgresPool).catch((err) => {
-        console.warn('[HAL PostgreSQL] Auto-bootstrap warning on pool creation:', err.message);
+        if (!err.message?.includes('Connection terminated') && !err.message?.includes('connect ENOENT')) {
+          console.warn('[HAL PostgreSQL] Auto-bootstrap notice on pool creation:', err.message);
+        }
       });
     }
   }

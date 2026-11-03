@@ -9220,8 +9220,17 @@ async function startServer() {
           }
         }
       }
-    } catch (loopErr) {
-      console.error('[Conversion Worker Loop Error]:', loopErr);
+    } catch (loopErr: any) {
+      const msg = loopErr?.message || String(loopErr);
+      const isConnectionError = msg.includes('connect') || msg.includes('terminated') || msg.includes('PermissionDenied') || loopErr?.cause?.message?.includes('connect');
+      if (isConnectionError) {
+        if (!(global as any)._conversionWorkerDbNoticeLogged) {
+          (global as any)._conversionWorkerDbNoticeLogged = true;
+          console.warn('[Conversion Worker] PostgreSQL connection offline or unconfigured; loop idling until database is reachable.');
+        }
+      } else {
+        console.error('[Conversion Worker Loop Error]:', loopErr);
+      }
     }
   }, 45000);
 

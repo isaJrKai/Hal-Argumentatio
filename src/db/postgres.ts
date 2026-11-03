@@ -1,6 +1,31 @@
+import fs from 'node:fs';
+import path from 'node:path';
 import { Pool, PoolClient } from 'pg';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import * as schema from './schema.ts';
+
+export function resolveValidSqlHost(): string | undefined {
+  const host = process.env.SQL_HOST;
+  if (!host) return undefined;
+  if (host.startsWith('/')) {
+    if (fs.existsSync(host)) return host;
+    if (fs.existsSync('/app/cloudsql')) {
+      try {
+        const entries = fs.readdirSync('/app/cloudsql');
+        for (const entry of entries) {
+          const candidate = path.join('/app/cloudsql', entry);
+          if (fs.existsSync(path.join(candidate, '.s.PGSQL.5432'))) {
+            return candidate;
+          }
+        }
+      } catch {
+        // ignore
+      }
+    }
+    return undefined;
+  }
+  return host;
+}
 
 let pool: Pool | null = null;
 let pgDb: ReturnType<typeof drizzle> | null = null;
@@ -27,16 +52,17 @@ export function getPostgresPool(customUrl?: string): Pool | null {
     return pool;
   }
 
-  if (process.env.SQL_HOST) {
+  const validHost = resolveValidSqlHost();
+  if (validHost) {
     if (!pool) {
       pool = new Pool({
-        host: process.env.SQL_HOST,
+        host: validHost,
         user: process.env.SQL_USER,
         password: process.env.SQL_PASSWORD,
         database: process.env.SQL_DB_NAME,
         max: 10,
         idleTimeoutMillis: 30000,
-        connectionTimeoutMillis: 15000,
+        connectionTimeoutMillis: 5000,
       });
       pgDb = drizzle(pool, { schema });
     }

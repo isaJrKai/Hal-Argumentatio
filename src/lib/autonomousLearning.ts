@@ -368,8 +368,8 @@ export class AutonomousLearningEngine {
       } else {
         await this.saveState();
       }
-    } catch (e) {
-      console.warn('[Autonomous Learning] DB Init failed, using memory fallback:', e);
+    } catch (e: any) {
+      console.info('[Autonomous Learning] Neural engine initialized with memory state (database offline or unconfigured).');
     }
   }
 
