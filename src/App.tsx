@@ -439,6 +439,8 @@ export default function App() {
       dataSyncRetryTimerRef.current = null;
     }
     dataSyncAbortRef.current?.abort();
+    dataSyncAbortRef.current = null;
+    dataSyncInFlightRef.current = false;
 
     let cleanupSSE: (() => void) | undefined;
     if (token) {
@@ -452,6 +454,8 @@ export default function App() {
         dataSyncRetryTimerRef.current = null;
       }
       dataSyncAbortRef.current?.abort();
+      dataSyncAbortRef.current = null;
+      dataSyncInFlightRef.current = false;
       if (cleanupSSE) cleanupSSE();
       if (sseTimeoutRef.current) clearTimeout(sseTimeoutRef.current);
     };
@@ -688,8 +692,10 @@ export default function App() {
       });
       scheduleDataSyncRetry(Math.min(2000 * Math.pow(2, Math.min(retryCount, 3)), 15000), generation);
     } finally {
-      if (dataSyncAbortRef.current === controller) dataSyncAbortRef.current = null;
-      dataSyncInFlightRef.current = false;
+      if (dataSyncAbortRef.current === controller) {
+        dataSyncAbortRef.current = null;
+        dataSyncInFlightRef.current = false;
+      }
     }
   };
 
