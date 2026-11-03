@@ -9,20 +9,20 @@ import { workTasks } from '../db/schema';
  * Tenant, worker, approval and retry-limit checks are repeated in the UPDATE
  * so stale preflight reads cannot bypass them.
  */
-export async function claimHermesWorkTask(db: any, taskId: string, contractorId: string) {
+export async function claimHermesWorkTask(db: any, taskId: string, contractorId: string, taskTable: any = workTasks) {
   const [claimed] = await db.update(workTasks).set({
     status: 'running',
-    startedAt: sql`COALESCE(${workTasks.startedAt}, NOW())`,
-    attemptCount: sql`${workTasks.attemptCount} + 1`,
+    startedAt: sql`COALESCE(${taskTable.startedAt}, NOW())`,
+    attemptCount: sql`${taskTable.attemptCount} + 1`,
     errorMessage: null,
     updatedAt: new Date()
   }).where(and(
-    eq(workTasks.id, taskId),
-    eq(workTasks.contractorId, contractorId),
-    eq(workTasks.assignedWorker, 'hermes'),
-    eq(workTasks.status, 'queued'),
-    lt(workTasks.attemptCount, workTasks.maxAttempts),
-    or(eq(workTasks.requiresApproval, false), isNotNull(workTasks.approvedAt))
+    eq(taskTable.id, taskId),
+    eq(taskTable.contractorId, contractorId),
+    eq(taskTable.assignedWorker, 'hermes'),
+    eq(taskTable.status, 'queued'),
+    lt(taskTable.attemptCount, taskTable.maxAttempts),
+    or(eq(taskTable.requiresApproval, false), isNotNull(taskTable.approvedAt))
   )).returning();
   return claimed || null;
 }
