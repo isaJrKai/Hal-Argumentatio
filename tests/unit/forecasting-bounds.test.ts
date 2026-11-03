@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildWeeklyDemandSeries, filterGoogleAdsTerritoryRecords, matchesTerritoryContext } from '../../src/lib/forecastData';
+import { buildWeeklyDemandSeries, filterGoogleAdsTerritoryRecords, isCurrentOrFutureForecastWeek, matchesTerritoryContext } from '../../src/lib/forecastData';
 import { validateTimesFmForecast } from '../../src/lib/timesfmClient';
 
 const records = [
@@ -22,6 +22,23 @@ function makeWeeklyRecords(weeks = 8) {
   }
   return records;
 }
+
+describe('Scheduled TimesFM forecast target weeks', () => {
+  const now = new Date('2026-11-05T14:00:00.000Z');
+
+  it('accepts a forecast whose Monday target date is earlier today in the current week', () => {
+    expect(isCurrentOrFutureForecastWeek('2026-11-02T00:00:00.000Z', now)).toBe(true);
+  });
+
+  it('rejects a forecast target from a previous calendar week', () => {
+    expect(isCurrentOrFutureForecastWeek('2026-10-26T00:00:00.000Z', now)).toBe(false);
+  });
+
+  it('accepts a future calendar week and rejects invalid dates', () => {
+    expect(isCurrentOrFutureForecastWeek('2026-11-09T00:00:00.000Z', now)).toBe(true);
+    expect(isCurrentOrFutureForecastWeek('not-a-date', now)).toBe(false);
+  });
+});
 
 describe('TimesFM input and forecast invariants', () => {
   it('builds a model series only from contiguous weeks with five observed days', () => {
