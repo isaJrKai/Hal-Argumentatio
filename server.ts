@@ -9110,7 +9110,7 @@ app.post('/api/revenue/recommendations/:id/transition', authenticate, async (req
 
 // ─── SERVER STARTUP & BACKGROUND WORKERS ───────────────────────────────
 
-function startServer() {
+async function startServer() {
   // Database initialization must never hold the HTTP listener hostage. AI Studio
   // and other preview proxies return their own "Starting Server" HTML page while
   // the process has not bound its port, which makes every /api request look like
