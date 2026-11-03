@@ -1,3 +1,5 @@
+import crypto from 'crypto';
+
 export type HermesToolOutcome = 'succeeded' | 'unavailable' | 'failed';
 
 /**
