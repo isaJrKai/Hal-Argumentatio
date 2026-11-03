@@ -432,12 +432,26 @@ export default function App() {
 
   // Auto-fetch data on token load
   useEffect(() => {
+    // Invalidate and cancel work from the previous authenticated session.
+    dataSyncGenerationRef.current += 1;
+    if (dataSyncRetryTimerRef.current) {
+      clearTimeout(dataSyncRetryTimerRef.current);
+      dataSyncRetryTimerRef.current = null;
+    }
+    dataSyncAbortRef.current?.abort();
+
     let cleanupSSE: (() => void) | undefined;
     if (token) {
       fetchAllData();
       cleanupSSE = setupSSEConnection();
     }
     return () => {
+      dataSyncGenerationRef.current += 1;
+      if (dataSyncRetryTimerRef.current) {
+        clearTimeout(dataSyncRetryTimerRef.current);
+        dataSyncRetryTimerRef.current = null;
+      }
+      dataSyncAbortRef.current?.abort();
       if (cleanupSSE) cleanupSSE();
       if (sseTimeoutRef.current) clearTimeout(sseTimeoutRef.current);
     };
@@ -570,8 +584,30 @@ export default function App() {
     markAsInstalled();
   };
 
+  // A single retry scheduler prevents SSE, auth and mount events from creating
+  // competing dashboard synchronization loops.
+  const dataSyncRetryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const dataSyncInFlightRef = useRef(false);
+  const dataSyncGenerationRef = useRef(0);
+  const dataSyncAbortRef = useRef<AbortController | null>(null);
+
+  const scheduleDataSyncRetry = (delayMs: number, generation: number) => {
+    if (dataSyncRetryTimerRef.current) clearTimeout(dataSyncRetryTimerRef.current);
+    dataSyncRetryTimerRef.current = setTimeout(() => {
+      dataSyncRetryTimerRef.current = null;
+      if (generation === dataSyncGenerationRef.current && token) {
+        void fetchAllData();
+      }
+    }, delayMs);
+  };
+
   const fetchAllData = async (retryCount = 0) => {
-    if (!token) return;
+    if (!token || dataSyncInFlightRef.current) return;
+    dataSyncInFlightRef.current = true;
+    const generation = dataSyncGenerationRef.current;
+    const controller = new AbortController();
+    dataSyncAbortRef.current = controller;
+
     const endpoints: { url: string; label: string; apply: (value: any) => void }[] = [
       { url: '/api/leads', label: 'leads', apply: setLeads },
       { url: '/api/campaigns', label: 'campaigns', apply: setCampaigns },
@@ -585,13 +621,16 @@ export default function App() {
     try {
       const headers = { 'Authorization': `Bearer ${token}` };
       const results = await Promise.allSettled(endpoints.map(async endpoint => {
-        const response = await fetch(endpoint.url, { headers });
+        const response = await fetch(endpoint.url, { headers, signal: controller.signal });
         const payload = await readApiResponse<unknown>(response, endpoint.label);
         if (!Array.isArray(payload)) {
           throw new Error(`${endpoint.label}: expected an array response but received ${payload === null ? 'null' : typeof payload}.`);
         }
         return payload;
       }));
+
+      // Ignore results belonging to a session that has since changed or logged out.
+      if (generation !== dataSyncGenerationRef.current || controller.signal.aborted) return;
 
       const failedEndpoints: string[] = [];
       let isServerWarmingUp = false;
@@ -606,60 +645,51 @@ export default function App() {
           if ((reason as any)?.isStartingServer || msg.includes('starting server') || msg.includes('server is starting') || msg.includes('starting up')) {
             isServerWarmingUp = true;
           }
-          console.warn(`HAL data sync notice for ${endpoints[index].url}:`, result.reason);
+          if (!(reason instanceof DOMException && reason.name === 'AbortError')) {
+            console.warn(`HAL data sync notice for ${endpoints[index].url}:`, reason);
+          }
         }
       });
 
       if (failedEndpoints.length > 0) {
-        if (isServerWarmingUp && retryCount < 8) {
-          setToastAlert({
-            id: 'data-sync',
-            title: 'Connecting to Server',
-            message: 'HAL backend service is initializing. Synchronizing operational records...',
-            type: 'system'
-          });
-          setTimeout(() => { void fetchAllData(retryCount + 1); }, 2000);
-          return;
-        }
-
-        const exhaustedRetries = retryCount >= 3;
+        const delay = isServerWarmingUp
+          ? Math.min(2000 * Math.pow(2, Math.min(retryCount, 3)), 15000)
+          : Math.min(1500 * (retryCount + 1), 15000);
         const allFailed = failedEndpoints.length === endpoints.length;
         const cleanMessage = isServerWarmingUp
-          ? 'Backend service is taking longer than expected to initialize. Retrying connection...'
+          ? 'Backend service is still initializing. HAL will reconnect automatically.'
           : allFailed
-          ? `Connecting to operational backend. ${exhaustedRetries ? 'Retaining current displayed data.' : 'Retrying...'}`
-          : `Synchronized ${endpoints.length - failedEndpoints.length}/${endpoints.length} modules. Retrying ${failedEndpoints.join(', ')}...`;
+          ? 'The operational backend is temporarily unavailable. Existing dashboard data is retained.'
+          : `Synchronized ${endpoints.length - failedEndpoints.length}/${endpoints.length} modules. Retrying ${failedEndpoints.join(', ')}.`;
 
         setToastAlert({
           id: 'data-sync',
-          title: isServerWarmingUp ? 'Connecting...' : (exhaustedRetries ? 'Sync Delayed' : 'Synchronizing...'),
+          title: isServerWarmingUp ? 'Connecting to Server' : 'Sync Delayed',
           message: cleanMessage,
           type: 'system'
         });
-
-        if (!exhaustedRetries) {
-          setTimeout(() => { void fetchAllData(retryCount + 1); }, 1500 * (retryCount + 1));
-        } else {
-          // Auto-retry in background after 15 seconds to self-heal once backend finishes booting
-          setTimeout(() => { void fetchAllData(0); }, 15000);
-        }
+        scheduleDataSyncRetry(delay, generation);
         return;
       }
 
+      if (dataSyncRetryTimerRef.current) {
+        clearTimeout(dataSyncRetryTimerRef.current);
+        dataSyncRetryTimerRef.current = null;
+      }
       setToastAlert(previous => previous?.id === 'data-sync' ? null : previous);
     } catch (err) {
+      if (generation !== dataSyncGenerationRef.current || controller.signal.aborted) return;
       console.warn('Unexpected dashboard synchronization failure:', err);
-      if (retryCount < 3) {
-        setTimeout(() => { void fetchAllData(retryCount + 1); }, 2000);
-      } else {
-        setToastAlert({
-          id: 'data-sync',
-          title: 'Connection Paused',
-          message: 'The dashboard could not reach the server. Existing data is retained; reconnecting automatically.',
-          type: 'system'
-        });
-        setTimeout(() => { void fetchAllData(0); }, 15000);
-      }
+      setToastAlert({
+        id: 'data-sync',
+        title: 'Connection Paused',
+        message: 'The dashboard could not reach the server. Existing data is retained; reconnecting automatically.',
+        type: 'system'
+      });
+      scheduleDataSyncRetry(Math.min(2000 * Math.pow(2, Math.min(retryCount, 3)), 15000), generation);
+    } finally {
+      if (dataSyncAbortRef.current === controller) dataSyncAbortRef.current = null;
+      dataSyncInFlightRef.current = false;
     }
   };
 
