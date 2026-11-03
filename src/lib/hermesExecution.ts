@@ -28,3 +28,14 @@ export function classifyHermesToolResult(result: unknown): HermesToolOutcome {
 
   return 'succeeded';
 }
+
+
+/**
+ * Stable tenant-local message identifier for a Hermes work-task attempt.
+ * Retries reuse the same user/assistant message identity instead of duplicating
+ * persisted conversation records when a task receipt write is interrupted.
+ */
+export function createHermesTaskMessageId(workTaskId: string, role: 'user' | 'assistant'): string {
+  const digest = crypto.createHash('sha256').update(workTaskId).digest('hex');
+  return `hermes-task-${digest}-${role}`;
+}
