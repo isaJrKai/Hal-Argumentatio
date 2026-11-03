@@ -10,7 +10,7 @@ import { workTasks } from '../db/schema';
  * so stale preflight reads cannot bypass them.
  */
 export async function claimHermesWorkTask(db: any, taskId: string, contractorId: string, taskTable: any = workTasks) {
-  const [claimed] = await db.update(workTasks).set({
+  const [claimed] = await db.update(taskTable).set({
     status: 'running',
     startedAt: sql`COALESCE(${taskTable.startedAt}, NOW())`,
     attemptCount: sql`${taskTable.attemptCount} + 1`,
