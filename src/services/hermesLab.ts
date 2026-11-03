@@ -25,6 +25,7 @@ import { callOpenRouterHermes } from './openrouter.ts';
 import { GoogleGenAI } from '@google/genai';
 import { getRecentWorkEvents, recordWorkEvent } from '../lib/workLedger';
 import { listWorkTasks } from '../lib/workTasks';
+import { createHermesTaskMessageId } from '../lib/hermesExecution';
 
 async function recordHermesEventSafely(event: Parameters<typeof recordWorkEvent>[1]) {
   try {
@@ -646,8 +647,33 @@ export async function chatWithHermesAgent(
     }
   }
 
-  // Save User message
-  const userMsgId = crypto.randomUUID();
+  // A previous attempt may have saved its assistant response but failed before
+  // the work-task receipt was committed. Return that durable response rather
+  // than calling providers again and creating a second result.
+  const stableAssistantMessageId = executionContext?.workTaskId
+    ? createHermesTaskMessageId(executionContext.workTaskId, 'assistant')
+    : null;
+  if (stableAssistantMessageId) {
+    const [existingAssistant] = await pgDb.select().from(hermesLabMessages).where(and(
+      eq(hermesLabMessages.id, stableAssistantMessageId),
+      eq(hermesLabMessages.contractorId, contractorId),
+      eq(hermesLabMessages.role, 'assistant')
+    )).limit(1);
+    if (existingAssistant) {
+      return {
+        replyMessageId: existingAssistant.id,
+        replyText: existingAssistant.content,
+        updatedArtifact: existingAssistant.attachedArtifact || undefined,
+        executionStatus: 'recovered'
+      };
+    }
+  }
+
+  // Save the user message with a stable task-scoped ID so retries do not
+  // duplicate the same request in Hermes conversation history.
+  const userMsgId = executionContext?.workTaskId
+    ? createHermesTaskMessageId(executionContext.workTaskId, 'user')
+    : crypto.randomUUID();
   await pgDb.insert(hermesLabMessages).values({
     id: userMsgId,
     contractorId,
@@ -655,7 +681,7 @@ export async function chatWithHermesAgent(
     role: 'user',
     content: userMessage,
     createdAt: new Date()
-  });
+  }).onConflictDoNothing();
 
   // Fetch recent message history
   const history = await pgDb
@@ -954,7 +980,7 @@ Respond in the required JSON format.`;
     });
   }
 
-  const assistantMsgId = crypto.randomUUID();
+  const assistantMsgId = stableAssistantMessageId || crypto.randomUUID();
   await pgDb.insert(hermesLabMessages).values({
     id: assistantMsgId,
     contractorId,
@@ -964,7 +990,7 @@ Respond in the required JSON format.`;
     attachedArtifact: updatedArtifactRecord ? updatedArtifactRecord : null,
     thoughtProcess: parsed.thoughtProcess || null,
     createdAt: new Date()
-  });
+  }).onConflictDoNothing();
 
   await recordHermesEventSafely({
     contractorId,
