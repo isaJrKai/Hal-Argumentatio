@@ -1,5 +1,6 @@
 import { FormEvent, useCallback, useEffect, useState } from 'react';
 import { Bot, CheckCircle2, ListTodo, Loader2, Play, Plus, RefreshCw, ShieldCheck, XCircle } from 'lucide-react';
+import { readApiResponse } from '../lib/apiResponse';
 
 type WorkerCapability = { id: string; label: string; mode: string; canClaimTasks: boolean; supportedTaskTypes: string[]; description: string; configured?: boolean; };
 
@@ -35,18 +36,20 @@ export default function WorkQueuePanel({ token }: WorkQueuePanelProps) {
   const [assignedWorker, setAssignedWorker] = useState('human');
   const [priority, setPriority] = useState('normal');
   const [requiresApproval, setRequiresApproval] = useState(false);
+  const [completionTaskId, setCompletionTaskId] = useState<string | null>(null);
+  const [completionNote, setCompletionNote] = useState('');
 
   const loadTasks = useCallback(async () => {
     setLoading(true); setError(null);
     try {
       const response = await fetch('/api/work-tasks?limit=100', { headers: { Authorization: `Bearer ${token}` } });
-      const body = await response.json();
+      const body = await readApiResponse<any>(response, 'Work queue request');
       if (!response.ok) throw new Error(body.error || 'Unable to load work queue.');
       setTasks(Array.isArray(body.tasks) ? body.tasks : []);
       try {
         const workerResponse = await fetch('/api/workers', { headers: { Authorization: `Bearer ${token}` } });
         if (workerResponse.ok) {
-          const workerBody = await workerResponse.json();
+          const workerBody = await readApiResponse<any>(workerResponse, 'Worker capability request');
           setWorkerCapabilities(Array.isArray(workerBody.workers) ? workerBody.workers : []);
         }
       } catch {
@@ -79,7 +82,7 @@ export default function WorkQueuePanel({ token }: WorkQueuePanelProps) {
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({ taskType, title: title.trim(), description: description.trim() || undefined, assignedWorker, priority, requiresApproval, ...(taskInput ? { input: taskInput } : {}) })
       });
-      const body = await response.json();
+      const body = await readApiResponse<any>(response, 'Create work item');
       if (!response.ok) throw new Error(body.error || 'Unable to create task.');
       setTitle(''); setDescription(''); setTaskType('research'); setInputJson('{}'); setRequiresApproval(false);
       await loadTasks();
@@ -95,10 +98,33 @@ export default function WorkQueuePanel({ token }: WorkQueuePanelProps) {
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({ status, ...(status === 'failed' ? { errorMessage: 'Marked failed by workspace operator.' } : {}) })
       });
-      const body = await response.json();
+      const body = await readApiResponse<any>(response, 'Update work item');
       if (!response.ok) throw new Error(body.error || 'Task update failed.');
       await loadTasks();
     } catch (err: any) { setError(err?.message || 'Task update failed.'); }
+  };
+
+  const completeHumanTask = async (task: WorkTask) => {
+    const note = completionNote.trim();
+    if (task.taskType === 'lead_follow_up' && note.length < 8) {
+      setError('Record what was reviewed and the next step before completing a lead review task.');
+      return;
+    }
+    setError(null);
+    try {
+      const response = await fetch(`/api/work-tasks/${encodeURIComponent(task.id)}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ status: 'completed', ...(note ? { output: { summary: note } } : {}) })
+      });
+      const body = await readApiResponse<any>(response, 'Complete work item');
+      if (!response.ok) throw new Error(body.error || 'Task completion failed.');
+      setCompletionTaskId(null);
+      setCompletionNote('');
+      await loadTasks();
+    } catch (err: any) {
+      setError(err?.message || 'Task completion failed.');
+    }
   };
 
   const executeWithHermes = async (task: WorkTask) => {
@@ -109,7 +135,7 @@ export default function WorkQueuePanel({ token }: WorkQueuePanelProps) {
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({ jsonrpc: '2.0', id: `work-${task.id}`, method: 'tools/call', params: { name: 'hal_execute_hermes_work_task', arguments: { taskId: task.id } } })
       });
-      const body = await response.json();
+      const body = await readApiResponse<any>(response, 'Hermes execution');
       if (!response.ok) throw new Error(body.error?.message || body.error || 'Hermes execution failed.');
       const result = body.structuredData || body.result?.structuredData;
       if (result?.success === false) throw new Error(result.error || 'Hermes could not complete this task.');
@@ -220,6 +246,16 @@ export default function WorkQueuePanel({ token }: WorkQueuePanelProps) {
                   })()}
                   {task.output?.replyText && <div className="mt-3 rounded-md border border-border-default bg-bg-base p-3"><div className="text-[9px] font-mono uppercase tracking-wider text-text-tertiary mb-1">Hermes result</div><p className="text-xs leading-relaxed text-text-secondary whitespace-pre-wrap">{task.output.replyText}</p>{task.output.updatedArtifactId && <p className="text-[10px] text-text-tertiary mt-2">Updated artifact: {task.output.updatedArtifactId}</p>}</div>}
                   {task.output?.artifactId && <p className="text-[10px] text-text-tertiary mt-2">Artifact receipt: {task.output.artifactId} · {task.output.status || 'saved'}</p>}
+                  {task.output?.summary && <div className="mt-3 rounded-md border border-border-default bg-bg-base p-3"><div className="text-[9px] font-mono uppercase tracking-wider text-text-tertiary mb-1">Human completion record</div><p className="text-xs text-text-secondary whitespace-pre-wrap">{task.output.summary}</p></div>}
+                  {completionTaskId === task.id && <div className="mt-3 rounded-md border border-border-default bg-bg-base p-3 space-y-2">
+                    <label className="block text-[10px] font-mono uppercase tracking-wider text-text-tertiary">Completion record
+                      <textarea value={completionNote} onChange={event => setCompletionNote(event.target.value)} rows={3} maxLength={4000} placeholder="What was reviewed, what was found, and what should happen next?" className="mt-1 w-full rounded-md border border-border-default bg-bg-raised p-2 text-xs text-text-primary" />
+                    </label>
+                    <div className="flex flex-wrap gap-2">
+                      <button onClick={() => void completeHumanTask(task)} className="px-3 py-1.5 rounded border border-emerald-400/30 text-emerald-300 text-[10px] font-mono">Save completion record</button>
+                      <button onClick={() => { setCompletionTaskId(null); setCompletionNote(''); }} className="px-3 py-1.5 rounded border border-border-default text-text-tertiary text-[10px] font-mono">Cancel</button>
+                    </div>
+                  </div>}
                   {task.errorMessage && <p className="text-xs text-red-400 mt-2">{task.errorMessage}</p>}
                 </div>
                 <div className="flex flex-wrap gap-1.5 shrink-0">
@@ -227,7 +263,7 @@ export default function WorkQueuePanel({ token }: WorkQueuePanelProps) {
                   {task.status === 'queued' && task.assignedWorker === 'hermes' && workerCapabilities.find(item => item.id === 'hermes')?.supportedTaskTypes.includes(task.taskType) && <button onClick={() => void executeWithHermes(task)} className="px-2.5 py-1.5 rounded border border-accent/40 text-accent text-[10px] font-mono inline-flex items-center gap-1"><Play className="w-3 h-3" /> Run with Hermes</button>}
                   {task.status === 'queued' && task.assignedWorker === 'human' && <button onClick={() => void transition(task, 'running')} className="px-2.5 py-1.5 rounded border border-border-default text-text-secondary text-[10px] font-mono">Start</button>}
                   {task.status === 'running' && task.assignedWorker === 'human' && <button onClick={() => void transition(task, 'failed')} className="px-2.5 py-1.5 rounded border border-red-400/30 text-red-300 text-[10px] font-mono">Fail</button>}
-                  {task.status === 'running' && task.assignedWorker === 'human' && <button onClick={() => void transition(task, 'completed')} className="px-2.5 py-1.5 rounded border border-emerald-400/30 text-emerald-300 text-[10px] font-mono inline-flex items-center gap-1"><CheckCircle2 className="w-3 h-3" /> Complete</button>}
+                  {task.status === 'running' && task.assignedWorker === 'human' && <button onClick={() => { setCompletionTaskId(task.id); setCompletionNote(''); setError(null); }} className="px-2.5 py-1.5 rounded border border-emerald-400/30 text-emerald-300 text-[10px] font-mono inline-flex items-center gap-1"><CheckCircle2 className="w-3 h-3" /> Record completion</button>}
                   {['queued', 'awaiting_approval', 'running', 'failed'].includes(task.status) && <button onClick={() => void transition(task, 'cancelled')} className="px-2.5 py-1.5 rounded border border-border-default text-text-tertiary text-[10px] font-mono inline-flex items-center gap-1"><XCircle className="w-3 h-3" /> Cancel</button>}
                   {task.status === 'failed' && task.attemptCount < task.maxAttempts && <button onClick={() => void transition(task, 'queued')} className="px-2.5 py-1.5 rounded border border-border-default text-text-secondary text-[10px] font-mono">Retry</button>}
                 </div>

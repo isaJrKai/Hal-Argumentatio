@@ -400,15 +400,7 @@ export default function NeuralPanel() {
         });
         localStorage.setItem('hal_neural_layout', JSON.stringify(layout));
         
-        // Also fire off background persist to DB API
-        fetch('/api/neural/network/layout', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${localStorage.getItem('halbiz_auth_token') || localStorage.getItem('token')}`
-          },
-          body: JSON.stringify({ layout })
-        }).catch(err => console.warn('Background layout sync failed', err));
+        // Layout is intentionally device-local until a tenant-scoped layout store is implemented.
       });
       
     d3.select(canvas).call(drag);
@@ -602,36 +594,11 @@ export default function NeuralPanel() {
     ctx.restore();
   };
 
-  const handlePruneNode = async () => {
-    if (!selectedPruneNode) return;
-    
-    // Call the backend to persist pruning
-    try {
-      await fetch(`/api/neural/network/prune/${selectedPruneNode.id}`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('halbiz_auth_token') || localStorage.getItem('token')}`
-        }
-      });
-    } catch (e) {
-      console.error('Failed to prune node on backend', e);
-    }
-    
-    // Optimistic UI update
-    setNetworkData(prev => ({
-      ...prev,
-      nodes: prev.nodes.filter(n => n.id !== selectedPruneNode.id),
-      links: prev.links.filter(l => l.source.id !== selectedPruneNode.id && l.target.id !== selectedPruneNode.id)
-    }));
-    nodesRef.current = nodesRef.current.filter(n => n.id !== selectedPruneNode.id);
-    linksRef.current = linksRef.current.filter(l => l.source.id !== selectedPruneNode.id && l.target.id !== selectedPruneNode.id);
+  const handlePruneNode = () => {
+    // No durable tenant-scoped pruning mutation exists. Do not remove graph
+    // nodes optimistically or imply that learned state was changed.
     setSelectedPruneNode(null);
-    setHoveredNode(null);
-    if (simulationRef.current) {
-      simulationRef.current.nodes(nodesRef.current);
-      simulationRef.current.force('link').links(linksRef.current);
-      simulationRef.current.alpha(1).restart();
-    }
+    setIsPruningMode(false);
   };
 
   const handleZoom = (factor: number) => {
@@ -678,11 +645,11 @@ export default function NeuralPanel() {
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-2 px-3 py-1.5 bg-bg-overlay border border-border-dim rounded-lg mr-2">
             <Scissors className={`w-4 h-4 ${isPruningMode ? 'text-red-500' : 'text-text-tertiary'}`} />
-            <span className="text-xs font-medium text-text-secondary mr-2">Manual Pruning</span>
+            <span className="text-xs font-medium text-text-secondary mr-2">Manual Pruning (disabled)</span>
             <button 
-              onClick={() => setIsPruningMode(!isPruningMode)}
-              disabled={!networkData.nodes.some(node => node.type === 'decaying')}
-              title={networkData.nodes.some(node => node.type === 'decaying') ? 'Toggle pruning for verified decaying nodes' : 'No verified decaying nodes are present in this territory'}
+              disabled
+              aria-label="Manual neural pruning disabled"
+              title="Manual pruning is disabled until learned weights can be safely persisted per workspace."
               className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${isPruningMode ? 'bg-red-500' : 'bg-bg-raised border border-border-dim'}`}
             >
               <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${isPruningMode ? 'translate-x-4.5' : 'translate-x-1'}`} />

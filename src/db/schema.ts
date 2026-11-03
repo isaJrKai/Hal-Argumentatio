@@ -17,6 +17,14 @@ export const contractors = pgTable('contractors', {
   lastLoginAt: timestamp('last_login_at'),
 });
 
+/** Hashed JWT revocations. Raw bearer tokens are never persisted. */
+export const revokedTokens = pgTable('revoked_tokens', {
+  tokenHash: text('token_hash').primaryKey(),
+  contractorId: text('contractor_id').notNull(),
+  expiresAt: timestamp('expires_at').notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+});
+
 export const leads = pgTable('leads', {
   id: text('id').primaryKey(),
   contractorId: text('contractor_id').notNull(),
@@ -109,6 +117,7 @@ export const predictionOutcomes = pgTable('prediction_outcomes', {
 
 export const learningInsights = pgTable('learning_insights', {
   id: text('id').primaryKey(),
+  contractorId: text('contractor_id').notNull(),
   metric: text('metric').notNull(),
   lesson: text('lesson').notNull(),
   confidenceShift: doublePrecision('confidence_shift').notNull(),
@@ -209,6 +218,14 @@ export const apiKeys = pgTable('api_keys', {
   createdAt: timestamp('created_at').defaultNow().notNull(),
 });
 
+export const connectorCredentials = pgTable('connector_credentials', {
+  id: text('id').primaryKey(),
+  contractorId: text('contractor_id').notNull(),
+  service: text('service').notNull(),
+  encryptedValue: text('encrypted_value').notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+});
+
 export const notifications = pgTable('notifications', {
   id: text('id').primaryKey(),
   contractorId: text('contractor_id').notNull(),
@@ -221,6 +238,7 @@ export const notifications = pgTable('notifications', {
 
 export const schedulerJobs = pgTable('scheduler_jobs', {
   id: text('id').primaryKey(),
+  contractorId: text('contractor_id'),
   job: text('job').notNull(),
   status: text('status').notNull(), // 'pending' | 'running' | 'completed' | 'failed'
   startedAt: timestamp('started_at'),
@@ -335,7 +353,7 @@ export const conversionOutbox = pgTable('conversion_outbox', {
   nextAttemptAt: timestamp('next_attempt_at'),
   lastAttemptAt: timestamp('last_attempt_at'),
   uploadedAt: timestamp('uploaded_at'),
-  idempotencyKey: text('idempotency_key').notNull().unique(),
+  idempotencyKey: text('idempotency_key').notNull(),
   googleResponse: jsonb('google_response'),
   errorCode: text('error_code'),
   errorMessage: text('error_message'),
@@ -346,7 +364,7 @@ export const conversionOutbox = pgTable('conversion_outbox', {
 export const communicationsOutbox = pgTable('communications_outbox', {
   id: text('id').primaryKey(),
   contractorId: text('contractor_id').notNull(),
-  leadId: text('lead_id').notNull(),
+  leadId: text('lead_id'),
   channel: text('channel').notNull(),
   provider: text('provider').notNull(),
   recipientEncrypted: text('recipient_encrypted').notNull(),

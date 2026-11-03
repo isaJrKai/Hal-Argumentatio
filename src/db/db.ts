@@ -42,7 +42,7 @@ export interface Lead {
   city: string;
   serviceType: string;
   source: string;
-  status: 'new' | 'contacted' | 'converted' | 'dead';
+  status: 'new' | 'contacted' | 'qualified' | 'sal' | 'proposal' | 'closed_won' | 'closed_lost' | 'converted' | 'dead' | 'retained' | 'churned' | 'reactivated';
   urgencyScore: number | null;
   predictedLtvUsd: number | null;
   notes?: string;

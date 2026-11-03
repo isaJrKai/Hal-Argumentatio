@@ -92,7 +92,7 @@ export default function CampaignsPanel({ campaigns, leads = [], token, onRefresh
       if (res.ok) {
         const data = await res.json();
         setDiagnosticReport(data.report || data);
-        showToast(`Hermes diagnostic scan complete: ${data.report?.issueCount || data.issueCount || '1'} optimization vector identified`, 'success');
+        showToast(data.message || `Reviewed ${data.evidenceRows || 0} stored Google Ads observations; ${data.newIncidentsFound || 0} new incident(s)`, 'success');
         if (onRefresh) onRefresh();
       } else {
         setDiagnosticReport({

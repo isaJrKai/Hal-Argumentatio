@@ -25,6 +25,7 @@ import {
 } from 'lucide-react';
 import { ClientProject, ClientMilestone, ClientAsset, Lead } from '../types';
 import { useBusinessContext } from '../context/BusinessContext';
+import { readApiResponse } from '../lib/apiResponse';
 
 interface DeliveryHubProps {
   token: string;
@@ -58,8 +59,7 @@ export default function DeliveryHub({ token, leads = [] }: DeliveryHubProps) {
       const res = await fetch('/api/projects', {
         headers: { 'Authorization': `Bearer ${activeToken}` }
       });
-      if (!res.ok) throw new Error(`Project list request failed (HTTP ${res.status}).`);
-      const data = await res.json();
+      const data = await readApiResponse<unknown>(res, 'Client project list');
       if (!Array.isArray(data)) throw new Error('Project list response was not a valid array.');
       setProjects(data);
       setSelectedProject(current => current && data.some(project => project.id === current.id)
@@ -110,13 +110,12 @@ export default function DeliveryHub({ token, leads = [] }: DeliveryHubProps) {
           monthlyRetainerUsd: newProjectRetainer
         })
       });
-      const responseData = await res.json().catch(() => ({}));
+      const responseData = await readApiResponse<Record<string, any>>(res, 'Create client project');
       if (!res.ok) throw new Error(responseData.error || `Project creation failed (HTTP ${res.status}).`);
 
       // A successful POST is not enough: confirm the project appears in the durable list.
       const verifyRes = await fetch('/api/projects', { headers: { 'Authorization': `Bearer ${activeToken}` } });
-      if (!verifyRes.ok) throw new Error(`Project was accepted, but persistence could not be verified (HTTP ${verifyRes.status}).`);
-      const persistedProjects = await verifyRes.json();
+      const persistedProjects = await readApiResponse<unknown>(verifyRes, 'Verify client project persistence');
       const created = responseData as ClientProject;
       if (!Array.isArray(persistedProjects) || !persistedProjects.some((project: ClientProject) => project.id === created.id)) {
         setProjectError('The server accepted this project, but it is missing from the persistent project list. It may not survive a refresh. Project storage needs repair before this project can be considered saved.');
@@ -160,7 +159,7 @@ export default function DeliveryHub({ token, leads = [] }: DeliveryHubProps) {
         headers: { 'Content-Type': 'application/json', ...(activeToken ? { 'Authorization': `Bearer ${activeToken}` } : {}) },
         body: JSON.stringify({ milestones: updatedMilestones, status: updatedProject.status })
       });
-      const responseData = await res.json().catch(() => ({}));
+      const responseData = await readApiResponse<Record<string, any>>(res, 'Save client project milestone');
       if (!res.ok) throw new Error(responseData.error || `Milestone update failed (HTTP ${res.status}).`);
       const savedProject = responseData && typeof responseData === 'object' ? { ...updatedProject, ...responseData } : updatedProject;
       setSelectedProject(savedProject);
@@ -187,7 +186,7 @@ export default function DeliveryHub({ token, leads = [] }: DeliveryHubProps) {
         headers: { 'Content-Type': 'application/json', ...(activeToken ? { 'Authorization': `Bearer ${activeToken}` } : {}) },
         body: JSON.stringify({ assets: updatedAssets })
       });
-      const responseData = await res.json().catch(() => ({}));
+      const responseData = await readApiResponse<Record<string, any>>(res, 'Save client project asset status');
       if (!res.ok) throw new Error(responseData.error || `Asset status update failed (HTTP ${res.status}).`);
       const savedProject = responseData && typeof responseData === 'object' ? { ...updatedProject, ...responseData } : updatedProject;
       setSelectedProject(savedProject);

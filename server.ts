@@ -1,4 +1,4 @@
-import { getDrizzleDb } from './src/db/postgres';
+import { testPostgresConnection, bootstrapPostgresTables } from './src/db/postgres';
 import express from 'express';
 import path from 'path';
 import fs from 'fs';
@@ -19,9 +19,9 @@ import {
   Forecast,
   Recommendation
 } from './src/db/db';
-import { db as pgDb } from './src/db/index.ts';
-import { contractors, auditLogs, leads, leadEvents, revenueRecords, campaigns, winLossRecords, performanceSnapshots, recommendations, forecasts, learningInsights, chatMessages, chatProjects, chatConversations, missions, clientProjects, outreachSequences, apiKeys, notifications, schedulerJobs, leadAttribution, conversionOutbox, googleAdsDailyPerformance, revenueExperiments, revenueRecommendations, revenueRecommendationEvents, revenueSimulations, revenueOutcomes, communicationsOutbox, communicationsDeliveryEvents, halLoops, halLoopEvents, hermesLabArtifacts, hermesDiagnosticIncidents, hermesLabMessages, workEvents, workTasks } from './src/db/schema.ts';
-import { eq, inArray, desc, and, or, like, sql, gte, lte } from 'drizzle-orm';
+import { db as pgDb, createPool as getApplicationPostgresPool } from './src/db/index.ts';
+import { contractors, auditLogs, leads, leadEvents, revenueRecords, campaigns, winLossRecords, performanceSnapshots, recommendations, forecasts, predictionOutcomes, learningInsights, chatMessages, chatProjects, chatConversations, missions, clientProjects, outreachSequences, apiKeys, connectorCredentials, notifications, schedulerJobs, leadAttribution, conversionOutbox, googleAdsDailyPerformance, revenueExperiments, revenueRecommendations, revenueRecommendationEvents, revenueSimulations, revenueOutcomes, communicationsOutbox, communicationsDeliveryEvents, halLoops, halLoopEvents, hermesLabArtifacts, hermesDiagnosticIncidents, hermesLabMessages, workEvents, workTasks, revokedTokens } from './src/db/schema.ts';
+import { eq, inArray, desc, and, or, like, sql, gte, lte, gt } from 'drizzle-orm';
 import { 
   generateLearningFromOutcome, 
   generateForecastNarrative,
@@ -40,10 +40,11 @@ import { generateContractorLandingPage, regenerateLandingSection } from './src/s
 import { generateLandingPageHtml } from './src/components/landing/htmlGenerator';
 import { validateCrmTransition, isKnownCrmStage } from './src/lib/crmStateMachine';
 import { buildFinancialSnapshotCore } from './src/lib/financialSnapshot';
+import { getRevenueAmountUsd } from './src/lib/revenueAmounts';
 import { buildPasswordResetResponse } from './src/lib/passwordResetResponse';
 import { verifyFirebaseGoogleIdToken } from './src/lib/firebaseGoogleIdentity';
 import { recordWorkEvent, getRecentWorkEvents, getEntityWorkEvents } from './src/lib/workLedger';
-import { canHumanUpdateWorkTask, canTransitionWorkTask, listWorkTasks, getWorkTask, requiresWorkTaskApproval } from './src/lib/workTasks';
+import { canHumanUpdateWorkTask, canTransitionWorkTask, listWorkTasks, getWorkTask, requiresWorkTaskApproval, ensureLeadReviewTask } from './src/lib/workTasks';
 import { getWorkerCapabilities } from './src/lib/workerCapabilities';
 import { resolvePublishedLandingPageOwner } from './src/lib/landingPageOwnership';
 import { validateLoopGate } from './src/lib/loopGating';
@@ -103,6 +104,7 @@ app.use(express.json({
     (req as any).rawBody = Buffer.from(buffer);
   }
 }));
+app.use(express.urlencoded({ extended: false, limit: '100kb' }));
 
 
 
@@ -267,9 +269,49 @@ app.use((req, res, next) => {
   next();
 });
 
-// API Health Check
-app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+// Liveness: confirms the HTTP process is responding.
+app.get('/api/health', (_req, res) => {
+  res.json({ status: 'ok', uptimeSeconds: Math.floor(process.uptime()), timestamp: new Date().toISOString() });
+});
+
+// Readiness: confirms the same PostgreSQL pool used by application queries is usable
+// and the core cross-module tables exist. A live process is not necessarily ready.
+app.get('/api/ready', async (_req, res) => {
+  let client: any;
+  try {
+    const pool = getApplicationPostgresPool();
+    client = await pool.connect();
+    const result = await client.query(`
+      SELECT
+        to_regclass('public.contractors') IS NOT NULL AS contractors,
+        to_regclass('public.leads') IS NOT NULL AS leads,
+        to_regclass('public.client_projects') IS NOT NULL AS client_projects,
+        to_regclass('public.revenue_records') IS NOT NULL AS revenue_records,
+        to_regclass('public.campaigns') IS NOT NULL AS campaigns,
+        to_regclass('public.work_tasks') IS NOT NULL AS work_tasks,
+        to_regclass('public.work_events') IS NOT NULL AS work_events,
+        to_regclass('public.hermes_lab_artifacts') IS NOT NULL AS hermes_lab_artifacts,
+        to_regclass('public.communications_outbox') IS NOT NULL AS communications_outbox,
+        to_regclass('public.communications_delivery_events') IS NOT NULL AS communications_delivery_events,
+        to_regclass('public.forecasts') IS NOT NULL AS forecasts,
+        to_regclass('public.prediction_outcomes') IS NOT NULL AS prediction_outcomes,
+        to_regclass('public.learning_insights') IS NOT NULL AS learning_insights,
+        to_regclass('public.outreach_sequences') IS NOT NULL AS outreach_sequences,
+        to_regclass('public.revoked_tokens') IS NOT NULL AS revoked_tokens,
+        to_regclass('public.hal_loops') IS NOT NULL AS hal_loops
+    `);
+    const checks = result.rows[0] || {};
+    const missingTables = Object.entries(checks).filter(([, exists]) => exists !== true).map(([name]) => name);
+    if (missingTables.length) {
+      return res.status(503).json({ status: 'not_ready', database: 'connected', missingTables, timestamp: new Date().toISOString() });
+    }
+    return res.json({ status: 'ready', database: 'connected', checkedTables: Object.keys(checks), timestamp: new Date().toISOString() });
+  } catch (error: any) {
+    console.error('[HAL readiness] Database check failed:', error?.message || error);
+    return res.status(503).json({ status: 'not_ready', database: 'unavailable', error: 'The application database is not ready.', timestamp: new Date().toISOString() });
+  } finally {
+    client?.release();
+  }
 });
 
 // Public Link & Community Sandbox Status & Controls
@@ -441,10 +483,18 @@ async function authenticate(req: express.Request, res: express.Response, next: e
     return res.status(401).json({ error: 'Invalid or expired authentication token' });
   }
 
-  // JWT claims can become stale after an account is deleted or its role changes.
-  // Always resolve the current account and privileges from PostgreSQL; fail closed
-  // if the account cannot be verified instead of trusting token/email fallbacks.
+  // Logout revocation is durable and tenant-scoped. Hash the bearer token so the
+  // raw credential is never stored in the database.
   try {
+    const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+    const revoked = await pgDb.select({ tokenHash: revokedTokens.tokenHash })
+      .from(revokedTokens)
+      .where(and(eq(revokedTokens.tokenHash, tokenHash), gt(revokedTokens.expiresAt, new Date())))
+      .limit(1);
+    if (revoked.length) return res.status(401).json({ error: 'Authentication token has been revoked. Please sign in again.' });
+
+    // JWT claims can become stale after an account is deleted or its role changes.
+    // Always resolve the current account and privileges from PostgreSQL.
     const result = await pgDb.select().from(contractors).where(eq(contractors.id, decoded.contractorId)).limit(1);
     const contractor = result[0];
     if (!contractor) {
@@ -642,7 +692,7 @@ app.patch('/api/work-tasks/:id', authenticate, async (req, res) => {
         actorType: 'human', actorId: contractorId, sourceModule: 'work_queue',
         correlationId: current.correlationId || taskId,
         summary: `Moved task "${current.title}" from ${current.status} to ${nextStatus}.`,
-        payload: { previousStatus: current.status, status: nextStatus, assignedWorker: current.assignedWorker }
+        payload: { previousStatus: current.status, status: nextStatus, assignedWorker: current.assignedWorker, ...(output !== undefined ? { output } : {}) }
       });
       return saved;
     });
@@ -721,7 +771,7 @@ app.post('/api/auth/register', async (req, res) => {
     });
 
     const token = signToken({ contractorId: id, email: cleanEmail, role: 'user' });
-    db.addSession(id, token, new Date(Date.now() + 30 * 24 * 3600 * 1000));
+
     recordAuthSuccess(req, cleanEmail);
 
     try {
@@ -783,7 +833,7 @@ app.post('/api/auth/login', async (req, res) => {
 
     const role: 'admin' | 'user' = contractor.role === 'admin' ? 'admin' : 'user';
     const token = signToken({ contractorId: contractor.id, email: cleanEmail, role });
-    db.addSession(contractor.id, token, new Date(Date.now() + 30 * 24 * 3600 * 1000));
+
     recordAuthSuccess(req, cleanEmail);
 
     try {
@@ -929,7 +979,7 @@ app.post('/api/auth/google', async (req, res) => {
 
   const role: 'admin' | 'user' = contractor.role === 'admin' ? 'admin' : 'user';
   const token = signToken({ contractorId: contractor.id, email: cleanEmail, role });
-  db.addSession(contractor.id, token, new Date(Date.now() + 30 * 24 * 3600 * 1000));
+
   recordAuthSuccess(req, cleanEmail);
 
   try {
@@ -959,16 +1009,25 @@ app.post('/api/auth/logout', authenticate, async (req, res) => {
   const authHeader = req.headers.authorization!;
   const token = authHeader.split(' ')[1];
   
-  db.deleteSession(token);
-  
+  const decoded = verifyToken(token);
+  if (!decoded) return res.status(401).json({ error: 'Invalid or expired authentication token.' });
   try {
+    const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+    await pgDb.insert(revokedTokens).values({
+      tokenHash,
+      contractorId: (req as any).contractorId,
+      expiresAt: new Date(decoded.exp * 1000)
+    }).onConflictDoNothing();
     await pgDb.insert(auditLogs).values({
       id: crypto.randomUUID(),
       contractorId: (req as any).contractorId,
       action: 'LOGOUT_SUCCESS',
       details: `Logout from IP: ${req.ip}`
     });
-  } catch (err) {}
+  } catch (err) {
+    console.error('[HAL auth] Token revocation failed:', err);
+    return res.status(503).json({ error: 'Logout could not be completed securely. Please retry.' });
+  }
 
   res.json({ success: true });
 });
@@ -1570,6 +1629,41 @@ app.post('/api/landing-pages/save', authenticate, async (req, res) => {
   }
 });
 
+app.get('/api/public/form/dispatch', async (req, res) => {
+  const landingPageId = typeof req.query.landingPageId === 'string' ? req.query.landingPageId.trim() : '';
+  if (!landingPageId || landingPageId.length > 128) {
+    return res.status(400).type('html').send('<!doctype html><html><body><h1>Form setup required</h1><p>A published landing page ID is required.</p></body></html>');
+  }
+  try {
+    const [artifact] = await pgDb.select().from(hermesLabArtifacts).where(and(
+      eq(hermesLabArtifacts.id, landingPageId),
+      eq(hermesLabArtifacts.toolId, 'landing_page')
+    )).limit(1);
+    const owner = resolvePublishedLandingPageOwner(artifact);
+    if (!owner.valid) {
+      return res.status(404).type('html').send('<!doctype html><html><body><h1>Form unavailable</h1><p>This landing page has not been published or is no longer available.</p></body></html>');
+    }
+    const escapeHtml = (value: unknown) => String(value ?? '').replace(/[&<>"']/g, char => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+    }[char] || char));
+    const title = escapeHtml(artifact.title || 'Request a service');
+    const safeId = escapeHtml(landingPageId);
+    res.type('html').send(`<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${title}</title>
+<style>body{margin:0;padding:20px;background:#f7f6f1;color:#18181b;font:15px/1.5 system-ui,sans-serif}form{max-width:520px;margin:auto;background:#fff;padding:22px;border:1px solid #e5e2d9;border-radius:10px}h1{font-size:21px;margin:0 0 16px}label{display:block;font-size:13px;font-weight:600;margin:12px 0 5px}input,textarea{box-sizing:border-box;width:100%;padding:11px;border:1px solid #d4d4d8;border-radius:6px;font:inherit}button{margin-top:16px;padding:12px 18px;border:0;border-radius:6px;background:#1b4332;color:#fff;font-weight:700;cursor:pointer}.hint{color:#71717a;font-size:12px}</style></head>
+<body><form method="post" action="/api/public/landing-leads">
+<input type="hidden" name="landingPageId" value="${safeId}">
+<h1>${title}</h1><p class="hint">Send your details and the business will review your inquiry.</p>
+<label for="name">Your name</label><input id="name" name="name" autocomplete="name" maxlength="120" required>
+<label for="phone">Phone number</label><input id="phone" name="phone" type="tel" autocomplete="tel" maxlength="40" required>
+<label for="serviceDetails">Service details</label><textarea id="serviceDetails" name="serviceDetails" rows="4" maxlength="2000" placeholder="Describe what you need"></textarea>
+<button type="submit">Send request</button></form></body></html>`);
+  } catch (error: any) {
+    console.error('[Public Form Render Error]', error);
+    return res.status(503).type('html').send('<!doctype html><html><body><h1>Form temporarily unavailable</h1><p>Please try again later.</p></body></html>');
+  }
+});
+
 app.post('/api/public/landing-leads', async (req, res) => {
   const { landingPageId, name, phone, serviceDetails } = req.body || {};
 
@@ -1638,7 +1732,63 @@ app.post('/api/public/landing-leads', async (req, res) => {
       notes: `Landing Page: ${landingPageId.trim()} | Details: ${normalizedDetails || 'No additional details supplied'}`
     };
 
-    await pgDb.insert(leads).values(leadValues);
+    const taskId = 'task_' + crypto.randomUUID();
+    const correlationId = taskId;
+    const createdAt = new Date();
+    await pgDb.transaction(async tx => {
+      await tx.insert(leads).values(leadValues);
+      await tx.insert(leadEvents).values({
+        id: crypto.randomUUID(),
+        leadId,
+        eventType: 'LeadCreated',
+        newStage: 'new',
+        notes: 'New inbound inquiry received from a published HAL landing page.',
+        createdAt
+      });
+      await tx.insert(workTasks).values({
+        id: taskId,
+        contractorId: targetContractorId,
+        taskType: 'lead_follow_up',
+        title: `Review inbound inquiry: ${normalizedName}`,
+        description: 'Review the inbound service inquiry, confirm its details and verification evidence, then record the next step. Contact only after the required verification checks pass.',
+        status: 'queued',
+        priority: 'normal',
+        assignedWorker: 'human',
+        entityType: 'lead',
+        entityId: leadId,
+        correlationId,
+        input: { source: 'published_landing_page', landingPageId: landingPageId.trim() },
+        requiresApproval: false,
+        createdAt,
+        updatedAt: createdAt
+      });
+      await tx.insert(workEvents).values({
+        id: 'evt_' + crypto.randomUUID(),
+        contractorId: targetContractorId,
+        eventType: 'task.created',
+        entityType: 'work_task',
+        entityId: taskId,
+        actorType: 'system',
+        actorId: 'public_landing_form',
+        sourceModule: 'landing_page_ingestion',
+        correlationId,
+        summary: `Created human review task for inbound inquiry from ${normalizedName}.`,
+        payload: { taskType: 'lead_follow_up', assignedWorker: 'human', priority: 'normal', status: 'queued', leadId }
+      });
+      await tx.insert(workEvents).values({
+        id: 'evt_' + crypto.randomUUID(),
+        contractorId: targetContractorId,
+        eventType: 'lead.queued_for_review',
+        entityType: 'lead',
+        entityId: leadId,
+        actorType: 'system',
+        actorId: 'public_landing_form',
+        sourceModule: 'landing_page_ingestion',
+        correlationId,
+        summary: `Inbound inquiry from ${normalizedName} was added to the human review queue.`,
+        payload: { taskId, landingPageId: landingPageId.trim() }
+      });
+    });
 
     try {
       db.addLead({
@@ -1678,10 +1828,14 @@ app.post('/api/public/landing-leads', async (req, res) => {
       );
     } catch (_) {}
 
+    if (req.is('application/x-www-form-urlencoded')) {
+      return res.status(201).type('html').send('<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Request received</title></head><body style="font:16px system-ui,sans-serif;padding:32px;color:#18181b"><h1>Request received</h1><p>Thank you. The business has received your inquiry and will review it before contacting you.</p></body></html>');
+    }
     return res.status(201).json({
       success: true,
       leadId,
-      message: 'Your request has been received. The business will contact you using the details you provided.'
+      taskId,
+      message: 'Your request has been received and added to the business review queue.'
     });
   } catch (err: any) {
     console.error('[Public Landing Lead Ingest Error]', err);
@@ -1818,6 +1972,7 @@ app.post('/api/leads', authenticate, async (req, res) => {
       newStage: 'new',
       notes: 'Lead captured on the HALBiz interface.'
     });
+    const reviewTask = await ensureLeadReviewTask(pgDb, contractorId, lead, 'manual_lead_entry');
 
     await recordWorkEvent(pgDb, {
       contractorId, eventType: 'lead.created', entityType: 'lead', entityId: lead.id,
@@ -1843,7 +1998,8 @@ app.post('/api/leads', authenticate, async (req, res) => {
     const decryptedLead = {
       ...lead,
       email: email || lead.email,
-      phone: phone || lead.phone
+      phone: phone || lead.phone,
+      reviewTaskId: reviewTask.taskId
     };
     res.status(201).json(decryptedLead);
   } catch (err: any) {
@@ -1919,13 +2075,14 @@ app.post('/api/leads/create', authenticate, async (req, res) => {
       newStage: 'new',
       notes: `Lead captured with attribution (GCLID: ${gclid ? 'Yes' : 'No'}, Campaign: ${utmCampaign || 'none'})`
     });
+    const reviewTask = await ensureLeadReviewTask(pgDb, contractorId, lead, 'lead_intake_form');
 
     const decryptedLead = {
       ...lead,
       email: email || lead.email,
       phone: phone || lead.phone
     };
-    res.status(201).json({ success: true, lead: decryptedLead, attributionRecorded: !!(gclid || gbraid || wbraid || utmSource) });
+    res.status(201).json({ success: true, lead: decryptedLead, reviewTaskId: reviewTask.taskId, attributionRecorded: !!(gclid || gbraid || wbraid || utmSource) });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
@@ -2118,29 +2275,29 @@ app.post('/api/webhooks/crm', async (req, res) => {
     return res.status(400).json({ error: 'Missing required idempotency identifier (eventId / X-Event-ID)' });
   }
 
-  // 1. Idempotency Check
-  try {
-    const existingEvent = await pgDb.select().from(leadEvents).where(eq(leadEvents.externalEventId, resolvedEventId));
-    if (existingEvent.length > 0) {
-      return res.status(200).json({ success: true, duplicate: true, message: 'Event already processed idempotently', eventId: resolvedEventId });
-    }
-  } catch (err) {
-    // Continue if column/table check fails
+  // 1. Tenant resolution must be explicit. Never attach an external event to
+  // whichever contractor happens to be first in the database.
+  const resolvedContractorId = contractorId || (leadData ? leadData.contractorId : null);
+  if (typeof resolvedContractorId !== 'string' || !resolvedContractorId.trim()) {
+    return res.status(400).json({ error: 'A valid contractorId is required for tenant-scoped CRM webhook routing.' });
+  }
+  const contractorCheck = await pgDb.select({ id: contractors.id }).from(contractors)
+    .where(eq(contractors.id, resolvedContractorId)).limit(1);
+  if (contractorCheck.length === 0) {
+    return res.status(403).json({ error: 'Forbidden: Invalid tenant contractor ID' });
   }
 
-  // 2. Tenant Isolation / Contractor resolution
-  let resolvedContractorId = contractorId || (leadData ? leadData.contractorId : null);
-  if (!resolvedContractorId) {
-    const allContractors = await pgDb.select().from(contractors).limit(1);
-    if (allContractors.length > 0) {
-      resolvedContractorId = allContractors[0].id;
-    } else {
-      return res.status(400).json({ error: 'Contractor ID could not be established for tenant isolation' });
-    }
-  } else {
-    const contractorCheck = await pgDb.select().from(contractors).where(eq(contractors.id, resolvedContractorId));
-    if (contractorCheck.length === 0) {
-      return res.status(403).json({ error: 'Forbidden: Invalid tenant contractor ID' });
+  // 2. Idempotency is tenant-scoped through the lead that owns the event.
+  const existingEvents = await pgDb.select({ leadId: leadEvents.leadId }).from(leadEvents)
+    .where(eq(leadEvents.externalEventId, resolvedEventId));
+  if (existingEvents.length) {
+    const eventLeadIds = existingEvents.map(event => event.leadId);
+    const existingTenantLead = await pgDb.select({ id: leads.id }).from(leads).where(and(
+      eq(leads.contractorId, resolvedContractorId),
+      inArray(leads.id, eventLeadIds)
+    )).limit(1);
+    if (existingTenantLead.length) {
+      return res.status(200).json({ success: true, duplicate: true, message: 'Event already processed idempotently for this workspace.', eventId: resolvedEventId });
     }
   }
 
@@ -2172,25 +2329,30 @@ app.post('/api/webhooks/crm', async (req, res) => {
       }
     }
 
+    // Load tenant records once for contact matching. PII is encrypted at rest,
+    // so comparisons must use decrypted values in memory, never placeholder columns.
+    const allTenantLeads = (!matchedLead && (normalizedEmail || normalizedPhone))
+      ? await pgDb.select().from(leads).where(eq(leads.contractorId, resolvedContractorId))
+      : [];
+
     // Priority 3: Normalized Email
     if (!matchedLead && normalizedEmail) {
-      const byEmail = await pgDb.select().from(leads).where(and(eq(leads.email, normalizedEmail), eq(leads.contractorId, resolvedContractorId)));
-      if (byEmail.length === 1) {
-        matchedLead = byEmail[0];
-      } else if (byEmail.length > 1) {
-        return res.status(409).json({ error: 'Conflict: Multiple leads match email address. Ambiguous reconciliation.' });
-      }
+      const byEmail = allTenantLeads.filter(lead => {
+        const emailValue = lead.emailEncrypted ? decrypt(lead.emailEncrypted) : (lead.email === '[ENCRYPTED]' ? '' : lead.email || '');
+        return String(emailValue).toLowerCase().trim() === normalizedEmail;
+      });
+      if (byEmail.length === 1) matchedLead = byEmail[0];
+      else if (byEmail.length > 1) return res.status(409).json({ error: 'Conflict: Multiple leads match email address. Ambiguous reconciliation.' });
     }
 
     // Priority 4: Normalized Phone
     if (!matchedLead && normalizedPhone) {
-      const allTenantLeads = await pgDb.select().from(leads).where(eq(leads.contractorId, resolvedContractorId));
-      const phoneMatches = allTenantLeads.filter(l => l.phone && l.phone.replace(/\D/g, '') === normalizedPhone);
-      if (phoneMatches.length === 1) {
-        matchedLead = phoneMatches[0];
-      } else if (phoneMatches.length > 1) {
-        return res.status(409).json({ error: 'Conflict: Multiple leads match phone number. Ambiguous reconciliation.' });
-      }
+      const phoneMatches = allTenantLeads.filter(lead => {
+        const phoneValue = lead.phoneEncrypted ? decrypt(lead.phoneEncrypted) : (lead.phone === '[ENCRYPTED]' ? '' : lead.phone || '');
+        return String(phoneValue).replace(/\D/g, '') === normalizedPhone;
+      });
+      if (phoneMatches.length === 1) matchedLead = phoneMatches[0];
+      else if (phoneMatches.length > 1) return res.status(409).json({ error: 'Conflict: Multiple leads match phone number. Ambiguous reconciliation.' });
     }
 
     if (!matchedLead) {
@@ -2251,10 +2413,24 @@ app.post('/api/webhooks/crm', async (req, res) => {
       newStage: newOperationalStatus,
       dealValue: newDealValue,
       currency: currency || 'USD',
-      metadata: { source: source || 'crm_webhook', rawPayload: req.body },
+      metadata: { source: source || 'crm_webhook', matchedBy: targetLeadId ? 'lead_id' : externalId ? 'external_crm_id' : normalizedEmail ? 'email' : 'phone', eventType: canonicalEventType },
       notes: `Inbound CRM event (${source || 'external'}) mapped to canonical "${canonicalEventType}"`,
       createdBy: source || 'external_webhook',
       occurredAt: parsedOccurredAt
+    });
+
+    await pgDb.insert(workEvents).values({
+      id: 'evt_' + crypto.randomUUID(),
+      contractorId: resolvedContractorId,
+      eventType: 'crm.webhook_reconciled',
+      entityType: 'lead',
+      entityId: matchedLead.id,
+      actorType: 'integration',
+      actorId: source || 'crm_webhook',
+      sourceModule: 'crm_webhook',
+      correlationId: resolvedEventId,
+      summary: `Reconciled external CRM event "${canonicalEventType}" to ${matchedLead.businessName}.`,
+      payload: { externalEventId: resolvedEventId, previousStatus: oldStatus, status: newOperationalStatus, dealValue: newDealValue }
     });
 
     if (newDealValue !== oldDealValue && canonicalEventType !== 'RevenueUpdated') {
@@ -2284,13 +2460,14 @@ app.post('/api/webhooks/crm', async (req, res) => {
       let hashedEmail: string | null = null;
       let hashedPhone: string | null = null;
 
-      if (matchedLead.email) {
-        const cleanEmail = matchedLead.email.toLowerCase().trim();
+      const rawMatchedEmail = matchedLead.emailEncrypted ? decrypt(matchedLead.emailEncrypted) : (matchedLead.email === '[ENCRYPTED]' ? '' : matchedLead.email || '');
+      const rawMatchedPhone = matchedLead.phoneEncrypted ? decrypt(matchedLead.phoneEncrypted) : (matchedLead.phone === '[ENCRYPTED]' ? '' : matchedLead.phone || '');
+      if (rawMatchedEmail) {
+        const cleanEmail = String(rawMatchedEmail).toLowerCase().trim();
         hashedEmail = crypto.createHash('sha256').update(cleanEmail).digest('hex');
       }
-
-      if (matchedLead.phone) {
-        const cleanPhone = matchedLead.phone.replace(/\D/g, '');
+      if (rawMatchedPhone) {
+        const cleanPhone = String(rawMatchedPhone).replace(/\D/g, '');
         hashedPhone = crypto.createHash('sha256').update(cleanPhone).digest('hex');
       }
 
@@ -2423,58 +2600,83 @@ app.all(['/api/webhooks/twilio', '/api/webhooks/whatsapp'], async (req, res) => 
 // Authenticated Webhook Simulator / Test Endpoint for the Operator
 app.post('/api/webhooks/test-inbound', authenticate, async (req, res) => {
   const contractorId = (req as any).contractorId;
-  const { channel = 'whatsapp', from = '+14035550192', body = 'Yes, we received your website audit and want to schedule a review.', leadId } = req.body || {};
+  const { channel = 'whatsapp', from = '', body = '', leadId } = req.body || {};
+  if (typeof from !== 'string' || typeof body !== 'string' || body.length > 4000) {
+    return res.status(400).json({ error: 'A sender number and message body of up to 4,000 characters are required.' });
+  }
 
   try {
     const isWhatsApp = channel === 'whatsapp';
-    const now = new Date().toISOString();
-    let targetLead: any = null;
-
-    if (leadId) {
-      targetLead = db.getLeads(contractorId).find(l => l.id === leadId);
-    }
+    const now = new Date();
+    const tenantLeads = await pgDb.select().from(leads).where(eq(leads.contractorId, contractorId));
+    let targetLead: any = typeof leadId === 'string' ? tenantLeads.find(lead => lead.id === leadId) : null;
 
     if (!targetLead) {
       const cleanDigits = from.replace(/\D/g, '');
-      targetLead = db.getLeads(contractorId).find(l => {
-        const p = (l.phone || '').replace(/\D/g, '');
-        return p.length >= 7 && (p.endsWith(cleanDigits) || cleanDigits.endsWith(p));
+      targetLead = tenantLeads.find(lead => {
+        const rawPhone = lead.phoneEncrypted ? decrypt(lead.phoneEncrypted) : (lead.phone === '[ENCRYPTED]' ? '' : lead.phone || '');
+        const digits = String(rawPhone || '').replace(/\D/g, '');
+        return digits.length >= 7 && cleanDigits.length >= 7 && (digits.endsWith(cleanDigits) || cleanDigits.endsWith(digits));
       });
     }
 
-    // Do not attach a simulated inbound message to an unrelated lead when no match exists.
     if (targetLead) {
-      const newStatus = (targetLead.status === 'new' ? 'contacted' : targetLead.status) as 'new' | 'contacted' | 'converted' | 'dead';
-      const updatedNotes = `${targetLead.notes || ''}\n[Simulated ${isWhatsApp ? 'WhatsApp' : 'SMS'} - ${now.slice(0, 16)}]: ${body}`.trim();
-
-      db.updateLead(targetLead.id, contractorId, {
-        status: newStatus,
-        notes: updatedNotes
+      const newStatus = targetLead.status === 'new' ? 'contacted' : targetLead.status;
+      const updatedNotes = `${targetLead.notes || ''}\n[Simulated ${isWhatsApp ? 'WhatsApp' : 'SMS'} - ${now.toISOString().slice(0, 16)}]: ${body}`.trim();
+      await pgDb.transaction(async tx => {
+        await tx.update(leads).set({ status: newStatus, notes: updatedNotes, updatedAt: now })
+          .where(and(eq(leads.id, targetLead.id), eq(leads.contractorId, contractorId)));
+        await tx.insert(leadEvents).values({
+          id: crypto.randomUUID(),
+          leadId: targetLead.id,
+          eventType: 'InboundMessageReceived',
+          previousStage: targetLead.status,
+          newStage: newStatus,
+          notes: `Simulated inbound ${isWhatsApp ? 'WhatsApp' : 'SMS'} reply received.`,
+          metadata: { channel: isWhatsApp ? 'whatsapp' : 'sms', sender: from, simulated: true },
+          occurredAt: now,
+          createdAt: now
+        });
+        await tx.insert(workEvents).values({
+          id: 'evt_' + crypto.randomUUID(),
+          contractorId,
+          eventType: 'lead.inbound_message_simulated',
+          entityType: 'lead',
+          entityId: targetLead.id,
+          actorType: 'human',
+          actorId: contractorId,
+          sourceModule: 'connector_simulator',
+          correlationId: targetLead.id,
+          summary: `Simulated inbound ${isWhatsApp ? 'WhatsApp' : 'SMS'} reply attached to ${targetLead.businessName}.`,
+          payload: { channel: isWhatsApp ? 'whatsapp' : 'sms', sender: from, body, simulated: true, previousStatus: targetLead.status, status: newStatus }
+        });
       });
+      targetLead.status = newStatus;
+      targetLead.notes = updatedNotes;
     }
 
-    // Trigger instant SSE notification
     const channelName = isWhatsApp ? 'WhatsApp' : 'SMS';
     const leadName = targetLead ? targetLead.businessName : 'Prospect ' + from;
     broadcastNotification(
       contractorId,
       'lead',
-      `💬 Inbound ${channelName}: ${leadName}`,
+      `Inbound ${channelName}: ${leadName}`,
       `"${body}"`
     );
 
-    res.json({
+    return res.json({
       success: true,
       channel,
       from,
       body,
-      leadMatched: targetLead ? { id: targetLead.id, name: targetLead.businessName, status: 'responded' } : null,
+      leadMatched: targetLead ? { id: targetLead.id, name: targetLead.businessName, status: targetLead.status } : null,
       message: targetLead
-        ? `Simulated inbound ${channelName} event attached to the matched lead and operator alerted.`
+        ? `Simulated inbound ${channelName} event attached to the PostgreSQL lead record and work history.`
         : `Simulated inbound ${channelName} event alerted to the operator; no existing lead matched and no lead was created.`
     });
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    console.error('[HAL Inbound Simulator] Failed:', err);
+    return res.status(503).json({ error: 'The simulated inbound event could not be persisted.' });
   }
 });
 
@@ -2482,46 +2684,107 @@ app.post('/api/webhooks/test-inbound', authenticate, async (req, res) => {
 app.post('/api/system/purge-fake-data', authenticate, async (req, res) => {
   const contractorId = (req as any).contractorId;
   try {
-    const beforeCount = db.getLeads().length;
-    
-    // Purge from db.ts memory & persistence
-    db.purgeAllMockData();
+    const committed = await pgDb.transaction(async tx => {
+      const seedLeadRows = await tx.select({ id: leads.id }).from(leads).where(and(
+        eq(leads.contractorId, contractorId),
+        or(like(leads.id, 'lead_seed_%'), like(leads.businessName, 'Apex Commercial%'))
+      ));
+      const seedLeadIds = seedLeadRows.map(row => row.id);
+      const tenantCampaignRows = await tx.select({ id: campaigns.id }).from(campaigns).where(and(
+        eq(campaigns.contractorId, contractorId),
+        or(like(campaigns.id, 'camp_seed_%'), like(campaigns.id, 'camp_isaac_%'))
+      ));
+      const campaignIds = tenantCampaignRows.map(row => row.id);
 
-    // Purge from PostgreSQL
-    try {
-      await pgDb.delete(leads).where(like(leads.id, 'lead_seed_%'));
-      await pgDb.delete(revenueRecords).where(or(like(revenueRecords.id, 'rev_seed_%'), like(revenueRecords.id, 'rev_isaac_%')));
-      await pgDb.delete(campaigns).where(or(like(campaigns.id, 'camp_seed_%'), like(campaigns.id, 'camp_isaac_%')));
-      await pgDb.delete(forecasts).where(or(like(forecasts.id, 'fc_seed_%'), like(forecasts.id, 'fc_isaac_%')));
-      await pgDb.delete(recommendations).where(or(like(recommendations.id, 'rec_seed_%'), like(recommendations.id, 'rec_isaac_%')));
-      // Delete test audit leads
-      await pgDb.delete(leads).where(like(leads.businessName, 'Apex Commercial%'));
-      // Clean up test audit contractors
-      await pgDb.delete(contractors).where(or(like(contractors.email, 'audit_%'), eq(contractors.email, 'guest@demo.halbiz')));
-    } catch (pe) {
-      console.warn('Postgres mock data deletion error:', pe);
-    }
+      if (seedLeadIds.length) {
+        await tx.update(workTasks).set({
+          status: 'cancelled',
+          errorMessage: 'Cancelled because the linked mock lead was removed by the workspace operator.',
+          updatedAt: new Date()
+        }).where(and(
+          eq(workTasks.contractorId, contractorId),
+          eq(workTasks.entityType, 'lead'),
+          inArray(workTasks.entityId, seedLeadIds),
+          inArray(workTasks.status, ['queued', 'running', 'awaiting_approval', 'failed'])
+        ));
+        await tx.delete(leadEvents).where(inArray(leadEvents.leadId, seedLeadIds));
+        await tx.delete(leadAttribution).where(inArray(leadAttribution.leadId, seedLeadIds));
+        await tx.delete(leads).where(and(eq(leads.contractorId, contractorId), inArray(leads.id, seedLeadIds)));
+      }
+      if (campaignIds.length) {
+        await tx.delete(performanceSnapshots).where(inArray(performanceSnapshots.campaignId, campaignIds));
+        await tx.delete(campaigns).where(and(eq(campaigns.contractorId, contractorId), inArray(campaigns.id, campaignIds)));
+      }
 
-    const remainingLeads = db.getLeads();
-    const mockRemaining = remainingLeads.filter(l => l.id.startsWith('lead_seed_')).length;
-    const realRemaining = remainingLeads.filter(l => !l.id.startsWith('lead_seed_')).length;
+      const deletedRevenueRows = await tx.delete(revenueRecords).where(and(
+        eq(revenueRecords.contractorId, contractorId),
+        or(like(revenueRecords.id, 'rev_seed_%'), like(revenueRecords.id, 'rev_isaac_%'))
+      )).returning({ id: revenueRecords.id });
+      const deletedForecasts = await tx.delete(forecasts).where(and(
+        eq(forecasts.contractorId, contractorId),
+        or(like(forecasts.id, 'fc_seed_%'), like(forecasts.id, 'fc_isaac_%'))
+      )).returning({ id: forecasts.id });
+      const deletedRecommendations = await tx.delete(recommendations).where(and(
+        eq(recommendations.contractorId, contractorId),
+        or(like(recommendations.id, 'rec_seed_%'), like(recommendations.id, 'rec_isaac_%'))
+      )).returning({ id: recommendations.id });
 
-    db.addAuditLog({
-      contractorId,
-      action: 'PURGE_MOCK_SEEDS',
-      details: `Purged all mock seed templates and fake data. HAL is initialized as a clean, new production app.`
+      await tx.insert(auditLogs).values({
+        id: crypto.randomUUID(),
+        contractorId,
+        action: 'PURGE_MOCK_SEEDS',
+        details: `Workspace operator removed ${seedLeadIds.length} mock leads, ${campaignIds.length} mock campaigns, and associated seed revenue/forecast/recommendation records.`
+      });
+      await tx.insert(workEvents).values({
+        id: 'evt_' + crypto.randomUUID(),
+        contractorId,
+        eventType: 'workspace.mock_data_purged',
+        entityType: 'workspace',
+        entityId: contractorId,
+        actorType: 'human',
+        actorId: contractorId,
+        sourceModule: 'settings',
+        correlationId: crypto.randomUUID(),
+        summary: 'Workspace mock seed data was removed.',
+        payload: {
+          purgedLeads: seedLeadIds.length,
+          purgedCampaigns: campaignIds.length,
+          purgedRevenueRecords: deletedRevenueRows.length,
+          purgedForecasts: deletedForecasts.length,
+          purgedRecommendations: deletedRecommendations.length
+        }
+      });
+      return {
+        purgedLeadCount: seedLeadIds.length,
+        purgedCampaignCount: campaignIds.length,
+        purgedRevenueCount: deletedRevenueRows.length,
+        purgedForecastCount: deletedForecasts.length,
+        purgedRecommendationCount: deletedRecommendations.length
+      };
     });
 
-    res.json({
+    // Best-effort cleanup of this workspace's legacy lead mirror only. Never
+    // invoke the old global purge method from an authenticated tenant route.
+    try { db.purgeMockLeads(contractorId); }
+    catch (mirrorError) { console.warn('[HAL Purge] Legacy tenant lead mirror cleanup failed.', mirrorError); }
+
+    const remaining = await pgDb.select({ id: leads.id }).from(leads).where(eq(leads.contractorId, contractorId));
+    const remainingRealLeads = remaining.filter(row => !row.id.startsWith('lead_seed_')).length;
+    return res.json({
       success: true,
-      beforeCount,
-      purgedCount: beforeCount - remainingLeads.length,
-      remainingRealLeads: realRemaining,
-      mockRemaining,
-      message: 'All mock templates, seed campaigns, fake revenues, and forecasts successfully removed.'
+      beforeCount: committed.purgedLeadCount + remaining.length,
+      purgedCount: committed.purgedLeadCount,
+      remainingRealLeads,
+      mockRemaining: remaining.filter(row => row.id.startsWith('lead_seed_')).length,
+      purgedCampaignCount: committed.purgedCampaignCount,
+      purgedRevenueCount: committed.purgedRevenueCount,
+      purgedForecastCount: committed.purgedForecastCount,
+      purgedRecommendationCount: committed.purgedRecommendationCount,
+      message: 'Mock seed data was removed from this workspace only. Other workspaces were not changed.'
     });
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    console.error('[HAL Workspace Mock Purge Error]', err);
+    return res.status(503).json({ success: false, error: err.message || 'Workspace mock data could not be removed.' });
   }
 });
 
@@ -2536,6 +2799,7 @@ app.post('/api/leads/bulk', authenticate, async (req, res) => {
 
   const addedLeads = [];
   let skippedCount = 0;
+  let queuedTasks = 0;
 
   try {
     for (const item of reqLeads) {
@@ -2594,6 +2858,8 @@ app.post('/api/leads/bulk', authenticate, async (req, res) => {
         newStage: 'new',
         notes: 'Lead imported via bulk spreadsheet upload.'
       });
+      const reviewTask = await ensureLeadReviewTask(pgDb, contractorId, lead, 'spreadsheet_import');
+      if (reviewTask.created) queuedTasks++;
 
       const decrypted = {
         ...lead,
@@ -2623,6 +2889,7 @@ app.post('/api/leads/bulk', authenticate, async (req, res) => {
       success: true, 
       importedCount: addedLeads.length, 
       skippedCount,
+      queuedTasks,
       leads: addedLeads 
     });
   } catch (err: any) {
@@ -2918,259 +3185,543 @@ app.post('/api/leads/harvest', authenticate, async (req, res) => {
 // Clean Additive Ingestion Endpoint: Appends discovered leads to pipeline without destructive purging
 app.post('/api/leads/ingest', authenticate, async (req, res) => {
   const contractorId = (req as any).contractorId;
-  const { leads: newLeads } = req.body;
+  const { leads: newLeads } = req.body || {};
 
-  if (!Array.isArray(newLeads) || newLeads.length === 0) {
-    return res.status(400).json({ error: 'An array of leads is required' });
+  if (!Array.isArray(newLeads) || newLeads.length === 0 || newLeads.length > 100) {
+    return res.status(400).json({ error: 'Provide between 1 and 100 harvested leads per import.' });
   }
 
   try {
-    const addedItems = [];
-    for (const hl of newLeads) {
-      const id = crypto.randomUUID();
-      const rawEmail = hl.email ? String(hl.email) : null;
-      const rawPhone = hl.phone ? String(hl.phone) : null;
-      const emailEncrypted = rawEmail ? encrypt(rawEmail) : null;
-      const phoneEncrypted = rawPhone ? encrypt(rawPhone) : null;
+    const existingRows = await pgDb.select({
+      businessName: leads.businessName,
+      city: leads.city,
+      niche: leads.niche
+    }).from(leads).where(eq(leads.contractorId, contractorId));
+    const normalize = (value: any) => String(value || '').trim().toLowerCase().replace(/\s+/g, ' ');
+    const seen = new Set(existingRows.map(row => [normalize(row.businessName), normalize(row.city), normalize(row.niche)].join('|')));
+    const accepted = [];
+    let skippedCount = 0;
 
-      // 1. Ingest into PostgreSQL
-      const [addedLead] = await pgDb.insert(leads).values({
-        id,
-        contractorId,
-        businessName: hl.businessName,
-        ownerName: hl.ownerName || 'Unknown Owner',
-        email: rawEmail ? '[ENCRYPTED]' : '',
-        phone: rawPhone ? '[ENCRYPTED]' : '',
-        emailEncrypted,
-        phoneEncrypted,
-        isSynthetic: Boolean(hl.isSynthetic),
-        sourceType: hl.sourceType || 'unknown',
-        city: hl.city,
-        niche: hl.serviceType,
-        source: 'harvested_intelligence',
-        status: 'new',
-        urgencyScore: null,
-        predictedLtv: null,
-        notes: hl.notes || `Harvested real business profile. Niche: ${hl.serviceType}.`,
-        websiteUrl: hl.websiteUrl,
-        performanceScore: null,
-        sslStatus: null,
-        reviewCount: null,
-        googleRating: null,
-        seoScore: null,
-        sentimentScore: null,
-        verificationStatus: (hl as any).verificationStatus || 'UNVERIFIED_STAGING',
-        dnsVerified: (hl as any).dnsVerified !== undefined ? Boolean((hl as any).dnsVerified) : false,
-        groundingEvidence: (hl as any).groundingEvidence || null,
-      }).returning();
-
-      // 2. Add lead creation event
-      await pgDb.insert(leadEvents).values({
-        id: crypto.randomUUID(),
-        leadId: addedLead.id,
-        eventType: 'LeadCreated',
-        newStage: 'new',
-        notes: `Harvested authentic local business via Live Territory Harvester.`
-      });
-
-      // 3. Keep in-memory store in sync
-      db.addLead({
-        id,
-        contractorId,
-        businessName: hl.businessName,
-        ownerName: hl.ownerName || undefined,
-        email: rawEmail || '',
-        phone: rawPhone || '',
-        city: hl.city,
-        serviceType: hl.serviceType,
-        source: 'harvested_intelligence',
-        status: 'new',
-        urgencyScore: null,
-        predictedLtvUsd: null,
-        notes: hl.notes || `Harvested real business profile. Niche: ${hl.serviceType}.`,
-        websiteUrl: hl.websiteUrl,
-        performanceScore: null,
-        sslStatus: null,
-        reviewCount: null,
-        googleRating: null,
-        seoScore: null,
-        sentimentScore: null,
-        sourceType: hl.sourceType || 'unknown',
-        isSynthetic: Boolean(hl.isSynthetic),
-        verificationStatus: (hl as any).verificationStatus || 'UNVERIFIED_STAGING',
-        dnsVerified: (hl as any).dnsVerified !== undefined ? Boolean((hl as any).dnsVerified) : false,
-        groundingEvidence: (hl as any).groundingEvidence || null,
-      });
-
-      addedItems.push(addedLead);
+    for (const item of newLeads) {
+      if (!item || typeof item.businessName !== 'string' || !item.businessName.trim() ||
+          typeof item.city !== 'string' || !item.city.trim() ||
+          typeof item.serviceType !== 'string' || !item.serviceType.trim()) {
+        skippedCount++;
+        continue;
+      }
+      const key = [normalize(item.businessName), normalize(item.city), normalize(item.serviceType)].join('|');
+      if (seen.has(key)) {
+        skippedCount++;
+        continue;
+      }
+      seen.add(key);
+      accepted.push(item);
     }
 
-    // 4. Log Audit Action
-    await pgDb.insert(auditLogs).values({
-      id: crypto.randomUUID(),
-      contractorId,
-      action: 'LEADS_INGESTED',
-      details: `Imported ${addedItems.length} territory prospect records; verification status is preserved and must pass before outreach.`
+    if (!accepted.length) {
+      return res.json({ success: true, count: 0, queuedTasks: 0, skippedCount, leads: [], message: 'No new unique prospects were found; existing leads were left unchanged.' });
+    }
+
+    const now = new Date();
+    const committed = await pgDb.transaction(async tx => {
+      const addedItems: any[] = [];
+      const legacyMirrors: any[] = [];
+
+      for (const item of accepted) {
+        const id = crypto.randomUUID();
+        const rawEmail = item.email ? String(item.email) : null;
+        const rawPhone = item.phone ? String(item.phone) : null;
+        const emailEncrypted = rawEmail ? encrypt(rawEmail) : null;
+        const phoneEncrypted = rawPhone ? encrypt(rawPhone) : null;
+        const verificationStatus = item.verificationStatus || 'UNVERIFIED_STAGING';
+        const dnsVerified = item.dnsVerified !== undefined ? Boolean(item.dnsVerified) : false;
+        const notes = item.notes || `Harvested business profile. Niche: ${item.serviceType}.`;
+
+        const [addedLead] = await tx.insert(leads).values({
+          id,
+          contractorId,
+          businessName: item.businessName.trim(),
+          ownerName: item.ownerName || 'Unknown Owner',
+          email: rawEmail ? '[ENCRYPTED]' : '',
+          phone: rawPhone ? '[ENCRYPTED]' : '',
+          emailEncrypted,
+          phoneEncrypted,
+          isSynthetic: Boolean(item.isSynthetic),
+          sourceType: item.sourceType || 'unknown',
+          city: item.city.trim(),
+          niche: item.serviceType.trim(),
+          source: 'harvested_intelligence',
+          status: 'new',
+          urgencyScore: null,
+          predictedLtv: null,
+          notes,
+          websiteUrl: item.websiteUrl || null,
+          performanceScore: null,
+          sslStatus: null,
+          reviewCount: null,
+          googleRating: null,
+          seoScore: null,
+          sentimentScore: null,
+          verificationStatus,
+          dnsVerified,
+          groundingEvidence: item.groundingEvidence || null,
+          createdAt: now,
+          updatedAt: now
+        }).returning();
+
+        await tx.insert(leadEvents).values({
+          id: crypto.randomUUID(),
+          leadId: addedLead.id,
+          eventType: 'LeadCreated',
+          newStage: 'new',
+          notes: 'Imported from the live territory harvester. Verification remains a separate step.'
+        });
+
+        const taskId = 'task_' + crypto.randomUUID();
+        const correlationId = taskId;
+        await tx.insert(workTasks).values({
+          id: taskId,
+          contractorId,
+          taskType: 'lead_follow_up',
+          title: `Review and qualify: ${addedLead.businessName}`,
+          description: 'Review this Maps/territory prospect, confirm its business details and verification evidence, then record the next step in the lead workspace. Do not contact the prospect until the outreach verification gate passes.',
+          status: 'queued',
+          priority: 'normal',
+          assignedWorker: 'human',
+          entityType: 'lead',
+          entityId: addedLead.id,
+          correlationId,
+          input: { source: 'maps_territory_harvest', verificationStatus },
+          requiresApproval: false,
+          createdAt: now,
+          updatedAt: now
+        });
+        await tx.insert(workEvents).values({
+          id: 'evt_' + crypto.randomUUID(),
+          contractorId,
+          eventType: 'task.created',
+          entityType: 'work_task',
+          entityId: taskId,
+          actorType: 'system',
+          actorId: 'territory_harvester',
+          sourceModule: 'lead_ingestion',
+          correlationId,
+          summary: `Created qualification task for ${addedLead.businessName}.`,
+          payload: { taskType: 'lead_follow_up', assignedWorker: 'human', priority: 'normal', status: 'queued', leadId: addedLead.id }
+        });
+        await tx.insert(workEvents).values({
+          id: 'evt_' + crypto.randomUUID(),
+          contractorId,
+          eventType: 'lead.queued_for_review',
+          entityType: 'lead',
+          entityId: addedLead.id,
+          actorType: 'system',
+          actorId: 'territory_harvester',
+          sourceModule: 'lead_ingestion',
+          correlationId,
+          summary: `${addedLead.businessName} was added to the human review queue.`,
+          payload: { taskId, verificationStatus }
+        });
+
+        addedItems.push(addedLead);
+        legacyMirrors.push({
+          id,
+          contractorId,
+          businessName: item.businessName.trim(),
+          ownerName: item.ownerName || undefined,
+          email: rawEmail || '',
+          phone: rawPhone || '',
+          city: item.city.trim(),
+          serviceType: item.serviceType.trim(),
+          source: 'harvested_intelligence',
+          status: 'new',
+          urgencyScore: null,
+          predictedLtvUsd: null,
+          notes,
+          websiteUrl: item.websiteUrl,
+          sourceType: item.sourceType || 'unknown',
+          isSynthetic: Boolean(item.isSynthetic),
+          verificationStatus,
+          dnsVerified,
+          groundingEvidence: item.groundingEvidence || null,
+          createdAt: now.toISOString(),
+          updatedAt: now.toISOString()
+        });
+      }
+
+      await tx.insert(auditLogs).values({
+        id: crypto.randomUUID(),
+        contractorId,
+        action: 'LEADS_INGESTED',
+        details: `Imported ${addedItems.length} unique territory prospects and created ${addedItems.length} human qualification tasks. Verification remains required before outreach.`
+      });
+      return { addedItems, legacyMirrors };
     });
 
-    // 5. Broadcast Real-time notification
+    // The JSON store is a temporary compatibility mirror only. A mirror failure
+    // must not undo or misreport the authoritative PostgreSQL transaction.
+    for (const legacyLead of committed.legacyMirrors) {
+      try { db.addLead(legacyLead); }
+      catch (mirrorError) { console.warn('[HAL Lead Ingest] Legacy mirror failed; PostgreSQL lead is committed.', mirrorError); }
+    }
+
     broadcastNotification(
       contractorId,
       'success',
       'Territory Leads Imported',
-      `Imported ${addedItems.length} business records. Review verification status before contacting them.`
+      `Imported ${committed.addedItems.length} unique prospects and created ${committed.addedItems.length} human review tasks. Verify each prospect before outreach.`
     );
-
-    res.json({ success: true, count: addedItems.length, leads: addedItems });
+    return res.json({
+      success: true,
+      count: committed.addedItems.length,
+      queuedTasks: committed.addedItems.length,
+      skippedCount,
+      leads: committed.addedItems
+    });
   } catch (err: any) {
-    console.error('Failed to ingest leads:', err);
-    res.status(500).json({ error: err.message });
+    console.error('[HAL Lead Ingest] Atomic import failed:', err);
+    return res.status(503).json({ error: err.message || 'Lead import could not be committed. No partial import was reported as successful.' });
   }
 });
 
 app.post('/api/leads/purge-and-replace', authenticate, async (req, res) => {
   const contractorId = (req as any).contractorId;
-  const { leads: harvestedLeads } = req.body;
-
-  if (!Array.isArray(harvestedLeads) || harvestedLeads.length === 0) {
-    return res.status(400).json({ error: 'An array of harvested leads is required' });
+  const { leads: harvestedLeads } = req.body || {};
+  if (!Array.isArray(harvestedLeads) || harvestedLeads.length > 100) {
+    return res.status(400).json({ error: 'Provide an array of up to 100 harvested leads.' });
   }
 
   try {
-    // 1. Purge all mock leads and mock revenues from local DB
-    await pgDb.delete(leads).where(and(eq(leads.contractorId, contractorId), like(leads.id, 'lead_seed_%')));
-    await pgDb.delete(revenueRecords).where(and(eq(revenueRecords.contractorId, contractorId), like(revenueRecords.id, 'rev_seed_%')));
-    db.purgeMockLeads(contractorId);
+    const now = new Date();
+    const committed = await pgDb.transaction(async tx => {
+      const seedRows = await tx.select({ id: leads.id }).from(leads)
+        .where(and(eq(leads.contractorId, contractorId), like(leads.id, 'lead_seed_%')));
+      const seedIds = seedRows.map(row => row.id);
+      if (seedIds.length) {
+        await tx.update(workTasks).set({
+          status: 'cancelled',
+          errorMessage: 'Cancelled because the mock seed lead was removed during a real-data replacement.',
+          updatedAt: now
+        }).where(and(
+          eq(workTasks.contractorId, contractorId),
+          eq(workTasks.entityType, 'lead'),
+          inArray(workTasks.entityId, seedIds),
+          inArray(workTasks.status, ['queued', 'running', 'awaiting_approval', 'failed'])
+        ));
+        await tx.delete(leadEvents).where(inArray(leadEvents.leadId, seedIds));
+        await tx.delete(leadAttribution).where(inArray(leadAttribution.leadId, seedIds));
+      }
+      await tx.delete(revenueRecords).where(and(eq(revenueRecords.contractorId, contractorId), like(revenueRecords.id, 'rev_seed_%')));
+      await tx.delete(leads).where(and(eq(leads.contractorId, contractorId), like(leads.id, 'lead_seed_%')));
 
-    // 2. Add each harvested lead as actual business data
-    for (const hl of harvestedLeads) {
-      const id = crypto.randomUUID();
-      const rawEmail = hl.email ? String(hl.email) : null;
-      const rawPhone = hl.phone ? String(hl.phone) : null;
-      const emailEncrypted = rawEmail ? encrypt(rawEmail) : null;
-      const phoneEncrypted = rawPhone ? encrypt(rawPhone) : null;
+      const existingRows = await tx.select({
+        id: leads.id,
+        businessName: leads.businessName,
+        city: leads.city,
+        niche: leads.niche
+      }).from(leads).where(eq(leads.contractorId, contractorId));
+      const normalize = (value: any) => String(value || '').trim().toLowerCase().replace(/\s+/g, ' ');
+      const seen = new Set(existingRows.map(row => [normalize(row.businessName), normalize(row.city), normalize(row.niche)].join('|')));
+      const addedItems: any[] = [];
+      const legacyMirrors: any[] = [];
+      let skippedCount = 0;
 
-      const [addedLead] = await pgDb.insert(leads).values({
-        id,
-        contractorId,
-        businessName: hl.businessName,
-        ownerName: hl.ownerName || 'Unknown Owner',
-        email: rawEmail ? '[ENCRYPTED]' : '',
-        phone: rawPhone ? '[ENCRYPTED]' : '',
-        emailEncrypted,
-        phoneEncrypted,
-        isSynthetic: Boolean(hl.isSynthetic),
-        sourceType: hl.sourceType || 'unknown',
-        city: hl.city,
-        niche: hl.serviceType,
-        source: 'harvested_intelligence',
-        status: 'new',
-        urgencyScore: null,
-        predictedLtv: null,
-        notes: hl.notes || `Harvested real business profile. Niche: ${hl.serviceType}.`,
-        websiteUrl: hl.websiteUrl,
-        performanceScore: null,
-        sslStatus: null,
-        reviewCount: null,
-        googleRating: null,
-        seoScore: null,
-        sentimentScore: null,
-        verificationStatus: (hl as any).verificationStatus || 'UNVERIFIED_STAGING',
-        dnsVerified: (hl as any).dnsVerified !== undefined ? Boolean((hl as any).dnsVerified) : false,
-        groundingEvidence: (hl as any).groundingEvidence || null,
-      }).returning();
+      for (const item of harvestedLeads) {
+        if (!item || typeof item.businessName !== 'string' || !item.businessName.trim() ||
+            typeof item.city !== 'string' || !item.city.trim() ||
+            typeof item.serviceType !== 'string' || !item.serviceType.trim()) {
+          skippedCount++;
+          continue;
+        }
+        const key = [normalize(item.businessName), normalize(item.city), normalize(item.serviceType)].join('|');
+        if (seen.has(key)) {
+          skippedCount++;
+          continue;
+        }
+        seen.add(key);
 
-      db.addLead({
-        id,
-        contractorId,
-        businessName: hl.businessName,
-        ownerName: hl.ownerName || undefined,
-        email: rawEmail || '',
-        phone: rawPhone || '',
-        city: hl.city,
-        serviceType: hl.serviceType,
-        source: 'harvested_intelligence',
-        status: 'new',
-        urgencyScore: null,
-        predictedLtvUsd: null,
-        sourceType: hl.sourceType || 'unknown',
-        isSynthetic: Boolean(hl.isSynthetic),
-        notes: hl.notes || `Harvested real business profile. Niche: ${hl.serviceType}.`,
-        websiteUrl: hl.websiteUrl,
-        performanceScore: null,
-        sslStatus: null,
-        reviewCount: null,
-        googleRating: null,
-        seoScore: null,
-        sentimentScore: null,
-        verificationStatus: (hl as any).verificationStatus || 'UNVERIFIED_STAGING',
-        dnsVerified: (hl as any).dnsVerified !== undefined ? Boolean((hl as any).dnsVerified) : false,
-        groundingEvidence: (hl as any).groundingEvidence || null,
-      });
+        const id = crypto.randomUUID();
+        const rawEmail = item.email ? String(item.email) : null;
+        const rawPhone = item.phone ? String(item.phone) : null;
+        const emailEncrypted = rawEmail ? encrypt(rawEmail) : null;
+        const phoneEncrypted = rawPhone ? encrypt(rawPhone) : null;
+        const verificationStatus = item.verificationStatus || 'UNVERIFIED_STAGING';
+        const dnsVerified = item.dnsVerified !== undefined ? Boolean(item.dnsVerified) : false;
+        const notes = item.notes || `Imported prospect profile. Niche: ${item.serviceType}.`;
 
-      // Add a creation event for the newly harvested lead
-      await pgDb.insert(leadEvents).values({
+        const [addedLead] = await tx.insert(leads).values({
+          id,
+          contractorId,
+          businessName: item.businessName.trim(),
+          ownerName: item.ownerName || 'Unknown Owner',
+          email: rawEmail ? '[ENCRYPTED]' : '',
+          phone: rawPhone ? '[ENCRYPTED]' : '',
+          emailEncrypted,
+          phoneEncrypted,
+          isSynthetic: Boolean(item.isSynthetic),
+          sourceType: item.sourceType || 'unknown',
+          city: item.city.trim(),
+          niche: item.serviceType.trim(),
+          source: 'harvested_intelligence',
+          status: 'new',
+          urgencyScore: null,
+          predictedLtv: null,
+          notes,
+          websiteUrl: item.websiteUrl || null,
+          performanceScore: null,
+          sslStatus: null,
+          reviewCount: null,
+          googleRating: null,
+          seoScore: null,
+          sentimentScore: null,
+          verificationStatus,
+          dnsVerified,
+          groundingEvidence: item.groundingEvidence || null,
+          createdAt: now,
+          updatedAt: now
+        }).returning();
+
+        await tx.insert(leadEvents).values({
+          id: crypto.randomUUID(),
+          leadId: addedLead.id,
+          eventType: 'LeadCreated',
+          newStage: 'new',
+          notes: 'Imported from the live territory harvester. Verification remains a separate step.'
+        });
+
+        const taskId = 'task_' + crypto.randomUUID();
+        const correlationId = taskId;
+        await tx.insert(workTasks).values({
+          id: taskId,
+          contractorId,
+          taskType: 'lead_follow_up',
+          title: `Review and qualify: ${addedLead.businessName}`,
+          description: 'Review this Maps/territory prospect, confirm its business details and verification evidence, then record the next step in the lead workspace. Do not contact the prospect until the outreach verification gate passes.',
+          status: 'queued',
+          priority: 'normal',
+          assignedWorker: 'human',
+          entityType: 'lead',
+          entityId: addedLead.id,
+          correlationId,
+          input: { source: 'maps_territory_harvest', verificationStatus },
+          requiresApproval: false,
+          createdAt: now,
+          updatedAt: now
+        });
+        await tx.insert(workEvents).values({
+          id: 'evt_' + crypto.randomUUID(),
+          contractorId,
+          eventType: 'task.created',
+          entityType: 'work_task',
+          entityId: taskId,
+          actorType: 'system',
+          actorId: 'territory_harvester',
+          sourceModule: 'lead_ingestion',
+          correlationId,
+          summary: `Created qualification task for ${addedLead.businessName}.`,
+          payload: { taskType: 'lead_follow_up', assignedWorker: 'human', priority: 'normal', status: 'queued', leadId: addedLead.id }
+        });
+        await tx.insert(workEvents).values({
+          id: 'evt_' + crypto.randomUUID(),
+          contractorId,
+          eventType: 'lead.queued_for_review',
+          entityType: 'lead',
+          entityId: addedLead.id,
+          actorType: 'system',
+          actorId: 'territory_harvester',
+          sourceModule: 'lead_ingestion',
+          correlationId,
+          summary: `${addedLead.businessName} was added to the human review queue.`,
+          payload: { taskId, verificationStatus }
+        });
+
+        addedItems.push(addedLead);
+        legacyMirrors.push({
+          id,
+          contractorId,
+          businessName: item.businessName.trim(),
+          ownerName: item.ownerName || undefined,
+          email: rawEmail || '',
+          phone: rawPhone || '',
+          city: item.city.trim(),
+          serviceType: item.serviceType.trim(),
+          source: 'harvested_intelligence',
+          status: 'new',
+          urgencyScore: null,
+          predictedLtvUsd: null,
+          notes,
+          websiteUrl: item.websiteUrl,
+          sourceType: item.sourceType || 'unknown',
+          isSynthetic: Boolean(item.isSynthetic),
+          verificationStatus,
+          dnsVerified,
+          groundingEvidence: item.groundingEvidence || null,
+          createdAt: now.toISOString(),
+          updatedAt: now.toISOString()
+        });
+      }
+
+      await tx.insert(auditLogs).values({
         id: crypto.randomUUID(),
-        leadId: addedLead.id,
-        eventType: 'LeadCreated',
-        newStage: 'new',
-        notes: `Imported prospect profile; website performance and reputation metrics have not been measured by this import.`
+        contractorId,
+        action: 'BUSINESS_RECORDS_REPLACED',
+        details: `Removed ${seedIds.length} mock seed leads and imported ${addedItems.length} unique real-source prospects with matching human review tasks.`
       });
-    }
-
-    // 3. Log Audit Action
-    await pgDb.insert(auditLogs).values({
-      id: crypto.randomUUID(),
-      contractorId,
-      action: 'BUSINESS_RECORDS_IMPORTED',
-      details: `Removed identified seed records and imported ${harvestedLeads.length} business records; import does not itself verify authenticity.`
+      await tx.insert(workEvents).values({
+        id: 'evt_' + crypto.randomUUID(),
+        contractorId,
+        eventType: 'lead.seed_replacement_completed',
+        entityType: 'workspace',
+        entityId: contractorId,
+        actorType: 'human',
+        actorId: contractorId,
+        sourceModule: 'lead_ingestion',
+        correlationId: crypto.randomUUID(),
+        summary: `Replaced ${seedIds.length} mock seed leads with ${addedItems.length} unique imported prospects.`,
+        payload: { removedSeedLeads: seedIds.length, importedLeads: addedItems.length, queuedTasks: addedItems.length, skippedCount }
+      });
+      return { addedItems, legacyMirrors, removedSeedCount: seedIds.length, skippedCount };
     });
 
-    // 4. Broadcast Real-time notification
+    try { db.purgeMockLeads(contractorId); }
+    catch (mirrorError) { console.warn('[HAL Lead Replace] Legacy seed purge mirror failed.', mirrorError); }
+    for (const legacyLead of committed.legacyMirrors) {
+      try { db.addLead(legacyLead); }
+      catch (mirrorError) { console.warn('[HAL Lead Replace] Legacy lead mirror failed; PostgreSQL lead is committed.', mirrorError); }
+    }
+
     broadcastNotification(
       contractorId,
       'success',
-      'Business Records Imported',
-      `Imported ${harvestedLeads.length} records. Verification must be performed separately.`
+      'Business Records Replaced',
+      `Removed ${committed.removedSeedCount} mock seeds and imported ${committed.addedItems.length} unique prospects. Each imported lead has a human review task.`
     );
-
-    res.json({ success: true, count: harvestedLeads.length });
+    return res.json({
+      success: true,
+      count: committed.addedItems.length,
+      queuedTasks: committed.addedItems.length,
+      removedSeedCount: committed.removedSeedCount,
+      skippedCount: committed.skippedCount,
+      leads: committed.addedItems
+    });
   } catch (err: any) {
-    console.error('Failed to replace mock data:', err);
-    res.status(500).json({ error: err.message });
+    console.error('[HAL Lead Replace] Atomic replacement failed:', err);
+    return res.status(503).json({ error: err.message || 'Seed replacement could not be committed.' });
   }
 });
 
 app.post('/api/system/campaign-reset', authenticate, async (req, res) => {
   const contractorId = (req as any).contractorId;
-  const { city, niche, mode } = req.body;
+  const { city, niche, mode } = req.body || {};
 
-  if (!city || !niche || !mode) {
-    return res.status(400).json({ error: 'city, niche, and mode are required' });
+  if (typeof city !== 'string' || !city.trim() || typeof niche !== 'string' || !niche.trim()) {
+    return res.status(400).json({ error: 'A target city and industry niche are required.' });
+  }
+  if (mode !== 'blank') {
+    return res.status(409).json({ error: 'Synthetic campaign seeding is disabled. HAL resets to a clean slate and real data must be imported from verified sources.' });
   }
 
+  const targetCity = city.trim();
+  const targetNiche = niche.trim();
   try {
-    const result = db.resetContractorCampaignData(contractorId, city, niche, mode);
+    // Client delivery projects are durable contracts and must never be orphaned
+    // by a territory reset. Require the operator to resolve them first.
+    const linkedProjects = await pgDb.select({ id: clientProjects.id, businessName: clientProjects.businessName })
+      .from(clientProjects)
+      .where(eq(clientProjects.contractorId, contractorId));
+    if (linkedProjects.length) {
+      return res.status(409).json({
+        error: 'Territory reset is blocked while client delivery projects exist. Complete or archive those projects before resetting the lead pipeline.',
+        protectedProjects: linkedProjects.length
+      });
+    }
 
-    // 3. Log Audit Action
-    db.addAuditLog({
-      contractorId,
-      action: 'CAMPAIGN_RESET',
-      details: `Pivot to city: ${city}, niche: ${niche}, mode: ${mode}`
+    const [tenantLeads, tenantCampaigns, tenantForecasts] = await Promise.all([
+      pgDb.select({ id: leads.id }).from(leads).where(eq(leads.contractorId, contractorId)),
+      pgDb.select({ id: campaigns.id }).from(campaigns).where(eq(campaigns.contractorId, contractorId)),
+      pgDb.select({ id: forecasts.id }).from(forecasts).where(eq(forecasts.contractorId, contractorId))
+    ]);
+    const leadIds = tenantLeads.map(row => row.id);
+    const campaignIds = tenantCampaigns.map(row => row.id);
+    const forecastIds = tenantForecasts.map(row => row.id);
+
+    await pgDb.transaction(async tx => {
+      // Cancel open human/agent tasks that refer to leads being removed. Preserve
+      // the task and work-event history instead of deleting operational evidence.
+      if (leadIds.length) {
+        await tx.update(workTasks).set({
+          status: 'cancelled',
+          errorMessage: 'Cancelled by an authorized territory reset; the linked lead was removed.',
+          updatedAt: new Date()
+        }).where(and(
+          eq(workTasks.contractorId, contractorId),
+          eq(workTasks.entityType, 'lead'),
+          inArray(workTasks.entityId, leadIds),
+          inArray(workTasks.status, ['queued', 'running', 'awaiting_approval', 'failed'])
+        ));
+        await tx.delete(leadAttribution).where(inArray(leadAttribution.leadId, leadIds));
+        await tx.delete(leadEvents).where(inArray(leadEvents.leadId, leadIds));
+      }
+      if (campaignIds.length) {
+        await tx.delete(performanceSnapshots).where(inArray(performanceSnapshots.campaignId, campaignIds));
+      }
+      if (forecastIds.length) {
+        await tx.delete(predictionOutcomes).where(inArray(predictionOutcomes.forecastId, forecastIds));
+      }
+
+      await tx.delete(revenueRecords).where(eq(revenueRecords.contractorId, contractorId));
+      await tx.delete(campaigns).where(eq(campaigns.contractorId, contractorId));
+      await tx.delete(forecasts).where(eq(forecasts.contractorId, contractorId));
+      await tx.delete(recommendations).where(eq(recommendations.contractorId, contractorId));
+      await tx.delete(missions).where(eq(missions.contractorId, contractorId));
+      await tx.delete(chatMessages).where(eq(chatMessages.contractorId, contractorId));
+      await tx.delete(leads).where(eq(leads.contractorId, contractorId));
+      await tx.update(contractors).set({
+        city: targetCity,
+        serviceType: targetNiche,
+        activeTerritories: [targetCity]
+      }).where(eq(contractors.id, contractorId));
+
+      await tx.insert(auditLogs).values({
+        id: crypto.randomUUID(),
+        contractorId,
+        action: 'TERRITORY_PIPELINE_RESET',
+        details: `Reset lead, campaign, revenue, forecast, recommendation, mission and chat-message data for ${targetCity} / ${targetNiche}. Client projects were checked and protected; open linked tasks were cancelled.`
+      });
+      await tx.insert(workEvents).values({
+        id: 'evt_' + crypto.randomUUID(),
+        contractorId,
+        eventType: 'workspace.territory_reset',
+        entityType: 'workspace',
+        entityId: contractorId,
+        actorType: 'human',
+        actorId: contractorId,
+        sourceModule: 'settings',
+        correlationId: crypto.randomUUID(),
+        summary: `Reset the operating territory to ${targetCity} / ${targetNiche}.`,
+        payload: { city: targetCity, niche: targetNiche, mode: 'blank', removedLeadCount: leadIds.length, removedCampaignCount: campaignIds.length, removedForecastCount: forecastIds.length }
+      });
     });
 
-    // 4. Broadcast Real-time notification
     broadcastNotification(
       contractorId,
-      'success',
-      'Campaign Pivot Executed!',
-      `Successfully reset ledger. Target redirected to ${city} (${niche}) in ${mode === 'mock' ? 'Simulated Seeding' : 'Blank Slate'} mode.`
+      'warning',
+      'Territory Pipeline Reset',
+      `The old lead pipeline was cleared. HAL is now configured for ${targetCity} / ${targetNiche}; import real prospects to begin again.`
     );
-
-    res.json({ success: true, ...result });
+    return res.json({
+      success: true,
+      city: targetCity,
+      niche: targetNiche,
+      mode: 'blank',
+      removedLeads: leadIds.length,
+      removedCampaigns: campaignIds.length,
+      removedForecasts: forecastIds.length,
+      message: 'The authoritative PostgreSQL pipeline was reset. No synthetic data was generated.'
+    });
   } catch (err: any) {
-    console.error('Failed to reset campaign data:', err);
-    res.status(500).json({ error: err.message });
+    console.error('[HAL Territory Reset] Transaction failed:', err);
+    return res.status(503).json({ error: err.message || 'Territory reset could not be completed.' });
   }
 });
 
@@ -3178,53 +3729,108 @@ app.post('/api/system/campaign-reset', authenticate, async (req, res) => {
 
 app.post('/api/revenues', authenticate, async (req, res) => {
   const contractorId = (req as any).contractorId;
-  const { leadId, amountUsd, source } = req.body;
+  const { leadId, amountUsd, source } = req.body || {};
+  const amount = Number(amountUsd);
 
-  if (!leadId || !amountUsd) {
-    return res.status(400).json({ error: 'leadId and amountUsd are required' });
+  if (typeof leadId !== 'string' || !leadId.trim() || !Number.isSafeInteger(amount) || amount <= 0) {
+    return res.status(400).json({ error: 'A valid leadId and a positive whole-dollar amountUsd are required.' });
   }
 
   try {
-    // Verify lead belongs to contractor
-    const existingLead = await pgDb.select().from(leads).where(eq(leads.id, leadId));
-    if (existingLead.length === 0 || existingLead[0].contractorId !== contractorId) {
-      return res.status(404).json({ error: 'Lead not found or inaccessible' });
+    const [existingLead] = await pgDb.select().from(leads)
+      .where(and(eq(leads.id, leadId), eq(leads.contractorId, contractorId)))
+      .limit(1);
+    if (!existingLead) return res.status(404).json({ error: 'Lead not found or inaccessible.' });
+
+    if (['closed_won', 'converted', 'won', 'customer'].includes(String(existingLead.status).toLowerCase())) {
+      return res.status(409).json({ error: 'This lead is already marked as closed-won. Record a separate payment workflow rather than closing the same deal again.' });
     }
 
-    const [rev] = await pgDb.insert(revenueRecords).values({
-      id: crypto.randomUUID(),
-      leadId,
-      contractorId,
-      amountUsd: Number(amountUsd),
-      source: source || 'manual_entry'
-    }).returning();
+    const transition = validateCrmTransition(existingLead.status, 'closed_won');
+    if (!transition.valid) {
+      return res.status(409).json({
+        error: 'Move this lead through qualification and proposal before recording a closed deal.',
+        currentStage: existingLead.status,
+        requiredNextSteps: existingLead.status === 'new' ? ['contacted', 'qualified', 'proposal'] :
+          existingLead.status === 'contacted' ? ['qualified', 'proposal'] :
+          existingLead.status === 'qualified' ? ['proposal'] : []
+      });
+    }
 
-    await recordWorkEvent(pgDb, {
-      contractorId, eventType: 'revenue.recorded', entityType: 'lead', entityId: leadId,
-      actorType: 'human', actorId: contractorId, sourceModule: 'financial_intelligence', correlationId: rev.id,
-      summary: `Recorded ${Number(amountUsd)} USD revenue for ${existingLead[0].businessName}.`,
-      payload: { amountUsd: Number(amountUsd), source: source || 'manual_entry', revenueRecordId: rev.id }
-    });
+    const now = new Date();
+    const revenueId = crypto.randomUUID();
+    const updated = await pgDb.transaction(async tx => {
+      const [updatedLead] = await tx.update(leads).set({ status: 'closed_won', updatedAt: now })
+        .where(and(
+          eq(leads.id, leadId),
+          eq(leads.contractorId, contractorId),
+          eq(leads.status, existingLead.status)
+        )).returning();
+      if (!updatedLead) throw new Error('Lead changed before the close could be committed. Refresh and try again.');
 
-    await pgDb.insert(leadEvents).values({
-      id: crypto.randomUUID(),
-      leadId,
-      eventType: 'RevenueRecorded',
-      newStage: 'customer',
-      dealValue: Number(amountUsd),
-      notes: `Revenue recorded: $${amountUsd} via ${source || 'manual_entry'}`
+      const [revenue] = await tx.insert(revenueRecords).values({
+        id: revenueId,
+        leadId,
+        contractorId,
+        amountUsd: amount,
+        source: typeof source === 'string' && source.trim() ? source.trim() : 'manual_entry',
+        createdAt: now
+      }).returning();
+
+      await tx.insert(leadEvents).values({
+        id: crypto.randomUUID(),
+        leadId,
+        eventType: 'ClosedWon',
+        previousStage: existingLead.status,
+        newStage: 'closed_won',
+        dealValue: amount,
+        currency: 'USD',
+        notes: `Deal closed and revenue of $${amount} recorded via ${source || 'manual_entry'}.`,
+        createdBy: 'revenue_conversion'
+      });
+      await tx.insert(leadEvents).values({
+        id: crypto.randomUUID(),
+        leadId,
+        eventType: 'RevenueRecorded',
+        previousStage: existingLead.status,
+        newStage: 'closed_won',
+        dealValue: amount,
+        currency: 'USD',
+        notes: `Revenue record ${revenue.id} created.`,
+        createdBy: 'revenue_conversion'
+      });
+      await tx.insert(workEvents).values({
+        id: 'evt_' + crypto.randomUUID(),
+        contractorId,
+        eventType: 'lead.closed_won',
+        entityType: 'lead',
+        entityId: leadId,
+        actorType: 'human',
+        actorId: contractorId,
+        sourceModule: 'financial_intelligence',
+        correlationId: revenue.id,
+        summary: `Closed ${existingLead.businessName} and recorded $${amount} USD.`,
+        payload: { amountUsd: amount, source: revenue.source, revenueRecordId: revenue.id, previousStage: existingLead.status, currentStage: 'closed_won' }
+      });
+      await tx.insert(auditLogs).values({
+        id: crypto.randomUUID(),
+        contractorId,
+        action: 'REVENUE_RECORDED_AND_LEAD_CLOSED',
+        details: `Closed ${existingLead.businessName} at $${amount} USD.`
+      });
+      return { revenue, lead: updatedLead };
     });
 
     broadcastNotification(
       contractorId,
       'success',
-      'Revenue Conversion Recorded!',
-      `Closed $${amountUsd} on "${existingLead[0].businessName}". Status updated to CONVERTED.`
+      'Deal Closed',
+      `Closed $${amount} on "${existingLead.businessName}". The lead and revenue ledger were updated together.`
     );
-
-    res.status(201).json(rev);
+    return res.status(201).json({ ...updated.revenue, leadStatus: updated.lead.status });
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    console.error('[HAL Revenue Conversion] Transaction failed:', err);
+    return res.status(503).json({ error: err.message || 'Revenue conversion could not be committed.' });
   }
 });
 
@@ -3460,10 +4066,11 @@ app.get('/api/forecasts', authenticate, async (req, res) => {
 });
 
 app.get('/api/learning-insights', authenticate, async (req, res) => {
+  const contractorId = (req as any).contractorId;
   try {
-    const insights = await pgDb.select().from(learningInsights).orderBy(desc(learningInsights.createdAt));
-    
-    // Map back to expected client structure
+    const insights = await pgDb.select().from(learningInsights)
+      .where(eq(learningInsights.contractorId, contractorId))
+      .orderBy(desc(learningInsights.createdAt));
     const mappedInsights = insights.map(i => ({
       id: i.id,
       category: i.metric,
@@ -3472,10 +4079,10 @@ app.get('/api/learning-insights', authenticate, async (req, res) => {
       observedCount: 1,
       createdAt: i.createdAt.toISOString()
     }));
-    
-    res.json(mappedInsights);
+    return res.json(mappedInsights);
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    console.error('[HAL Learning] Tenant insights unavailable:', err);
+    return res.status(503).json({ error: 'Learning insights are temporarily unavailable.' });
   }
 });
 
@@ -3989,6 +4596,7 @@ app.post('/api/missions', authenticate, async (req, res) => {
         // Step 1: Harvest
         const harvested = await harvestRealBusinesses(city, niche);
         const createdLeads: any[] = [];
+        let queuedTasks = 0;
         
         steps[0].status = 'completed';
         (steps[0] as any).result = `Returned ${harvested.length} prospect records. Source and verification status are preserved; no SEO, review, or performance scores are inferred.`;
@@ -4050,6 +4658,8 @@ app.post('/api/missions', authenticate, async (req, res) => {
             newStage: 'new',
             notes: `Prospect profile imported. DNS/HTTP/TLS evidence is stored separately; PageSpeed and reputation metrics were not measured.`
           });
+          const reviewTask = await ensureLeadReviewTask(pgDb, contractorId, addedLead, 'mission_territory_harvest');
+          if (reviewTask.created) queuedTasks++;
         }
 
         // Step 2: summarize the actual DNS / HTTP / TLS evidence collected during harvest.
@@ -4112,7 +4722,7 @@ app.post('/api/missions', authenticate, async (req, res) => {
           contractorId, eventType: 'mission.completed', entityType: 'mission', entityId: mission.id,
           actorType: 'agent', actorId: 'territory_harvester', sourceModule: 'mission_control',
           correlationId: mission.id, summary: `Completed territory mission for ${city} / ${niche}.`,
-          payload: { prospectsDiscovered: createdLeads.length, outreachDraftsCreated: draftsCreated, messagesSent: 0 }
+          payload: { prospectsDiscovered: createdLeads.length, queuedReviewTasks: queuedTasks, outreachDraftsCreated: draftsCreated, messagesSent: 0 }
         });
 
         // Log & Broadcast SSE Notification
@@ -4321,25 +4931,27 @@ app.get('/api/learning/winloss', authenticate, async (req, res) => {
 
 app.post('/api/learning/winloss', authenticate, async (req, res) => {
   const contractorId = (req as any).contractorId;
-  const { leadId, businessName, city, niche, outcome, closedValueUsd, primaryReason, keyLesson, outreachChannelUsed } = req.body;
+  const { leadId, businessName, city, niche, outcome, closedValueUsd, primaryReason, keyLesson, outreachChannelUsed } = req.body || {};
+  const closedValue = closedValueUsd === undefined || closedValueUsd === null || closedValueUsd === '' ? 0 : Number(closedValueUsd);
 
-  if (!businessName || !outcome) {
-    return res.status(400).json({ error: 'Business name and outcome (won/lost) are required' });
+  if (typeof businessName !== 'string' || !businessName.trim() || !['won', 'lost'].includes(outcome)) {
+    return res.status(400).json({ error: 'Business name and a valid won/lost outcome are required.' });
+  }
+  if (!Number.isSafeInteger(closedValue) || closedValue < 0) {
+    return res.status(400).json({ error: 'Closed value must be a non-negative whole-dollar amount.' });
   }
 
   try {
-    let targetStatus = outcome === 'won' ? 'closed_won' : 'closed_lost';
+    const targetStatus = outcome === 'won' ? 'closed_won' : 'closed_lost';
     let targetLead: any = null;
-
     if (leadId) {
       const [foundLead] = await pgDb.select().from(leads)
-        .where(and(eq(leads.id, leadId), eq(leads.contractorId, contractorId)));
-      if (!foundLead) {
-        return res.status(404).json({ error: 'Lead not found or inaccessible' });
-      }
+        .where(and(eq(leads.id, leadId), eq(leads.contractorId, contractorId))).limit(1);
+      if (!foundLead) return res.status(404).json({ error: 'Lead not found or inaccessible.' });
       targetLead = foundLead;
-
-      // Validate CRM state transition
+      if (['closed_won', 'closed_lost', 'converted', 'dead', 'won', 'lost'].includes(String(targetLead.status).toLowerCase())) {
+        return res.status(409).json({ error: 'This lead already has a terminal CRM outcome recorded.' });
+      }
       const transitionCheck = validateCrmTransition(targetLead.status, targetStatus);
       if (!transitionCheck.valid) {
         return res.status(409).json({
@@ -4350,128 +4962,201 @@ app.post('/api/learning/winloss', authenticate, async (req, res) => {
       }
     }
 
-    const [record] = await pgDb.insert(winLossRecords).values({
-      id: 'wl_' + crypto.randomBytes(8).toString('hex'),
-      contractorId,
-      leadId: leadId || '',
-      businessName,
-      city: city || 'Territory',
-      niche: niche || 'General',
-      outcome,
-      closedValueUsd: Number(closedValueUsd) || 0,
-      primaryReason: primaryReason || (outcome === 'won' ? 'Speed audit demonstrated clear ROI' : 'Price / Timing'),
-      keyLesson: keyLesson || (outcome === 'won' ? 'Audit-first email with video teardown converts 3x better.' : 'Need to follow up within 24 hours.'),
-      outreachChannelUsed: outreachChannelUsed || 'Email + Audit'
-    }).returning();
+    const now = new Date();
+    const recordId = 'wl_' + crypto.randomBytes(8).toString('hex');
+    const record = await pgDb.transaction(async tx => {
+      const [winLoss] = await tx.insert(winLossRecords).values({
+        id: recordId,
+        contractorId,
+        leadId: leadId || '',
+        businessName: businessName.trim(),
+        city: city || 'Territory',
+        niche: niche || 'General',
+        outcome,
+        closedValueUsd: closedValue,
+        primaryReason: primaryReason || (outcome === 'won' ? 'Reason not supplied' : 'Reason not supplied'),
+        keyLesson: keyLesson || `Deal ${outcome}. Reason: ${primaryReason || 'not supplied'}. Channel: ${outreachChannelUsed || 'not supplied'}.`,
+        outreachChannelUsed: outreachChannelUsed || 'unspecified'
+      }).returning();
 
-    // If lead exists and was validated, update lead status and record event
-    if (targetLead && leadId) {
-      if (outcome === 'won' && Number(closedValueUsd) > 0) {
-        await pgDb.insert(revenueRecords).values({
-          id: 'rev_' + crypto.randomBytes(8).toString('hex'),
-          contractorId,
+      if (targetLead && leadId) {
+        const [updatedLead] = await tx.update(leads).set({
+          status: targetStatus,
+          updatedAt: now
+        }).where(and(
+          eq(leads.id, leadId),
+          eq(leads.contractorId, contractorId),
+          eq(leads.status, targetLead.status)
+        )).returning();
+        if (!updatedLead) throw new Error('Lead changed before the win/loss outcome could be committed. Refresh and retry.');
+
+        if (outcome === 'won' && closedValue > 0) {
+          await tx.insert(revenueRecords).values({
+            id: 'rev_' + crypto.randomBytes(8).toString('hex'),
+            contractorId,
+            leadId,
+            amountUsd: closedValue,
+            source: 'conquest_deal_closed',
+            createdAt: now
+          });
+        }
+
+        await tx.insert(leadEvents).values({
+          id: crypto.randomUUID(),
           leadId,
-          amountUsd: Number(closedValueUsd),
-          source: 'conquest_deal_closed'
+          eventType: outcome === 'won' ? 'ClosedWon' : 'ClosedLost',
+          previousStage: targetLead.status,
+          newStage: targetStatus,
+          dealValue: closedValue > 0 ? closedValue : null,
+          notes: primaryReason || `Deal marked as ${outcome} via win/loss learning system.`,
+          createdBy: 'win_loss_calibration'
         });
       }
 
-      await pgDb.update(leads).set({
-        status: targetStatus,
-        predictedLtv: Number(closedValueUsd) > 0 ? Number(closedValueUsd) : targetLead.predictedLtv,
-        updatedAt: new Date()
-      }).where(and(eq(leads.id, leadId), eq(leads.contractorId, contractorId)));
+      await tx.insert(workEvents).values({
+        id: 'evt_' + crypto.randomUUID(),
+        contractorId,
+        eventType: outcome === 'won' ? 'deal.won' : 'deal.lost',
+        entityType: leadId ? 'lead' : 'deal',
+        entityId: leadId || winLoss.id,
+        actorType: 'human',
+        actorId: contractorId,
+        sourceModule: 'sales_pipeline',
+        correlationId: winLoss.id,
+        summary: `${outcome === 'won' ? 'Won' : 'Lost'} ${businessName.trim()}; recorded value ${closedValue} USD.`,
+        payload: { outcome, valueUsd: closedValue, channel: outreachChannelUsed || 'unspecified', leadId: leadId || null }
+      });
 
-      await pgDb.insert(leadEvents).values({
+      await tx.insert(learningInsights).values({
+        id: 'li_' + crypto.randomBytes(8).toString('hex'),
+        contractorId,
+        metric: outcome === 'won' ? 'conversion_strategy' : 'objection_handling',
+        lesson: keyLesson || `Deal ${outcome}. Reason: ${primaryReason || 'not supplied'}. Channel: ${outreachChannelUsed || 'not supplied'}.`,
+        confidenceShift: 0.92,
+        createdAt: now
+      });
+      await tx.insert(auditLogs).values({
         id: crypto.randomUUID(),
-        leadId,
-        eventType: outcome === 'won' ? 'DealWon' : 'DealLost',
-        previousStage: targetLead.status,
-        newStage: targetStatus,
-        dealValue: Number(closedValueUsd) > 0 ? Number(closedValueUsd) : targetLead.predictedLtv,
-        notes: primaryReason || `Deal marked as ${outcome} via win/loss learning system`
+        contractorId,
+        action: `DEAL_${outcome.toUpperCase()}_LOGGED`,
+        details: `Closed-loop deal logged for ${businessName.trim()}. Value: ${closedValue}. Reason: ${primaryReason || 'not supplied'}.`
       });
-    }
-
-    await recordWorkEvent(pgDb, {
-      contractorId, eventType: outcome === 'won' ? 'deal.won' : 'deal.lost',
-      entityType: leadId ? 'lead' : 'deal', entityId: leadId || record.id,
-      actorType: 'human', actorId: contractorId, sourceModule: 'sales_pipeline',
-      correlationId: record.id, summary: `${outcome === 'won' ? 'Won' : 'Lost'} ${businessName}; recorded value ${Number(closedValueUsd) || 0} USD.`,
-      payload: { outcome, valueUsd: Number(closedValueUsd) || 0, channel: outreachChannelUsed || 'Email + Audit' }
-    });
-    if (targetLead && leadId && outcome === 'won' && Number(closedValueUsd) > 0) {
-      await recordWorkEvent(pgDb, {
-        contractorId, eventType: 'revenue.recorded', entityType: 'revenue_record', entityId: record.id,
-        actorType: 'system', actorId: 'win_loss_calibration', sourceModule: 'financial_intelligence',
-        correlationId: record.id, summary: `Recorded closed-won revenue of ${Number(closedValueUsd)} USD for ${businessName}.`,
-        payload: { leadId, amountUsd: Number(closedValueUsd), source: 'conquest_deal_closed' }
-      });
-    }
-
-    // Add automatic system lesson
-    await pgDb.insert(learningInsights).values({
-      id: 'li_' + crypto.randomBytes(8).toString('hex'),
-      metric: outcome === 'won' ? 'conversion_strategy' : 'objection_handling',
-      lesson: keyLesson || `Deal ${outcome}. Reason: ${primaryReason}. Channel: ${outreachChannelUsed}.`,
-      confidenceShift: 0.92
-    });
-
-    await pgDb.insert(auditLogs).values({
-      id: crypto.randomUUID(),
-      contractorId,
-      action: `DEAL_${outcome.toUpperCase()}_LOGGED`,
-      details: `Closed-loop deal logged for ${businessName}. Value: ${closedValueUsd || 0}. Reason: ${primaryReason}.`
+      return winLoss;
     });
 
     broadcastNotification(
       contractorId,
       outcome === 'won' ? 'success' : 'info',
       outcome === 'won' ? 'Deal Won & Closed-Loop Calibrated!' : 'Deal Outcome Logged',
-      `Recorded ${outcome.toUpperCase()} deal for ${businessName}. Autonomous learning model updated.`
+      `Recorded ${outcome.toUpperCase()} deal for ${businessName.trim()}. CRM, revenue (when applicable), work history and tenant learning were committed together.`
     );
-
-    res.status(201).json({ success: true, record });
+    return res.status(201).json({ success: true, record });
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    console.error('[HAL Win/Loss] Transaction failed:', err);
+    return res.status(503).json({ error: err.message || 'Deal outcome could not be committed.' });
   }
 });
 
 // ─── AUTONOMOUS OUTREACH SEQUENCE BUILDER ─────────────────────────────────────
 
+async function getTenantOutreachSequences(contractorId: string) {
+  const legacySequences = db.getOutreachSequences(contractorId) || [];
+  for (const legacy of legacySequences) {
+    if (!legacy?.id || !Array.isArray(legacy.steps)) continue;
+    const toDate = (value: any, fallback: Date) => {
+      if (!value) return fallback;
+      const parsed = new Date(value);
+      return Number.isFinite(parsed.getTime()) ? parsed : fallback;
+    };
+    const now = new Date();
+    await pgDb.insert(outreachSequences).values({
+      id: String(legacy.id),
+      contractorId,
+      name: String(legacy.name || 'Imported outreach sequence'),
+      niche: typeof legacy.niche === 'string' ? legacy.niche : 'General',
+      steps: legacy.steps,
+      createdAt: toDate(legacy.createdAt, now),
+      updatedAt: toDate(legacy.createdAt, now)
+    }).onConflictDoNothing();
+  }
+  return pgDb.select().from(outreachSequences)
+    .where(eq(outreachSequences.contractorId, contractorId))
+    .orderBy(desc(outreachSequences.createdAt));
+}
+
 app.get('/api/outreach/sequences', authenticate, async (req, res) => {
   const contractorId = (req as any).contractorId;
   try {
-    const sequences = await pgDb.select().from(outreachSequences).where(eq(outreachSequences.contractorId, contractorId)).orderBy(desc(outreachSequences.createdAt));
+    const sequences = await getTenantOutreachSequences(contractorId);
     res.json(sequences);
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
 });
 
-app.post('/api/outreach/sequences', authenticate, (req, res) => {
+app.post('/api/outreach/sequences', authenticate, async (req, res) => {
   const contractorId = (req as any).contractorId;
-  const { id, name, niche, steps } = req.body;
+  const { id, name, niche, steps } = req.body || {};
 
-  if (!name || !steps || !Array.isArray(steps)) {
-    return res.status(400).json({ error: 'Sequence name and steps array are required' });
+  if (typeof name !== 'string' || !name.trim() || !Array.isArray(steps) || steps.length === 0) {
+    return res.status(400).json({ error: 'A sequence name and non-empty steps array are required.' });
+  }
+  if (steps.some((step: any) => !step || typeof step !== 'object' || Array.isArray(step))) {
+    return res.status(400).json({ error: 'Every outreach step must be a structured object.' });
   }
 
-  const seq = db.saveOutreachSequence(contractorId, {
-    id: id || 'seq_' + crypto.randomBytes(6).toString('hex'),
-    name,
-    niche: niche || 'General',
-    steps,
-    createdAt: new Date().toISOString()
-  });
+  try {
+    const sequenceId = typeof id === 'string' && id.trim() ? id.trim() : 'seq_' + crypto.randomUUID();
+    const [existing] = await pgDb.select().from(outreachSequences)
+      .where(eq(outreachSequences.id, sequenceId)).limit(1);
+    if (existing && existing.contractorId !== contractorId) {
+      return res.status(404).json({ error: 'Outreach sequence not found or inaccessible.' });
+    }
 
-  db.addAuditLog({
-    contractorId,
-    action: 'OUTREACH_SEQUENCE_SAVED',
-    details: `Saved multi-touch cadence "${name}" with ${steps.length} touchpoints.`
-  });
+    const now = new Date();
+    const values = {
+      name: name.trim(),
+      niche: typeof niche === 'string' && niche.trim() ? niche.trim() : 'General',
+      steps,
+      updatedAt: now
+    };
+    const saved = await pgDb.transaction(async tx => {
+      const record = existing
+        ? (await tx.update(outreachSequences).set(values)
+            .where(and(eq(outreachSequences.id, sequenceId), eq(outreachSequences.contractorId, contractorId)))
+            .returning())[0]
+        : (await tx.insert(outreachSequences).values({
+            id: sequenceId, contractorId, ...values, createdAt: now
+          }).returning())[0];
+      if (!record) throw new Error('Outreach sequence was not persisted.');
 
-  res.status(201).json(seq);
+      await tx.insert(auditLogs).values({
+        id: crypto.randomUUID(),
+        contractorId,
+        action: existing ? 'OUTREACH_SEQUENCE_UPDATED' : 'OUTREACH_SEQUENCE_SAVED',
+        details: `${existing ? 'Updated' : 'Saved'} multi-touch cadence "${name.trim()}" with ${steps.length} touchpoints.`
+      });
+      await tx.insert(workEvents).values({
+        id: 'evt_' + crypto.randomUUID(),
+        contractorId,
+        eventType: existing ? 'outreach.sequence_updated' : 'outreach.sequence_created',
+        entityType: 'outreach_sequence',
+        entityId: sequenceId,
+        actorType: 'human',
+        actorId: contractorId,
+        sourceModule: 'outreach',
+        correlationId: sequenceId,
+        summary: `${existing ? 'Updated' : 'Created'} outreach sequence "${name.trim()}".`,
+        payload: { niche: values.niche, stepCount: steps.length }
+      });
+      return record;
+    });
+
+    return res.status(existing ? 200 : 201).json(saved);
+  } catch (err: any) {
+    console.error('[HAL Outreach] Sequence save failed:', err);
+    return res.status(503).json({ error: 'Outreach sequence could not be saved to the application database.' });
+  }
 });
 
 // ─── CAMPAIGN OUTREACH & WEBHOOK RELAY ENGINE ────────────────────────────────
@@ -4492,7 +5177,6 @@ interface DispatchLogEntry {
   preview?: string;
 }
 
-const dispatchLogs: DispatchLogEntry[] = [];
 const liveEmailDispatchLimits = new Map<string, { count: number; resetAt: number }>();
 
 app.post('/api/webhooks/resend', async (req, res) => {
@@ -4603,33 +5287,44 @@ app.get('/api/dispatch/history', authenticate, async (req, res) => {
     const persisted = await pgDb.select().from(communicationsOutbox)
       .where(eq(communicationsOutbox.contractorId, contractorId))
       .orderBy(desc(communicationsOutbox.createdAt))
-      .limit(50);
-    const liveHistory = persisted.map(row => {
+      .limit(100);
+    const leadIds = [...new Set(persisted.map(row => row.leadId).filter((id): id is string => Boolean(id)))];
+    const leadRows = leadIds.length
+      ? await pgDb.select({ id: leads.id, businessName: leads.businessName }).from(leads)
+          .where(and(eq(leads.contractorId, contractorId), inArray(leads.id, leadIds)))
+      : [];
+    const leadNames = new Map(leadRows.map(row => [row.id, row.businessName]));
+
+    const history = persisted.map(row => {
       const rawRecipient = row.recipientEncrypted ? decrypt(row.recipientEncrypted) : '';
       const parts = String(rawRecipient || '').split('@');
       const maskedRecipient = parts.length === 2
         ? (parts[0].slice(0, 1) + '***@' + parts[1])
-        : 'Saved recipient';
+        : (() => {
+            const digits = String(rawRecipient || '').replace(/\D/g, '');
+            return digits.length >= 4 ? `••••${digits.slice(-4)}` : 'Saved recipient';
+          })();
+      const body = row.bodyEncrypted ? decrypt(row.bodyEncrypted) : '';
       return {
         id: row.id,
         contractorId: row.contractorId,
         channel: row.channel,
         recipient: maskedRecipient,
         leadId: row.leadId,
-        leadBusinessName: 'Saved lead',
+        leadBusinessName: row.leadId ? (leadNames.get(row.leadId) || 'Lead no longer available') : 'Direct Recipient',
         status: row.status,
-        mode: 'live',
+        mode: row.status === 'simulated' ? 'simulation' : 'live',
         providerId: row.providerMessageId,
+        provider: row.provider,
         timestamp: (row.deliveredAt || row.submittedAt || row.createdAt).toISOString(),
         subject: row.subjectEncrypted ? decrypt(row.subjectEncrypted) : '',
-        preview: 'Message content is encrypted at rest'
+        preview: body ? body.slice(0, 80) : 'Message content unavailable'
       };
     });
-    const simulations = dispatchLogs.filter(item => item.contractorId === contractorId && item.mode === 'simulation');
-    return res.json([...simulations, ...liveHistory].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()).slice(0, 50));
+    return res.json(history);
   } catch (err: any) {
-    console.error('[HAL Dispatch History] Neon read failed:', err?.message || err);
-    return res.status(503).json({ success: false, code: 'OUTBOX_UNAVAILABLE', error: 'Durable dispatch history is unavailable from Neon.' });
+    console.error('[HAL Dispatch History] PostgreSQL read failed:', err?.message || err);
+    return res.status(503).json({ success: false, code: 'OUTBOX_UNAVAILABLE', error: 'Durable dispatch history is unavailable.' });
   }
 });
 
@@ -4723,8 +5418,13 @@ app.post('/api/dispatch/campaign-batch', authenticate, async (req, res) => {
   const contractorId = (req as any).contractorId;
   const { campaignId, channel, template, leadIds } = req.body;
 
-  if (!channel || !template) {
-    return res.status(400).json({ error: 'Channel and template are required' });
+  if (!['email', 'sms', 'whatsapp'].includes(channel) || !template || typeof template !== 'object') {
+    return res.status(400).json({ error: 'A supported channel (email, sms or WhatsApp) and a message template are required.' });
+  }
+  if (campaignId) {
+    const [campaign] = await pgDb.select({ id: campaigns.id }).from(campaigns)
+      .where(and(eq(campaigns.id, campaignId), eq(campaigns.contractorId, contractorId))).limit(1);
+    if (!campaign) return res.status(404).json({ error: 'Campaign not found or inaccessible.' });
   }
 
   const targetLeads = leadIds && Array.isArray(leadIds) && leadIds.length > 0
@@ -4786,31 +5486,43 @@ app.post('/api/dispatch/campaign-batch', authenticate, async (req, res) => {
 
     const recipient = channel === 'email' ? decryptedEmail : decryptedPhone;
     if (recipient && recipient !== '[ENCRYPTED]') {
-      await pgDb.insert(leadEvents).values({
-        id: crypto.randomUUID(),
-        leadId: lead.id,
-        eventType: 'OutreachSimulationRecorded',
-        newStage: lead.status,
-        notes: `[Simulation only - ${channel.toUpperCase()}] No external message was sent. Intended recipient: ${recipient}. Subject: "${customizedSubject}"`
-      });
-
-      dispatchLogs.push({
-        id: 'simulation_' + crypto.randomBytes(6).toString('hex'),
-        contractorId,
-        channel,
-        recipient,
-        leadId: lead.id,
-        leadBusinessName: lead.businessName,
-        status: 'simulated',
-        mode: 'simulation' as any,
-        providerId: 'SIMULATION_ONLY',
-        timestamp: new Date().toISOString(),
-        subject: customizedSubject,
-        preview: customizedBody.slice(0, 80)
+      const outboxId = 'sim_' + crypto.randomUUID();
+      const recordedAt = new Date();
+      await pgDb.transaction(async tx => {
+        await tx.insert(communicationsOutbox).values({
+          id: outboxId,
+          contractorId,
+          leadId: lead.id,
+          channel,
+          provider: 'simulation_only',
+          recipientEncrypted: encrypt(String(recipient)),
+          subjectEncrypted: encrypt(customizedSubject),
+          bodyEncrypted: encrypt(customizedBody),
+          status: 'simulated',
+          idempotencyKey: `simulation:${contractorId}:${lead.id}:${crypto.randomUUID()}`,
+          attempts: 0,
+          createdAt: recordedAt,
+          updatedAt: recordedAt
+        });
+        await tx.insert(communicationsDeliveryEvents).values({
+          id: 'delivery_' + crypto.randomUUID(),
+          outboxId,
+          provider: 'simulation_only',
+          eventType: 'simulation_recorded',
+          payload: { channel, campaignId: campaignId || null, providerContacted: false, externalMessageSent: false },
+          receivedAt: recordedAt
+        });
+        await tx.insert(leadEvents).values({
+          id: crypto.randomUUID(),
+          leadId: lead.id,
+          eventType: 'OutreachSimulationRecorded',
+          newStage: lead.status,
+          notes: `[Simulation only - ${channel.toUpperCase()}] No external message was sent. A durable simulation record was saved.`
+        });
       });
 
       simulated++;
-      results.push({ leadId: lead.id, businessName: lead.businessName, status: 'simulated', recipient, note: 'No external message was sent; lead status was not changed.' });
+      results.push({ leadId: lead.id, businessName: lead.businessName, status: 'simulated', recipient, note: 'Simulation saved durably; no external message was sent and lead status was not changed.' });
     } else {
       results.push({ leadId: lead.id, businessName: lead.businessName, status: 'skipped', reason: 'Missing channel contact info' });
       failed++;
@@ -4825,7 +5537,8 @@ app.post('/api/dispatch/campaign-batch', authenticate, async (req, res) => {
     }
   }
 
-  db.addAuditLog({
+  await pgDb.insert(auditLogs).values({
+    id: crypto.randomUUID(),
     contractorId,
     action: 'BATCH_CAMPAIGN_SIMULATED',
     details: `Recorded ${simulated} simulated outreach attempts out of ${targetLeads.length} leads; ${failed} were blocked or skipped. No external messages were sent.`
@@ -4911,56 +5624,125 @@ interface ChannelBridgeSettings {
   };
 }
 
-const contractorBridges = new Map<string, ChannelBridgeSettings>();
-
-function getBridgesForContractor(contractorId: string): ChannelBridgeSettings {
-  if (!contractorBridges.has(contractorId)) {
-    const emailProvider: ChannelBridgeSettings['email']['provider'] =
-      process.env.SENDGRID_API_KEY ? 'sendgrid' : process.env.SMTP_HOST ? 'smtp' : 'resend';
-    const calendarProvider: ChannelBridgeSettings['calendar']['provider'] =
-      process.env.CALCOM_BOOKING_URL ? 'cal_com' : 'google_calendar';
-    contractorBridges.set(contractorId, {
-      whatsapp: {
-        enabled: Boolean(process.env.WHATSAPP_ACCESS_TOKEN && process.env.WHATSAPP_PHONE_NUMBER_ID),
-        phoneNumberId: process.env.WHATSAPP_PHONE_NUMBER_ID || '',
-        displayNumber: process.env.WHATSAPP_DISPLAY_NUMBER || '',
-        webhookActive: Boolean(process.env.WHATSAPP_VERIFY_TOKEN),
-        verifiedBusiness: false,
-        accessToken: process.env.WHATSAPP_ACCESS_TOKEN
-      },
-      email: {
-        enabled: Boolean(process.env.RESEND_API_KEY || process.env.SENDGRID_API_KEY || (process.env.SMTP_HOST && process.env.SMTP_PORT && process.env.SMTP_USER && process.env.SMTP_PASSWORD && process.env.HAL_SENDER_EMAIL)),
-        provider: emailProvider,
-        senderEmail: process.env.HAL_SENDER_EMAIL || '',
-        senderName: process.env.HAL_SENDER_NAME || 'HAL',
-        smtpHost: process.env.SMTP_HOST || undefined,
-        smtpPort: process.env.SMTP_PORT ? Number(process.env.SMTP_PORT) : undefined,
-        smtpUser: process.env.SMTP_USER || undefined,
-        smtpPassword: process.env.SMTP_PASSWORD || undefined,
-        apiKey: process.env.RESEND_API_KEY || process.env.SENDGRID_API_KEY
-      },
-      sms: {
-        enabled: Boolean(process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN && process.env.TWILIO_PHONE_NUMBER),
-        provider: 'twilio',
-        accountSid: process.env.TWILIO_ACCOUNT_SID || '',
-        authToken: process.env.TWILIO_AUTH_TOKEN,
-        virtualNumber: process.env.TWILIO_PHONE_NUMBER || ''
-      },
-      calendar: {
-        enabled: Boolean(process.env.CALCOM_BOOKING_URL || process.env.GOOGLE_CALENDAR_ID),
-        provider: calendarProvider,
-        bookingUrl: process.env.CALCOM_BOOKING_URL || '',
-        timezone: process.env.TZ || 'UTC'
-      }
-    });
-  }
-  return contractorBridges.get(contractorId)!;
+function getDefaultBridgeSettings(): ChannelBridgeSettings {
+  const emailProvider: ChannelBridgeSettings['email']['provider'] =
+    process.env.SENDGRID_API_KEY ? 'sendgrid' : process.env.SMTP_HOST ? 'smtp' : 'resend';
+  const calendarProvider: ChannelBridgeSettings['calendar']['provider'] =
+    process.env.CALCOM_BOOKING_URL ? 'cal_com' : 'google_calendar';
+  return {
+    whatsapp: {
+      enabled: Boolean(process.env.WHATSAPP_ACCESS_TOKEN && process.env.WHATSAPP_PHONE_NUMBER_ID),
+      phoneNumberId: process.env.WHATSAPP_PHONE_NUMBER_ID || '',
+      displayNumber: process.env.WHATSAPP_DISPLAY_NUMBER || '',
+      webhookActive: Boolean(process.env.WHATSAPP_VERIFY_TOKEN),
+      verifiedBusiness: false,
+      accessToken: process.env.WHATSAPP_ACCESS_TOKEN
+    },
+    email: {
+      enabled: Boolean(process.env.RESEND_API_KEY || process.env.SENDGRID_API_KEY || (process.env.SMTP_HOST && process.env.SMTP_PORT && process.env.SMTP_USER && process.env.SMTP_PASSWORD && process.env.HAL_SENDER_EMAIL)),
+      provider: emailProvider,
+      senderEmail: process.env.HAL_SENDER_EMAIL || '',
+      senderName: process.env.HAL_SENDER_NAME || 'HAL',
+      smtpHost: process.env.SMTP_HOST || undefined,
+      smtpPort: process.env.SMTP_PORT ? Number(process.env.SMTP_PORT) : undefined,
+      smtpUser: process.env.SMTP_USER || undefined,
+      smtpPassword: process.env.SMTP_PASSWORD || undefined,
+      apiKey: process.env.RESEND_API_KEY || process.env.SENDGRID_API_KEY
+    },
+    sms: {
+      enabled: Boolean(process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN && process.env.TWILIO_PHONE_NUMBER),
+      provider: 'twilio',
+      accountSid: process.env.TWILIO_ACCOUNT_SID || '',
+      authToken: process.env.TWILIO_AUTH_TOKEN,
+      virtualNumber: process.env.TWILIO_PHONE_NUMBER || ''
+    },
+    calendar: {
+      enabled: Boolean(process.env.CALCOM_BOOKING_URL || process.env.GOOGLE_CALENDAR_ID),
+      provider: calendarProvider,
+      bookingUrl: process.env.CALCOM_BOOKING_URL || '',
+      timezone: process.env.TZ || 'UTC'
+    }
+  };
 }
 
-app.get('/api/outreach/bridges/status', authenticate, (req, res) => {
+async function getBridgesForContractor(contractorId: string): Promise<ChannelBridgeSettings> {
+  const defaults = getDefaultBridgeSettings();
+  const credentials = await getTenantConnectorCredentials(contractorId);
+  let saved: Partial<ChannelBridgeSettings> = {};
+  try {
+    const parsed = credentials.bridgeSettings ? JSON.parse(credentials.bridgeSettings) : {};
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) saved = parsed;
+  } catch {
+    console.warn('[Connectors] Ignoring invalid persisted bridge settings for workspace', contractorId);
+  }
+  const emailProvider: ChannelBridgeSettings['email']['provider'] =
+    credentials.resend ? 'resend' : credentials.sendgrid ? 'sendgrid' : defaults.email.provider;
+  const emailApiKey = credentials.resend || credentials.sendgrid || defaults.email.apiKey;
+  const savedEmail = (saved.email || {}) as Partial<ChannelBridgeSettings['email']>;
+  const email = {
+    ...defaults.email,
+    provider: emailProvider,
+    apiKey: emailApiKey,
+    ...savedEmail,
+    enabled: Boolean(emailApiKey && (savedEmail.senderEmail || defaults.email.senderEmail) && savedEmail.enabled !== false)
+  };
+  return {
+    whatsapp: { ...defaults.whatsapp, ...(saved.whatsapp || {}) },
+    email,
+    sms: { ...defaults.sms, ...(saved.sms || {}) },
+    calendar: { ...defaults.calendar, ...(saved.calendar || {}) }
+  };
+}
+
+function sanitizeBridgeSettings(channel: keyof ChannelBridgeSettings, input: any): Record<string, any> {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) throw new Error('Bridge settings must be an object.');
+  const output: Record<string, any> = {};
+  const booleanKeys = ['enabled']; // Verification flags are server/provider-derived and cannot be set by a browser client.
+  for (const key of booleanKeys) if (key in input) {
+    if (typeof input[key] !== 'boolean') throw new Error(`${key} must be a boolean.`);
+    output[key] = input[key];
+  }
+  const stringKeys: Record<keyof ChannelBridgeSettings, string[]> = {
+    whatsapp: ['phoneNumberId', 'displayNumber', 'accessToken'],
+    email: ['senderEmail', 'senderName', 'smtpHost', 'smtpUser', 'smtpPassword', 'apiKey'],
+    sms: ['accountSid', 'authToken', 'virtualNumber'],
+    calendar: ['bookingUrl', 'timezone']
+  };
+  for (const key of stringKeys[channel]) if (key in input) {
+    if (typeof input[key] !== 'string' || input[key].length > 8192) throw new Error(`${key} must be a string no longer than 8,192 characters.`);
+    output[key] = input[key].trim();
+  }
+  if (channel === 'email' && 'provider' in input) {
+    if (!['smtp', 'resend', 'sendgrid'].includes(input.provider)) throw new Error('Unsupported email provider.');
+    output.provider = input.provider;
+  }
+  if (channel === 'sms' && 'provider' in input) {
+    if (!['twilio', 'virtual_carrier'].includes(input.provider)) throw new Error('Unsupported SMS provider.');
+    output.provider = input.provider;
+  }
+  if (channel === 'calendar' && 'provider' in input) {
+    if (!['google_calendar', 'cal_com', 'direct_booking'].includes(input.provider)) throw new Error('Unsupported calendar provider.');
+    output.provider = input.provider;
+  }
+  if (channel === 'email' && 'smtpPort' in input) {
+    const port = Number(input.smtpPort);
+    if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error('SMTP port must be between 1 and 65535.');
+    output.smtpPort = port;
+  }
+  if (channel === 'calendar' && output.bookingUrl) {
+    let parsed: URL;
+    try { parsed = new URL(output.bookingUrl); } catch { throw new Error('Booking URL must be a valid HTTPS URL.'); }
+    if (parsed.protocol !== 'https:') throw new Error('Booking URL must use HTTPS.');
+  }
+  return output;
+}
+
+app.get('/api/outreach/bridges/status', authenticate, async (req, res) => {
   const contractorId = (req as any).contractorId;
-  const cfg = getBridgesForContractor(contractorId);
-  const userLogs = dispatchLogs.filter(l => l.contractorId === contractorId);
+  const cfg = await getBridgesForContractor(contractorId);
+  const userLogs = await pgDb.select().from(communicationsOutbox)
+    .where(eq(communicationsOutbox.contractorId, contractorId))
+    .orderBy(desc(communicationsOutbox.createdAt)).limit(500);
   const whatsappDelivered = userLogs.filter(l => l.channel === 'whatsapp' && l.status === 'delivered').length;
   const emailDelivered = userLogs.filter(l => l.channel === 'email' && l.status === 'delivered').length;
   const smsDelivered = userLogs.filter(l => l.channel === 'sms' && l.status === 'delivered').length;
@@ -4969,7 +5751,9 @@ app.get('/api/outreach/bridges/status', authenticate, (req, res) => {
     success: true,
     bridges: {
       whatsapp: {
-        enabled: cfg.whatsapp.enabled,
+        enabled: false,
+        configured: Boolean(cfg.whatsapp.accessToken && cfg.whatsapp.phoneNumberId),
+        liveInboundSupported: false,
         phoneNumberId: cfg.whatsapp.phoneNumberId,
         displayNumber: cfg.whatsapp.displayNumber,
         webhookActive: cfg.whatsapp.webhookActive,
@@ -4977,27 +5761,31 @@ app.get('/api/outreach/bridges/status', authenticate, (req, res) => {
         accessToken: cfg.whatsapp.accessToken ? '••••••••' : undefined,
         deliveredCount: whatsappDelivered,
         replyRate: null,
-        status: cfg.whatsapp.enabled ? 'configured_unverified' : 'not_configured'
+        status: cfg.whatsapp.enabled ? 'tenant_routing_required' : 'not_configured'
       },
       email: {
-        enabled: Boolean(process.env.RESEND_API_KEY && process.env.HAL_SENDER_EMAIL),
-        provider: 'resend',
-        senderEmail: process.env.HAL_SENDER_EMAIL || '',
-        senderName: process.env.HAL_SENDER_NAME || 'HAL',
+        enabled: cfg.email.enabled,
+        configured: cfg.email.enabled,
+        liveDispatchSupported: cfg.email.provider === 'resend' && Boolean(cfg.email.apiKey && cfg.email.senderEmail),
+        provider: cfg.email.provider,
+        senderEmail: cfg.email.senderEmail,
+        senderName: cfg.email.senderName,
         deliveredCount: emailDelivered,
         submittedCount: userLogs.filter(l => l.channel === 'email' && l.status === 'submitted').length,
         openRate: null,
-        status: process.env.RESEND_API_KEY && process.env.HAL_SENDER_EMAIL ? 'configured_unverified' : 'not_configured'
+        status: cfg.email.provider === 'resend' && cfg.email.apiKey && cfg.email.senderEmail ? 'configured_unverified' : 'not_configured'
       },
       sms: {
-        enabled: cfg.sms.enabled,
+        enabled: false,
+        configured: cfg.sms.enabled,
+        liveDispatchSupported: false,
         provider: cfg.sms.provider,
         virtualNumber: cfg.sms.virtualNumber,
         accountSid: cfg.sms.accountSid ? '••••••••' : undefined,
         authToken: cfg.sms.authToken ? '••••••••' : undefined,
         deliveredCount: smsDelivered,
         slaResponseSec: null,
-        status: cfg.sms.enabled ? 'configured_unverified' : 'not_configured'
+        status: cfg.sms.enabled ? 'simulation_only' : 'not_configured'
       },
       calendar: {
         enabled: cfg.calendar.enabled,
@@ -5011,28 +5799,47 @@ app.get('/api/outreach/bridges/status', authenticate, (req, res) => {
   });
 });
 
-app.post('/api/outreach/bridges/configure', authenticate, (req, res) => {
+app.post('/api/outreach/bridges/configure', authenticate, async (req, res) => {
   const contractorId = (req as any).contractorId;
-  const { channel, settings } = req.body;
-  if (!channel || !settings) {
-    return res.status(400).json({ error: 'Channel and settings are required' });
+  const { channel, settings } = req.body || {};
+  if (!['whatsapp', 'email', 'sms', 'calendar'].includes(channel)) {
+    return res.status(400).json({ error: 'A supported channel is required.' });
   }
-
-  const current = getBridgesForContractor(contractorId);
-  if (channel in current) {
-    (current as any)[channel] = {
-      ...(current as any)[channel],
-      ...settings
-    };
+  try {
+    const credentials = await getTenantConnectorCredentials(contractorId);
+    let saved: Record<string, any> = {};
+    try {
+      const parsed = credentials.bridgeSettings ? JSON.parse(credentials.bridgeSettings) : {};
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) saved = parsed;
+    } catch {
+      throw new Error('Existing saved bridge settings are invalid and must be repaired before updating.');
+    }
+    const sanitized = sanitizeBridgeSettings(channel as keyof ChannelBridgeSettings, settings);
+    const next = { ...saved, [channel]: { ...(saved[channel] || {}), ...sanitized } };
+    const id = 'conn_' + crypto.createHash('sha256').update(`${contractorId}:bridgeSettings`).digest('hex');
+    const encryptedValue = encrypt(JSON.stringify(next));
+    await pgDb.insert(connectorCredentials).values({
+      id, contractorId, service: 'bridgeSettings', encryptedValue, updatedAt: new Date()
+    }).onConflictDoUpdate({
+      target: connectorCredentials.id,
+      set: { encryptedValue, updatedAt: new Date() }
+    });
+    await pgDb.insert(auditLogs).values({
+      id: crypto.randomUUID(), contractorId, action: 'BRIDGE_CONFIGURED',
+      details: `Persisted bridge settings for channel: ${channel}`
+    });
+    await pgDb.insert(workEvents).values({
+      id: 'evt_' + crypto.randomUUID(), contractorId,
+      eventType: 'connector.bridge_configured', entityType: 'connector_bridge',
+      entityId: String(channel), actorType: 'human', actorId: contractorId,
+      sourceModule: 'connectors', correlationId: id,
+      summary: `Persisted settings for the ${channel} bridge.`,
+      payload: { channel, enabled: Boolean(sanitized.enabled), settingsPersisted: true }
+    });
+    return res.json({ success: true, channel, persisted: true, message: `Updated and saved ${channel} bridge settings.` });
+  } catch (error: any) {
+    return res.status(400).json({ success: false, error: error.message || 'Bridge settings could not be saved.' });
   }
-
-  db.addAuditLog({
-    contractorId,
-    action: 'BRIDGE_CONFIGURED',
-    details: `Updated bridge settings for channel: ${channel}`
-  });
-
-  res.json({ success: true, message: `Updated ${channel} bridge settings` });
 });
 
 app.post('/api/outreach/draft-ai', authenticate, async (req, res) => {
@@ -5146,11 +5953,12 @@ app.post('/api/outreach/dispatch', authenticate, async (req, res) => {
       throw gateError;
     }
 
-    if (!process.env.RESEND_API_KEY || !process.env.HAL_SENDER_EMAIL) {
+    const emailBridge = await getBridgesForContractor(contractorId);
+    if (emailBridge.email.provider !== 'resend' || !emailBridge.email.apiKey || !emailBridge.email.senderEmail) {
       return res.status(503).json({
         success: false,
         code: 'EMAIL_PROVIDER_NOT_CONFIGURED',
-        error: 'Resend is not configured. Set RESEND_API_KEY and HAL_SENDER_EMAIL on the server.'
+        error: 'A Resend API key and verified sender address must be configured for this workspace or the platform.'
       });
     }
     const rateNow = Date.now();
@@ -5217,6 +6025,9 @@ app.post('/api/outreach/dispatch', authenticate, async (req, res) => {
         to: String(recipient),
         subject: customizedSubject,
         text: customizedMessage
+      }, {
+        apiKey: emailBridge.email.apiKey,
+        from: emailBridge.email.senderEmail
       });
       const submittedAt = new Date().toISOString();
       await pgDb.update(communicationsOutbox).set({
@@ -5243,7 +6054,6 @@ app.post('/api/outreach/dispatch', authenticate, async (req, res) => {
         subject: customizedSubject,
         preview: customizedMessage.slice(0, 100)
       };
-      dispatchLogs.push(entry);
       await recordWorkEvent(pgDb, {
         contractorId, eventType: 'outreach.email.submitted', entityType: leadId ? 'lead' : 'outreach_dispatch', entityId: leadId || entry.id,
         actorType: 'human', actorId: contractorId, sourceModule: 'outreach_dispatch', correlationId: entry.id,
@@ -5325,57 +6135,83 @@ app.post('/api/outreach/dispatch', authenticate, async (req, res) => {
     });
   }
 
-  const now = new Date().toISOString();
-  const entry: DispatchLogEntry = {
-    id: 'simulation_' + crypto.randomBytes(6).toString('hex'),
-    contractorId,
-    channel,
-    recipient: String(recipient),
-    leadId,
-    leadBusinessName: leadBusinessName || 'Direct Recipient',
-    status: 'simulated',
-    mode: 'simulation',
-    timestamp: now,
-    subject: customizedSubject || undefined,
-    preview: customizedMessage.slice(0, 100)
-  };
-  dispatchLogs.push(entry);
+  let linkedLead: any = null;
+  if (leadId) {
+    const [storedLead] = await pgDb.select().from(leads).where(and(
+      eq(leads.id, String(leadId)),
+      eq(leads.contractorId, contractorId)
+    )).limit(1);
+    if (!storedLead) return res.status(404).json({ success: false, code: 'LEAD_NOT_FOUND', error: 'The selected lead was not found in this workspace.' });
+    linkedLead = storedLead;
+  }
+  const idempotencyKey = String(requestedIdempotencyKey || req.headers['idempotency-key'] || crypto.randomUUID()).trim();
+  if (!idempotencyKey || idempotencyKey.length > 200) {
+    return res.status(400).json({ success: false, code: 'INVALID_IDEMPOTENCY_KEY', error: 'Idempotency key must be 1-200 characters.' });
+  }
+  const [existingSimulation] = await pgDb.select().from(communicationsOutbox).where(and(
+    eq(communicationsOutbox.contractorId, contractorId),
+    eq(communicationsOutbox.idempotencyKey, idempotencyKey)
+  )).limit(1);
+  if (existingSimulation) {
+    return res.status(200).json({ success: true, duplicate: true, dispatchId: existingSimulation.id, status: existingSimulation.status, mode: existingSimulation.status === 'simulated' ? 'simulation' : 'live' });
+  }
+
+  const now = new Date();
+  const dispatchId = 'simulation_' + crypto.randomUUID();
+  const resolvedLeadName = linkedLead?.businessName || leadBusinessName || 'Direct Recipient';
+  try {
+    await pgDb.insert(communicationsOutbox).values({
+      id: dispatchId,
+      contractorId,
+      leadId: linkedLead?.id || null,
+      channel,
+      provider: 'simulation',
+      recipientEncrypted: encrypt(String(recipient)),
+      subjectEncrypted: customizedSubject ? encrypt(customizedSubject) : null,
+      bodyEncrypted: encrypt(customizedMessage),
+      status: 'simulated',
+      idempotencyKey,
+      attempts: 0,
+      createdAt: now,
+      updatedAt: now
+    });
+  } catch (error: any) {
+    console.error('[HAL Dispatch Simulation] Could not persist simulation:', error?.message || error);
+    return res.status(503).json({ success: false, code: 'OUTBOX_UNAVAILABLE', error: 'Simulation history could not be persisted. No dispatch was attempted.' });
+  }
+
   await recordWorkEvent(pgDb, {
-    contractorId, eventType: 'outreach.simulated', entityType: leadId ? 'lead' : 'outreach_dispatch', entityId: leadId || entry.id,
-    actorType: 'human', actorId: contractorId, sourceModule: 'outreach_dispatch', correlationId: entry.id,
-    summary: `Prepared a ${channel} outreach simulation for ${leadBusinessName || 'a direct recipient'}; no message was sent.`,
-    payload: { channel, mode: 'simulation', status: 'simulated', providerContacted: false }
+    contractorId, eventType: 'outreach.simulated', entityType: linkedLead ? 'lead' : 'outreach_dispatch', entityId: linkedLead?.id || dispatchId,
+    actorType: 'human', actorId: contractorId, sourceModule: 'outreach_dispatch', correlationId: dispatchId,
+    summary: `Prepared a ${channel} outreach simulation for ${resolvedLeadName}; no message was sent.`,
+    payload: { channel, mode: 'simulation', status: 'simulated', providerContacted: false, dispatchId }
   });
 
   const auditBlock = db.recordLedgerEntry({
     contractorId,
     eventType: 'phase3_verification_audit',
     entityType: 'outreach_simulation',
-    entityId: entry.id,
+    entityId: dispatchId,
     actor: 'HAL Simulation',
     details: 'Outreach payload prepared in simulation mode. No external message was sent.',
-    metadata: {
-      channel,
-      leadId: leadId || null,
-      mode: 'simulation',
-      status: 'simulated'
-    }
+    metadata: { channel, leadId: linkedLead?.id || null, mode: 'simulation', status: 'simulated' }
   });
 
   broadcastNotification(
     contractorId,
     'info',
     'Outreach Simulation Recorded',
-    `Prepared a ${channel.toUpperCase()} message for ${String(recipient)}. No external message was sent.`
+    `Prepared a ${channel.toUpperCase()} message for ${resolvedLeadName}. No external message was sent.`
   );
 
   return res.json({
     success: true,
-    dispatchId: entry.id,
+    dispatchId,
+    idempotencyKey,
     status: 'simulated',
     mode: 'simulation',
     providerContacted: false,
-    timestamp: now,
+    timestamp: now.toISOString(),
     renderedMessage: customizedMessage,
     renderedSubject: customizedSubject,
     block: auditBlock
@@ -5419,33 +6255,24 @@ app.post('/api/outreach/whatsapp/webhook', (req, res) => {
 
   const body = req.body;
   try {
-    if (body.object === 'whatsapp_business_account') {
-      for (const entry of body.entry || []) {
-        for (const change of entry.changes || []) {
-          const value = change.value;
-          if (value?.messages?.length > 0) {
-            for (const msg of value.messages) {
-              const fromPhone = msg.from;
-              const text = msg.text?.body || '[Interactive Message]';
-              console.log(`[Inbound WhatsApp from +${fromPhone}]: ${text}`);
-
-              for (const [cid] of contractorBridges.entries()) {
-                broadcastNotification(
-                  cid,
-                  'lead_captured',
-                  '💬 Inbound WhatsApp Reply!',
-                  `From +${fromPhone}: "${text.slice(0, 80)}"`
-                );
-              }
-            }
-          }
-        }
+    if (body?.object === 'whatsapp_business_account') {
+      const hasInboundMessages = (body.entry || []).some((entry: any) =>
+        (entry.changes || []).some((change: any) => Array.isArray(change.value?.messages) && change.value.messages.length > 0)
+      );
+      if (hasInboundMessages) {
+        // Never fan out an inbound message to every connected workspace. A
+        // verified signature authenticates Meta, not the tenant that owns the
+        // destination phone number. Tenant routing must be configured first.
+        console.warn('[WhatsApp Webhook] Signed inbound message received without a verified phone-number-to-tenant mapping.');
+        return res.status(503).json({
+          error: 'WhatsApp signature verified, but tenant routing is not configured. The message was not exposed to any workspace.'
+        });
       }
     }
-    res.sendStatus(200);
+    return res.sendStatus(200);
   } catch (err) {
     console.error('[WhatsApp Webhook Error]', err);
-    res.sendStatus(500);
+    return res.sendStatus(500);
   }
 });
 
@@ -5637,116 +6464,215 @@ app.post('/api/proposals/generate', authenticate, (req, res) => {
 app.get('/api/projects', authenticate, async (req, res) => {
   const contractorId = (req as any).contractorId;
   try {
-    const projects = await pgDb.select().from(clientProjects).where(eq(clientProjects.contractorId, contractorId)).orderBy(desc(clientProjects.createdAt));
-    res.json(projects);
+    // One-time compatibility migration: older releases wrote delivery projects to
+    // the local JSON store while the client portal and financials read PostgreSQL.
+    // Copy only this authenticated tenant's legacy records; never overwrite PG rows.
+    const legacyProjects = db.getClientProjects(contractorId);
+    if (legacyProjects.length > 0) {
+      await pgDb.insert(clientProjects).values(legacyProjects.map(project => ({
+        id: project.id,
+        contractorId,
+        leadId: project.leadId || '',
+        clientName: project.clientName || 'Business Owner',
+        businessName: project.businessName,
+        city: project.city,
+        serviceType: project.serviceType,
+        packageTier: project.packageTier,
+        monthlyRetainerUsd: project.monthlyRetainerUsd,
+        startDate: new Date(project.startDate),
+        status: project.status,
+        initialAuditScore: project.initialAuditScore,
+        currentScore: project.currentScore,
+        targetScore: project.targetScore,
+        milestones: project.milestones || [],
+        assets: project.assets || [],
+        notes: project.notes || null,
+        portalAccessToken: project.portalAccessToken,
+        createdAt: new Date(project.createdAt),
+        updatedAt: new Date(project.updatedAt)
+      }))).onConflictDoNothing();
+    }
+
+    const projects = await pgDb.select().from(clientProjects)
+      .where(eq(clientProjects.contractorId, contractorId))
+      .orderBy(desc(clientProjects.createdAt));
+    return res.json(projects);
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    console.error('[Client Projects] PostgreSQL list/migration failed:', err);
+    return res.status(503).json({ error: 'Client projects are temporarily unavailable. No unsaved project data was substituted.' });
   }
 });
 
 app.post('/api/projects', authenticate, async (req, res) => {
   const contractorId = (req as any).contractorId;
-  const { leadId, clientName, businessName, city, serviceType, packageTier, monthlyRetainerUsd, initialAuditScore } = req.body;
+  const { leadId, clientName, businessName, city, serviceType, packageTier, monthlyRetainerUsd, initialAuditScore } = req.body || {};
 
-  if (!businessName) {
+  if (typeof businessName !== 'string' || !businessName.trim()) {
     return res.status(400).json({ error: 'Business name is required to create a project' });
   }
 
-  const project = db.createClientProject(contractorId, {
-    id: 'proj_' + crypto.randomBytes(6).toString('hex'),
-    leadId: leadId || '',
-    clientName: clientName || 'Business Owner',
-    businessName,
-    city: city || 'Calgary',
-    serviceType: serviceType || 'General Trade',
-    packageTier: packageTier || 'Dominance',
-    monthlyRetainerUsd: Number(monthlyRetainerUsd) || 2400,
-    startDate: new Date().toISOString().split('T')[0],
-    status: 'onboarding',
-    initialAuditScore: Number(initialAuditScore) || 50,
-    currentScore: Number(initialAuditScore) || 50,
-    targetScore: 95,
-    portalAccessToken: crypto.randomBytes(12).toString('hex'),
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-    assets: [
-      { id: 'ast_' + crypto.randomBytes(4).toString('hex'), name: 'High-Res Brand Logo', category: 'logo', status: 'pending' },
-      { id: 'ast_' + crypto.randomBytes(4).toString('hex'), name: 'Domain Registrar Credentials', category: 'domain_access', status: 'pending' },
-      { id: 'ast_' + crypto.randomBytes(4).toString('hex'), name: 'Google Business Profile Manager Delegation', category: 'analytics_access', status: 'pending' }
-    ],
-    milestones: [
-      { id: 'ms_1', title: 'Onboarding & Asset Intake', description: 'Intake and verify client DNS, assets, and service radius.', status: 'in_progress' },
-      { id: 'ms_2', title: 'Technical Speed & SSL Hardening', description: 'Compress images, configure TLS 1.3, optimize Core Web Vitals.', status: 'pending' },
-      { id: 'ms_3', title: 'Geo-SEO Schema & Map Pack Synchronization', description: 'Inject JSON-LD structured data and align 40+ local citations.', status: 'pending' },
-      { id: 'ms_4', title: 'Autonomous Funnel Activation', description: 'Launch lead capture forms and direct SMS dispatch routing.', status: 'pending' },
-      { id: 'ms_5', title: 'Monthly Executive ROI Review', description: 'Deliver progress comparison report and growth metrics breakdown.', status: 'pending' }
-    ]
-  });
+  try {
+    if (typeof leadId === 'string' && leadId.trim()) {
+      const [linkedLead] = await pgDb.select({ id: leads.id }).from(leads)
+        .where(and(eq(leads.id, leadId.trim()), eq(leads.contractorId, contractorId)))
+        .limit(1);
+      if (!linkedLead) return res.status(400).json({ error: 'The selected lead does not belong to this workspace.' });
+    }
 
-  await recordWorkEvent(pgDb, {
-    contractorId, eventType: 'client_project.created', entityType: 'client_project', entityId: project.id,
-    actorType: 'human', actorId: contractorId, sourceModule: 'client_operations', correlationId: project.id,
-    summary: `Created client delivery project for ${businessName}.`,
-    payload: { leadId: leadId || null, status: project.status, packageTier: project.packageTier, monthlyRetainerUsd: project.monthlyRetainerUsd }
-  });
+    const now = new Date();
+    const score = Number.isFinite(Number(initialAuditScore)) ? Number(initialAuditScore) : 50;
+    const projectId = 'proj_' + crypto.randomBytes(6).toString('hex');
+    const projectValues = {
+      id: projectId,
+      contractorId,
+      leadId: typeof leadId === 'string' ? leadId : '',
+      clientName: typeof clientName === 'string' && clientName.trim() ? clientName.trim() : 'Business Owner',
+      businessName: businessName.trim(),
+      city: typeof city === 'string' && city.trim() ? city.trim() : 'Calgary',
+      serviceType: typeof serviceType === 'string' && serviceType.trim() ? serviceType.trim() : 'General Trade',
+      packageTier: ['Growth', 'Dominance', 'Enterprise'].includes(packageTier) ? packageTier : 'Dominance',
+      monthlyRetainerUsd: Number.isFinite(Number(monthlyRetainerUsd)) && Number(monthlyRetainerUsd) > 0 ? Math.round(Number(monthlyRetainerUsd)) : 2400,
+      startDate: now,
+      status: 'onboarding',
+      initialAuditScore: score,
+      currentScore: score,
+      targetScore: 95,
+      portalAccessToken: crypto.randomBytes(12).toString('hex'),
+      createdAt: now,
+      updatedAt: now,
+      assets: [
+        { id: 'ast_' + crypto.randomBytes(4).toString('hex'), name: 'High-Res Brand Logo', category: 'logo', status: 'pending' },
+        { id: 'ast_' + crypto.randomBytes(4).toString('hex'), name: 'Domain Registrar Credentials', category: 'domain_access', status: 'pending' },
+        { id: 'ast_' + crypto.randomBytes(4).toString('hex'), name: 'Google Business Profile Manager Delegation', category: 'analytics_access', status: 'pending' }
+      ],
+      milestones: [
+        { id: 'ms_1', title: 'Onboarding & Asset Intake', description: 'Intake and verify client DNS, assets, and service radius.', status: 'in_progress' },
+        { id: 'ms_2', title: 'Technical Speed & SSL Hardening', description: 'Compress images, configure TLS 1.3, optimize Core Web Vitals.', status: 'pending' },
+        { id: 'ms_3', title: 'Geo-SEO Schema & Map Pack Synchronization', description: 'Inject JSON-LD structured data and align 40+ local citations.', status: 'pending' },
+        { id: 'ms_4', title: 'Autonomous Funnel Activation', description: 'Launch lead capture forms and direct SMS dispatch routing.', status: 'pending' },
+        { id: 'ms_5', title: 'Monthly Executive ROI Review', description: 'Deliver progress comparison report and growth metrics breakdown.', status: 'pending' }
+      ]
+    };
+    const [project] = await pgDb.insert(clientProjects).values(projectValues).returning();
 
-  db.addAuditLog({
-    contractorId,
-    action: 'PROJECT_ONBOARDED',
-    details: `Initiated active delivery project for ${businessName} ($${project.monthlyRetainerUsd}/mo).`
-  });
+    try {
+      await recordWorkEvent(pgDb, {
+        contractorId, eventType: 'client_project.created', entityType: 'client_project', entityId: project.id,
+        actorType: 'human', actorId: contractorId, sourceModule: 'client_operations', correlationId: project.id,
+        summary: `Created client delivery project for ${businessName.trim()}.`,
+        payload: { leadId: leadId || null, status: project.status, packageTier: project.packageTier, monthlyRetainerUsd: project.monthlyRetainerUsd }
+      });
+    } catch (ledgerError) {
+      // The project row is already durable. A secondary ledger outage must not
+      // tell the operator creation failed and invite a duplicate retry.
+      console.error('[Client Projects] Creation ledger event failed:', ledgerError);
+    }
 
-  broadcastNotification(
-    contractorId,
-    'success',
-    'New Client Project Onboarded',
-    `Created delivery workspace for ${businessName}. Client onboarding portal link generated.`
-  );
+    db.addAuditLog({
+      contractorId,
+      action: 'PROJECT_ONBOARDED',
+      details: `Initiated active delivery project for ${businessName.trim()} (${project.monthlyRetainerUsd}/mo).`
+    });
 
-  res.status(201).json(project);
+    broadcastNotification(
+      contractorId,
+      'success',
+      'New Client Project Onboarded',
+      `Created delivery workspace for ${businessName.trim()}. Client onboarding portal link generated.`
+    );
+
+    return res.status(201).json(project);
+  } catch (err: any) {
+    console.error('[Client Projects] Create failed:', err);
+    return res.status(503).json({ error: 'Client project could not be saved to the database.' });
+  }
 });
 
 app.put('/api/projects/:id', authenticate, async (req, res) => {
   const contractorId = (req as any).contractorId;
   const { id } = req.params;
-  const updates = req.body;
+  const updates = req.body || {};
 
-  const existingProject = db.getClientProjects(contractorId).find(p => p.id === id);
-  const updated = db.updateClientProject(id, contractorId, updates);
-  if (!updated) {
-    return res.status(404).json({ error: 'Project not found or unauthorized' });
+  try {
+    const [existingProject] = await pgDb.select().from(clientProjects)
+      .where(and(eq(clientProjects.id, id), eq(clientProjects.contractorId, contractorId)))
+      .limit(1);
+    if (!existingProject) return res.status(404).json({ error: 'Project not found or unauthorized' });
+
+    // Accept only fields used by the delivery workflow; tenant ownership and
+    // immutable identifiers can never be changed by a client-supplied payload.
+    const safeUpdates: Partial<typeof clientProjects.$inferInsert> = { updatedAt: new Date() };
+    if (Array.isArray(updates.milestones)) safeUpdates.milestones = updates.milestones;
+    if (Array.isArray(updates.assets)) safeUpdates.assets = updates.assets;
+    if (typeof updates.status === 'string' && ['onboarding', 'active_delivery', 'review', 'completed'].includes(updates.status)) {
+      safeUpdates.status = updates.status;
+    }
+    if (typeof updates.notes === 'string') safeUpdates.notes = updates.notes.slice(0, 10000);
+
+    const [updated] = await pgDb.update(clientProjects).set(safeUpdates)
+      .where(and(eq(clientProjects.id, id), eq(clientProjects.contractorId, contractorId)))
+      .returning();
+    if (!updated) return res.status(404).json({ error: 'Project not found or unauthorized' });
+
+    try {
+      await recordWorkEvent(pgDb, {
+        contractorId, eventType: 'client_project.updated', entityType: 'client_project', entityId: id,
+        actorType: 'human', actorId: contractorId, sourceModule: 'client_operations', correlationId: id,
+        summary: `Updated client project for ${updated.businessName}.`,
+        payload: { previousStatus: existingProject.status, currentStatus: updated.status }
+      });
+    } catch (ledgerError) {
+      console.error('[Client Projects] Update ledger event failed:', ledgerError);
+    }
+
+    if (updates.status === 'completed' && existingProject.status !== 'completed') {
+      db.addAuditLog({
+        contractorId,
+        action: 'REVIEW_REQUEST_QUEUED',
+        details: `Project completed for ${updated.businessName}. Automated SMS/Email review and referral incentive queued for operator review.`
+      });
+      broadcastNotification(
+        contractorId,
+        'success',
+        'Post-Job Referral Engine Triggered',
+        `Project completed for ${updated.clientName} (${updated.businessName}); review-request follow-up is ready for operator review.`
+      );
+    }
+
+    return res.json(updated);
+  } catch (err: any) {
+    console.error('[Client Projects] Update failed:', err);
+    return res.status(503).json({ error: 'Client project update could not be saved.' });
   }
-  await recordWorkEvent(pgDb, {
-    contractorId, eventType: 'client_project.updated', entityType: 'client_project', entityId: id,
-    actorType: 'human', actorId: contractorId, sourceModule: 'client_operations', correlationId: id,
-    summary: `Updated client project for ${updated.businessName}.`,
-    payload: { previousStatus: existingProject?.status || null, currentStatus: updated.status }
-  });
-
-  // Phase 2: Automated Post-Job Referral & Review Engine Trigger
-  if (updates.status === 'completed' && existingProject && existingProject.status !== 'completed') {
-    db.addAuditLog({
-      contractorId,
-      action: 'REVIEW_REQUEST_QUEUED',
-      details: `Project completed for ${updated.businessName}. Automated SMS/Email review and $100 referral incentive queued within 24-hour window.`
-    });
-    broadcastNotification(
-      contractorId,
-      'success',
-      'Post-Job Referral Engine Triggered',
-      `Review request & referral invite dispatched to ${updated.clientName} (${updated.businessName}) to capture 24-hr referral window.`
-    );
-  }
-
-  res.json(updated);
 });
 
 // ─── CONNECTORS CREDENTIALS & HEALTH API ──────────────────────────────────────
 
-app.get('/api/connectors/credentials', authenticate, (req, res) => {
+async function getTenantConnectorCredentials(contractorId: string): Promise<Record<string, string>> {
+  // Import existing encrypted JSON-store values once. PostgreSQL becomes the
+  // durable source after first read; conflicts never overwrite newer DB values.
+  const legacyCredentials = db.getConnectorCredentials(contractorId) || {};
+  for (const [service, value] of Object.entries(legacyCredentials)) {
+    if (typeof value !== 'string' || !value) continue;
+    const id = 'conn_' + crypto.createHash('sha256').update(`${contractorId}:${service}`).digest('hex');
+    await pgDb.insert(connectorCredentials).values({
+      id, contractorId, service, encryptedValue: encrypt(value), updatedAt: new Date()
+    }).onConflictDoNothing();
+  }
+  const rows = await pgDb.select().from(connectorCredentials)
+    .where(eq(connectorCredentials.contractorId, contractorId));
+  const credentials: Record<string, string> = {};
+  for (const row of rows) {
+    const value = decrypt(row.encryptedValue);
+    if (value) credentials[row.service] = value;
+  }
+  return credentials;
+}
+
+app.get('/api/connectors/credentials', authenticate, async (req, res) => {
   const contractorId = (req as any).contractorId;
   try {
-    const creds = db.getConnectorCredentials(contractorId);
+    const creds = await getTenantConnectorCredentials(contractorId);
     const configured = Object.fromEntries(
       Object.entries(creds).map(([service, value]) => [service, Boolean(value)])
     );
@@ -5757,7 +6683,7 @@ app.get('/api/connectors/credentials', authenticate, (req, res) => {
   }
 });
 
-app.post('/api/connectors/credentials', authenticate, (req, res) => {
+app.post('/api/connectors/credentials', authenticate, async (req, res) => {
   const contractorId = (req as any).contractorId;
   const { service, keyVal } = req.body || {};
   const allowedServices = new Set([
@@ -5772,22 +6698,43 @@ app.post('/api/connectors/credentials', authenticate, (req, res) => {
     return res.status(400).json({ error: 'A non-empty connector credential is required.' });
   }
   try {
-    db.saveConnectorCredential(contractorId, service, keyVal.trim());
-    db.addAuditLog({
+    const id = 'conn_' + crypto.createHash('sha256').update(`${contractorId}:${service}`).digest('hex');
+    const encryptedValue = encrypt(keyVal.trim());
+    await pgDb.insert(connectorCredentials).values({
+      id, contractorId, service, encryptedValue, updatedAt: new Date()
+    }).onConflictDoUpdate({
+      target: connectorCredentials.id,
+      set: { encryptedValue, updatedAt: new Date() }
+    });
+    await pgDb.insert(auditLogs).values({
+      id: crypto.randomUUID(),
       contractorId,
       action: 'CONNECTOR_KEY_UPDATED',
-      details: `Updated API credentials for connector service: ${service}`
+      details: `Updated encrypted API credentials for connector service: ${service}`
     });
-    res.json({ success: true, service, configured: true });
+    await pgDb.insert(workEvents).values({
+      id: 'evt_' + crypto.randomUUID(),
+      contractorId,
+      eventType: 'connector.credential_updated',
+      entityType: 'connector_credential',
+      entityId: id,
+      actorType: 'human',
+      actorId: contractorId,
+      sourceModule: 'connectors',
+      correlationId: id,
+      summary: `Updated encrypted credentials for ${service}.`,
+      payload: { service, configured: true }
+    });
+    return res.json({ success: true, service, configured: true });
   } catch (err: any) {
     res.status(500).json({ error: 'Unable to securely save connector credentials.' });
   }
 });
 
-app.get('/api/connectors/health', authenticate, (req, res) => {
+app.get('/api/connectors/health', authenticate, async (req, res) => {
   const contractorId = (req as any).contractorId;
   try {
-    const creds = db.getConnectorCredentials(contractorId);
+    const creds = await getTenantConnectorCredentials(contractorId);
 
     const services = [
       { id: 'stripe', name: 'Stripe Billing API', category: 'billing' },
@@ -5914,12 +6861,6 @@ app.get('/api/financials/overview', authenticate, async (req, res) => {
 
 // ─── NEURAL NETWORK TOPOLOGY API ──────────────────────────────────────────────
 
-app.post('/api/neural/network/layout', authenticate, async (req, res) => {
-  // In a real app this would save to PostgreSQL, but for now we'll accept it and let the client rely on localStorage, 
-  // or we could implement a layout column. We'll return 200 OK to satisfy the client fetch.
-  res.json({ success: true, message: 'Layout sync received' });
-});
-
 // Manual neural-weight pruning is disabled until learned weights are tenant-scoped and independently validated.
 
 app.get('/api/neural/network', authenticate, async (req, res) => {
@@ -5928,8 +6869,7 @@ app.get('/api/neural/network', authenticate, async (req, res) => {
     const cityFilter = String(req.query.city || '').trim();
     const nicheFilter = String(req.query.niche || '').trim().toLowerCase();
     const timesfmConfigured = Boolean(process.env.TIMESFM_SERVICE_URL && (process.env.TIMESFM_API_KEY || '').length >= 32);
-    const dbInstance = getDrizzleDb();
-    if (!dbInstance) throw new Error('Neon/PostgreSQL is unavailable');
+    const dbInstance = pgDb;
 
     // Every record below is scoped to the authenticated tenant before graph construction.
     const [allLeads, allOutcomes, adsRows, recentEvents] = await Promise.all([
@@ -6540,8 +7480,8 @@ app.post('/api/system/postgres-connect', authenticate, requireRole('admin'), asy
   }
 
   try {
-    const { setCustomDatabaseUrl, testPostgresConnection } = await import('./src/db/postgres');
-    setCustomDatabaseUrl(databaseUrl);
+    // This is an isolated connection test only. It must not silently switch
+    // the database pool used by live application queries.
     const result = await testPostgresConnection(databaseUrl);
     
     db.addAuditLog({
@@ -6568,8 +7508,8 @@ app.post('/api/system/postgres-sync', authenticate, requireRole('admin'), async 
   }
   
   try {
-    const { getPostgresPool, bootstrapPostgresTables } = await import('./src/db/postgres');
-    const pool = getPostgresPool();
+    // Sync into the same pool used by the application, not a second settings-only pool.
+    const pool = getApplicationPostgresPool();
     
     if (!pool) {
       return res.status(400).json({ 
@@ -6732,257 +7672,384 @@ app.post('/api/system/postgres-sync', authenticate, requireRole('admin'), async 
 
 app.get('/api/system/postgres-status', authenticate, async (req, res) => {
   try {
-    const { testPostgresConnection } = await import('./src/db/postgres');
-    const result = await testPostgresConnection();
-    res.json(result);
+    const pool = getApplicationPostgresPool();
+    const client = await pool.connect();
+    try {
+      const result = await client.query('SELECT version(), current_database(), current_user;');
+      res.json({
+        connected: true,
+        message: 'Connected to the application PostgreSQL database.',
+        version: String(result.rows[0]?.version || 'PostgreSQL').split(' on ')[0],
+        provider: String(result.rows[0]?.version || '').toLowerCase().includes('neon') ? 'Neon PostgreSQL' : 'PostgreSQL'
+      });
+    } finally {
+      client.release();
+    }
   } catch (err: any) {
     res.json({ connected: false, message: err.message });
   }
 });
 
-app.get('/api/system/audit-logs', authenticate, (req, res) => {
-  const contractorId = (req as any).contractorId;
-  const role = (req as any).role;
-  // Admin sees all audit logs; standard user sees their own.
-  const logs = role === 'admin' ? db.getAuditLogs() : db.getAuditLogs(contractorId);
-  res.json(logs);
+// Non-destructive cryptographic self-test. The probe is generated in memory and never persisted.
+app.get('/api/system/diagnostics/crypto', authenticate, (_req, res) => {
+  try {
+    const probe = `hal-crypto-probe:${crypto.randomBytes(32).toString('hex')}`;
+    const ciphertext = encrypt(probe);
+    const verified = Boolean(ciphertext && ciphertext !== probe && decrypt(ciphertext) === probe);
+    if (!verified) {
+      return res.status(503).json({ status: 'failed', algorithm: 'AES-256-GCM', error: 'Encryption round-trip verification failed.' });
+    }
+    return res.json({ status: 'verified', algorithm: 'AES-256-GCM', roundTrip: true });
+  } catch (error: any) {
+    console.error('[HAL crypto diagnostics] Self-test failed:', error?.message || error);
+    return res.status(503).json({ status: 'failed', error: 'Encryption self-test failed.' });
+  }
 });
 
-app.post('/api/system/audit-logs', authenticate, (req, res) => {
+app.get('/api/system/audit-logs', authenticate, async (req, res) => {
   const contractorId = (req as any).contractorId;
-  const { action, details } = req.body;
-  
-  if (!action) {
-    return res.status(400).json({ error: 'Action is required' });
+  const role = (req as any).contractorRole;
+  try {
+    // PostgreSQL is authoritative for new audit records; include legacy entries
+    // during migration so older modules do not disappear from the activity view.
+    const persisted = role === 'admin'
+      ? await pgDb.select().from(auditLogs).orderBy(desc(auditLogs.timestamp)).limit(500)
+      : await pgDb.select().from(auditLogs)
+          .where(eq(auditLogs.contractorId, contractorId))
+          .orderBy(desc(auditLogs.timestamp)).limit(500);
+    const legacy = role === 'admin' ? db.getAuditLogs() : db.getAuditLogs(contractorId);
+    const merged = new Map<string, any>();
+    for (const item of legacy) merged.set(item.id, item);
+    for (const item of persisted) merged.set(item.id, {
+      id: item.id,
+      contractorId: item.contractorId,
+      action: item.action,
+      details: item.details,
+      createdAt: item.timestamp,
+      source: 'postgres'
+    });
+    return res.json([...merged.values()].sort((a, b) =>
+      new Date(b.createdAt || b.timestamp || 0).getTime() - new Date(a.createdAt || a.timestamp || 0).getTime()
+    ).slice(0, 500));
+  } catch (err: any) {
+    console.error('[HAL Audit] Could not load tenant audit history:', err);
+    return res.status(503).json({ error: 'Audit history is temporarily unavailable.' });
+  }
+});
+
+app.post('/api/system/audit-logs', authenticate, async (req, res) => {
+  const contractorId = (req as any).contractorId;
+  const { action, details } = req.body || {};
+
+  if (typeof action !== 'string' || !action.trim()) {
+    return res.status(400).json({ error: 'Action is required.' });
   }
 
-  const log = db.addAuditLog({
-    contractorId,
-    action,
-    details: details || '',
-    ipAddress: req.ip || req.socket.remoteAddress || undefined
-  });
-
-  res.json({ success: true, log });
+  try {
+    const [log] = await pgDb.insert(auditLogs).values({
+      id: crypto.randomUUID(),
+      contractorId,
+      action: action.trim(),
+      details: typeof details === 'string' ? details : ''
+    }).returning();
+    return res.status(201).json({
+      success: true,
+      log: { ...log, createdAt: log.timestamp, ipAddress: req.ip || req.socket.remoteAddress || undefined }
+    });
+  } catch (err: any) {
+    console.error('[HAL Audit] Could not persist audit event:', err);
+    return res.status(503).json({ error: 'Audit event could not be saved.' });
+  }
 });
 
 // ─── SCHEDULER SYSTEM (Core Learning Loops) ──────────────────────────────────
 
 app.get('/api/scheduler/jobs', authenticate, async (req, res) => {
+  const contractorId = (req as any).contractorId;
   try {
-    const jobs = await pgDb.select().from(schedulerJobs).orderBy(desc(schedulerJobs.createdAt));
-    res.json(jobs);
+    // One-time compatibility migration from the old tenant-local JSON store.
+    // PostgreSQL is authoritative after this read; legacy rows are never
+    // returned directly and cannot overwrite an existing durable record.
+    const legacyJobs = db.getSchedulerJobs(contractorId) || [];
+    const toDate = (value: any, fallback?: Date) => {
+      if (!value) return fallback || null;
+      const parsed = new Date(value);
+      return Number.isFinite(parsed.getTime()) ? parsed : fallback || null;
+    };
+    for (const legacy of legacyJobs) {
+      if (!legacy?.id || !legacy?.job) continue;
+      await pgDb.insert(schedulerJobs).values({
+        id: String(legacy.id),
+        contractorId,
+        job: String(legacy.job),
+        status: String(legacy.status || 'failed'),
+        startedAt: toDate(legacy.startedAt),
+        completedAt: toDate(legacy.completedAt),
+        error: legacy.error ? String(legacy.error) : null,
+        result: typeof legacy.result === 'string' ? legacy.result : legacy.result == null ? null : JSON.stringify(legacy.result),
+        createdAt: toDate(legacy.createdAt, new Date()) as Date
+      }).onConflictDoNothing();
+    }
+    const jobs = await pgDb.select().from(schedulerJobs)
+      .where(eq(schedulerJobs.contractorId, contractorId))
+      .orderBy(desc(schedulerJobs.createdAt)).limit(100);
+    return res.json(jobs);
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    console.error('[Scheduler] Durable job list failed:', err);
+    return res.status(503).json({ error: 'Scheduled jobs are temporarily unavailable from PostgreSQL.' });
   }
 });
 
 app.post('/api/scheduler', authenticate, async (req, res) => {
   const contractorId = (req as any).contractorId;
-  const { job } = req.body;
-
-  if (!job) {
-    return res.status(400).json({ error: 'Job name is required' });
+  const { job } = req.body || {};
+  if (typeof job !== 'string' || !job.trim()) {
+    return res.status(400).json({ error: 'Job name is required.' });
   }
 
-  const jobRecord = db.addSchedulerJob({
+  const startedAt = new Date();
+  const [jobRecord] = await pgDb.insert(schedulerJobs).values({
+    id: 'job_' + crypto.randomUUID(),
+    contractorId,
     job,
     status: 'running',
-    startedAt: new Date().toISOString()
-  });
+    startedAt,
+    createdAt: startedAt
+  }).returning();
 
   try {
     let resultMessage = '';
 
-    // ─── 3.5 Forecast Evaluator (HIGHEST LEVERAGE LOOP) ───
     if (job === 'evaluate_forecasts') {
-      const forecasts = db.getForecasts();
-      const expiredUnevaluated = forecasts.filter(f => !f.evaluated && new Date(f.targetDate) <= new Date());
-      let evaluatedCount = 0;
+      const now = new Date();
+      const expiredUnevaluated = await pgDb.select().from(forecasts).where(and(
+        eq(forecasts.contractorId, contractorId),
+        eq(forecasts.evaluated, false),
+        lte(forecasts.targetDate, now)
+      )).orderBy(desc(forecasts.targetDate));
 
-      for (const fc of expiredUnevaluated) {
-        // Compare the forecast against observations from its own target window,
-        // not lifetime totals or a different period.
-        const targetEnd = new Date(fc.targetDate);
-        const targetStart = fc.createdAt
-          ? new Date(fc.createdAt)
-          : new Date(targetEnd.getTime() - 7 * 24 * 60 * 60 * 1000);
-        if (!Number.isFinite(targetStart.getTime()) || !Number.isFinite(targetEnd.getTime()) || targetStart >= targetEnd) {
-          continue;
-        }
-        const inTargetWindow = (value: any) => {
+      const [tenantLeads, tenantCampaigns, tenantRevenues] = await Promise.all([
+        pgDb.select().from(leads).where(eq(leads.contractorId, contractorId)),
+        pgDb.select({ id: campaigns.id }).from(campaigns).where(eq(campaigns.contractorId, contractorId)),
+        pgDb.select().from(revenueRecords).where(eq(revenueRecords.contractorId, contractorId))
+      ]);
+      const campaignIds = tenantCampaigns.map(row => row.id);
+      const snapshots = campaignIds.length
+        ? await pgDb.select().from(performanceSnapshots).where(inArray(performanceSnapshots.campaignId, campaignIds))
+        : [];
+      const tenantLeadIds = tenantLeads.map(row => row.id);
+      const closedWonEvents = tenantLeadIds.length
+        ? await pgDb.select().from(leadEvents).where(and(
+            inArray(leadEvents.leadId, tenantLeadIds),
+            eq(leadEvents.eventType, 'ClosedWon')
+          ))
+        : [];
+
+      let evaluatedCount = 0;
+      for (const forecast of expiredUnevaluated) {
+        const targetEnd = new Date(forecast.targetDate);
+        const targetStart = new Date(forecast.createdAt);
+        if (!Number.isFinite(targetStart.getTime()) || !Number.isFinite(targetEnd.getTime()) || targetStart >= targetEnd) continue;
+        const inWindow = (value: any) => {
           const timestamp = new Date(value).getTime();
           return Number.isFinite(timestamp) && timestamp >= targetStart.getTime() && timestamp <= targetEnd.getTime();
         };
 
-        let actualVal: number | null = null;
-        if (fc.metric === 'lead_volume') {
-          const leads = db.getLeads(fc.contractorId);
-          actualVal = leads.length
-            ? leads.filter((lead: any) => inTargetWindow(lead.createdAt)).length
+        let actualValue: number | null = null;
+        if (forecast.metric === 'lead_volume') {
+          actualValue = tenantLeads.length
+            ? tenantLeads.filter(lead => inWindow(lead.createdAt)).length
             : null;
-        } else if (fc.metric === 'cpl') {
-          const campaigns = db.getCampaigns(fc.contractorId);
-          const campaignIds = campaigns.map(c => c.id);
-          const snaps = db.getPerformanceSnapshots(campaignIds).filter((snapshot: any) => inTargetWindow(snapshot.date));
-          const aggregateSpend = snaps.reduce((sum: number, snapshot: any) => sum + Number(snapshot.spend || 0), 0);
-          const aggregateLeads = snaps.reduce((sum: number, snapshot: any) => sum + Number(snapshot.leads || 0), 0);
-          actualVal = aggregateLeads > 0 ? aggregateSpend / aggregateLeads : null;
-        } else if (fc.metric === 'revenue') {
-          const revenues = db.getRevenues(fc.contractorId).filter((revenue: any) => inTargetWindow(revenue.createdAt));
-          actualVal = revenues.length
-            ? revenues.reduce((sum: number, revenue: any) => sum + Number(revenue.amountUsd || 0), 0)
+        } else if (forecast.metric === 'cpl') {
+          const windowSnapshots = snapshots.filter(snapshot => inWindow(snapshot.date));
+          const spend = windowSnapshots.reduce((sum, snapshot) => sum + Number(snapshot.spend || 0), 0);
+          const leadCount = windowSnapshots.reduce((sum, snapshot) => sum + Number(snapshot.leads || 0), 0);
+          actualValue = windowSnapshots.length && leadCount > 0 ? spend / leadCount : null;
+        } else if (forecast.metric === 'revenue') {
+          actualValue = tenantRevenues.length
+            ? tenantRevenues.filter(revenue => inWindow(revenue.createdAt)).reduce((sum, revenue) => sum + Number(revenue.amountUsd || 0), 0)
+            : null;
+        } else if (forecast.metric === 'conversions') {
+          actualValue = closedWonEvents.length
+            ? closedWonEvents.filter(event => inWindow(event.createdAt)).length
             : null;
         }
 
-        // Missing measurements are not zero. Leave the forecast unevaluated until
-        // the relevant source has observations for its target window.
-        if (actualVal === null || !Number.isFinite(actualVal)) continue;
-        const deviation = fc.predicted > 0 ? (actualVal - fc.predicted) / fc.predicted : 0;
-        
-        // Save Prediction Outcome
-        db.addPredictionOutcome({
-          forecastId: fc.id,
-          predicted: fc.predicted,
-          actual: actualVal,
-          deviation
-        });
-
-        // Generate Learning Insight via Gemini (or fallback)
+        // A missing measurement is not a zero. Keep the forecast unevaluated.
+        if (actualValue === null || !Number.isFinite(actualValue)) continue;
+        const deviation = forecast.predicted !== 0 ? (actualValue - forecast.predicted) / forecast.predicted : 0;
         const learning = await generateLearningFromOutcome(
-          fc.metric,
-          fc.predicted,
-          actualVal,
+          forecast.metric,
+          forecast.predicted,
+          actualValue,
           deviation,
-          fc.assumptions || ''
+          forecast.assumptions || ''
         );
+        const confidenceShift = Number.isFinite(Number(learning.confidence)) ? Number(learning.confidence) : 0;
+        const evaluatedAt = new Date();
 
-        db.addLearningInsight({
-          category: learning.category,
-          insight: learning.insight,
-          confidence: learning.confidence,
-          sourceForecastId: fc.id,
-          observedCount: 1
+        await pgDb.transaction(async tx => {
+          await tx.insert(predictionOutcomes).values({
+            id: crypto.randomUUID(),
+            forecastId: forecast.id,
+            predicted: forecast.predicted,
+            actual: actualValue as number,
+            deviation,
+            evaluatedAt
+          });
+          await tx.insert(learningInsights).values({
+            id: crypto.randomUUID(),
+            contractorId,
+            metric: forecast.metric,
+            lesson: learning.insight,
+            confidenceShift,
+            createdAt: evaluatedAt
+          });
+          await tx.update(forecasts).set({ evaluated: true, updatedAt: evaluatedAt })
+            .where(and(eq(forecasts.id, forecast.id), eq(forecasts.contractorId, contractorId), eq(forecasts.evaluated, false)));
+          await tx.insert(workEvents).values({
+            id: 'evt_' + crypto.randomUUID(),
+            contractorId,
+            eventType: 'forecast.evaluated',
+            entityType: 'forecast',
+            entityId: forecast.id,
+            actorType: 'system',
+            actorId: 'forecast_evaluator',
+            sourceModule: 'intelligence',
+            correlationId: forecast.id,
+            summary: `Evaluated ${forecast.metric} forecast against recorded observations.`,
+            payload: { predicted: forecast.predicted, actual: actualValue, deviation, learningInsight: learning.insight }
+          });
         });
 
-        // Also save as Lesson DB (Phase 2)
-        db.addLesson({
-          category: learning.category,
-          title: `Forecast Deviation Lesson (${fc.metric.toUpperCase()})`,
-          description: learning.insight,
-          confidence: learning.confidence,
-          timesObserved: 1,
-          lastObserved: new Date().toISOString()
-        });
-
+        // Legacy lesson history is retained for older screens during migration.
+        try {
+          db.addLesson({
+            category: learning.category,
+            title: `Forecast Deviation Lesson (${forecast.metric.toUpperCase()})`,
+            description: learning.insight,
+            confidence: confidenceShift,
+            timesObserved: 1,
+            lastObserved: evaluatedAt.toISOString()
+          });
+        } catch (legacyError) {
+          console.warn('[HAL Learning] Legacy lesson mirror failed; PostgreSQL insight remains authoritative.', legacyError);
+        }
         evaluatedCount++;
       }
 
-      resultMessage = `Evaluated ${evaluatedCount} expired forecasts. Closed the intelligence loop. LearningInsights populated.`;
-      broadcastNotification(
-        contractorId,
-        'info',
-        'Forecast Evaluation Completed',
-        `Evaluated ${evaluatedCount} expired hypotheses. Generated fresh strategic learning lessons.`
-      );
+      resultMessage = evaluatedCount
+        ? `Evaluated ${evaluatedCount} expired forecasts using tenant PostgreSQL observations; prediction outcomes and learning insights were persisted.`
+        : 'No expired forecasts had sufficient recorded observations to evaluate. No synthetic measurements were substituted.';
+      broadcastNotification(contractorId, 'info', 'Forecast Evaluation Completed', resultMessage);
 
-    // ─── 3.6 Auto-Forecaster ───
     } else if (job === 'auto_forecaster') {
-      const campaigns = db.getCampaigns(contractorId);
-      const campaignIds = campaigns.map(c => c.id);
-      const snaps = db.getPerformanceSnapshots(campaignIds);
-      
-      // Use only the trailing 90 days of recorded campaign snapshots.
-      const historyCutoff = Date.now() - 90 * 24 * 60 * 60 * 1000;
-      const historicalData = snaps
+      const tenantCampaigns = await pgDb.select({ id: campaigns.id }).from(campaigns)
+        .where(eq(campaigns.contractorId, contractorId));
+      const campaignIds = tenantCampaigns.map(row => row.id);
+      const snapshots = campaignIds.length
+        ? await pgDb.select().from(performanceSnapshots).where(inArray(performanceSnapshots.campaignId, campaignIds))
+        : [];
+      const cutoff = Date.now() - 90 * 24 * 60 * 60 * 1000;
+      const historicalData = snapshots
         .filter(snapshot => {
           const timestamp = new Date(snapshot.date).getTime();
-          return Number.isFinite(timestamp) && timestamp >= historyCutoff;
+          return Number.isFinite(timestamp) && timestamp >= cutoff;
         })
-        .map(snapshot => ({
-          date: snapshot.date,
-          value: snapshot.leads
-        }));
+        .map(snapshot => ({ date: snapshot.date, value: Number(snapshot.leads || 0) }))
+        .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
-      const forecastResult = await generateForecastNarrative('lead_volume', historicalData, req.body.preferredAI);
-
-      const newFc = db.addForecast({
-        contractorId,
-        metric: 'lead_volume',
-        predicted: forecastResult.predicted,
-        confidenceScore: forecastResult.confidenceScore,
-        targetDate: new Date(Date.now() + 7 * 24 * 3600 * 1000).toISOString(), // Target next week
-        modelVersion: forecastResult.source || 'unknown',
-        evaluated: false,
-        assumptions: forecastResult.assumptions
-      });
-
-      resultMessage = `Created a 7-day lead-volume estimate using ${forecastResult.source || 'an unverified source'}. Estimate: ${newFc.predicted} leads. Confidence: ${newFc.confidenceScore}. Assumptions: ${newFc.assumptions}`;
-      broadcastNotification(
-        contractorId,
-        'info',
-        'Lead-volume estimate created',
-        `Created a 7-day estimate using ${forecastResult.source || 'an unverified source'}. Model-reported confidence: ${newFc.confidenceScore}.`
-      );
-
-    // ─── 3.8 Revenue LTV Correction ───
-    } else if (job === 'ltv_correction') {
-      const leads = db.getLeads(contractorId);
-      const revenues = db.getRevenues(contractorId);
-      
-      // Correcting LTV heuristic factor: compute actual vs predicted LTV
-      const convertedLeads = leads.filter(l => l.status === 'converted');
-      let matchesCount = 0;
-      let totalPredicted = 0;
-      let totalActual = 0;
-
-      for (const cl of convertedLeads) {
-        const rev = revenues.find(r => r.leadId === cl.id);
-        if (rev) {
-          matchesCount++;
-          totalPredicted += cl.predictedLtvUsd;
-          totalActual += rev.amountUsd;
-        }
+      if (!historicalData.length) {
+        resultMessage = 'No campaign performance observations exist for this tenant in the last 90 days. No forecast was fabricated.';
+      } else {
+        const forecastResult = await generateForecastNarrative('lead_volume', historicalData, req.body?.preferredAI);
+        const newForecast = await pgDb.transaction(async tx => {
+          const [created] = await tx.insert(forecasts).values({
+            id: crypto.randomUUID(),
+            contractorId,
+            metric: 'lead_volume',
+            predicted: Number(forecastResult.predicted),
+            confidenceScore: Number(forecastResult.confidenceScore),
+            targetDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+            modelVersion: forecastResult.source || 'unverified',
+            evaluated: false,
+            assumptions: forecastResult.assumptions || '',
+            createdAt: new Date(),
+            updatedAt: new Date()
+          }).returning();
+          await tx.insert(workEvents).values({
+            id: 'evt_' + crypto.randomUUID(),
+            contractorId,
+            eventType: 'forecast.created',
+            entityType: 'forecast',
+            entityId: created.id,
+            actorType: 'system',
+            actorId: 'auto_forecaster',
+            sourceModule: 'intelligence',
+            correlationId: created.id,
+            summary: 'Created a seven-day lead-volume forecast from recorded campaign observations.',
+            payload: { modelVersion: created.modelVersion, predicted: created.predicted, historyPoints: historicalData.length }
+          });
+          return created;
+        });
+        resultMessage = `Created a 7-day lead-volume forecast from ${historicalData.length} recorded campaign observations using ${newForecast.modelVersion}. Estimate: ${newForecast.predicted} leads.`;
+        broadcastNotification(contractorId, 'info', 'Lead-volume forecast created', resultMessage);
       }
 
-      const multiplier = totalPredicted > 0 ? totalActual / totalPredicted : 1.0;
-      resultMessage = `LTV assessment finished on ${matchesCount} samples. Heuristic correction multiplier computed: ${multiplier.toFixed(3)}.`;
-      
-      broadcastNotification(
-        contractorId,
-        'success',
-        'LTV Correction Realized',
-        `LTV calibration completed. Correction multiplier: ${multiplier.toFixed(3)} based on real closed revenues.`
-      );
+    } else if (job === 'ltv_correction') {
+      const [tenantLeads, tenantRevenues] = await Promise.all([
+        pgDb.select().from(leads).where(eq(leads.contractorId, contractorId)),
+        pgDb.select().from(revenueRecords).where(eq(revenueRecords.contractorId, contractorId))
+      ]);
+      const closedWon = tenantLeads.filter(lead => ['closed_won', 'converted', 'customer'].includes(String(lead.status).toLowerCase()));
+      const revenueByLead = new Map<string, number>();
+      for (const revenue of tenantRevenues) {
+        if (!revenue.leadId) continue;
+        revenueByLead.set(revenue.leadId, (revenueByLead.get(revenue.leadId) || 0) + Number(revenue.amountUsd || 0));
+      }
+      let matched = 0, predictedTotal = 0, actualTotal = 0;
+      for (const lead of closedWon) {
+        const actual = revenueByLead.get(lead.id);
+        if (actual === undefined) continue;
+        matched++;
+        predictedTotal += Number(lead.predictedLtv || 0);
+        actualTotal += actual;
+      }
+      const multiplier = predictedTotal > 0 ? actualTotal / predictedTotal : null;
+      resultMessage = multiplier === null
+        ? `LTV calibration has insufficient matched closed-won lead and revenue records (${matched} matched).`
+        : `LTV calibration used ${matched} closed-won records. Actual-to-predicted revenue multiplier: ${multiplier.toFixed(3)}.`;
+      broadcastNotification(contractorId, 'info', 'LTV Calibration Completed', resultMessage);
 
-    // ─── 5.7 Weekly Intelligence Summary ───
     } else if (job === 'weekly_summary') {
-      resultMessage = 'Weekly marketing intelligence summary generated. Budget optimization triggers updated.';
-      broadcastNotification(
-        contractorId,
-        'info',
-        'Weekly Summary Compiled',
-        'HAL has synchronized active accounts with high-level campaign targets.'
-      );
+      const [tenantLeads, tenantCampaigns, tenantRevenues] = await Promise.all([
+        pgDb.select().from(leads).where(eq(leads.contractorId, contractorId)),
+        pgDb.select().from(campaigns).where(eq(campaigns.contractorId, contractorId)),
+        pgDb.select().from(revenueRecords).where(eq(revenueRecords.contractorId, contractorId))
+      ]);
+      const totalRevenue = tenantRevenues.reduce((sum, revenue) => sum + Number(revenue.amountUsd || 0), 0);
+      const closedWonCount = tenantLeads.filter(lead => ['closed_won', 'converted', 'customer'].includes(String(lead.status).toLowerCase())).length;
+      resultMessage = `Operating summary: ${tenantLeads.length} leads, ${closedWonCount} closed-won leads, ${tenantCampaigns.length} campaigns, ${tenantRevenues.length} revenue records, and $${totalRevenue.toFixed(2)} recorded revenue. No budget or external campaign changes were made.`;
+      broadcastNotification(contractorId, 'info', 'Operating Summary Compiled', resultMessage);
+
     } else {
       throw new Error(`Job type "${job}" is unrecognised`);
     }
 
-    db.updateSchedulerJob(jobRecord.id, {
+    await pgDb.update(schedulerJobs).set({
       status: 'completed',
-      completedAt: new Date().toISOString(),
+      completedAt: new Date(),
       result: resultMessage
-    });
-
-    res.json({ success: true, result: resultMessage });
-
+    }).where(and(eq(schedulerJobs.id, jobRecord.id), eq(schedulerJobs.contractorId, contractorId)));
+    return res.json({ success: true, result: resultMessage, jobId: jobRecord.id });
   } catch (err: any) {
-    db.updateSchedulerJob(jobRecord.id, {
+    await pgDb.update(schedulerJobs).set({
       status: 'failed',
-      completedAt: new Date().toISOString(),
-      error: err.message
-    });
-    res.status(500).json({ error: err.message });
+      completedAt: new Date(),
+      error: String(err.message || 'Scheduled job failed.')
+    }).where(and(eq(schedulerJobs.id, jobRecord.id), eq(schedulerJobs.contractorId, contractorId)));
+    console.error('[HAL Scheduler] Job failed:', err);
+    return res.status(503).json({ error: err.message || 'Scheduled job failed.' });
   }
 });
 
@@ -7470,7 +8537,7 @@ app.post('/api/revenue/decision-engine/run', authenticate, async (req, res) => {
         campaignMap[camp] = { spend: 0, clicks: 0, leads: 0, closedWon: 0, revenue: 0 };
       }
       campaignMap[camp].closedWon += 1;
-      campaignMap[camp].revenue += Number(rev.amount || 0);
+      campaignMap[camp].revenue += getRevenueAmountUsd(rev);
     }
 
     // Calculate ROAS, CPL, CAC for each campaign
@@ -7548,7 +8615,7 @@ app.post('/api/revenue/decision-engine/run', authenticate, async (req, res) => {
         geoMap[geo] = { spend: 0, leads: 0, closedWon: 0, revenue: 0 };
       }
       geoMap[geo].closedWon += 1;
-      geoMap[geo].revenue += Number(rev.amount || 0);
+      geoMap[geo].revenue += getRevenueAmountUsd(rev);
     }
 
     const geoList = Object.keys(geoMap).map(geo => {
@@ -7658,8 +8725,8 @@ app.post('/api/revenue/simulations', authenticate, async (req, res) => {
       const camp = attr?.utmCampaign || Object.keys(campaignMap)[0] || 'Unknown Campaign';
       if (!campaignMap[camp]) campaignMap[camp] = { spend: 0, revenue: 0, leads: 0, closedWon: 0 };
       campaignMap[camp].closedWon += 1;
-      campaignMap[camp].revenue += Number(rev.amount || 0);
-      totalRevenue += Number(rev.amount || 0);
+      campaignMap[camp].revenue += getRevenueAmountUsd(rev);
+      totalRevenue += getRevenueAmountUsd(rev);
       totalClosedWon += 1;
     }
 
@@ -8774,55 +9841,8 @@ async function startServer() {
     }
   });
 
-  app.get('/api/financials/overview', authenticate, async (req, res) => {
-    const contractorId = (req as any).contractorId;
-    try {
-      const records = await pgDb.select().from(revenueRecords).where(eq(revenueRecords.contractorId, contractorId));
-      const projects = await pgDb.select().from(clientProjects).where(eq(clientProjects.contractorId, contractorId));
-
-      let currentMrr = 14500;
-      if (records.length > 0) {
-        currentMrr = records.reduce((sum, r) => sum + Number(r.amountUsd || 0), 0) || 14500;
-      } else if (projects.length > 0) {
-        currentMrr = projects.length * 2400;
-      }
-
-      const activeCount = projects.length > 0 ? projects.length : Math.max(6, Math.floor(currentMrr / 2400));
-      const arr = currentMrr * 12;
-      const blendedCac = 450;
-      const ltv = currentMrr > 0 ? Math.round((currentMrr / Math.max(1, activeCount)) * 14) : 18500;
-      const ltvToCac = Number((ltv / blendedCac).toFixed(1));
-
-      res.json({
-        currentMrrUsd: currentMrr,
-        arrUsd: arr,
-        activeClientCount: activeCount,
-        ltvToCacRatio: ltvToCac > 0 ? ltvToCac : 4.2,
-        blendedCacUsd: blendedCac,
-        averageLtvUsd: ltv,
-        averageContractLengthMonths: 14,
-        churnRatePercent: 1.8,
-        projectedMrr6Months: Math.round(currentMrr * 1.15),
-        projectedMrr12Months: Math.round(currentMrr * 1.35),
-        cashRunwayMonths: 18,
-        mrrHistory: [
-          { month: 'Apr', mrr: Math.round(currentMrr * 0.75) },
-          { month: 'May', mrr: Math.round(currentMrr * 0.82) },
-          { month: 'Jun', mrr: Math.round(currentMrr * 0.90) },
-          { month: 'Jul', mrr: Math.round(currentMrr * 0.95) },
-          { month: 'Aug', mrr: Math.round(currentMrr * 0.98) },
-          { month: 'Sep', mrr: currentMrr },
-        ],
-        tierDistribution: [
-          { tier: 'Enterprise Retainer', count: Math.max(1, Math.floor(activeCount * 0.3)), totalRevenue: Math.round(currentMrr * 0.5) },
-          { tier: 'Growth Acceleration', count: Math.max(2, Math.floor(activeCount * 0.5)), totalRevenue: Math.round(currentMrr * 0.35) },
-          { tier: 'Starter SEO/Ads', count: Math.max(1, Math.floor(activeCount * 0.2)), totalRevenue: Math.round(currentMrr * 0.15) },
-        ]
-      });
-    } catch (err: any) {
-      res.status(500).json({ success: false, error: err.message });
-    }
-  });
+  // The canonical financial overview route is registered above. Do not register a
+  // second handler here: Express would make this dead code and hide stale metrics.
 
   // ─── PHASE 8A: HAL MCP TOOL GATEWAY FOR HERMES AGENT ────────────────────
   app.post('/api/mcp', authenticate, async (req, res) => {
@@ -9066,10 +10086,11 @@ async function startServer() {
         success: true,
         incidents,
         overseerStatus: {
-          active: true,
-          mode: 'ACTIVE_SUPERVISION',
-          lastScanAt: new Date().toISOString(),
-          monitoredSurfaces: ['GCLID Attribution Outbox', 'Webhook Payloads', 'SSL & Tag Integrity', 'ROAS Anomalies']
+          active: false,
+          mode: 'ON_DEMAND_DIAGNOSTIC_ONLY',
+          lastScanAt: incidents[0]?.createdAt || null,
+          monitoredSurfaces: ['Google Ads daily performance observations'],
+          providerReachabilityVerified: false
         }
       });
     } catch (err: any) {
@@ -9081,41 +10102,63 @@ async function startServer() {
   app.post('/api/hermes/diagnostics/scan', authenticate, async (req, res) => {
     const contractorId = (req as any).contractorId;
     try {
-      // Check contractor lead conversion rate and ad anomalies
-      const ads = await pgDb
-        .select()
-        .from(googleAdsDailyPerformance)
+      // This endpoint checks stored Google Ads observations only. It does not
+      // probe landing-page tags, webhooks, or provider delivery reachability.
+      const ads = await pgDb.select().from(googleAdsDailyPerformance)
         .where(eq(googleAdsDailyPerformance.contractorId, contractorId));
-
+      const totalSpend = ads.reduce((sum, row) => sum + (Number(row.cost) || 0), 0);
+      const totalConversions = ads.reduce((sum, row) => sum + (Number(row.conversions) || 0), 0);
       const detectedIssues: any[] = [];
-      const totalSpend = ads.reduce((acc, a) => acc + (Number(a.cost) || 0), 0);
-      const totalConv = ads.reduce((acc, a) => acc + (Number(a.conversions) || 0), 0);
 
-      if (totalSpend > 400 && totalConv === 0) {
-        const incidentId = crypto.randomUUID();
-        await pgDb.insert(hermesDiagnosticIncidents).values({
-          id: incidentId,
-          contractorId,
-          title: 'Zero Conversion Leak Detected in Google Ads Traffic',
-          severity: 'HIGH',
-          category: 'TRACKING_TAG',
-          rootCause: 'Traffic is landing on destination URL without active GCLID attribution form listener.',
-          evidence: { spend: totalSpend, conversions: 0 },
-          proposedFix: 'Inject HAL GCLID capture script and deploy pre-wired emergency landing page from Hermes Lab.',
-          status: 'open',
-          createdAt: new Date()
-        });
-        detectedIssues.push({ id: incidentId, title: 'Zero Conversion Leak Detected' });
+      if (ads.length > 0 && totalSpend > 400 && totalConversions === 0) {
+        const title = 'Spend recorded without conversions in Google Ads observations';
+        const [existing] = await pgDb.select({ id: hermesDiagnosticIncidents.id })
+          .from(hermesDiagnosticIncidents)
+          .where(and(
+            eq(hermesDiagnosticIncidents.contractorId, contractorId),
+            eq(hermesDiagnosticIncidents.title, title),
+            eq(hermesDiagnosticIncidents.status, 'open')
+          )).limit(1);
+        if (!existing) {
+          const incidentId = crypto.randomUUID();
+          await pgDb.insert(hermesDiagnosticIncidents).values({
+            id: incidentId,
+            contractorId,
+            title,
+            severity: 'MEDIUM',
+            category: 'CAMPAIGN_DECAY',
+            rootCause: 'Stored Google Ads observations show spend above the screening threshold and zero recorded conversions. This does not establish whether tracking is broken or whether no conversions occurred.',
+            evidence: {
+              spend: totalSpend,
+              conversions: totalConversions,
+              observationRows: ads.length,
+              source: 'google_ads_daily_performance',
+              interpretation: 'Screening signal only; validate attribution and conversion tracking independently.'
+            },
+            proposedFix: 'Review the Google Ads conversion configuration and reconcile it against verified landing-page and CRM events before changing campaign budgets or deploying code.',
+            status: 'open',
+            createdAt: new Date()
+          });
+          detectedIssues.push({ id: incidentId, title });
+        }
       }
 
-      res.json({
+      return res.json({
         success: true,
-        scannedSurfaces: 4,
+        scanMode: 'on_demand',
+        scannedSurfaces: ads.length ? ['Google Ads daily performance observations'] : [],
+        evidenceRows: ads.length,
+        totalSpend,
+        totalConversions,
         newIncidentsFound: detectedIssues.length,
-        detectedIssues
+        detectedIssues,
+        message: ads.length
+          ? 'Google Ads observations were reviewed. No external tracking-tag, webhook, or delivery-provider health checks were performed.'
+          : 'No Google Ads performance observations are stored for this workspace; no diagnostic conclusion was generated.'
       });
     } catch (err: any) {
-      res.status(500).json({ success: false, error: err.message });
+      console.error('[Hermes Diagnostic Scan Error]', err);
+      return res.status(500).json({ success: false, error: err.message || 'Diagnostic scan failed.' });
     }
   });
 
@@ -9272,8 +10315,10 @@ async function startServer() {
         }
       ];
 
-      const allRevenues = db.getRevenues(contractorId);
-      const totalRevenue = allRevenues.reduce((sum, revenue) => sum + (revenue.amountUsd || 0), 0);
+      const allRevenues = await pgDb.select({ amountUsd: revenueRecords.amountUsd })
+        .from(revenueRecords)
+        .where(eq(revenueRecords.contractorId, contractorId));
+      const totalRevenue = allRevenues.reduce((sum, revenue) => sum + getRevenueAmountUsd(revenue), 0);
 
       res.json({
         success: true,
@@ -9360,8 +10405,11 @@ async function startServer() {
       const encryptionPass = ivDifferent && decryptMatch && tamperFailsClosed;
 
       // Test 3: Basic Pipeline Lead & CRM Invariants
-      const leadsList = db.getLeads(contractorId);
-      const pipelinePass = Array.isArray(leadsList);
+      const leadsList = await pgDb.select().from(leads).where(eq(leads.contractorId, contractorId));
+      const pipelinePass =
+        leadsList.every(lead => isKnownCrmStage(lead.status)) &&
+        validateCrmTransition('new', 'contacted').valid &&
+        !validateCrmTransition('unknown_stage', 'contacted').valid;
 
       const tests = [
         {
@@ -9383,7 +10431,7 @@ async function startServer() {
           name: 'Pillar 3: Basic Pipeline Flow & CRM State Invariants',
           status: pipelinePass ? 'PASSED' : 'FAILED',
           latencyMs: 2,
-          details: `Verified lead ingestion, CRM stage machine, and tenant isolation across ${leadsList.length} entities.`
+          details: `Inspected ${leadsList.length} tenant-scoped PostgreSQL leads; all stored stages recognized: ${leadsList.every(lead => isKnownCrmStage(lead.status))}; CRM transition guard checks passed: ${pipelinePass}.`
         }
       ];
 
@@ -9611,8 +10659,9 @@ async function startServer() {
       // 2. Harvest actual active businesses
       const harvested = await harvestRealBusinesses(city, niche);
 
-      // 3. Save each with AES-GCM-256 encrypted PII
+      // 3. Save each with AES-GCM-256 encrypted PII and create a human review assignment.
       const savedLeads = [];
+      let queuedTasks = 0;
       for (const hl of harvested) {
         const id = crypto.randomUUID();
         const rawEmail = hl.email ? String(hl.email) : null;
@@ -9670,6 +10719,44 @@ async function startServer() {
           metadata: { city: addedLead.city, niche: addedLead.niche, source: 'harvested_intelligence' }
         });
 
+        const [activeReviewTask] = await pgDb.select({ id: workTasks.id }).from(workTasks).where(and(
+          eq(workTasks.contractorId, contractorId),
+          eq(workTasks.taskType, 'lead_follow_up'),
+          eq(workTasks.entityType, 'lead'),
+          eq(workTasks.entityId, addedLead.id),
+          eq(workTasks.assignedWorker, 'human'),
+          inArray(workTasks.status, ['queued', 'running', 'awaiting_approval'])
+        )).limit(1);
+        if (!activeReviewTask) {
+          const taskId = 'task_' + crypto.randomUUID();
+          const correlationId = taskId;
+          await pgDb.transaction(async tx => {
+            await tx.insert(workTasks).values({
+              id: taskId, contractorId, taskType: 'lead_follow_up',
+              title: `Review and qualify: ${addedLead.businessName}`,
+              description: 'Review this Phase 2 territory discovery candidate, verify its details and evidence, then record the next step. Do not contact the prospect until outreach verification checks pass.',
+              status: 'queued', priority: 'normal', assignedWorker: 'human',
+              entityType: 'lead', entityId: addedLead.id, correlationId,
+              input: { source: 'phase2_territory_harvest', verificationStatus: addedLead.verificationStatus || 'UNVERIFIED_STAGING' },
+              requiresApproval: false, createdAt: new Date(), updatedAt: new Date()
+            });
+            await tx.insert(workEvents).values({
+              id: 'evt_' + crypto.randomUUID(), contractorId,
+              eventType: 'task.created', entityType: 'work_task', entityId: taskId,
+              actorType: 'system', actorId: 'phase2_territory_harvester', sourceModule: 'phase2_territory_harvest',
+              correlationId, summary: `Created human qualification task for ${addedLead.businessName}.`,
+              payload: { taskType: 'lead_follow_up', assignedWorker: 'human', status: 'queued', leadId: addedLead.id }
+            });
+            await tx.insert(workEvents).values({
+              id: 'evt_' + crypto.randomUUID(), contractorId,
+              eventType: 'lead.queued_for_review', entityType: 'lead', entityId: addedLead.id,
+              actorType: 'system', actorId: 'phase2_territory_harvester', sourceModule: 'phase2_territory_harvest',
+              correlationId, summary: `${addedLead.businessName} was added to the human review queue.`,
+              payload: { taskId, verificationStatus: addedLead.verificationStatus || 'UNVERIFIED_STAGING' }
+            });
+          });
+          queuedTasks++;
+        }
         savedLeads.push(addedLead);
       }
 
@@ -9687,6 +10774,7 @@ async function startServer() {
       res.json({
         success: true,
         harvestedCount: savedLeads.length,
+        queuedTasks,
         verifiedCount: savedLeads.filter(lead => lead.verificationStatus === 'VERIFIED' && !lead.isSynthetic).length,
         unverifiedCount: savedLeads.filter(lead => lead.verificationStatus !== 'VERIFIED' || lead.isSynthetic).length,
         syntheticCount: savedLeads.filter(lead => lead.isSynthetic).length,
@@ -9711,10 +10799,10 @@ async function startServer() {
 
     try {
       const integrity = db.verifyLedgerIntegrity(contractorId);
-      const sequences = db.getOutreachSequences(contractorId);
+      const sequences = await getTenantOutreachSequences(contractorId);
       const sequenceTemplates = getDefaultCadenceSequences();
       const outbox = await pgDb.select().from(conversionOutbox).where(eq(conversionOutbox.contractorId, contractorId));
-      const jobs = db.getSchedulerJobs(contractorId);
+      const jobs = await pgDb.select().from(schedulerJobs).where(eq(schedulerJobs.contractorId, contractorId)).orderBy(desc(schedulerJobs.createdAt));
       const schedulerTemplates = getDefaultSchedulerRules();
 
       const verification = verifyPhase3Pillars(sequences, outbox, jobs);
@@ -9752,9 +10840,9 @@ async function startServer() {
     const contractorId = (req as any).contractorId;
 
     try {
-      const sequences = db.getOutreachSequences(contractorId);
+      const sequences = await getTenantOutreachSequences(contractorId);
       const outbox = await pgDb.select().from(conversionOutbox).where(eq(conversionOutbox.contractorId, contractorId));
-      const jobs = db.getSchedulerJobs(contractorId);
+      const jobs = await pgDb.select().from(schedulerJobs).where(eq(schedulerJobs.contractorId, contractorId)).orderBy(desc(schedulerJobs.createdAt));
       const verification = verifyPhase3Pillars(sequences, outbox, jobs);
 
       const auditBlock = db.recordLedgerEntry({
@@ -9794,7 +10882,7 @@ async function startServer() {
     const { sequenceId, businessName, ownerName, city, niche } = req.body || {};
 
     try {
-      const savedSequences = db.getOutreachSequences(contractorId);
+      const savedSequences = await getTenantOutreachSequences(contractorId);
       const savedSequence = savedSequences.find(sequence => sequence.id === sequenceId);
       const templates = getDefaultCadenceSequences();
       const templateSequence = templates.find(sequence => sequence.id === sequenceId) || templates[0];
@@ -9807,7 +10895,7 @@ async function startServer() {
             conversionRatePct: null,
             templateOnly: false,
             createdAt: savedSequence.createdAt,
-            steps: savedSequence.steps.map((step, index) => ({
+            steps: (Array.isArray(savedSequence.steps) ? savedSequence.steps as any[] : []).map((step, index) => ({
               id: `${savedSequence.id}_step_${index + 1}`,
               stepNumber: index + 1,
               dayOffset: step.day,
@@ -9910,14 +10998,17 @@ async function startServer() {
       const templates = getDefaultSchedulerRules();
       const configuredRules: any[] = [];
       const now = new Date().toISOString();
-      const jobRecord = db.addSchedulerJob({
+      const jobTime = new Date(now);
+      const [jobRecord] = await pgDb.insert(schedulerJobs).values({
+        id: 'job_' + crypto.randomUUID(),
         contractorId,
         job: 'phase3_scheduler_configuration_check',
         status: 'completed',
-        startedAt: now,
-        completedAt: now,
-        result: 'No persisted scheduler rules are configured; no calendar or outreach triggers were executed.'
-      });
+        startedAt: jobTime,
+        completedAt: jobTime,
+        result: 'No persisted scheduler rules are configured; no calendar or outreach triggers were executed.',
+        createdAt: jobTime
+      }).returning();
 
       const auditBlock = db.recordLedgerEntry({
         contractorId,
@@ -9959,13 +11050,38 @@ async function startServer() {
     try {
       const records = await pgDb.select().from(conversionOutbox)
         .where(eq(conversionOutbox.contractorId, contractorId)).limit(50);
-      const filteredLogs = dispatchLogs.filter(log => log.contractorId === contractorId).slice(-50).reverse();
+      const dispatchRows = await pgDb.select().from(communicationsOutbox)
+        .where(eq(communicationsOutbox.contractorId, contractorId))
+        .orderBy(desc(communicationsOutbox.createdAt)).limit(50);
+      const dispatchLeadIds = [...new Set(dispatchRows.map(row => row.leadId).filter((id): id is string => Boolean(id)))];
+      const dispatchLeadRows = dispatchLeadIds.length
+        ? await pgDb.select({ id: leads.id, businessName: leads.businessName }).from(leads)
+            .where(and(eq(leads.contractorId, contractorId), inArray(leads.id, dispatchLeadIds)))
+        : [];
+      const dispatchLeadNames = new Map(dispatchLeadRows.map(row => [row.id, row.businessName]));
+      const filteredLogs = dispatchRows.map(row => ({
+        id: row.id, contractorId: row.contractorId, channel: row.channel,
+        recipient: (() => {
+          const raw = row.recipientEncrypted ? decrypt(row.recipientEncrypted) : '';
+          const parts = String(raw || '').split('@');
+          if (parts.length === 2) return parts[0].slice(0, 1) + '***@' + parts[1];
+          const digits = String(raw || '').replace(/\D/g, '');
+          return digits.length >= 4 ? `••••${digits.slice(-4)}` : 'Saved recipient';
+        })(),
+        leadId: row.leadId || undefined,
+        leadBusinessName: row.leadId ? (dispatchLeadNames.get(row.leadId) || 'Lead no longer available') : 'Direct Recipient',
+        status: row.status, mode: row.status === 'simulated' ? 'simulation' : 'live',
+        providerId: row.providerMessageId || undefined,
+        timestamp: (row.deliveredAt || row.submittedAt || row.createdAt).toISOString(),
+        subject: row.subjectEncrypted ? decrypt(row.subjectEncrypted) : undefined,
+        preview: row.bodyEncrypted ? decrypt(row.bodyEncrypted).slice(0, 100) : ''
+      }));
       const ledgerHistory = db.getStructuredLedger(contractorId, 20).filter(entry =>
         entry.eventType === 'phase3_live_dispatch' ||
         entry.eventType === 'phase3_outbox_inspected' ||
         entry.entityType === 'conversion_outbox'
       );
-      const credentials = db.getConnectorCredentials(contractorId);
+      const credentials = await getTenantConnectorCredentials(contractorId);
 
       const gateways = [
         { id: 'resend_email', name: 'Resend Email API', type: 'email', configured: Boolean(credentials.resend), status: credentials.resend ? 'configured_unverified' : 'not_configured', mode: credentials.resend ? 'Credential saved; provider not verified' : 'No credential configured', latencyMs: null, encryption: 'HTTPS API', deliverability: null, lastHeartbeat: null },

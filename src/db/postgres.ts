@@ -106,6 +106,14 @@ export async function bootstrapPostgresTables(poolInstance?: Pool): Promise<void
         last_login_at TIMESTAMP
       );
 
+      CREATE TABLE IF NOT EXISTS revoked_tokens (
+        token_hash TEXT PRIMARY KEY,
+        contractor_id TEXT NOT NULL,
+        expires_at TIMESTAMP NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS revoked_tokens_expiry_idx ON revoked_tokens (expires_at);
+
       CREATE TABLE IF NOT EXISTS leads (
         id TEXT PRIMARY KEY,
         contractor_id TEXT NOT NULL,
@@ -198,11 +206,16 @@ export async function bootstrapPostgresTables(poolInstance?: Pool): Promise<void
 
       CREATE TABLE IF NOT EXISTS learning_insights (
         id TEXT PRIMARY KEY,
+        contractor_id TEXT NOT NULL,
         metric TEXT NOT NULL,
         lesson TEXT NOT NULL,
         confidence_shift DOUBLE PRECISION NOT NULL,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
       );
+      ALTER TABLE learning_insights ADD COLUMN IF NOT EXISTS contractor_id TEXT;
+      UPDATE learning_insights SET contractor_id = 'system' WHERE contractor_id IS NULL;
+      ALTER TABLE learning_insights ALTER COLUMN contractor_id SET NOT NULL;
+      CREATE INDEX IF NOT EXISTS learning_insights_tenant_created_idx ON learning_insights (contractor_id, created_at DESC);
 
       CREATE TABLE IF NOT EXISTS chat_projects (
         id TEXT PRIMARY KEY,
@@ -298,6 +311,15 @@ export async function bootstrapPostgresTables(poolInstance?: Pool): Promise<void
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
       );
 
+      CREATE TABLE IF NOT EXISTS connector_credentials (
+        id TEXT PRIMARY KEY,
+        contractor_id TEXT NOT NULL,
+        service TEXT NOT NULL,
+        encrypted_value TEXT NOT NULL,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS connector_credentials_tenant_idx ON connector_credentials (contractor_id, service);
+
       CREATE TABLE IF NOT EXISTS notifications (
         id TEXT PRIMARY KEY,
         contractor_id TEXT NOT NULL,
@@ -310,6 +332,7 @@ export async function bootstrapPostgresTables(poolInstance?: Pool): Promise<void
 
       CREATE TABLE IF NOT EXISTS scheduler_jobs (
         id TEXT PRIMARY KEY,
+        contractor_id TEXT,
         job TEXT NOT NULL,
         status TEXT NOT NULL,
         started_at TIMESTAMP,
@@ -318,6 +341,9 @@ export async function bootstrapPostgresTables(poolInstance?: Pool): Promise<void
         result TEXT,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
       );
+
+      ALTER TABLE scheduler_jobs ADD COLUMN IF NOT EXISTS contractor_id TEXT;
+      CREATE INDEX IF NOT EXISTS scheduler_jobs_tenant_created_idx ON scheduler_jobs (contractor_id, created_at DESC);
 
       CREATE TABLE IF NOT EXISTS lead_events (
         id TEXT PRIMARY KEY,
@@ -391,7 +417,7 @@ export async function bootstrapPostgresTables(poolInstance?: Pool): Promise<void
       CREATE TABLE IF NOT EXISTS communications_outbox (
         id TEXT PRIMARY KEY,
         contractor_id TEXT NOT NULL,
-        lead_id TEXT NOT NULL,
+        lead_id TEXT,
         channel TEXT NOT NULL,
         provider TEXT NOT NULL,
         recipient_encrypted TEXT NOT NULL,
@@ -410,6 +436,10 @@ export async function bootstrapPostgresTables(poolInstance?: Pool): Promise<void
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
       );
+
+      ALTER TABLE communications_outbox ALTER COLUMN lead_id DROP NOT NULL;
+      ALTER TABLE communications_outbox DROP CONSTRAINT IF EXISTS communications_outbox_idempotency_key_key;
+      CREATE UNIQUE INDEX IF NOT EXISTS communications_outbox_tenant_idempotency_idx ON communications_outbox (contractor_id, idempotency_key);
 
       CREATE TABLE IF NOT EXISTS communications_delivery_events (
         id TEXT PRIMARY KEY,
@@ -817,59 +847,73 @@ export async function bootstrapPostgresTables(poolInstance?: Pool): Promise<void
   }
 }
 
-export async function testPostgresConnection(customUrl?: string): Promise<{ 
-  connected: boolean; 
-  message: string; 
-  version?: string; 
-  provider?: string; 
+export async function testPostgresConnection(customUrl?: string): Promise<{
+  connected: boolean;
+  schemaReady?: boolean;
+  message: string;
+  version?: string;
+  provider?: string;
   latencyMs?: number;
   tablesCount?: number;
 }> {
-  const p = getPostgresPool(customUrl);
+  // A supplied URL is an isolated diagnostic target. Never replace the pool used
+  // by application queries and never run DDL just because an admin tested a URL.
+  const temporaryPool = customUrl
+    ? new Pool({
+        connectionString: customUrl,
+        ssl: customUrl.includes('sslmode=require') || customUrl.includes('neon.tech') || customUrl.includes('supabase')
+          ? { rejectUnauthorized: false }
+          : undefined,
+        max: 1,
+        connectionTimeoutMillis: 5000,
+      })
+    : null;
+  const p = temporaryPool || getPostgresPool();
   if (!p) {
-    return { connected: false, message: 'DATABASE_URL or NEON_DATABASE_URL is not configured.' };
+    return { connected: false, schemaReady: false, message: 'DATABASE_URL or NEON_DATABASE_URL is not configured.' };
   }
 
-  const start = Date.now();
+  const startTime = Date.now();
   let client: PoolClient | null = null;
   try {
     client = await p.connect();
     const result = await client.query('SELECT version(), current_database(), current_user;');
-
-    // Apply idempotent bootstrap or prove that the managed schema is complete.
-    await bootstrapPostgresTables(p);
-
     const tablesRes = await client.query(`
       SELECT
-        count(*) as count,
+        count(*) AS count,
+        to_regclass('public.contractors') IS NOT NULL AS has_contractors,
+        to_regclass('public.leads') IS NOT NULL AS has_leads,
         to_regclass('public.work_tasks') IS NOT NULL AS has_work_tasks,
         to_regclass('public.work_events') IS NOT NULL AS has_work_events
       FROM information_schema.tables
       WHERE table_schema = 'public';
     `);
-    const schemaState = tablesRes.rows[0];
-    if (!schemaState?.has_work_tasks || !schemaState?.has_work_events) {
-      throw new Error('Database connection succeeded, but the HAL operating-layer schema is incomplete (work_tasks/work_events missing).');
-    }
-
-    const latencyMs = Date.now() - start;
+    const schemaState = tablesRes.rows[0] || {};
+    const schemaReady = Boolean(schemaState.has_contractors && schemaState.has_leads && schemaState.has_work_tasks && schemaState.has_work_events);
+    const latencyMs = Date.now() - startTime;
     const versionStr = result.rows[0]?.version || 'PostgreSQL';
-    const isNeon = (activeConnectionString || '').includes('neon.tech') || versionStr.toLowerCase().includes('neon');
-
+    const provider = (customUrl || activeConnectionString || process.env.DATABASE_URL || process.env.NEON_DATABASE_URL || '').includes('neon.tech') || versionStr.toLowerCase().includes('neon')
+      ? 'Neon PostgreSQL'
+      : 'PostgreSQL';
     return {
       connected: true,
-      message: `Successfully connected to ${isNeon ? 'Neon Serverless PostgreSQL' : 'PostgreSQL database'}. Required operating-layer schema verified.`,
+      schemaReady,
+      message: schemaReady
+        ? `Successfully connected to ${provider}; required HAL tables are present.`
+        : `Connected to ${provider}, but the required HAL schema is incomplete. No schema changes were made by this connection test.`,
       version: versionStr.split(' on ')[0] || versionStr,
-      provider: isNeon ? 'Neon PostgreSQL' : 'Self-Hosted PostgreSQL',
+      provider,
       latencyMs,
       tablesCount: parseInt(schemaState.count || '0', 10)
     };
   } catch (err: any) {
     return {
       connected: false,
+      schemaReady: false,
       message: `PostgreSQL connection error: ${err.message}`,
     };
   } finally {
     client?.release();
+    if (temporaryPool) await temporaryPool.end().catch(() => {});
   }
 }

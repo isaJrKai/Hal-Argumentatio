@@ -92,7 +92,6 @@ export default function SettingsPanel({
   // Campaign Pivot / Reset State
   const [resetCity, setResetCity] = useState(activeCity);
   const [resetNiche, setResetNiche] = useState(activeNiche);
-  const [resetMode, setResetMode] = useState<'blank' | 'mock'>('blank');
   const [resetConfirm, setResetConfirm] = useState('');
   const [resetLoading, setResetLoading] = useState(false);
   const [resetError, setResetError] = useState<string | null>(null);
@@ -200,7 +199,7 @@ export default function SettingsPanel({
         body: JSON.stringify({
           city: resetCity,
           niche: resetNiche,
-          mode: resetMode
+          mode: 'blank'
         })
       });
 
@@ -231,7 +230,7 @@ export default function SettingsPanel({
   const [postgresSuccess, setPostgresSuccess] = useState<string | null>(null);
   const [postgresTesting, setPostgresTesting] = useState(false);
   const [postgresSyncing, setPostgresSyncing] = useState(false);
-  const [postgresStatus, setPostgresStatus] = useState<{ connected: boolean; message: string; version?: string; provider?: string; latencyMs?: number } | null>(null);
+  const [postgresStatus, setPostgresStatus] = useState<{ connected: boolean; schemaReady?: boolean; message: string; version?: string; provider?: string; latencyMs?: number } | null>(null);
 
   const handleTestPostgres = async () => {
     setPostgresTesting(true);
@@ -920,12 +919,16 @@ export default function SettingsPanel({
 
           {postgresStatus && (
             <div className={`p-3 border text-xs rounded-sm font-mono leading-relaxed ${
-              postgresStatus.connected 
+              postgresStatus.connected && postgresStatus.schemaReady !== false
                 ? 'bg-positive/10 border-positive/30 text-positive'
-                : 'bg-negative-dim border-negative/30 text-negative'
+                : postgresStatus.connected
+                  ? 'bg-amber-500/10 border-amber-500/30 text-amber-500'
+                  : 'bg-negative-dim border-negative/30 text-negative'
             }`}>
               <div className="flex items-center justify-between font-bold">
-                <span>{postgresStatus.connected ? 'POSTGRESQL ONLINE' : 'CONNECTION TEST RESULT'}</span>
+                <span>{postgresStatus.connected
+                  ? postgresStatus.schemaReady === false ? 'DATABASE REACHABLE · SCHEMA INCOMPLETE' : 'POSTGRESQL ONLINE'
+                  : 'CONNECTION TEST RESULT'}</span>
                 {postgresStatus.latencyMs !== undefined && (
                   <span className="text-[11px] px-1.5 py-0.5 bg-bg-dark rounded border border-border-dim text-text-secondary">{postgresStatus.latencyMs}ms</span>
                 )}
@@ -1351,14 +1354,9 @@ export default function SettingsPanel({
 
             <div className="space-y-1">
               <label className="block text-[11px] font-mono opacity-80 uppercase tracking-wider font-bold">Ledger Inception Mode</label>
-              <select
-                value={resetMode}
-                onChange={(e) => setResetMode(e.target.value as 'blank' | 'mock')}
-                className={`w-full border rounded p-2 focus:outline-none focus:border-accent text-inherit ${innerBg} ${borderCol}`}
-              >
-                <option value="mock">Simulated Seeding (5 Mock Leads + Active Campaign)</option>
-                <option value="blank">Blank Slate Ledger (Zero Data - Ready for Deep Scrapes)</option>
-              </select>
+              <div className={`w-full border rounded p-2 text-xs font-mono uppercase tracking-wider ${innerBg} ${borderCol}`}>
+                Blank slate only · real sourced data required
+              </div>
             </div>
           </div>
 
@@ -1368,7 +1366,7 @@ export default function SettingsPanel({
               <span>Critical Administrative Override Action</span>
             </div>
             <p className="text-[11px] opacity-75 leading-relaxed">
-              This action is irreversible. All current leads, converted client metrics, activity streams, and system snapshots under your ID will be cleared permanently. If you choose **Simulated Seeding**, we will pre-populate the dashboard with realistic target business accounts for {resetCity} ({resetNiche}). If you choose **Blank Slate**, your ledger will be completely empty.
+              This action is irreversible. It clears the tenant's lead pipeline, campaign and performance records, revenue entries, forecasts, recommendations, missions and chat messages in the authoritative database. Client delivery projects are protected; if any exist, the reset is blocked. Open work tasks linked to removed leads are cancelled and retained in the work history. HAL will not generate synthetic business data.
             </p>
 
             <div className="space-y-1 pt-1">
