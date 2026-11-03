@@ -11,7 +11,7 @@ import {
 import { eq, desc } from 'drizzle-orm';
 import crypto from 'crypto';
 import { requestTimesFmForecast, TimesFmForecastResponse } from './timesfmClient';
-import { buildWeeklyDemandSeries, filterGoogleAdsTerritoryRecords } from './forecastData';
+import { buildWeeklyDemandSeries, filterGoogleAdsTerritoryRecords, isCurrentOrFutureForecastWeek } from './forecastData';
 
 export interface GoogleAdsBaseline {
   recordsCount: number;
@@ -411,7 +411,7 @@ async function loadScheduledTimesFmForecast(
   const candidates = rows.flatMap((row) => {
     if (row.metric !== 'conversions' || row.modelVersion !== 'timesfm-2.5-batch-v1') return [];
     const targetDate = new Date(row.targetDate as any);
-    if (!Number.isFinite(targetDate.getTime()) || targetDate.getTime() <= now) return [];
+    if (!isCurrentOrFutureForecastWeek(targetDate, new Date(now))) return [];
     let metadata: any;
     try {
       metadata = typeof row.assumptions === 'string' ? JSON.parse(row.assumptions) : row.assumptions;
