@@ -1,5 +1,6 @@
 /// <reference types="vite/client" />
 import { initializeApp, getApps, getApp } from '@firebase/app';
+import { getGoogleWorkspaceTokenExpiry, isGoogleWorkspaceAccessTokenFresh } from './googleWorkspaceToken';
 import { 
   getAuth, 
   signInWithPopup, 
@@ -48,11 +49,17 @@ provider.addScope('https://www.googleapis.com/auth/gmail.send');
 
 let isSigningIn = false;
 let cachedAccessToken: string | null = null;
+let cachedAccessTokenExpiresAt = 0;
 
 try {
   const savedToken = sessionStorage.getItem('google_workspace_access_token');
-  if (savedToken) {
+  const savedExpiry = Number(sessionStorage.getItem('google_workspace_access_token_expires_at') || 0);
+  if (savedToken && isGoogleWorkspaceAccessTokenFresh(savedExpiry)) {
     cachedAccessToken = savedToken;
+    cachedAccessTokenExpiresAt = savedExpiry;
+  } else {
+    sessionStorage.removeItem('google_workspace_access_token');
+    sessionStorage.removeItem('google_workspace_access_token_expires_at');
   }
 } catch (e) {
   console.warn('Session storage not accessible for token caching', e);
@@ -68,16 +75,22 @@ export const initGoogleWorkspaceAuth = (
   }
   return onAuthStateChanged(auth, async (user: User | null) => {
     if (user) {
-      if (cachedAccessToken) {
+      if (cachedAccessToken && isGoogleWorkspaceAccessTokenFresh(cachedAccessTokenExpiresAt)) {
         if (onAuthSuccess) onAuthSuccess(user, cachedAccessToken);
       } else if (!isSigningIn) {
         cachedAccessToken = null;
+        cachedAccessTokenExpiresAt = 0;
+        try {
+          sessionStorage.removeItem('google_workspace_access_token');
+          sessionStorage.removeItem('google_workspace_access_token_expires_at');
+        } catch {}
         if (onAuthFailure) onAuthFailure();
       }
     } else {
       cachedAccessToken = null;
       try {
         sessionStorage.removeItem('google_workspace_access_token');
+        sessionStorage.removeItem('google_workspace_access_token_expires_at');
         sessionStorage.removeItem('gdrive_access_token');
       } catch (e) {}
       if (onAuthFailure) onAuthFailure();
@@ -98,8 +111,10 @@ export const googleWorkspaceSignIn = async (): Promise<{ user: User; accessToken
     }
 
     cachedAccessToken = credential.accessToken;
+    cachedAccessTokenExpiresAt = getGoogleWorkspaceTokenExpiry();
     try {
       sessionStorage.setItem('google_workspace_access_token', cachedAccessToken);
+      sessionStorage.setItem('google_workspace_access_token_expires_at', String(cachedAccessTokenExpiresAt));
     } catch (e) {}
     return { user: result.user, accessToken: cachedAccessToken };
   } catch (error: any) {
@@ -126,14 +141,25 @@ export const googleWorkspaceSignIn = async (): Promise<{ user: User; accessToken
 };
 
 export const getGoogleWorkspaceToken = async (): Promise<string | null> => {
-  return auth ? cachedAccessToken : null;
+  if (!auth || !cachedAccessToken || !isGoogleWorkspaceAccessTokenFresh(cachedAccessTokenExpiresAt)) {
+    cachedAccessToken = null;
+    cachedAccessTokenExpiresAt = 0;
+    try {
+      sessionStorage.removeItem('google_workspace_access_token');
+      sessionStorage.removeItem('google_workspace_access_token_expires_at');
+    } catch {}
+    return null;
+  }
+  return cachedAccessToken;
 };
 
 export const googleWorkspaceLogout = async () => {
   if (auth) await signOut(auth);
   cachedAccessToken = null;
+  cachedAccessTokenExpiresAt = 0;
   try {
     sessionStorage.removeItem('google_workspace_access_token');
+    sessionStorage.removeItem('google_workspace_access_token_expires_at');
     sessionStorage.removeItem('gdrive_access_token');
   } catch (e) {}
 };
