@@ -34,6 +34,7 @@ import { getRecentWorkEvents, recordWorkEvent } from '../../lib/workLedger';
 import { listWorkTasks, getWorkTask, requiresWorkTaskApproval, canExecutorClaimWorkTask } from '../../lib/workTasks';
 import { analyzeCampaignPerformance } from '../../lib/campaignAnomaly';
 import { classifyHermesToolResult } from '../../lib/hermesExecution';
+import { claimHermesWorkTask } from '../../lib/hermesTaskClaim';
 
 export const HAL_MCP_TOOLS: McpToolDefinition[] = [
   {
@@ -354,14 +355,7 @@ export async function executeMcpTool(
       }
 
       const claimed = await pgDb.transaction(async tx => {
-        const [running] = await tx.update(workTasks).set({
-          status: 'running', startedAt: task.startedAt || new Date(),
-          attemptCount: task.attemptCount + 1, errorMessage: null, updatedAt: new Date()
-        }).where(and(
-          eq(workTasks.id, taskId), eq(workTasks.contractorId, contractorId),
-          eq(workTasks.assignedWorker, 'hermes'), eq(workTasks.status, 'queued'),
-          or(eq(workTasks.requiresApproval, false), isNotNull(workTasks.approvedAt))
-        )).returning();
+        const running = await claimHermesWorkTask(tx, taskId, contractorId);
         if (!running) return null;
         await tx.insert(workEvents).values({
           id: 'evt_' + crypto.randomUUID(), contractorId,
