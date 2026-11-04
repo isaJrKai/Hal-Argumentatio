@@ -15,7 +15,18 @@ export async function readApiResponse<T = any>(response: Response, context: stri
       payload = JSON.parse(raw);
     } catch {
       const lower = raw.toLowerCase();
-      const isStarting = lower.includes('starting server') || lower.includes('server starting');
+      const startupSignals = [
+        'starting server',
+        'server starting',
+        'server is starting',
+        'server is initializing',
+        'backend service is initializing',
+        'service is initializing',
+        'initializing server',
+        'warming up server',
+        'server warming up'
+      ];
+      const isStarting = startupSignals.some(signal => lower.includes(signal));
       const preview = raw.replace(/\s+/g, ' ').trim().slice(0, 160);
       const suffix = isStarting
         ? ' Server is starting up. Reconnecting...'
