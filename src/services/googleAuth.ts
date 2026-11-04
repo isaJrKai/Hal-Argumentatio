@@ -1,9 +1,7 @@
-import { initializeApp, getApps, getApp } from '@firebase/app';
-import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, User, signOut } from '@firebase/auth';
-import firebaseConfig from '../../firebase-applet-config.json';
+import { signInWithPopup, GoogleAuthProvider, onAuthStateChanged, User, signOut } from '@firebase/auth';
+import { auth } from '../lib/firebaseClient';
 
-const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
-export const auth = getAuth(app);
+export { auth };
 
 export const provider = new GoogleAuthProvider();
 // Request standard Google Workspace identity scopes
@@ -18,6 +16,10 @@ export const initGoogleAuth = (
   onAuthSuccess?: (user: User, token: string) => void,
   onAuthFailure?: () => void
 ) => {
+  if (!auth) {
+    onAuthFailure?.();
+    return () => {};
+  }
   return onAuthStateChanged(auth, async (user: User | null) => {
     if (user) {
       if (cachedAccessToken) {
@@ -34,6 +36,9 @@ export const initGoogleAuth = (
 };
 
 export const googleSignIn = async (): Promise<{ user: User; accessToken: string; idToken?: string } | null> => {
+  if (!auth) {
+    throw new Error('Google sign-in is not configured. Firebase project credentials are missing.');
+  }
   try {
     isSigningIn = true;
     const result = await signInWithPopup(auth, provider);
@@ -60,6 +65,6 @@ export const getAccessToken = async (): Promise<string | null> => {
 };
 
 export const logoutGoogle = async () => {
-  await signOut(auth);
+  if (auth) await signOut(auth);
   cachedAccessToken = null;
 };
