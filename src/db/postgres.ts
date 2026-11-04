@@ -41,7 +41,7 @@ export function getPostgresPool(customUrl?: string): Pool | null {
       pool = new Pool({
         connectionString: customUrl,
         ssl: customUrl.includes('sslmode=require') || customUrl.includes('neon.tech') || customUrl.includes('supabase')
-          ? { rejectUnauthorized: false }
+          ? { rejectUnauthorized: true }
           : undefined,
         max: 10,
         idleTimeoutMillis: 30000,
@@ -79,7 +79,7 @@ export function getPostgresPool(customUrl?: string): Pool | null {
     pool = new Pool({
       connectionString,
       ssl: connectionString.includes('sslmode=require') || connectionString.includes('neon.tech') || connectionString.includes('supabase')
-        ? { rejectUnauthorized: false }
+        ? { rejectUnauthorized: true }
         : undefined,
       max: 10,
       idleTimeoutMillis: 30000,
@@ -905,7 +905,7 @@ export async function testPostgresConnection(customUrl?: string): Promise<{
     ? new Pool({
         connectionString: customUrl,
         ssl: customUrl.includes('sslmode=require') || customUrl.includes('neon.tech') || customUrl.includes('supabase')
-          ? { rejectUnauthorized: false }
+          ? { rejectUnauthorized: true }
           : undefined,
         max: 1,
         connectionTimeoutMillis: 5000,
