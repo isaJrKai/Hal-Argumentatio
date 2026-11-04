@@ -54,7 +54,7 @@ export const TopTelemetryBar: React.FC<TopTelemetryBarProps> = ({
   onInstallClick,
   onLogout
 }) => {
-  const { workspaceConfig } = useBusinessContext();
+  const { workspaceConfig, activeCity, activeIndustry, supportedCities, setActiveCity, setCity } = useBusinessContext();
 
   // Top Workspace Tabs (AutoCAD Master Panels)
   const topNavTabs = [
@@ -235,7 +235,21 @@ export const TopTelemetryBar: React.FC<TopTelemetryBarProps> = ({
             );
           })}
         </div>
-
+        <div className="hidden xl:flex items-center gap-2 pl-4 border-l border-border-dim shrink-0">
+          <label htmlFor="workspace-territory" className="text-xs text-text-secondary">Territory</label>
+          <select
+            id="workspace-territory"
+            aria-label="Workspace territory"
+            value={activeCity}
+            onChange={(event) => (setActiveCity ? setActiveCity(event.target.value) : setCity?.(event.target.value))}
+            className="max-w-[160px] px-2.5 py-2 rounded-md text-xs font-sans font-medium bg-bg-raised text-text-primary border border-border-dim focus:outline-none focus:border-accent cursor-pointer"
+          >
+            {Array.from(new Set([activeCity, ...(supportedCities || [])])).map((city) => (
+              <option key={city} value={city}>{city}</option>
+            ))}
+          </select>
+          <span className="text-xs text-text-secondary pl-2">{activeIndustry.name}</span>
+        </div>
       </div>
 
 
