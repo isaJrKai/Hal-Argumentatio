@@ -397,8 +397,7 @@ export default function SettingsPanel({
 
   // Password reset state
 
-  const textPrimary = 'text-text-primary';
-  const textSecondary = 'text-text-secondary';
+  const textPrimary = 'text-text-primary';  const textSecondary = 'text-text-secondary';
   const textTertiary = 'text-text-tertiary';
 
   const handleProfileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -797,7 +796,6 @@ export default function SettingsPanel({
                 </label>
                 <div className="text-[11px] mt-1.5 text-inherit opacity-60">PNG, JPG or WEBP. Max size 2MB.</div>
               </div>            </div>          </div>
-
           {/* Company Brand Logo Uploader */}
           <div className={`p-5 rounded border flex flex-col justify-between ${innerBg} ${borderCol}`}>
             <div className="space-y-3">
@@ -986,7 +984,7 @@ export default function SettingsPanel({
               { id: 'openai', label: 'OpenAI', placeholder: 'OpenAI API key', env: 'OPENAI_API_KEY', brand: 'openai' },
               { id: 'anthropic', label: 'Anthropic Claude', placeholder: 'Anthropic API key', env: 'ANTHROPIC_API_KEY', brand: 'anthropic' }
             ] as const).map(provider => (
-              <div key={provider.id} className={`border p-3.5 rounded space-y-2 ${innerBg} ${borderCol}`}>
+              <div key={provider.id} className={`border p-4 rounded-xl space-y-3 transition-colors hover:border-accent/40 ${innerBg} ${borderCol}`}>
                 <div className="flex justify-between items-center">
                   <span className="flex min-w-0 items-center gap-2.5"><ProviderBrandIcon brand={provider.brand} label={provider.label} /><span className="font-semibold text-[12px] text-text-primary normal-case tracking-normal">{provider.label}</span></span>
                   <span className={`text-[11px] font-mono px-1.5 py-0.5 rounded font-bold uppercase ${connectorConfigured[provider.id] ? 'bg-positive/20 text-positive' : 'bg-warning-dim text-warning'}`}>
@@ -1006,7 +1004,7 @@ export default function SettingsPanel({
               </div>
             ))}
             {/* Stripe */}
-            <div className={`border p-3.5 rounded space-y-2 ${innerBg} ${borderCol}`}>
+            <div className={`border p-4 rounded-xl space-y-3 transition-colors hover:border-accent/40 ${innerBg} ${borderCol}`}>
               <div className="flex justify-between items-center">
                 <span className="flex items-center gap-2.5"><ProviderBrandIcon brand="stripe" label="Stripe" /><span className="text-[12px] font-semibold normal-case tracking-normal text-text-primary">Stripe Billing</span></span>
                 <span className={`text-[11px] font-mono px-1.5 py-0.5 rounded font-bold uppercase ${connectorKeys.stripe ? 'bg-positive/20 text-positive' : 'bg-warning-dim text-warning'}`}>
@@ -1025,7 +1023,7 @@ export default function SettingsPanel({
             </div>
 
             {/* Twilio */}
-            <div className={`border p-3.5 rounded space-y-2 ${innerBg} ${borderCol}`}>
+            <div className={`border p-4 rounded-xl space-y-3 transition-colors hover:border-accent/40 ${innerBg} ${borderCol}`}>
               <div className="flex justify-between items-center">
                 <span className="flex items-center gap-2.5"><ProviderBrandIcon brand="twilio" label="Twilio" /><span className="text-[12px] font-semibold normal-case tracking-normal text-text-primary">Twilio SMS</span></span>
                 <span className={`text-[11px] font-mono px-1.5 py-0.5 rounded font-bold uppercase ${connectorKeys.twilio ? 'bg-positive/20 text-positive' : 'bg-warning-dim text-warning'}`}>
@@ -1044,7 +1042,7 @@ export default function SettingsPanel({
             </div>
 
             {/* SendGrid */}
-            <div className={`border p-3.5 rounded space-y-2 ${innerBg} ${borderCol}`}>
+            <div className={`border p-4 rounded-xl space-y-3 transition-colors hover:border-accent/40 ${innerBg} ${borderCol}`}>
               <div className="flex justify-between items-center">
                 <span className="flex items-center gap-2.5"><ProviderBrandIcon brand="sendgrid" label="SendGrid" /><span className="text-[12px] font-semibold normal-case tracking-normal text-text-primary">SendGrid Mail</span></span>
                 <span className={`text-[11px] font-mono px-1.5 py-0.5 rounded font-bold uppercase ${connectorKeys.sendgrid ? 'bg-positive/20 text-positive' : 'bg-warning-dim text-warning'}`}>
@@ -1063,7 +1061,7 @@ export default function SettingsPanel({
             </div>
 
             {/* Google Maps */}
-            <div className={`border p-3.5 rounded space-y-2 ${innerBg} ${borderCol}`}>
+            <div className={`border p-4 rounded-xl space-y-3 transition-colors hover:border-accent/40 ${innerBg} ${borderCol}`}>
               <div className="flex justify-between items-center">
                 <span className="flex items-center gap-2.5"><ProviderBrandIcon brand="googlemaps" label="Google Maps" /><span className="text-[12px] font-semibold normal-case tracking-normal text-text-primary">Google Maps Platform</span></span>
                 <span className={`text-[11px] font-mono px-1.5 py-0.5 rounded font-bold uppercase ${connectorKeys.googleMaps ? 'bg-positive/20 text-positive' : 'bg-warning-dim text-warning'}`}>
@@ -1082,7 +1080,7 @@ export default function SettingsPanel({
             </div>
 
             {/* Google Ads */}
-            <div className={`border p-3.5 rounded space-y-2 ${innerBg} ${borderCol}`}>
+            <div className={`border p-4 rounded-xl space-y-3 transition-colors hover:border-accent/40 ${innerBg} ${borderCol}`}>
               <div className="flex justify-between items-center">
                 <span className="flex items-center gap-2.5"><ProviderBrandIcon brand="googleads" label="Google Ads" /><span className="text-[12px] font-semibold normal-case tracking-normal text-text-primary">Google Ads</span></span>
                 <span className={`text-[11px] font-mono px-1.5 py-0.5 rounded font-bold uppercase ${connectorKeys.googleAds ? 'bg-positive/20 text-positive' : 'bg-warning-dim text-warning'}`}>
@@ -1101,7 +1099,7 @@ export default function SettingsPanel({
             </div>
 
             {/* Meta Ads */}
-            <div className={`border p-3.5 rounded space-y-2 ${innerBg} ${borderCol}`}>
+            <div className={`border p-4 rounded-xl space-y-3 transition-colors hover:border-accent/40 ${innerBg} ${borderCol}`}>
               <div className="flex justify-between items-center">
                 <span className="flex items-center gap-2.5"><ProviderBrandIcon brand="meta" label="Meta" /><span className="text-[12px] font-semibold normal-case tracking-normal text-text-primary">Meta Marketing</span></span>
                 <span className={`text-[11px] font-mono px-1.5 py-0.5 rounded font-bold uppercase ${connectorKeys.metaAds ? 'bg-positive/20 text-positive' : 'bg-warning-dim text-warning'}`}>
@@ -1120,7 +1118,7 @@ export default function SettingsPanel({
             </div>
 
             {/* GA4 / Search Console */}
-            <div className={`border p-3.5 rounded space-y-2 ${innerBg} ${borderCol}`}>
+            <div className={`border p-4 rounded-xl space-y-3 transition-colors hover:border-accent/40 ${innerBg} ${borderCol}`}>
               <div className="flex justify-between items-center">
                 <span className="flex items-center gap-2.5"><ProviderBrandIcon brand="googleanalytics" label="Google Analytics" /><span className="text-[12px] font-semibold normal-case tracking-normal text-text-primary">GA4 & Search Console</span></span>
                 <span className={`text-[11px] font-mono px-1.5 py-0.5 rounded font-bold uppercase ${connectorKeys.ga4 ? 'bg-positive/20 text-positive' : 'bg-warning-dim text-warning'}`}>
@@ -1139,7 +1137,7 @@ export default function SettingsPanel({
             </div>
 
             {/* Slack Webhook */}
-            <div className={`border p-3.5 rounded space-y-2 ${innerBg} ${borderCol}`}>
+            <div className={`border p-4 rounded-xl space-y-3 transition-colors hover:border-accent/40 ${innerBg} ${borderCol}`}>
               <div className="flex justify-between items-center">
                 <span className="flex items-center gap-2.5"><ProviderBrandIcon brand="slack" label="Slack" /><span className="text-[12px] font-semibold normal-case tracking-normal text-text-primary">Slack Operations</span></span>
                 <span className={`text-[11px] font-mono px-1.5 py-0.5 rounded font-bold uppercase ${connectorKeys.slack ? 'bg-positive/20 text-positive' : 'bg-warning-dim text-warning'}`}>
@@ -1197,8 +1195,7 @@ export default function SettingsPanel({
         </div>
       {/* PUBLIC SHARE & REDDIT TESTING SHIELD */}      <div className={`border rounded-lg p-5 mt-6 space-y-5 ${cardBg}`}>
         <div className="flex flex-wrap items-center justify-between gap-3 border-b pb-3 border-inherit">
-          <div className="flex items-center gap-2">
-            <Globe className="w-4 h-4 text-brand" />
+          <div className="flex items-center gap-2">            <Globe className="w-4 h-4 text-brand" />
             <span className="text-xs font-mono uppercase tracking-wider font-bold">Public Link Controls</span>
           </div>
           <span className={`text-[11px] font-mono px-2 py-0.5 rounded border uppercase font-bold ${
