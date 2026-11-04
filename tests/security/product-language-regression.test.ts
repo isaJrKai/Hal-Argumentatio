@@ -37,8 +37,12 @@ describe('HAL product language and truthful controls', () => {
 
   it('uses plain language for planned model and service modules', () => {
     expect(phase4).toContain('Model comparison preview');
+    expect(phase4).not.toContain('Dual-Drive Consensus Sandbox');
+    expect(phase4).not.toContain('Strategy Arbitrage');
     expect(phase4).not.toContain('Cognitive Arbitration Sandbox');
     expect(phase5).toContain('Service checks');
+    expect(phase5).not.toContain('Unified Business Brain');
+    expect(phase5).not.toContain('Multi-Org Hierarchy & RBAC');
     expect(phase5).not.toContain('Unified Business Brain');
   });
 

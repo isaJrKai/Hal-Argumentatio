@@ -96,7 +96,7 @@ export const HalRoadmapPhase5View: React.FC = () => {
           setActionNotice('Diagnostic response received, but no diagnostic details were returned.');
         }
       } else {
-        setActionNotice(data.error || 'Runtime brain health instrumentation is unavailable.');
+        setActionNotice(data.error || 'Runtime service health instrumentation is unavailable.');
       }
     } catch {
       setActionNotice('Service check failed. No success state was recorded.');
@@ -216,21 +216,21 @@ export const HalRoadmapPhase5View: React.FC = () => {
             <div className="flex items-center justify-between">
               <span className="text-xs font-medium text-text-secondary flex items-center gap-1.5">
                 <Building2 className="w-3.5 h-3.5 text-accent" />
-                Multi-Org Vaults
+                Company accounts
               </span>
               <span className="text-[10px] font-mono font-bold text-emerald-500 bg-emerald-500/10 px-1.5 py-0.5 rounded">
                 ORGANIZATION COUNT UNVERIFIED
               </span>
             </div>
-            <div className="text-sm font-bold text-text-primary">SHA-256 Key Isolation</div>
-            <div className="text-[11px] text-text-tertiary">Cryptographic multi-tier RBAC</div>
+            <div className="text-sm font-bold text-text-primary">Access controls not verified</div>
+            <div className="text-[11px] text-text-tertiary">Role-based access not verified</div>
           </div>
 
           <div className="p-3.5 rounded-xl bg-bg-base border border-border-dim space-y-1">
             <div className="flex items-center justify-between">
               <span className="text-xs font-medium text-text-secondary flex items-center gap-1.5">
                 <Server className="w-3.5 h-3.5 text-accent" />
-                Edge Federation
+                Regional service endpoints
               </span>
               <span className="text-[10px] font-mono font-bold text-emerald-500 bg-emerald-500/10 px-1.5 py-0.5 rounded">
                 REGION STATUS UNVERIFIED
@@ -244,7 +244,7 @@ export const HalRoadmapPhase5View: React.FC = () => {
             <div className="flex items-center justify-between">
               <span className="text-xs font-medium text-text-secondary flex items-center gap-1.5">
                 <BookOpen className="w-3.5 h-3.5 text-accent" />
-                Trade Ontologies
+                Industry data models
               </span>
               <span className="text-[10px] font-mono font-bold text-emerald-500 bg-emerald-500/10 px-1.5 py-0.5 rounded">
                 VERTICAL COUNT UNVERIFIED
@@ -264,8 +264,8 @@ export const HalRoadmapPhase5View: React.FC = () => {
                 ALIGNMENT NOT MEASURED
               </span>
             </div>
-            <div className="text-sm font-bold text-emerald-500">Layer status not verified</div>
-            <div className="text-[11px] text-text-tertiary">Constitution alignment not verified</div>
+            <div className="text-sm font-bold text-emerald-500">Service status not verified</div>
+            <div className="text-[11px] text-text-tertiary">Service coverage not measured</div>
           </div>
         </div>
       </div>
@@ -283,7 +283,7 @@ export const HalRoadmapPhase5View: React.FC = () => {
           <Cpu className="w-3.5 h-3.5" />
           <span>Service checks</span>
           <span className="px-1.5 py-0.2 rounded-full text-[10px] font-mono bg-emerald-500/15 text-emerald-500">
-            LOCKED
+            UNVERIFIED
           </span>
         </button>
 
@@ -296,7 +296,7 @@ export const HalRoadmapPhase5View: React.FC = () => {
           }`}
         >
           <Building2 className="w-3.5 h-3.5" />
-          <span>Multi-Org Hierarchy & RBAC</span>
+          <span>Company accounts & roles</span>
           <span className="px-1.5 py-0.2 rounded-full text-[10px] font-mono bg-border-dim text-text-secondary">
             {orgNodes.length} Orgs
           </span>
@@ -311,7 +311,7 @@ export const HalRoadmapPhase5View: React.FC = () => {
           }`}
         >
           <Server className="w-3.5 h-3.5" />
-          <span>Decentralized Edge Federation</span>
+          <span>Decentralized Regional service endpoints</span>
           <span className="px-1.5 py-0.2 rounded-full text-[10px] font-mono bg-accent/15 text-accent">
             {edgeRegions.length} Regions
           </span>
@@ -463,7 +463,7 @@ export const HalRoadmapPhase5View: React.FC = () => {
           </div>
 
           <div className="space-y-3">
-            {orgNodes.length === 0 && <div className="p-5 rounded-xl border border-border-dim text-sm text-text-secondary">No connected enterprise organization records are available.</div>}
+            {orgNodes.length === 0 && <div className="p-5 rounded-xl border border-border-dim text-sm text-text-secondary">No company account records are connected to this workspace yet.</div>}
             {orgNodes.map((org) => (
               <div key={org.id} className="p-4 rounded-xl bg-bg-raised border border-border-dim space-y-3">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
@@ -510,7 +510,7 @@ export const HalRoadmapPhase5View: React.FC = () => {
               <div>
                 <h3 className="text-sm font-bold text-text-primary flex items-center gap-1.5">
                   <Server className="w-4 h-4 text-accent" />
-                  Decentralized Edge Federation Mesh
+                  Decentralized Regional service endpoints Mesh
                 </h3>
                 <p className="text-xs text-text-secondary">
                   Continuous edge health telemetry and multi-region consensus failover.
