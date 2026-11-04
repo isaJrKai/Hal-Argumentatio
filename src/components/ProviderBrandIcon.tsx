@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 
-type ProviderBrand = 'googlegemini' | 'openai' | 'anthropic' | 'nvidia' | 'stripe' | 'twilio' | 'sendgrid' | 'googlemaps' | 'googleads' | 'meta' | 'googleanalytics' | 'slack';
+type ProviderBrand = 'google' | 'googlegemini' | 'openai' | 'anthropic' | 'nvidia' | 'stripe' | 'twilio' | 'sendgrid' | 'googlemaps' | 'googleads' | 'meta' | 'googleanalytics' | 'slack';
 
 const BRAND_PATH: Record<ProviderBrand, string> = {
+  google: 'https://cdn.simpleicons.org/google',
   googlegemini: 'https://cdn.simpleicons.org/googlegemini',
   openai: 'https://cdn.simpleicons.org/openai',
   anthropic: 'https://cdn.simpleicons.org/anthropic',
