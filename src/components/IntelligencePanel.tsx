@@ -526,7 +526,7 @@ export default function IntelligencePanel({
                   </button>
 
                   <span className="text-[9px] font-mono text-text-tertiary hidden xl:inline">
-                    ENGINE: {activeAi === 'gemini' ? '🧠 GEMINI-3.5-FLASH' : '⚡ NEMOTRON-70B'}
+                    PROVIDER: {activeAi === 'gemini' ? 'GEMINI-3.5-FLASH' : 'NEMOTRON-70B'}
                   </span>
                 </div>
               </div>
