@@ -134,9 +134,9 @@ export const TopTelemetryBar: React.FC<TopTelemetryBarProps> = ({
             onClick={() => setActiveTab('overview')}
             className="flex items-center gap-2.5 cursor-pointer group"
           >
-            <div className="flex items-center gap-1.5">
-              <span className="text-xl font-bold tracking-tight text-text-primary font-display">HAL</span>
-              <span className="w-2 h-2 rounded-full bg-accent animate-pulse shadow-xs" />
+            <div className="flex items-center gap-2.5">
+              <img src="/hal-mark.svg" alt="HAL" className="w-8 h-8 rounded-lg ring-1 ring-border-dim/80 shadow-sm" />
+              <span className="text-lg font-semibold tracking-tight text-text-primary font-display">HAL<span className="text-accent">Biz</span></span>
             </div>
             <div className="hidden sm:block h-3.5 w-px bg-border-dim" />
             <span className="hidden sm:block text-xs font-medium text-text-secondary font-sans truncate">
@@ -236,8 +236,7 @@ export const TopTelemetryBar: React.FC<TopTelemetryBarProps> = ({
                     <div className="text-center py-4 text-text-tertiary text-xs">
                       No notifications to show.
                     </div>
-                  )}
-                </div>
+                  )}                </div>
               </div>
             )}
           </div>
@@ -516,8 +515,7 @@ export const TopTelemetryBar: React.FC<TopTelemetryBarProps> = ({
                   <strong className="text-text-secondary font-mono">Not configured</strong>
                 </div>
               </div>
-            </>
-          )}
+            </>          )}
 
           {/* ============================================================== */}
           {/* 6. RIBBON FOR FINANCIALS & REVENUE (revenue-intelligence)      */}

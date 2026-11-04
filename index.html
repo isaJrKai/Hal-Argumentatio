@@ -3,38 +3,20 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>HALBiz - AI Business Operating Intelligence</title>
-    <meta name="description" content="AI Business Operating Intelligence System with advanced forecasting, decision engines, real-time dashboards, and secure isolation." />
+    <title>HALBiz — Business Intelligence</title>
+    <meta name="description" content="HALBiz is a configurable business intelligence workspace for contractor businesses." />
     <meta property="og:title" content="HALBiz" />
-    <meta property="og:description" content="AI Business Operating Intelligence System with advanced forecasting, decision engines, real-time dashboards, and secure isolation." />
+    <meta property="og:description" content="A configurable business intelligence workspace." />
+    <link rel="icon" type="image/svg+xml" href="/hal-mark.svg" />
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;0,6..72,700;1,6..72,400;1,6..72,600&family=IBM+Plex+Mono:ital,wght@0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
     <link rel="manifest" href="/manifest.json" />
     <link rel="apple-touch-icon" href="/icon.jpg" />
-    <meta name="theme-color" content="#EBB929" />
-    <script>
-      // Force unregister service worker and clear cache in development/preview to prevent interception
-      if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.getRegistrations().then((registrations) => {
-          for (let registration of registrations) {
-            registration.unregister();
-            console.log('ServiceWorker unregistered successfully');
-          }
-        });
-      }
-      if ('caches' in window) {
-        caches.keys().then((names) => {
-          for (let name of names) {
-            caches.delete(name);
-          }
-        });
-      }
-    </script>
+    <meta name="theme-color" content="#151A1D" />
   </head>
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
-

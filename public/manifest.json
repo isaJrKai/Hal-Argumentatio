@@ -1,24 +1,24 @@
 {
-  "name": "HALBiz Business Intelligence",
+  "name": "HALBiz — Business Intelligence",
   "short_name": "HALBiz",
-  "description": "AI Business Operating Intelligence System with advanced forecasting, decision engines, real-time dashboards, and secure isolation.",
+  "description": "A configurable business intelligence workspace.",
   "start_url": "/",
   "display": "standalone",
   "orientation": "any",
-  "background_color": "#0A0D10",
-  "theme_color": "#EBB929",
+  "background_color": "#151A1D",
+  "theme_color": "#151A1D",
   "icons": [
+    {
+      "src": "/hal-mark.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
     {
       "src": "/icon.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any"
-    },
-    {
-      "src": "/icon.jpg",
-      "sizes": "512x512",
-      "type": "image/jpeg",
-      "purpose": "any maskable"
     }
   ]
 }

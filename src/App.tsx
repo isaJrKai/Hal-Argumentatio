@@ -1081,7 +1081,10 @@ export default function App() {
 
               {/* Footer of Mobile Menu */}
               <div className="p-3.5 border-t bg-bg-overlay/60 flex items-center justify-between text-xs font-sans text-text-tertiary border-border-dim/40">
-                <span className="font-semibold text-text-secondary text-xs">HAL Enterprise</span>
+                <div className="flex items-center gap-2">
+                  <img src="/hal-mark.svg" alt="" className="w-5 h-5 rounded-md" />
+                  <span className="font-semibold text-text-secondary text-xs">HALBiz</span>
+                </div>
                 <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-accent-dim text-accent font-bold">v2.0</span>
               </div>
             </motion.aside>
@@ -1152,7 +1155,10 @@ export default function App() {
           {/* Footer of Sidebar */}
           <div className="p-3 border-t bg-bg-overlay/60 space-y-2 border-border-dim/40">
             <div className="flex items-center justify-between text-xs font-sans text-text-tertiary">
-              <span className="font-semibold text-text-secondary text-[11px]">HAL Enterprise</span>
+              <div className="flex items-center gap-2">
+                <img src="/hal-mark.svg" alt="" className="w-5 h-5 rounded-md" />
+                <span className="font-semibold text-text-secondary text-[11px]">HALBiz</span>
+              </div>
               <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-accent-dim text-accent font-bold">v2.0</span>
             </div>
 
@@ -1621,7 +1627,7 @@ export default function App() {
 
               {/* Footer notice */}
               <div className="mt-5 pt-3 border-t border-border-dim flex items-center justify-between text-[8px] font-mono text-text-tertiary">
-                <span>LICENSED TO HAL OS v2.0.0</span>
+                <span>HALBiz · v2.0.0</span>
                 <span>SECURED & ISOLATED</span>
               </div>
             </motion.div>

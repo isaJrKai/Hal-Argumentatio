@@ -6857,7 +6857,7 @@ app.post('/api/connectors/credentials', authenticate, async (req, res) => {
   const allowedServices = new Set([
     'stripe', 'twilio', 'sendgrid', 'googleMaps', 'googleDrive', 'linkedin',
     'salesforce', 'hubspot', 'mailchimp', 'notion', 'googleAds', 'metaAds',
-    'ga4', 'quickbooks', 'slack', 'resend', 'gemini', 'openai', 'anthropic'
+    'ga4', 'quickbooks', 'slack', 'resend', 'gemini', 'openai', 'anthropic', 'metaAdsAccountId'
   ]);
   if (typeof service !== 'string' || !allowedServices.has(service)) {
     return res.status(400).json({ error: 'A supported connector service is required.' });
@@ -7223,7 +7223,10 @@ app.get('/api/ai/engine-status', authenticate, async (req, res) => {
   } catch {
     console.warn('[HAL AI status] Tenant credentials unavailable; checking deployment-level keys only.');
   }
-  const geminiKeySet = !!(tenantCredentials.gemini || process.env.GEMINI_API_KEY);
+  // The current inference services read the deployment-level Gemini key only.
+  // A tenant-saved Gemini credential is stored securely but is not yet wired into request-scoped inference.
+  const geminiKeySet = !!process.env.GEMINI_API_KEY;
+  const tenantGeminiCredentialSaved = Boolean(tenantCredentials.gemini);
   const nvidiaKeySet = !!process.env.NVIDIA_API_KEY;
   const timesfmConfigured = Boolean(process.env.TIMESFM_SERVICE_URL && (process.env.TIMESFM_API_KEY || '').length >= 32);
   const requestedPreference = process.env.HAL_ACTIVE_AI;
@@ -7246,6 +7249,7 @@ app.get('/api/ai/engine-status', authenticate, async (req, res) => {
         capabilities: ['Parallel Consensus', 'Cross-Validation', 'Zero-Downtime Resilience']
       },
       gemini: {
+        tenantCredentialSaved: tenantGeminiCredentialSaved,
         name: 'Google Gemini',
         model: 'gemini-3.8-flash (fallbacks: gemini-flash-latest, gemini-3.1-flash-lite)',
         configured: geminiKeySet,
