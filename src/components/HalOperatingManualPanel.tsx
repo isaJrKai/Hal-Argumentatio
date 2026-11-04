@@ -233,7 +233,7 @@ ${documents.map(d => `## Section ${d.number}: ${d.title}
 **Phase:** ${d.phase.toUpperCase()} | **Status:** ${d.status.toUpperCase()}
 
 ${d.description}
-`).join('\\n---\\n\\n')}
+`).join('\n---\n\n')}
 `;
     const blob = new Blob([markdownContent], { type: 'text/markdown;charset=utf-8' });
     const url = URL.createObjectURL(blob);
