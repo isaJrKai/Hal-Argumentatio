@@ -680,7 +680,7 @@ export default function HermesLabPanel({ token }: { token: string | null }) {
         </div>
       </div>
 
-      {/* ─── TAB 1: TOOL FOUNDRY ─── */}
+      {/* ─── TAB 1: TOOLS ─── */}
       {activeSubTab === 'tools' && (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
           {/* Tool Selector Catalog */}
@@ -948,7 +948,7 @@ export default function HermesLabPanel({ token }: { token: string | null }) {
                 </div>
                 <div>
                   <h3 className="text-xs font-bold text-text-primary">Hermes Creative Strategist</h3>
-                  <p className="text-[11px] text-text-secondary">Personalize assets to your exact brand & taste</p>
+                  <p className="text-[11px] text-text-secondary">Set the colors, typography and voice used in your assets.</p>
                 </div>
               </div>
 
@@ -1429,7 +1429,7 @@ export default function HermesLabPanel({ token }: { token: string | null }) {
                           }
                           setActiveSubTab('tools');
                         }}
-                        className="px-2.5 py-1 bg-cyan-600 hover:bg-accent text-accent-contrast rounded text-[10px] font-bold uppercase ml-4 shrink-0 cursor-pointer"
+                        className="px-2.5 py-1 bg-accent hover:bg-accent text-accent-contrast rounded text-[10px] font-bold uppercase ml-4 shrink-0 cursor-pointer"
                       >
                         Deploy from Lab
                       </button>
