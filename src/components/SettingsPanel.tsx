@@ -316,6 +316,9 @@ export default function SettingsPanel({
 
   // Real connector API keys configuration state
   const [connectorKeys, setConnectorKeys] = useState({
+    gemini: '',
+    openai: '',
+    anthropic: '',
     stripe: '',
     twilio: '',
     sendgrid: '',
@@ -980,6 +983,30 @@ export default function SettingsPanel({
           )}
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs font-sans">
+            {([
+              { id: 'gemini', label: 'Google Gemini AI', placeholder: 'AIza...', env: 'GEMINI_API_KEY' },
+              { id: 'openai', label: 'OpenAI API', placeholder: 'sk-...', env: 'OPENAI_API_KEY' },
+              { id: 'anthropic', label: 'Anthropic Claude API', placeholder: 'sk-ant-...', env: 'ANTHROPIC_API_KEY' }
+            ] as const).map(provider => (
+              <div key={provider.id} className={`border p-3.5 rounded space-y-2 ${innerBg} ${borderCol}`}>
+                <div className="flex justify-between items-center">
+                  <span className="font-bold uppercase font-mono text-[11px] text-accent">{provider.label}</span>
+                  <span className={`text-[11px] font-mono px-1.5 py-0.5 rounded font-bold uppercase ${connectorConfigured[provider.id] ? 'bg-positive/20 text-positive' : 'bg-warning-dim text-warning'}`}>
+                    {connectorConfigured[provider.id] ? 'Configured' : 'Unconfigured'}
+                  </span>
+                </div>
+                <input
+                  type="password"
+                  autoComplete="new-password"
+                  value={connectorKeys[provider.id]}
+                  onChange={(e) => setConnectorKeys(prev => ({ ...prev, [provider.id]: e.target.value }))}
+                  onBlur={() => handleSaveConnectorKey(provider.id, connectorKeys[provider.id])}
+                  placeholder={provider.placeholder}
+                  className={`w-full border rounded p-2 focus:outline-none focus:border-accent text-inherit font-mono text-xs ${innerBg} ${borderCol}`}
+                />
+                <span className="text-[11px] text-inherit opacity-60 block">Encrypted tenant credential · {provider.env}</span>
+              </div>
+            ))}
             {/* Stripe */}
             <div className={`border p-3.5 rounded space-y-2 ${innerBg} ${borderCol}`}>
               <div className="flex justify-between items-center">
