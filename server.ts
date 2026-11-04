@@ -1,4 +1,4 @@
-import { bootstrapPostgresTables } from './src/db/postgres';
+import { testPostgresConnection, bootstrapPostgresTables } from './src/db/postgres';
 import express from 'express';
 import path from 'path';
 import fs from 'fs';
