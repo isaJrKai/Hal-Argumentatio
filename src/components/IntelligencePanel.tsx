@@ -476,9 +476,9 @@ export default function IntelligencePanel({
                           ? 'bg-accent/15 text-accent border border-accent/20'
                           : 'text-text-tertiary hover:text-text-secondary border border-transparent'
                       }`}
-                      title="Google Gemini 3.5: Highly detailed context reasoning but slower (18s+)"
+                      title="Google Gemini 3.5 is selected for supported requests; provider access is not verified here."
                     >
-                      🧠 Gemini
+                      Gemini
                     </button>
                     <button
                       type="button"
@@ -498,7 +498,7 @@ export default function IntelligencePanel({
                       }`}
                       title="NVIDIA Nemotron is selected for supported requests; provider access is not verified here."
                     >
-                      ⚡ Nemotron
+                      Nemotron
                     </button>
                   </div>
 
