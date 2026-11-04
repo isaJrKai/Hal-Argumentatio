@@ -397,7 +397,6 @@ export default function SettingsPanel({
 
   // Password reset state
 
-
   const textPrimary = 'text-text-primary';
   const textSecondary = 'text-text-secondary';
   const textTertiary = 'text-text-tertiary';
@@ -797,8 +796,7 @@ export default function SettingsPanel({
                   />
                 </label>
                 <div className="text-[11px] mt-1.5 text-inherit opacity-60">PNG, JPG or WEBP. Max size 2MB.</div>
-              </div>            </div>
-          </div>
+              </div>            </div>          </div>
 
           {/* Company Brand Logo Uploader */}
           <div className={`p-5 rounded border flex flex-col justify-between ${innerBg} ${borderCol}`}>
@@ -1010,7 +1008,7 @@ export default function SettingsPanel({
             {/* Stripe */}
             <div className={`border p-3.5 rounded space-y-2 ${innerBg} ${borderCol}`}>
               <div className="flex justify-between items-center">
-                <span className="font-bold uppercase font-mono text-[11px] text-accent">Stripe Billing API</span>
+                <span className="flex items-center gap-2.5"><ProviderBrandIcon brand="stripe" label="Stripe" /><span className="text-[12px] font-semibold normal-case tracking-normal text-text-primary">Stripe Billing</span></span>
                 <span className={`text-[11px] font-mono px-1.5 py-0.5 rounded font-bold uppercase ${connectorKeys.stripe ? 'bg-positive/20 text-positive' : 'bg-warning-dim text-warning'}`}>
                   {connectorConfigured.stripe || connectorKeys.stripe ? 'Configured' : 'Unconfigured'}
                 </span>
@@ -1029,7 +1027,7 @@ export default function SettingsPanel({
             {/* Twilio */}
             <div className={`border p-3.5 rounded space-y-2 ${innerBg} ${borderCol}`}>
               <div className="flex justify-between items-center">
-                <span className="font-bold uppercase font-mono text-[11px] text-accent">Twilio SMS Gateway</span>
+                <span className="flex items-center gap-2.5"><ProviderBrandIcon brand="twilio" label="Twilio" /><span className="text-[12px] font-semibold normal-case tracking-normal text-text-primary">Twilio SMS</span></span>
                 <span className={`text-[11px] font-mono px-1.5 py-0.5 rounded font-bold uppercase ${connectorKeys.twilio ? 'bg-positive/20 text-positive' : 'bg-warning-dim text-warning'}`}>
                   {connectorConfigured.twilio || connectorKeys.twilio ? 'Configured' : 'Unconfigured'}
                 </span>
@@ -1048,7 +1046,7 @@ export default function SettingsPanel({
             {/* SendGrid */}
             <div className={`border p-3.5 rounded space-y-2 ${innerBg} ${borderCol}`}>
               <div className="flex justify-between items-center">
-                <span className="font-bold uppercase font-mono text-[11px] text-accent">SendGrid Mail API</span>
+                <span className="flex items-center gap-2.5"><ProviderBrandIcon brand="sendgrid" label="SendGrid" /><span className="text-[12px] font-semibold normal-case tracking-normal text-text-primary">SendGrid Mail</span></span>
                 <span className={`text-[11px] font-mono px-1.5 py-0.5 rounded font-bold uppercase ${connectorKeys.sendgrid ? 'bg-positive/20 text-positive' : 'bg-warning-dim text-warning'}`}>
                   {connectorConfigured.sendgrid || connectorKeys.sendgrid ? 'Configured' : 'Unconfigured'}
                 </span>
@@ -1067,7 +1065,7 @@ export default function SettingsPanel({
             {/* Google Maps */}
             <div className={`border p-3.5 rounded space-y-2 ${innerBg} ${borderCol}`}>
               <div className="flex justify-between items-center">
-                <span className="font-bold uppercase font-mono text-[11px] text-accent">Google Maps Platform</span>
+                <span className="flex items-center gap-2.5"><ProviderBrandIcon brand="googlemaps" label="Google Maps" /><span className="text-[12px] font-semibold normal-case tracking-normal text-text-primary">Google Maps Platform</span></span>
                 <span className={`text-[11px] font-mono px-1.5 py-0.5 rounded font-bold uppercase ${connectorKeys.googleMaps ? 'bg-positive/20 text-positive' : 'bg-warning-dim text-warning'}`}>
                   {connectorConfigured.googleMaps || connectorKeys.googleMaps ? 'Configured' : 'Unconfigured'}
                 </span>
@@ -1086,7 +1084,7 @@ export default function SettingsPanel({
             {/* Google Ads */}
             <div className={`border p-3.5 rounded space-y-2 ${innerBg} ${borderCol}`}>
               <div className="flex justify-between items-center">
-                <span className="font-bold uppercase font-mono text-[11px] text-accent">Google Ads API</span>
+                <span className="flex items-center gap-2.5"><ProviderBrandIcon brand="googleads" label="Google Ads" /><span className="text-[12px] font-semibold normal-case tracking-normal text-text-primary">Google Ads</span></span>
                 <span className={`text-[11px] font-mono px-1.5 py-0.5 rounded font-bold uppercase ${connectorKeys.googleAds ? 'bg-positive/20 text-positive' : 'bg-warning-dim text-warning'}`}>
                   {connectorConfigured.googleAds || connectorKeys.googleAds ? 'Configured' : 'Unconfigured'}
                 </span>
@@ -1105,7 +1103,7 @@ export default function SettingsPanel({
             {/* Meta Ads */}
             <div className={`border p-3.5 rounded space-y-2 ${innerBg} ${borderCol}`}>
               <div className="flex justify-between items-center">
-                <span className="font-bold uppercase font-mono text-[11px] text-accent">Meta Marketing API</span>
+                <span className="flex items-center gap-2.5"><ProviderBrandIcon brand="meta" label="Meta" /><span className="text-[12px] font-semibold normal-case tracking-normal text-text-primary">Meta Marketing</span></span>
                 <span className={`text-[11px] font-mono px-1.5 py-0.5 rounded font-bold uppercase ${connectorKeys.metaAds ? 'bg-positive/20 text-positive' : 'bg-warning-dim text-warning'}`}>
                   {connectorConfigured.metaAds || connectorKeys.metaAds ? 'Configured' : 'Unconfigured'}
                 </span>
@@ -1124,7 +1122,7 @@ export default function SettingsPanel({
             {/* GA4 / Search Console */}
             <div className={`border p-3.5 rounded space-y-2 ${innerBg} ${borderCol}`}>
               <div className="flex justify-between items-center">
-                <span className="font-bold uppercase font-mono text-[11px] text-accent">GA4 & Search Console</span>
+                <span className="flex items-center gap-2.5"><ProviderBrandIcon brand="googleanalytics" label="Google Analytics" /><span className="text-[12px] font-semibold normal-case tracking-normal text-text-primary">GA4 & Search Console</span></span>
                 <span className={`text-[11px] font-mono px-1.5 py-0.5 rounded font-bold uppercase ${connectorKeys.ga4 ? 'bg-positive/20 text-positive' : 'bg-warning-dim text-warning'}`}>
                   {connectorConfigured.ga4 || connectorKeys.ga4 ? 'Configured' : 'Unconfigured'}
                 </span>
@@ -1143,7 +1141,7 @@ export default function SettingsPanel({
             {/* Slack Webhook */}
             <div className={`border p-3.5 rounded space-y-2 ${innerBg} ${borderCol}`}>
               <div className="flex justify-between items-center">
-                <span className="font-bold uppercase font-mono text-[11px] text-accent">Slack Operations Webhook</span>
+                <span className="flex items-center gap-2.5"><ProviderBrandIcon brand="slack" label="Slack" /><span className="text-[12px] font-semibold normal-case tracking-normal text-text-primary">Slack Operations</span></span>
                 <span className={`text-[11px] font-mono px-1.5 py-0.5 rounded font-bold uppercase ${connectorKeys.slack ? 'bg-positive/20 text-positive' : 'bg-warning-dim text-warning'}`}>
                   {connectorConfigured.slack || connectorKeys.slack ? 'Configured' : 'Unconfigured'}
                 </span>
@@ -1197,8 +1195,7 @@ export default function SettingsPanel({
             </div>
           </div>
         </div>
-      {/* PUBLIC SHARE & REDDIT TESTING SHIELD */}
-      <div className={`border rounded-lg p-5 mt-6 space-y-5 ${cardBg}`}>
+      {/* PUBLIC SHARE & REDDIT TESTING SHIELD */}      <div className={`border rounded-lg p-5 mt-6 space-y-5 ${cardBg}`}>
         <div className="flex flex-wrap items-center justify-between gap-3 border-b pb-3 border-inherit">
           <div className="flex items-center gap-2">
             <Globe className="w-4 h-4 text-brand" />
