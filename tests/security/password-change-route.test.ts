@@ -11,6 +11,8 @@ describe('Authenticated password change route', () => {
   it('requires an authenticated account and verifies the current password', () => {
     expect(route).toContain('authenticate');
     expect(route).toContain('verifyPassword(currentPassword');
+    expect(route).toContain('checkRateLimit(req, res, account.email)');
+    expect(route).toContain('recordAuthFailure(req, account.email)');
     expect(route).toContain('hashPassword(newPassword)');
   });
 

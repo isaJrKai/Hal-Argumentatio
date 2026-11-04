@@ -1209,6 +1209,11 @@ export default function SettingsPanel({
                 placeholder="Service Account JSON Token"
                 className={`w-full border rounded p-2 focus:outline-none focus:border-accent text-inherit font-mono text-xs ${innerBg} ${borderCol}`}
               />
+              <div className="flex justify-end">
+                <button type="button" onClick={() => handleSaveConnectorKey('ga4', connectorKeys.ga4)} disabled={connectorSaving.ga4 || !connectorKeys.ga4.trim()} className="px-3 py-2 rounded-md bg-accent text-black text-xs font-semibold disabled:opacity-40 disabled:cursor-not-allowed hover:bg-accent/85 transition-colors">
+                  {connectorSaving.ga4 ? 'Saving…' : 'Save credential'}
+                </button>
+              </div>
               <span className="text-[11px] text-inherit opacity-60 block">Key: GOOGLE_SERVICE_ACCOUNT</span>
             </div>
 
@@ -1255,7 +1260,7 @@ export default function SettingsPanel({
           </div>
 
           <p className="text-sm text-text-secondary leading-relaxed font-sans">
-            Change the password for this account. HAL verifies your current password and stores the new password as a server-side hash.
+            Change the password for this account. HAL verifies your current password and stores the new password as a server-side hash. This form is for email-and-password accounts; Google sign-in passwords are managed in your Google Account.
           </p>
 
           {passwordFeedback && (

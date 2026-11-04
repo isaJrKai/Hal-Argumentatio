@@ -899,9 +899,13 @@ app.post('/api/auth/change-password', authenticate, async (req, res) => {
       passwordHash: contractors.passwordHash
     }).from(contractors).where(eq(contractors.id, contractorId)).limit(1);
 
-    if (!account || !verifyPassword(currentPassword, account.passwordHash || '')) {
+    if (!account) return res.status(401).json({ error: 'Your account could not be verified.' });
+    if (!checkRateLimit(req, res, account.email)) return;
+    if (!verifyPassword(currentPassword, account.passwordHash || '')) {
+      recordAuthFailure(req, account.email);
       return res.status(401).json({ error: 'Your current password is incorrect.' });
     }
+    recordAuthSuccess(req, account.email);
 
     const nextHash = hashPassword(newPassword);
     const [updated] = await pgDb.update(contractors)
