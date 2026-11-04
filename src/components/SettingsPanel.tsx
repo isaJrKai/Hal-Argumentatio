@@ -974,6 +974,7 @@ export default function SettingsPanel({
         <p className="text-xs text-inherit opacity-80 leading-relaxed font-sans">
           Configure real API credentials for external integrations. When saved, keys are encrypted and stored in your isolated database tier to power billing, SMS notifications, ad spend syncs, and territory intelligence.
         </p>
+        <p className="text-[11px] text-inherit opacity-70 leading-relaxed">AI provider keys are encrypted per tenant and never returned to the browser. Gemini is connected to HAL Copilot. OpenAI and Anthropic keys can be stored securely, but their runtime adapters are not active yet.</p>
 
           {connectorKeySuccess && (
             <div className="p-3 bg-accent/10 border border-accent/20 text-accent text-xs rounded-sm font-mono leading-relaxed font-bold uppercase tracking-wider flex items-center gap-2">
