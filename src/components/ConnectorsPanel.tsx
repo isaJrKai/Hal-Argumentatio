@@ -347,8 +347,7 @@ export default function ConnectorsPanel() {
       .then(response => response.ok ? response.json() : null)
       .then(data => setMetaStatus(data?.configured?.metaAds ? 'configured' : 'idle'))
       .catch(() => setMetaStatus('idle'));
-  }, []);
-  const handleSaveMetaCredentials = async () => {
+  }, []);  const handleSaveMetaCredentials = async () => {
     if (!metaToken.trim() || !metaAdAccountId.trim()) {
       toast({
         variant: 'warning',
@@ -464,11 +463,11 @@ export default function ConnectorsPanel() {
           onClick={() => setActiveTab('workspace')}
           className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
             activeTab === 'workspace' 
-              ? 'bg-blue-600 text-white shadow-sm' 
+              ? 'bg-accent text-black shadow-sm' 
               : 'text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800'
           }`}
         >
-          <ProviderBrandIcon brand="googlegemini" label="Google" className="h-5 w-5" />
+          <ProviderBrandIcon brand="google" label="Google" className="h-5 w-5" />
           <span>Google Workspace</span>
           {googleUser && (
             <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
@@ -479,7 +478,7 @@ export default function ConnectorsPanel() {
           onClick={() => setActiveTab('communications')}
           className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
             activeTab === 'communications' 
-              ? 'bg-blue-600 text-white shadow-sm' 
+              ? 'bg-accent text-black shadow-sm' 
               : 'text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800'
           }`}
         >
@@ -492,7 +491,7 @@ export default function ConnectorsPanel() {
           onClick={() => setActiveTab('meta')}
           className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
             activeTab === 'meta' 
-              ? 'bg-blue-600 text-white shadow-sm' 
+              ? 'bg-accent text-black shadow-sm' 
               : 'text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800'
           }`}
         >
@@ -507,7 +506,7 @@ export default function ConnectorsPanel() {
           onClick={() => setActiveTab('infrastructure')}
           className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
             activeTab === 'infrastructure' 
-              ? 'bg-blue-600 text-white shadow-sm' 
+              ? 'bg-accent text-black shadow-sm' 
               : 'text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800'
           }`}
         >
@@ -561,7 +560,7 @@ export default function ConnectorsPanel() {
                   <Button 
                     onClick={handleGoogleConnect} 
                     disabled={isGoogleLoading || !isGoogleWorkspaceConfigured}
-                    className="bg-blue-600 hover:bg-blue-700 text-white text-xs shadow-sm font-medium"
+                    className="bg-accent hover:bg-accent/85 text-black text-xs shadow-sm font-medium"
                   >
                     <Key className="w-3.5 h-3.5 mr-1.5" />
                     {!isGoogleWorkspaceConfigured ? 'Not configured' : isGoogleLoading ? 'Connecting...' : 'Connect Google Workspace'}
@@ -697,8 +696,7 @@ export default function ConnectorsPanel() {
             <div className="flex items-center gap-3 pb-4 border-b border-zinc-100 dark:border-zinc-800">
               <div className="p-2.5 rounded-xl bg-blue-500/10 text-blue-600 dark:text-blue-400">
                 <Mail className="w-6 h-6" />              </div>
-              <div>
-                <h3 className="text-base font-semibold text-zinc-900 dark:text-zinc-100">
+              <div>                <h3 className="text-base font-semibold text-zinc-900 dark:text-zinc-100">
                   Production Email Dispatch & Password Reset Delivery
                 </h3>
                 <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
@@ -782,7 +780,7 @@ export default function ConnectorsPanel() {
                     <Button
                       onClick={handleSendTestResetEmail}
                       disabled={isSendingTestEmail}
-                      className="w-full text-xs h-9 bg-blue-600 hover:bg-blue-700 text-white font-semibold"
+                      className="w-full text-xs h-9 bg-accent hover:bg-accent/85 text-black font-semibold"
                     >
                       <Send className="w-3.5 h-3.5 mr-1.5" />
                       {isSendingTestEmail ? 'Dispatching...' : 'Send Test Reset Email'}
@@ -1047,8 +1045,7 @@ export default function ConnectorsPanel() {
               <div className="flex items-center justify-between pt-2">
                 <div className="flex items-center gap-2">                  <Badge variant={metaStatus === 'error' ? 'danger' : 'neutral'}>
                     {metaStatus === 'configured' ? 'Saved · unverified' : metaStatus === 'error' ? 'Save failed' : 'Not configured'}
-                  </Badge>
-                </div>
+                  </Badge>                </div>
 
                 <Button
                   onClick={handleSaveMetaCredentials}
