@@ -300,7 +300,7 @@ ${d.description}
       </html>`);
     printWindow.document.close();
     printWindow.focus();
-    printWindow.onload = () => printWindow.print();
+    printWindow.setTimeout(() => printWindow.print(), 300);
   };
 
   const escapeHtml = (value: string) => value
