@@ -164,41 +164,50 @@ export default function App() {
     return parseCachedContractor(saved);
   });
 
-  // Session rehydration and token validation on mount
+  // Session rehydration follows the active token and cancels stale validation.
   useEffect(() => {
     // Review mode is deliberately unauthenticated and must not rehydrate a real saved session.
-    if (reviewMode) return;
+    if (reviewMode || !token) return;
 
-    const existingToken = readLocalStorage('halbiz_auth_token') || readLocalStorage('token');
-    if (existingToken) {
-      fetch('/api/auth/me', {
-        headers: { 'Authorization': `Bearer ${existingToken}` }
+    const controller = new AbortController();
+    let isCurrent = true;
+
+    fetch('/api/auth/me', {
+      headers: { 'Authorization': `Bearer ${token}` },
+      signal: controller.signal
+    })
+      .then(res => {
+        if (!isCurrent) return null;
+        if (res.status === 401 || res.status === 403) {
+          // Clear only the session this effect validated. A newer token/session
+          // causes cleanup first, so an old response cannot log it out.
+          removeLocalStorage('halbiz_auth_token');
+          removeLocalStorage('token');
+          removeLocalStorage('halbiz_auth_contractor');
+          setToken(null);
+          setContractor(null);
+          return null;
+        }
+        if (!res.ok) throw new Error(`Session verification failed (HTTP ${res.status})`);
+        return res.json();
       })
-        .then(res => {
-          if (res.status === 401 || res.status === 403) {
-            removeLocalStorage('halbiz_auth_token');
-            removeLocalStorage('token');
-            removeLocalStorage('halbiz_auth_contractor');
-            setToken(null);
-            setContractor(null);
-            throw new Error('Saved session is no longer valid');
-          }
-          if (!res.ok) throw new Error(`Session verification failed (HTTP ${res.status})`);
-          return res.json();
-        })
-        .then(data => {
-          if (data.contractor) {
-            setContractor(data.contractor);
-            writeLocalStorage('halbiz_auth_contractor', JSON.stringify(data.contractor));
-          }
-        })
-        .catch((error: unknown) => {
-          // Keep the cached session on transient server/network errors; only an explicit
-          // 401/403 above clears it. This avoids logging users out during an outage.
-          console.warn('Session verification could not be completed.', error);
-        });
-    }
-  }, []);
+      .then(data => {
+        if (!isCurrent || !data?.contractor) return;
+        setContractor(data.contractor);
+        writeLocalStorage('halbiz_auth_contractor', JSON.stringify(data.contractor));
+      })
+      .catch((error: unknown) => {
+        if (!isCurrent || controller.signal.aborted) return;
+        // Keep the cached session on transient server/network errors; only an explicit
+        // 401/403 clears it. This avoids logging users out during an outage.
+        console.warn('Session verification could not be completed.', error);
+      });
+
+    return () => {
+      isCurrent = false;
+      controller.abort();
+    };
+  }, [reviewMode, token]);
 
   // Public Interactive Audit Mode Detection (Direct client view without login)
   const [publicAuditId, setPublicAuditId] = useState<string | null>(() => {
