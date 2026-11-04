@@ -41,8 +41,9 @@ jobs:
           bun-version: 1.4.4
       - name: Refresh dependency lockfiles for security audit
         run: |
-          bun install
-          npm install --package-lock-only --ignore-scripts --no-audit
+          bun update
+          bun install --frozen-lockfile
+          npm update --package-lock-only --ignore-scripts --no-audit
       - name: Upload refreshed dependency lockfiles
         uses: actions/upload-artifact@v4
         with:
