@@ -1,34 +1,19 @@
 import React from 'react';
-import { 
-  Sparkles, 
-  Search, 
-  Bell, 
-  Map, 
-  Users, 
-  Send, 
-  TrendingUp, 
-  Cpu, 
-  ChevronDown,
-  ArrowUpRight,
-  CheckCircle2,
-  AlertTriangle,
+import {
+  Search,
+  Bell,
+  Map,
+  Users,
+  Send,
+  TrendingUp,
+  Cpu,
   Download,
   LogOut,
   Activity,
   ListTodo,
-  Plus,
-  Phone,
-  Mail,
-  Layers,
   Compass,
-  Sliders,
-  RefreshCw,
-  Globe,
-  Sun,
-  Moon,
   Bot
-} from 'lucide-react';
-import { useBusinessContext } from '../context/BusinessContext';
+} from 'lucide-react';import { useBusinessContext } from '../context/BusinessContext';
 
 interface TopTelemetryBarProps {
   activeTab: string;
