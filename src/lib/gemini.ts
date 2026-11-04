@@ -867,7 +867,7 @@ RESPONSE STANDARD
     }
 
     // Fallback to Gemini (Strictly 3.5)
-    const ai = getAIClient();
+    const ai = getAIClient(providerApiKeys?.gemini);
     if (ai) {
       try {
         const config: any = {
