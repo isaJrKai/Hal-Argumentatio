@@ -4622,12 +4622,17 @@ app.post('/api/intelligence/chat', authenticate, async (req, res) => {
 
     // 4. Save HAL's reply to the database
     const replyDate = new Date();
-    await recordWorkEvent(pgDb, {
-      contractorId, eventType: 'assistant.responded', entityType: 'conversation', entityId: conversationId,
-      actorType: 'agent', actorId: activeAi || 'hal_assistant', sourceModule: 'hal_assistant',
-      correlationId: conversationId, summary: 'HAL generated a response using conversation and bounded workspace context.',
-      payload: { groundingEnabled: !!enableGrounding, projectId: conversation.projectId || null, sourcesCount: result.sources?.length || 0, toolNames: result.toolCalls?.map(call => call.name) || [] }
-    });
+    try {
+      await recordWorkEvent(pgDb, {
+        contractorId, eventType: 'assistant.responded', entityType: 'conversation', entityId: conversationId,
+        actorType: 'agent', actorId: activeAi || 'hal_assistant', sourceModule: 'hal_assistant',
+        correlationId: conversationId, summary: 'HAL generated a response using conversation and bounded workspace context.',
+        payload: { groundingEnabled: !!enableGrounding, projectId: conversation.projectId || null, sourcesCount: result.sources?.length || 0, toolNames: result.toolCalls?.map(call => call.name) || [] }
+      });
+    } catch (ledgerError) {
+      // Work History is a secondary audit append; it must not suppress a valid Copilot reply.
+      console.error('[HAL Work History] Copilot reply generated but response event could not be recorded:', ledgerError);
+    }
 
     const [modelMsg] = await pgDb.insert(chatMessages).values({
       id: 'msg_' + crypto.randomBytes(8).toString('hex'),
