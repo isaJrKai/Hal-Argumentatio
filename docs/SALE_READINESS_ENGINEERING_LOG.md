@@ -46,7 +46,7 @@
 - Added a route-specific anonymous write rate limit to public audit booking, landing-page lead intake, and delivery webhook routes.
 - Added bounded field validation to public audit booking and require a name plus at least one contact method.
 - Moved third-party integration credential controls into a collapsed Advanced section so routine workspace settings are less cluttered; credential values remain encrypted and are not exposed in the UI.
-- Improved the HAL Bible specification/manual reading layout: larger body text and line-height, wrapping for long file/metadata values, and stacked metadata rows on narrow screens.
+- Improved the HAL Operating Manual specification/manual reading layout: larger body text and line-height, wrapping for long file/metadata values, and stacked metadata rows on narrow screens.
 - Hardened CORS configuration diagnostics: production now warns clearly when no browser origins are configured; malformed entries and non-HTTPS non-local origins are rejected rather than silently accepted. Exact production origin values still must be supplied in deployment environment settings.
 - Added a real Phase 5 system-check action: tenant-scoped database reachability and lead count, cryptographic ledger integrity, AI key-configuration flags, process uptime/memory/runtime version, and an audit-ledger record. The UI explicitly distinguishes configured keys from verified provider connectivity and does not claim the 11-layer brain is synchronized.
 - Corrected the JWT default session lifetime from 30 days to the documented 24 hours and added regression coverage for the default and explicit shorter expirations.
