@@ -1,4 +1,4 @@
-# HAL — AI Business Operating Intelligence Platform
+# HAL Business Operating Intelligence Platform
 
 HAL (Human Argumentation Layer) is a full-stack AI Business Operating Intelligence System. It consolidates lead harvesting, technical SEO auditing, high-conversion landing page generation, multi-channel outreach (WhatsApp, Email, SMS, Calendar), client intelligence graphs, and an immutable cryptographic audit ledger into a unified software platform.
 
