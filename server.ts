@@ -99,6 +99,7 @@ dotenv.config();
 
 const app = express();
 const PORT = 3000;
+let applicationDatabaseState: 'starting' | 'ready' | 'failed' = 'starting';
 
 app.use(express.json({
   verify: (req, _res, buffer) => {
@@ -278,6 +279,15 @@ app.get('/api/health', (_req, res) => {
 // Readiness: confirms the same PostgreSQL pool used by application queries is usable
 // and the core cross-module tables exist. A live process is not necessarily ready.
 app.get('/api/ready', async (_req, res) => {
+  if (applicationDatabaseState !== 'ready') {
+    return res.status(503).json({
+      ready: false,
+      status: applicationDatabaseState,
+      error: applicationDatabaseState === 'failed'
+        ? 'Application database initialization failed.'
+        : 'Application database initialization is still in progress.'
+    });
+  }
   let client: any;
   try {
     const pool = getApplicationPostgresPool();
@@ -9274,17 +9284,28 @@ app.post('/api/revenue/recommendations/:id/transition', authenticate, async (req
 // ─── SERVER STARTUP & BACKGROUND WORKERS ───────────────────────────────
 
 async function startServer() {
-  // Initialize the schema on the same pool used by every application query.
-  // Startup must not advertise a running server while database initialization failed.
-  try {
-    const pool = getApplicationPostgresPool();
-    await bootstrapPostgresTables(pool);
-    await pool.query('SELECT 1');
-    console.log('[HAL PostgreSQL] Application database schema is ready.');
-  } catch (e: any) {
-    console.error('[HAL PostgreSQL] Startup blocked: application database initialization failed.', e?.message || e);
-    throw e;
-  }
+  // Bind the HTTP listener without waiting for database bootstrap. Readiness stays
+  // false until the same pool used by application queries has completed bootstrap.
+  void (async () => {
+    try {
+      const pool = getApplicationPostgresPool();
+      await bootstrapPostgresTables(pool);
+      await pool.query('SELECT 1');
+      applicationDatabaseState = 'ready';
+      console.log('[HAL PostgreSQL] Application database schema is ready.');
+    } catch (error: any) {
+      applicationDatabaseState = 'failed';
+      console.error('[HAL PostgreSQL] Background database initialization failed.', error?.message || error);
+      return;
+    }
+
+    try {
+      await autonomousLearning.initializeFromDb();
+      console.log('[HAL Neural Engine] Persistent learning state initialized.');
+    } catch (error) {
+      console.warn('[HAL Neural Engine] Persistent learning initialization failed:', error);
+    }
+  })();
 
   // Phase 4: Start Durable Conversion Worker Background Loop (Runs every 45s with exponential backoff & concurrency locking)
   setInterval(async () => {
