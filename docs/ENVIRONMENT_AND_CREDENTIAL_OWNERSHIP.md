@@ -1,6 +1,6 @@
 # HALBiz environment and credential ownership
 
-This guide separates buyer-configurable integrations from deployment-owned infrastructure. It is an inventory policy, not proof that every integration is implemented.
+This guide separates buyer-configurable integrations from deployment-owned infrastructure. It is an inventory policy, not proof that every integration is implemented. The repository `.gitignore` excludes `.env*` files while explicitly allowing the blank `.env.example` template; never place live values in that template.
 
 ## Deployment-owned secrets — never put these in ordinary workspace settings
 
