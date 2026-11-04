@@ -44,6 +44,7 @@ import { getRevenueAmountUsd } from './src/lib/revenueAmounts';
 import { buildPasswordResetResponse } from './src/lib/passwordResetResponse';
 import { verifyFirebaseGoogleIdToken } from './src/lib/firebaseGoogleIdentity';
 import { getClientIp } from './src/lib/clientIp';
+import { pruneBoundedMap } from './src/lib/boundedMap';
 import { recordWorkEvent, getRecentWorkEvents, getEntityWorkEvents } from './src/lib/workLedger';
 import { canHumanUpdateWorkTask, canTransitionWorkTask, listWorkTasks, getWorkTask, requiresWorkTaskApproval, ensureLeadReviewTask } from './src/lib/workTasks';
 import { validateStaffInput, getEffectiveStaffAvailability } from './src/lib/staff';
@@ -167,6 +168,12 @@ const publicLinkConfig: PublicLinkConfig = {
 };
 
 const publicIpRateMap = new Map<string, { count: number; resetAt: number; aiCount: number; aiResetAt: number }>();
+let lastPublicRateMapPruneAt = 0;
+function prunePublicRateMap(now: number) {
+  if (now - lastPublicRateMapPruneAt < 60_000 && publicIpRateMap.size < 10_000) return;
+  lastPublicRateMapPruneAt = now;
+  pruneBoundedMap(publicIpRateMap, now, record => Math.max(record.resetAt, record.aiResetAt), 10_000);
+}
 
 app.use((req, res, next) => {
   const host = (req.headers['x-forwarded-host'] || req.headers.host || '') as string;
@@ -226,6 +233,7 @@ app.use((req, res, next) => {
     if (publicLinkConfig.mode === 'safe_sandbox') {
       const clientIp = getClientIp(req);
       const now = Date.now();
+      prunePublicRateMap(now);
       let record = publicIpRateMap.get(clientIp);
 
       if (!record || now > record.resetAt) {
@@ -361,13 +369,21 @@ app.get(['/sw.js', '/service-worker.js'], (req, res) => {
 interface AuthFailure {
   attempts: number;
   lockoutUntil: number;
+  updatedAt: number;
 }
 const loginFailures = new Map<string, AuthFailure>();
+let lastLoginFailurePruneAt = 0;
+function pruneLoginFailures(now: number) {
+  if (now - lastLoginFailurePruneAt < 60_000 && loginFailures.size < 20_000) return;
+  lastLoginFailurePruneAt = now;
+  pruneBoundedMap(loginFailures, now, failure => failure.updatedAt + 15 * 60 * 1000, 20_000);
+}
 
 function checkRateLimit(req: express.Request, res: express.Response, email: string): boolean {
   const ip = getClientIp(req);
   const limitKey = `${ip}:${email.toLowerCase().trim()}`;
   const now = Date.now();
+  pruneLoginFailures(now);
 
   const failure = loginFailures.get(limitKey);
   if (failure && failure.attempts >= 5) {
@@ -395,9 +411,11 @@ function recordAuthFailure(req: express.Request, email: string) {
   const ip = getClientIp(req);
   const limitKey = `${ip}:${email.toLowerCase().trim()}`;
   const now = Date.now();
+  pruneLoginFailures(now);
 
-  const failure = loginFailures.get(limitKey) || { attempts: 0, lockoutUntil: 0 };
+  const failure = loginFailures.get(limitKey) || { attempts: 0, lockoutUntil: 0, updatedAt: now };
   failure.attempts += 1;
+  failure.updatedAt = now;
   if (failure.attempts >= 5) {
     failure.lockoutUntil = now + 15 * 60 * 1000; // 15 minutes lockout
     db.addAuditLog({
@@ -412,6 +430,7 @@ function recordAuthFailure(req: express.Request, email: string) {
 function recordAuthSuccess(req: express.Request, email: string) {
   const ip = getClientIp(req);
   const limitKey = `${ip}:${email.toLowerCase().trim()}`;
+  pruneLoginFailures(Date.now());
   loginFailures.delete(limitKey);
 }
 
