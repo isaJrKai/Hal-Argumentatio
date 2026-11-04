@@ -2035,11 +2035,8 @@ app.get('/api/leads', authenticate, async (req, res) => {
     res.json(decryptedLeads);
   } catch (err: any) {
     console.error('Failed to fetch tenant leads from authoritative PostgreSQL:', err);
-    return res.status(503).json({
-      success: false,
-      code: 'DATABASE_UNAVAILABLE',
-      error: 'Neon/PostgreSQL is unavailable. HAL did not substitute stale local JSON data.'
-    });
+    res.set('X-HAL-Degraded', 'true').set('X-HAL-Data-Source', 'tenant-local-json-fallback');
+    return res.status(200).json(db.getLeads(contractorId));
   }
 });
 
@@ -3981,7 +3978,9 @@ app.get('/api/revenues', authenticate, async (req, res) => {
     const revenues = await pgDb.select().from(revenueRecords).where(inArray(revenueRecords.contractorId, targetIds)).orderBy(desc(revenueRecords.createdAt));
     res.json(revenues);
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    console.error('[HAL Revenue] PostgreSQL read failed; using tenant-local fallback.', err);
+    res.set('X-HAL-Degraded', 'true').set('X-HAL-Data-Source', 'tenant-local-json-fallback');
+    return res.status(200).json(db.getRevenues(contractorId));
   }
 });
 
@@ -3995,7 +3994,9 @@ app.get('/api/campaigns', authenticate, async (req, res) => {
     const contractorCampaigns = await pgDb.select().from(campaigns).where(inArray(campaigns.contractorId, targetIds)).orderBy(desc(campaigns.createdAt));
     res.json(contractorCampaigns);
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    console.error('[HAL Campaigns] PostgreSQL read failed; using tenant-local fallback.', err);
+    res.set('X-HAL-Degraded', 'true').set('X-HAL-Data-Source', 'tenant-local-json-fallback');
+    return res.status(200).json(db.getCampaigns(contractorId));
   }
 });
 
@@ -4114,7 +4115,9 @@ app.get('/api/recommendations', authenticate, async (req, res) => {
     const contractorRecommendations = await pgDb.select().from(recommendations).where(inArray(recommendations.contractorId, targetIds)).orderBy(desc(recommendations.createdAt));
     res.json(contractorRecommendations);
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    console.error('[HAL Recommendations] PostgreSQL read failed; using tenant-local fallback.', err);
+    res.set('X-HAL-Degraded', 'true').set('X-HAL-Data-Source', 'tenant-local-json-fallback');
+    return res.status(200).json(db.getRecommendations(contractorId));
   }
 });
 
@@ -4200,7 +4203,9 @@ app.get('/api/forecasts', authenticate, async (req, res) => {
     const contractorForecasts = await pgDb.select().from(forecasts).where(inArray(forecasts.contractorId, targetIds)).orderBy(desc(forecasts.createdAt));
     res.json(contractorForecasts);
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    console.error('[HAL Forecasts] PostgreSQL read failed; using tenant-local fallback.', err);
+    res.set('X-HAL-Degraded', 'true').set('X-HAL-Data-Source', 'tenant-local-json-fallback');
+    return res.status(200).json(db.getForecasts(contractorId));
   }
 });
 
@@ -4220,8 +4225,17 @@ app.get('/api/learning-insights', authenticate, async (req, res) => {
     }));
     return res.json(mappedInsights);
   } catch (err: any) {
-    console.error('[HAL Learning] Tenant insights unavailable:', err);
-    return res.status(503).json({ error: 'Learning insights are temporarily unavailable.' });
+    console.error('[HAL Learning] PostgreSQL read failed; using tenant-scoped local fallback.', err);
+    const localInsights = db.getLearningInsights().filter((insight: any) => insight.contractorId === contractorId);
+    res.set('X-HAL-Degraded', 'true').set('X-HAL-Data-Source', 'tenant-local-json-fallback');
+    return res.status(200).json(localInsights.map((insight: any) => ({
+      id: insight.id,
+      category: insight.category,
+      insight: insight.insight,
+      confidence: insight.confidence,
+      observedCount: insight.observedCount,
+      createdAt: insight.createdAt
+    })));
   }
 });
 
@@ -4581,7 +4595,9 @@ app.post('/api/intelligence/chat', authenticate, async (req, res) => {
       createdAt: timestampDate,
     }).returning();
 
-    // 3. Ask HAL
+    // 3. Resolve this tenant's encrypted AI provider settings without exposing secrets to the browser.
+    const tenantAiCredentials = await getTenantConnectorCredentials(contractorId);
+    // 4. Ask HAL
     const result = await askHalBot(message, formattedHistory, !!enableGrounding, activeAi, {
       // Only the authenticated server supplies this runtime. Tool calls inherit
       // the contractor ID from the verified session, never from model arguments.
@@ -4618,9 +4634,9 @@ app.post('/api/intelligence/chat', authenticate, async (req, res) => {
         }
         return toolResult;
       }
-    });
+    }, { gemini: tenantAiCredentials.gemini });
 
-    // 4. Save HAL's reply to the database
+    // 5. Save HAL's reply to the database
     const replyDate = new Date();
     try {
       await recordWorkEvent(pgDb, {
@@ -6841,7 +6857,7 @@ app.post('/api/connectors/credentials', authenticate, async (req, res) => {
   const allowedServices = new Set([
     'stripe', 'twilio', 'sendgrid', 'googleMaps', 'googleDrive', 'linkedin',
     'salesforce', 'hubspot', 'mailchimp', 'notion', 'googleAds', 'metaAds',
-    'ga4', 'quickbooks', 'slack', 'resend'
+    'ga4', 'quickbooks', 'slack', 'resend', 'gemini', 'openai', 'anthropic'
   ]);
   if (typeof service !== 'string' || !allowedServices.has(service)) {
     return res.status(400).json({ error: 'A supported connector service is required.' });
@@ -7201,7 +7217,13 @@ app.get('/api/neural/network', authenticate, async (req, res) => {
 // ─── AI ENGINE DUAL-DRIVE & AUTONOMOUS ENGINE STATUS ─────────────────────────
 
 app.get('/api/ai/engine-status', authenticate, async (req, res) => {
-  const geminiKeySet = !!process.env.GEMINI_API_KEY;
+  let tenantCredentials: Record<string, string> = {};
+  try {
+    tenantCredentials = await getTenantConnectorCredentials((req as any).contractorId);
+  } catch {
+    console.warn('[HAL AI status] Tenant credentials unavailable; checking deployment-level keys only.');
+  }
+  const geminiKeySet = !!(tenantCredentials.gemini || process.env.GEMINI_API_KEY);
   const nvidiaKeySet = !!process.env.NVIDIA_API_KEY;
   const timesfmConfigured = Boolean(process.env.TIMESFM_SERVICE_URL && (process.env.TIMESFM_API_KEY || '').length >= 32);
   const requestedPreference = process.env.HAL_ACTIVE_AI;
@@ -7947,8 +7969,9 @@ app.get('/api/scheduler/jobs', authenticate, async (req, res) => {
       .orderBy(desc(schedulerJobs.createdAt)).limit(100);
     return res.json(jobs);
   } catch (err: any) {
-    console.error('[Scheduler] Durable job list failed:', err);
-    return res.status(503).json({ error: 'Scheduled jobs are temporarily unavailable from PostgreSQL.' });
+    console.error('[Scheduler] PostgreSQL read failed; using tenant-local fallback.', err);
+    res.set('X-HAL-Degraded', 'true').set('X-HAL-Data-Source', 'tenant-local-json-fallback');
+    return res.status(200).json(db.getSchedulerJobs(contractorId));
   }
 });
 

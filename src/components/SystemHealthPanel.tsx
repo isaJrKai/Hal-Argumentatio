@@ -266,12 +266,19 @@ export default function SystemHealthPanel({ token }: SystemHealthPanelProps) {
       runDiagnostics(true);
       fetchAuditLogs();
       
-      // Auto-poll logs and diagnostics every 8 seconds for semi-realtime updates
+      // Diagnostics are low-frequency and paused while the tab is hidden.
       const poll = setInterval(() => {
-        runDiagnostics(true);
-      }, 8000);
+        if (!document.hidden) runDiagnostics(true);
+      }, 30000);
+      const handleVisibility = () => {
+        if (!document.hidden) runDiagnostics(true);
+      };
+      document.addEventListener('visibilitychange', handleVisibility);
 
-      return () => clearInterval(poll);
+      return () => {
+        clearInterval(poll);
+        document.removeEventListener('visibilitychange', handleVisibility);
+      };
     }
   }, [token]);
 

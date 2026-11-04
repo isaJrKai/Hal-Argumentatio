@@ -604,12 +604,12 @@ export default function App() {
   const dataSyncGenerationRef = useRef(0);
   const dataSyncAbortRef = useRef<AbortController | null>(null);
 
-  const scheduleDataSyncRetry = (delayMs: number, generation: number) => {
+  const scheduleDataSyncRetry = (delayMs: number, generation: number, nextRetryCount: number) => {
     if (dataSyncRetryTimerRef.current) clearTimeout(dataSyncRetryTimerRef.current);
     dataSyncRetryTimerRef.current = setTimeout(() => {
       dataSyncRetryTimerRef.current = null;
       if (generation === dataSyncGenerationRef.current && token) {
-        void fetchAllData();
+        void fetchAllData(nextRetryCount);
       }
     }, delayMs);
   };
@@ -639,18 +639,23 @@ export default function App() {
         if (!Array.isArray(payload)) {
           throw new Error(`${endpoint.label}: expected an array response but received ${payload === null ? 'null' : typeof payload}.`);
         }
-        return payload;
+        return { payload, degraded: response.headers.get('X-HAL-Degraded') === 'true' };
       }));
 
       // Ignore results belonging to a session that has since changed or logged out.
       if (generation !== dataSyncGenerationRef.current || controller.signal.aborted) return;
 
       const failedEndpoints: string[] = [];
+      const degradedEndpoints: string[] = [];
       let isServerWarmingUp = false;
 
       results.forEach((result, index) => {
         if (result.status === 'fulfilled') {
-          endpoints[index].apply(result.value);
+          endpoints[index].apply(result.value.payload);
+          if (result.value.degraded) {
+            degradedEndpoints.push(endpoints[index].label);
+            failedEndpoints.push(endpoints[index].label);
+          }
         } else {
           failedEndpoints.push(endpoints[index].label);
           const reason = result.reason;
@@ -658,8 +663,8 @@ export default function App() {
           if ((reason as any)?.isStartingServer || msg.includes('starting server') || msg.includes('server is starting') || msg.includes('starting up')) {
             isServerWarmingUp = true;
           }
-          if (!(reason instanceof DOMException && reason.name === 'AbortError')) {
-            console.warn(`HAL data sync notice for ${endpoints[index].url}:`, reason);
+          if (retryCount === 0 && !(reason instanceof DOMException && reason.name === 'AbortError')) {
+            console.warn(`HAL data sync initial notice for ${endpoints[index].url}:`, reason);
           }
         }
       });
@@ -669,7 +674,9 @@ export default function App() {
           ? Math.min(2000 * Math.pow(2, Math.min(retryCount, 3)), 15000)
           : Math.min(1500 * (retryCount + 1), 15000);
         const allFailed = failedEndpoints.length === endpoints.length;
-        const cleanMessage = isServerWarmingUp
+        const cleanMessage = degradedEndpoints.length > 0
+          ? `Showing isolated local fallback data for ${degradedEndpoints.join(', ')} while PostgreSQL reconnects. Some data may be stale.`
+          : isServerWarmingUp
           ? 'Backend service is still initializing. HAL will reconnect automatically.'
           : allFailed
           ? 'The operational backend is temporarily unavailable. Existing dashboard data is retained.'
@@ -681,7 +688,16 @@ export default function App() {
           message: cleanMessage,
           type: 'system'
         });
-        scheduleDataSyncRetry(delay, generation);
+        if (retryCount < 5) {
+          scheduleDataSyncRetry(delay, generation, retryCount + 1);
+        } else {
+          setToastAlert({
+            id: 'data-sync',
+            title: 'Sync Paused',
+            message: 'Automatic retries reached the five-attempt limit. Your existing data is retained; use Refresh or revisit the dashboard to try again.',
+            type: 'system'
+          });
+        }
         return;
       }
 
@@ -699,7 +715,9 @@ export default function App() {
         message: 'The dashboard could not reach the server. Existing data is retained; reconnecting automatically.',
         type: 'system'
       });
-      scheduleDataSyncRetry(Math.min(2000 * Math.pow(2, Math.min(retryCount, 3)), 15000), generation);
+      if (retryCount < 5) {
+        scheduleDataSyncRetry(Math.min(2000 * Math.pow(2, Math.min(retryCount, 4)), 30000), generation, retryCount + 1);
+      }
     } finally {
       if (dataSyncAbortRef.current === controller) {
         dataSyncAbortRef.current = null;
