@@ -882,7 +882,7 @@ export default function App() {
     }
   };
 
-  const clearNotifications = async () => {
+  const markAllNotificationsRead = async () => {
     try {
       const response = await fetch('/api/notifications/read-all', {
         method: 'POST',
@@ -1152,7 +1152,7 @@ export default function App() {
         companyLogo={companyLogo}
         unreadNotificationsCount={unreadNotificationsCount}
         notifications={notifications}
-        clearNotifications={clearNotifications}
+        markAllNotificationsRead={markAllNotificationsRead}
         onMarkNotificationRead={markNotificationRead}
         showNotifications={showNotificationDropdown}
         onToggleNotifications={() => setShowNotificationDropdown(prev => !prev)}
