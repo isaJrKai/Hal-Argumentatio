@@ -7,8 +7,7 @@ import {
   GoogleAuthProvider, 
   onAuthStateChanged,
   signOut,
-  User,
-  Auth
+  User
 } from '@firebase/auth';
 
 export const isGoogleWorkspaceConfigured = isFirebaseConfigured;
