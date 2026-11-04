@@ -789,9 +789,13 @@ export default function App() {
             if (Array.isArray(history)) {
               const historyItems = history as Notification[];
               setNotifications(previous => {
-                const byId = new Map<string, Notification>();
-                [...historyItems, ...previous].forEach(item => byId.set(item.id, item));
-                return Array.from(byId.values()).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+                const mergedNotifications: Notification[] = [];
+                [...historyItems, ...previous].forEach(item => {
+                  const existingIndex = mergedNotifications.findIndex(existing => existing.id === item.id);
+                  if (existingIndex === -1) mergedNotifications.push(item);
+                  else mergedNotifications[existingIndex] = item;
+                });
+                return mergedNotifications.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
               });
             }
           }
