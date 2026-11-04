@@ -286,6 +286,11 @@ app.get('/api/ready', async (_req, res) => {
       SELECT
         to_regclass('public.contractors') IS NOT NULL AS contractors,
         to_regclass('public.leads') IS NOT NULL AS leads,
+        to_regclass('public.chat_projects') IS NOT NULL AS chat_projects,
+        to_regclass('public.chat_conversations') IS NOT NULL AS chat_conversations,
+        to_regclass('public.chat_messages') IS NOT NULL AS chat_messages,
+        to_regclass('public.lead_events') IS NOT NULL AS lead_events,
+        to_regclass('public.revenue_outcomes') IS NOT NULL AS revenue_outcomes,
         to_regclass('public.client_projects') IS NOT NULL AS client_projects,
         to_regclass('public.revenue_records') IS NOT NULL AS revenue_records,
         to_regclass('public.campaigns') IS NOT NULL AS campaigns,
@@ -9111,16 +9116,16 @@ app.post('/api/revenue/recommendations/:id/transition', authenticate, async (req
 // ─── SERVER STARTUP & BACKGROUND WORKERS ───────────────────────────────
 
 async function startServer() {
-  // Auto-bootstrap PostgreSQL tables on startup
+  // Initialize the schema on the same pool used by every application query.
+  // Startup must not advertise a running server while database initialization failed.
   try {
-    const { getPostgresPool, bootstrapPostgresTables } = await import('./src/db/postgres');
-    const pool = getPostgresPool();
-    if (pool) {
-      await bootstrapPostgresTables(pool);
-      console.log('[HAL PostgreSQL] Tables automatically bootstrapped successfully.');
-    }
+    const pool = getApplicationPostgresPool();
+    await bootstrapPostgresTables(pool);
+    await testPostgresConnection();
+    console.log('[HAL PostgreSQL] Application database schema is ready.');
   } catch (e: any) {
-    console.warn('[HAL PostgreSQL] Auto-bootstrap note:', e?.message || e);
+    console.error('[HAL PostgreSQL] Startup blocked: application database initialization failed.', e?.message || e);
+    throw e;
   }
 
   // Phase 4: Start Durable Conversion Worker Background Loop (Runs every 45s with exponential backoff & concurrency locking)
