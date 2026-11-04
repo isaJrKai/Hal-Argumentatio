@@ -787,9 +787,10 @@ export default function App() {
           if (historyResponse.ok) {
             const history = await historyResponse.json();
             if (Array.isArray(history)) {
+              const historyItems = history as Notification[];
               setNotifications(previous => {
                 const byId = new Map<string, Notification>();
-                [...history, ...previous].forEach(item => byId.set(item.id, item));
+                [...historyItems, ...previous].forEach(item => byId.set(item.id, item));
                 return Array.from(byId.values()).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
               });
             }
