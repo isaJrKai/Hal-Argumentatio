@@ -26,7 +26,7 @@ export const createPool = () => {
       if (connectionString) {
         global._postgresPool = new Pool({
           connectionString,
-          ssl: connectionString.includes('neon.tech') || connectionString.includes('sslmode=require') ? { rejectUnauthorized: false } : undefined,
+          ssl: connectionString.includes('neon.tech') || connectionString.includes('sslmode=require') ? { rejectUnauthorized: true } : undefined,
           max: 10,
           connectionTimeoutMillis: 5000,
         });
