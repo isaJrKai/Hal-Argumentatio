@@ -196,7 +196,7 @@ export const HalRoadmapPhase4View: React.FC = () => {
               </span>
             </div>
             <h2 className="text-xl font-bold font-display text-text-primary tracking-tight">
-              Distributed Autonomous Optimization & Dual-Drive Consensus
+              Model comparison and decision support
             </h2>
             <p className="text-xs text-text-secondary max-w-3xl leading-relaxed">
               Designed to support multi-model consensus and campaign guardrails. Provider availability, measured model latency, and calibration history are not yet verified; no default historical records are shown.
@@ -252,7 +252,7 @@ export const HalRoadmapPhase4View: React.FC = () => {
             <div className="flex items-center justify-between">
               <span className="text-xs font-medium text-text-secondary flex items-center gap-1.5">
                 <Network className="w-3.5 h-3.5 text-accent" />
-                Neural Agent Routing
+                Model routing
               </span>
               <span className="text-[10px] font-mono font-bold text-emerald-500 bg-emerald-500/10 px-1.5 py-0.5 rounded">
                 NODES NOT VERIFIED
@@ -316,7 +316,7 @@ export const HalRoadmapPhase4View: React.FC = () => {
           }`}
         >
           <Network className="w-3.5 h-3.5" />
-          <span>Neural Graph & Bayesian Weights</span>
+          <span>Learning graph and calibration</span>
           <span className="px-1.5 py-0.2 rounded-full text-[10px] font-mono bg-border-dim text-text-secondary">
             {neuralNodes.length} Nodes
           </span>
@@ -369,7 +369,7 @@ export const HalRoadmapPhase4View: React.FC = () => {
                   NOT VERIFIED
                 </span>
               </div>
-              <h3 className="text-sm font-bold text-text-primary">Adaptive Bayesian Weight Tuning</h3>
+              <h3 className="text-sm font-bold text-text-primary">Calibration weights</h3>
               <p className="text-xs text-text-secondary leading-relaxed">
                 Planned capability: recalibrate urgency weights from completed conversion outcomes. This is unavailable until measured outcomes and persisted model parameters are connected.
               </p>
@@ -432,7 +432,7 @@ export const HalRoadmapPhase4View: React.FC = () => {
               <div>
                 <h3 className="text-sm font-bold text-text-primary flex items-center gap-1.5">
                   <Sparkles className="w-4 h-4 text-accent" />
-                  Dual-Drive Cognitive Arbitration Sandbox
+                  Model comparison preview
                 </h3>
                 <p className="text-xs text-text-secondary">
                   No live Gemini/NVIDIA inference adapters or persisted consensus store are connected. This panel is not currently able to generate a real consensus.
@@ -600,7 +600,7 @@ export const HalRoadmapPhase4View: React.FC = () => {
           <div>
             <h3 className="text-sm font-bold text-text-primary mb-3 flex items-center gap-2">
               <Network className="w-4 h-4 text-accent" />
-              Specialized Autonomous Agent Nodes
+              Model and service components
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               {neuralNodes.length === 0 && <div className="p-5 rounded-xl border border-border-dim text-sm text-text-secondary md:col-span-3">Runtime node telemetry is not configured. No latency, confidence, or task counts are being reported.</div>}

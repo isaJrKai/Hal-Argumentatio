@@ -143,7 +143,7 @@ export default function CommandPalette({
   // Navigation commands
   const navigationCommands = [
     { id: 'overview', label: 'Go to Overview', icon: Sparkles, type: 'nav', keywords: 'dashboard home overview stats kpi mission' },
-    { id: 'blueprint', label: 'Go to Blueprints & spatial audits', icon: Layout, type: 'nav', keywords: 'claude blueprint audit spatial dossier architecture overview auto-cad' },
+    { id: 'blueprint', label: 'Go to Product architecture', icon: Layout, type: 'nav', keywords: 'claude blueprint audit spatial dossier architecture overview auto-cad' },
     { id: 'neural', label: 'Go to Territory & learning graph', icon: Network, type: 'nav', keywords: 'synaptic tool neural networks synaptic mesh deep learning weights nodes dual drive autonomous offline self teaching' },
     { id: 'missions', label: 'Go to Tasks & operations', icon: Briefcase, type: 'nav', keywords: 'operations tasks missions goals execution' },
     { id: 'forecasts', label: 'Go to Forecasts & reports', icon: TrendingUp, type: 'nav', keywords: 'intelligence forecast revenue predictions market analytics' },

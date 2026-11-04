@@ -9,6 +9,9 @@ const guide = readFileSync('src/components/HalBiblePanel.tsx', 'utf8');
 const drive = readFileSync('src/components/GoogleDrivePanel.tsx', 'utf8');
 const intelligence = readFileSync('src/components/IntelligencePanel.tsx', 'utf8');
 const settings = readFileSync('src/components/SettingsPanel.tsx', 'utf8');
+const architecture = readFileSync('src/components/BlueprintViewerPanel.tsx', 'utf8');
+const phase4 = readFileSync('src/components/HalRoadmapPhase4View.tsx', 'utf8');
+const phase5 = readFileSync('src/components/HalRoadmapPhase5View.tsx', 'utf8');
 
 describe('HAL product language and truthful controls', () => {
   it('uses plain labels in navigation and the command palette', () => {
@@ -23,6 +26,20 @@ describe('HAL product language and truthful controls', () => {
     expect(graph).not.toContain('Manual Pruning');
     expect(graph).not.toContain('Confirm Prune');
     expect(graph).not.toContain('CLICK TO MANUAL PRUNE');
+  });
+
+  it('replaces the Claude prompt dossier with a product architecture overview', () => {
+    expect(architecture).toContain('Product architecture');
+    expect(architecture).not.toContain('Claude');
+    expect(architecture).not.toContain('Ready-To-Paste');
+    expect(architecture).not.toContain('AutoCAD');
+  });
+
+  it('uses plain language for planned model and service modules', () => {
+    expect(phase4).toContain('Model comparison preview');
+    expect(phase4).not.toContain('Cognitive Arbitration Sandbox');
+    expect(phase5).toContain('Service checks');
+    expect(phase5).not.toContain('Unified Business Brain');
   });
 
   it('describes model selection as a preference, not proof of provider connectivity', () => {
