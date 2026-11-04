@@ -31,6 +31,7 @@ import {
 import { useBusinessContext } from '../context/BusinessContext';
 import { IndustryProfile } from '../config/industryTaxonomy';
 import HalBiblePanel from './HalBiblePanel';
+import { ProviderBrandIcon } from './ProviderBrandIcon';
 
 interface SettingsPanelProps {
   token: string | null;
@@ -309,7 +310,7 @@ export default function SettingsPanel({
 
   const handleSavePostgres = async (e: React.FormEvent) => {
     e.preventDefault();
-    setPostgresSuccess('Neon PostgreSQL database link configured. Validating connection...');
+    setPostgresSuccess('Running a one-time PostgreSQL connection check. No production database settings are being changed.');
     await handleTestPostgres();
     setTimeout(() => setPostgresSuccess(null), 5000);
   };
@@ -395,7 +396,6 @@ export default function SettingsPanel({
   };
 
   // Password reset state
-
 
 
   const textPrimary = 'text-text-primary';
@@ -797,8 +797,7 @@ export default function SettingsPanel({
                   />
                 </label>
                 <div className="text-[11px] mt-1.5 text-inherit opacity-60">PNG, JPG or WEBP. Max size 2MB.</div>
-              </div>
-            </div>
+              </div>            </div>
           </div>
 
           {/* Company Brand Logo Uploader */}
@@ -857,17 +856,17 @@ export default function SettingsPanel({
       {/* DIRECT INTEGRATION GATEWAY: POSTGRESQL & JWT SECURITY */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 min-w-0">
         <details className={`border rounded-lg ${cardBg}`}>
-          <summary className="cursor-pointer list-none p-5 font-mono text-xs font-bold uppercase tracking-wider">Advanced · PostgreSQL connection and sync</summary>
+          <summary className="cursor-pointer list-none p-5 font-mono text-xs font-bold uppercase tracking-wider">Advanced · PostgreSQL connection diagnostics</summary>
           <div className="px-5 pb-5">
         {/* PostgreSQL Database Section */}
         <div className={`border rounded-lg p-5 space-y-6 ${cardBg}`}>
           <div className="flex flex-wrap items-center gap-2 border-b pb-3 border-inherit">
             <Database className="w-4 h-4 text-accent" />
-            <span className="text-xs font-mono uppercase tracking-wider font-bold">Neon PostgreSQL Database Link</span>
+            <span className="text-xs font-mono uppercase tracking-wider font-bold">External PostgreSQL Connection Test</span>
           </div>
 
           <p className="text-xs text-inherit opacity-80 leading-relaxed font-sans">
-            Connects HAL directly to your external Neon or PostgreSQL relational database. Clicking <strong className="text-text-primary">Test Connection</strong> performs an immediate live latency ping, while <strong className="text-text-primary">Sync Leads &amp; Neural Weights</strong> runs real SQL migrations to persist your local leads, win/loss records, and Bayesian model weights into the cloud.
+            This diagnostic tests a PostgreSQL URI for reachability and reports schema status. It does not switch HAL's live production database or persist a new application connection. A buyer-owned database migration requires a separate, backed-up handover process.
           </p>
 
           {postgresSuccess && (
@@ -879,7 +878,7 @@ export default function SettingsPanel({
           <form onSubmit={handleSavePostgres} className="space-y-4 text-xs font-sans">
             <div className="space-y-1">
               <label className="block text-[11px] font-mono opacity-80 uppercase tracking-wider font-bold">PostgreSQL Connection URI (admin only)</label>
-              <p className="text-[11px] text-text-secondary">Used only for this settings session; it is not saved in browser storage. Configure DATABASE_URL in the server environment for persistent production connections.</p>
+              <p className="text-[11px] text-text-secondary">One-time diagnostic only. The URI is not saved by this form or written to browser storage. The live application database remains server-managed.</p>
               <textarea
                 rows={3}
                 required
@@ -895,7 +894,7 @@ export default function SettingsPanel({
                 type="submit"
                 className="bg-accent text-black hover:bg-accent/80 py-2 px-4 rounded font-mono text-xs font-bold uppercase transition-colors tracking-wider shadow-sm cursor-pointer"
               >
-                Save & Verify URI
+                Validate Connection
               </button>
 
               <button
@@ -961,7 +960,7 @@ export default function SettingsPanel({
       <details className={`border rounded-lg ${cardBg} mt-6`}>
         <summary className="cursor-pointer list-none p-5 flex flex-wrap items-center justify-between gap-3">
           <span className="font-mono text-xs font-bold uppercase tracking-wider">Advanced · Connected services and API credentials</span>
-          <span className="text-[11px] text-text-secondary">Encrypted integration settings · expand to manage</span>
+          <span className="text-[11px] text-text-secondary">Encrypted integration credentials · expand to manage</span>
         </summary>
         <div className="px-5 pb-5">
       {/* Connected Business Services & Third-Party API Credentials */}
@@ -972,9 +971,9 @@ export default function SettingsPanel({
         </div>
 
         <p className="text-xs text-inherit opacity-80 leading-relaxed font-sans">
-          Configure real API credentials for external integrations. When saved, keys are encrypted and stored in your isolated database tier to power billing, SMS notifications, ad spend syncs, and territory intelligence.
+          Add credentials only for integrations that your workspace is authorized to use. Saved secrets are encrypted server-side. A saved key is not proof of provider connectivity or an enabled feature.
         </p>
-        <p className="text-[11px] text-inherit opacity-70 leading-relaxed">AI provider keys are encrypted per tenant and never returned to the browser. Gemini is connected to HAL Copilot. OpenAI and Anthropic keys can be stored securely, but their runtime adapters are not active yet.</p>
+        <p className="text-[11px] text-inherit opacity-70 leading-relaxed">Gemini is used by supported HAL AI workflows when a valid server or tenant credential is available. OpenAI and Anthropic credentials can be stored, but their runtime adapters are not active. Provider status must not be inferred from a saved-key indicator.</p>
 
           {connectorKeySuccess && (
             <div className="p-3 bg-accent/10 border border-accent/20 text-accent text-xs rounded-sm font-mono leading-relaxed font-bold uppercase tracking-wider flex items-center gap-2">
@@ -985,13 +984,13 @@ export default function SettingsPanel({
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs font-sans">
             {([
-              { id: 'gemini', label: 'Google Gemini AI', placeholder: 'AIza...', env: 'GEMINI_API_KEY' },
-              { id: 'openai', label: 'OpenAI API', placeholder: 'sk-...', env: 'OPENAI_API_KEY' },
-              { id: 'anthropic', label: 'Anthropic Claude API', placeholder: 'sk-ant-...', env: 'ANTHROPIC_API_KEY' }
+              { id: 'gemini', label: 'Google Gemini', placeholder: 'Google AI Studio API key', env: 'GEMINI_API_KEY', brand: 'googlegemini' },
+              { id: 'openai', label: 'OpenAI', placeholder: 'OpenAI API key', env: 'OPENAI_API_KEY', brand: 'openai' },
+              { id: 'anthropic', label: 'Anthropic Claude', placeholder: 'Anthropic API key', env: 'ANTHROPIC_API_KEY', brand: 'anthropic' }
             ] as const).map(provider => (
               <div key={provider.id} className={`border p-3.5 rounded space-y-2 ${innerBg} ${borderCol}`}>
                 <div className="flex justify-between items-center">
-                  <span className="font-bold uppercase font-mono text-[11px] text-accent">{provider.label}</span>
+                  <span className="flex min-w-0 items-center gap-2.5"><ProviderBrandIcon brand={provider.brand} label={provider.label} /><span className="font-semibold text-[12px] text-text-primary normal-case tracking-normal">{provider.label}</span></span>
                   <span className={`text-[11px] font-mono px-1.5 py-0.5 rounded font-bold uppercase ${connectorConfigured[provider.id] ? 'bg-positive/20 text-positive' : 'bg-warning-dim text-warning'}`}>
                     {connectorConfigured[provider.id] ? 'Configured' : 'Unconfigured'}
                   </span>
@@ -1005,7 +1004,7 @@ export default function SettingsPanel({
                   placeholder={provider.placeholder}
                   className={`w-full border rounded p-2 focus:outline-none focus:border-accent text-inherit font-mono text-xs ${innerBg} ${borderCol}`}
                 />
-                <span className="text-[11px] text-inherit opacity-60 block">Encrypted tenant credential · {provider.env}</span>
+                <span className="text-[11px] text-inherit opacity-60 block">Encrypted credential · {provider.env}</span>
               </div>
             ))}
             {/* Stripe */}
@@ -1198,7 +1197,6 @@ export default function SettingsPanel({
             </div>
           </div>
         </div>
-
       {/* PUBLIC SHARE & REDDIT TESTING SHIELD */}
       <div className={`border rounded-lg p-5 mt-6 space-y-5 ${cardBg}`}>
         <div className="flex flex-wrap items-center justify-between gap-3 border-b pb-3 border-inherit">
