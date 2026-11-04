@@ -1,7 +1,7 @@
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { Pool } from 'pg';
 import * as schema from './schema.ts';
-import { bootstrapPostgresTables, resolveValidSqlHost } from './postgres.ts';
+import { resolveValidSqlHost } from './postgres.ts';
 
 // Add global connection pool caching to persist across hot-reloads
 declare global {
@@ -56,14 +56,8 @@ export const createPool = () => {
       }
     });
 
-    // Automatically bootstrap tables on pool creation only when a database is configured
-    if (process.env.DATABASE_URL || process.env.NEON_DATABASE_URL || validHost) {
-      bootstrapPostgresTables(global._postgresPool).catch((err) => {
-        if (!err.message?.includes('Connection terminated') && !err.message?.includes('connect ENOENT')) {
-          console.warn('[HAL PostgreSQL] Auto-bootstrap notice on pool creation:', err.message);
-        }
-      });
-    }
+    // Schema initialization is awaited by server startup against this exact pool.
+    // Do not start a fire-and-forget bootstrap here: application queries could race it.
   }
   return global._postgresPool;
 };
