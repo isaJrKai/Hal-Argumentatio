@@ -1,9 +1,9 @@
 /// <reference types="vite/client" />
-import { initializeApp, getApps, getApp } from '@firebase/app';
+import { auth, isFirebaseConfigured } from './firebaseClient';
+export { auth };
 import { getGoogleWorkspaceTokenExpiry, isGoogleWorkspaceAccessTokenFresh } from './googleWorkspaceToken';
 import { 
-  getAuth, 
-  signInWithPopup, 
+    signInWithPopup, 
   GoogleAuthProvider, 
   onAuthStateChanged,
   signOut,
@@ -11,35 +11,7 @@ import {
   Auth
 } from '@firebase/auth';
 
-const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || '',
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || '',
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || '',
-  appId: import.meta.env.VITE_FIREBASE_APP_ID || '',
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || '',
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || ''
-};
-
-export const isGoogleWorkspaceConfigured = Boolean(
-  firebaseConfig.apiKey &&
-  firebaseConfig.authDomain &&
-  firebaseConfig.projectId &&
-  firebaseConfig.appId
-);
-
-// Never initialize Firebase from the committed placeholder applet configuration.
-// Keep Workspace OAuth separate from the Firebase applet used for HAL account
-// sign-in. Otherwise the first initialized default app can silently override the
-// VITE_FIREBASE_* Workspace project configuration.
-const WORKSPACE_APP_NAME = 'hal-google-workspace';
-const app = isGoogleWorkspaceConfigured
-  ? (
-      getApps().some(existing => existing.name === WORKSPACE_APP_NAME)
-        ? getApp(WORKSPACE_APP_NAME)
-        : initializeApp(firebaseConfig, WORKSPACE_APP_NAME)
-    )
-  : null;
-export const auth: Auth | null = app ? getAuth(app) : null;
+export const isGoogleWorkspaceConfigured = isFirebaseConfigured;
 
 // Unified Provider with Google Drive, Calendar, and Gmail scopes
 const provider = new GoogleAuthProvider();
