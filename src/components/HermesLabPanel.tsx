@@ -597,17 +597,17 @@ export default function HermesLabPanel({ token }: { token: string | null }) {
           </div>
           <div>
             <div className="flex items-center gap-2 flex-wrap">
-              <h2 className="text-xl font-bold tracking-tight text-text-primary">Hermes Cognitive Lab</h2>
+              <h2 className="text-xl font-bold tracking-tight text-text-primary">Business assistant & tools</h2>
               <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">
                 {engineStatus?.activeEngine || 'NOUS HERMES 3.7'}
               </span>
               <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center gap-1">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                {engineStatus?.provider && engineStatus.provider !== 'fallback' ? `${engineStatus.provider.toUpperCase()} CONFIGURED · UNVERIFIED` : 'DETERMINISTIC FALLBACK'}
+                {engineStatus?.provider && engineStatus.provider !== 'fallback' ? `${engineStatus.provider.toUpperCase()} Configured · not tested` : 'Fallback mode'}
               </span>
             </div>
             <p className="text-xs text-text-secondary mt-0.5">
-              Isolated creative & operational workshop for high-converting landing pages, ads, SEO schema, and self-healing diagnostics.
+              Create landing pages and ad assets, manage SEO details, and review operational diagnostics.
             </p>
           </div>
         </div>
@@ -634,7 +634,7 @@ export default function HermesLabPanel({ token }: { token: string | null }) {
             >
               <span className="flex items-center gap-1.5">
                 <Wrench className="w-3.5 h-3.5" />
-                Tool Foundry ({catalog.length})
+                Tools ({catalog.length})
               </span>
             </button>
             <button
@@ -647,7 +647,7 @@ export default function HermesLabPanel({ token }: { token: string | null }) {
             >
               <span className="flex items-center gap-1.5">
                 <MessageSquare className="w-3.5 h-3.5" />
-                Brand & Taste Studio
+                Assistant chat
               </span>
             </button>
             <button
@@ -1190,7 +1190,7 @@ export default function HermesLabPanel({ token }: { token: string | null }) {
               </div>
               {artifacts.length === 0 ? (
                 <div className="p-6 text-center text-xs text-text-tertiary border border-border-dim rounded-xl bg-bg-raised">
-                  No artifacts generated yet. Use the Tool Foundry to create your first landing page or ad set.
+                  No assets have been created yet. Use Tools to create a landing page or ad set.
                 </div>
               ) : (
                 <div className="space-y-2 max-h-[640px] overflow-y-auto pr-1">
@@ -1357,7 +1357,7 @@ export default function HermesLabPanel({ token }: { token: string | null }) {
             <div className="space-y-1">
               <h3 className="text-sm font-bold text-text-primary flex items-center gap-2">
                 <ShieldCheck className="w-4 h-4 text-emerald-400" />
-                Autonomous Resilience Overseer
+                Service diagnostics
               </h3>
               <p className="text-xs text-text-secondary">
                 Continuous telemetry monitoring for webhook delivery failures, attribution tag drops, and zero-conversion leaks.
@@ -1381,7 +1381,7 @@ export default function HermesLabPanel({ token }: { token: string | null }) {
             <div className="bg-bg-raised border border-border-dim rounded-xl p-4 space-y-1">
               <span className="text-[10px] font-mono uppercase text-text-tertiary">Open Diagnostic Incidents</span>
               <div className="text-xl font-extrabold text-amber-400">{incidents.length} Pending</div>
-              <p className="text-[11px] text-text-secondary">Automated self-healing proposals ready in Lab</p>
+              <p className="text-[11px] text-text-secondary">Suggested fixes are ready for review</p>
             </div>
             <div className="bg-bg-raised border border-border-dim rounded-xl p-4 space-y-1">
               <span className="text-[10px] font-mono uppercase text-text-tertiary">Healing Execution Policy</span>
@@ -1420,7 +1420,7 @@ export default function HermesLabPanel({ token }: { token: string | null }) {
                     </div>
                     <div className="text-xs text-cyan-400 bg-cyan-500/5 p-2.5 rounded border border-cyan-500/20 flex items-center justify-between">
                       <div>
-                        <strong className="text-text-primary">Proposed Self-Healing Fix:</strong> {inc.proposedFix}
+                        <strong className="text-text-primary">Suggested fix:</strong> {inc.proposedFix}
                       </div>
                       <button
                         onClick={() => {

@@ -142,116 +142,116 @@ export default function CommandPalette({
 
   // Navigation commands
   const navigationCommands = [
-    { id: 'overview', label: 'Go to Mission Control', icon: Sparkles, type: 'nav', keywords: 'dashboard home overview stats kpi mission' },
-    { id: 'blueprint', label: 'Go to Claude Blueprint & Spatial Audit', icon: Layout, type: 'nav', keywords: 'claude blueprint audit spatial dossier architecture overview auto-cad' },
-    { id: 'neural', label: 'Go to Synaptic Neural Networks (Mesh & Learning)', icon: Network, type: 'nav', keywords: 'synaptic tool neural networks synaptic mesh deep learning weights nodes dual drive autonomous offline self teaching' },
-    { id: 'missions', label: 'Go to Operations (Missions)', icon: Briefcase, type: 'nav', keywords: 'operations tasks missions goals execution' },
-    { id: 'forecasts', label: 'Go to Intelligence (Forecasts & Scans)', icon: TrendingUp, type: 'nav', keywords: 'intelligence forecast revenue predictions market analytics' },
-    { id: 'board', label: 'Go to Sales (Clients & Pipeline)', icon: Users, type: 'nav', keywords: 'sales pipeline clients crm deals revenue' },
-    { id: 'campaigns', label: 'Go to Marketing (Campaigns & Sequences)', icon: BarChart3, type: 'nav', keywords: 'marketing email cold outreach campaigns sequences' },
-    { id: 'leads', label: 'Go to Memory (Prospect Leads)', icon: Compass, type: 'nav', keywords: 'leads prospects contractors calgary winnipeg edmonton' },
-    { id: 'drive', label: 'Go to Knowledge (Drive & Assets)', icon: FileText, type: 'nav', keywords: 'knowledge vault files documents drive assets' },
-    { id: 'skills', label: 'Go to AI Council & Skills Engine', icon: Cpu, type: 'nav', keywords: 'skills ai council agents strategy audit seo' },
-    { id: 'connectors', label: 'Go to Connectors Hub (AI & Cloud APIs)', icon: Share2, type: 'nav', keywords: 'connectors hub integrations google gemini nvidia nemotron stripe neon' },
-    { id: 'health', label: 'Go to System Heartbeat & Health', icon: Activity, type: 'nav', keywords: 'health heartbeat diagnostics logs latency status' },
-    { id: 'scheduler', label: 'Go to Simulations & Automated Scans', icon: Play, type: 'nav', keywords: 'simulations cron scheduler background jobs' },
-    { id: 'bible', label: 'Go to HAL Constitution & Directives', icon: BookOpen, type: 'nav', keywords: 'bible constitution directives lore system architecture' },
-    { id: 'credentials', label: 'Go to Settings & Database (Neon/Postgres)', icon: Settings, type: 'nav', keywords: 'settings postgres neon database api keys tokens credentials' }
+    { id: 'overview', label: 'Go to Overview', icon: Sparkles, type: 'nav', keywords: 'dashboard home overview stats kpi mission' },
+    { id: 'blueprint', label: 'Go to Blueprints & spatial audits', icon: Layout, type: 'nav', keywords: 'claude blueprint audit spatial dossier architecture overview auto-cad' },
+    { id: 'neural', label: 'Go to Territory & learning graph', icon: Network, type: 'nav', keywords: 'synaptic tool neural networks synaptic mesh deep learning weights nodes dual drive autonomous offline self teaching' },
+    { id: 'missions', label: 'Go to Tasks & operations', icon: Briefcase, type: 'nav', keywords: 'operations tasks missions goals execution' },
+    { id: 'forecasts', label: 'Go to Forecasts & reports', icon: TrendingUp, type: 'nav', keywords: 'intelligence forecast revenue predictions market analytics' },
+    { id: 'board', label: 'Go to Sales pipeline', icon: Users, type: 'nav', keywords: 'sales pipeline clients crm deals revenue' },
+    { id: 'campaigns', label: 'Go to Campaigns', icon: BarChart3, type: 'nav', keywords: 'marketing email cold outreach campaigns sequences' },
+    { id: 'leads', label: 'Go to Prospects', icon: Compass, type: 'nav', keywords: 'leads prospects contractors calgary winnipeg edmonton' },
+    { id: 'drive', label: 'Go to Files & assets', icon: FileText, type: 'nav', keywords: 'knowledge vault files documents drive assets' },
+    { id: 'skills', label: 'Go to Skills & tools', icon: Cpu, type: 'nav', keywords: 'skills ai council agents strategy audit seo' },
+    { id: 'connectors', label: 'Go to Integrations', icon: Share2, type: 'nav', keywords: 'connectors hub integrations google gemini nvidia nemotron stripe neon' },
+    { id: 'health', label: 'Go to System health', icon: Activity, type: 'nav', keywords: 'health heartbeat diagnostics logs latency status' },
+    { id: 'scheduler', label: 'Go to Tasks & schedules', icon: Play, type: 'nav', keywords: 'simulations cron scheduler background jobs' },
+    { id: 'bible', label: 'Go to Product guide', icon: BookOpen, type: 'nav', keywords: 'bible constitution directives lore system architecture' },
+    { id: 'credentials', label: 'Go to Settings & credentials', icon: Settings, type: 'nav', keywords: 'settings postgres neon database api keys tokens credentials' }
   ];
 
-  // Synaptic Tools & Cognitive Engines
+  // Analysis tools
   const synapticCommands = [
     { 
       id: 'synaptic_dual_consensus', 
-      label: 'Synaptic Tool: Dual-Drive Cognitive Consensus (Gemini 2.5 + Nemotron 70B)', 
-      description: 'Concurrent multimodal discovery + high-speed deterministic verification with live failover telemetry.',
+      label: 'Open model comparison', 
+      description: 'Open the configured model comparison workflow.',
       icon: Cpu, 
       type: 'synaptic', 
       tab: 'neural', 
       subTab: 'dual_engine',
-      badge: 'CONSENSUS CO-PILOT',
-      category: 'DUAL DRIVE',
+      badge: 'MODEL COMPARISON',
+      category: 'MODEL COMPARISON',
       keywords: 'synaptic tool cognitive task cognitive tasks reasoning consensus dual drive parallel synthesis cross validation nemotron 70b gemini 2.5 failover co pilot multimodal deterministic verification architecture' 
     },
     { 
       id: 'synaptic_bayesian_calibration', 
-      label: 'Synaptic Tool: Autonomous Bayesian Calibration Matrix', 
-      description: 'Calibrates feature weights (SSL status, PageSpeed, Review count, Territory priors) per epoch without cloud dependencies.',
+      label: 'Open territory calibration', 
+      description: 'Review the territory calibration and learning metrics.',
       icon: Sparkles, 
       type: 'synaptic', 
       tab: 'neural', 
       subTab: 'autonomous_learning',
-      badge: 'SELF-TEACHING',
-      category: 'BAYESIAN WEIGHTS',
+      badge: 'CALIBRATION',
+      category: 'CALIBRATION',
       keywords: 'synaptic tool cognitive task cognitive tasks reasoning weights neural weights bayesian calibration matrix epoch loss minimization priors learning gradient descent self teaching autonomous offline' 
     },
     { 
       id: 'synaptic_objection_graph', 
-      label: 'Synaptic Tool: Self-Taught Objection & Win-Rate Graph', 
-      description: 'Resolves price, timing, and authority resistance using calibrated win/loss confidence vectors.',
+      label: 'Open sales outcome analysis', 
+      description: 'Review recorded objections and win/loss outcomes.',
       icon: Shield, 
       type: 'synaptic', 
       tab: 'neural', 
       subTab: 'autonomous_learning',
-      badge: 'GRAPH MODEL',
-      category: 'OBJECTION SOLVER',
+      badge: 'OUTCOME ANALYSIS',
+      category: 'SALES OUTCOMES',
       keywords: 'synaptic tool cognitive task cognitive tasks reasoning objection solver rebuttal graph resistance pricing timing authority win rate conversion optimization sales objections cold call resistance' 
     },
     { 
       id: 'synaptic_pitch_synthesizer', 
-      label: 'Synaptic Tool: Offline Cold Script & Discovery Synthesizer', 
-      description: 'Generates phone & email discovery scripts from self-taught Bayesian weights in zero-latency offline mode.',
+      label: 'Open outreach script tools', 
+      description: 'Open the tools for drafting phone and email outreach.',
       icon: Play, 
       type: 'synaptic', 
       tab: 'neural', 
       subTab: 'autonomous_learning',
-      badge: 'OFFLINE SAFE',
-      category: 'SCRIPT ENGINE',
+      badge: 'SCRIPT TOOLS',
+      category: 'OUTREACH',
       keywords: 'synaptic tool cognitive task cognitive tasks reasoning pitch synthesizer cold script cold outreach cold email discovery call script synthesis offline pitch phone script outreach message' 
     },
     { 
       id: 'synaptic_mesh_inspector', 
-      label: 'Synaptic Tool: 13,000+ Associative Mesh Synapse Inspector', 
-      description: 'Explores interactive associative nodes, hyperlinked definitions, and mathematical activation gradients.',
+      label: 'Open territory graph explorer', 
+      description: 'Explore the records and relationships in the territory graph.',
       icon: Network, 
       type: 'synaptic', 
       tab: 'neural', 
       subTab: 'neural_mesh',
-      badge: '13K+ SYNAPSES',
-      category: 'SYNAPTIC MESH',
+      badge: 'GRAPH EXPLORER',
+      category: 'TERRITORY GRAPH',
       keywords: 'synaptic tool cognitive task cognitive tasks reasoning synaptic mesh inspector neural graph nodes dictionary layers associative graph topology variables neural intelligence node' 
     },
     { 
       id: 'synaptic_offline_toggle', 
-      label: 'Synaptic Tool: Simulated Zero-Latency Offline Mode Toggle', 
-      description: 'Isolates the intelligence engine from cloud APIs to stress-test local autonomous reasoning.',
+      label: 'Open offline-mode simulation', 
+      description: 'Open the offline-mode simulation. This does not change production inference routing.',
       icon: Zap, 
       type: 'synaptic', 
       tab: 'neural', 
       subTab: 'autonomous_learning',
-      badge: 'STATE CONTROL',
-      category: 'SYSTEM RESILIENCE',
+      badge: 'SIMULATION',
+      category: 'SIMULATION',
       keywords: 'synaptic tool cognitive task offline mode toggle simulated cloud disconnect zero latency local autonomous offline reasoning failover fallback stress test' 
     },
     { 
       id: 'credentials', 
-      label: 'Synaptic Tool: Sync Neural Weights to Neon Cloud PostgreSQL', 
-      description: 'Durable cloud replication of Bayesian weights and learning history to PostgreSQL.',
+      label: 'Open database settings', 
+      description: 'Review database settings and available data-sync options.',
       icon: Database, 
       type: 'nav', 
       tab: 'credentials',
-      badge: 'CLOUD BACKUP',
-      category: 'POSTGRES SYNC',
+      badge: 'DATABASE',
+      category: 'DATABASE',
       keywords: 'synaptic tool sync postgres neon database cloud backup weights persistence durable replication' 
     }
   ];
 
-  // Neural Intelligence Nodes (Surfaced for cognitive tasks & architecture exploration)
+  // Technical components and their current verification status
   const neuralNodeCommands = [
     {
       id: 'node_SECURE_SQLITE',
       nodeId: 'SECURE_SQLITE',
-      label: 'Neural Node: SECURE_SQLITE (Sensorium Vault)',
+      label: 'Local data store (unverified)',
       description: 'Local encrypted relational store holding leads, audits, and real-time territory telemetry.',
       icon: Database,
       type: 'node',
@@ -264,7 +264,7 @@ export default function CommandPalette({
     {
       id: 'node_BAYESIAN_CALIBRATOR',
       nodeId: 'BAYESIAN_CALIBRATOR',
-      label: 'Neural Node: BAYESIAN_CALIBRATOR (Feedback Optimization)',
+      label: 'Feedback calibration',
       description: 'Calibrates feature weights and prior probabilities per territory epoch without external LLMs.',
       icon: Sparkles,
       type: 'node',
@@ -277,7 +277,7 @@ export default function CommandPalette({
     {
       id: 'node_CRYPTOGRAPHIC_GUARD',
       nodeId: 'CRYPTOGRAPHIC_GUARD',
-      label: 'Neural Node: CRYPTOGRAPHIC_GUARD (PII AES-256-GCM)',
+      label: 'PII encryption guard',
       description: 'Intended role: check PII encryption before persistence. Live activation is not verified by this command palette.',
       icon: Shield,
       type: 'node',
@@ -290,7 +290,7 @@ export default function CommandPalette({
     {
       id: 'node_TERRITORY_MAP',
       nodeId: 'TERRITORY_CONQUEST_MAP',
-      label: 'Neural Node: TERRITORY_CONQUEST_MAP (Relational Spatial Graph)',
+      label: 'Territory map component',
       description: 'Intended role: geographic analysis. Trusted coordinates and live competitor data are not verified here.',
       icon: Map,
       type: 'node',
@@ -303,7 +303,7 @@ export default function CommandPalette({
     {
       id: 'node_REVENUE_PREDICTOR',
       nodeId: 'REVENUE_PREDICTOR_V2',
-      label: 'Neural Node: REVENUE_PREDICTOR_V2 (Decision Engine)',
+      label: 'Revenue estimate component',
       description: 'Intended role: revenue-risk estimation. This command does not prove a validated predictive model or measured loss.',
       icon: TrendingUp,
       type: 'node',
@@ -316,14 +316,14 @@ export default function CommandPalette({
     {
       id: 'node_AUTONOMOUS_FALLBACK',
       nodeId: 'AUTONOMOUS_FALLBACK_CORE',
-      label: 'Neural Node: AUTONOMOUS_FALLBACK_CORE (Cognitive Associative)',
+      label: 'Fallback reasoning component (unverified)',
       description: 'Intended role: fallback reasoning. Offline availability and autonomous operation have not been verified.',
       icon: Zap,
       type: 'node',
       tab: 'neural',
       subTab: 'neural_mesh',
       badge: 'UNVERIFIED',
-      category: 'COGNITIVE ASSOCIATIVE',
+      category: 'FALLBACK',
       keywords: 'neural node neural intelligence node cognitive task autonomous fallback core zero cloud offline reasoning failover emergency'
     }
   ];
@@ -626,7 +626,7 @@ export default function CommandPalette({
             <input
               ref={inputRef}
               type="text"
-              placeholder="Search cognitive tasks, synaptic tools, neural nodes, skills, or prospects..."
+              placeholder="Search pages, tools, prospects or commands..."
               value={search}
               onChange={e => setSearch(e.target.value)}
               onKeyDown={handleKeyDown}
@@ -652,7 +652,7 @@ export default function CommandPalette({
                   NO INTELLIGENCE COMMANDS FOUND FOR "{(search || '').toUpperCase()}"
                 </div>
                 <div className="text-[10px] text-text-secondary">
-                  Try searching "cognitive", "objection", "dual drive", "consensus", "bayesian", "script", or a prospect name.
+                  Search for a tool, prospect, task or sales topic.
                 </div>
               </div>
             ) : (
@@ -699,12 +699,12 @@ export default function CommandPalette({
                       </div>
                     )}
 
-                    {/* Synaptic Tools Section */}
+                    {/* Analysis tools section */}
                     <div className="space-y-1">
                       <div className="flex items-center justify-between px-3 py-1 text-[9px] font-mono font-bold text-accent uppercase tracking-wider">
                         <span className="flex items-center gap-1.5">
                           <Sparkles className="w-3 h-3 text-accent" />
-                          Synaptic Tools & Cognitive Engines
+                          Analysis tools
                         </span>
                         <span className="text-text-tertiary">{synapticCommands.length} Tools</span>
                       </div>
@@ -832,7 +832,7 @@ export default function CommandPalette({
                                   {cmd.label}
                                 </span>
                                 <span className="text-[8px] font-mono px-1.5 py-0.2 rounded bg-accent/15 border border-accent/30 text-accent font-extrabold uppercase shrink-0">
-                                  {cmd.badge || 'SYNAPTIC TOOL'}
+                                  {cmd.badge || 'TOOL'}
                                 </span>
                               </div>
                               <p className="text-[11px] text-text-secondary truncate font-sans">
