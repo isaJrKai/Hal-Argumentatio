@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Network, Database, TrendingUp, Shield, RefreshCw, Brain, Focus, Fingerprint, Code2, Scissors, CheckCircle, XCircle, ZoomIn, ZoomOut, Maximize, Activity, Clock } from 'lucide-react';
+import { Network, Database, TrendingUp, Shield, RefreshCw, Brain, Focus, Fingerprint, Code2, ZoomIn, ZoomOut, Maximize, Activity, Clock } from 'lucide-react';
 import * as d3 from 'd3';
 import { useBusinessContext } from '../context/BusinessContext';
 
@@ -774,11 +774,6 @@ export default function NeuralPanel() {
                       <span className="text-[9px] text-text-primary font-mono">
                          {Math.floor((Date.now() - new Date(hoveredNode.createdAt).getTime()) / (1000 * 3600 * 24))} Days
                       </span>
-                    </div>
-                  )}
-                  {false && (
-                    <div className="mt-2 text-[10px] font-bold text-red-500 animate-pulse text-center">
-                       CLICK TO MANUAL PRUNE
                     </div>
                   )}
                </div>
