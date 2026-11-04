@@ -162,12 +162,12 @@ export const HalRoadmapPhase5View: React.FC = () => {
       <div className="p-6 rounded-2xl bg-bg-raised border border-border-dim shadow-xs space-y-4">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="space-y-1">
-            <div className="flex items-center gap-2">
-              <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-accent/15 text-accent border border-accent/30 flex items-center gap-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="max-w-full whitespace-normal break-words px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-accent/15 text-accent border border-accent/30 flex items-center gap-1">
                 <Globe className="w-3 h-3 text-accent" />
                 PHASE 5: MULTI-REGION EXPANSION
               </span>
-              <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 flex items-center gap-1">
+              <span className="max-w-full whitespace-normal break-words px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 flex items-center gap-1">
                 <CheckCircle2 className="w-3 h-3 text-emerald-500" />
                 RUNTIME STATUS UNVERIFIED
               </span>
@@ -180,7 +180,7 @@ export const HalRoadmapPhase5View: React.FC = () => {
             </p>
           </div>
 
-          <div className="flex items-center gap-2.5 shrink-0">
+          <div className="flex flex-wrap items-center gap-2.5 shrink-0">
             <button
               onClick={handleSyncBrain}
               disabled={isSyncingBrain}
@@ -211,23 +211,23 @@ export const HalRoadmapPhase5View: React.FC = () => {
         )}
 
         {/* Verification Status Metrics */}
-        <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 pt-2">
-          <div className="p-3.5 rounded-xl bg-bg-base border border-border-dim space-y-1">
-            <div className="flex items-center justify-between">
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3 pt-2">
+          <div className="min-w-0 p-3.5 rounded-xl bg-bg-base border border-border-dim space-y-2">
+            <div className="flex min-w-0 flex-col items-start gap-2">
               <span className="text-xs font-medium text-text-secondary flex items-center gap-1.5">
                 <Building2 className="w-3.5 h-3.5 text-accent" />
                 Company accounts
               </span>
-              <span className="text-[10px] font-mono font-bold text-emerald-500 bg-emerald-500/10 px-1.5 py-0.5 rounded">
+              <span className="max-w-full whitespace-normal break-words text-[10px] leading-snug font-mono font-bold text-emerald-500 bg-emerald-500/10 px-1.5 py-0.5 rounded">
                 ORGANIZATION COUNT UNVERIFIED
               </span>
             </div>
-            <div className="text-sm font-bold text-text-primary">Access controls not verified</div>
+            <div className="min-w-0 max-w-full break-words text-sm font-bold text-text-primary">Access controls not verified</div>
             <div className="text-[11px] text-text-tertiary">Role-based access not verified</div>
           </div>
 
-          <div className="p-3.5 rounded-xl bg-bg-base border border-border-dim space-y-1">
-            <div className="flex items-center justify-between">
+          <div className="min-w-0 p-3.5 rounded-xl bg-bg-base border border-border-dim space-y-2">
+            <div className="flex min-w-0 flex-col items-start gap-2">
               <span className="text-xs font-medium text-text-secondary flex items-center gap-1.5">
                 <Server className="w-3.5 h-3.5 text-accent" />
                 Regional service endpoints
@@ -240,8 +240,8 @@ export const HalRoadmapPhase5View: React.FC = () => {
             <div className="text-[11px] text-text-tertiary">Failover not verified</div>
           </div>
 
-          <div className="p-3.5 rounded-xl bg-bg-base border border-border-dim space-y-1">
-            <div className="flex items-center justify-between">
+          <div className="min-w-0 p-3.5 rounded-xl bg-bg-base border border-border-dim space-y-2">
+            <div className="flex min-w-0 flex-col items-start gap-2">
               <span className="text-xs font-medium text-text-secondary flex items-center gap-1.5">
                 <BookOpen className="w-3.5 h-3.5 text-accent" />
                 Industry data models
@@ -254,8 +254,8 @@ export const HalRoadmapPhase5View: React.FC = () => {
             <div className="text-[11px] text-text-tertiary">No verified ontology records</div>
           </div>
 
-          <div className="p-3.5 rounded-xl bg-bg-base border border-border-dim space-y-1">
-            <div className="flex items-center justify-between">
+          <div className="min-w-0 p-3.5 rounded-xl bg-bg-base border border-border-dim space-y-2">
+            <div className="flex min-w-0 flex-col items-start gap-2">
               <span className="text-xs font-medium text-text-secondary flex items-center gap-1.5">
                 <Award className="w-3.5 h-3.5 text-emerald-500" />
                 Integration status
@@ -264,14 +264,14 @@ export const HalRoadmapPhase5View: React.FC = () => {
                 ALIGNMENT NOT MEASURED
               </span>
             </div>
-            <div className="text-sm font-bold text-emerald-500">Service status not verified</div>
+            <div className="min-w-0 max-w-full break-words text-sm font-bold text-emerald-500">Service status not verified</div>
             <div className="text-[11px] text-text-tertiary">Service coverage not measured</div>
           </div>
         </div>
       </div>
 
       {/* ─── NAVIGATION TABS ─── */}
-      <div className="flex border-b border-border-dim gap-6 text-xs font-semibold">
+      <div className="flex flex-wrap border-b border-border-dim gap-x-6 gap-y-3 text-xs font-semibold">
         <button
           onClick={() => setActiveTab('brain_sync')}
           className={`pb-2.5 transition-colors cursor-pointer flex items-center gap-1.5 ${
@@ -542,21 +542,21 @@ export const HalRoadmapPhase5View: React.FC = () => {
                 </div>
 
                 <div className="p-2.5 rounded bg-bg-base border border-border-dim text-[11px] font-mono space-y-1.5">
-                  <div className="flex justify-between">
+                  <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-1">
                     <span className="text-text-tertiary">Location:</span>
-                    <span className="text-text-primary">{region.location}</span>
+                    <span className="min-w-0 max-w-full break-words text-right text-text-primary">{region.location}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-text-tertiary">Latency:</span>
-                    <span className="text-emerald-500 font-bold">{region.latencyMs} ms</span>
+                    <span className="shrink-0 text-right tabular-nums text-emerald-500 font-bold">{region.latencyMs} ms</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-text-tertiary">Active Nodes:</span>
-                    <span className="text-accent font-bold">{region.activeNodesCount}</span>
+                    <span className="shrink-0 text-right tabular-nums text-accent font-bold">{region.activeNodesCount}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-text-tertiary">Endpoint:</span>
-                    <span className="text-text-tertiary truncate max-w-[140px]">{region.endpoint}</span>
+                    <span className="min-w-0 max-w-[min(100%,14rem)] break-all text-right text-text-tertiary">{region.endpoint}</span>
                   </div>
                 </div>
               </div>
