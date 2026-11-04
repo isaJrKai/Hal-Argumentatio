@@ -77,7 +77,7 @@ export default function HalBiblePanel({ initialDocId }: HalBiblePanelProps = {})
   // List of all 23 documents in the Master Plan
   const documents: DocumentSpec[] = useMemo(() => [
     // Phase 1 — Foundation
-    { id: '01', number: '01', title: 'Vision', description: 'The grand mandate: coordinating local contractor outreach through evidence-based intelligence.', status: 'canonical', phase: 'foundation', icon: Sparkles },
+    { id: '01', number: '01', title: 'Vision', description: 'A workspace for contractor prospect management, outreach, sales activity and reporting.', status: 'canonical', phase: 'foundation', icon: Sparkles },
     { id: '02', number: '02', title: 'Philosophy', description: 'The absolute core convictions. The rules determining every engineering and product decision.', status: 'canonical', phase: 'foundation', icon: BookOpen },
     { id: '03', number: '03', title: 'Design Language', description: 'Visual code of HAL: high density, space optimization, zero bloat, and absolute layout clarity.', status: 'canonical', phase: 'foundation', icon: Palette },
     { id: '04', number: '04', title: 'Design System', description: 'Unified visual primitives, cryptographic UI states, and interactive live components.', status: 'canonical', phase: 'foundation', icon: Layers },
@@ -85,19 +85,19 @@ export default function HalBiblePanel({ initialDocId }: HalBiblePanelProps = {})
     { id: '06', number: '06', title: 'UX Principles', description: 'Micro-feedback, spring animations, clear outcomes, and instructive empty states.', status: 'canonical', phase: 'foundation', icon: Compass },
 
     // Phase 2 — Intelligence
-    { id: '07', number: '07', title: 'Memory', description: 'State persistence engines: AES-256-CBC PII encryption, cryptographic genesis chains, and immutable Merkle ledger.', status: 'canonical', phase: 'intelligence', icon: Database },
-    { id: '08', number: '08', title: 'Knowledge', description: 'Designed for map grounding and diagnostic audits; live provider access and measured results must be verified.', status: 'canonical', phase: 'intelligence', icon: Compass },
-    { id: '09', number: '09', title: 'Skills', description: 'Diagnostic script library: technical SEO scans, speed index calculations, and SSL sweeps.', status: 'canonical', phase: 'intelligence', icon: Cpu },
-    { id: '10', number: '10', title: 'Agents', description: 'Dual-Drive Multi-Agent Consensus: Google Gemini 2.5 coupled with NVIDIA Nemotron 70B.', status: 'canonical', phase: 'intelligence', icon: Cpu },
-    { id: '11', number: '11', title: 'Council', description: 'Decision orchestrator, Bayesian neural weight recalibration, and strategy arbitrage loops.', status: 'canonical', phase: 'intelligence', icon: Users },
-    { id: '12', number: '12', title: 'Missions', description: 'Operational pipelines, launch triggers, and client outreach campaigns.', status: 'canonical', phase: 'intelligence', icon: Briefcase },
-    { id: '13', number: '13', title: 'Connectors', description: 'Pre-wired zero-code connection bridges: WhatsApp, Twilio SMS, SendGrid SMTP, and Cloud storage.', status: 'canonical', phase: 'intelligence', icon: Settings },
+    { id: '07', number: '07', title: 'Memory', description: 'Encrypted business records and sensitive contact details, with access controls and audit history.', status: 'canonical', phase: 'intelligence', icon: Database },
+    { id: '08', number: '08', title: 'Knowledge', description: 'Map context and diagnostic reports; external data sources must be connected and verified.', status: 'canonical', phase: 'intelligence', icon: Compass },
+    { id: '09', number: '09', title: 'Skills', description: 'Tools for technical SEO checks, website performance review and SSL status; results depend on configured providers.', status: 'canonical', phase: 'intelligence', icon: Cpu },
+    { id: '10', number: '10', title: 'Agents', description: 'Model-assisted workflows using Gemini and NVIDIA services; availability and output quality depend on provider access.', status: 'canonical', phase: 'intelligence', icon: Cpu },
+    { id: '11', number: '11', title: 'Council', description: 'Decision-support tools and feedback analysis; recommendations require operator review.', status: 'canonical', phase: 'intelligence', icon: Users },
+    { id: '12', number: '12', title: 'Missions', description: 'Tasks, workflows and campaign follow-up.', status: 'canonical', phase: 'intelligence', icon: Briefcase },
+    { id: '13', number: '13', title: 'Connectors', description: 'Provider settings for messaging, email and cloud services. Each connection must be configured and tested before use.', status: 'canonical', phase: 'intelligence', icon: Settings },
 
     // Phase 3 — Engineering
     { id: '14', number: '14', title: 'Database', description: 'Relational Cloud SQL setups, Drizzle schemas, encrypted PII vaults, and tamper-evident audit logging.', status: 'canonical', phase: 'engineering', icon: Database },
     { id: '15', number: '15', title: 'APIs', description: 'Express + Vite proxies, server-side secure endpoints, HMAC-SHA256 signed outbox, and route controllers.', status: 'canonical', phase: 'engineering', icon: Code },
     { id: '16', number: '16', title: 'Components', description: 'Pragmatic, beautiful, and accessible UI components styled with pure Tailwind.', status: 'canonical', phase: 'engineering', icon: Layers },
-    { id: '17', number: '17', title: 'Security', description: 'AES-GCM/CBC-256 cryptography vault for prospect phone numbers and emails with zero plaintext leakage.', status: 'canonical', phase: 'engineering', icon: Shield },
+    { id: '17', number: '17', title: 'Security', description: 'Sensitive contact data is encrypted in storage and access is controlled by account permissions. Review deployment settings and security tests before relying on it.', status: 'canonical', phase: 'engineering', icon: Shield },
     { id: '18', number: '18', title: 'Testing', description: 'Type checking validations, static analysis lint checks, and verified production build pipelines.', status: 'canonical', phase: 'engineering', icon: Activity },
     { id: '19', number: '19', title: 'DevOps', description: 'Vite/esbuild bundling, container routing to port 3000, and fast cold-starts.', status: 'canonical', phase: 'engineering', icon: GitPullRequest },
 
@@ -105,8 +105,8 @@ export default function HalBiblePanel({ initialDocId }: HalBiblePanelProps = {})
     { id: '20', number: '20', title: 'Roadmap', description: 'Roadmap phases are tracked separately; each remains unverified until its runtime behavior has supporting evidence.', status: 'canonical', phase: 'product', icon: LineChart },
     { id: '21', number: '21', title: 'UI Library', description: 'Standardized layout files, typography primitives, and Document Ribbon studio suite.', status: 'canonical', phase: 'product', icon: Layers },
     { id: '22', number: '22', title: 'Workspaces', description: 'Contractor dashboard orchestration, campaign builders, and leads flow.', status: 'canonical', phase: 'product', icon: Briefcase },
-    { id: '23', number: '23', title: 'Future Vision', description: '11-Layer Brain Architecture, decentralized edge federation, and cross-industry ontology transfer.', status: 'canonical', phase: 'product', icon: Sparkles },
-    { id: '24', number: '24', title: 'Hermes Engine', description: 'Nous Research Hermes synthesis: dynamic anti-AI landing pages, diagnostic scripts, and event-bus dispatch.', status: 'canonical', phase: 'intelligence', icon: Sparkles }
+    { id: '23', number: '23', title: 'Future Vision', description: 'Planned research into forecasting, workflow automation and additional integrations. These are not all available product features.', status: 'canonical', phase: 'product', icon: Sparkles },
+    { id: '24', number: '24', title: 'Hermes Engine', description: 'Assistant tools for drafting assets, reviewing diagnostics and organizing work. Provider-backed actions require configuration and testing.', status: 'canonical', phase: 'intelligence', icon: Sparkles }
   ], []);
 
   // Filter documents based on search query
@@ -253,9 +253,9 @@ ${d.description}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-border-dim pb-4">
         <div className="space-y-1">
           <Breadcrumbs items={[{ label: 'System Configuration' }, { label: 'HAL Bible' }]} />
-          <MissionTitle>HAL Master Specification</MissionTitle>
+          <MissionTitle>HAL product and operating guide</MissionTitle>
           <ProseText className="max-w-xl">
-            The canonical Bible of HAL as a high-fidelity intelligence platform. Each section acts as an active blueprint, aligning engineering and visual layout with core philosophy.
+            A practical guide to HAL's product structure, workflows, integrations and roadmap. Planned capabilities are identified separately from features verified in the live application.
           </ProseText>
         </div>
 
@@ -487,33 +487,33 @@ ${d.description}
                 {/* 1. HERO CONVICTION ELEMENT */}
                 <div className="bg-bg-base border border-border-dim rounded p-6 flex flex-col items-center justify-center text-center py-10 relative overflow-hidden">
                   <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-accent via-indigo-500 to-accent" />
-                  <span className="text-[11px] font-mono tracking-wider text-text-secondary uppercase mb-3">HAL CORE SUBSTANCE</span>
+                  <span className="text-[11px] font-mono tracking-wider text-text-secondary uppercase mb-3">ABOUT HAL</span>
                   <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-text-primary font-sans max-w-lg leading-tight break-words">
                     HAL IS AN
                   </h1>
                   <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-accent font-sans max-w-lg mt-1 select-all break-words">
-                    AI Business Operating Intelligence System
+                    Contractor sales and operations workspace
                   </h1>
                   <p className="text-xs text-text-secondary max-w-md mt-4 font-sans leading-relaxed">
-                    Not a chatbot. Not a CRM. Not a marketing dashboard. Not another SaaS application. HAL is an executive partner.
+                    HAL brings prospect management, sales activity, outreach and reporting into one contractor-focused workspace.
                   </p>
 
-                  {/* SUPREME INTENTIONALITY DIRECTIVE CARD */}
+                  {/* PRODUCT STANDARDS CARD */}
                   <div className="mt-6 w-full max-w-2xl bg-bg-overlay/80 border border-accent/30 rounded-lg p-4 text-left shadow-sm">
                     <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border-dim/60 pb-2 mb-2.5">
                       <span className="text-[11px] font-mono font-bold text-accent uppercase tracking-wider flex items-center gap-1.5">
                         <Sparkles className="w-3.5 h-3.5 text-accent" />
-                        INTENTIONALITY DIRECTIVE (DESIGN CONCEPT)
+                        PRODUCT STANDARD
                       </span>
                       <span className="text-[11px] font-mono text-positive bg-positive/10 border border-positive/20 px-1.5 py-0.5 rounded uppercase font-bold">
-                        ACTIVE LAW
+                        STANDARD
                       </span>
                     </div>
                     <blockquote className="text-xs sm:text-sm font-sans font-medium text-text-primary leading-relaxed italic border-l-2 border-accent pl-3 my-1">
-                      "HAL does not exist to answer everything. HAL exists to understand what matters, reason about it, and help the operator move the business forward."
+                      "Use real business data. Make the next action clear. Keep the operator in control."
                     </blockquote>
                     <p className="text-[11px] text-text-secondary mt-2 font-mono">
-                      Every behavior must have intent: <span className="text-text-primary">Evidence ➔ Interpretation ➔ Decision</span>. Never fabricate reality or manufacture certainty where evidence is absent.
+                      Show the source of important claims. Separate recorded results from estimates. Never mark an action complete unless it has run.
                     </p>
                   </div>
                 </div>
@@ -549,7 +549,7 @@ ${d.description}
                   <div className="border border-border-dim bg-bg-overlay p-4 rounded-sm space-y-2">
                     <span className="text-[11px] font-mono font-bold text-indigo-400 uppercase tracking-wider">Intelligence Philosophy</span>
                     <p className="text-xs text-text-primary leading-relaxed">
-                      HAL does not simply retrieve information. HAL understands relationships, reasons, explains, learns, reflects, recommends, and improves.
+                      HAL organizes business records, highlights relationships and provides context for the operator's decision.
                     </p>
                   </div>
 
@@ -557,7 +557,7 @@ ${d.description}
                   <div className="border border-border-dim bg-bg-overlay p-4 rounded-sm space-y-2">
                     <span className="text-[11px] font-mono font-bold text-sky-400 uppercase tracking-wider">Design Philosophy</span>
                     <p className="text-xs text-text-primary leading-relaxed">
-                      Every screen reduces cognitive load. Every interaction increases clarity. Every recommendation is evidence-based. Every action serves a mission.
+                      Keep screens focused. Make actions and outcomes clear. Show evidence for recommendations. Never imply work ran unless it did.
                     </p>
                   </div>
 
@@ -565,7 +565,7 @@ ${d.description}
                   <div className="border border-border-dim bg-bg-overlay p-4 rounded-sm space-y-2">
                     <span className="text-[11px] font-mono font-bold text-sky-400 uppercase tracking-wider">UI Philosophy</span>
                     <p className="text-xs text-text-primary leading-relaxed">
-                      HAL never resembles a traditional CRM. HAL resembles an executive operating system.
+                      Use familiar navigation and clear language. Keep advanced details available without crowding everyday workflows.
                     </p>
                   </div>
 
@@ -573,7 +573,7 @@ ${d.description}
                   <div className="border border-border-dim bg-bg-overlay p-4 rounded-sm space-y-2">
                     <span className="text-[11px] font-mono font-bold text-[#f59e0b] uppercase tracking-wider">Architecture Philosophy</span>
                     <p className="text-xs text-text-primary leading-relaxed">
-                      HAL Core remains permanently small. New capability is added through: Skills, Agents, Connectors, Workspaces. Never by increasing HAL Core complexity.
+                      Keep core workflows maintainable. Add optional tools and integrations as separate modules.
                     </p>
                   </div>
 
@@ -607,7 +607,7 @@ ${d.description}
                   <div className="border border-border-dim bg-bg-overlay p-4 rounded-sm space-y-2">
                     <span className="text-[11px] font-mono font-bold text-purple-400 uppercase tracking-wider">Learning Philosophy</span>
                     <p className="text-xs text-text-primary leading-relaxed">
-                      Every interaction teaches HAL. Every outcome improves HAL. Every mistake becomes knowledge.
+                      Recorded outcomes can inform future analysis. Do not imply automatic learning unless the process has been measured and verified.
                     </p>
                   </div>
 
@@ -615,7 +615,7 @@ ${d.description}
                   <div className="border border-border-dim bg-bg-overlay p-4 rounded-sm space-y-2">
                     <span className="text-[11px] font-mono font-bold text-emerald-400 uppercase tracking-wider">Business Philosophy</span>
                     <p className="text-xs text-text-primary leading-relaxed">
-                      HAL does not manage businesses. HAL helps businesses make better decisions.
+                      HAL supports day-to-day work; the business owner remains responsible for decisions and follow-up.
                     </p>
                   </div>
 
@@ -623,7 +623,7 @@ ${d.description}
                   <div className="border border-border-dim bg-bg-overlay p-4 rounded-sm space-y-2">
                     <span className="text-[11px] font-mono font-bold text-emerald-400 uppercase tracking-wider">Human Philosophy</span>
                     <p className="text-xs text-text-primary leading-relaxed">
-                      The human always owns the final decision. HAL recommends. Humans approve.
+                      The operator owns the final decision. Recommendations should be reviewable before action.
                     </p>
                   </div>
 
@@ -649,7 +649,7 @@ ${d.description}
                     <div className="p-3 border border-border-dim bg-bg-base/40 rounded-sm">
                       <h4 className="text-[11px] font-mono font-bold text-accent uppercase">Growth Principle</h4>
                       <p className="text-[11px] text-text-secondary mt-1">
-                        Never build because it is possible. Build because it advances the mission.
+                        Build only when a feature solves a real operator problem.
                       </p>
                     </div>
                   </div>
@@ -658,7 +658,7 @@ ${d.description}
                   <div className="bg-accent-dim/10 border border-accent/25 p-4 rounded-sm text-center">
                     <span className="text-[11px] font-mono text-accent uppercase font-bold block mb-1">THE GOLDEN RULE</span>
                     <p className="text-xs text-text-primary max-w-xl mx-auto leading-relaxed">
-                      Every new feature must answer: <span className="text-accent font-semibold">"Does this help the user make better business decisions?"</span> If the answer is no, it does not belong in HAL.
+                      Add a feature when it solves a real customer problem and can be supported reliably.
                     </p>
                   </div>
                 </div>
@@ -669,7 +669,7 @@ ${d.description}
                     <div className="space-y-1">
                       <h3 className="text-sm font-bold text-text-primary uppercase font-mono flex items-center gap-1.5">
                         <Terminal className="w-4 h-4 text-accent animate-pulse" />
-                        Verification Animation Preview (Not a Live Audit)
+                        Loading-state example (demo only)
                       </h3>
                       <p className="text-xs text-text-secondary">
                         This is a UI animation only. It does not inspect the running server, network ports, security configuration, or encryption.
@@ -814,7 +814,7 @@ ${d.description}
                         </div>
                       </CardContent>
                       <CardFooter>
-                        <span>Font families: Inter (Sans) & JetBrains Mono</span>
+                        <span>Font families: DM Sans, Newsreader & IBM Plex Mono</span>
                         <span className="font-mono text-accent">STANDARDIZATION NOT VERIFIED</span>
                       </CardFooter>
                     </Card>
@@ -898,8 +898,8 @@ ${d.description}
                           <Badge variant="info">Syncing Api</Badge>
                         </div>
                         <div className="bg-bg-base border border-border-dim p-3 rounded text-center space-y-2">
-                          <span className="text-[11px] font-mono opacity-50 block uppercase">AI / Reasoning</span>
-                          <Badge variant="ai">HAL Cog Engine</Badge>
+                          <span className="text-[11px] font-mono opacity-50 block uppercase">Assistant</span>
+                          <Badge variant="ai">Assistant tools</Badge>
                         </div>
                         <div className="bg-bg-base border border-border-dim p-3 rounded text-center space-y-2">
                           <span className="text-[11px] font-mono opacity-50 block uppercase">Neutral</span>
@@ -1035,8 +1035,6 @@ ${d.description}
                           whyEmpty="No location records are loaded in this UI preview. No database purge or cache operation has been performed."
                           whatNext="Configure and verify a map provider, then load actual harvest results."
                           expectedOutcome="No result count is promised. Display only records returned by the configured live source."
-                          actionLabel="CONFIGURE DATA SOURCE"
-                          onActionClick={() => alert('Harvesting Map grounding!')}
                         />
                       </div>
 
@@ -1049,11 +1047,6 @@ ${d.description}
                                 colSpan={4}
                                 title="No Connected Google Ads Accounts"
                                 description="Live ad performance is unavailable until a verified ad-platform connection and authorization are configured."
-                                action={
-                                  <Button variant="outline" size="sm">
-                                    PROPOSE ENTERPRISE CONNECT
-                                  </Button>
-                                }
                               />
                             </TableBody>
                           </Table>
@@ -1068,17 +1061,17 @@ ${d.description}
                     {/* PORTAL DIALOG DEMO */}
                     <Card>
                       <CardHeader 
-                        title="Animated Portal Overlays (Dialog)" 
-                        subtitle="SPRING DAMPED DIALOG SHELF" 
+                        title="Dialog example" 
+                        subtitle="DIALOG PREVIEW" 
                         action={<Maximize2 className="w-4 h-4 text-accent" />} 
                       />
                       <CardContent className="space-y-3">
                         <ProseText>
-                          Modals must behave like native desktop frames. They support focus traps, body scroll locking, spring entrance curves, ESC key dismissal, and backdrop click triggers.
+                          This example shows the dialog layout and close behavior used in the product.
                         </ProseText>
                         <div className="pt-2">
                           <Button variant="primary" onClick={() => setIsDialogOpen(true)}>
-                            LAUNCH PORTAL CONSOLE
+                            Preview dialog
                           </Button>
                         </div>
                       </CardContent>
@@ -1091,13 +1084,13 @@ ${d.description}
                     {/* TOAST NOTIFICATION TRIGGERS */}
                     <Card>
                       <CardHeader 
-                        title="Intelligent Executive Notifications (Toasts)" 
+                        title="Notification examples" 
                         subtitle="EVERY TOAST CLARIFIES IMPACT AND ACTIONS" 
                         action={<BellRing className="w-4 h-4 text-accent" />} 
                       />
                       <CardContent className="space-y-3">
                         <ProseText>
-                          Every notification inside HAL answers three fundamental executive questions: What changed? Why does it matter? What should the agent do next? Click below to experience micro-interactions:
+                          Notifications should explain what changed and what the user can do next. These buttons preview sample messages only.
                         </ProseText>
                         <div className="grid grid-cols-2 gap-2 pt-2">
                           <Button variant="outline" size="sm" onClick={() => triggerToast('info')}>
@@ -1112,15 +1105,11 @@ ${d.description}
                           <Button variant="danger" size="sm" onClick={() => triggerToast('danger')}>
                             Trigger Critical Toast
                           </Button>
-                          <Button variant="primary" size="sm" className="col-span-2 text-indigo-400 bg-indigo-500/10 hover:bg-indigo-500/20 border-indigo-500/30" onClick={() => triggerToast('ai')}>
-                            <Sparkles className="w-3.5 h-3.5 mr-2 animate-pulse" />
-                            Trigger AI Reason Toast
-                          </Button>
                         </div>
                       </CardContent>
                       <CardFooter>
                         <span>Stack container: Dynamic AnimatePresence</span>
-                        <span className="font-mono text-indigo-400 font-bold uppercase">REAL TIME STREAM</span>
+                        <span className="font-mono text-indigo-400 font-bold uppercase">LOCAL PREVIEW</span>
                       </CardFooter>
                     </Card>
 
@@ -1128,7 +1117,7 @@ ${d.description}
                     <Dialog
                       isOpen={isDialogOpen}
                       onClose={() => setIsDialogOpen(false)}
-                      title="HAL Executive Operating System"
+                      title="HAL workspace"
                       size="md"
                       footer={
                         <div className="flex gap-2">
@@ -1137,22 +1126,22 @@ ${d.description}
                             setIsDialogOpen(false);
                             toast({
                               variant: 'success',
-                              title: 'Strategic Mission Commenced',
-                              description: 'The automated outreach protocol for Alberta has been scheduled.',
+                              title: 'Example confirmation',
+                              description: 'This is a sample dialog only. No outreach was scheduled.',
                               whatNext: 'Monitor response metrics in the workspace logs.'
                             });
-                          }}>COMMENCE MANDATE</Button>
+                          }}>Preview confirmation</Button>
                         </div>
                       }
                     >
                       <div className="space-y-3">
-                        <span className="text-[11px] font-mono tracking-wider text-accent uppercase font-bold block">CONFIRM EXECUTIVE AUTHORIZATION</span>
+                        <span className="text-[11px] font-mono tracking-wider text-accent uppercase font-bold block">SAMPLE CONFIRMATION</span>
                         <p className="text-xs text-text-secondary leading-relaxed font-sans">
-                          You are about to synchronize active direct marketing pitch templates with active lead registers. This operation accesses external Google Maps APIs and launches secure territory scans.
+                          This is a sample confirmation dialog. It does not connect to Google Maps, start a scan or send outreach.
                         </p>
                         <div className="p-3 bg-bg-base border border-border-dim rounded space-y-1">
                           <div className="flex justify-between items-center text-[11px] font-mono">
-                            <span className="opacity-60 uppercase">TARGET CONTRACTOR:</span>
+                            <span className="opacity-60 uppercase">EXAMPLE ACCOUNT:</span>
                             <span className="text-text-primary font-bold font-mono">REGIONAL_OPERATOR_DIRECT</span>
                           </div>
                           <div className="flex justify-between items-center text-[11px] font-mono">

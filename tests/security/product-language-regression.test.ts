@@ -5,6 +5,7 @@ const commandPalette = readFileSync('src/components/CommandPalette.tsx', 'utf8')
 const assistant = readFileSync('src/components/HermesLabPanel.tsx', 'utf8');
 const overview = readFileSync('src/components/OverviewPanel.tsx', 'utf8');
 const graph = readFileSync('src/components/NeuralPanel.tsx', 'utf8');
+const guide = readFileSync('src/components/HalBiblePanel.tsx', 'utf8');
 
 describe('HAL product language and truthful controls', () => {
   it('uses plain labels in navigation and the command palette', () => {
@@ -19,6 +20,15 @@ describe('HAL product language and truthful controls', () => {
     expect(graph).not.toContain('Manual Pruning');
     expect(graph).not.toContain('Confirm Prune');
     expect(graph).not.toContain('CLICK TO MANUAL PRUNE');
+  });
+
+  it('removes aspirational claims and fake actions from the product guide', () => {
+    expect(guide).toContain('Contractor sales and operations workspace');
+    expect(guide).not.toContain('AI Business Operating Intelligence System');
+    expect(guide).not.toContain('Harvesting Map grounding!');
+    expect(guide).not.toContain('PROPOSE ENTERPRISE CONNECT');
+    expect(guide).not.toContain('COMMENCE MANDATE');
+    expect(guide).toContain('This is a sample dialog only. No outreach was scheduled.');
   });
 
   it('removes inflated assistant and dashboard labels', () => {
