@@ -1,9 +1,9 @@
 name: Refresh dependency lockfiles
 
 on:
-  push:
+  pull_request:
     branches:
-      - security/dependency-audit-remediation
+      - main
 
 permissions:
   contents: write
@@ -16,6 +16,7 @@ jobs:
       - name: Check out branch
         uses: actions/checkout@v4
         with:
+          ref: security/dependency-audit-remediation
           token: ${{ secrets.GITHUB_TOKEN }}
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -41,7 +42,7 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add bun.lock package-lock.json
           git commit -m "security: refresh dependency lockfiles"
-          git push
+          git push origin security/dependency-audit-remediation
       - name: Report production dependency audit
         continue-on-error: true
         run: bun audit --prod --audit-level=high
