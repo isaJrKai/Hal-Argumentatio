@@ -6,6 +6,9 @@ const assistant = readFileSync('src/components/HermesLabPanel.tsx', 'utf8');
 const overview = readFileSync('src/components/OverviewPanel.tsx', 'utf8');
 const graph = readFileSync('src/components/NeuralPanel.tsx', 'utf8');
 const guide = readFileSync('src/components/HalBiblePanel.tsx', 'utf8');
+const drive = readFileSync('src/components/GoogleDrivePanel.tsx', 'utf8');
+const intelligence = readFileSync('src/components/IntelligencePanel.tsx', 'utf8');
+const settings = readFileSync('src/components/SettingsPanel.tsx', 'utf8');
 
 describe('HAL product language and truthful controls', () => {
   it('uses plain labels in navigation and the command palette', () => {
@@ -20,6 +23,18 @@ describe('HAL product language and truthful controls', () => {
     expect(graph).not.toContain('Manual Pruning');
     expect(graph).not.toContain('Confirm Prune');
     expect(graph).not.toContain('CLICK TO MANUAL PRUNE');
+  });
+
+  it('describes model selection as a preference, not proof of provider connectivity', () => {
+    expect(drive).toContain('Model provider:');
+    expect(drive).not.toContain('cognitive pathways');
+    expect(intelligence).toContain('Model provider');
+    expect(intelligence).not.toContain('ultra-low latency (<400ms)');
+  });
+
+  it('uses plain language in workspace settings', () => {
+    expect(settings).not.toContain("cognitive intelligence and campaign tracking engines");
+    expect(settings).toContain('Sync leads & learning data');
   });
 
   it('removes aspirational claims and fake actions from the product guide', () => {

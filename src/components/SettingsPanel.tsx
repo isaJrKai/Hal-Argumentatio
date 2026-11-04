@@ -958,7 +958,7 @@ export default function SettingsPanel({
                 className="bg-accent/20 hover:bg-accent/30 border border-accent/40 text-accent py-2 px-4 rounded font-mono text-xs font-bold uppercase transition-colors tracking-wider flex items-center gap-2 cursor-pointer disabled:opacity-50"
               >
                 <Database className={`w-3.5 h-3.5 text-accent ${postgresSyncing ? 'animate-bounce' : ''}`} />
-                {postgresSyncing ? 'Syncing to Neon...' : 'Sync Leads & Neural Weights'}
+                {postgresSyncing ? 'Syncing to Neon...' : 'Sync leads & learning data'}
               </button>
             </div>
           </form>
@@ -1429,8 +1429,8 @@ export default function SettingsPanel({
         </div>
 
         <p className="text-xs text-inherit opacity-80 leading-relaxed font-sans">
-          Redirect HAL's cognitive intelligence and campaign tracking engines to a brand new market. 
-          Resetting will securely purge all current leads, outreach event timelines, closed revenue ledgers, and chat histories associated with your contractor profile. This allows you to start a completely fresh campaign in another city.
+          Change the target market and service category used by this workspace. 
+          Resetting clears this workspace's leads, outreach history, closed revenue records and chat history before starting the new market.
         </p>
 
         {resetSuccess && (
