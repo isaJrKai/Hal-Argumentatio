@@ -5,9 +5,12 @@ import { calibrateForecastConfidence } from "./forecastConfidence";
 
 let aiClient: GoogleGenAI | null = null;
 
-function getAIClient(): GoogleGenAI | null {
+function getAIClient(apiKeyOverride?: string): GoogleGenAI | null {
+  const apiKey = apiKeyOverride || process.env.GEMINI_API_KEY;
+  if (apiKeyOverride) {
+    return new GoogleGenAI({ apiKey: apiKeyOverride, httpOptions: { headers: { 'User-Agent': 'aistudio-build' } } });
+  }
   if (!aiClient) {
-    const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
       console.warn("GEMINI_API_KEY is not defined. Falling back to heuristic analytics.");
       return null;
@@ -613,7 +616,8 @@ export async function askHalBot(
   toolRuntime?: {
     tools: Array<{ name: string; description: string; inputSchema: { type: 'object'; properties: Record<string, any>; required?: string[] } }>;
     execute: (name: string, args: Record<string, any>) => Promise<any>;
-  }
+  },
+  providerApiKeys?: { gemini?: string }
 ): Promise<{ text: string; sources?: Array<{ title: string; uri: string }>; toolCalls?: Array<{ name: string; result: any }> }> {
   const systemInstruction = `You are HAL, the central business operating assistant inside HAL (Human Augmentation Layer).
 
@@ -674,7 +678,7 @@ RESPONSE STANDARD
 
   if (activeAI === 'gemini' || activeAI === 'dual') {
     // 1. Try Gemini first (Strictly 3.5)
-    const ai = getAIClient();
+    const ai = getAIClient(providerApiKeys?.gemini);
     if (ai) {
       const toolCalls: Array<{ name: string; result: any }> = [];
       try {
