@@ -1036,7 +1036,7 @@ export default function SettingsPanel({
                 <div className="flex justify-between items-center">
                   <span className="flex min-w-0 items-center gap-2.5"><ProviderBrandIcon brand={provider.brand} label={provider.label} /><span className="font-semibold text-[12px] text-text-primary normal-case tracking-normal">{provider.label}</span></span>
                   <span className={`text-[11px] font-mono px-1.5 py-0.5 rounded font-bold uppercase ${connectorConfigured[provider.id] ? 'bg-positive/20 text-positive' : 'bg-warning-dim text-warning'}`}>
-                    {connectorConfigured[provider.id] ? 'Configured' : 'Unconfigured'}
+                    {connectorConfigured[provider.id] ? 'Saved' : 'Not saved'}
                   </span>
                 </div>
                 <input
@@ -1060,8 +1060,8 @@ export default function SettingsPanel({
             <div className={`border p-4 rounded-xl space-y-3 transition-colors hover:border-accent/40 ${innerBg} ${borderCol}`}>
               <div className="flex justify-between items-center">
                 <span className="flex items-center gap-2.5"><ProviderBrandIcon brand="stripe" label="Stripe" /><span className="text-[12px] font-semibold normal-case tracking-normal text-text-primary">Stripe Billing</span></span>
-                <span className={`text-[11px] font-mono px-1.5 py-0.5 rounded font-bold uppercase ${connectorKeys.stripe ? 'bg-positive/20 text-positive' : 'bg-warning-dim text-warning'}`}>
-                  {connectorConfigured.stripe || connectorKeys.stripe ? 'Configured' : 'Unconfigured'}
+                <span className={`text-[11px] font-mono px-1.5 py-0.5 rounded font-bold uppercase ${connectorConfigured.stripe || connectorKeys.stripe ? 'bg-positive/20 text-positive' : 'bg-warning-dim text-warning'}`}>
+                  {connectorConfigured.stripe || connectorKeys.stripe ? 'Saved' : 'Not saved'}
                 </span>
               </div>
               <input
@@ -1083,8 +1083,8 @@ export default function SettingsPanel({
             <div className={`border p-4 rounded-xl space-y-3 transition-colors hover:border-accent/40 ${innerBg} ${borderCol}`}>
               <div className="flex justify-between items-center">
                 <span className="flex items-center gap-2.5"><ProviderBrandIcon brand="twilio" label="Twilio" /><span className="text-[12px] font-semibold normal-case tracking-normal text-text-primary">Twilio SMS</span></span>
-                <span className={`text-[11px] font-mono px-1.5 py-0.5 rounded font-bold uppercase ${connectorKeys.twilio ? 'bg-positive/20 text-positive' : 'bg-warning-dim text-warning'}`}>
-                  {connectorConfigured.twilio || connectorKeys.twilio ? 'Configured' : 'Unconfigured'}
+                <span className={`text-[11px] font-mono px-1.5 py-0.5 rounded font-bold uppercase ${connectorConfigured.twilio || connectorKeys.twilio ? 'bg-positive/20 text-positive' : 'bg-warning-dim text-warning'}`}>
+                  {connectorConfigured.twilio || connectorKeys.twilio ? 'Saved' : 'Not saved'}
                 </span>
               </div>
               <input
@@ -1106,8 +1106,8 @@ export default function SettingsPanel({
             <div className={`border p-4 rounded-xl space-y-3 transition-colors hover:border-accent/40 ${innerBg} ${borderCol}`}>
               <div className="flex justify-between items-center">
                 <span className="flex items-center gap-2.5"><ProviderBrandIcon brand="sendgrid" label="SendGrid" /><span className="text-[12px] font-semibold normal-case tracking-normal text-text-primary">SendGrid Mail</span></span>
-                <span className={`text-[11px] font-mono px-1.5 py-0.5 rounded font-bold uppercase ${connectorKeys.sendgrid ? 'bg-positive/20 text-positive' : 'bg-warning-dim text-warning'}`}>
-                  {connectorConfigured.sendgrid || connectorKeys.sendgrid ? 'Configured' : 'Unconfigured'}
+                <span className={`text-[11px] font-mono px-1.5 py-0.5 rounded font-bold uppercase ${connectorConfigured.sendgrid || connectorKeys.sendgrid ? 'bg-positive/20 text-positive' : 'bg-warning-dim text-warning'}`}>
+                  {connectorConfigured.sendgrid || connectorKeys.sendgrid ? 'Saved' : 'Not saved'}
                 </span>
               </div>
               <input
@@ -1129,8 +1129,8 @@ export default function SettingsPanel({
             <div className={`border p-4 rounded-xl space-y-3 transition-colors hover:border-accent/40 ${innerBg} ${borderCol}`}>
               <div className="flex justify-between items-center">
                 <span className="flex items-center gap-2.5"><ProviderBrandIcon brand="googlemaps" label="Google Maps" /><span className="text-[12px] font-semibold normal-case tracking-normal text-text-primary">Google Maps Platform</span></span>
-                <span className={`text-[11px] font-mono px-1.5 py-0.5 rounded font-bold uppercase ${connectorKeys.googleMaps ? 'bg-positive/20 text-positive' : 'bg-warning-dim text-warning'}`}>
-                  {connectorConfigured.googleMaps || connectorKeys.googleMaps ? 'Configured' : 'Unconfigured'}
+                <span className={`text-[11px] font-mono px-1.5 py-0.5 rounded font-bold uppercase ${connectorConfigured.googleMaps || connectorKeys.googleMaps ? 'bg-positive/20 text-positive' : 'bg-warning-dim text-warning'}`}>
+                  {connectorConfigured.googleMaps || connectorKeys.googleMaps ? 'Saved' : 'Not saved'}
                 </span>
               </div>
               <input
@@ -1152,8 +1152,8 @@ export default function SettingsPanel({
             <div className={`border p-4 rounded-xl space-y-3 transition-colors hover:border-accent/40 ${innerBg} ${borderCol}`}>
               <div className="flex justify-between items-center">
                 <span className="flex items-center gap-2.5"><ProviderBrandIcon brand="googleads" label="Google Ads" /><span className="text-[12px] font-semibold normal-case tracking-normal text-text-primary">Google Ads</span></span>
-                <span className={`text-[11px] font-mono px-1.5 py-0.5 rounded font-bold uppercase ${connectorKeys.googleAds ? 'bg-positive/20 text-positive' : 'bg-warning-dim text-warning'}`}>
-                  {connectorConfigured.googleAds || connectorKeys.googleAds ? 'Configured' : 'Unconfigured'}
+                <span className={`text-[11px] font-mono px-1.5 py-0.5 rounded font-bold uppercase ${connectorConfigured.googleAds || connectorKeys.googleAds ? 'bg-positive/20 text-positive' : 'bg-warning-dim text-warning'}`}>
+                  {connectorConfigured.googleAds || connectorKeys.googleAds ? 'Saved' : 'Not saved'}
                 </span>
               </div>
               <input
@@ -1175,8 +1175,8 @@ export default function SettingsPanel({
             <div className={`border p-4 rounded-xl space-y-3 transition-colors hover:border-accent/40 ${innerBg} ${borderCol}`}>
               <div className="flex justify-between items-center">
                 <span className="flex items-center gap-2.5"><ProviderBrandIcon brand="meta" label="Meta" /><span className="text-[12px] font-semibold normal-case tracking-normal text-text-primary">Meta Marketing</span></span>
-                <span className={`text-[11px] font-mono px-1.5 py-0.5 rounded font-bold uppercase ${connectorKeys.metaAds ? 'bg-positive/20 text-positive' : 'bg-warning-dim text-warning'}`}>
-                  {connectorConfigured.metaAds || connectorKeys.metaAds ? 'Configured' : 'Unconfigured'}
+                <span className={`text-[11px] font-mono px-1.5 py-0.5 rounded font-bold uppercase ${connectorConfigured.metaAds || connectorKeys.metaAds ? 'bg-positive/20 text-positive' : 'bg-warning-dim text-warning'}`}>
+                  {connectorConfigured.metaAds || connectorKeys.metaAds ? 'Saved' : 'Not saved'}
                 </span>
               </div>
               <input
@@ -1198,8 +1198,8 @@ export default function SettingsPanel({
             <div className={`border p-4 rounded-xl space-y-3 transition-colors hover:border-accent/40 ${innerBg} ${borderCol}`}>
               <div className="flex justify-between items-center">
                 <span className="flex items-center gap-2.5"><ProviderBrandIcon brand="googleanalytics" label="Google Analytics" /><span className="text-[12px] font-semibold normal-case tracking-normal text-text-primary">GA4 & Search Console</span></span>
-                <span className={`text-[11px] font-mono px-1.5 py-0.5 rounded font-bold uppercase ${connectorKeys.ga4 ? 'bg-positive/20 text-positive' : 'bg-warning-dim text-warning'}`}>
-                  {connectorConfigured.ga4 || connectorKeys.ga4 ? 'Configured' : 'Unconfigured'}
+                <span className={`text-[11px] font-mono px-1.5 py-0.5 rounded font-bold uppercase ${connectorConfigured.ga4 || connectorKeys.ga4 ? 'bg-positive/20 text-positive' : 'bg-warning-dim text-warning'}`}>
+                  {connectorConfigured.ga4 || connectorKeys.ga4 ? 'Saved' : 'Not saved'}
                 </span>
               </div>
               <input
@@ -1221,8 +1221,8 @@ export default function SettingsPanel({
             <div className={`border p-4 rounded-xl space-y-3 transition-colors hover:border-accent/40 ${innerBg} ${borderCol}`}>
               <div className="flex justify-between items-center">
                 <span className="flex items-center gap-2.5"><ProviderBrandIcon brand="slack" label="Slack" /><span className="text-[12px] font-semibold normal-case tracking-normal text-text-primary">Slack Operations</span></span>
-                <span className={`text-[11px] font-mono px-1.5 py-0.5 rounded font-bold uppercase ${connectorKeys.slack ? 'bg-positive/20 text-positive' : 'bg-warning-dim text-warning'}`}>
-                  {connectorConfigured.slack || connectorKeys.slack ? 'Configured' : 'Unconfigured'}
+                <span className={`text-[11px] font-mono px-1.5 py-0.5 rounded font-bold uppercase ${connectorConfigured.slack || connectorKeys.slack ? 'bg-positive/20 text-positive' : 'bg-warning-dim text-warning'}`}>
+                  {connectorConfigured.slack || connectorKeys.slack ? 'Saved' : 'Not saved'}
                 </span>
               </div>
               <input
