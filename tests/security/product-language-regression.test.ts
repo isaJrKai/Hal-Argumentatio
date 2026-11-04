@@ -25,6 +25,7 @@ describe('HAL product language and truthful controls', () => {
   it('removes aspirational claims and fake actions from the product guide', () => {
     expect(guide).toContain('Contractor sales and operations workspace');
     expect(guide).not.toContain('AI Business Operating Intelligence System');
+    expect(guide).not.toContain('executive partner. Not a tool. Not an assistant.');
     expect(guide).not.toContain('Harvesting Map grounding!');
     expect(guide).not.toContain('PROPOSE ENTERPRISE CONNECT');
     expect(guide).not.toContain('COMMENCE MANDATE');

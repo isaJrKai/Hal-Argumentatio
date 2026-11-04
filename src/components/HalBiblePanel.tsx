@@ -489,7 +489,7 @@ ${d.description}
                   <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-accent via-indigo-500 to-accent" />
                   <span className="text-[11px] font-mono tracking-wider text-text-secondary uppercase mb-3">ABOUT HAL</span>
                   <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-text-primary font-sans max-w-lg leading-tight break-words">
-                    HAL IS AN
+                    HAL IS A
                   </h1>
                   <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-accent font-sans max-w-lg mt-1 select-all break-words">
                     Contractor sales and operations workspace
@@ -533,7 +533,7 @@ ${d.description}
                   <div className="border border-border-dim bg-bg-overlay p-4 rounded-sm space-y-2">
                     <span className="text-[11px] font-mono font-bold text-accent uppercase tracking-wider">Identity</span>
                     <p className="text-xs text-text-primary leading-relaxed">
-                      HAL is an executive partner. Not a tool. Not an assistant. Not an employee. A partner.
+                      A workspace for contractor operators and the teams that support them.
                     </p>
                   </div>
 
@@ -656,7 +656,7 @@ ${d.description}
 
                   {/* Golden Rule banner */}
                   <div className="bg-accent-dim/10 border border-accent/25 p-4 rounded-sm text-center">
-                    <span className="text-[11px] font-mono text-accent uppercase font-bold block mb-1">THE GOLDEN RULE</span>
+                    <span className="text-[11px] font-mono text-accent uppercase font-bold block mb-1">PRODUCT RULE</span>
                     <p className="text-xs text-text-primary max-w-xl mx-auto leading-relaxed">
                       Add a feature when it solves a real customer problem and can be supported reliably.
                     </p>
@@ -787,13 +787,13 @@ ${d.description}
                       />
                       <CardContent className="space-y-5">
                         <div className="border-l border-border-dim pl-3.5 space-y-1">
-                          <MetadataText>Mission (Largest)</MetadataText>
-                          <MissionTitle>Example mission (not live data)</MissionTitle>
+                          <MetadataText>Primary task</MetadataText>
+                          <MissionTitle>Example task (illustrative only)</MissionTitle>
                         </div>
 
                         <div className="border-l border-border-dim pl-3.5 space-y-1">
                           <MetadataText>Section (Large)</MetadataText>
-                          <SectionTitle>Operational Intelligence Map</SectionTitle>
+                          <SectionTitle>Product overview</SectionTitle>
                         </div>
 
                         <div className="border-l border-border-dim pl-3.5 space-y-1">
@@ -1142,7 +1142,7 @@ ${d.description}
                         <div className="p-3 bg-bg-base border border-border-dim rounded space-y-1">
                           <div className="flex justify-between items-center text-[11px] font-mono">
                             <span className="opacity-60 uppercase">EXAMPLE ACCOUNT:</span>
-                            <span className="text-text-primary font-bold font-mono">REGIONAL_OPERATOR_DIRECT</span>
+                            <span className="text-text-primary font-bold font-mono">Example workspace</span>
                           </div>
                           <div className="flex justify-between items-center text-[11px] font-mono">
                             <span className="opacity-60 uppercase">ENCRYPTION PROTOCOL:</span>
