@@ -38,9 +38,19 @@ jobs:
       - name: Set up Bun
         uses: oven-sh/setup-bun@v2
         with:
-          bun-version: latest
-      - name: Install locked dependencies
-        run: bun install --frozen-lockfile
+          bun-version: 1.4.4
+      - name: Refresh dependency lockfiles for security audit
+        run: |
+          bun install
+          npm install --package-lock-only --ignore-scripts --no-audit
+      - name: Upload refreshed dependency lockfiles
+        uses: actions/upload-artifact@v4
+        with:
+          name: refreshed-dependency-lockfiles
+          path: |
+            bun.lock
+            package-lock.json
+          if-no-files-found: error
       - name: Set up Python for inference service syntax check
         uses: actions/setup-python@v5
         with:
