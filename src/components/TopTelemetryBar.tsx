@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   Search,
   Bell,
@@ -12,7 +12,9 @@ import {
   Activity,
   ListTodo,
   Compass,
-  Bot
+  Bot,
+  ChevronDown,
+  ChevronUp
 } from 'lucide-react';import { useBusinessContext } from '../context/BusinessContext';
 
 interface TopTelemetryBarProps {
@@ -23,7 +25,8 @@ interface TopTelemetryBarProps {
   companyLogo?: string | null;
   unreadNotificationsCount?: number;
   notifications?: any[];
-  clearNotifications?: () => void;
+  markAllNotificationsRead?: () => void;
+  onMarkNotificationRead?: (notificationId: string) => void;
   showNotifications?: boolean;
   onToggleNotifications?: () => void;
   onCloseNotifications?: () => void;
@@ -43,7 +46,8 @@ export const TopTelemetryBar: React.FC<TopTelemetryBarProps> = ({
   companyLogo,
   unreadNotificationsCount = 0,
   notifications = [],
-  clearNotifications,
+  markAllNotificationsRead,
+  onMarkNotificationRead,
   showNotifications = false,
   onToggleNotifications,
   onCloseNotifications,
@@ -55,6 +59,7 @@ export const TopTelemetryBar: React.FC<TopTelemetryBarProps> = ({
   onLogout
 }) => {
   const { workspaceConfig, activeCity, activeIndustry, supportedCities, setActiveCity, setCity } = useBusinessContext();
+  const [isRibbonExpanded, setIsRibbonExpanded] = useState(false);
 
   // Top Workspace Tabs (AutoCAD Master Panels)
   const topNavTabs = [
@@ -155,12 +160,12 @@ export const TopTelemetryBar: React.FC<TopTelemetryBarProps> = ({
               <div className="absolute right-0 mt-2 w-80 sm:w-88 border border-border-default rounded-xl shadow-2xl p-4 space-y-3 z-50 text-xs bg-bg-raised text-text-primary backdrop-blur-xl">
                 <div className="flex justify-between items-center border-b border-border-dim pb-2">
                   <span className="font-sans text-xs font-bold text-text-primary uppercase tracking-wide">Company Updates</span>
-                  {clearNotifications && (
+                  {markAllNotificationsRead && (
                     <button
-                      onClick={clearNotifications}
+                      onClick={markAllNotificationsRead}
                       className="text-[10px] text-accent hover:underline cursor-pointer"
                     >
-                      Dismiss All
+                      Mark all as read
                     </button>
                   )}
                 </div>
@@ -168,10 +173,20 @@ export const TopTelemetryBar: React.FC<TopTelemetryBarProps> = ({
                 <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
                   {notifications.length > 0 ? (
                     notifications.map((notif: any, i: number) => (
-                      <div key={i} className="p-2.5 rounded bg-bg-subtle border border-border-dim space-y-1">
-                        <div className="font-semibold text-text-primary text-xs">{notif.title || 'System Notification'}</div>
+                      <button
+                        key={notif.id || i}
+                        type="button"
+                        onClick={() => notif.id && onMarkNotificationRead?.(notif.id)}
+                        aria-label={`Mark notification as read: ${notif.title || 'System notification'}`}
+                        className={`w-full text-left p-2.5 rounded border space-y-1 transition-colors ${notif.read ? 'bg-bg-subtle border-border-dim' : 'bg-accent-dim/40 border-accent/30'}`}
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <span className="font-semibold text-text-primary text-xs">{notif.title || 'System Notification'}</span>
+                          {!notif.read && <span className="mt-1 w-1.5 h-1.5 rounded-full bg-accent shrink-0" aria-hidden="true" />}
+                        </div>
                         <div className="text-[11px] text-text-secondary">{notif.message || notif.text}</div>
-                      </div>
+                        <span className="text-[10px] text-text-tertiary">{notif.read ? 'Read' : 'Select to mark as read'}</span>
+                      </button>
                     ))
                   ) : (
                     <div className="text-center py-4 text-text-tertiary text-xs">
@@ -214,7 +229,7 @@ export const TopTelemetryBar: React.FC<TopTelemetryBarProps> = ({
 
       {/* ─── ROW 2: PRIMARY WORKSPACE TABS (DOMAINS) ─── */}
       <div className="px-3 sm:px-5 flex items-center justify-between border-b border-border-dim bg-bg-base transition-colors duration-200">
-        <div className="flex items-center gap-1 overflow-x-auto no-scrollbar py-0.5">
+        <div id="hal-primary-workspace-tabs" className={`flex items-center gap-1 no-scrollbar py-0.5 min-w-0 ${isRibbonExpanded ? 'flex-wrap overflow-visible' : 'overflow-x-auto'}`}>
           {topNavTabs.map((tab) => {
             const isActive = activeTab === tab.id;
             const Icon = tab.icon;
@@ -235,6 +250,18 @@ export const TopTelemetryBar: React.FC<TopTelemetryBarProps> = ({
             );
           })}
         </div>
+        <button
+          type="button"
+          onClick={() => setIsRibbonExpanded(value => !value)}
+          aria-expanded={isRibbonExpanded}
+          aria-controls="hal-primary-workspace-tabs"
+          className="inline-flex items-center gap-1.5 shrink-0 px-2.5 py-2 text-[11px] font-medium text-text-secondary hover:text-text-primary rounded-md border border-border-dim hover:bg-bg-subtle transition-colors"
+          title={isRibbonExpanded ? "Collapse workspace ribbon" : "Expand workspace ribbon"}
+        >
+          {isRibbonExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+          <span className="hidden sm:inline">{isRibbonExpanded ? "Collapse ribbon" : "Expand ribbon"}</span>
+          <span className="sm:hidden">{isRibbonExpanded ? "Less" : "More"}</span>
+        </button>
         <div className="hidden xl:flex items-center gap-2 pl-4 border-l border-border-dim shrink-0">
           <label htmlFor="workspace-territory" className="text-xs text-text-secondary">Territory</label>
           <select
