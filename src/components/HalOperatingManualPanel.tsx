@@ -1,0 +1,1353 @@
+import React, { useState, useMemo } from 'react';
+import { 
+  BookOpen, 
+  Sparkles, 
+  Shield, 
+  FileText, 
+  Database, 
+  Key, 
+  Cpu, 
+  Layers, 
+  Activity, 
+  CheckCircle2, 
+  AlertCircle, 
+  Terminal, 
+  ArrowRight, 
+  Search, 
+  Lock, 
+  Code, 
+  LineChart, 
+  GitPullRequest, 
+  Compass, 
+  Users, 
+  Settings, 
+  Briefcase,
+  HelpCircle,
+  Eye,
+  Type,
+  Palette,
+  Grid,
+  BellRing,
+  Maximize2,
+  Loader2,
+  Download
+} from 'lucide-react';
+import { Button } from './ui/Button';
+import { Badge } from './ui/Badge';
+import { Card, CardHeader, CardContent, CardFooter } from './ui/Card';
+import { Dialog } from './ui/Dialog';
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell, TableEmptyState } from './ui/Table';
+import { MissionTitle, SectionTitle, CardTitle, MetadataText, ProseText, MonoValue } from './ui/Typography';
+import { EmptyState } from './ui/EmptyState';
+import { Breadcrumbs } from './ui/Breadcrumbs';
+import { useToast } from '../context/ToastContext';
+import { HalRoadmapPhase1 } from './HalRoadmapPhase1';
+import { HalRoadmapPhase5View } from './HalRoadmapPhase5View';
+
+// We can reuse the design system components or write the Design System view inline for Document 04
+interface DocumentSpec {
+  id: string;
+  number: string;
+  title: string;
+  description: string;
+  status: 'canonical' | 'draft' | 'planned';
+  phase: 'foundation' | 'intelligence' | 'engineering' | 'product';
+  icon: any;
+}
+
+interface HalOperatingManualPanelProps {
+  initialDocId?: string;
+}
+
+export default function HalOperatingManualPanel({ initialDocId }: HalOperatingManualPanelProps = {}) {
+  const { toast } = useToast();
+  const [selectedDocId, setSelectedDocId] = useState<string>(initialDocId || '20');
+  const [searchQuery, setSearchQuery] = useState<string>('');
+  
+  // Design system specific states
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [tableSort, setTableSort] = useState<'asc' | 'desc'>('asc');
+  const [activeDSCategory, setActiveDSCategory] = useState<'primitives' | 'semantics' | 'interaction'>('primitives');
+
+  // Verify Alignment state
+  const [isVerifying, setIsVerifying] = useState(false);
+  const [verificationProgress, setVerificationProgress] = useState(0);
+  const [verificationPassed, setVerificationPassed] = useState(false);
+
+  // List of all 23 documents in the Master Plan
+  const documents: DocumentSpec[] = useMemo(() => [
+    // Phase 1 — Foundation
+    { id: '01', number: '01', title: 'Vision', description: 'A workspace for contractor prospect management, outreach, sales activity and reporting.', status: 'canonical', phase: 'foundation', icon: Sparkles },
+    { id: '02', number: '02', title: 'Philosophy', description: 'The absolute core convictions. The rules determining every engineering and product decision.', status: 'canonical', phase: 'foundation', icon: BookOpen },
+    { id: '03', number: '03', title: 'Design Language', description: 'Visual code of HAL: high density, space optimization, zero bloat, and absolute layout clarity.', status: 'canonical', phase: 'foundation', icon: Palette },
+    { id: '04', number: '04', title: 'Design System', description: 'Unified visual primitives, cryptographic UI states, and interactive live components.', status: 'canonical', phase: 'foundation', icon: Layers },
+    { id: '05', number: '05', title: 'Architecture', description: 'Modular services, unified state contexts, and decoupled client-server structures.', status: 'canonical', phase: 'foundation', icon: Grid },
+    { id: '06', number: '06', title: 'UX Principles', description: 'Micro-feedback, spring animations, clear outcomes, and instructive empty states.', status: 'canonical', phase: 'foundation', icon: Compass },
+
+    // Phase 2 — Intelligence
+    { id: '07', number: '07', title: 'Memory', description: 'Encrypted business records and sensitive contact details, with access controls and audit history.', status: 'canonical', phase: 'intelligence', icon: Database },
+    { id: '08', number: '08', title: 'Knowledge', description: 'Map context and diagnostic reports; external data sources must be connected and verified.', status: 'canonical', phase: 'intelligence', icon: Compass },
+    { id: '09', number: '09', title: 'Skills', description: 'Tools for technical SEO checks, website performance review and SSL status; results depend on configured providers.', status: 'canonical', phase: 'intelligence', icon: Cpu },
+    { id: '10', number: '10', title: 'Agents', description: 'Model-assisted workflows using Gemini and NVIDIA services; availability and output quality depend on provider access.', status: 'canonical', phase: 'intelligence', icon: Cpu },
+    { id: '11', number: '11', title: 'Council', description: 'Decision-support tools and feedback analysis; recommendations require operator review.', status: 'canonical', phase: 'intelligence', icon: Users },
+    { id: '12', number: '12', title: 'Missions', description: 'Tasks, workflows and campaign follow-up.', status: 'canonical', phase: 'intelligence', icon: Briefcase },
+    { id: '13', number: '13', title: 'Connectors', description: 'Provider settings for messaging, email and cloud services. Each connection must be configured and tested before use.', status: 'canonical', phase: 'intelligence', icon: Settings },
+
+    // Phase 3 — Engineering
+    { id: '14', number: '14', title: 'Database', description: 'Relational Cloud SQL setups, Drizzle schemas, encrypted PII vaults, and tamper-evident audit logging.', status: 'canonical', phase: 'engineering', icon: Database },
+    { id: '15', number: '15', title: 'APIs', description: 'Express + Vite proxies, server-side secure endpoints, HMAC-SHA256 signed outbox, and route controllers.', status: 'canonical', phase: 'engineering', icon: Code },
+    { id: '16', number: '16', title: 'Components', description: 'Pragmatic, beautiful, and accessible UI components styled with pure Tailwind.', status: 'canonical', phase: 'engineering', icon: Layers },
+    { id: '17', number: '17', title: 'Security', description: 'Sensitive contact data is encrypted in storage and access is controlled by account permissions. Review deployment settings and security tests before relying on it.', status: 'canonical', phase: 'engineering', icon: Shield },
+    { id: '18', number: '18', title: 'Testing', description: 'Type checking validations, static analysis lint checks, and verified production build pipelines.', status: 'canonical', phase: 'engineering', icon: Activity },
+    { id: '19', number: '19', title: 'DevOps', description: 'Vite/esbuild bundling, container routing to port 3000, and fast cold-starts.', status: 'canonical', phase: 'engineering', icon: GitPullRequest },
+
+    // Phase 4 — Product
+    { id: '20', number: '20', title: 'Roadmap', description: 'Roadmap phases are tracked separately; each remains unverified until its runtime behavior has supporting evidence.', status: 'canonical', phase: 'product', icon: LineChart },
+    { id: '21', number: '21', title: 'UI Library', description: 'Standardized layout files, typography primitives, and Document Ribbon studio suite.', status: 'canonical', phase: 'product', icon: Layers },
+    { id: '22', number: '22', title: 'Workspaces', description: 'Contractor dashboard orchestration, campaign builders, and leads flow.', status: 'canonical', phase: 'product', icon: Briefcase },
+    { id: '23', number: '23', title: 'Future Vision', description: 'Planned research into forecasting, workflow automation and additional integrations. These are not all available product features.', status: 'canonical', phase: 'product', icon: Sparkles },
+    { id: '24', number: '24', title: 'Hermes Engine', description: 'Assistant tools for drafting assets, reviewing diagnostics and organizing work. Provider-backed actions require configuration and testing.', status: 'canonical', phase: 'intelligence', icon: Sparkles }
+  ], []);
+
+  // Filter documents based on search query
+  const filteredDocs = useMemo(() => {
+    if (!searchQuery.trim()) return documents;
+    const q = searchQuery.toLowerCase();
+    return documents.filter(d => 
+      d.title.toLowerCase().includes(q) || 
+      d.number.includes(q) || 
+      d.description.toLowerCase().includes(q)
+    );
+  }, [documents, searchQuery]);
+
+  // Group filtered documents by Phase
+  const groupedDocs = useMemo(() => {
+    const groups = {
+      foundation: [] as DocumentSpec[],
+      intelligence: [] as DocumentSpec[],
+      engineering: [] as DocumentSpec[],
+      product: [] as DocumentSpec[]
+    };
+    filteredDocs.forEach(d => {
+      groups[d.phase].push(d);
+    });
+    return groups;
+  }, [filteredDocs]);
+
+  // Calculate spec completion statistics
+  const stats = useMemo(() => {
+    const total = documents.length;
+    const canonical = documents.filter(d => d.status === 'canonical').length;
+    const draft = documents.filter(d => d.status === 'draft').length;
+    const planned = documents.filter(d => d.status === 'planned').length;
+    const percent = Math.round((canonical / total) * 100);
+    return { total, canonical, draft, planned, percent };
+  }, [documents]);
+
+  const activeDoc = useMemo(() => {
+    return documents.find(d => d.id === selectedDocId) || documents[1];
+  }, [documents, selectedDocId]);
+
+  // This component preview must not present invented operational records or revenue.
+  const sampleTableData: Array<{ id: string; item: string; status: string; priority: string; value: string }> = [];
+
+  const sortedData = [...sampleTableData].sort((a, b) => {
+    if (tableSort === 'asc') return a.value.localeCompare(b.value);
+    return b.value.localeCompare(a.value);
+  });
+
+  const triggerToast = (variant: 'info' | 'success' | 'warning' | 'danger' | 'ai') => {
+    const titles = {
+      info: 'Information Toast Preview',
+      success: 'Success Toast Preview',
+      warning: 'Warning Toast Preview',
+      danger: 'Error Toast Preview',
+      ai: 'AI Toast Preview'
+    };
+
+    const descs = {
+      info: 'UI preview only. No live business data was loaded.',
+      success: 'UI preview only. No database or encryption operation was performed.',
+      warning: 'UI preview only. No usage quota was queried.',
+      danger: 'UI preview only. No integration request was made.',
+      ai: 'UI preview only. No websites were scanned and no performance data was measured.'
+    };
+
+    const nextActions = {
+      info: 'Connect a real data source before relying on this workflow.',
+      success: 'Verify the actual operation in the runtime before treating it as successful.',
+      warning: 'Load real usage metrics before making quota decisions.',
+      danger: 'Check the relevant integration logs and configuration.',
+      ai: 'Run a real audit and retain its evidence before generating a report.'
+    };
+
+    toast({
+      variant,
+      title: titles[variant],
+      description: descs[variant],
+      whatNext: nextActions[variant],
+      actionLabel: 'RESOLVE NOW',
+      onAction: () => alert('UI preview only; no action was performed.')
+    });
+  };
+
+  // Play a visual preview only; this does not audit the running system.
+  const startSystemVerification = () => {
+    setIsVerifying(true);
+    setVerificationProgress(10);
+    setVerificationPassed(false);
+
+    const steps = [
+      { p: 25, label: 'Preview step 1 of 4 (no system check performed).' },
+      { p: 50, label: 'Preview step 2 of 4 (no code scan performed).' },
+      { p: 75, label: 'Preview step 3 of 4 (no UI audit performed).' },
+      { p: 90, label: 'Preview step 4 of 4 (no layout audit performed).' },
+      { p: 100, label: 'Preview finished; no verification checks ran.' }
+    ];
+
+    steps.forEach((step, idx) => {
+      setTimeout(() => {
+        setVerificationProgress(step.p);
+        if (step.p === 100) {
+          setIsVerifying(false);
+          setVerificationPassed(true);
+          toast({
+            variant: 'success',
+            title: 'Verification Preview Finished',
+            description: 'The animation completed; no system, codebase, security, or compliance checks were performed.',
+            whatNext: 'Proceed with building product features.'
+          });
+        }
+      }, (idx + 1) * 600);
+    });
+  };
+
+  const handleDownloadManual = () => {
+    const markdownContent = `# HAL OPERATING MANUAL
+**Product guide and architecture reference**
+*Exported: ${new Date().toLocaleDateString()}*
+
+---
+
+${documents.map(d => `## Section ${d.number}: ${d.title}
+**Phase:** ${d.phase.toUpperCase()} | **Status:** ${d.status.toUpperCase()}
+
+${d.description}
+`).join('\\n---\\n\\n')}
+`;
+    const blob = new Blob([markdownContent], { type: 'text/markdown;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `HAL_Operating_Manual_${new Date().toISOString().slice(0, 10)}.md`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  const handlePrintManual = () => {
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      toast({
+        variant: 'warning',
+        title: 'Pop-up blocked',
+        description: 'Allow pop-ups for HAL, then select Print / Save as PDF again.'
+      });
+      return;
+    }
+
+    const sections = documents.map(d => `
+      <section class="manual-section">
+        <p class="eyebrow">SECTION ${d.number} · ${d.phase.toUpperCase()} · ${d.status.toUpperCase()}</p>
+        <h2>${escapeHtml(d.title)}</h2>
+        <p>${escapeHtml(d.description)}</p>
+      </section>
+    `).join('');
+
+    printWindow.document.open();
+    printWindow.document.write(`<!doctype html>
+      <html lang="en">
+      <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>HAL Operating Manual</title>
+        <style>
+          @page { size: A4; margin: 20mm 18mm; }
+          * { box-sizing: border-box; }
+          body { margin: 0; color: #18211d; font: 11pt/1.6 Arial, sans-serif; }
+          header { padding-bottom: 18pt; border-bottom: 2px solid #176b4a; margin-bottom: 24pt; }
+          h1 { margin: 0 0 8pt; font: bold 25pt/1.15 Georgia, serif; }
+          h2 { margin: 0 0 8pt; font: bold 17pt/1.25 Georgia, serif; }
+          p { margin: 0 0 10pt; }
+          .eyebrow { color: #176b4a; font: bold 8pt/1.3 Arial, sans-serif; letter-spacing: .08em; margin-bottom: 8pt; }
+          .meta { color: #59645e; font-size: 9pt; }
+          .manual-section { padding: 0 0 18pt; margin: 0 0 18pt; border-bottom: 1px solid #d8dfda; break-inside: avoid; }
+          footer { color: #66716a; font-size: 8pt; margin-top: 24pt; }
+          @media screen { body { max-width: 800px; margin: 32px auto; padding: 40px; box-shadow: 0 2px 24px #0002; } }
+        </style>
+      </head>
+      <body>
+        <header>
+          <p class="eyebrow">HAL · PRODUCT DOCUMENTATION</p>
+          <h1>Operating Manual</h1>
+          <p>A practical guide to HAL's product structure, workflows, integrations and roadmap.</p>
+          <p class="meta">Generated ${new Date().toLocaleDateString()} · ${documents.length} documented sections</p>
+        </header>
+        ${sections}
+        <footer>HAL Operating Manual · Verify live system status before relying on planned or unverified capabilities.</footer>
+      </body>
+      </html>`);
+    printWindow.document.close();
+    printWindow.focus();
+    printWindow.onload = () => printWindow.print();
+  };
+
+  const escapeHtml = (value: string) => value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+
+  return (
+    <div className="space-y-6 select-none pb-12 animate-fade-in text-text-primary">
+      
+      {/* HEADER SECTION WITH BREADCRUMBS */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-border-dim pb-4">
+        <div className="space-y-1">
+          <Breadcrumbs items={[{ label: 'System Configuration' }, { label: 'HAL Operating Manual' }]} />
+          <MissionTitle>HAL product and operating guide</MissionTitle>
+          <ProseText className="max-w-xl">
+            A practical guide to HAL's product structure, workflows, integrations and roadmap. Planned capabilities are identified separately from features verified in the live application.
+          </ProseText>
+        </div>
+
+        {/* Master Completion Badge & Download Action */}
+        <div className="flex flex-wrap items-center gap-3 shrink-0">
+          <button
+            type="button"
+            onClick={handlePrintManual}
+            className="flex items-center gap-2 px-3.5 py-2 border border-border-dim bg-bg-base hover:bg-bg-subtle text-text-primary rounded font-mono text-xs font-bold transition cursor-pointer"
+            title="Print the full operating manual or save it as a PDF"
+          >
+            <FileText className="w-3.5 h-3.5" />
+            <span>Print / Save as PDF</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={handleDownloadManual}
+            className="flex items-center gap-2 px-3.5 py-2 bg-accent hover:bg-accent/80 text-black rounded font-mono text-xs font-bold transition shadow-sm cursor-pointer"
+            title="Download the editable operating manual in Markdown"
+          >
+            <Download className="w-3.5 h-3.5" />
+            <span>Download Markdown (.md)</span>
+          </button>
+
+          <div className="flex items-center gap-4 bg-bg-base border border-border-dim p-3 rounded-sm">
+            <div className="space-y-0.5">
+              <span className="text-[11px] font-mono text-text-secondary uppercase block">Master Spec Completion</span>
+              <div className="flex items-center gap-2">
+                <div className="w-24 h-1.5 bg-bg-subtle rounded-full overflow-hidden border border-border-dim/55">
+                  <div 
+                    className="h-full bg-accent transition-all duration-500" 
+                    style={{ width: `${stats.percent}%` }}
+                  />
+                </div>
+                <span className="text-xs font-mono font-bold text-accent">{stats.percent}%</span>
+              </div>
+            </div>
+            <div className="border-l border-border-dim pl-3 text-right">
+              <span className="text-[11px] font-mono text-text-secondary uppercase block">Status</span>
+              <span className="text-xs font-mono font-bold text-positive-dim text-positive">CANONICAL</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* TWO COLUMN GRID WORKSPACE */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6 items-start min-w-0">
+        
+        {/* LEFT COLUMN: INDEX DRAWER (col-span-4) */}
+        <div className="lg:col-span-4 min-w-0 space-y-4">
+          
+          {/* SEARCH & FILTER */}
+          <div className="relative">
+            <Search className="absolute left-3 top-2.5 w-3.5 h-3.5 text-text-tertiary" />
+            <input
+              type="text"
+              placeholder="Search specifications..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full bg-bg-overlay border border-border-dim text-xs py-2 pl-9 pr-4 rounded-sm text-text-primary placeholder:text-text-tertiary outline-none focus:border-accent transition-colors"
+            />
+          </div>
+
+          {/* DOCUMENT TREE INDEX */}
+          <div className="bg-bg-raised border border-border-dim rounded-sm divide-y divide-border-dim/40 max-h-[640px] overflow-y-auto">
+            
+            {/* PHASE 1 — FOUNDATION */}
+            {groupedDocs.foundation.length > 0 && (
+              <div className="p-3 space-y-1.5">
+                <span className="text-[11px] font-mono font-bold text-accent tracking-wider uppercase block mb-1 break-words">
+                  Phase 1 — Foundation
+                </span>
+                <div className="space-y-1">
+                  {groupedDocs.foundation.map((doc) => (
+                    <button
+                      key={doc.id}
+                      onClick={() => setSelectedDocId(doc.id)}
+                      className={`w-full flex flex-wrap sm:flex-nowrap items-center justify-between gap-2 text-left p-2 rounded-sm transition-all border ${
+                        selectedDocId === doc.id
+                          ? 'bg-accent/10 border-accent/30 text-text-primary font-medium'
+                          : 'border-transparent hover:bg-white/[0.02] text-text-secondary'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                        <span className="text-[11px] font-mono text-text-tertiary w-4 shrink-0">{doc.number}</span>
+                        <doc.icon className={`w-3.5 h-3.5 shrink-0 ${selectedDocId === doc.id ? 'text-accent' : 'text-text-tertiary'}`} />
+                        <span className="text-[11px] font-sans min-w-0 flex-1 break-words whitespace-normal">{doc.title}</span>
+                      </div>
+                      <Badge variant={doc.status}>
+                        {doc.status}
+                      </Badge>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* PHASE 2 — INTELLIGENCE */}
+            {groupedDocs.intelligence.length > 0 && (
+              <div className="p-3 space-y-1.5">
+                <span className="text-[11px] font-mono font-bold text-[#8b5cf6] tracking-wider uppercase block mb-1 break-words">
+                  Phase 2 — Intelligence
+                </span>
+                <div className="space-y-1">
+                  {groupedDocs.intelligence.map((doc) => (
+                    <button
+                      key={doc.id}
+                      onClick={() => setSelectedDocId(doc.id)}
+                      className={`w-full flex flex-wrap sm:flex-nowrap items-center justify-between gap-2 text-left p-2 rounded-sm transition-all border ${
+                        selectedDocId === doc.id
+                          ? 'bg-[#8b5cf6]/10 border-[#8b5cf6]/30 text-text-primary font-medium'
+                          : 'border-transparent hover:bg-white/[0.02] text-text-secondary'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                        <span className="text-[11px] font-mono text-text-tertiary w-4 shrink-0">{doc.number}</span>
+                        <doc.icon className={`w-3.5 h-3.5 shrink-0 ${selectedDocId === doc.id ? 'text-[#8b5cf6]' : 'text-text-tertiary'}`} />
+                        <span className="text-[11px] font-sans min-w-0 flex-1 break-words whitespace-normal">{doc.title}</span>
+                      </div>
+                      <Badge variant={doc.status}>
+                        {doc.status}
+                      </Badge>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* PHASE 3 — ENGINEERING */}
+            {groupedDocs.engineering.length > 0 && (
+              <div className="p-3 space-y-1.5">
+                <span className="text-[11px] font-mono font-bold text-sky-400 tracking-wider uppercase block mb-1 break-words">
+                  Phase 3 — Engineering
+                </span>
+                <div className="space-y-1">
+                  {groupedDocs.engineering.map((doc) => (
+                    <button
+                      key={doc.id}
+                      onClick={() => setSelectedDocId(doc.id)}
+                      className={`w-full flex flex-wrap sm:flex-nowrap items-center justify-between gap-2 text-left p-2 rounded-sm transition-all border ${
+                        selectedDocId === doc.id
+                          ? 'bg-sky-500/10 border-sky-500/30 text-text-primary font-medium'
+                          : 'border-transparent hover:bg-white/[0.02] text-text-secondary'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                        <span className="text-[11px] font-mono text-text-tertiary w-4 shrink-0">{doc.number}</span>
+                        <doc.icon className={`w-3.5 h-3.5 shrink-0 ${selectedDocId === doc.id ? 'text-sky-400' : 'text-text-tertiary'}`} />
+                        <span className="text-[11px] font-sans min-w-0 flex-1 break-words whitespace-normal">{doc.title}</span>
+                      </div>
+                      <Badge variant={doc.status}>
+                        {doc.status}
+                      </Badge>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* PHASE 4 — PRODUCT */}
+            {groupedDocs.product.length > 0 && (
+              <div className="p-3 space-y-1.5">
+                <span className="text-[11px] font-mono font-bold text-[#f59e0b] tracking-wider uppercase block mb-1 break-words">
+                  Phase 4 — Product
+                </span>
+                <div className="space-y-1">
+                  {groupedDocs.product.map((doc) => (
+                    <button
+                      key={doc.id}
+                      onClick={() => setSelectedDocId(doc.id)}
+                      className={`w-full flex flex-wrap sm:flex-nowrap items-center justify-between gap-2 text-left p-2 rounded-sm transition-all border ${
+                        selectedDocId === doc.id
+                          ? 'bg-[#f59e0b]/10 border-[#f59e0b]/30 text-text-primary font-medium'
+                          : 'border-transparent hover:bg-white/[0.02] text-text-secondary'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                        <span className="text-[11px] font-mono text-text-tertiary w-4 shrink-0">{doc.number}</span>
+                        <doc.icon className={`w-3.5 h-3.5 shrink-0 ${selectedDocId === doc.id ? 'text-[#f59e0b]' : 'text-text-tertiary'}`} />
+                        <span className="text-[11px] font-sans min-w-0 flex-1 break-words whitespace-normal">{doc.title}</span>
+                      </div>
+                      <Badge variant={doc.status}>
+                        {doc.status}
+                      </Badge>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+          </div>
+
+          {/* METRIC BOX: BIBLE FOOTER CREDITS */}
+          <div className="bg-bg-raised border border-border-dim p-4 rounded-sm space-y-1 font-mono text-[11px] text-text-secondary">
+            <div className="flex justify-between">
+              <span>CANONICAL:</span>
+              <span className="text-text-primary font-bold">{stats.canonical} Docs</span>
+            </div>
+            <div className="flex justify-between">
+              <span>BLUEPRINT DRAFTS:</span>
+              <span className="text-text-primary font-bold">{stats.draft} Docs</span>
+            </div>
+            <div className="flex justify-between">
+              <span>PLANNED SCHEMA:</span>
+              <span className="text-text-primary font-bold">{stats.planned} Docs</span>
+            </div>
+          </div>
+
+        </div>
+
+        {/* RIGHT COLUMN: ACTIVE CANVAS (col-span-8) */}
+        <div className="lg:col-span-8 min-w-0 bg-bg-raised border border-border-dim rounded-sm p-4 sm:p-6 min-h-[500px]">
+          
+          {/* ACTIVE SPECIFICATION TEMPLATE VIEW */}
+          <div className="space-y-6">
+            
+            {/* DOCUMENT SUB-HEADER */}
+            <div className="flex flex-wrap items-start justify-between gap-3 border-b border-border-dim pb-4 min-w-0">
+              <div className="space-y-1">
+                <div className="flex flex-wrap items-center gap-2 text-[11px] font-mono text-text-secondary uppercase min-w-0">
+                  <span>SPECIFICATION DOCUMENT {activeDoc.number}</span>
+                  <span>•</span>
+                  <span className="text-accent uppercase tracking-wider">{activeDoc.phase}</span>
+                </div>
+                <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-text-primary break-words">{activeDoc.title}</h2>
+              </div>
+              <Badge variant={activeDoc.status}>
+                {activeDoc.status.toUpperCase()} SPECIFICATION
+              </Badge>
+            </div>
+
+            {/* RENDER SPECIFIC INTERACTIVE ARTIFACTS OR BLUEPRINT */}
+            
+            {/* DOCUMENT 02: PHILOSOPHY */}
+            {activeDoc.id === '02' && (
+              <div className="space-y-6">
+                
+                {/* 1. HERO CONVICTION ELEMENT */}
+                <div className="bg-bg-base border border-border-dim rounded p-6 flex flex-col items-center justify-center text-center py-10 relative overflow-hidden">
+                  <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-accent via-indigo-500 to-accent" />
+                  <span className="text-[11px] font-mono tracking-wider text-text-secondary uppercase mb-3">ABOUT HAL</span>
+                  <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-text-primary font-sans max-w-lg leading-tight break-words">
+                    HAL IS A
+                  </h1>
+                  <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-accent font-sans max-w-lg mt-1 select-all break-words">
+                    Contractor sales and operations workspace
+                  </h1>
+                  <p className="text-xs text-text-secondary max-w-md mt-4 font-sans leading-relaxed">
+                    HAL brings prospect management, sales activity, outreach and reporting into one contractor-focused workspace.
+                  </p>
+
+                  {/* PRODUCT STANDARDS CARD */}
+                  <div className="mt-6 w-full max-w-2xl bg-bg-overlay/80 border border-accent/30 rounded-lg p-4 text-left shadow-sm">
+                    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border-dim/60 pb-2 mb-2.5">
+                      <span className="text-[11px] font-mono font-bold text-accent uppercase tracking-wider flex items-center gap-1.5">
+                        <Sparkles className="w-3.5 h-3.5 text-accent" />
+                        PRODUCT STANDARD
+                      </span>
+                      <span className="text-[11px] font-mono text-positive bg-positive/10 border border-positive/20 px-1.5 py-0.5 rounded uppercase font-bold">
+                        STANDARD
+                      </span>
+                    </div>
+                    <blockquote className="text-xs sm:text-sm font-sans font-medium text-text-primary leading-relaxed italic border-l-2 border-accent pl-3 my-1">
+                      "Use real business data. Make the next action clear. Keep the operator in control."
+                    </blockquote>
+                    <p className="text-[11px] text-text-secondary mt-2 font-mono">
+                      Show the source of important claims. Separate recorded results from estimates. Never mark an action complete unless it has run.
+                    </p>
+                  </div>
+                </div>
+
+                {/* 2. THE CORE STATEMENT PILLARS */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  
+                  {/* Mission */}
+                  <div className="border border-border-dim bg-bg-overlay p-4 rounded-sm space-y-2">
+                    <span className="text-[11px] font-mono font-bold text-accent uppercase tracking-wider">Mission</span>
+                    <p className="text-xs text-text-primary leading-relaxed">
+                      To help humans make better business decisions through intelligence, memory, reasoning, planning, learning, and execution.
+                    </p>
+                  </div>
+
+                  {/* Identity */}
+                  <div className="border border-border-dim bg-bg-overlay p-4 rounded-sm space-y-2">
+                    <span className="text-[11px] font-mono font-bold text-accent uppercase tracking-wider">Identity</span>
+                    <p className="text-xs text-text-primary leading-relaxed">
+                      A workspace for contractor operators and the teams that support them.
+                    </p>
+                  </div>
+
+                  {/* Product Philosophy */}
+                  <div className="border border-border-dim bg-bg-overlay p-4 rounded-sm space-y-2">
+                    <span className="text-[11px] font-mono font-bold text-indigo-400 uppercase tracking-wider">Product Philosophy</span>
+                    <p className="text-xs text-text-primary leading-relaxed">
+                      HAL exists to answer one question: <span className="text-indigo-300">"What should I do next to grow this business?"</span> Everything else supports this.
+                    </p>
+                  </div>
+
+                  {/* Intelligence Philosophy */}
+                  <div className="border border-border-dim bg-bg-overlay p-4 rounded-sm space-y-2">
+                    <span className="text-[11px] font-mono font-bold text-indigo-400 uppercase tracking-wider">Intelligence Philosophy</span>
+                    <p className="text-xs text-text-primary leading-relaxed">
+                      HAL organizes business records, highlights relationships and provides context for the operator's decision.
+                    </p>
+                  </div>
+
+                  {/* Design Philosophy */}
+                  <div className="border border-border-dim bg-bg-overlay p-4 rounded-sm space-y-2">
+                    <span className="text-[11px] font-mono font-bold text-sky-400 uppercase tracking-wider">Design Philosophy</span>
+                    <p className="text-xs text-text-primary leading-relaxed">
+                      Keep screens focused. Make actions and outcomes clear. Show evidence for recommendations. Never imply work ran unless it did.
+                    </p>
+                  </div>
+
+                  {/* UI Philosophy */}
+                  <div className="border border-border-dim bg-bg-overlay p-4 rounded-sm space-y-2">
+                    <span className="text-[11px] font-mono font-bold text-sky-400 uppercase tracking-wider">UI Philosophy</span>
+                    <p className="text-xs text-text-primary leading-relaxed">
+                      Use familiar navigation and clear language. Keep advanced details available without crowding everyday workflows.
+                    </p>
+                  </div>
+
+                  {/* Architecture Philosophy */}
+                  <div className="border border-border-dim bg-bg-overlay p-4 rounded-sm space-y-2">
+                    <span className="text-[11px] font-mono font-bold text-[#f59e0b] uppercase tracking-wider">Architecture Philosophy</span>
+                    <p className="text-xs text-text-primary leading-relaxed">
+                      Keep core workflows maintainable. Add optional tools and integrations as separate modules.
+                    </p>
+                  </div>
+
+                  {/* Knowledge Philosophy */}
+                  <div className="border border-border-dim bg-bg-overlay p-4 rounded-sm space-y-2">
+                    <span className="text-[11px] font-mono font-bold text-[#f59e0b] uppercase tracking-wider">Knowledge Philosophy</span>
+                    <div className="text-[11px] text-text-primary flex flex-col items-center gap-1 font-mono pt-1">
+                      <span>Data</span>
+                      <span className="text-[11px] opacity-40">↓</span>
+                      <span>Information</span>
+                      <span className="text-[11px] opacity-40">↓</span>
+                      <span>Knowledge</span>
+                      <span className="text-[11px] opacity-40">↓</span>
+                      <span>Understanding</span>
+                      <span className="text-[11px] opacity-40">↓</span>
+                      <span>Recommendations</span>
+                      <span className="text-[11px] opacity-40">↓</span>
+                      <span className="text-accent font-bold">Action</span>
+                    </div>
+                  </div>
+
+                  {/* Decision Philosophy */}
+                  <div className="border border-border-dim bg-bg-overlay p-4 rounded-sm space-y-2">
+                    <span className="text-[11px] font-mono font-bold text-purple-400 uppercase tracking-wider">Decision Philosophy</span>
+                    <p className="text-xs text-text-primary leading-relaxed">
+                      Every page must answer: What matters? Why? What should happen next?
+                    </p>
+                  </div>
+
+                  {/* Learning Philosophy */}
+                  <div className="border border-border-dim bg-bg-overlay p-4 rounded-sm space-y-2">
+                    <span className="text-[11px] font-mono font-bold text-purple-400 uppercase tracking-wider">Learning Philosophy</span>
+                    <p className="text-xs text-text-primary leading-relaxed">
+                      Recorded outcomes can inform future analysis. Do not imply automatic learning unless the process has been measured and verified.
+                    </p>
+                  </div>
+
+                  {/* Business Philosophy */}
+                  <div className="border border-border-dim bg-bg-overlay p-4 rounded-sm space-y-2">
+                    <span className="text-[11px] font-mono font-bold text-emerald-400 uppercase tracking-wider">Business Philosophy</span>
+                    <p className="text-xs text-text-primary leading-relaxed">
+                      HAL supports day-to-day work; the business owner remains responsible for decisions and follow-up.
+                    </p>
+                  </div>
+
+                  {/* Human Philosophy */}
+                  <div className="border border-border-dim bg-bg-overlay p-4 rounded-sm space-y-2">
+                    <span className="text-[11px] font-mono font-bold text-emerald-400 uppercase tracking-wider">Human Philosophy</span>
+                    <p className="text-xs text-text-primary leading-relaxed">
+                      The operator owns the final decision. Recommendations should be reviewable before action.
+                    </p>
+                  </div>
+
+                </div>
+
+                {/* PRINCIPLES LIST */}
+                <div className="space-y-3 pt-4 border-t border-border-dim">
+                  <span className="text-[11px] font-mono tracking-wider text-text-secondary uppercase font-semibold block">SYSTEM PRINCIPLES</span>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="p-3 border border-border-dim bg-bg-base/40 rounded-sm">
+                      <h4 className="text-[11px] font-mono font-bold text-accent uppercase">Design Principle</h4>
+                      <p className="text-[11px] text-text-secondary mt-1">
+                        Order over decoration. Consistency over creativity. Clarity over complexity. Speed over unnecessary animation. Depth over clutter.
+                      </p>
+                    </div>
+                    <div className="p-3 border border-border-dim bg-bg-base/40 rounded-sm">
+                      <h4 className="text-[11px] font-mono font-bold text-accent uppercase">Engineering Principle</h4>
+                      <p className="text-[11px] text-text-secondary mt-1">
+                        Architecture first. Features second. Polish always.
+                      </p>
+                    </div>
+                    <div className="p-3 border border-border-dim bg-bg-base/40 rounded-sm">
+                      <h4 className="text-[11px] font-mono font-bold text-accent uppercase">Growth Principle</h4>
+                      <p className="text-[11px] text-text-secondary mt-1">
+                        Build only when a feature solves a real operator problem.
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Golden Rule banner */}
+                  <div className="bg-accent-dim/10 border border-accent/25 p-4 rounded-sm text-center">
+                    <span className="text-[11px] font-mono text-accent uppercase font-bold block mb-1">PRODUCT RULE</span>
+                    <p className="text-xs text-text-primary max-w-xl mx-auto leading-relaxed">
+                      Add a feature when it solves a real customer problem and can be supported reliably.
+                    </p>
+                  </div>
+                </div>
+
+                {/* INTERACTIVE ALIGNMENT ENGINE - "Artifacts get used, not just read" */}
+                <div className="pt-6 border-t border-border-dim space-y-4">
+                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-2">
+                    <div className="space-y-1">
+                      <h3 className="text-sm font-bold text-text-primary uppercase font-mono flex items-center gap-1.5">
+                        <Terminal className="w-4 h-4 text-accent animate-pulse" />
+                        Loading-state example (demo only)
+                      </h3>
+                      <p className="text-xs text-text-secondary">
+                        This is a UI animation only. It does not inspect the running server, network ports, security configuration, or encryption.
+                      </p>
+                    </div>
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      onClick={startSystemVerification}
+                      isLoading={isVerifying}
+                    >
+                      PLAY PREVIEW
+                    </Button>
+                  </div>
+
+                  {isVerifying && (
+                    <div className="bg-bg-base border border-border-dim p-4 rounded font-mono text-xs text-text-secondary space-y-3">
+                      <div className="flex justify-between items-center text-[11px]">
+                        <span>CORE ALIGNMENT PROGRESS:</span>
+                        <span className="text-accent">{verificationProgress}%</span>
+                      </div>
+                      <div className="w-full h-1.5 bg-bg-subtle rounded-full overflow-hidden">
+                        <div 
+                          className="h-full bg-accent transition-all duration-300"
+                          style={{ width: `${verificationProgress}%` }}
+                        />
+                      </div>
+                      <div className="flex items-center gap-2 text-[11px] text-text-tertiary">
+                        <Loader2 className="w-3 h-3 animate-spin text-accent" />
+                        <span>
+                          {verificationProgress < 25 && 'Auditing Network configuration port...'}
+                          {verificationProgress >= 25 && verificationProgress < 50 && 'Scanning codebase for PII cryptology functions...'}
+                          {verificationProgress >= 50 && verificationProgress < 75 && 'Evaluating UI visual weights and gradients...'}
+                          {verificationProgress >= 75 && verificationProgress < 100 && 'Checking for unrequested layout bloat...'}
+                          {verificationProgress === 100 && 'Preview finished; no verification checks ran.'}
+                        </span>
+                      </div>
+                    </div>
+                  )}
+
+                  {verificationPassed && !isVerifying && (
+                    <div className="bg-bg-base border border-border-dim p-4 rounded font-mono text-xs text-text-secondary space-y-3">
+                      <div className="flex items-center gap-2 text-positive">
+                        <CheckCircle2 className="w-4 h-4 shrink-0" />
+                        <span className="font-bold">PREVIEW COMPLETE — NOT A SECURITY AUDIT</span>
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-[11px] pt-1">
+                        <div className="flex justify-between border-b border-border-dim/40 pb-1.5">
+                          <span className="opacity-60">PORT 3000 INTEGRITY:</span>
+                          <span className="text-positive font-bold">Not checked</span>
+                        </div>
+                        <div className="flex justify-between border-b border-border-dim/40 pb-1.5">
+                          <span className="opacity-60">PII CRYPTOLOGY FIELD:</span>
+                          <span className="text-positive font-bold">Not checked</span>
+                        </div>
+                        <div className="flex justify-between border-b border-border-dim/40 pb-1.5">
+                          <span className="opacity-60">UI GRADIENT DECORATION:</span>
+                          <span className="text-positive font-bold">Not checked</span>
+                        </div>
+                        <div className="flex justify-between border-b border-border-dim/40 pb-1.5">
+                          <span className="opacity-60">UNREQUESTED MENUS BLOAT:</span>
+                          <span className="text-positive font-bold">0% BLOCKED (COMPLIANT)</span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                </div>
+
+              </div>
+            )}
+
+            {/* DOCUMENT 04: DESIGN SYSTEM */}
+            {activeDoc.id === '04' && (
+              <div className="space-y-6">
+                
+                {/* Embedded Design System Toggle and Categories */}
+                <div className="flex items-center justify-between border-b border-border-dim pb-3">
+                  <span className="text-[11px] font-mono text-text-secondary uppercase">
+                    LIVE SHIELDS & INTERACTIVE COMPONENT PREVIEWS
+                  </span>
+                  <div className="flex items-center gap-1 bg-bg-base border border-border-dim p-1 rounded-sm shrink-0">
+                    <Button 
+                      variant={activeDSCategory === 'primitives' ? 'primary' : 'ghost'} 
+                      size="sm"
+                      onClick={() => setActiveDSCategory('primitives')}
+                    >
+                      Primitives
+                    </Button>
+                    <Button 
+                      variant={activeDSCategory === 'semantics' ? 'primary' : 'ghost'} 
+                      size="sm"
+                      onClick={() => setActiveDSCategory('semantics')}
+                    >
+                      Semantics
+                    </Button>
+                    <Button 
+                      variant={activeDSCategory === 'interaction' ? 'primary' : 'ghost'} 
+                      size="sm"
+                      onClick={() => setActiveDSCategory('interaction')}
+                    >
+                      Interactions
+                    </Button>
+                  </div>
+                </div>
+
+                {activeDSCategory === 'primitives' && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* CARD 1: TYPOGRAPHY HIERARCHY */}
+                    <Card>
+                      <CardHeader 
+                        title="Mathematical Typography Scale" 
+                        subtitle="HIERARCHY IS INSTANTLY RECOGNIZABLE" 
+                        action={<Type className="w-4 h-4 text-accent" />} 
+                      />
+                      <CardContent className="space-y-5">
+                        <div className="border-l border-border-dim pl-3.5 space-y-1">
+                          <MetadataText>Primary task</MetadataText>
+                          <MissionTitle>Example task (illustrative only)</MissionTitle>
+                        </div>
+
+                        <div className="border-l border-border-dim pl-3.5 space-y-1">
+                          <MetadataText>Section (Large)</MetadataText>
+                          <SectionTitle>Product overview</SectionTitle>
+                        </div>
+
+                        <div className="border-l border-border-dim pl-3.5 space-y-1">
+                          <MetadataText>Cards (Medium)</MetadataText>
+                          <CardTitle>Provider credential status</CardTitle>
+                        </div>
+
+                        <div className="border-l border-border-dim pl-3.5 space-y-1">
+                          <MetadataText>Prose / Explanation</MetadataText>
+                          <ProseText>
+                            Use consistent type sizes and spacing so information is easy to scan.
+                          </ProseText>
+                        </div>
+
+                        <div className="border-l border-border-dim pl-3.5 space-y-1">
+                          <MetadataText>System / Database Values (Monospace)</MetadataText>
+                          <MonoValue>Not configured or verified</MonoValue>
+                        </div>
+                      </CardContent>
+                      <CardFooter>
+                        <span>Font families: DM Sans, Newsreader & IBM Plex Mono</span>
+                        <span className="font-mono text-accent">STANDARDIZATION NOT VERIFIED</span>
+                      </CardFooter>
+                    </Card>
+
+                    {/* CARD 2: BUTTON STATES & DISCIPLINE */}
+                    <Card>
+                      <CardHeader 
+                        title="Deterministic Buttons" 
+                        subtitle="DETERMINISTIC STATES PREVENT LAYOUT SHIFTS" 
+                        action={<Layers className="w-4 h-4 text-indigo-400" />} 
+                      />
+                      <CardContent className="space-y-4">
+                        <div className="space-y-2">
+                          <span className="text-[11px] font-mono text-text-secondary uppercase">Active Variants</span>
+                          <div className="flex flex-wrap gap-2">
+                            <Button variant="primary">Primary Accent</Button>
+                            <Button variant="secondary">Secondary</Button>
+                            <Button variant="outline">Outline</Button>
+                            <Button variant="ghost">Ghost link</Button>
+                          </div>
+                        </div>
+
+                        <div className="space-y-2">
+                          <span className="text-[11px] font-mono text-text-secondary uppercase">Semantic Actions</span>
+                          <div className="flex flex-wrap gap-2">
+                            <Button variant="success">Success state</Button>
+                            <Button variant="danger">Critical Danger</Button>
+                          </div>
+                        </div>
+
+                        <div className="space-y-2">
+                          <span className="text-[11px] font-mono text-text-secondary uppercase">Interactive Loader Feedbacks</span>
+                          <div className="flex flex-wrap gap-2">
+                            <Button variant="primary" isLoading={true}>Button Loading</Button>
+                            <Button variant="danger" isLoading={true}>Destructive loading</Button>
+                            <Button variant="outline" disabled={true}>Disabled Primitive</Button>
+                          </div>
+                        </div>
+
+                        <div className="space-y-2">
+                          <span className="text-[11px] font-mono text-text-secondary uppercase">Responsive Scale Bounds</span>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <Button size="sm">Small (sm)</Button>
+                            <Button size="md">Medium (md)</Button>
+                            <Button size="lg">Large (lg)</Button>
+                          </div>
+                        </div>
+                      </CardContent>
+                      <CardFooter>
+                        <span>Transition animations: 150ms spring curves</span>
+                        <span className="font-mono text-text-secondary">ACCESSIBILITY SAFE</span>
+                      </CardFooter>
+                    </Card>
+
+                    {/* CARD 3: BADGES & LABELS */}
+                    <Card className="md:col-span-2">
+                      <CardHeader 
+                        title="Semantic Badging Rules" 
+                        subtitle="BADGES DECORATE STATUS WITH STRICT COLOR DISCIPLINE" 
+                        action={<Grid className="w-4 h-4 text-[#c8f542]" />} 
+                      />
+                      <CardContent className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                        <div className="bg-bg-base border border-border-dim p-3 rounded text-center space-y-2">
+                          <span className="text-[11px] font-mono opacity-50 block uppercase">New / Fresh</span>
+                          <Badge variant="new">Prospect New</Badge>
+                        </div>
+                        <div className="bg-bg-base border border-border-dim p-3 rounded text-center space-y-2">
+                          <span className="text-[11px] font-mono opacity-50 block uppercase">Active / Good</span>
+                          <Badge variant="active">Operational</Badge>
+                        </div>
+                        <div className="bg-bg-base border border-border-dim p-3 rounded text-center space-y-2">
+                          <span className="text-[11px] font-mono opacity-50 block uppercase">Warning / Attn</span>
+                          <Badge variant="warning">Quota Warning</Badge>
+                        </div>
+                        <div className="bg-bg-base border border-border-dim p-3 rounded text-center space-y-2">
+                          <span className="text-[11px] font-mono opacity-50 block uppercase">Danger / Critical</span>
+                          <Badge variant="danger">Token Expired</Badge>
+                        </div>
+                        <div className="bg-bg-base border border-border-dim p-3 rounded text-center space-y-2">
+                          <span className="text-[11px] font-mono opacity-50 block uppercase">Information</span>
+                          <Badge variant="info">Syncing Api</Badge>
+                        </div>
+                        <div className="bg-bg-base border border-border-dim p-3 rounded text-center space-y-2">
+                          <span className="text-[11px] font-mono opacity-50 block uppercase">Assistant</span>
+                          <Badge variant="ai">Assistant tools</Badge>
+                        </div>
+                        <div className="bg-bg-base border border-border-dim p-3 rounded text-center space-y-2">
+                          <span className="text-[11px] font-mono opacity-50 block uppercase">Neutral</span>
+                          <Badge variant="neutral">Offline Cache</Badge>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </div>
+                )}
+
+                {activeDSCategory === 'semantics' && (
+                  <div className="space-y-6">
+                    {/* COLOR DISCIPLINE SECTION */}
+                    <Card>
+                      <CardHeader 
+                        title="Semantic Color Palette" 
+                        subtitle="COLOR IS DESIGNATED FOR EMOTION AND MEANING" 
+                        action={<Palette className="w-4 h-4 text-purple-400" />} 
+                      />
+                      <CardContent className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-6 gap-3">
+                        
+                        <div className="space-y-2">
+                          <div className="h-14 rounded bg-[#080808] border border-border-default flex items-end p-2">
+                            <span className="text-[11px] font-mono font-bold text-text-primary uppercase">#080808</span>
+                          </div>
+                          <div>
+                            <h4 className="text-[11px] font-mono uppercase font-bold text-text-primary">Base Canvas</h4>
+                            <p className="text-[11px] text-text-secondary">Default dark space</p>
+                          </div>
+                        </div>
+
+                        <div className="space-y-2">
+                          <div className="h-14 rounded bg-[#0f0f0f] border border-border-default flex items-end p-2">
+                            <span className="text-[11px] font-mono font-bold text-text-primary uppercase">#0F0F0F</span>
+                          </div>
+                          <div>
+                            <h4 className="text-[11px] font-mono uppercase font-bold text-text-primary">Raised Card</h4>
+                            <p className="text-[11px] text-text-secondary">Bento widgets canvas</p>
+                          </div>
+                        </div>
+
+                        <div className="space-y-2">
+                          <div className="h-14 rounded bg-accent flex items-end p-2">
+                            <span className="text-[11px] font-mono font-bold text-black uppercase">#C8F542</span>
+                          </div>
+                          <div>
+                            <h4 className="text-[11px] font-mono uppercase font-bold text-text-primary">HAL Lime</h4>
+                            <p className="text-[11px] text-text-secondary">Primary call-to-action</p>
+                          </div>
+                        </div>
+
+                        <div className="space-y-2">
+                          <div className="h-14 rounded bg-positive-dim text-positive border border-positive/35 flex items-end p-2">
+                            <span className="text-[11px] font-mono font-bold uppercase">#22C55E</span>
+                          </div>
+                          <div>
+                            <h4 className="text-[11px] font-mono uppercase font-bold text-text-primary">Healthy Green</h4>
+                            <p className="text-[11px] text-text-secondary">Connected & Synchronized</p>
+                          </div>
+                        </div>
+
+                        <div className="space-y-2">
+                          <div className="h-14 rounded bg-warning-dim text-warning border border-warning/35 flex items-end p-2">
+                            <span className="text-[11px] font-mono font-bold uppercase">#F59E0B</span>
+                          </div>
+                          <div>
+                            <h4 className="text-[11px] font-mono uppercase font-bold text-text-primary">Amber Warning</h4>
+                            <p className="text-[11px] text-text-secondary">Approaching thresholds</p>
+                          </div>
+                        </div>
+
+                        <div className="space-y-2">
+                          <div className="h-14 rounded bg-negative-dim text-negative border border-negative/35 flex items-end p-2">
+                            <span className="text-[11px] font-mono font-bold uppercase">#EF4444</span>
+                          </div>
+                          <div>
+                            <h4 className="text-[11px] font-mono uppercase font-bold text-text-primary">Critical Red</h4>
+                            <p className="text-[11px] text-text-secondary">Authentication disruptions</p>
+                          </div>
+                        </div>
+
+                      </CardContent>
+                    </Card>
+
+                    {/* TABLE PRIMITIVE DEMONSTRATION */}
+                    <div className="space-y-2">
+                      <span className="text-[11px] font-mono tracking-wider text-text-secondary uppercase font-semibold">OPERATIONAL TABLE PREVIEW — NO LIVE RECORDS</span>
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Territory Client Object</TableHead>
+                            <TableHead>Operational State</TableHead>
+                            <TableHead>Value Weight</TableHead>
+                            <TableHead 
+                              className="cursor-pointer hover:text-accent"
+                              isSorted={true} 
+                              sortDirection={tableSort}
+                              onClick={() => setTableSort(prev => prev === 'asc' ? 'desc' : 'asc')}
+                            >
+                              Est. Revenue Value
+                            </TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {sortedData.length === 0 ? (
+                            <TableRow>
+                              <TableCell colSpan={4} className="text-xs text-text-secondary">
+                                No live operational records loaded. Revenue and activity values are intentionally omitted until a real data source is connected.
+                              </TableCell>
+                            </TableRow>
+                          ) : sortedData.map((d) => (
+                            <TableRow key={d.id} isSelectable={true}>
+                              <TableCell className="font-sans font-medium">{d.item}</TableCell>
+                              <TableCell>
+                                <Badge variant={d.status as any}>
+                                  {d.status}
+                                </Badge>
+                              </TableCell>
+                              <TableCell className="font-mono text-text-secondary uppercase">{d.priority}</TableCell>
+                              <TableCell className="font-mono text-accent font-semibold">{d.value}</TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+
+                    {/* INSTRUCTIONAL EMPTY STATES */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
+                      <div className="space-y-2">
+                        <span className="text-[11px] font-mono tracking-wider text-text-secondary uppercase font-semibold font-bold">PEDAGOGICAL EMPTY STATES</span>
+                        <EmptyState 
+                          title="Location Cache Empty-State Preview"
+                          whyEmpty="No location records are loaded in this UI preview. No database purge or cache operation has been performed."
+                          whatNext="Configure and verify a map provider, then load actual harvest results."
+                          expectedOutcome="No result count is promised. Display only records returned by the configured live source."
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <span className="text-[11px] font-mono tracking-wider text-text-secondary uppercase font-semibold font-bold">DATABASE SEARCH NO-RECORDS FOUND</span>
+                        <Card className="p-0">
+                          <Table>
+                            <TableBody>
+                              <TableEmptyState 
+                                colSpan={4}
+                                title="No Connected Google Ads Accounts"
+                                description="Live ad performance is unavailable until a verified ad-platform connection and authorization are configured."
+                              />
+                            </TableBody>
+                          </Table>
+                        </Card>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {activeDSCategory === 'interaction' && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* PORTAL DIALOG DEMO */}
+                    <Card>
+                      <CardHeader 
+                        title="Dialog example" 
+                        subtitle="DIALOG PREVIEW" 
+                        action={<Maximize2 className="w-4 h-4 text-accent" />} 
+                      />
+                      <CardContent className="space-y-3">
+                        <ProseText>
+                          This example shows the dialog layout and close behavior used in the product.
+                        </ProseText>
+                        <div className="pt-2">
+                          <Button variant="primary" onClick={() => setIsDialogOpen(true)}>
+                            Preview dialog
+                          </Button>
+                        </div>
+                      </CardContent>
+                      <CardFooter>
+                        <span>Portal Node: React document.body</span>
+                        <span className="font-mono text-text-secondary">ESC DETECTED</span>
+                      </CardFooter>
+                    </Card>
+
+                    {/* TOAST NOTIFICATION TRIGGERS */}
+                    <Card>
+                      <CardHeader 
+                        title="Notification examples" 
+                        subtitle="EVERY TOAST CLARIFIES IMPACT AND ACTIONS" 
+                        action={<BellRing className="w-4 h-4 text-accent" />} 
+                      />
+                      <CardContent className="space-y-3">
+                        <ProseText>
+                          Notifications should explain what changed and what the user can do next. These buttons preview sample messages only.
+                        </ProseText>
+                        <div className="grid grid-cols-2 gap-2 pt-2">
+                          <Button variant="outline" size="sm" onClick={() => triggerToast('info')}>
+                            Trigger Info Toast
+                          </Button>
+                          <Button variant="success" size="sm" onClick={() => triggerToast('success')}>
+                            Trigger Success Toast
+                          </Button>
+                          <Button variant="secondary" size="sm" onClick={() => triggerToast('warning')}>
+                            Trigger Warning Toast
+                          </Button>
+                          <Button variant="danger" size="sm" onClick={() => triggerToast('danger')}>
+                            Trigger Critical Toast
+                          </Button>
+                        </div>
+                      </CardContent>
+                      <CardFooter>
+                        <span>Stack container: Dynamic AnimatePresence</span>
+                        <span className="font-mono text-indigo-400 font-bold uppercase">LOCAL PREVIEW</span>
+                      </CardFooter>
+                    </Card>
+
+                    {/* PORTAL DIALOG FRAME */}
+                    <Dialog
+                      isOpen={isDialogOpen}
+                      onClose={() => setIsDialogOpen(false)}
+                      title="HAL workspace"
+                      size="md"
+                      footer={
+                        <div className="flex gap-2">
+                          <Button variant="outline" onClick={() => setIsDialogOpen(false)}>CANCEL</Button>
+                          <Button variant="primary" onClick={() => {
+                            setIsDialogOpen(false);
+                            toast({
+                              variant: 'success',
+                              title: 'Example confirmation',
+                              description: 'This is a sample dialog only. No outreach was scheduled.',
+                              whatNext: 'Monitor response metrics in the workspace logs.'
+                            });
+                          }}>Preview confirmation</Button>
+                        </div>
+                      }
+                    >
+                      <div className="space-y-3">
+                        <span className="text-[11px] font-mono tracking-wider text-accent uppercase font-bold block">SAMPLE CONFIRMATION</span>
+                        <p className="text-xs text-text-secondary leading-relaxed font-sans">
+                          This is a sample confirmation dialog. It does not connect to Google Maps, start a scan or send outreach.
+                        </p>
+                        <div className="p-3 bg-bg-base border border-border-dim rounded space-y-1">
+                          <div className="flex justify-between items-center text-[11px] font-mono">
+                            <span className="opacity-60 uppercase">EXAMPLE ACCOUNT:</span>
+                            <span className="text-text-primary font-bold font-mono">Example workspace</span>
+                          </div>
+                          <div className="flex justify-between items-center text-[11px] font-mono">
+                            <span className="opacity-60 uppercase">ENCRYPTION PROTOCOL:</span>
+                            <span className="text-positive font-bold font-mono">AES-GCM-256</span>
+                          </div>
+                        </div>
+                      </div>
+                    </Dialog>
+                  </div>
+                )}
+
+              </div>
+            )}
+
+            {/* DOCUMENT 20 — ROADMAP & FOUNDATION COMMAND CONSOLE */}
+            {activeDoc.id === '20' && (
+              <HalRoadmapPhase1 />
+            )}
+
+            {/* DOCUMENT 23 — FUTURE VISION & 11-LAYER ENTERPRISE BRAIN */}
+            {activeDoc.id === '23' && (
+              <HalRoadmapPhase5View />
+            )}
+
+            {/* BLUEPRINT / DRAFT SPECIFICATION PLACEHOLDERS */}
+            {activeDoc.id !== '02' && activeDoc.id !== '04' && activeDoc.id !== '20' && activeDoc.id !== '23' && (
+              <div className="space-y-6">
+                
+                {/* BLUEPRINT SUBTITLE BANNER */}
+                <div className="p-4 bg-bg-overlay border border-border-dim rounded-sm flex items-start gap-3">
+                  <Shield className="w-5 h-5 text-accent shrink-0 mt-0.5" />
+                  <div className="space-y-1">
+                    <span className="text-[11px] font-mono text-accent font-bold uppercase block">
+                      CANONICAL ARCHITECTURAL SPECIFICATION
+                    </span>
+                    <p className="text-xs text-text-secondary leading-relaxed font-sans">
+                      This page displays the selected specification document. It does not verify runtime behavior or prove that every listed feature is implemented.
+                    </p>
+                  </div>
+                </div>
+
+                {/* DETAILED SPECIFICATION WRITING FOR CORE ARCHITECTURES */}
+                <div className="space-y-5 min-w-0 break-words">
+                  <h3 className="text-sm font-mono tracking-wider text-text-secondary uppercase font-semibold">1. OVERVIEW & OBJECTIVE</h3>
+                  <p className="text-sm text-text-secondary leading-7 font-sans max-w-prose break-words">
+                    {activeDoc.description}
+                  </p>
+
+                  <h3 className="text-sm font-mono tracking-wider text-text-secondary uppercase font-semibold pt-2">2. RELEVANT SOURCE FILES</h3>
+                  <div className="p-4 bg-bg-base border border-border-dim rounded font-mono text-xs text-text-secondary space-y-3 min-w-0">
+                    <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-1.5 py-2 border-b border-border-dim/40 min-w-0 break-words">
+                      <span className="opacity-50">CORE SOURCE FILE:</span>
+                      <span className="text-accent font-semibold min-w-0 break-all sm:text-right">
+                        {activeDoc.id === '07' ? 'src/db/db.ts (AES-256 Vault)' :
+                         activeDoc.id === '08' ? 'src/lib/realDataHarvest.ts' :
+                         activeDoc.id === '09' ? 'src/skills/*.ts (SEO & Speed)' :
+                         activeDoc.id === '10' ? 'src/lib/phase4-multi-agent.ts' :
+                         activeDoc.id === '11' ? 'src/lib/autonomousLearning.ts' :
+                         activeDoc.id === '12' ? 'src/components/MissionsPanel.tsx' :
+                         activeDoc.id === '13' ? 'src/components/ConnectorsPanel.tsx' :
+                         activeDoc.id === '14' ? 'src/db/schema.ts + db.ts' :
+                         activeDoc.id === '15' ? 'server.ts (API & Outbox)' :
+                         activeDoc.id === '16' ? 'src/components/ui/Typography.tsx' :
+                         activeDoc.id === '17' ? 'src/db/db.ts (Crypto Subsystem)' :
+                         activeDoc.id === '18' ? 'package.json (tsc & esbuild)' :
+                         activeDoc.id === '19' ? 'server.ts + vite.config.ts' :
+                         activeDoc.id === '21' ? 'src/components/document-studio/*' :
+                         activeDoc.id === '22' ? 'src/components/MissionControl.tsx' :
+                         activeDoc.id === '23' ? 'src/lib/phase5-enterprise.ts' :
+                         activeDoc.id === '24' ? 'src/services/hermesLab.ts' :
+                         `src/${activeDoc.phase}/${activeDoc.title.toLowerCase()}`}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center py-0.5 border-b border-border-dim/40">
+                      <span className="opacity-50">IMPLEMENTATION NOTE:</span>
+                      <span className="text-text-primary min-w-0 break-words sm:text-right">
+                        {activeDoc.id === '07' ? 'Encrypt sensitive contact details and restrict access; verify the deployed controls.' :
+                         activeDoc.id === '08' ? 'Use source-backed records and clearly label estimates or examples.' :
+                         activeDoc.id === '10' ? 'Model comparison workflow; verify both providers before relying on results.' :
+                         activeDoc.id === '11' ? 'Review calibration weights and revenue assumptions; validate outputs before use.' :
+                         activeDoc.id === '13' ? 'Provider integrations require credentials, permissions and a successful connection test.' :
+                         activeDoc.id === '15' ? 'Verify signed events and duplicate handling in the deployed messaging workflow.' :
+                         activeDoc.id === '23' ? 'Keep tools scoped and require human review.' :
+                         'Keep modules separated by responsibility.'}
+                      </span>
+                    </div>
+                    <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-1.5 py-2 min-w-0 break-words">
+                      <span className="opacity-50">VERIFICATION STATUS:</span>
+                      <span className="text-text-secondary uppercase font-bold flex items-center gap-1">
+                        <AlertCircle className="w-3.5 h-3.5 text-warning" />
+                        Not independently verified
+                      </span>
+                    </div>
+                  </div>
+
+                  <h3 className="text-sm font-mono tracking-wider text-text-secondary uppercase font-semibold pt-2">3. OPERATING PRINCIPLES & DESK EQUIVALENT</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm font-sans">
+                    <div className="border border-border-dim p-3 rounded-sm bg-bg-base/40">
+                      <span className="text-[11px] font-mono text-accent block font-bold mb-1 uppercase tracking-wider">INPUTS</span>
+                      <p className="text-sm text-text-secondary leading-7 break-words">
+                        Uses database records, map-provider data and operator input. Encryption and provider behavior should be verified in the deployed environment.
+                      </p>
+                    </div>
+                    <div className="border border-border-dim p-3 rounded-sm bg-bg-base/40">
+                      <span className="text-[11px] font-mono text-accent block font-bold mb-1 uppercase tracking-wider">OUTPUTS</span>
+                      <p className="text-[11px] text-text-secondary leading-relaxed">
+                        Designed to integrate with Document Studio, the SMS/Email Outbox, and territory audits; each integration must be verified in the deployed environment.
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Golden rule alignment check */}
+                  <div className="pt-4 border-t border-border-dim flex flex-col sm:flex-row sm:justify-between sm:items-start gap-2 text-xs font-mono text-text-secondary min-w-0">
+                    <span>PHILOSOPHY COMPLIANCE:</span>
+                    <div className="flex items-center gap-1 text-positive font-bold">
+                      <CheckCircle2 className="w-3.5 h-3.5" />
+                      <span>INTENTIONALITY DIRECTIVE STATUS UNVERIFIED</span>
+                    </div>
+                  </div>
+
+                </div>
+
+              </div>
+            )}
+
+          </div>
+
+        </div>
+
+      </div>
+
+    </div>
+  );
+}
