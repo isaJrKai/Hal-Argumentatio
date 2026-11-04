@@ -63,7 +63,7 @@ const SettingsPanel = lazy(() => import('./components/SettingsPanel'));
 const MissionsPanel = lazy(() => import('./components/MissionsPanel'));
 const SkillsPanel = lazy(() => import('./components/SkillsPanel'));
 const CommandPalette = lazy(() => import('./components/CommandPalette'));
-const HalBiblePanel = lazy(() => import('./components/HalBiblePanel'));
+const HalOperatingManualPanel = lazy(() => import('./components/HalOperatingManualPanel'));
 const GoogleDrivePanel = lazy(() => import('./components/GoogleDrivePanel'));
 const ConnectorsPanel = lazy(() => import('./components/ConnectorsPanel'));
 const NeuralPanel = lazy(() => import('./components/NeuralPanel'));
@@ -1329,7 +1329,7 @@ export default function App() {
                     />
                   )}
 
-                  {(activeTab === 'about' || activeTab === 'bible' || activeTab === 'roadmap') && (
+                  {(activeTab === 'about' || activeTab === 'manual' || activeTab === 'roadmap') && (
                     <SettingsPanel 
                       token={token}
                       theme={theme}
@@ -1415,7 +1415,7 @@ export default function App() {
       <footer className="h-6 shrink-0 border-t border-border-dim/50 bg-bg-overlay text-text-secondary flex items-center justify-between px-4 text-[9.5px] font-mono transition-colors select-none">
         <div className="flex items-center gap-3">
           <button 
-            onClick={() => setActiveTab('bible')} 
+            onClick={() => setActiveTab('manual')} 
             className="text-accent font-semibold hover:underline cursor-pointer"
           >
             HAL v2.0

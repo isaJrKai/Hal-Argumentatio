@@ -5,7 +5,7 @@ const commandPalette = readFileSync('src/components/CommandPalette.tsx', 'utf8')
 const assistant = readFileSync('src/components/HermesLabPanel.tsx', 'utf8');
 const overview = readFileSync('src/components/OverviewPanel.tsx', 'utf8');
 const graph = readFileSync('src/components/NeuralPanel.tsx', 'utf8');
-const guide = readFileSync('src/components/HalBiblePanel.tsx', 'utf8');
+const guide = readFileSync('src/components/HalOperatingManualPanel.tsx', 'utf8');
 const drive = readFileSync('src/components/GoogleDrivePanel.tsx', 'utf8');
 const intelligence = readFileSync('src/components/IntelligencePanel.tsx', 'utf8');
 const settings = readFileSync('src/components/SettingsPanel.tsx', 'utf8');
@@ -60,6 +60,8 @@ describe('HAL product language and truthful controls', () => {
 
   it('removes aspirational claims and fake actions from the product guide', () => {
     expect(guide).toContain('Contractor sales and operations workspace');
+    expect(guide).toContain('HAL Operating Manual');
+    expect(guide).not.toContain('Bible');
     expect(guide).not.toContain('AI Business Operating Intelligence System');
     expect(guide).not.toContain('executive partner. Not a tool. Not an assistant.');
     expect(guide).not.toContain('Harvesting Map grounding!');

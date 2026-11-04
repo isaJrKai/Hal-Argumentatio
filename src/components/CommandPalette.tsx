@@ -155,7 +155,7 @@ export default function CommandPalette({
     { id: 'connectors', label: 'Go to Integrations', icon: Share2, type: 'nav', keywords: 'connectors hub integrations google gemini nvidia nemotron stripe neon' },
     { id: 'health', label: 'Go to System health', icon: Activity, type: 'nav', keywords: 'health heartbeat diagnostics logs latency status' },
     { id: 'scheduler', label: 'Go to Tasks & schedules', icon: Play, type: 'nav', keywords: 'simulations cron scheduler background jobs' },
-    { id: 'bible', label: 'Go to Product guide', icon: BookOpen, type: 'nav', keywords: 'bible constitution directives lore system architecture' },
+    { id: 'manual', label: 'Go to Product guide', icon: BookOpen, type: 'nav', keywords: 'manual operating manual product guide documentation architecture' },
     { id: 'credentials', label: 'Go to Settings & credentials', icon: Settings, type: 'nav', keywords: 'settings postgres neon database api keys tokens credentials' }
   ];
 
@@ -405,7 +405,7 @@ export default function CommandPalette({
     }
   ];
 
-  // HAL Bible & Architecture Specifications
+  // HAL Operating Manual & Architecture Specifications
   const documentCommands = [
     {
       id: 'doc_01_vision',
@@ -415,7 +415,7 @@ export default function CommandPalette({
       type: 'document',
       badge: 'CONSTITUTION',
       docData: { title: 'HAL Spec 01: Vision', id: '01' },
-      targetTab: 'bible',
+      targetTab: 'manual',
       keywords: 'spec 01 vision constitution mission hal mandate north star'
     },
     {
@@ -426,7 +426,7 @@ export default function CommandPalette({
       type: 'document',
       badge: 'PHILOSOPHY',
       docData: { title: 'HAL Spec 02: Philosophy', id: '02' },
-      targetTab: 'bible',
+      targetTab: 'manual',
       keywords: 'spec 02 philosophy intentionality laws rules constitution principles'
     },
     {
@@ -437,7 +437,7 @@ export default function CommandPalette({
       type: 'document',
       badge: 'DESIGN SYSTEM',
       docData: { title: 'HAL Spec 04: Design System', id: '04' },
-      targetTab: 'bible',
+      targetTab: 'manual',
       keywords: 'spec 04 design system ui primitives components tokens'
     },
     {
@@ -448,7 +448,7 @@ export default function CommandPalette({
       type: 'document',
       badge: 'ENCRYPTION',
       docData: { title: 'HAL Spec 17: Security', id: '17' },
-      targetTab: 'bible',
+      targetTab: 'manual',
       keywords: 'spec 17 security encryption pii crypto aes gcm vault credentials'
     },
     {
@@ -459,7 +459,7 @@ export default function CommandPalette({
       type: 'document',
       badge: 'HERMES SPEC',
       docData: { title: 'HAL Spec 24: Hermes Engine', id: '24' },
-      targetTab: 'bible',
+      targetTab: 'manual',
       keywords: 'spec 24 hermes engine nous research ai synthesis landing page ad copy'
     }
   ];
@@ -476,7 +476,7 @@ export default function CommandPalette({
       type: 'artifact',
       badge: 'HERMES ASSET',
       docData: art,
-      targetTab: 'bible',
+      targetTab: 'manual',
       keywords: `${art.title || ''} ${category} ${art.toolId || ''} hermes artifact asset report code`
     };
   });
@@ -593,7 +593,7 @@ export default function CommandPalette({
       if (cmd.docData) {
         openInspector('artifact', cmd.docData.title || cmd.label, cmd.docData);
       }
-      onNavigate(cmd.targetTab || 'bible');
+      onNavigate(cmd.targetTab || 'manual');
     }
     onClose();
   };

@@ -55,11 +55,11 @@ interface DocumentSpec {
   icon: any;
 }
 
-interface HalBiblePanelProps {
+interface HalOperatingManualPanelProps {
   initialDocId?: string;
 }
 
-export default function HalBiblePanel({ initialDocId }: HalBiblePanelProps = {}) {
+export default function HalOperatingManualPanel({ initialDocId }: HalOperatingManualPanelProps = {}) {
   const { toast } = useToast();
   const [selectedDocId, setSelectedDocId] = useState<string>(initialDocId || '20');
   const [searchQuery, setSearchQuery] = useState<string>('');
@@ -223,9 +223,9 @@ export default function HalBiblePanel({ initialDocId }: HalBiblePanelProps = {})
   };
 
   const handleDownloadManual = () => {
-    const markdownContent = `# HAL ENTERPRISE OPERATING MANUAL
-**Canonical Specifications & Architecture Blueprint**
-*Exported: ${new Date().toLocaleDateString()} | Master Completion: ${stats.percent}%*
+    const markdownContent = `# HAL OPERATING MANUAL
+**Product guide and architecture reference**
+*Exported: ${new Date().toLocaleDateString()}*
 
 ---
 
@@ -246,13 +246,77 @@ ${d.description}
     URL.revokeObjectURL(url);
   };
 
+  const handlePrintManual = () => {
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      toast({
+        variant: 'warning',
+        title: 'Pop-up blocked',
+        description: 'Allow pop-ups for HAL, then select Print / Save as PDF again.'
+      });
+      return;
+    }
+
+    const sections = documents.map(d => `
+      <section class="manual-section">
+        <p class="eyebrow">SECTION ${d.number} · ${d.phase.toUpperCase()} · ${d.status.toUpperCase()}</p>
+        <h2>${escapeHtml(d.title)}</h2>
+        <p>${escapeHtml(d.description)}</p>
+      </section>
+    `).join('');
+
+    printWindow.document.open();
+    printWindow.document.write(`<!doctype html>
+      <html lang="en">
+      <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>HAL Operating Manual</title>
+        <style>
+          @page { size: A4; margin: 20mm 18mm; }
+          * { box-sizing: border-box; }
+          body { margin: 0; color: #18211d; font: 11pt/1.6 Arial, sans-serif; }
+          header { padding-bottom: 18pt; border-bottom: 2px solid #176b4a; margin-bottom: 24pt; }
+          h1 { margin: 0 0 8pt; font: bold 25pt/1.15 Georgia, serif; }
+          h2 { margin: 0 0 8pt; font: bold 17pt/1.25 Georgia, serif; }
+          p { margin: 0 0 10pt; }
+          .eyebrow { color: #176b4a; font: bold 8pt/1.3 Arial, sans-serif; letter-spacing: .08em; margin-bottom: 8pt; }
+          .meta { color: #59645e; font-size: 9pt; }
+          .manual-section { padding: 0 0 18pt; margin: 0 0 18pt; border-bottom: 1px solid #d8dfda; break-inside: avoid; }
+          footer { color: #66716a; font-size: 8pt; margin-top: 24pt; }
+          @media screen { body { max-width: 800px; margin: 32px auto; padding: 40px; box-shadow: 0 2px 24px #0002; } }
+        </style>
+      </head>
+      <body>
+        <header>
+          <p class="eyebrow">HAL · PRODUCT DOCUMENTATION</p>
+          <h1>Operating Manual</h1>
+          <p>A practical guide to HAL's product structure, workflows, integrations and roadmap.</p>
+          <p class="meta">Generated ${new Date().toLocaleDateString()} · ${documents.length} documented sections</p>
+        </header>
+        ${sections}
+        <footer>HAL Operating Manual · Verify live system status before relying on planned or unverified capabilities.</footer>
+      </body>
+      </html>`);
+    printWindow.document.close();
+    printWindow.focus();
+    printWindow.setTimeout(() => printWindow.print(), 300);
+  };
+
+  const escapeHtml = (value: string) => value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+
   return (
     <div className="space-y-6 select-none pb-12 animate-fade-in text-text-primary">
       
       {/* HEADER SECTION WITH BREADCRUMBS */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-border-dim pb-4">
         <div className="space-y-1">
-          <Breadcrumbs items={[{ label: 'System Configuration' }, { label: 'HAL Bible' }]} />
+          <Breadcrumbs items={[{ label: 'System Configuration' }, { label: 'HAL Operating Manual' }]} />
           <MissionTitle>HAL product and operating guide</MissionTitle>
           <ProseText className="max-w-xl">
             A practical guide to HAL's product structure, workflows, integrations and roadmap. Planned capabilities are identified separately from features verified in the live application.
@@ -263,12 +327,22 @@ ${d.description}
         <div className="flex flex-wrap items-center gap-3 shrink-0">
           <button
             type="button"
+            onClick={handlePrintManual}
+            className="flex items-center gap-2 px-3.5 py-2 border border-border-dim bg-bg-base hover:bg-bg-subtle text-text-primary rounded font-mono text-xs font-bold transition cursor-pointer"
+            title="Print the full operating manual or save it as a PDF"
+          >
+            <FileText className="w-3.5 h-3.5" />
+            <span>Print / Save as PDF</span>
+          </button>
+
+          <button
+            type="button"
             onClick={handleDownloadManual}
             className="flex items-center gap-2 px-3.5 py-2 bg-accent hover:bg-accent/80 text-black rounded font-mono text-xs font-bold transition shadow-sm cursor-pointer"
-            title="Download full operating manual in Markdown"
+            title="Download the editable operating manual in Markdown"
           >
             <Download className="w-3.5 h-3.5" />
-            <span>Download Manual (.md)</span>
+            <span>Download Markdown (.md)</span>
           </button>
 
           <div className="flex items-center gap-4 bg-bg-base border border-border-dim p-3 rounded-sm">
