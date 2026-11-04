@@ -4595,7 +4595,9 @@ app.post('/api/intelligence/chat', authenticate, async (req, res) => {
       createdAt: timestampDate,
     }).returning();
 
-    // 3. Ask HAL
+    // 3. Resolve this tenant's encrypted AI provider settings without exposing secrets to the browser.
+    const tenantAiCredentials = await getTenantConnectorCredentials(contractorId);
+    // 4. Ask HAL
     const result = await askHalBot(message, formattedHistory, !!enableGrounding, activeAi, {
       // Only the authenticated server supplies this runtime. Tool calls inherit
       // the contractor ID from the verified session, never from model arguments.
@@ -4632,9 +4634,9 @@ app.post('/api/intelligence/chat', authenticate, async (req, res) => {
         }
         return toolResult;
       }
-    });
+    }, { gemini: tenantAiCredentials.gemini });
 
-    // 4. Save HAL's reply to the database
+    // 5. Save HAL's reply to the database
     const replyDate = new Date();
     try {
       await recordWorkEvent(pgDb, {
@@ -6855,7 +6857,7 @@ app.post('/api/connectors/credentials', authenticate, async (req, res) => {
   const allowedServices = new Set([
     'stripe', 'twilio', 'sendgrid', 'googleMaps', 'googleDrive', 'linkedin',
     'salesforce', 'hubspot', 'mailchimp', 'notion', 'googleAds', 'metaAds',
-    'ga4', 'quickbooks', 'slack', 'resend'
+    'ga4', 'quickbooks', 'slack', 'resend', 'gemini', 'openai', 'anthropic'
   ]);
   if (typeof service !== 'string' || !allowedServices.has(service)) {
     return res.status(400).json({ error: 'A supported connector service is required.' });
@@ -7215,7 +7217,8 @@ app.get('/api/neural/network', authenticate, async (req, res) => {
 // ─── AI ENGINE DUAL-DRIVE & AUTONOMOUS ENGINE STATUS ─────────────────────────
 
 app.get('/api/ai/engine-status', authenticate, async (req, res) => {
-  const geminiKeySet = !!process.env.GEMINI_API_KEY;
+  const tenantCredentials = await getTenantConnectorCredentials((req as any).contractorId);
+  const geminiKeySet = !!(tenantCredentials.gemini || process.env.GEMINI_API_KEY);
   const nvidiaKeySet = !!process.env.NVIDIA_API_KEY;
   const timesfmConfigured = Boolean(process.env.TIMESFM_SERVICE_URL && (process.env.TIMESFM_API_KEY || '').length >= 32);
   const requestedPreference = process.env.HAL_ACTIVE_AI;
