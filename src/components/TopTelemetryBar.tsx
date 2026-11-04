@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { 
   Sparkles, 
   Search, 
@@ -69,45 +69,20 @@ export const TopTelemetryBar: React.FC<TopTelemetryBarProps> = ({
   onInstallClick,
   onLogout
 }) => {
-  const { 
-    workspaceConfig, 
-    activeIndustry, 
-    activeCity, 
-    regionalProfile, 
-    formatCurrency, 
-    supportedCities,
-    setActiveCity,
-    setCity 
-  } = useBusinessContext();
-  
-  const [showRibbon, setShowRibbon] = useState(true);
-  const [quickNotification, setQuickNotification] = useState<string | null>(null);
-
-  // Ribbon items are shortcuts, not evidence that a background operation ran.
-  const triggerRibbonAction = (_actionName: string, tabRedirect?: string) => {
-    if (tabRedirect) {
-      setActiveTab(tabRedirect);
-      setQuickNotification('Workspace opened. No scan, verification, export, or message was run.');
-    } else {
-      setQuickNotification('This shortcut is not connected to a live operation yet.');
-    }
-    setTimeout(() => {
-      setQuickNotification(null);
-    }, 2800);
-  };
+  const { workspaceConfig } = useBusinessContext();
 
   // Top Workspace Tabs (AutoCAD Master Panels)
   const topNavTabs = [
-    { id: 'overview', label: 'Mission Control', icon: Sparkles },
-    { id: 'work-history', label: 'Work History', icon: Activity },
-    { id: 'work-queue', label: 'Work Queue', icon: ListTodo },
-    { id: 'leads', label: 'Prospect Finder', icon: Compass },
+    { id: 'overview', label: 'Overview', icon: Activity },
+    { id: 'work-history', label: 'Activity', icon: Activity },
+    { id: 'work-queue', label: 'Tasks', icon: ListTodo },
+    { id: 'leads', label: 'Prospects', icon: Compass },
     { id: 'board', label: 'Sales Pipeline', icon: Users },
-    { id: 'map', label: 'Map Intelligence', icon: Map },
+    { id: 'map', label: 'Map', icon: Map },
     { id: 'campaigns', label: 'Outreach & Messages', icon: Send },
-    { id: 'revenue-intelligence', label: 'Financials & Revenue', icon: TrendingUp },
-    { id: 'hermes-lab', label: 'AI Business Assistant', icon: Cpu },
-    { id: 'chat', label: 'HAL Copilot', icon: Bot },
+    { id: 'revenue-intelligence', label: 'Financials', icon: TrendingUp },
+    { id: 'hermes-lab', label: 'Business assistant', icon: Cpu },
+    { id: 'chat', label: 'Chat', icon: Bot },
   ];
 
   return (
@@ -140,7 +115,7 @@ export const TopTelemetryBar: React.FC<TopTelemetryBarProps> = ({
             </div>
             <div className="hidden sm:block h-3.5 w-px bg-border-dim" />
             <span className="hidden sm:block text-xs font-medium text-text-secondary font-sans truncate">
-              {workspaceConfig.agencyName || 'Contractor Operating Intelligence'}
+              {workspaceConfig.agencyName || 'Contractor workspace'}
             </span>
           </div>
         </div>
@@ -152,7 +127,7 @@ export const TopTelemetryBar: React.FC<TopTelemetryBarProps> = ({
         >
           <div className="flex items-center gap-2 text-text-secondary group-hover:text-text-primary min-w-0">
             <Search className="w-3.5 h-3.5 text-text-tertiary group-hover:text-accent transition-colors shrink-0" />
-            <span className="text-xs font-sans truncate">Search prospects, deals, or tools (⌘K)...</span>
+            <span className="text-xs font-sans truncate">Search prospects, deals or tools</span>
           </div>
           <kbd className="hidden sm:inline-flex items-center gap-0.5 px-2 py-0.5 text-[10px] font-mono font-semibold bg-bg-raised text-text-secondary rounded border border-border-dim shrink-0">
             ⌘K
@@ -162,14 +137,6 @@ export const TopTelemetryBar: React.FC<TopTelemetryBarProps> = ({
         {/* Right Status Cluster */}
         <div className="flex items-center gap-2 sm:gap-2.5 shrink-0">
           
-          {/* Quick Notification Toast */}
-          {quickNotification && (
-            <div className="hidden md:flex items-center gap-1.5 px-2.5 py-1 rounded bg-positive-dim border border-positive/30 text-positive text-xs font-sans animate-fadeIn">
-              <CheckCircle2 className="w-3.5 h-3.5" />
-              <span>{quickNotification}</span>
-            </div>
-          )}
-
           {/* Download App Action - Disappears after download */}
           {!isAppInstalled && onInstallClick && (
             <button
@@ -183,17 +150,6 @@ export const TopTelemetryBar: React.FC<TopTelemetryBarProps> = ({
               <span className="sm:hidden">DOWNLOAD</span>
             </button>
           )}
-
-          {/* AI Assistant Quick Status */}
-          <button
-            onClick={() => setActiveTab('hermes-lab')}
-            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-accent-dim border border-accent/30 text-accent hover:bg-accent-mid text-xs font-sans font-medium transition-all cursor-pointer shadow-xs"
-            title="Open the AI Assistant workspace"
-          >
-            <Sparkles className="w-3.5 h-3.5 text-accent" />
-            <span className="hidden sm:inline">AI Assistant</span>
-            <span className="w-1.5 h-1.5 rounded-full bg-text-tertiary" />
-          </button>
 
           {/* Notifications */}
           <div className="relative">
@@ -295,330 +251,8 @@ export const TopTelemetryBar: React.FC<TopTelemetryBarProps> = ({
           })}
         </div>
 
-        {/* Toggle Ribbon Mini-Panels */}
-        <button
-          onClick={() => setShowRibbon(!showRibbon)}
-          className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 text-xs font-sans text-text-secondary hover:text-text-primary rounded border border-border-dim bg-bg-subtle hover:bg-bg-raised transition-colors shrink-0 ml-2"
-          title="Toggle Contextual Action Ribbon"
-        >
-          <Sliders className="w-3 h-3 text-accent" />
-          <span>{showRibbon ? 'Collapse Ribbon' : 'Expand Tools'}</span>
-          <ChevronDown className={`w-3 h-3 transition-transform duration-200 ${showRibbon ? 'rotate-180' : ''}`} />
-        </button>
       </div>
 
-      {/* ─── ROW 3: CONTEXTUAL ACTION RIBBON ─── */}
-      {showRibbon && (
-        <div className="px-3 sm:px-5 py-2 bg-bg-subtle border-b border-border-dim flex items-center gap-3 overflow-x-auto no-scrollbar animate-fadeIn text-xs transition-colors duration-200">
-          
-          {/* ============================================================== */}
-          {/* 1. RIBBON FOR MISSION CONTROL (overview)                      */}
-          {/* ============================================================== */}
-          {activeTab === 'overview' && (
-            <>
-              {/* Mini-Panel: Daily Actions */}
-              <div className="flex items-center gap-1.5 pr-3 border-r border-border-dim/50 shrink-0">
-                <button
-                  onClick={() => triggerRibbonAction('Open prospect workspace', 'leads')}
-                  className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-accent-dim hover:bg-accent-mid text-accent border border-accent/40 font-medium transition-all cursor-pointer shadow-xs"
-                >
-                  <RefreshCw className="w-3.5 h-3.5 text-accent" />
-                  <span>Open Prospects</span>
-                </button>
-
-                <button
-                  onClick={() => triggerRibbonAction(`Weather data is not connected`)}
-                  className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-warning-dim hover:bg-warning-dim/80 text-warning border border-warning/30 font-medium transition-all cursor-pointer"
-                >
-                  <AlertTriangle className="w-3.5 h-3.5 text-warning" />
-                  <span>Weather Data</span>
-                </button>
-
-                <button
-                  onClick={() => triggerRibbonAction('Open prospect list', 'leads')}
-                  className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-bg-raised hover:bg-bg-subtle text-text-secondary hover:text-text-primary border border-border-default font-medium transition-all cursor-pointer"
-                >
-                  <Sparkles className="w-3.5 h-3.5 text-accent" />
-                  <span>View Prospects</span>
-                </button>
-              </div>
-
-              {/* Mini-Panel: Territory & Trade Selector */}
-              <div className="flex items-center gap-2 px-3 border-r border-border-dim/50 shrink-0">
-                <span className="text-[11px] text-text-tertiary font-sans">Location:</span>
-                <select
-                  aria-label="Workspace territory"
-                  value={activeCity}
-                  onChange={(event) => (setActiveCity ? setActiveCity(event.target.value) : setCity?.(event.target.value))}
-                  className="max-w-[180px] px-2 py-1 rounded text-[11px] font-sans font-medium bg-bg-raised text-text-primary border border-border-dim focus:outline-none focus:border-accent cursor-pointer"
-                >
-                  {Array.from(new Set([activeCity, ...(supportedCities || [])])).map((city) => (
-                    <option key={city} value={city}>{city}</option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Mini-Panel: Trade Focus */}
-              <div className="flex items-center gap-2 px-3 border-r border-border-dim/50 shrink-0">
-                <span className="text-[11px] text-text-tertiary font-sans">Trade:</span>
-                <span className="px-2.5 py-0.5 rounded bg-bg-raised border border-border-default text-text-primary font-medium text-[11px]">
-                  {activeIndustry.name}
-                </span>
-              </div>
-
-              {/* Mini-Panel: Quick Performance Ticker */}
-              <div className="flex items-center gap-4 pl-2 shrink-0 text-[11px] font-sans">
-                <div className="flex items-center gap-1">
-                  <span className="text-text-tertiary">Revenue (MTD):</span>
-                  <span className="font-bold text-text-primary font-mono">Not available</span>
-                  <span className="text-positive font-medium">(change unavailable)</span>
-                </div>
-                <div className="flex items-center gap-1">
-                  <span className="text-text-tertiary">Pipeline:</span>
-                  <span className="font-bold text-accent font-mono">Not available</span>
-                </div>
-              </div>
-            </>
-          )}
-
-          {/* ============================================================== */}
-          {/* 2. RIBBON FOR PROSPECT FINDER (leads)                          */}
-          {/* ============================================================== */}
-          {activeTab === 'leads' && (
-            <>
-              <div className="flex items-center gap-1.5 pr-3 border-r border-border-dim/50 shrink-0">
-                <button
-                  onClick={() => triggerRibbonAction('Scanning territory for new verified contractor prospects...')}
-                  className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-accent text-accent-contrast border border-accent font-bold transition-all cursor-pointer shadow-xs"
-                >
-                  <Search className="w-3.5 h-3.5" />
-                  <span>Find New Prospects</span>
-                </button>
-
-                <span className="text-[12px] text-text-secondary px-2">Phone verification and spreadsheet export are not connected yet.</span>
-              </div>
-
-              <div className="flex items-center gap-2 px-3 shrink-0 text-[12px] text-text-secondary">
-                Filters are available in Prospect Finder; no sample filter results are shown here.
-              </div>
-            </>
-          )}
-
-          {/* ============================================================== */}
-          {/* 3. RIBBON FOR SALES PIPELINE (board)                           */}
-          {/* ============================================================== */}
-          {activeTab === 'board' && (
-            <>
-              <div className="flex items-center gap-1.5 pr-3 border-r border-border-dim/50 shrink-0">
-                <button
-                  onClick={() => triggerRibbonAction('Ready to add a new qualified deal card')}
-                  className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-accent text-accent-contrast border border-accent font-bold transition-all cursor-pointer shadow-xs"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  <span>Add New Deal</span>
-                </button>
-
-                <button
-                  onClick={() => triggerRibbonAction('Recalculated pipeline closing probabilities')}
-                  className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-bg-raised hover:bg-bg-subtle text-text-secondary hover:text-text-primary border border-border-default font-medium transition-all cursor-pointer"
-                >
-                  <RefreshCw className="w-3.5 h-3.5" />
-                  <span>Recalculate Values</span>
-                </button>
-              </div>
-
-              <div className="flex items-center gap-3 px-3 shrink-0 text-[11px]">
-                <div>
-                  <span className="text-text-tertiary">Pipeline Value:</span>{' '}
-                  <strong className="text-text-secondary font-mono text-xs">Not available</strong>
-                </div>
-                <span className="text-border-default">|</span>
-                <div>
-                  <span className="text-text-tertiary">Active Deals:</span>{' '}
-                  <strong className="text-text-secondary font-mono text-xs">Not tracked</strong>
-                </div>
-                <span className="text-border-default">|</span>
-                <div>
-                  <span className="text-text-tertiary">Win Rate:</span>{' '}
-                  <strong className="text-text-secondary font-mono text-xs">Not available</strong>
-                </div>
-              </div>
-            </>
-          )}
-
-          {/* ============================================================== */}
-          {/* 4. RIBBON FOR MAP INTELLIGENCE (map)                           */}
-          {/* ============================================================== */}
-          {activeTab === 'map' && (
-            <>
-              <div className="flex items-center gap-1.5 pr-3 border-r border-border-dim/50 shrink-0">
-                <button
-                  onClick={() => triggerRibbonAction(`Geofence set to 15km Metro coverage for ${activeCity}`)}
-                  className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-accent text-accent-contrast border border-accent font-bold transition-all cursor-pointer shadow-xs"
-                >
-                  <Globe className="w-3.5 h-3.5" />
-                  <span>15 km Metro Radius</span>
-                </button>
-                <button
-                  onClick={() => triggerRibbonAction('Contractor density heatmap layer active')}
-                  className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-bg-raised hover:bg-bg-subtle text-text-secondary hover:text-text-primary border border-border-default font-medium transition-all cursor-pointer"
-                >
-                  <Layers className="w-3.5 h-3.5" />
-                  <span>Contractor Heatmap</span>
-                </button>
-              </div>
-
-              <div className="flex items-center gap-2 px-3 shrink-0 text-[11px]">
-                <span className="text-text-tertiary">Territory:</span>
-                <span className="font-bold text-text-primary">{activeCity}, {regionalProfile.countryCode}</span>
-                <span className="text-text-tertiary">(reference estimate: {regionalProfile.territoryMetrics.activeCompetitorDensity} competitors)</span>
-              </div>
-            </>
-          )}
-
-          {/* ============================================================== */}
-          {/* 5. RIBBON FOR OUTREACH & MESSAGES (campaigns)                  */}
-          {/* ============================================================== */}
-          {activeTab === 'campaigns' && (
-            <>
-              <div className="flex items-center gap-1.5 pr-3 border-r border-border-dim/50 shrink-0">
-                <button
-                  onClick={() => triggerRibbonAction('Drafting new automated outreach sequence')}
-                  className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-accent text-accent-contrast border border-accent font-bold transition-all cursor-pointer shadow-xs"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  <span>New Outreach Campaign</span>
-                </button>
-
-                <button
-                  onClick={() => triggerRibbonAction('Sent test outreach email to owner inbox')}
-                  className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-bg-raised hover:bg-bg-subtle text-text-secondary hover:text-text-primary border border-border-default font-medium transition-all cursor-pointer"
-                >
-                  <Mail className="w-3.5 h-3.5" />
-                  <span>Send Test Email</span>
-                </button>
-              </div>
-
-              <div className="flex items-center gap-3 px-3 shrink-0 text-[11px]">
-                <div>
-                  <span className="text-text-tertiary">Open Rate:</span>{' '}
-                  <strong className="text-text-secondary font-mono">Not tracked</strong>
-                </div>
-                <span className="text-border-default">|</span>
-                <div>
-                  <span className="text-text-tertiary">Reply Rate:</span>{' '}
-                  <strong className="text-text-secondary font-mono">Not tracked</strong>
-                </div>
-                <span className="text-border-default">|</span>
-                <div>
-                  <span className="text-text-tertiary">Dispatch Limit:</span>{' '}
-                  <strong className="text-text-secondary font-mono">Not configured</strong>
-                </div>
-              </div>
-            </>          )}
-
-          {/* ============================================================== */}
-          {/* 6. RIBBON FOR FINANCIALS & REVENUE (revenue-intelligence)      */}
-          {/* ============================================================== */}
-          {activeTab === 'revenue-intelligence' && (
-            <>
-              <div className="flex items-center gap-1.5 pr-3 border-r border-border-dim/50 shrink-0">
-                <button
-                  onClick={() => triggerRibbonAction('Opening new customer invoice creator')}
-                  className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-accent text-accent-contrast border border-accent font-bold transition-all cursor-pointer shadow-xs"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  <span>Create Invoice</span>
-                </button>
-
-                <button
-                  onClick={() => triggerRibbonAction('Monthly revenue target updated')}
-                  className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-bg-raised hover:bg-bg-subtle text-text-secondary hover:text-text-primary border border-border-default font-medium transition-all cursor-pointer"
-                >
-                  <TrendingUp className="w-3.5 h-3.5" />
-                  <span>Adjust Monthly Goal</span>
-                </button>
-
-                <button
-                  onClick={() => triggerRibbonAction('Exporting monthly financial statement')}
-                  className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-bg-raised hover:bg-bg-subtle text-text-secondary hover:text-text-primary border border-border-default font-medium transition-all cursor-pointer"
-                >
-                  <Download className="w-3.5 h-3.5" />
-                  <span>Export Financial Report</span>
-                </button>
-              </div>
-
-              <div className="flex items-center gap-3 px-3 shrink-0 text-[11px]">
-                <div>
-                  <span className="text-text-tertiary">Monthly Run-Rate:</span>{' '}
-                  <strong className="text-text-secondary font-mono">Not available</strong>
-                </div>
-                <span className="text-border-default">|</span>
-                <div>
-                  <span className="text-text-tertiary">Retainers Active:</span>{' '}
-                  <strong className="text-text-secondary font-mono">Not tracked</strong>
-                </div>
-              </div>
-            </>
-          )}
-
-          {/* ============================================================== */}
-          {/* 7. RIBBON FOR AI ASSISTANT (hermes-lab)                        */}
-          {/* ============================================================== */}
-          {activeTab === 'hermes-lab' && (
-            <>
-              <div className="flex items-center gap-1.5 pr-3 border-r border-border-dim/50 shrink-0">
-                <button
-                  onClick={() => triggerRibbonAction('Prompt drafted: Personalized cold email for contractor')}
-                  className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-accent text-accent-contrast border border-accent font-bold transition-all cursor-pointer shadow-xs"
-                >
-                  <Mail className="w-3.5 h-3.5" />
-                  <span>Draft Contractor Email</span>
-                </button>
-
-                <button
-                  onClick={() => triggerRibbonAction('Prompt drafted: Cold calling rebuttal script')}
-                  className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-bg-raised hover:bg-bg-subtle text-text-secondary hover:text-text-primary border border-border-default font-medium transition-all cursor-pointer"
-                >
-                  <Phone className="w-3.5 h-3.5" />
-                  <span>Generate Phone Script</span>
-                </button>
-
-                <button
-                  onClick={() => triggerRibbonAction('Prompt drafted: Local competitor gap analysis')}
-                  className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-bg-raised hover:bg-bg-subtle text-text-secondary hover:text-text-primary border border-border-default font-medium transition-all cursor-pointer"
-                >
-                  <Compass className="w-3.5 h-3.5" />
-                  <span>Analyze Competitor</span>
-                </button>
-              </div>
-
-              <div className="flex items-center gap-2 px-3 shrink-0 text-[11px] text-text-secondary">
-                <span className="w-2 h-2 rounded-full bg-positive animate-pulse" />
-                <span>AI Operating Assistant active • Powered by Google Gemini Enterprise</span>
-              </div>
-            </>
-          )}
-
-          {/* Fallback for secondary tools */}
-          {!['overview', 'leads', 'board', 'map', 'campaigns', 'revenue-intelligence', 'hermes-lab'].includes(activeTab) && (
-            <div className="flex items-center justify-between w-full">
-              <div className="flex items-center gap-2">
-                <span className="text-text-tertiary font-sans text-xs">Secondary Workspace Tool:</span>
-                <span className="font-bold text-text-primary text-xs uppercase">{activeTab.replace('-', ' ')}</span>
-              </div>
-              <button
-                onClick={() => setActiveTab('overview')}
-                className="flex items-center gap-1 text-xs text-accent hover:underline cursor-pointer font-medium"
-              >
-                <span>Return to Mission Control</span>
-                <ArrowUpRight className="w-3.5 h-3.5" />
-              </button>
-            </div>
-          )}
-
-        </div>
-      )}
 
     </div>
   );

@@ -28,21 +28,21 @@ export function MetricCard({
   return (
     <div
       onClick={onClick}
-      className={`bg-bg-raised border border-border-dim rounded-md p-5 md:p-6 transition-all duration-200 select-none ${
-        onClick ? 'cursor-pointer hover:border-border-strong hover:bg-bg-subtle hover:shadow-md' : ''
-      } ${pulse ? 'border-red-500/50 bg-red-500/[0.02] animate-pulse' : ''} ${className}`}
+      className={`bg-bg-raised border border-border-dim rounded-md p-5 md:p-6 transition-colors duration-200 ${
+        onClick ? 'cursor-pointer hover:border-border-strong hover:bg-bg-subtle' : ''
+      } ${pulse ? 'border-negative/50 bg-negative-dim/20' : ''} ${className}`}
     >
       <div className="flex justify-between items-start mb-2">
-        <span className="metric-label font-sans tracking-widest text-[10px] text-text-secondary">{label}</span>
+        <span className="metric-label font-sans tracking-normal text-xs font-medium text-text-secondary">{label}</span>
         {trend && (
-          <span className={`text-[11px] font-mono font-medium ${trend.isPositive ? 'text-positive' : 'text-negative'}`}>
+          <span className={`text-xs font-sans font-medium ${trend.isPositive ? 'text-positive' : 'text-negative'}`}>
             {trend.isPositive ? '↑' : '↓'} {trend.value}
           </span>
         )}
       </div>
 
       <div className="flex items-baseline justify-between mt-1">
-        <span className="metric-value font-mono text-3xl font-light tracking-tight text-text-primary">
+        <span className="metric-value font-display text-3xl font-semibold tracking-tight text-text-primary">
           {value}
         </span>
         
@@ -65,7 +65,7 @@ export function MetricCard({
       </div>
 
       {subtext && (
-        <div className="text-[11px] font-sans text-text-secondary/80 mt-2 flex items-center gap-1.5">
+        <div className="text-xs font-sans text-text-secondary mt-2 flex items-center gap-1.5">
           {pulse && <span className="w-1.5 h-1.5 rounded-full bg-negative" />}
           <span>{subtext}</span>
         </div>
