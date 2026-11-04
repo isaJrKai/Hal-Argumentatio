@@ -337,6 +337,16 @@ export async function bootstrapPostgresTables(poolInstance?: Pool): Promise<void
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
       );
 
+      -- Upgrade legacy API-key storage to the hashed-key schema used by Drizzle.
+      -- The existing HAL intelligence database currently has zero API-key rows.
+      ALTER TABLE api_keys ADD COLUMN IF NOT EXISTS key_hash TEXT;
+      ALTER TABLE api_keys ADD COLUMN IF NOT EXISTS prefix TEXT;
+      ALTER TABLE api_keys ADD COLUMN IF NOT EXISTS last_used_at TIMESTAMP;
+      ALTER TABLE api_keys ADD COLUMN IF NOT EXISTS expires_at TIMESTAMP;
+      ALTER TABLE api_keys ALTER COLUMN key DROP NOT NULL;
+      ALTER TABLE api_keys ALTER COLUMN key_hash SET NOT NULL;
+      ALTER TABLE api_keys ALTER COLUMN prefix SET NOT NULL;
+
       CREATE TABLE IF NOT EXISTS connector_credentials (
         id TEXT PRIMARY KEY,
         contractor_id TEXT NOT NULL,
