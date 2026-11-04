@@ -7217,7 +7217,12 @@ app.get('/api/neural/network', authenticate, async (req, res) => {
 // ─── AI ENGINE DUAL-DRIVE & AUTONOMOUS ENGINE STATUS ─────────────────────────
 
 app.get('/api/ai/engine-status', authenticate, async (req, res) => {
-  const tenantCredentials = await getTenantConnectorCredentials((req as any).contractorId);
+  let tenantCredentials: Record<string, string> = {};
+  try {
+    tenantCredentials = await getTenantConnectorCredentials((req as any).contractorId);
+  } catch {
+    console.warn('[HAL AI status] Tenant credentials unavailable; checking deployment-level keys only.');
+  }
   const geminiKeySet = !!(tenantCredentials.gemini || process.env.GEMINI_API_KEY);
   const nvidiaKeySet = !!process.env.NVIDIA_API_KEY;
   const timesfmConfigured = Boolean(process.env.TIMESFM_SERVICE_URL && (process.env.TIMESFM_API_KEY || '').length >= 32);
