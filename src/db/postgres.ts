@@ -337,6 +337,16 @@ export async function bootstrapPostgresTables(poolInstance?: Pool): Promise<void
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
       );
 
+      -- Upgrade legacy API-key storage to the hashed-key schema used by Drizzle.
+      -- The existing HAL intelligence database currently has zero API-key rows.
+      ALTER TABLE api_keys ADD COLUMN IF NOT EXISTS key_hash TEXT;
+      ALTER TABLE api_keys ADD COLUMN IF NOT EXISTS prefix TEXT;
+      ALTER TABLE api_keys ADD COLUMN IF NOT EXISTS last_used_at TIMESTAMP;
+      ALTER TABLE api_keys ADD COLUMN IF NOT EXISTS expires_at TIMESTAMP;
+      ALTER TABLE api_keys ALTER COLUMN key DROP NOT NULL;
+      ALTER TABLE api_keys ALTER COLUMN key_hash SET NOT NULL;
+      ALTER TABLE api_keys ALTER COLUMN prefix SET NOT NULL;
+
       CREATE TABLE IF NOT EXISTS connector_credentials (
         id TEXT PRIMARY KEY,
         contractor_id TEXT NOT NULL,
@@ -721,6 +731,9 @@ export async function bootstrapPostgresTables(poolInstance?: Pool): Promise<void
       ALTER TABLE leads ADD COLUMN IF NOT EXISTS dns_verified BOOLEAN DEFAULT false;
       ALTER TABLE leads ADD COLUMN IF NOT EXISTS grounding_evidence JSONB;
 
+      -- Ensure legacy databases have this column before changing its default/nullability.
+      ALTER TABLE leads ADD COLUMN IF NOT EXISTS source_type TEXT DEFAULT 'live_harvest' NOT NULL;
+
       ALTER TABLE leads ALTER COLUMN source_type DROP DEFAULT;
       ALTER TABLE leads ALTER COLUMN source_type DROP NOT NULL;
       ALTER TABLE leads ALTER COLUMN review_count DROP DEFAULT;
@@ -849,6 +862,30 @@ export async function bootstrapPostgresTables(poolInstance?: Pool): Promise<void
         thought_process TEXT,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
       );
+
+      -- Reconcile legacy nullable columns with the current Drizzle contract.
+      ALTER TABLE contractors ALTER COLUMN role SET DEFAULT 'user';
+      ALTER TABLE contractors ALTER COLUMN role SET NOT NULL;
+
+      ALTER TABLE leads ALTER COLUMN verification_status SET DEFAULT 'UNVERIFIED_STAGING';
+      ALTER TABLE leads ALTER COLUMN verification_status SET NOT NULL;
+      ALTER TABLE leads ALTER COLUMN dns_verified SET DEFAULT false;
+      ALTER TABLE leads ALTER COLUMN dns_verified SET NOT NULL;
+
+      ALTER TABLE lead_events ALTER COLUMN event_type SET NOT NULL;
+      ALTER TABLE lead_events ALTER COLUMN new_stage SET NOT NULL;
+      ALTER TABLE lead_events ALTER COLUMN currency SET DEFAULT 'USD';
+      ALTER TABLE lead_events ALTER COLUMN currency SET NOT NULL;
+
+      ALTER TABLE revenue_recommendations ALTER COLUMN proposed_at SET DEFAULT CURRENT_TIMESTAMP;
+      ALTER TABLE revenue_recommendations ALTER COLUMN proposed_at SET NOT NULL;
+      ALTER TABLE revenue_recommendations ALTER COLUMN updated_at SET DEFAULT CURRENT_TIMESTAMP;
+      ALTER TABLE revenue_recommendations ALTER COLUMN updated_at SET NOT NULL;
+
+      ALTER TABLE outreach_sequences ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
+      UPDATE outreach_sequences SET updated_at = created_at WHERE updated_at IS NULL;
+      ALTER TABLE outreach_sequences ALTER COLUMN updated_at SET DEFAULT CURRENT_TIMESTAMP;
+      ALTER TABLE outreach_sequences ALTER COLUMN updated_at SET NOT NULL;
 
       -- Safe idempotent column upgrades for leads table
       ALTER TABLE leads ADD COLUMN IF NOT EXISTS is_synthetic BOOLEAN DEFAULT false NOT NULL;
