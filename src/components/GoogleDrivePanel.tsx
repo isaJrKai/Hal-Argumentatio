@@ -781,7 +781,7 @@ Analyze this file according to the User Goal, offering concrete business strateg
                   <div className="bg-bg-overlay border border-border-dim rounded p-3 space-y-2.5">
                     <div className="flex items-center justify-between">
                       <span className="text-[10px] font-mono text-text-secondary uppercase tracking-wider font-bold">
-                        Cognitive Engine:
+                        Model provider:
                       </span>
                       <span className="text-[9px] font-mono px-1.5 py-0.5 rounded uppercase font-semibold bg-accent/10 text-accent border border-accent/20">
                         {activeAi === 'gemini' ? 'Gemini 3.5' : 'Nemotron'}
@@ -796,8 +796,8 @@ Analyze this file according to the User Goal, offering concrete business strateg
                           localStorage.setItem('hal_active_ai', 'gemini');
                           toast({
                             variant: 'success',
-                            title: 'Gemini 3.5 Activated',
-                            description: 'Strictly utilizing Google Gemini 3.5 cognitive pathways.'
+                            title: 'Gemini selected',
+                            description: 'Gemini is selected for supported requests. This does not verify provider access.'
                           });
                         }}
                         className={`p-2 rounded border text-left flex flex-col justify-between transition-all ${
@@ -807,7 +807,7 @@ Analyze this file according to the User Goal, offering concrete business strateg
                         }`}
                       >
                         <span className="text-[10px] font-bold font-sans uppercase">Gemini 3.5</span>
-                        <span className="text-[8px] font-mono opacity-80 mt-1 uppercase">Primary AI</span>
+                        <span className="text-[8px] font-mono opacity-80 mt-1 uppercase">Preferred provider</span>
                       </button>
 
                       <button
@@ -817,8 +817,8 @@ Analyze this file according to the User Goal, offering concrete business strateg
                           localStorage.setItem('hal_active_ai', 'nemotron');
                           toast({
                             variant: 'success',
-                            title: 'NVIDIA Nemotron Activated',
-                            description: 'NVIDIA high-performance Llama analytics are now driving operations.'
+                            title: 'Nemotron selected',
+                            description: 'Nemotron is selected for supported requests. This does not verify provider access.'
                           });
                         }}
                         className={`p-2 rounded border text-left flex flex-col justify-between transition-all ${
@@ -828,12 +828,12 @@ Analyze this file according to the User Goal, offering concrete business strateg
                         }`}
                       >
                         <span className="text-[10px] font-bold font-sans uppercase">Nemotron</span>
-                        <span className="text-[8px] font-mono opacity-80 mt-1 uppercase">Secondary AI</span>
+                        <span className="text-[8px] font-mono opacity-80 mt-1 uppercase">Alternate provider</span>
                       </button>
                     </div>
 
                     <div className="flex items-center justify-between pt-1 border-t border-border-dim/30 text-[9.5px]">
-                      <span className="text-text-tertiary uppercase">Gemini Switch:</span>
+                      <span className="text-text-tertiary uppercase">Selected provider:</span>
                       <button
                         type="button"
                         onClick={() => {
@@ -842,14 +842,14 @@ Analyze this file according to the User Goal, offering concrete business strateg
                           localStorage.setItem('hal_active_ai', next);
                           toast({
                             variant: 'info',
-                            title: `Gemini toggled ${next === 'gemini' ? 'ON' : 'OFF'}`,
-                            description: next === 'gemini' ? 'Gemini 3.5 is primary.' : 'Nemotron is now operating.'
+                            title: `${next === 'gemini' ? 'Gemini selected' : 'Nemotron selected'}`,
+                            description: next === 'gemini' ? 'Gemini is selected for supported requests. Provider access is not verified here.' : 'Nemotron is selected for supported requests. Provider access is not verified here.'
                           });
                         }}
                         className="flex items-center gap-1 font-mono uppercase font-bold focus:outline-none text-text-primary"
                       >
                         <span className={activeAi === 'gemini' ? 'text-accent' : 'text-text-tertiary'}>
-                          {activeAi === 'gemini' ? 'ON' : 'OFF'}
+                          {activeAi === 'gemini' ? 'Gemini' : 'Nemotron'}
                         </span>
                         <div className={`w-8 h-4 rounded-full relative p-0.5 transition-colors ${activeAi === 'gemini' ? 'bg-accent/20 border border-accent/40' : 'bg-bg-base border border-border-dim'}`}>
                           <div className={`w-2 h-2 rounded-full bg-white transition-all absolute top-0.5 ${activeAi === 'gemini' ? 'right-0.5' : 'left-0.5'}`} />

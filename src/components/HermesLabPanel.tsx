@@ -592,22 +592,22 @@ export default function HermesLabPanel({ token }: { token: string | null }) {
       {/* Header Banner */}
       <div className="bg-bg-raised border border-border-dim rounded-xl p-6 shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
-          <div className="w-12 h-12 rounded-xl bg-gradient-to-tr from-cyan-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-cyan-500/20 text-white shrink-0">
+          <div className="w-12 h-12 rounded-xl bg-accent-dim border border-accent/20 flex items-center justify-center text-accent shrink-0">
             <Cpu className="w-6 h-6" />
           </div>
           <div>
             <div className="flex items-center gap-2 flex-wrap">
-              <h2 className="text-xl font-bold tracking-tight text-text-primary">Hermes Cognitive Lab</h2>
-              <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">
+              <h2 className="text-xl font-bold tracking-tight text-text-primary">Business assistant & tools</h2>
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-accent-dim text-accent border border-accent/20">
                 {engineStatus?.activeEngine || 'NOUS HERMES 3.7'}
               </span>
               <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center gap-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                {engineStatus?.provider && engineStatus.provider !== 'fallback' ? `${engineStatus.provider.toUpperCase()} CONFIGURED · UNVERIFIED` : 'DETERMINISTIC FALLBACK'}
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 " />
+                {engineStatus?.provider && engineStatus.provider !== 'fallback' ? `${engineStatus.provider.toUpperCase()} Configured · not tested` : 'Fallback mode'}
               </span>
             </div>
             <p className="text-xs text-text-secondary mt-0.5">
-              Isolated creative & operational workshop for high-converting landing pages, ads, SEO schema, and self-healing diagnostics.
+              Create landing pages and ad assets, manage SEO details, and review operational diagnostics.
             </p>
           </div>
         </div>
@@ -617,10 +617,10 @@ export default function HermesLabPanel({ token }: { token: string | null }) {
           <button
             onClick={refreshAll}
             disabled={loading}
-            className="p-2 bg-bg-base border border-border-dim hover:border-cyan-500 rounded-lg text-text-secondary hover:text-text-primary text-xs cursor-pointer transition-colors"
+            className="p-2 bg-bg-base border border-border-dim hover:border-accent rounded-lg text-text-secondary hover:text-text-primary text-xs cursor-pointer transition-colors"
             title="Refresh Lab Artifacts & Engine Status"
           >
-            <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin text-cyan-400' : ''}`} />
+            <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin text-accent' : ''}`} />
           </button>
 
           <div className="flex items-center gap-1 bg-bg-base p-1 border border-border-dim rounded-lg text-xs">
@@ -634,20 +634,20 @@ export default function HermesLabPanel({ token }: { token: string | null }) {
             >
               <span className="flex items-center gap-1.5">
                 <Wrench className="w-3.5 h-3.5" />
-                Tool Foundry ({catalog.length})
+                Tools ({catalog.length})
               </span>
             </button>
             <button
               onClick={() => setActiveSubTab('chat')}
               className={`px-3 py-1.5 rounded-md font-medium transition-all cursor-pointer ${
                 activeSubTab === 'chat' 
-                  ? 'bg-cyan-500 text-white shadow-sm shadow-cyan-500/20' 
-                  : 'text-cyan-400 hover:text-cyan-300'
+                  ? 'bg-accent text-accent-contrast shadow-sm' 
+                  : 'text-text-secondary hover:text-text-primary'
               }`}
             >
               <span className="flex items-center gap-1.5">
                 <MessageSquare className="w-3.5 h-3.5" />
-                Brand & Taste Studio
+                Assistant chat
               </span>
             </button>
             <button
@@ -680,7 +680,7 @@ export default function HermesLabPanel({ token }: { token: string | null }) {
         </div>
       </div>
 
-      {/* ─── TAB 1: TOOL FOUNDRY ─── */}
+      {/* ─── TAB 1: TOOLS ─── */}
       {activeSubTab === 'tools' && (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
           {/* Tool Selector Catalog */}
@@ -699,18 +699,18 @@ export default function HermesLabPanel({ token }: { token: string | null }) {
                     onClick={() => handleSelectTool(tool)}
                     className={`p-3.5 rounded-xl border transition-all cursor-pointer ${
                       isSelected
-                        ? 'bg-cyan-500/10 border-cyan-500/50 shadow-md shadow-cyan-500/5'
+                        ? 'bg-accent-dim border-accent/50 shadow-md shadow-none'
                         : 'bg-bg-raised border-border-dim hover:border-border-bright hover:bg-bg-subtle'
                     }`}
                   >
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex items-center gap-2.5">
-                        <div className={`p-2 rounded-lg ${isSelected ? 'bg-cyan-500 text-white' : 'bg-bg-subtle text-text-secondary'}`}>
+                        <div className={`p-2 rounded-lg ${isSelected ? 'bg-accent text-accent-contrast' : 'bg-bg-subtle text-text-secondary'}`}>
                           <IconComponent className="w-4 h-4" />
                         </div>
                         <div>
                           <h4 className="text-xs font-bold text-text-primary">{tool.name}</h4>
-                          <span className="text-[10px] text-cyan-400 font-mono font-semibold">{tool.badge}</span>
+                          <span className="text-[10px] text-accent font-mono font-semibold">{tool.badge}</span>
                         </div>
                       </div>
                       <span className="text-[9px] uppercase px-1.5 py-0.5 rounded bg-bg-base border border-border-dim text-text-tertiary font-mono">
@@ -735,7 +735,7 @@ export default function HermesLabPanel({ token }: { token: string | null }) {
                     <h3 className="text-sm font-bold text-text-primary">{selectedTool.name}</h3>
                     <p className="text-xs text-text-secondary">Tailored execution parameters for contractor business context.</p>
                   </div>
-                  <span className="text-xs font-mono text-cyan-400 bg-cyan-500/10 px-2 py-1 rounded border border-cyan-500/20">
+                  <span className="text-xs font-mono text-accent bg-accent-dim px-2 py-1 rounded border border-accent/20">
                     {selectedTool.category.toUpperCase()} WORKBENCH
                   </span>
                 </div>
@@ -750,7 +750,7 @@ export default function HermesLabPanel({ token }: { token: string | null }) {
                     value={promptOverride}
                     onChange={(e) => setPromptOverride(e.target.value)}
                     rows={3}
-                    className="w-full bg-bg-base border border-border-dim rounded-lg p-2.5 text-xs text-text-primary font-mono focus:outline-none focus:border-cyan-500"
+                    className="w-full bg-bg-base border border-border-dim rounded-lg p-2.5 text-xs text-text-primary font-mono focus:outline-none focus:border-accent"
                     placeholder="Enter specific campaign requirements or special offers..."
                   />
                 </div>
@@ -943,12 +943,12 @@ export default function HermesLabPanel({ token }: { token: string | null }) {
           <div className="lg:col-span-4 space-y-4">
             <div className="bg-bg-raised border border-border-dim rounded-xl p-4 space-y-3">
               <div className="flex items-center gap-2">
-                <div className="p-2 rounded-lg bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">
+                <div className="p-2 rounded-lg bg-accent-dim text-accent border border-accent/20">
                   <Bot className="w-4 h-4" />
                 </div>
                 <div>
                   <h3 className="text-xs font-bold text-text-primary">Hermes Creative Strategist</h3>
-                  <p className="text-[11px] text-text-secondary">Personalize assets to your exact brand & taste</p>
+                  <p className="text-[11px] text-text-secondary">Set the colors, typography and voice used in your assets.</p>
                 </div>
               </div>
 
@@ -959,7 +959,7 @@ export default function HermesLabPanel({ token }: { token: string | null }) {
                   {activeArtifact && (
                     <button
                       onClick={() => setActiveArtifact(null)}
-                      className="text-[9px] text-cyan-400 hover:underline cursor-pointer"
+                      className="text-[9px] text-accent hover:underline cursor-pointer"
                     >
                       Clear selection
                     </button>
@@ -967,10 +967,10 @@ export default function HermesLabPanel({ token }: { token: string | null }) {
                 </label>
 
                 {activeArtifact ? (
-                  <div className="p-2.5 bg-bg-base border border-cyan-500/30 rounded-lg space-y-1">
+                  <div className="p-2.5 bg-bg-base border border-accent/30 rounded-lg space-y-1">
                     <div className="flex items-center justify-between">
-                      <span className="text-xs font-bold text-cyan-400 line-clamp-1">{activeArtifact.title}</span>
-                      <span className="text-[9px] font-mono uppercase bg-cyan-500/10 text-cyan-300 px-1 rounded">
+                      <span className="text-xs font-bold text-accent line-clamp-1">{activeArtifact.title}</span>
+                      <span className="text-[9px] font-mono uppercase bg-accent-dim text-accent px-1 rounded">
                         {activeArtifact.toolId}
                       </span>
                     </div>
@@ -1001,10 +1001,10 @@ export default function HermesLabPanel({ token }: { token: string | null }) {
                     <button
                       key={idx}
                       onClick={() => setChatInput(preset)}
-                      className="text-left px-2.5 py-1.5 rounded bg-bg-base border border-border-dim hover:border-cyan-500/50 hover:bg-bg-subtle text-[11px] text-text-secondary hover:text-text-primary transition-all flex items-center justify-between group cursor-pointer"
+                      className="text-left px-2.5 py-1.5 rounded bg-bg-base border border-border-dim hover:border-accent/50 hover:bg-bg-subtle text-[11px] text-text-secondary hover:text-text-primary transition-all flex items-center justify-between group cursor-pointer"
                     >
                       <span className="line-clamp-1">{preset}</span>
-                      <ChevronRight className="w-3 h-3 opacity-0 group-hover:opacity-100 text-cyan-400" />
+                      <ChevronRight className="w-3 h-3 opacity-0 group-hover:opacity-100 text-accent" />
                     </button>
                   ))}
                 </div>
@@ -1017,7 +1017,7 @@ export default function HermesLabPanel({ token }: { token: string | null }) {
             {/* Header */}
             <div className="px-4 py-3 border-b border-border-dim flex items-center justify-between bg-bg-base/40">
               <div className="flex items-center gap-2">
-                <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                <div className="w-2 h-2 rounded-full bg-emerald-400 " />
                 <span className="text-xs font-bold text-text-primary">Hermes Lab Dialogue</span>
                 <span className="px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[10px] font-mono font-bold flex items-center gap-1">
                   <Sparkles className="w-3 h-3" />
@@ -1033,7 +1033,7 @@ export default function HermesLabPanel({ token }: { token: string | null }) {
             <div className="flex-1 overflow-y-auto p-4 space-y-4">
               {messages.length === 0 ? (
                 <div className="h-full flex flex-col items-center justify-center text-center p-6 space-y-3">
-                  <div className="p-3 bg-cyan-500/10 text-cyan-400 rounded-full border border-cyan-500/20">
+                  <div className="p-3 bg-accent-dim text-accent rounded-full border border-accent/20">
                     <MessageSquare className="w-6 h-6" />
                   </div>
                   <div className="max-w-md space-y-1">
@@ -1052,7 +1052,7 @@ export default function HermesLabPanel({ token }: { token: string | null }) {
                       className={`flex gap-3 ${isUser ? 'justify-end' : 'justify-start'}`}
                     >
                       {!isUser && (
-                        <div className="w-7 h-7 rounded-lg bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 flex items-center justify-center shrink-0">
+                        <div className="w-7 h-7 rounded-lg bg-accent-dim text-accent border border-accent/30 flex items-center justify-center shrink-0">
                           <Bot className="w-4 h-4" />
                         </div>
                       )}
@@ -1061,13 +1061,13 @@ export default function HermesLabPanel({ token }: { token: string | null }) {
                         <div
                           className={`p-3.5 rounded-2xl text-xs leading-relaxed ${
                             isUser
-                              ? 'bg-cyan-600 text-white rounded-tr-none'
+                              ? 'bg-accent text-accent-contrast rounded-tr-none'
                               : 'bg-bg-base border border-border-dim text-text-primary rounded-tl-none'
                           }`}
                         >
                           {msg.thoughtProcess && (
                             <div className="mb-2 p-2 bg-bg-subtle border border-border-dim rounded text-[10px] font-mono text-text-tertiary">
-                              <span className="font-bold text-cyan-400">Hermes Reasoning: </span>
+                              <span className="font-bold text-accent">Hermes Reasoning: </span>
                               {msg.thoughtProcess}
                             </div>
                           )}
@@ -1075,9 +1075,9 @@ export default function HermesLabPanel({ token }: { token: string | null }) {
 
                           {/* Attached / Updated Artifact Badge */}
                           {msg.attachedArtifact && (
-                            <div className="mt-3 p-2.5 bg-cyan-500/10 border border-cyan-500/30 rounded-lg flex items-center justify-between gap-2">
+                            <div className="mt-3 p-2.5 bg-accent-dim border border-accent/30 rounded-lg flex items-center justify-between gap-2">
                               <div className="space-y-0.5">
-                                <span className="text-[10px] font-mono text-cyan-400 font-bold uppercase block">
+                                <span className="text-[10px] font-mono text-accent font-bold uppercase block">
                                   Updated Asset Ready
                                 </span>
                                 <span className="text-xs font-bold text-text-primary block line-clamp-1">
@@ -1089,7 +1089,7 @@ export default function HermesLabPanel({ token }: { token: string | null }) {
                                   setActiveArtifact(msg.attachedArtifact);
                                   setActiveSubTab('artifacts');
                                 }}
-                                className="px-2.5 py-1 bg-cyan-500 hover:bg-cyan-400 text-white text-[11px] font-bold rounded flex items-center gap-1 cursor-pointer shrink-0"
+                                className="px-2.5 py-1 bg-accent hover:bg-accent/85 text-white text-[11px] font-bold rounded flex items-center gap-1 cursor-pointer shrink-0"
                               >
                                 <span>Preview</span>
                                 <ExternalLink className="w-3 h-3" />
@@ -1126,12 +1126,12 @@ export default function HermesLabPanel({ token }: { token: string | null }) {
                       ? `Tell Hermes how to personalize "${activeArtifact.title}"...`
                       : 'Ask Hermes to build or customize an asset to your taste...'
                   }
-                  className="flex-1 bg-bg-raised border border-border-dim rounded-lg px-3.5 py-2.5 text-xs text-text-primary placeholder:text-text-tertiary focus:outline-none focus:border-cyan-500"
+                  className="flex-1 bg-bg-raised border border-border-dim rounded-lg px-3.5 py-2.5 text-xs text-text-primary placeholder:text-text-tertiary focus:outline-none focus:border-accent"
                 />
                 <button
                   type="submit"
                   disabled={!chatInput.trim() || sendingChat}
-                  className="px-4 py-2.5 bg-gradient-to-r from-cyan-600 to-indigo-600 hover:from-cyan-500 hover:to-indigo-500 text-white rounded-lg font-bold text-xs flex items-center gap-1.5 shadow-md shadow-cyan-600/10 cursor-pointer disabled:opacity-50"
+                  className="px-4 py-2.5 bg-gradient-to-r bg-accent hover:bg-accent/85 text-white rounded-lg font-bold text-xs flex items-center gap-1.5 shadow-md shadow-none cursor-pointer disabled:opacity-50"
                 >
                   {sendingChat ? (
                     <RefreshCw className="w-4 h-4 animate-spin" />
@@ -1152,7 +1152,7 @@ export default function HermesLabPanel({ token }: { token: string | null }) {
           {/* PostgreSQL Storage Status & Architecture Strip */}
           <div className="bg-bg-raised border border-border-dim rounded-xl p-4 flex flex-col md:flex-row md:items-center justify-between gap-3 text-xs shadow-sm">
             <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-lg bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 flex items-center justify-center shrink-0">
+              <div className="w-8 h-8 rounded-lg bg-accent-dim border border-accent/30 text-accent flex items-center justify-center shrink-0">
                 <Database className="w-4 h-4" />
               </div>
               <div>
@@ -1173,7 +1173,7 @@ export default function HermesLabPanel({ token }: { token: string | null }) {
               </span>
               <button
                 onClick={fetchArtifacts}
-                className="p-1.5 bg-bg-base border border-border-dim hover:border-cyan-500 text-text-secondary hover:text-text-primary rounded-md transition-colors cursor-pointer"
+                className="p-1.5 bg-bg-base border border-border-dim hover:border-accent text-text-secondary hover:text-text-primary rounded-md transition-colors cursor-pointer"
                 title="Sync with PostgreSQL"
               >
                 <RefreshCw className="w-3.5 h-3.5" />
@@ -1186,11 +1186,11 @@ export default function HermesLabPanel({ token }: { token: string | null }) {
             <div className="lg:col-span-4 space-y-2">
               <div className="flex items-center justify-between text-xs font-mono font-bold uppercase tracking-wider text-text-tertiary px-1">
                 <span>Stored Productions</span>
-                <span className="text-[10px] text-cyan-400 lowercase">drizzle orm</span>
+                <span className="text-[10px] text-accent lowercase">drizzle orm</span>
               </div>
               {artifacts.length === 0 ? (
                 <div className="p-6 text-center text-xs text-text-tertiary border border-border-dim rounded-xl bg-bg-raised">
-                  No artifacts generated yet. Use the Tool Foundry to create your first landing page or ad set.
+                  No assets have been created yet. Use Tools to create a landing page or ad set.
                 </div>
               ) : (
                 <div className="space-y-2 max-h-[640px] overflow-y-auto pr-1">
@@ -1200,7 +1200,7 @@ export default function HermesLabPanel({ token }: { token: string | null }) {
                       onClick={() => setActiveArtifact(art)}
                       className={`p-3.5 rounded-xl border transition-all cursor-pointer ${
                         activeArtifact?.id === art.id
-                          ? 'bg-cyan-500/10 border-cyan-500/50 shadow-sm'
+                          ? 'bg-accent-dim border-accent/50 shadow-sm'
                           : 'bg-bg-raised border-border-dim hover:bg-bg-subtle'
                       }`}
                     >
@@ -1243,13 +1243,13 @@ export default function HermesLabPanel({ token }: { token: string | null }) {
                       <div className="flex items-center bg-bg-base border border-border-dim rounded-lg p-0.5 text-xs">
                         <button
                           onClick={() => setViewMode('preview')}
-                          className={`px-2.5 py-1 rounded-md ${viewMode === 'preview' ? 'bg-cyan-500 text-white' : 'text-text-secondary'}`}
+                          className={`px-2.5 py-1 rounded-md ${viewMode === 'preview' ? 'bg-accent text-accent-contrast' : 'text-text-secondary'}`}
                         >
                           Preview
                         </button>
                         <button
                           onClick={() => setViewMode('code')}
-                          className={`px-2.5 py-1 rounded-md ${viewMode === 'code' ? 'bg-cyan-500 text-white' : 'text-text-secondary'}`}
+                          className={`px-2.5 py-1 rounded-md ${viewMode === 'code' ? 'bg-accent text-accent-contrast' : 'text-text-secondary'}`}
                         >
                           Code
                         </button>
@@ -1260,14 +1260,14 @@ export default function HermesLabPanel({ token }: { token: string | null }) {
                         <div className="flex items-center bg-bg-base border border-border-dim rounded-lg p-0.5 text-xs">
                           <button
                             onClick={() => setDevicePreview('desktop')}
-                            className={`p-1.5 rounded-md ${devicePreview === 'desktop' ? 'bg-bg-subtle text-cyan-400' : 'text-text-secondary'}`}
+                            className={`p-1.5 rounded-md ${devicePreview === 'desktop' ? 'bg-bg-subtle text-accent' : 'text-text-secondary'}`}
                             title="Desktop View"
                           >
                             <Laptop className="w-3.5 h-3.5" />
                           </button>
                           <button
                             onClick={() => setDevicePreview('mobile')}
-                            className={`p-1.5 rounded-md ${devicePreview === 'mobile' ? 'bg-bg-subtle text-cyan-400' : 'text-text-secondary'}`}
+                            className={`p-1.5 rounded-md ${devicePreview === 'mobile' ? 'bg-bg-subtle text-accent' : 'text-text-secondary'}`}
                             title="Mobile View"
                           >
                             <Smartphone className="w-3.5 h-3.5" />
@@ -1279,14 +1279,14 @@ export default function HermesLabPanel({ token }: { token: string | null }) {
                         <>
                           <button
                             onClick={handleOpenInNewTab}
-                            className="p-1.5 bg-bg-base border border-border-dim hover:border-cyan-500 rounded-lg text-text-secondary hover:text-text-primary text-xs flex items-center gap-1 cursor-pointer"
+                            className="p-1.5 bg-bg-base border border-border-dim hover:border-accent rounded-lg text-text-secondary hover:text-text-primary text-xs flex items-center gap-1 cursor-pointer"
                             title="Open Live Public URL in New Window"
                           >
                             <ExternalLink className="w-3.5 h-3.5" />
                           </button>
                           <button
                             onClick={handleCopyLiveLink}
-                            className="p-1.5 bg-bg-base border border-border-dim hover:border-cyan-500 rounded-lg text-text-secondary hover:text-cyan-400 text-xs flex items-center gap-1 cursor-pointer"
+                            className="p-1.5 bg-bg-base border border-border-dim hover:border-accent rounded-lg text-text-secondary hover:text-accent text-xs flex items-center gap-1 cursor-pointer"
                             title="Copy Public Shareable Landing Page Link"
                           >
                             <Share2 className="w-3.5 h-3.5" />
@@ -1296,7 +1296,7 @@ export default function HermesLabPanel({ token }: { token: string | null }) {
 
                       <button
                         onClick={handleCopyCode}
-                        className="p-1.5 bg-bg-base border border-border-dim hover:border-cyan-500 rounded-lg text-text-secondary hover:text-text-primary text-xs flex items-center gap-1 cursor-pointer"
+                        className="p-1.5 bg-bg-base border border-border-dim hover:border-accent rounded-lg text-text-secondary hover:text-text-primary text-xs flex items-center gap-1 cursor-pointer"
                         title="Copy Code"
                       >
                         {copiedCode ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
@@ -1304,7 +1304,7 @@ export default function HermesLabPanel({ token }: { token: string | null }) {
 
                       <button
                         onClick={handleDownloadCode}
-                        className="p-1.5 bg-bg-base border border-border-dim hover:border-cyan-500 rounded-lg text-text-secondary hover:text-text-primary text-xs flex items-center gap-1 cursor-pointer"
+                        className="p-1.5 bg-bg-base border border-border-dim hover:border-accent rounded-lg text-text-secondary hover:text-text-primary text-xs flex items-center gap-1 cursor-pointer"
                         title="Download File"
                       >
                         <Download className="w-3.5 h-3.5" />
@@ -1334,7 +1334,7 @@ export default function HermesLabPanel({ token }: { token: string | null }) {
                         </div>
                       )
                     ) : (
-                      <pre className="p-4 overflow-auto h-full text-xs font-mono text-cyan-400 bg-slate-950 select-all">
+                      <pre className="p-4 overflow-auto h-full text-xs font-mono text-accent bg-slate-950 select-all">
                         <code>{activeArtifact.content?.renderedOutput}</code>
                       </pre>
                     )}
@@ -1357,7 +1357,7 @@ export default function HermesLabPanel({ token }: { token: string | null }) {
             <div className="space-y-1">
               <h3 className="text-sm font-bold text-text-primary flex items-center gap-2">
                 <ShieldCheck className="w-4 h-4 text-emerald-400" />
-                Autonomous Resilience Overseer
+                Service diagnostics
               </h3>
               <p className="text-xs text-text-secondary">
                 Continuous telemetry monitoring for webhook delivery failures, attribution tag drops, and zero-conversion leaks.
@@ -1375,13 +1375,13 @@ export default function HermesLabPanel({ token }: { token: string | null }) {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="bg-bg-raised border border-border-dim rounded-xl p-4 space-y-1">
               <span className="text-[10px] font-mono uppercase text-text-tertiary">Active Monitored Surfaces</span>
-              <div className="text-xl font-extrabold text-cyan-400">4 Surfaces</div>
+              <div className="text-xl font-extrabold text-accent">4 Surfaces</div>
               <p className="text-[11px] text-text-secondary">Google Ads GCLID, Webhook Outbox, SSL, Mobile Vitals</p>
             </div>
             <div className="bg-bg-raised border border-border-dim rounded-xl p-4 space-y-1">
               <span className="text-[10px] font-mono uppercase text-text-tertiary">Open Diagnostic Incidents</span>
               <div className="text-xl font-extrabold text-amber-400">{incidents.length} Pending</div>
-              <p className="text-[11px] text-text-secondary">Automated self-healing proposals ready in Lab</p>
+              <p className="text-[11px] text-text-secondary">Suggested fixes are ready for review</p>
             </div>
             <div className="bg-bg-raised border border-border-dim rounded-xl p-4 space-y-1">
               <span className="text-[10px] font-mono uppercase text-text-tertiary">Healing Execution Policy</span>
@@ -1418,9 +1418,9 @@ export default function HermesLabPanel({ token }: { token: string | null }) {
                     <div className="text-xs text-text-secondary">
                       <strong className="text-text-primary">Root Cause:</strong> {inc.rootCause}
                     </div>
-                    <div className="text-xs text-cyan-400 bg-cyan-500/5 p-2.5 rounded border border-cyan-500/20 flex items-center justify-between">
+                    <div className="text-xs text-accent bg-accent-dim p-2.5 rounded border border-accent/20 flex items-center justify-between">
                       <div>
-                        <strong className="text-text-primary">Proposed Self-Healing Fix:</strong> {inc.proposedFix}
+                        <strong className="text-text-primary">Suggested fix:</strong> {inc.proposedFix}
                       </div>
                       <button
                         onClick={() => {
@@ -1429,7 +1429,7 @@ export default function HermesLabPanel({ token }: { token: string | null }) {
                           }
                           setActiveSubTab('tools');
                         }}
-                        className="px-2.5 py-1 bg-cyan-600 hover:bg-cyan-500 text-white rounded text-[10px] font-bold uppercase ml-4 shrink-0 cursor-pointer"
+                        className="px-2.5 py-1 bg-accent hover:bg-accent text-accent-contrast rounded text-[10px] font-bold uppercase ml-4 shrink-0 cursor-pointer"
                       >
                         Deploy from Lab
                       </button>

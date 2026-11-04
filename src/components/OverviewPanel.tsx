@@ -305,8 +305,8 @@ export default function OverviewPanel({
     <div className="w-full space-y-4">
       <div className="w-full grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-4 auto-rows-max select-none min-w-0">
       
-      {/* EXECUTIVE MISSION CONTROL CARD (STARTS WITH PURPOSE AND LITERAL VISION) */}
-      {/* EXECUTIVE MISSION CONTROL CARD */}
+      {/* WORKSPACE SUMMARY */}
+      {/* WORKSPACE SUMMARY */}
       <section className={`border rounded-xl p-5 relative overflow-hidden flex flex-col justify-between ${cardBg} lg:col-span-8 md:col-span-2 col-span-1`}>
           <div className="absolute top-0 right-0 w-64 h-64 bg-accent-dim/5 rounded-full blur-3xl pointer-events-none" />
           
@@ -314,14 +314,14 @@ export default function OverviewPanel({
             <div className="space-y-1">
               <div className="flex items-center justify-between text-xs">
                 <span className="font-semibold uppercase tracking-wider text-accent text-[11px]">
-                  Executive Briefing · {workspaceConfig?.agencyName || 'Agency'}
+                  Workspace summary · {workspaceConfig?.agencyName || 'Agency'}
                 </span>
                 <span className="font-medium text-accent text-[11px]">
                   {activeIndustry?.name || 'Trade'}
                 </span>
               </div>
               <h2 className="text-lg font-semibold tracking-tight text-text-primary">
-                Good morning, {contractorFirstName}.
+                Welcome back, {contractorFirstName}.
               </h2>
               <p className="text-xs text-text-secondary leading-relaxed">
                 Operating workspace configured for <span className="font-medium text-text-primary">{(activeNiche || 'Contracting').toUpperCase()}</span> services in <span className="font-medium text-text-primary">{activeCity}</span>. Performance trends will populate as records accumulate.
@@ -332,7 +332,7 @@ export default function OverviewPanel({
               <div className={`p-3.5 rounded-lg border ${innerBg} ${borderCol} space-y-1.5`}>
                 <div className="flex items-center gap-1.5 text-xs font-semibold text-text-primary">
                   <span className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse" />
-                  Operational Priorities
+                  Recent activity
                 </div>
                 <ul className="space-y-1 text-xs text-text-secondary leading-relaxed">
                   <li className="flex items-start gap-1.5">
@@ -350,7 +350,7 @@ export default function OverviewPanel({
                 <div>
                   <div className="flex items-center gap-1.5 text-xs font-semibold text-text-primary">
                     <span className="w-1.5 h-1.5 rounded-full bg-positive" />
-                    Recommended Action
+                    Next step
                   </div>
                   <p className="text-xs text-text-secondary leading-relaxed mt-1">
                     Review and dispatch outreach to qualified <span className="font-medium text-text-primary">{activeNiche}</span> prospects in <span className="font-medium text-text-primary">{activeCity}</span>.
@@ -367,13 +367,13 @@ export default function OverviewPanel({
 
             <div className={`p-3 rounded-lg border flex flex-col md:flex-row justify-between items-start md:items-center gap-2 ${innerBg} ${borderCol}`}>
               <div className="flex items-center gap-2">
-                <span className="text-xs font-medium text-text-tertiary uppercase">Mission:</span>
+                <span className="text-xs font-medium text-text-tertiary uppercase">Current focus:</span>
                 <span className="text-xs font-medium text-text-primary">
                   Acquire {(activeNiche || 'Contracting').toUpperCase()} commercial contracts
                 </span>
               </div>
               <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium bg-accent-dim text-accent border border-accent/20">
-                Active Execution
+                Configured
               </span>
             </div>
           </div>
@@ -385,12 +385,12 @@ export default function OverviewPanel({
             <div className="space-y-1">
               <div className="flex justify-between items-center text-xs">
                 <span className="font-semibold uppercase tracking-wider text-accent text-[11px]">
-                  Market Intelligence
+                  Market context
                 </span>
                 <Sparkles className="w-3.5 h-3.5 text-accent" />
               </div>
               <h2 className="text-lg font-semibold tracking-tight text-text-primary">
-                Local Trade Signals
+                Local market context
               </h2>
               <p className="text-xs text-text-secondary leading-relaxed">
                 Seasonal focus for <span className="font-medium text-text-primary">{activeCity}, {regionalProfile.countryCode}</span>.
@@ -399,15 +399,15 @@ export default function OverviewPanel({
 
             <div className={`p-3.5 rounded-lg border border-border-dim bg-bg-subtle text-xs text-text-secondary space-y-2`}>
               <div className="flex items-center justify-between text-xs">
-                <span className="text-text-primary font-medium">Seasonal Demand Driver</span>
+                <span className="text-text-primary font-medium">Seasonal focus</span>
                 <span className="text-text-tertiary font-mono text-[11px]">{regionalProfile.climateZone}</span>
               </div>
               <p className="text-text-primary font-medium text-xs leading-relaxed">
                 {regionalProfile.currentSeasonalFocus}
               </p>
               <div className="flex items-center justify-between text-xs text-text-tertiary pt-2 border-t border-border-dim/40 font-mono">
-                <span>Target CAC: <strong className="text-accent font-semibold">{formatCurrency(regionalProfile.territoryMetrics.averageCAC)}</strong></span>
-                <span>Bench CPC: <strong className="text-text-primary font-semibold">{formatCurrency(regionalProfile.territoryMetrics.typicalCPC)}</strong></span>
+                <span>Reference CAC: <strong className="text-accent font-semibold">{formatCurrency(regionalProfile.territoryMetrics.averageCAC)}</strong></span>
+                <span>Reference CPC: <strong className="text-text-primary font-semibold">{formatCurrency(regionalProfile.territoryMetrics.typicalCPC)}</strong></span>
               </div>
             </div>
           </div>
@@ -416,7 +416,7 @@ export default function OverviewPanel({
             onClick={() => setActiveTab('scheduler')}
             className="w-full h-8 mt-4 bg-accent text-accent-contrast hover:opacity-90 active:scale-95 rounded-md font-sans text-xs font-semibold transition-all shadow-xs flex items-center justify-center gap-1.5 cursor-pointer"
           >
-            <Play className="w-3 h-3 fill-current" /> Daily Tasks & Schedule
+            <Play className="w-3 h-3 fill-current" /> Open schedule
           </button>
         </section>
 
@@ -907,7 +907,7 @@ export default function OverviewPanel({
           </div>
         </section>
 
-        {/* Opportunities Donut Chart & Interactive Intelligence Layer */}
+        {/* Opportunities Donut Chart & Performance breakdown */}
         <section className={`border rounded-xl p-5 flex flex-col justify-between min-h-[300px] ${cardBg} lg:col-span-6 md:col-span-1 col-span-1 min-w-0 transition-all`}>
           <div className="flex justify-between items-start mb-3 pb-3 border-b border-border-dim/40">
             <div>
@@ -980,7 +980,7 @@ export default function OverviewPanel({
             </div>
           </div>
 
-          {/* INTERACTIVE INTELLIGENCE LAYER (Expanded when segment clicked) */}
+          {/* PERFORMANCE BREAKDOWN (Expanded when segment clicked) */}
           <AnimatePresence>
             {selectedSegment && segmentStats && (
               <motion.div

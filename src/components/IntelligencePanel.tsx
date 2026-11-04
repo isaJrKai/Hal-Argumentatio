@@ -449,8 +449,8 @@ export default function IntelligencePanel({
               {/* Header */}
               <div className="px-4 py-3 border-b border-border-dim bg-bg-overlay flex items-center justify-between shrink-0">
                 <div className="flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full bg-positive animate-ping" />
-                  <span className="text-[10px] font-mono text-text-primary uppercase font-bold tracking-wider">HAL Core Assistant</span>
+                  <span className="w-2 h-2 rounded-full bg-positive " />
+                  <span className="text-[10px] font-mono text-text-primary uppercase font-bold tracking-wider">Assistant</span>
                   {isMaximized && (
                     <span className="bg-accent/15 text-accent border border-accent/30 text-[9px] font-mono px-2 py-0.5 rounded uppercase tracking-wider">
                       Fullscreen Mode
@@ -458,7 +458,7 @@ export default function IntelligencePanel({
                   )}
                 </div>
                 <div className="flex items-center gap-3">
-                  {/* Cognitive Engine Switcher */}
+                  {/* Model provider */}
                   <div className="flex items-center gap-1 bg-bg-base/60 border border-border-dim rounded-md p-0.5 shrink-0">
                     <button
                       type="button"
@@ -467,8 +467,8 @@ export default function IntelligencePanel({
                         localStorage.setItem('hal_active_ai', 'gemini');
                         toast({
                           variant: 'success',
-                          title: 'Gemini 3.5 Active',
-                          description: 'Switched cognitive engine to Google Gemini 3.5.'
+                          title: 'Gemini selected',
+                          description: 'Gemini is selected as the preferred provider. Provider access is not verified here.'
                         });
                       }}
                       className={`px-2 py-1 rounded text-[9px] font-mono font-bold uppercase transition-all ${
@@ -476,9 +476,9 @@ export default function IntelligencePanel({
                           ? 'bg-accent/15 text-accent border border-accent/20'
                           : 'text-text-tertiary hover:text-text-secondary border border-transparent'
                       }`}
-                      title="Google Gemini 3.5: Highly detailed context reasoning but slower (18s+)"
+                      title="Google Gemini 3.5 is selected for supported requests; provider access is not verified here."
                     >
-                      🧠 Gemini
+                      Gemini
                     </button>
                     <button
                       type="button"
@@ -487,8 +487,8 @@ export default function IntelligencePanel({
                         localStorage.setItem('hal_active_ai', 'nemotron');
                         toast({
                           variant: 'success',
-                          title: 'Nemotron Active',
-                          description: 'Switched to NVIDIA Nemotron ultra-low latency (<400ms) engine.'
+                          title: 'Nemotron selected',
+                          description: 'Nemotron is selected as the preferred provider. Provider access and latency are not verified here.'
                         });
                       }}
                       className={`px-2 py-1 rounded text-[9px] font-mono font-bold uppercase transition-all ${
@@ -496,9 +496,9 @@ export default function IntelligencePanel({
                           ? 'bg-positive/10 text-positive border border-positive/20'
                           : 'text-text-tertiary hover:text-text-secondary border border-transparent'
                       }`}
-                      title="NVIDIA Nemotron: Ultra-low latency high-speed reasoning (<400ms!)"
+                      title="NVIDIA Nemotron is selected for supported requests; provider access is not verified here."
                     >
-                      ⚡ Nemotron
+                      Nemotron
                     </button>
                   </div>
 
@@ -510,10 +510,10 @@ export default function IntelligencePanel({
                         ? 'bg-accent/10 border-accent/45 text-accent font-bold' 
                         : 'bg-transparent border-border-dim text-text-tertiary hover:text-text-secondary hover:border-border-dark'
                     }`}
-                    title="Enable Google Search Grounding for real-time web research and knowledge verification."
+                    title="Enable web search grounding for supported requests."
                   >
-                    <Globe className={`w-3.5 h-3.5 ${enableGrounding ? 'animate-pulse text-accent' : 'text-text-tertiary'}`} />
-                    <span>Web Search: {enableGrounding ? 'Active' : 'Offline'}</span>
+                    <Globe className={`w-3.5 h-3.5 ${enableGrounding ? 'text-accent' : 'text-text-tertiary'}`} />
+                    <span>Web search: {enableGrounding ? 'Enabled' : 'Disabled'}</span>
                   </button>
 
                   <button
@@ -526,7 +526,7 @@ export default function IntelligencePanel({
                   </button>
 
                   <span className="text-[9px] font-mono text-text-tertiary hidden xl:inline">
-                    ENGINE: {activeAi === 'gemini' ? '🧠 GEMINI-3.5-FLASH' : '⚡ NEMOTRON-70B'}
+                    PROVIDER: {activeAi === 'gemini' ? 'GEMINI-3.5-FLASH' : 'NEMOTRON-70B'}
                   </span>
                 </div>
               </div>
