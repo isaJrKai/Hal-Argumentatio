@@ -338,6 +338,7 @@ export default function SettingsPanel({
   });
   const [connectorKeySuccess, setConnectorKeySuccess] = useState<string | null>(null);
   const [connectorConfigured, setConnectorConfigured] = useState<Record<string, boolean>>({});
+  const [connectorSaving, setConnectorSaving] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     // Remove any legacy browser-stored database URI; production credentials belong in server env.
@@ -372,8 +373,13 @@ export default function SettingsPanel({
 
   const handleSaveConnectorKey = async (service: string, keyVal: string) => {
     const value = keyVal.trim();
-    if (!value) return;
+    if (!value) {
+      setConnectorKeySuccess('Enter a credential before saving.');
+      return;
+    }
 
+    setConnectorSaving(prev => ({ ...prev, [service]: true }));
+    setConnectorKeySuccess(null);
     try {
       const res = await fetch('/api/connectors/credentials', {
         method: 'POST',
@@ -388,11 +394,53 @@ export default function SettingsPanel({
 
       setConnectorConfigured(prev => ({ ...prev, [service]: true }));
       setConnectorKeys(prev => ({ ...prev, [service]: '' }));
-      setConnectorKeySuccess(`${service.toUpperCase()} credential saved securely. The secret is not returned to the browser.`);
+      setConnectorKeySuccess(`${service.toUpperCase()} credential saved securely. Provider connectivity has not been tested.`);
     } catch (err: any) {
       setConnectorKeySuccess(`Could not save ${service.toUpperCase()} credential: ${err.message || 'request failed'}`);
+    } finally {
+      setConnectorSaving(prev => ({ ...prev, [service]: false }));
+      setTimeout(() => setConnectorKeySuccess(null), 5000);
     }
-    setTimeout(() => setConnectorKeySuccess(null), 5000);
+  };
+
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmNewPassword, setConfirmNewPassword] = useState('');
+  const [passwordSaving, setPasswordSaving] = useState(false);
+  const [passwordFeedback, setPasswordFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+
+  const handleChangePassword = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setPasswordFeedback(null);
+    if (newPassword.length < 12) {
+      setPasswordFeedback({ type: 'error', message: 'Use at least 12 characters for your new password.' });
+      return;
+    }
+    if (newPassword !== confirmNewPassword) {
+      setPasswordFeedback({ type: 'error', message: 'The new passwords do not match.' });
+      return;
+    }
+    setPasswordSaving(true);
+    try {
+      const response = await fetch('/api/auth/change-password', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token || localStorage.getItem('halbiz_auth_token') || localStorage.getItem('token') || ''}`
+        },
+        body: JSON.stringify({ currentPassword, newPassword })
+      });
+      const result = await response.json();
+      if (!response.ok || !result.success) throw new Error(result.error || 'Password could not be changed.');
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmNewPassword('');
+      setPasswordFeedback({ type: 'success', message: result.message || 'Password updated successfully.' });
+    } catch (error: any) {
+      setPasswordFeedback({ type: 'error', message: error?.message || 'Password could not be changed. Please try again.' });
+    } finally {
+      setPasswordSaving(false);
+    }
   };
 
   // Password reset state
@@ -453,7 +501,7 @@ export default function SettingsPanel({
           </button>
         </div>
         <div className="text-[11px] font-mono text-text-tertiary hidden sm:block min-w-0 break-words text-right">
-          {activeSubTab === 'about' ? 'HAL CONSTITUTION & ROADMAP' : 'ENTERPRISE SYSTEM CONFIGURATION'}
+          {activeSubTab === 'about' ? 'PRODUCT GUIDE' : 'WORKSPACE SETTINGS'}
         </div>
       </div>
 
@@ -467,14 +515,14 @@ export default function SettingsPanel({
       <div className={`border rounded-lg p-6 space-y-6 min-w-0 ${cardBg}`}>
         <div className="flex flex-wrap items-center gap-2 border-b pb-3 border-inherit">
           <Briefcase className="w-4 h-4 text-brand" />
-          <span className="text-xs font-mono uppercase tracking-wider font-bold">White-Label Workspace Configurator</span>
+          <span className="text-xs font-mono uppercase tracking-wider font-bold">Workspace and company profile</span>
           <span className="ml-auto text-[11px] px-2 py-0.5 bg-brand/10 text-brand font-mono border border-brand/20 rounded font-semibold uppercase flex items-center gap-1">
-            <Sparkles className="w-3 h-3" /> WHITE-LABEL READY
+            <Sparkles className="w-3 h-3" /> Custom branding
           </span>
         </div>
 
         <p className="text-xs text-text-secondary leading-relaxed max-w-3xl font-mono">
-          Configure your target sub-niche, primary operating city territory, and white-label agency branding settings below.
+          Set the market, service category and company details used across your workspace.
         </p>
 
         {/* SUB-NICHE & CITY TERRITORY CUSTOMIZATION */}
@@ -955,15 +1003,15 @@ export default function SettingsPanel({
 
       <details className={`border rounded-lg ${cardBg} mt-6`}>
         <summary className="cursor-pointer list-none p-5 flex flex-wrap items-center justify-between gap-3">
-          <span className="font-mono text-xs font-bold uppercase tracking-wider">Advanced · Connected services and API credentials</span>
-          <span className="text-[11px] text-text-secondary">Encrypted integration credentials · expand to manage</span>
+          <span className="font-mono text-xs font-bold uppercase tracking-wider">Integration credentials</span>
+          <span className="text-[11px] text-text-secondary">Manage saved credentials</span>
         </summary>
         <div className="px-5 pb-5">
-      {/* Connected Business Services & Third-Party API Credentials */}
+      {/* Integration credentials */}
       <div className={`border rounded-lg p-5 space-y-6 ${cardBg} mt-2`}>
         <div className="flex flex-wrap items-center gap-2 border-b pb-3 border-inherit">
           <Globe className="w-4 h-4 text-accent" />
-          <span className="text-xs font-mono uppercase tracking-wider font-bold">Connected Business Services & Third-Party API Credentials</span>
+          <span className="text-xs font-mono uppercase tracking-wider font-bold">Integration credentials</span>
         </div>
 
         <p className="text-xs text-inherit opacity-80 leading-relaxed font-sans">
@@ -988,7 +1036,7 @@ export default function SettingsPanel({
                 <div className="flex justify-between items-center">
                   <span className="flex min-w-0 items-center gap-2.5"><ProviderBrandIcon brand={provider.brand} label={provider.label} /><span className="font-semibold text-[12px] text-text-primary normal-case tracking-normal">{provider.label}</span></span>
                   <span className={`text-[11px] font-mono px-1.5 py-0.5 rounded font-bold uppercase ${connectorConfigured[provider.id] ? 'bg-positive/20 text-positive' : 'bg-warning-dim text-warning'}`}>
-                    {connectorConfigured[provider.id] ? 'Configured' : 'Unconfigured'}
+                    {connectorConfigured[provider.id] ? 'Saved' : 'Not saved'}
                   </span>
                 </div>
                 <input
@@ -996,29 +1044,38 @@ export default function SettingsPanel({
                   autoComplete="new-password"
                   value={connectorKeys[provider.id]}
                   onChange={(e) => setConnectorKeys(prev => ({ ...prev, [provider.id]: e.target.value }))}
-                  onBlur={() => handleSaveConnectorKey(provider.id, connectorKeys[provider.id])}
                   placeholder={provider.placeholder}
-                  className={`w-full border rounded p-2 focus:outline-none focus:border-accent text-inherit font-mono text-xs ${innerBg} ${borderCol}`}
+                  className={`w-full border rounded-lg p-3 focus:outline-none focus:border-accent text-inherit text-sm ${innerBg} ${borderCol}`}
                 />
-                <span className="text-[11px] text-inherit opacity-60 block">Encrypted credential · {provider.env}</span>
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-xs text-text-secondary">{connectorConfigured[provider.id] ? 'Credential saved' : 'Not saved'}</span>
+                  <button type="button" onClick={() => handleSaveConnectorKey(provider.id, connectorKeys[provider.id])} disabled={connectorSaving[provider.id] || !connectorKeys[provider.id].trim()} className="px-3 py-2 rounded-md bg-accent text-black text-xs font-semibold disabled:opacity-40 disabled:cursor-not-allowed hover:bg-accent/85 transition-colors">
+                    {connectorSaving[provider.id] ? 'Saving…' : 'Save credential'}
+                  </button>
+                </div>
+                <span className="text-[11px] text-text-secondary block">Stored encrypted. Saving does not test provider access.</span>
               </div>
             ))}
             {/* Stripe */}
             <div className={`border p-4 rounded-xl space-y-3 transition-colors hover:border-accent/40 ${innerBg} ${borderCol}`}>
               <div className="flex justify-between items-center">
                 <span className="flex items-center gap-2.5"><ProviderBrandIcon brand="stripe" label="Stripe" /><span className="text-[12px] font-semibold normal-case tracking-normal text-text-primary">Stripe Billing</span></span>
-                <span className={`text-[11px] font-mono px-1.5 py-0.5 rounded font-bold uppercase ${connectorKeys.stripe ? 'bg-positive/20 text-positive' : 'bg-warning-dim text-warning'}`}>
-                  {connectorConfigured.stripe || connectorKeys.stripe ? 'Configured' : 'Unconfigured'}
+                <span className={`text-[11px] font-mono px-1.5 py-0.5 rounded font-bold uppercase ${connectorConfigured.stripe || connectorKeys.stripe ? 'bg-positive/20 text-positive' : 'bg-warning-dim text-warning'}`}>
+                  {connectorConfigured.stripe || connectorKeys.stripe ? 'Saved' : 'Not saved'}
                 </span>
               </div>
               <input
                 type="password"
                 value={connectorKeys.stripe}
                 onChange={(e) => setConnectorKeys(prev => ({ ...prev, stripe: e.target.value }))}
-                onBlur={() => handleSaveConnectorKey('stripe', connectorKeys.stripe)}
                 placeholder="sk_live_..."
                 className={`w-full border rounded p-2 focus:outline-none focus:border-accent text-inherit font-mono text-xs ${innerBg} ${borderCol}`}
               />
+              <div className="flex justify-end">
+                <button type="button" onClick={() => handleSaveConnectorKey('stripe', connectorKeys.stripe)} disabled={connectorSaving.stripe || !connectorKeys.stripe.trim()} className="px-3 py-2 rounded-md bg-accent text-black text-xs font-semibold disabled:opacity-40 disabled:cursor-not-allowed hover:bg-accent/85 transition-colors">
+                  {connectorSaving.stripe ? 'Saving…' : 'Save credential'}
+                </button>
+              </div>
               <span className="text-[11px] text-inherit opacity-60 block">Key: STRIPE_SECRET_KEY</span>
             </div>
 
@@ -1026,18 +1083,22 @@ export default function SettingsPanel({
             <div className={`border p-4 rounded-xl space-y-3 transition-colors hover:border-accent/40 ${innerBg} ${borderCol}`}>
               <div className="flex justify-between items-center">
                 <span className="flex items-center gap-2.5"><ProviderBrandIcon brand="twilio" label="Twilio" /><span className="text-[12px] font-semibold normal-case tracking-normal text-text-primary">Twilio SMS</span></span>
-                <span className={`text-[11px] font-mono px-1.5 py-0.5 rounded font-bold uppercase ${connectorKeys.twilio ? 'bg-positive/20 text-positive' : 'bg-warning-dim text-warning'}`}>
-                  {connectorConfigured.twilio || connectorKeys.twilio ? 'Configured' : 'Unconfigured'}
+                <span className={`text-[11px] font-mono px-1.5 py-0.5 rounded font-bold uppercase ${connectorConfigured.twilio || connectorKeys.twilio ? 'bg-positive/20 text-positive' : 'bg-warning-dim text-warning'}`}>
+                  {connectorConfigured.twilio || connectorKeys.twilio ? 'Saved' : 'Not saved'}
                 </span>
               </div>
               <input
                 type="password"
                 value={connectorKeys.twilio}
                 onChange={(e) => setConnectorKeys(prev => ({ ...prev, twilio: e.target.value }))}
-                onBlur={() => handleSaveConnectorKey('twilio', connectorKeys.twilio)}
                 placeholder="AC... (Auth Token)"
                 className={`w-full border rounded p-2 focus:outline-none focus:border-accent text-inherit font-mono text-xs ${innerBg} ${borderCol}`}
               />
+              <div className="flex justify-end">
+                <button type="button" onClick={() => handleSaveConnectorKey('twilio', connectorKeys.twilio)} disabled={connectorSaving.twilio || !connectorKeys.twilio.trim()} className="px-3 py-2 rounded-md bg-accent text-black text-xs font-semibold disabled:opacity-40 disabled:cursor-not-allowed hover:bg-accent/85 transition-colors">
+                  {connectorSaving.twilio ? 'Saving…' : 'Save credential'}
+                </button>
+              </div>
               <span className="text-[11px] text-inherit opacity-60 block">Key: TWILIO_AUTH_TOKEN</span>
             </div>
 
@@ -1045,18 +1106,22 @@ export default function SettingsPanel({
             <div className={`border p-4 rounded-xl space-y-3 transition-colors hover:border-accent/40 ${innerBg} ${borderCol}`}>
               <div className="flex justify-between items-center">
                 <span className="flex items-center gap-2.5"><ProviderBrandIcon brand="sendgrid" label="SendGrid" /><span className="text-[12px] font-semibold normal-case tracking-normal text-text-primary">SendGrid Mail</span></span>
-                <span className={`text-[11px] font-mono px-1.5 py-0.5 rounded font-bold uppercase ${connectorKeys.sendgrid ? 'bg-positive/20 text-positive' : 'bg-warning-dim text-warning'}`}>
-                  {connectorConfigured.sendgrid || connectorKeys.sendgrid ? 'Configured' : 'Unconfigured'}
+                <span className={`text-[11px] font-mono px-1.5 py-0.5 rounded font-bold uppercase ${connectorConfigured.sendgrid || connectorKeys.sendgrid ? 'bg-positive/20 text-positive' : 'bg-warning-dim text-warning'}`}>
+                  {connectorConfigured.sendgrid || connectorKeys.sendgrid ? 'Saved' : 'Not saved'}
                 </span>
               </div>
               <input
                 type="password"
                 value={connectorKeys.sendgrid}
                 onChange={(e) => setConnectorKeys(prev => ({ ...prev, sendgrid: e.target.value }))}
-                onBlur={() => handleSaveConnectorKey('sendgrid', connectorKeys.sendgrid)}
                 placeholder="SG..."
                 className={`w-full border rounded p-2 focus:outline-none focus:border-accent text-inherit font-mono text-xs ${innerBg} ${borderCol}`}
               />
+              <div className="flex justify-end">
+                <button type="button" onClick={() => handleSaveConnectorKey('sendgrid', connectorKeys.sendgrid)} disabled={connectorSaving.sendgrid || !connectorKeys.sendgrid.trim()} className="px-3 py-2 rounded-md bg-accent text-black text-xs font-semibold disabled:opacity-40 disabled:cursor-not-allowed hover:bg-accent/85 transition-colors">
+                  {connectorSaving.sendgrid ? 'Saving…' : 'Save credential'}
+                </button>
+              </div>
               <span className="text-[11px] text-inherit opacity-60 block">Key: SENDGRID_API_KEY</span>
             </div>
 
@@ -1064,18 +1129,22 @@ export default function SettingsPanel({
             <div className={`border p-4 rounded-xl space-y-3 transition-colors hover:border-accent/40 ${innerBg} ${borderCol}`}>
               <div className="flex justify-between items-center">
                 <span className="flex items-center gap-2.5"><ProviderBrandIcon brand="googlemaps" label="Google Maps" /><span className="text-[12px] font-semibold normal-case tracking-normal text-text-primary">Google Maps Platform</span></span>
-                <span className={`text-[11px] font-mono px-1.5 py-0.5 rounded font-bold uppercase ${connectorKeys.googleMaps ? 'bg-positive/20 text-positive' : 'bg-warning-dim text-warning'}`}>
-                  {connectorConfigured.googleMaps || connectorKeys.googleMaps ? 'Configured' : 'Unconfigured'}
+                <span className={`text-[11px] font-mono px-1.5 py-0.5 rounded font-bold uppercase ${connectorConfigured.googleMaps || connectorKeys.googleMaps ? 'bg-positive/20 text-positive' : 'bg-warning-dim text-warning'}`}>
+                  {connectorConfigured.googleMaps || connectorKeys.googleMaps ? 'Saved' : 'Not saved'}
                 </span>
               </div>
               <input
                 type="password"
                 value={connectorKeys.googleMaps}
                 onChange={(e) => setConnectorKeys(prev => ({ ...prev, googleMaps: e.target.value }))}
-                onBlur={() => handleSaveConnectorKey('googleMaps', connectorKeys.googleMaps)}
                 placeholder="AIza..."
                 className={`w-full border rounded p-2 focus:outline-none focus:border-accent text-inherit font-mono text-xs ${innerBg} ${borderCol}`}
               />
+              <div className="flex justify-end">
+                <button type="button" onClick={() => handleSaveConnectorKey('googleMaps', connectorKeys.googleMaps)} disabled={connectorSaving.googleMaps || !connectorKeys.googleMaps.trim()} className="px-3 py-2 rounded-md bg-accent text-black text-xs font-semibold disabled:opacity-40 disabled:cursor-not-allowed hover:bg-accent/85 transition-colors">
+                  {connectorSaving.googleMaps ? 'Saving…' : 'Save credential'}
+                </button>
+              </div>
               <span className="text-[11px] text-inherit opacity-60 block">Key: VITE_GOOGLE_MAPS_API_KEY</span>
             </div>
 
@@ -1083,18 +1152,22 @@ export default function SettingsPanel({
             <div className={`border p-4 rounded-xl space-y-3 transition-colors hover:border-accent/40 ${innerBg} ${borderCol}`}>
               <div className="flex justify-between items-center">
                 <span className="flex items-center gap-2.5"><ProviderBrandIcon brand="googleads" label="Google Ads" /><span className="text-[12px] font-semibold normal-case tracking-normal text-text-primary">Google Ads</span></span>
-                <span className={`text-[11px] font-mono px-1.5 py-0.5 rounded font-bold uppercase ${connectorKeys.googleAds ? 'bg-positive/20 text-positive' : 'bg-warning-dim text-warning'}`}>
-                  {connectorConfigured.googleAds || connectorKeys.googleAds ? 'Configured' : 'Unconfigured'}
+                <span className={`text-[11px] font-mono px-1.5 py-0.5 rounded font-bold uppercase ${connectorConfigured.googleAds || connectorKeys.googleAds ? 'bg-positive/20 text-positive' : 'bg-warning-dim text-warning'}`}>
+                  {connectorConfigured.googleAds || connectorKeys.googleAds ? 'Saved' : 'Not saved'}
                 </span>
               </div>
               <input
                 type="password"
                 value={connectorKeys.googleAds}
                 onChange={(e) => setConnectorKeys(prev => ({ ...prev, googleAds: e.target.value }))}
-                onBlur={() => handleSaveConnectorKey('googleAds', connectorKeys.googleAds)}
                 placeholder="Developer Token / Client ID"
                 className={`w-full border rounded p-2 focus:outline-none focus:border-accent text-inherit font-mono text-xs ${innerBg} ${borderCol}`}
               />
+              <div className="flex justify-end">
+                <button type="button" onClick={() => handleSaveConnectorKey('googleAds', connectorKeys.googleAds)} disabled={connectorSaving.googleAds || !connectorKeys.googleAds.trim()} className="px-3 py-2 rounded-md bg-accent text-black text-xs font-semibold disabled:opacity-40 disabled:cursor-not-allowed hover:bg-accent/85 transition-colors">
+                  {connectorSaving.googleAds ? 'Saving…' : 'Save credential'}
+                </button>
+              </div>
               <span className="text-[11px] text-inherit opacity-60 block">Key: GOOGLE_ADS_DEVELOPER_TOKEN</span>
             </div>
 
@@ -1102,18 +1175,22 @@ export default function SettingsPanel({
             <div className={`border p-4 rounded-xl space-y-3 transition-colors hover:border-accent/40 ${innerBg} ${borderCol}`}>
               <div className="flex justify-between items-center">
                 <span className="flex items-center gap-2.5"><ProviderBrandIcon brand="meta" label="Meta" /><span className="text-[12px] font-semibold normal-case tracking-normal text-text-primary">Meta Marketing</span></span>
-                <span className={`text-[11px] font-mono px-1.5 py-0.5 rounded font-bold uppercase ${connectorKeys.metaAds ? 'bg-positive/20 text-positive' : 'bg-warning-dim text-warning'}`}>
-                  {connectorConfigured.metaAds || connectorKeys.metaAds ? 'Configured' : 'Unconfigured'}
+                <span className={`text-[11px] font-mono px-1.5 py-0.5 rounded font-bold uppercase ${connectorConfigured.metaAds || connectorKeys.metaAds ? 'bg-positive/20 text-positive' : 'bg-warning-dim text-warning'}`}>
+                  {connectorConfigured.metaAds || connectorKeys.metaAds ? 'Saved' : 'Not saved'}
                 </span>
               </div>
               <input
                 type="password"
                 value={connectorKeys.metaAds}
                 onChange={(e) => setConnectorKeys(prev => ({ ...prev, metaAds: e.target.value }))}
-                onBlur={() => handleSaveConnectorKey('metaAds', connectorKeys.metaAds)}
                 placeholder="EAAG..."
                 className={`w-full border rounded p-2 focus:outline-none focus:border-accent text-inherit font-mono text-xs ${innerBg} ${borderCol}`}
               />
+              <div className="flex justify-end">
+                <button type="button" onClick={() => handleSaveConnectorKey('metaAds', connectorKeys.metaAds)} disabled={connectorSaving.metaAds || !connectorKeys.metaAds.trim()} className="px-3 py-2 rounded-md bg-accent text-black text-xs font-semibold disabled:opacity-40 disabled:cursor-not-allowed hover:bg-accent/85 transition-colors">
+                  {connectorSaving.metaAds ? 'Saving…' : 'Save credential'}
+                </button>
+              </div>
               <span className="text-[11px] text-inherit opacity-60 block">Key: META_SYSTEM_USER_TOKEN</span>
             </div>
 
@@ -1121,18 +1198,22 @@ export default function SettingsPanel({
             <div className={`border p-4 rounded-xl space-y-3 transition-colors hover:border-accent/40 ${innerBg} ${borderCol}`}>
               <div className="flex justify-between items-center">
                 <span className="flex items-center gap-2.5"><ProviderBrandIcon brand="googleanalytics" label="Google Analytics" /><span className="text-[12px] font-semibold normal-case tracking-normal text-text-primary">GA4 & Search Console</span></span>
-                <span className={`text-[11px] font-mono px-1.5 py-0.5 rounded font-bold uppercase ${connectorKeys.ga4 ? 'bg-positive/20 text-positive' : 'bg-warning-dim text-warning'}`}>
-                  {connectorConfigured.ga4 || connectorKeys.ga4 ? 'Configured' : 'Unconfigured'}
+                <span className={`text-[11px] font-mono px-1.5 py-0.5 rounded font-bold uppercase ${connectorConfigured.ga4 || connectorKeys.ga4 ? 'bg-positive/20 text-positive' : 'bg-warning-dim text-warning'}`}>
+                  {connectorConfigured.ga4 || connectorKeys.ga4 ? 'Saved' : 'Not saved'}
                 </span>
               </div>
               <input
                 type="password"
                 value={connectorKeys.ga4}
                 onChange={(e) => setConnectorKeys(prev => ({ ...prev, ga4: e.target.value }))}
-                onBlur={() => handleSaveConnectorKey('ga4', connectorKeys.ga4)}
                 placeholder="Service Account JSON Token"
                 className={`w-full border rounded p-2 focus:outline-none focus:border-accent text-inherit font-mono text-xs ${innerBg} ${borderCol}`}
               />
+              <div className="flex justify-end">
+                <button type="button" onClick={() => handleSaveConnectorKey('ga4', connectorKeys.ga4)} disabled={connectorSaving.ga4 || !connectorKeys.ga4.trim()} className="px-3 py-2 rounded-md bg-accent text-black text-xs font-semibold disabled:opacity-40 disabled:cursor-not-allowed hover:bg-accent/85 transition-colors">
+                  {connectorSaving.ga4 ? 'Saving…' : 'Save credential'}
+                </button>
+              </div>
               <span className="text-[11px] text-inherit opacity-60 block">Key: GOOGLE_SERVICE_ACCOUNT</span>
             </div>
 
@@ -1140,18 +1221,22 @@ export default function SettingsPanel({
             <div className={`border p-4 rounded-xl space-y-3 transition-colors hover:border-accent/40 ${innerBg} ${borderCol}`}>
               <div className="flex justify-between items-center">
                 <span className="flex items-center gap-2.5"><ProviderBrandIcon brand="slack" label="Slack" /><span className="text-[12px] font-semibold normal-case tracking-normal text-text-primary">Slack Operations</span></span>
-                <span className={`text-[11px] font-mono px-1.5 py-0.5 rounded font-bold uppercase ${connectorKeys.slack ? 'bg-positive/20 text-positive' : 'bg-warning-dim text-warning'}`}>
-                  {connectorConfigured.slack || connectorKeys.slack ? 'Configured' : 'Unconfigured'}
+                <span className={`text-[11px] font-mono px-1.5 py-0.5 rounded font-bold uppercase ${connectorConfigured.slack || connectorKeys.slack ? 'bg-positive/20 text-positive' : 'bg-warning-dim text-warning'}`}>
+                  {connectorConfigured.slack || connectorKeys.slack ? 'Saved' : 'Not saved'}
                 </span>
               </div>
               <input
                 type="password"
                 value={connectorKeys.slack}
                 onChange={(e) => setConnectorKeys(prev => ({ ...prev, slack: e.target.value }))}
-                onBlur={() => handleSaveConnectorKey('slack', connectorKeys.slack)}
                 placeholder="https://hooks.slack.com/services/..."
                 className={`w-full border rounded p-2 focus:outline-none focus:border-accent text-inherit font-mono text-xs ${innerBg} ${borderCol}`}
               />
+              <div className="flex justify-end">
+                <button type="button" onClick={() => handleSaveConnectorKey('slack', connectorKeys.slack)} disabled={connectorSaving.slack || !connectorKeys.slack.trim()} className="px-3 py-2 rounded-md bg-accent text-black text-xs font-semibold disabled:opacity-40 disabled:cursor-not-allowed hover:bg-accent/85 transition-colors">
+                  {connectorSaving.slack ? 'Saving…' : 'Save credential'}
+                </button>
+              </div>
               <span className="text-[11px] text-inherit opacity-60 block">Key: SLACK_WEBHOOK_URL</span>
             </div>
 
@@ -1171,27 +1256,43 @@ export default function SettingsPanel({
         <div className={`border rounded-lg p-5 space-y-6 ${cardBg}`}>
           <div className="flex flex-wrap items-center gap-2 border-b pb-3 border-inherit">
             <Lock className="w-4 h-4 text-accent" />
-            <span className="text-xs font-mono uppercase tracking-wider font-bold">Identity Security Reset</span>
+            <span className="text-xs font-mono uppercase tracking-wider font-bold">Password and account security</span>
           </div>
 
-          <p className="text-xs text-inherit opacity-80 leading-relaxed font-sans">
-            Reset password to update identity security policies. Performing this update immediately invalidates all active sessions except your current authenticated window.
+          <p className="text-sm text-text-secondary leading-relaxed font-sans">
+            Change the password for this account. HAL verifies your current password and stores the new password as a server-side hash. This form is for email-and-password accounts; Google sign-in passwords are managed in your Google Account.
           </p>
 
-          <div className="p-4 border border-warning/30 bg-warning-dim rounded text-xs leading-relaxed">
-            Password changes are unavailable in this deployment because a secure authenticated change-password flow has not been implemented. No password will be submitted from this screen.
-          </div>
-
-
-          <div className={`border p-4 rounded flex gap-3.5 items-start ${innerBg} ${borderCol}`}>
-            <ShieldAlert className="w-5 h-5 text-accent shrink-0 mt-0.5" />
-            <div className="space-y-1 text-xs">
-              <span className="font-bold font-sans">Cryptographic Hashing Standard</span>
-              <p className="text-inherit opacity-80 leading-normal font-sans text-[11px]">
-                Password hashing is handled server-side. This screen does not expose a password-change operation until the complete authenticated workflow is available.
-              </p>
+          {passwordFeedback && (
+            <div role="status" className={`p-3 rounded-md border text-sm ${passwordFeedback.type === 'success' ? 'border-positive/30 bg-positive/10 text-positive' : 'border-negative/30 bg-negative-dim text-negative'}`}>
+              {passwordFeedback.message}
             </div>
-          </div>
+          )}
+
+          <form onSubmit={handleChangePassword} className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-3xl">
+            <label className="space-y-1.5 text-sm">
+              <span className="block text-text-secondary">Current password</span>
+              <input type="password" autoComplete="current-password" required value={currentPassword} onChange={event => setCurrentPassword(event.target.value)} className={`w-full border rounded-md p-3 text-sm ${innerBg} ${borderCol}`} />
+            </label>
+            <div className="hidden md:block" />
+            <label className="space-y-1.5 text-sm">
+              <span className="block text-text-secondary">New password</span>
+              <input type="password" autoComplete="new-password" minLength={12} maxLength={128} required value={newPassword} onChange={event => setNewPassword(event.target.value)} className={`w-full border rounded-md p-3 text-sm ${innerBg} ${borderCol}`} />
+              <span className="text-xs text-text-secondary">Use 12–128 characters.</span>
+            </label>
+            <label className="space-y-1.5 text-sm">
+              <span className="block text-text-secondary">Confirm new password</span>
+              <input type="password" autoComplete="new-password" minLength={12} maxLength={128} required value={confirmNewPassword} onChange={event => setConfirmNewPassword(event.target.value)} className={`w-full border rounded-md p-3 text-sm ${innerBg} ${borderCol}`} />
+            </label>
+            <div className="md:col-span-2">
+              <button type="submit" disabled={passwordSaving || !currentPassword || !newPassword || !confirmNewPassword} className="px-4 py-2.5 rounded-md bg-accent text-black text-sm font-semibold disabled:opacity-40 disabled:cursor-not-allowed hover:bg-accent/85 transition-colors">
+                {passwordSaving ? 'Updating password…' : 'Update password'}
+              </button>
+            </div>
+          </form>
+          <p className="text-xs text-text-secondary leading-relaxed max-w-3xl">
+            Your current session stays active after the change. Other devices may remain signed in until their sessions expire; sign them out separately if you no longer trust them.
+          </p>
         </div>
       {/* PUBLIC SHARE & REDDIT TESTING SHIELD */}      <div className={`border rounded-lg p-5 mt-6 space-y-5 ${cardBg}`}>
         <div className="flex flex-wrap items-center justify-between gap-3 border-b pb-3 border-inherit">

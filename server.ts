@@ -877,6 +877,67 @@ app.get('/api/auth/me', authenticate, async (req, res) => {
   }
 });
 
+app.post('/api/auth/change-password', authenticate, async (req, res) => {
+  const contractorId = (req as any).contractorId as string;
+  const currentPassword = req.body?.currentPassword;
+  const newPassword = req.body?.newPassword;
+
+  if (typeof currentPassword !== 'string' || typeof newPassword !== 'string' || !currentPassword || !newPassword) {
+    return res.status(400).json({ error: 'Enter your current password and a new password.' });
+  }
+  if (newPassword.length < 12 || newPassword.length > 128) {
+    return res.status(400).json({ error: 'Your new password must be between 12 and 128 characters.' });
+  }
+  if (currentPassword === newPassword) {
+    return res.status(400).json({ error: 'Choose a password different from your current password.' });
+  }
+
+  try {
+    const [account] = await pgDb.select({
+      id: contractors.id,
+      email: contractors.email,
+      passwordHash: contractors.passwordHash
+    }).from(contractors).where(eq(contractors.id, contractorId)).limit(1);
+
+    if (!account) return res.status(401).json({ error: 'Your account could not be verified.' });
+    if (!checkRateLimit(req, res, account.email)) return;
+    if (!verifyPassword(currentPassword, account.passwordHash || '')) {
+      recordAuthFailure(req, account.email);
+      return res.status(401).json({ error: 'Your current password is incorrect.' });
+    }
+    recordAuthSuccess(req, account.email);
+
+    const nextHash = hashPassword(newPassword);
+    const [updated] = await pgDb.update(contractors)
+      .set({ passwordHash: nextHash })
+      .where(and(eq(contractors.id, contractorId), eq(contractors.passwordHash, account.passwordHash)))
+      .returning({ id: contractors.id });
+
+    if (!updated) {
+      return res.status(409).json({ error: 'Your account changed during this request. Please try again.' });
+    }
+
+    try {
+      await pgDb.insert(auditLogs).values({
+        id: crypto.randomUUID(),
+        contractorId,
+        action: 'PASSWORD_CHANGED',
+        details: 'Account password changed through the authenticated account settings flow.'
+      });
+    } catch {
+      // Password changes do not depend on the optional audit-log insert.
+    }
+
+    return res.json({
+      success: true,
+      message: 'Password updated. Your current session remains active; other devices may remain signed in until their sessions expire.'
+    });
+  } catch (error: any) {
+    console.error('[HAL auth] Password update failed:', error?.message || error);
+    return res.status(503).json({ error: 'Password service is temporarily unavailable. Please try again.' });
+  }
+});
+
 app.post('/api/auth/register', async (req, res) => {
   const email = req.body.email;
   const password = req.body.password;
