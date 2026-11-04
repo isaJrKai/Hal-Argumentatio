@@ -18,8 +18,8 @@
   },
   "dependencies": {
     "@electric-sql/pglite": "^0.5.15",
-    "@firebase/app": "^0.16.2",
-    "@firebase/auth": "^1.13.6",
+    "@firebase/app": "0.16.2",
+    "@firebase/auth": "1.13.6",
     "@fontsource/inter": "^5.2.8",
     "@fontsource/jetbrains-mono": "^5.2.8",
     "@google/genai": "^2.4.0",
