@@ -26,6 +26,7 @@ interface TopTelemetryBarProps {
   unreadNotificationsCount?: number;
   notifications?: any[];
   clearNotifications?: () => void;
+  onMarkNotificationRead?: (notificationId: string) => void;
   showNotifications?: boolean;
   onToggleNotifications?: () => void;
   onCloseNotifications?: () => void;
@@ -46,6 +47,7 @@ export const TopTelemetryBar: React.FC<TopTelemetryBarProps> = ({
   unreadNotificationsCount = 0,
   notifications = [],
   clearNotifications,
+  onMarkNotificationRead,
   showNotifications = false,
   onToggleNotifications,
   onCloseNotifications,
@@ -171,10 +173,20 @@ export const TopTelemetryBar: React.FC<TopTelemetryBarProps> = ({
                 <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
                   {notifications.length > 0 ? (
                     notifications.map((notif: any, i: number) => (
-                      <div key={i} className="p-2.5 rounded bg-bg-subtle border border-border-dim space-y-1">
-                        <div className="font-semibold text-text-primary text-xs">{notif.title || 'System Notification'}</div>
+                      <button
+                        key={notif.id || i}
+                        type="button"
+                        onClick={() => notif.id && onMarkNotificationRead?.(notif.id)}
+                        aria-label={`Mark notification as read: ${notif.title || 'System notification'}`}
+                        className={`w-full text-left p-2.5 rounded border space-y-1 transition-colors ${notif.read ? 'bg-bg-subtle border-border-dim' : 'bg-accent-dim/40 border-accent/30'}`}
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <span className="font-semibold text-text-primary text-xs">{notif.title || 'System Notification'}</span>
+                          {!notif.read && <span className="mt-1 w-1.5 h-1.5 rounded-full bg-accent shrink-0" aria-hidden="true" />}
+                        </div>
                         <div className="text-[11px] text-text-secondary">{notif.message || notif.text}</div>
-                      </div>
+                        <span className="text-[10px] text-text-tertiary">{notif.read ? 'Read' : 'Select to mark as read'}</span>
+                      </button>
                     ))
                   ) : (
                     <div className="text-center py-4 text-text-tertiary text-xs">

@@ -431,23 +431,32 @@ interface SseClient {
 }
 let sseClients: SseClient[] = [];
 
-function broadcastNotification(contractorId: string, type: string, title: string, message: string) {
-  // Save notification to DB
-  const notification = db.addNotification({
+async function broadcastNotification(contractorId: string, type: string, title: string, message: string) {
+  const notification = {
+    id: crypto.randomUUID(),
     contractorId,
     type,
     title,
     message,
-    read: false
-  });
+    read: false,
+    createdAt: new Date()
+  };
 
-  // Strict tenant-isolation: broadcast ONLY to matching contractorId
+  // Persist first. Do not broadcast an event that cannot be recovered after reconnect.
+  try {
+    await pgDb.insert(notifications).values(notification);
+  } catch (error) {
+    console.error('[HAL Notifications] Could not persist notification; event was not broadcast:', error);
+    return;
+  }
+
+  // Strict tenant-isolation: broadcast ONLY to matching contractorId.
   const payload = JSON.stringify({ type: 'notification', data: notification });
   sseClients.filter(client => client.contractorId === contractorId).forEach(client => {
     try {
       client.res.write(`data: ${payload}\n\n`);
-    } catch (err) {
-      // client connection closed
+    } catch {
+      // Client connection has already closed.
     }
   });
 }
@@ -1395,6 +1404,54 @@ app.post('/api/auth/reset-password', async (req, res) => {
   }
 });
 
+
+// ─── PERSISTED TENANT NOTIFICATIONS ──────────────────────────────────────────
+app.get('/api/notifications', authenticate, async (req, res) => {
+  const contractorId = (req as any).contractorId;
+  try {
+    const items = await pgDb.select().from(notifications)
+      .where(eq(notifications.contractorId, contractorId))
+      .orderBy(desc(notifications.createdAt))
+      .limit(100);
+    return res.json(items);
+  } catch (error: any) {
+    console.error('[HAL Notifications] History read failed:', error);
+    return res.status(503).json({ error: 'Notification history is temporarily unavailable.' });
+  }
+});
+
+app.patch('/api/notifications/:id', authenticate, async (req, res) => {
+  const contractorId = (req as any).contractorId;
+  const notificationId = String(req.params.id || '');
+  const read = req.body?.read;
+  if (typeof read !== 'boolean') {
+    return res.status(400).json({ error: 'A boolean read value is required.' });
+  }
+  try {
+    const updated = await pgDb.update(notifications)
+      .set({ read })
+      .where(and(eq(notifications.id, notificationId), eq(notifications.contractorId, contractorId)))
+      .returning({ id: notifications.id, read: notifications.read });
+    if (updated.length === 0) return res.status(404).json({ error: 'Notification not found.' });
+    return res.json({ success: true, notification: updated[0] });
+  } catch (error: any) {
+    console.error('[HAL Notifications] Read-state update failed:', error);
+    return res.status(503).json({ error: 'Notification state could not be updated.' });
+  }
+});
+
+app.post('/api/notifications/read-all', authenticate, async (req, res) => {
+  const contractorId = (req as any).contractorId;
+  try {
+    await pgDb.update(notifications)
+      .set({ read: true })
+      .where(eq(notifications.contractorId, contractorId));
+    return res.json({ success: true });
+  } catch (error: any) {
+    console.error('[HAL Notifications] Mark-all-read failed:', error);
+    return res.status(503).json({ error: 'Notifications could not be updated.' });
+  }
+});
 
 // ─── SSE REALTIME EVENTS ─────────────────────────────────────────────────────
 

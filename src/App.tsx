@@ -747,7 +747,7 @@ export default function App() {
         if (payload.type === 'notification') {
           const newNotif = payload.data as Notification;
           if (newNotif.contractorId === contractor?.id) {
-            setNotifications(previous => [newNotif, ...previous]);
+            setNotifications(previous => [newNotif, ...previous.filter(item => item.id !== newNotif.id)]);
             setToastAlert({
               id: newNotif.id,
               title: newNotif.title,
@@ -777,6 +777,26 @@ export default function App() {
         });
         if (!response.ok) throw new Error(`SSE connection failed (HTTP ${response.status})`);
         if (!response.body) throw new Error('SSE response did not provide a readable stream');
+
+        // Recover notifications created while this app was closed or disconnected.
+        try {
+          const historyResponse = await fetch('/api/notifications', {
+            headers: { Authorization: `Bearer ${sessionToken}` },
+            signal: currentController.signal
+          });
+          if (historyResponse.ok) {
+            const history = await historyResponse.json();
+            if (Array.isArray(history)) {
+              setNotifications(previous => {
+                const byId = new Map<string, Notification>();
+                [...history, ...previous].forEach(item => byId.set(item.id, item));
+                return Array.from(byId.values()).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+              });
+            }
+          }
+        } catch (historyError) {
+          if (!currentController.signal.aborted) console.warn('Notification history could not be loaded:', historyError);
+        }
 
         setSseConnected(true);
         sseRetryCountRef.current = 0;
@@ -843,9 +863,33 @@ export default function App() {
     }
   };
 
-  const clearNotifications = () => {
-    setNotifications([]);
-    setShowNotificationDropdown(false);
+  const markNotificationRead = async (notificationId: string) => {
+    try {
+      const response = await fetch(`/api/notifications/${encodeURIComponent(notificationId)}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token || ''}` },
+        body: JSON.stringify({ read: true })
+      });
+      if (!response.ok) throw new Error('Notification could not be marked as read.');
+      setNotifications(previous => previous.map(item => item.id === notificationId ? { ...item, read: true } : item));
+    } catch (error) {
+      console.warn('Notification read-state update failed:', error);
+    }
+  };
+
+  const clearNotifications = async () => {
+    try {
+      const response = await fetch('/api/notifications/read-all', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token || ''}` }
+      });
+      if (!response.ok) throw new Error('Notifications could not be marked as read.');
+      setNotifications(previous => previous.map(item => ({ ...item, read: true })));
+    } catch (error) {
+      console.warn('Mark-all-read request failed:', error);
+    } finally {
+      setShowNotificationDropdown(false);
+    }
   };
 
   if (publicAuditId) {
@@ -940,7 +984,7 @@ export default function App() {
     }
   ];
 
-  const unreadNotificationsCount = notifications.length;
+  const unreadNotificationsCount = notifications.filter(notification => !notification.read).length;
   const contractorFirstName = contractor?.name ? contractor.name.split(' ')[0] : 'Operator';
 
   const isDark = theme === 'dark';
@@ -1104,6 +1148,7 @@ export default function App() {
         unreadNotificationsCount={unreadNotificationsCount}
         notifications={notifications}
         clearNotifications={clearNotifications}
+        onMarkNotificationRead={markNotificationRead}
         showNotifications={showNotificationDropdown}
         onToggleNotifications={() => setShowNotificationDropdown(prev => !prev)}
         onCloseNotifications={() => setShowNotificationDropdown(false)}
