@@ -25,7 +25,7 @@ interface TopTelemetryBarProps {
   companyLogo?: string | null;
   unreadNotificationsCount?: number;
   notifications?: any[];
-  clearNotifications?: () => void;
+  markAllNotificationsRead?: () => void;
   onMarkNotificationRead?: (notificationId: string) => void;
   showNotifications?: boolean;
   onToggleNotifications?: () => void;
@@ -46,7 +46,7 @@ export const TopTelemetryBar: React.FC<TopTelemetryBarProps> = ({
   companyLogo,
   unreadNotificationsCount = 0,
   notifications = [],
-  clearNotifications,
+  markAllNotificationsRead,
   onMarkNotificationRead,
   showNotifications = false,
   onToggleNotifications,
@@ -160,12 +160,12 @@ export const TopTelemetryBar: React.FC<TopTelemetryBarProps> = ({
               <div className="absolute right-0 mt-2 w-80 sm:w-88 border border-border-default rounded-xl shadow-2xl p-4 space-y-3 z-50 text-xs bg-bg-raised text-text-primary backdrop-blur-xl">
                 <div className="flex justify-between items-center border-b border-border-dim pb-2">
                   <span className="font-sans text-xs font-bold text-text-primary uppercase tracking-wide">Company Updates</span>
-                  {clearNotifications && (
+                  {markAllNotificationsRead && (
                     <button
-                      onClick={clearNotifications}
+                      onClick={markAllNotificationsRead}
                       className="text-[10px] text-accent hover:underline cursor-pointer"
                     >
-                      Dismiss All
+                      Mark all as read
                     </button>
                   )}
                 </div>
