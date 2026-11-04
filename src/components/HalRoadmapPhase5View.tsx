@@ -311,7 +311,7 @@ export const HalRoadmapPhase5View: React.FC = () => {
           }`}
         >
           <Server className="w-3.5 h-3.5" />
-          <span>Decentralized Regional service endpoints</span>
+          <span>Regional service endpoints</span>
           <span className="px-1.5 py-0.2 rounded-full text-[10px] font-mono bg-accent/15 text-accent">
             {edgeRegions.length} Regions
           </span>
@@ -326,7 +326,7 @@ export const HalRoadmapPhase5View: React.FC = () => {
           }`}
         >
           <BookOpen className="w-3.5 h-3.5" />
-          <span>Cross-Industry Ontologies</span>
+          <span>Industry data models</span>
           <span className="px-1.5 py-0.2 rounded-full text-[10px] font-mono bg-emerald-500/15 text-emerald-500">
             {ontologies.length} Verticals
           </span>
@@ -450,7 +450,7 @@ export const HalRoadmapPhase5View: React.FC = () => {
               <div>
                 <h3 className="text-sm font-bold text-text-primary flex items-center gap-1.5">
                   <Building2 className="w-4 h-4 text-accent" />
-                  Enterprise Tenant Hierarchy & Vault Isolation
+                  Company accounts and data separation
                 </h3>
                 <p className="text-xs text-text-secondary">
                   Hierarchical organization units enforce cryptographic data separation with isolated SHA-256 vault keys.
@@ -510,7 +510,7 @@ export const HalRoadmapPhase5View: React.FC = () => {
               <div>
                 <h3 className="text-sm font-bold text-text-primary flex items-center gap-1.5">
                   <Server className="w-4 h-4 text-accent" />
-                  Decentralized Regional service endpoints Mesh
+                  Regional service endpoints Mesh
                 </h3>
                 <p className="text-xs text-text-secondary">
                   Continuous edge health telemetry and multi-region consensus failover.

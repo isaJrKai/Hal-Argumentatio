@@ -148,7 +148,7 @@ export const HalRoadmapPhase4View: React.FC = () => {
     }
   };
 
-  // Re-evaluate Arbitrage against live database telemetry
+  // Refresh recommendations against live database telemetry
   const handleReevaluateArbitrage = async () => {
     setIsArbitrating(true);
     try {
@@ -350,7 +350,7 @@ export const HalRoadmapPhase4View: React.FC = () => {
                   NOT VERIFIED
                 </span>
               </div>
-              <h3 className="text-sm font-bold text-text-primary">Dual-Drive Model comparison</h3>
+              <h3 className="text-sm font-bold text-text-primary">Model comparison</h3>
               <p className="text-xs text-text-secondary leading-relaxed">
                 Designed to request parallel model analysis. Provider connectivity, model identity, policy enforcement, and consensus quality have not been verified in this deployment.
               </p>
@@ -638,7 +638,7 @@ export const HalRoadmapPhase4View: React.FC = () => {
             </div>
           </div>
 
-          {/* Calibrated Bayesian Weights Display */}
+          {/* Calibration weights */}
           <div className="p-5 rounded-xl bg-bg-raised border border-border-dim space-y-4">
             <div className="flex items-center justify-between">
               <div>
@@ -742,7 +742,7 @@ export const HalRoadmapPhase4View: React.FC = () => {
             </div>
           </div>
 
-          {/* Arbitrage Opportunities Table */}
+          {/* Budget recommendations */}
           <div className="space-y-4">
             {arbitrageList.length === 0 && <div className="p-5 rounded-xl border border-border-dim text-sm text-text-secondary">No campaign estimates are available. Connect measured campaign performance before evaluating any budget changes.</div>}
             {arbitrageList.map((item) => (
