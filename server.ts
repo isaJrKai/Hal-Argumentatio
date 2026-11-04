@@ -43,6 +43,7 @@ import { buildFinancialSnapshotCore } from './src/lib/financialSnapshot';
 import { getRevenueAmountUsd } from './src/lib/revenueAmounts';
 import { buildPasswordResetResponse } from './src/lib/passwordResetResponse';
 import { verifyFirebaseGoogleIdToken } from './src/lib/firebaseGoogleIdentity';
+import { getClientIp } from './src/lib/clientIp';
 import { recordWorkEvent, getRecentWorkEvents, getEntityWorkEvents } from './src/lib/workLedger';
 import { canHumanUpdateWorkTask, canTransitionWorkTask, listWorkTasks, getWorkTask, requiresWorkTaskApproval, ensureLeadReviewTask } from './src/lib/workTasks';
 import { validateStaffInput, getEffectiveStaffAvailability } from './src/lib/staff';
@@ -223,7 +224,7 @@ app.use((req, res, next) => {
 
     // 2. In Safe Sandbox Mode: Rate limit to avoid DoS & Gemini Quota Exhaustion
     if (publicLinkConfig.mode === 'safe_sandbox') {
-      const clientIp = ((req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim()) || req.socket.remoteAddress || '127.0.0.1';
+      const clientIp = getClientIp(req);
       const now = Date.now();
       let record = publicIpRateMap.get(clientIp);
 
@@ -364,7 +365,7 @@ interface AuthFailure {
 const loginFailures = new Map<string, AuthFailure>();
 
 function checkRateLimit(req: express.Request, res: express.Response, email: string): boolean {
-  const ip = req.ip || req.headers['x-forwarded-for'] as string || 'unknown-ip';
+  const ip = getClientIp(req);
   const limitKey = `${ip}:${email.toLowerCase().trim()}`;
   const now = Date.now();
 
@@ -391,7 +392,7 @@ function checkRateLimit(req: express.Request, res: express.Response, email: stri
 }
 
 function recordAuthFailure(req: express.Request, email: string) {
-  const ip = req.ip || req.headers['x-forwarded-for'] as string || 'unknown-ip';
+  const ip = getClientIp(req);
   const limitKey = `${ip}:${email.toLowerCase().trim()}`;
   const now = Date.now();
 
@@ -409,7 +410,7 @@ function recordAuthFailure(req: express.Request, email: string) {
 }
 
 function recordAuthSuccess(req: express.Request, email: string) {
-  const ip = req.ip || req.headers['x-forwarded-for'] as string || 'unknown-ip';
+  const ip = getClientIp(req);
   const limitKey = `${ip}:${email.toLowerCase().trim()}`;
   loginFailures.delete(limitKey);
 }
