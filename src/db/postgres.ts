@@ -731,6 +731,9 @@ export async function bootstrapPostgresTables(poolInstance?: Pool): Promise<void
       ALTER TABLE leads ADD COLUMN IF NOT EXISTS dns_verified BOOLEAN DEFAULT false;
       ALTER TABLE leads ADD COLUMN IF NOT EXISTS grounding_evidence JSONB;
 
+      -- Ensure legacy databases have this column before changing its default/nullability.
+      ALTER TABLE leads ADD COLUMN IF NOT EXISTS source_type TEXT DEFAULT 'live_harvest' NOT NULL;
+
       ALTER TABLE leads ALTER COLUMN source_type DROP DEFAULT;
       ALTER TABLE leads ALTER COLUMN source_type DROP NOT NULL;
       ALTER TABLE leads ALTER COLUMN review_count DROP DEFAULT;
