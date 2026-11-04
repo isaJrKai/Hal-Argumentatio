@@ -18,7 +18,7 @@ export function Card({
   const variantClasses = {
     default: 'bg-bg-raised border border-border-dim text-text-primary',
     subtle: 'bg-bg-base border border-border-dim/50 text-text-primary',
-    raised: 'bg-bg-overlay border border-border-default text-text-primary shadow-lg',
+    raised: 'bg-bg-overlay border border-border-default text-text-primary',
     accent: 'bg-bg-raised border border-accent/20 text-text-primary hover:border-accent/40',
     error: 'bg-negative-dim/20 border border-negative/20 text-text-primary',
     warning: 'bg-warning-dim/20 border border-warning/20 text-text-primary',
@@ -26,13 +26,13 @@ export function Card({
   };
 
   const hoverClass = isHoverable 
-    ? 'hover:border-border-strong hover:bg-bg-subtle transition-all duration-200 cursor-pointer active:scale-[0.99]'
-    : 'transition-all duration-200';
+    ? 'hover:border-border-strong hover:bg-bg-subtle transition-colors duration-200 cursor-pointer'
+    : 'transition-colors duration-200';
 
   return (
     <div
       className={`
-        rounded-md p-5 md:p-6 select-none overflow-hidden
+        rounded-xl p-5 md:p-6 overflow-hidden
         ${variantClasses[variant]}
         ${hoverClass}
         ${className}
@@ -66,7 +66,7 @@ export function CardHeader({
           {title}
         </h3>
         {subtitle && (
-          <p className="font-mono text-[10px] text-text-secondary uppercase tracking-wider">
+          <p className="font-sans text-xs text-text-secondary">
             {subtitle}
           </p>
         )}
