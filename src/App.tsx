@@ -341,10 +341,13 @@ export default function App() {
     setCompanyLogo(logo);
   };
 
-  const toggleTheme = () => {
-    const next = theme === 'dark' ? 'light' : 'dark';
+  const setThemePreference = (next: 'dark' | 'light') => {
     writeLocalStorage('hal_theme', next);
     setTheme(next);
+  };
+
+  const toggleTheme = () => {
+    setThemePreference(theme === 'dark' ? 'light' : 'dark');
   };
 
   // Follow OS theme changes live while the user has not picked a theme manually
@@ -949,7 +952,7 @@ export default function App() {
 
   return (
     <InspectorProvider>
-      <div className={`h-screen flex flex-col font-sans overflow-hidden select-none selection:bg-accent/30 selection:text-white transition-colors duration-200 ${theme === 'light' ? 'light-theme' : 'dark-theme'} ${baseBg}`}>
+      <div className={`h-[100dvh] min-h-[100vh] flex flex-col font-sans overflow-hidden select-none selection:bg-accent/30 selection:text-white transition-colors duration-200 ${theme === 'light' ? 'light-theme' : 'dark-theme'} ${baseBg}`}>
 
       {/* PUBLIC COMMUNITY SANDBOX BANNER (REDDIT / SHARED LINK VISITORS) */}
       {isSharedPreview && (
@@ -1320,6 +1323,7 @@ export default function App() {
                     <SettingsPanel 
                       token={token}
                       theme={theme}
+                      onThemeChange={setThemePreference}
                       profilePhoto={profilePhoto}
                       companyLogo={companyLogo}
                       onProfilePhotoUpdate={handleProfilePhotoUpdate}
@@ -1333,6 +1337,7 @@ export default function App() {
                     <SettingsPanel 
                       token={token}
                       theme={theme}
+                      onThemeChange={setThemePreference}
                       profilePhoto={profilePhoto}
                       companyLogo={companyLogo}
                       onProfilePhotoUpdate={handleProfilePhotoUpdate}

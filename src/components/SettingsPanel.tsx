@@ -36,6 +36,7 @@ import { ProviderBrandIcon } from './ProviderBrandIcon';
 interface SettingsPanelProps {
   token: string | null;
   theme: 'dark' | 'light';
+  onThemeChange: (theme: 'dark' | 'light') => void;
   profilePhoto: string | null;
   companyLogo: string | null;
   onProfilePhotoUpdate: (photo: string | null) => void;
@@ -47,6 +48,8 @@ interface SettingsPanelProps {
 
 export default function SettingsPanel({ 
   token, 
+  theme,
+  onThemeChange,
   profilePhoto,
   companyLogo,
   onProfilePhotoUpdate,
@@ -511,6 +514,19 @@ export default function SettingsPanel({
         </div>
       ) : (
         <>
+      <section className={`border rounded-lg p-5 space-y-4 min-w-0 ${cardBg}`} aria-labelledby="hal-appearance-heading">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h2 id="hal-appearance-heading" className="text-sm font-semibold text-text-primary">Appearance</h2>
+            <p className="mt-1 text-xs text-text-secondary">Choose how HAL looks on this device.</p>
+          </div>
+          <div className="inline-flex items-center gap-1 rounded-lg border border-border-dim bg-bg-base p-1" role="group" aria-label="Appearance theme">
+            <button type="button" onClick={() => onThemeChange('light')} aria-pressed={theme === 'light'} className={`px-3 py-2 rounded-md text-xs font-medium transition-colors ${theme === 'light' ? 'bg-accent text-black' : 'text-text-secondary hover:text-text-primary'}`}>Light</button>
+            <button type="button" onClick={() => onThemeChange('dark')} aria-pressed={theme === 'dark'} className={`px-3 py-2 rounded-md text-xs font-medium transition-colors ${theme === 'dark' ? 'bg-accent text-black' : 'text-text-secondary hover:text-text-primary'}`}>Dark</button>
+          </div>
+        </div>
+      </section>
+
       {/* MULTI-INDUSTRY & WHITE-LABEL WORKSPACE MANAGER */}
       <div className={`border rounded-lg p-6 space-y-6 min-w-0 ${cardBg}`}>
         <div className="flex flex-wrap items-center gap-2 border-b pb-3 border-inherit">
