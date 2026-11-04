@@ -347,7 +347,9 @@ export default function ConnectorsPanel() {
       .then(response => response.ok ? response.json() : null)
       .then(data => setMetaStatus(data?.configured?.metaAds ? 'configured' : 'idle'))
       .catch(() => setMetaStatus('idle'));
-  }, []);  const handleSaveMetaCredentials = async () => {
+  }, []);
+
+  const handleSaveMetaCredentials = async () => {
     if (!metaToken.trim() || !metaAdAccountId.trim()) {
       toast({
         variant: 'warning',
