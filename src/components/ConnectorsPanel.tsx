@@ -32,6 +32,7 @@ import {
   CalendarEvent
 } from '../lib/googleWorkspace';
 import { User } from '@firebase/auth';
+import { ProviderBrandIcon } from './ProviderBrandIcon';
 
 export default function ConnectorsPanel() {
   const { toast } = useToast();
@@ -332,49 +333,61 @@ export default function ConnectorsPanel() {
   };
 
   // ─── META ADS STATE ────────────────────────────────────────────────────────
-  const [metaToken, setMetaToken] = useState(() => localStorage.getItem('hal_meta_token') || '');
-  const [metaAdAccountId, setMetaAdAccountId] = useState(() => localStorage.getItem('hal_meta_ad_account_id') || '');
+  const [metaToken, setMetaToken] = useState('');
+  const [metaAdAccountId, setMetaAdAccountId] = useState('');
   const [isTestingMeta, setIsTestingMeta] = useState(false);
-  const [metaStatus, setMetaStatus] = useState<'idle' | 'configured' | 'connected' | 'error'>(() => {
-    return localStorage.getItem('hal_meta_token') ? 'configured' : 'idle';
-  });
+  const [metaStatus, setMetaStatus] = useState<'idle' | 'configured' | 'error'>('idle');
+
+  useEffect(() => {
+    // Remove legacy browser-stored Meta secrets; use the encrypted server-side vault.
+    localStorage.removeItem('hal_meta_token');
+    localStorage.removeItem('hal_meta_ad_account_id');
+    const authToken = localStorage.getItem('halbiz_auth_token') || localStorage.getItem('token') || '';
+    fetch('/api/connectors/credentials', { headers: authToken ? { Authorization: `Bearer ${authToken}` } : {} })
+      .then(response => response.ok ? response.json() : null)
+      .then(data => setMetaStatus(data?.configured?.metaAds ? 'configured' : 'idle'))
+      .catch(() => setMetaStatus('idle'));
+  }, []);
 
   const handleSaveMetaCredentials = async () => {
     if (!metaToken.trim() || !metaAdAccountId.trim()) {
       toast({
         variant: 'warning',
         title: 'Missing Required Fields',
-        description: 'Provide both your Meta System User Access Token and Ad Account ID (e.g., act_123456789).'
+        description: 'Provide both the Meta System User Access Token and Ad Account ID.'
       });
       return;
     }
 
     setIsTestingMeta(true);
     try {
-      // Test the token against Meta Graph API
-      const res = await fetch(`https://graph.facebook.com/v19.0/me?access_token=${encodeURIComponent(metaToken.trim())}`);
-      const data = await res.json();
+      const authToken = localStorage.getItem('halbiz_auth_token') || localStorage.getItem('token') || '';
+      const saveCredential = async (service: string, keyVal: string) => {
+        const response = await fetch('/api/connectors/credentials', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${authToken}` },
+          body: JSON.stringify({ service, keyVal })
+        });
+        const result = await response.json();
+        if (!response.ok || !result.success) throw new Error(result.error || `Could not save ${service}.`);
+      };
 
-      if (data.error) {
-        throw new Error(data.error.message || 'Invalid Meta Access Token');
-      }
-
-      localStorage.setItem('hal_meta_token', metaToken.trim());
-      localStorage.setItem('hal_meta_ad_account_id', metaAdAccountId.trim());
-      setMetaStatus('connected');
-
+      await saveCredential('metaAds', metaToken.trim());
+      await saveCredential('metaAdsAccountId', metaAdAccountId.trim());
+      setMetaToken('');
+      setMetaAdAccountId('');
+      setMetaStatus('configured');
       toast({
-        variant: 'success',
-        title: 'Meta Marketing API Authenticated',
-        description: `Connected to Meta user/app: "${data.name || data.id}". Ad Account: ${metaAdAccountId.trim()}`,
-        whatNext: 'HAL can now query ad set performance and audience sync.'
+        variant: 'info',
+        title: 'Meta credentials saved',
+        description: 'Credentials were saved to HAL’s encrypted server-side vault. Provider connectivity has not been tested, so the integration remains unverified.'
       });
     } catch (err: any) {
       setMetaStatus('error');
       toast({
         variant: 'danger',
-        title: 'Meta Authentication Error',
-        description: err.message || 'Failed to authenticate with Meta Graph API.'
+        title: 'Could not save Meta credentials',
+        description: err.message || 'The encrypted credential save failed.'
       });
     } finally {
       setIsTestingMeta(false);
@@ -456,8 +469,8 @@ export default function ConnectorsPanel() {
               : 'text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800'
           }`}
         >
-          <Calendar className="w-4 h-4" />
-          <span>Unified Google Workspace</span>
+          <ProviderBrandIcon brand="googlegemini" label="Google" className="h-5 w-5" />
+          <span>Google Workspace</span>
           {googleUser && (
             <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
           )}
@@ -484,9 +497,9 @@ export default function ConnectorsPanel() {
               : 'text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800'
           }`}
         >
-          <Share2 className="w-4 h-4" />
+          <ProviderBrandIcon brand="meta" label="Meta" className="h-5 w-5" />
           <span>Meta & Instagram Ads</span>
-          {metaStatus === 'connected' && (
+          {metaStatus === 'configured' && (
             <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
           )}
         </button>
@@ -697,8 +710,7 @@ export default function ConnectorsPanel() {
             </div>
 
             <div className="space-y-6 pt-4">
-              {/* Buyer Handover Guide Callout */}
-              <div className="p-4 rounded-xl bg-blue-500/5 border border-blue-500/20 space-y-2">
+              {/* Buyer Handover Guide Callout */}              <div className="p-4 rounded-xl bg-blue-500/5 border border-blue-500/20 space-y-2">
                 <div className="flex items-center gap-2 text-xs font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wider font-mono">
                   <ShieldCheck className="w-4 h-4" />
                   Buyer / New Owner Setup Guide: Real Email API Integration
@@ -1036,8 +1048,8 @@ export default function ConnectorsPanel() {
 
               <div className="flex items-center justify-between pt-2">
                 <div className="flex items-center gap-2">
-                  <Badge variant={metaStatus === 'connected' ? 'active' : metaStatus === 'error' ? 'danger' : 'neutral'}>
-                    {metaStatus === 'connected' ? 'API validated' : metaStatus === 'configured' ? 'Saved · unverified' : metaStatus === 'error' ? 'Validation failed' : 'Not configured'}
+                  <Badge variant={metaStatus === 'error' ? 'danger' : 'neutral'}>
+                    {metaStatus === 'configured' ? 'Saved · unverified' : metaStatus === 'error' ? 'Save failed' : 'Not configured'}
                   </Badge>
                 </div>
 
@@ -1047,8 +1059,7 @@ export default function ConnectorsPanel() {
                   className="bg-purple-600 hover:bg-purple-700 text-white text-xs font-medium"
                 >
                   <Key className="w-3.5 h-3.5 mr-1.5" />
-                  {isTestingMeta ? 'Testing Connection...' : 'Save & Validate Meta API'}
-                </Button>
+                  {isTestingMeta ? 'Saving securely...' : 'Save credentials'}                </Button>
               </div>
             </div>
           </Card>
