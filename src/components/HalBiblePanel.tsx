@@ -215,7 +215,7 @@ export default function HalBiblePanel({ initialDocId }: HalBiblePanelProps = {})
             variant: 'success',
             title: 'Verification Preview Finished',
             description: 'The animation completed; no system, codebase, security, or compliance checks were performed.',
-            whatNext: 'Proceed with building high-fidelity client features.'
+            whatNext: 'Proceed with building product features.'
           });
         }
       }, (idx + 1) * 600);
@@ -804,7 +804,7 @@ ${d.description}
                         <div className="border-l border-border-dim pl-3.5 space-y-1">
                           <MetadataText>Prose / Explanation</MetadataText>
                           <ProseText>
-                            Never mix visual weights. Content is optimized to maintain absolute vertical alignment across bento layouts, minimizing user cognitive load.
+                            Use consistent type sizes and spacing so information is easy to scan.
                           </ProseText>
                         </div>
 
@@ -1191,7 +1191,7 @@ ${d.description}
                     {activeDoc.description}
                   </p>
 
-                  <h3 className="text-sm font-mono tracking-wider text-text-secondary uppercase font-semibold pt-2">2. LIVE ARCHITECTURAL CODE MAPPING</h3>
+                  <h3 className="text-sm font-mono tracking-wider text-text-secondary uppercase font-semibold pt-2">2. RELEVANT SOURCE FILES</h3>
                   <div className="p-4 bg-bg-base border border-border-dim rounded font-mono text-xs text-text-secondary space-y-3 min-w-0">
                     <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-1.5 py-2 border-b border-border-dim/40 min-w-0 break-words">
                       <span className="opacity-50">CORE SOURCE FILE:</span>
@@ -1217,23 +1217,23 @@ ${d.description}
                       </span>
                     </div>
                     <div className="flex justify-between items-center py-0.5 border-b border-border-dim/40">
-                      <span className="opacity-50">CANONICAL DIRECTIVE:</span>
+                      <span className="opacity-50">IMPLEMENTATION NOTE:</span>
                       <span className="text-text-primary min-w-0 break-words sm:text-right">
-                        {activeDoc.id === '07' ? 'Zero plaintext PII at rest; Merkle-root block validation' :
-                         activeDoc.id === '08' ? 'Live territory data only; zero synthetic hallucinations' :
-                         activeDoc.id === '10' ? 'Dual-Drive Consensus: Gemini 2.5 + Nemotron 70B' :
-                         activeDoc.id === '11' ? 'Bayesian weights calibration & CAC/LTV arbitrage' :
-                         activeDoc.id === '13' ? 'Pre-wired zero-code integration bridges (No code required)' :
-                         activeDoc.id === '15' ? 'HMAC-SHA256 signature verification & idempotent queue' :
-                         activeDoc.id === '23' ? 'Constrain instruments, not behavior; Apprenticeship loop' :
-                         'Decoupled Single-Responsibility Engine'}
+                        {activeDoc.id === '07' ? 'Encrypt sensitive contact details and restrict access; verify the deployed controls.' :
+                         activeDoc.id === '08' ? 'Use source-backed records and clearly label estimates or examples.' :
+                         activeDoc.id === '10' ? 'Model comparison workflow; verify both providers before relying on results.' :
+                         activeDoc.id === '11' ? 'Review calibration weights and revenue assumptions; validate outputs before use.' :
+                         activeDoc.id === '13' ? 'Provider integrations require credentials, permissions and a successful connection test.' :
+                         activeDoc.id === '15' ? 'Verify signed events and duplicate handling in the deployed messaging workflow.' :
+                         activeDoc.id === '23' ? 'Keep tools scoped and require human review.' :
+                         'Keep modules separated by responsibility.'}
                       </span>
                     </div>
                     <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-1.5 py-2 min-w-0 break-words">
-                      <span className="opacity-50">STABILITY RANKING:</span>
+                      <span className="opacity-50">VERIFICATION STATUS:</span>
                       <span className="text-text-secondary uppercase font-bold flex items-center gap-1">
-                        <CheckCircle2 className="w-3.5 h-3.5 text-positive" />
-                        CODE STATUS NOT VERIFIED
+                        <AlertCircle className="w-3.5 h-3.5 text-warning" />
+                        Not independently verified
                       </span>
                     </div>
                   </div>
@@ -1241,13 +1241,13 @@ ${d.description}
                   <h3 className="text-sm font-mono tracking-wider text-text-secondary uppercase font-semibold pt-2">3. OPERATING PRINCIPLES & DESK EQUIVALENT</h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm font-sans">
                     <div className="border border-border-dim p-3 rounded-sm bg-bg-base/40">
-                      <span className="text-[11px] font-mono text-accent block font-bold mb-1 uppercase tracking-wider">UPSTREAM TRIGGER SOURCES</span>
+                      <span className="text-[11px] font-mono text-accent block font-bold mb-1 uppercase tracking-wider">INPUTS</span>
                       <p className="text-sm text-text-secondary leading-7 break-words">
-                        Designed to support database-backed records, map-provider data, and operator guidance. Storage encryption and live provider integrations are not verified in this deployment.
+                        Uses database records, map-provider data and operator input. Encryption and provider behavior should be verified in the deployed environment.
                       </p>
                     </div>
                     <div className="border border-border-dim p-3 rounded-sm bg-bg-base/40">
-                      <span className="text-[11px] font-mono text-accent block font-bold mb-1 uppercase tracking-wider">DOWNSTREAM OUTCOME EXECUTION</span>
+                      <span className="text-[11px] font-mono text-accent block font-bold mb-1 uppercase tracking-wider">OUTPUTS</span>
                       <p className="text-[11px] text-text-secondary leading-relaxed">
                         Designed to integrate with Document Studio, the SMS/Email Outbox, and territory audits; each integration must be verified in the deployed environment.
                       </p>

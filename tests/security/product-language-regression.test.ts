@@ -29,6 +29,8 @@ describe('HAL product language and truthful controls', () => {
     expect(guide).not.toContain('Harvesting Map grounding!');
     expect(guide).not.toContain('PROPOSE ENTERPRISE CONNECT');
     expect(guide).not.toContain('COMMENCE MANDATE');
+    expect(guide).not.toContain('zero synthetic hallucinations');
+    expect(guide).toContain('Not independently verified');
     expect(guide).toContain('This is a sample dialog only. No outreach was scheduled.');
   });
 
