@@ -30,7 +30,7 @@ import {
 } from 'lucide-react';
 import { useBusinessContext } from '../context/BusinessContext';
 import { IndustryProfile } from '../config/industryTaxonomy';
-import HalBiblePanel from './HalBiblePanel';
+import HalOperatingManualPanel from './HalOperatingManualPanel';
 import { ProviderBrandIcon } from './ProviderBrandIcon';
 
 interface SettingsPanelProps {
@@ -507,7 +507,7 @@ export default function SettingsPanel({
 
       {activeSubTab === 'about' ? (
         <div className="pt-2">
-          <HalBiblePanel initialDocId={initialDocId} />
+          <HalOperatingManualPanel initialDocId={initialDocId} />
         </div>
       ) : (
         <>
