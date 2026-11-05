@@ -10579,38 +10579,40 @@ async function startServer() {
         newStatus = 'completed';
       }
 
-      const [updated] = await pgDb.update(halLoops).set({
-        currentStage: nextStage,
-        status: newStatus,
-        criticFindings,
-        stateSnapshot: { ...existingSnapshot, lastStage: loop.currentStage, currentStage: nextStage, updated: new Date().toISOString() },
-        updatedAt: new Date()
-      }).where(and(eq(halLoops.id, id), eq(halLoops.contractorId, contractorId))).returning();
-
-      await pgDb.insert(halLoopEvents).values({
-        id: crypto.randomUUID(),
-        loopId: id,
-        contractorId,
-        previousState: loop.currentStage,
-        newState: nextStage,
-        eventType: 'stage_transition',
-        actor: 'HAL Operator',
-        metadata: { status: newStatus }
-      });
-
-      await recordStructuredLedgerEntry({
+      const stageLedgerInput: StructuredLedgerInput = {
         contractorId,
         eventType: 'stage_transition',
         entityType: 'hal_loop',
         entityId: id,
         actor: 'HAL Operator',
         details: `Operating Loop advanced from '${loop.currentStage}' to '${nextStage}'.`,
-        metadata: {
-          previousStage: loop.currentStage,
-          newStage: nextStage,
-          status: newStatus
-        }
+        metadata: { previousStage: loop.currentStage, newStage: nextStage, status: newStatus }
+      };
+      const updated = await pgDb.transaction(async tx => {
+        const [saved] = await tx.update(halLoops).set({
+          currentStage: nextStage,
+          status: newStatus,
+          criticFindings,
+          stateSnapshot: { ...existingSnapshot, lastStage: loop.currentStage, currentStage: nextStage, updated: new Date().toISOString() },
+          updatedAt: new Date()
+        }).where(and(eq(halLoops.id, id), eq(halLoops.contractorId, contractorId))).returning();
+        if (!saved) throw new Error('Operating loop disappeared before its stage transition could be committed.');
+        await tx.insert(halLoopEvents).values({
+          id: crypto.randomUUID(),
+          loopId: id,
+          contractorId,
+          previousState: loop.currentStage,
+          newState: nextStage,
+          eventType: 'stage_transition',
+          actor: 'HAL Operator',
+          metadata: { status: newStatus }
+        });
+        await recordStructuredLedgerEntryInTransaction(tx, stageLedgerInput);
+        return saved;
       });
+      if (!postgresStructuredLedgerEnabled()) {
+        await recordStructuredLedgerEntry(stageLedgerInput);
+      }
 
       res.json({ success: true, loop: updated });
     } catch (err: any) {
@@ -10759,7 +10761,7 @@ async function startServer() {
         lastUpdated: new Date().toISOString()
       };
 
-      const updatedLoop = await pgDb.transaction(async tx => {
+      const gatherResult = await pgDb.transaction(async tx => {
         if (leadsToPersist.length) {
           await tx.insert(leads).values(leadsToPersist);
         }
@@ -10769,6 +10771,15 @@ async function startServer() {
         }).where(and(eq(halLoops.id, id), eq(halLoops.contractorId, contractorId))).returning();
         if (!updated) throw new Error('Operating loop disappeared before evidence could be committed.');
 
+        const evidenceLedgerInput: StructuredLedgerInput = {
+          contractorId,
+          eventType: 'evidence_gathered',
+          entityType: 'hal_loop',
+          entityId: id,
+          actor: 'HAL Stage 1 Harvest Engine',
+          details: `Harvested and validated ${totalDiscovered} territory entities in ${city} (${niche}) for Operating Loop.`,
+          metadata: { loopId: id, territory: city, niche, recordsCount: totalDiscovered, completenessScore: 95 }
+        };
         await tx.insert(halLoopEvents).values({
           id: crypto.randomUUID(),
           loopId: id,
@@ -10785,25 +10796,13 @@ async function startServer() {
             validationPassed: true
           }
         });
-        return updated;
+        await recordStructuredLedgerEntryInTransaction(tx, evidenceLedgerInput);
+        return { updated, evidenceLedgerInput };
       });
-
-      // Commit to immutable structured ledger
-      await recordStructuredLedgerEntry({
-        contractorId,
-        eventType: 'evidence_gathered',
-        entityType: 'hal_loop',
-        entityId: id,
-        actor: 'HAL Stage 1 Harvest Engine',
-        details: `Harvested and validated ${totalDiscovered} territory entities in ${city} (${niche}) for Operating Loop.`,
-        metadata: {
-          loopId: id,
-          territory: city,
-          niche,
-          recordsCount: totalDiscovered,
-          completenessScore: 95
-        }
-      });
+      const updatedLoop = gatherResult.updated;
+      if (!postgresStructuredLedgerEnabled()) {
+        await recordStructuredLedgerEntry(gatherResult.evidenceLedgerInput);
+      }
 
       res.json({
         success: true,
