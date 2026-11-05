@@ -7586,7 +7586,7 @@ app.post('/api/admin/git/push', authenticate, requireRole('admin'), (_req, res) 
 
 app.post('/api/proposals/generate', authenticate, async (req, res) => {
   const contractorId = (req as any).contractorId;
-  const { leadId, packageTier, monthlyRetainerUsd, setupFeeUsd, auditScores } = req.body || {};
+  const { leadId, packageTier, monthlyRetainerUsd, setupFeeUsd } = req.body || {};
 
   const retainer = Number(monthlyRetainerUsd);
   const setup = Number(setupFeeUsd);
@@ -7599,33 +7599,42 @@ app.post('/api/proposals/generate', authenticate, async (req, res) => {
     });
   }
 
-  if (auditScores !== undefined && (!auditScores || typeof auditScores !== 'object' || Array.isArray(auditScores))) {
-    return res.status(400).json({ error: 'Audit evidence must be a structured object.' });
-  }
-
   try {
     const [lead] = await pgDb.select({
       id: leads.id,
       businessName: leads.businessName,
-      ownerName: leads.ownerName
+      ownerName: leads.ownerName,
+      groundingEvidence: leads.groundingEvidence
     }).from(leads)
       .where(and(eq(leads.id, leadId.trim()), eq(leads.contractorId, contractorId)))
       .limit(1);
     if (!lead) return res.status(404).json({ error: 'Lead not found or inaccessible.' });
 
+    const leadEvidence = lead.groundingEvidence && typeof lead.groundingEvidence === 'object'
+      ? lead.groundingEvidence as Record<string, any>
+      : {};
+    const websiteAudit = leadEvidence.websiteAudit && typeof leadEvidence.websiteAudit === 'object'
+      ? leadEvidence.websiteAudit
+      : null;
     const highlights: string[] = [];
-    const appendScore = (key: string, label: string) => {
-      const value = auditScores?.[key];
-      if (value === undefined || value === null || value === '') return;
-      const score = Number(value);
-      if (Number.isFinite(score) && score >= 0 && score <= 100) {
-        highlights.push(`${label}: ${score}/100 (recorded audit value)`);
+    if (websiteAudit?.status === 'measured') {
+      const measurements = websiteAudit.measurements || {};
+      highlights.push(`HAL inspected ${websiteAudit.websiteUrl || 'the saved website'} on ${websiteAudit.auditedAt || 'an unrecorded date'}.`);
+      if (websiteAudit.evidence?.statusCode) highlights.push(`Observed HTTP status: ${websiteAudit.evidence.statusCode}.`);
+      if (measurements.title) highlights.push(`Observed page title: ${String(measurements.title).slice(0, 160)}.`);
+      if (measurements.metaDescription) highlights.push('Meta description was present in the fetched HTML.');
+      else highlights.push('No meta description was observed in the fetched HTML.');
+      if (typeof measurements.viewportConfigured === 'boolean') highlights.push(`Responsive viewport meta tag: ${measurements.viewportConfigured ? 'present' : 'not observed'}.`);
+      if (Number.isFinite(measurements.imagesMissingAlt)) highlights.push(`Images without non-empty alt text: ${measurements.imagesMissingAlt} of ${measurements.imageCount || 0}.`);
+      if (Array.isArray(websiteAudit.findings)) {
+        for (const finding of websiteAudit.findings.slice(0, 6)) {
+          if (typeof finding === 'string' && finding.trim()) highlights.push(finding.trim().slice(0, 400));
+        }
       }
-    };
-    appendScore('mobileSpeedScore', 'Mobile Speed Score');
-    appendScore('seoHealthScore', 'SEO Health Score');
-    if (typeof auditScores?.sslStatus === 'string' && auditScores.sslStatus.trim()) {
-      highlights.push(`SSL Status: ${auditScores.sslStatus.trim()}`);
+    } else if (websiteAudit?.status === 'redirect_not_followed') {
+      highlights.push('A website audit was attempted but stopped at a redirect. Review the destination before drawing conclusions.');
+    } else {
+      highlights.push('No measured website audit is currently saved to this lead. This proposal contains no website-specific findings.');
     }
 
     const proposal = {
@@ -7647,6 +7656,9 @@ app.post('/api/proposals/generate', authenticate, async (req, res) => {
       // No attributable revenue model exists to support an ROI estimate.
       roiEstimateAnnualUsd: null,
       auditHighlights: highlights,
+      auditEvidenceStatus: websiteAudit?.status || 'not_available',
+      sourceAuditId: websiteAudit?.auditId || null,
+      sourceAuditAt: websiteAudit?.auditedAt || null,
       validUntil: new Date(Date.now() + 14 * 24 * 3600 * 1000).toISOString(),
       persistenceStatus: 'persisted_draft'
     };
