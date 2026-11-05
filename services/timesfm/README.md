@@ -113,15 +113,20 @@ workflow logs.
 
 ### Historical data ingestion status
 
-The TimesFM batch runner is a consumer of `google_ads_daily_performance`; it is
-not itself an ingestion connector. The repository currently contains the table
-schema and read paths, but this audit did not find a supported Google Ads import
-writer or verify any production rows. Table existence and a successful SQL
-connection are not proof of genuine historical ingestion. Before enabling the
-batch secret, verify a real provider/export ingestion path, tenant ownership,
-source timestamps, city/trade metadata, deduplication, and daily coverage in the
-actual database. If no trusted ingestion path exists, forecasting must remain
-unavailable rather than using sample or synthetic rows.
+A tenant-authenticated Google Ads API ingestion endpoint is now implemented at
+`POST /api/forecasting/google-ads/sync`. It uses the current encrypted
+workspace credential, queries city-level physical-presence daily performance,
+resolves Google geo-target city names, and upserts tenant-owned records
+idempotently. It does not invent missing days or fabricate sample rows. The
+batch runner consumes only rows whose city and campaign text match the selected
+territory and service type.
+
+The code path and its input/query contracts are covered by CI tests. However,
+no production Google Ads OAuth consent, live account query, or Neon row count
+has yet been verified. The ingestion feature is therefore implemented but
+production-unverified until a workspace owner saves valid OAuth credentials and
+the UI reports a non-zero imported row count. The database table existing by
+itself is not proof of genuine historical ingestion.
 
 ### Resource and product limitations
 
