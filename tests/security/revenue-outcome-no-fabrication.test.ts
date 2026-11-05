@@ -63,3 +63,27 @@ describe('recommendation transition integrity', () => {
     expect(transitionHandler).toContain('tx.insert(revenueRecommendationEvents)');
   });
 });
+
+const projectStart = server.indexOf("app.post('/api/projects',");
+const projectEnd = server.indexOf("app.put('/api/projects/:id'", projectStart);
+const projectHandler = server.slice(projectStart, projectEnd);
+
+describe('client project financial integrity', () => {
+  it('requires explicit commercial terms and does not seed fake project metrics', () => {
+    expect(projectHandler).toContain("typeof city !== 'string'");
+    expect(projectHandler).toContain("typeof serviceType !== 'string'");
+    expect(projectHandler).toContain("!['Growth', 'Dominance', 'Enterprise'].includes(packageTier)");
+    expect(projectHandler).toContain('!Number.isSafeInteger(monthlyRetainerUsd)');
+    expect(projectHandler).not.toContain(': 2400');
+    expect(projectHandler).not.toContain("'Calgary'");
+    expect(projectHandler).not.toContain("targetScore: 95");
+    expect(projectHandler).toContain('targetScore: null');
+  });
+
+  it('only links a project to a tenant-owned won lead and blocks duplicate conversion', () => {
+    expect(projectHandler).toContain('eq(leads.contractorId, contractorId)');
+    expect(projectHandler).toContain("includes(String(linkedLead.status).toLowerCase())");
+    expect(projectHandler).toContain('A client project can only be converted from a lead recorded as closed-won.');
+    expect(projectHandler).toContain('A client project already exists for this won lead.');
+  });
+});
