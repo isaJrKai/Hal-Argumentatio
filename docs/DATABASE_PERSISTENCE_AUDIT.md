@@ -61,7 +61,7 @@ This substantially reduces the risk that normal server requests are writing to e
 1. Finish a route/service-level persistence trace for every active domain and confirm database failures are returned as failures, not swallowed.
 2. Add the structured-ledger table and an atomic append/verify repository using a transaction-level lock, immutable rows, global sequence ordering matching the current chain, and unique sequence/hash constraints.
 3. Wire the PostgreSQL connector credential repository into the actual connector integration paths, then add end-to-end secret rotation and failure behavior tests.
-4. Add integration coverage that writes, disposes/recreates the repository, and reads data back; simulate connection loss and prove no write is reported successful without a committed transaction.
+4. Extend the fresh-pool and unavailable-database tests to the other active persistence domains; verify no write is reported successful without a committed transaction.
 5. Review and version the bootstrap DDL. Resolve API-key constraints and audit-log nullability with forward-only migrations.
 6. Determine whether any operator-held JSON export actually needs importing. If so, provide a dry-run-first, insert-only importer with duplicate/conflict reports, per-domain counts/checksums and no startup auto-import.
 7. Remove the legacy JSON singleton and its JSON-specific tests only after all references and recovery requirements are accounted for.
