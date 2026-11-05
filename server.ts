@@ -2199,8 +2199,28 @@ app.post('/api/landing-pages/:id/publish', authenticate, async (req, res) => {
     const pageConfig = content.pageConfig && typeof content.pageConfig === 'object'
       ? content.pageConfig as Record<string, any>
       : {};
-    if (!String(pageConfig.businessName || '').trim() || !String(pageConfig.city || '').trim()) {
-      return res.status(409).json({ success: false, error: 'Business name and city must be present before publishing.' });
+    if (!String(pageConfig.businessName || '').trim() || !String(pageConfig.city || '').trim() ||
+        String(pageConfig.businessName).trim().toLowerCase() === 'your business name' ||
+        String(pageConfig.city).trim().toLowerCase() === 'your service area') {
+      return res.status(409).json({ success: false, error: 'Replace the template business name and service area with accurate business details before publishing.' });
+    }
+
+    const pageSections = pageConfig.sections && typeof pageConfig.sections === 'object' ? pageConfig.sections : {};
+    const heroBadge = String(pageSections.hero?.badgeText || '');
+    const licenseText = String(pageConfig.licenseNumber || '');
+    const serviceTitle = String(pageSections.services?.title || '');
+    const serviceSubtitle = String(pageSections.services?.subtitle || '');
+    const footerAddress = String(pageSections.footer?.address || '');
+    if (/add verified|remove this field|placeholder/i.test(heroBadge) ||
+        /add verified|remove this field|placeholder/i.test(licenseText) ||
+        /suggested services/i.test(serviceTitle) ||
+        /keep only the services your business actually provides/i.test(serviceSubtitle) ||
+        /add the business address or remove/i.test(footerAddress)) {
+      return res.status(409).json({
+        success: false,
+        code: 'TEMPLATE_CONTENT_REQUIRES_REVIEW',
+        error: 'This page still contains template instructions or placeholder content. Replace or remove each placeholder before publishing.'
+      });
     }
 
     const sourceLeadId = typeof content.sourceLeadId === 'string'
