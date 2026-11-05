@@ -2,6 +2,11 @@ import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
 import bcrypt from 'bcryptjs';
+import { tmpdir } from 'node:os';
+import { parseLegacyDatabase } from './legacyJsonStore';
+import type { StructuredLedgerEntry } from './structuredLedgerTypes';
+export type { StructuredLedgerEntry } from './structuredLedgerTypes';
+export { parseLegacyDatabase } from './legacyJsonStore';
 
 // Types for our Database models
 export interface Contractor {
@@ -225,55 +230,6 @@ export interface SystemAuditLog {
 }
 
 // ─── HAL Roadmap Phase 1 (Foundation): Cryptographic Structured Ledger ───────
-export interface StructuredLedgerEntry {
-  id: string;
-  contractorId: string;
-  sequenceNumber: number;
-  eventType: 
-    | 'lead_captured' 
-    | 'crm_transition' 
-    | 'recommendation_proposed' 
-    | 'recommendation_approved' 
-    | 'recommendation_executed' 
-    | 'conversion_outbox' 
-    | 'revenue_recognized' 
-    | 'security_event' 
-    | 'pipeline_mutation'
-    | 'evidence_gathered'
-    | 'stage_transition'
-    | 'phase2_verification_audit'
-    | 'competitor_audit_completed'
-    | 'lead_harvested'
-    | 'territory_harvest_completed'
-    | 'phase3_verification_audit'
-    | 'phase3_sequence_triggered'
-    | 'phase3_sequence_previewed'
-    | 'phase3_outbox_processed'
-    | 'phase3_outbox_inspected'
-    | 'phase3_live_dispatch'
-    | 'phase3_scheduler_executed'
-    | 'phase3_scheduler_configuration_checked'
-    | 'phase4_verification_audit'
-    | 'phase4_consensus_synthesized'
-    | 'phase4_weights_recalibrated'
-    | 'phase4_arbitrage_executed'
-    | 'phase5_verification_audit'
-    | 'phase5_runtime_diagnostic'
-    | 'phase5_brain_synced'
-    | 'phase5_regions_federated'
-    | 'phase5_ontology_propagated'
-    | 'genesis_block';
-  entityType: string;
-  entityId: string;
-  actor: string;
-  payloadHash: string;
-  prevHash: string;
-  entryHash: string;
-  details?: string;
-  metadata?: Record<string, any>;
-  createdAt: string;
-}
-
 export interface SchedulerJob {
   id: string;
   contractorId?: string;
@@ -420,94 +376,21 @@ interface DBStructure {
   connectorCredentials?: Record<string, Record<string, string>>;
 }
 
-const DATA_DIR = path.join(process.cwd(), 'data');
+const DATA_DIR = process.env.NODE_ENV === 'test' || process.env.VITEST
+  ? path.join(tmpdir(), 'hal-legacy-db-tests', String(process.pid))
+  : path.join(process.cwd(), 'data');
 const DB_FILE = path.join(DATA_DIR, 'db.json');
 
-// Helper to get Lead encryption key
-function getEncryptionKey(): Buffer {
-  const b64 = process.env.LEAD_ENCRYPTION_KEY_B64;
-  if (!b64) {
-    if (process.env.NODE_ENV === 'test' || process.env.VITEST || process.env.NODE_ENV !== 'production') {
-      return Buffer.from('0123456789abcdef0123456789abcdef', 'utf8');
-    }
-    throw new Error('LEAD_ENCRYPTION_KEY_B64 is required before encrypting or decrypting personal data.');
-  }
-  const key = Buffer.from(b64, 'base64');
-  if (key.length !== 32) {
-    if (process.env.NODE_ENV === 'test' || process.env.VITEST || process.env.NODE_ENV !== 'production') {
-      return Buffer.from('0123456789abcdef0123456789abcdef', 'utf8');
-    }
-    throw new Error('LEAD_ENCRYPTION_KEY_B64 must decode to exactly 32 bytes.');
-  }
-  return key;
-}
-
-// AES-256-GCM encryption - strictly fail-closed
-export function encrypt(text: string): string {
-  if (!text) return '';
-  try {
-    const key = getEncryptionKey();
-    const iv = crypto.randomBytes(12);
-    const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
-    let encrypted = cipher.update(text, 'utf8', 'hex');
-    encrypted += cipher.final('hex');
-    const authTag = cipher.getAuthTag().toString('hex');
-    return `${iv.toString('hex')}:${encrypted}:${authTag}`;
-  } catch (err) {
-    console.error('Encryption failed:', err);
-    throw new Error('PII Encryption failure: aborting to prevent plaintext data leakage.');
-  }
-}
-
-// AES-256-GCM decryption with a specific key
-function decryptWithKey(encryptedText: string, key: Buffer): string | null {
-  try {
-    if (!encryptedText || !encryptedText.includes(':')) return null;
-    const parts = encryptedText.split(':');
-    if (parts.length !== 3) return null;
-    const iv = Buffer.from(parts[0], 'hex');
-    const encrypted = parts[1];
-    const authTag = Buffer.from(parts[2], 'hex');
-    const decipher = crypto.createDecipheriv('aes-256-gcm', key, iv);
-    decipher.setAuthTag(authTag);
-    let decrypted = decipher.update(encrypted, 'hex', 'utf8');
-    decrypted += decipher.final('utf8');
-    return decrypted;
-  } catch (err) {
-    return null;
-  }
-}
-
-// AES-256-GCM decryption - strictly fail-closed
-export function decrypt(encryptedText: string): string {
-  if (!encryptedText) return '';
-  if (!encryptedText.includes(':')) return '';
-
-  // 1. Try with the active derived encryption key
-  try {
-    const key = getEncryptionKey();
-    const result = decryptWithKey(encryptedText, key);
-    if (result !== null) return result;
-  } catch (err) {}
-
-  // Legacy ciphertext can be migrated only when the operator explicitly supplies
-  // the old key through HAL_LEGACY_ENCRYPTION_KEY_B64. No key is embedded in source.
-  try {
-    const legacyB64 = process.env.HAL_LEGACY_ENCRYPTION_KEY_B64;
-    if (legacyB64) {
-      const legacyKey = Buffer.from(legacyB64, 'base64');
-      if (legacyKey.length === 32) {
-        const result = decryptWithKey(encryptedText, legacyKey);
-        if (result !== null) return result;
-      }
-    }
-  } catch (err) {}
-
-  // Fail closed - never return raw ciphertext or corrupted data
-  return '';
-}
+export { encrypt, decrypt } from './encryption';
+import { encrypt, decrypt } from './encryption';
 
 class Database {
+  private legacyStorePresent = false;
+
+  public hasLegacyStore(): boolean {
+    return this.legacyStorePresent;
+  }
+
   private data: DBStructure = {
     contractors: [],
     sessions: [],
@@ -541,24 +424,35 @@ class Database {
     if (!fs.existsSync(DATA_DIR)) {
       fs.mkdirSync(DATA_DIR, { recursive: true });
     }
-    
-    if (fs.existsSync(DB_FILE)) {
+
+    this.legacyStorePresent = fs.existsSync(DB_FILE);
+    const postgresLedgerMode = process.env.HAL_STRUCTURED_LEDGER_POSTGRES_ENABLED === 'true';
+
+    if (this.legacyStorePresent) {
       try {
         const raw = fs.readFileSync(DB_FILE, 'utf8');
-        const parsed = JSON.parse(raw);
+        const parsed = parseLegacyDatabase(raw) as Partial<DBStructure>;
         // Load with proper fallbacks
         this.data = { ...this.data, ...parsed };
         console.log('Database loaded successfully with', this.data.leads.length, 'leads.');
       } catch (e) {
-        console.error('Error loading database, resetting...', e);
-        this.save();
+        // Never replace an unreadable store with empty defaults. A truncated or
+        // malformed file may contain the only copy of customer/business data.
+        // Fail startup and require an operator-led recovery from a verified backup.
+        console.error('Database file is unreadable; refusing to reset or overwrite it.', e);
+        throw new Error(
+          'HAL legacy database could not be parsed. Startup aborted to prevent data loss; restore a verified backup before restarting.',
+          { cause: e }
+        );
       }
-    } else {
+    } else if (!postgresLedgerMode) {
+      // In PostgreSQL-ledger mode, a fresh instance must not manufacture a new
+      // local JSON genesis chain that can conflict with the durable DB ledger.
       this.save();
     }
 
     // Ensure Phase 1 Genesis Block in Structured Ledger
-    if (!this.data.structuredLedger || this.data.structuredLedger.length === 0) {
+    if ((!this.data.structuredLedger || this.data.structuredLedger.length === 0) && (!postgresLedgerMode || this.legacyStorePresent)) {
       this.data.structuredLedger = [];
       this.recordLedgerEntry({
         contractorId: 'system_genesis',
@@ -571,7 +465,7 @@ class Database {
       });
     }
 
-    if (this.data.contractors.length === 0) {
+    if (this.data.contractors.length === 0 && !postgresLedgerMode) {
       this.seed();
     }
 

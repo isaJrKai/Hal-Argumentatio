@@ -117,6 +117,9 @@ export async function bootstrapPostgresTables(poolInstance?: Pool): Promise<void
   if (!p) return;
   const client = await p.connect();
   try {
+    // Bootstrap DDL is one unit: a failed statement must not leave a partially
+    // upgraded schema for the next application restart.
+    await client.query('BEGIN');
     await client.query(`
       CREATE TABLE IF NOT EXISTS contractors (
         id TEXT PRIMARY KEY,
@@ -402,8 +405,8 @@ export async function bootstrapPostgresTables(poolInstance?: Pool): Promise<void
       ALTER TABLE api_keys ADD COLUMN IF NOT EXISTS last_used_at TIMESTAMP;
       ALTER TABLE api_keys ADD COLUMN IF NOT EXISTS expires_at TIMESTAMP;
       ALTER TABLE api_keys ALTER COLUMN key DROP NOT NULL;
-      ALTER TABLE api_keys ALTER COLUMN key_hash SET NOT NULL;
-      ALTER TABLE api_keys ALTER COLUMN prefix SET NOT NULL;
+      -- Keep the new columns nullable until a versioned, data-aware backfill
+      -- has reconciled every legacy key row. Drizzle mirrors this transition.
 
       CREATE TABLE IF NOT EXISTS connector_credentials (
         id TEXT PRIMARY KEY,
@@ -964,6 +967,46 @@ export async function bootstrapPostgresTables(poolInstance?: Pool): Promise<void
       CREATE INDEX IF NOT EXISTS work_events_tenant_time_idx ON work_events (contractor_id, occurred_at DESC);
       CREATE INDEX IF NOT EXISTS work_events_entity_idx ON work_events (contractor_id, entity_type, entity_id, occurred_at DESC);
 
+      -- One global append-only hash chain shared by all tenants. Keep the
+      -- original payload serialization as TEXT because JSONB does not preserve
+      -- object key order and cannot reproduce historical SHA-256 payload hashes.
+      CREATE TABLE IF NOT EXISTS structured_ledger_entries (
+        id TEXT PRIMARY KEY,
+        contractor_id TEXT NOT NULL,
+        sequence_number BIGINT NOT NULL UNIQUE CHECK (sequence_number > 0),
+        event_type TEXT NOT NULL,
+        entity_type TEXT NOT NULL,
+        entity_id TEXT NOT NULL,
+        actor TEXT NOT NULL,
+        payload_json TEXT NOT NULL,
+        payload_hash TEXT NOT NULL CHECK (length(payload_hash) = 64),
+        prev_hash TEXT NOT NULL CHECK (length(prev_hash) = 64),
+        entry_hash TEXT NOT NULL UNIQUE CHECK (length(entry_hash) = 64),
+        details TEXT,
+        metadata JSONB,
+        created_at TIMESTAMPTZ NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS structured_ledger_tenant_sequence_idx
+        ON structured_ledger_entries (contractor_id, sequence_number DESC);
+
+      CREATE OR REPLACE FUNCTION prevent_structured_ledger_mutation()
+      RETURNS trigger AS $ledger$
+      BEGIN
+        RAISE EXCEPTION 'structured_ledger_entries is append-only; % is prohibited', TG_OP
+          USING ERRCODE = '55000';
+        RETURN OLD;
+      END;
+      $ledger$ LANGUAGE plpgsql;
+
+      DROP TRIGGER IF EXISTS structured_ledger_no_mutation ON structured_ledger_entries;
+      CREATE TRIGGER structured_ledger_no_mutation
+        BEFORE UPDATE OR DELETE ON structured_ledger_entries
+        FOR EACH ROW EXECUTE FUNCTION prevent_structured_ledger_mutation();
+      DROP TRIGGER IF EXISTS structured_ledger_no_truncate ON structured_ledger_entries;
+      CREATE TRIGGER structured_ledger_no_truncate
+        BEFORE TRUNCATE ON structured_ledger_entries
+        FOR EACH STATEMENT EXECUTE FUNCTION prevent_structured_ledger_mutation();
+
       CREATE TABLE IF NOT EXISTS hermes_lab_artifacts (
         id TEXT PRIMARY KEY,
         contractor_id TEXT NOT NULL,
@@ -1036,7 +1079,11 @@ export async function bootstrapPostgresTables(poolInstance?: Pool): Promise<void
       ALTER TABLE leads ADD COLUMN IF NOT EXISTS external_crm_id TEXT;
       ALTER TABLE leads ADD COLUMN IF NOT EXISTS external_source TEXT;
     `);
+    await client.query('COMMIT');
   } catch (err: any) {
+    // Roll back every bootstrap statement before checking whether an externally
+    // provisioned managed schema is already complete.
+    await client.query('ROLLBACK').catch(() => undefined);
     // If running in a managed Cloud SQL environment where DDL is provisioned via drizzle-kit / admin runner
     if (err?.code === '42501' || err?.routine === 'aclcheck_error') {
       try {
@@ -1044,19 +1091,22 @@ export async function bootstrapPostgresTables(poolInstance?: Pool): Promise<void
           SELECT
             count(*) FILTER (WHERE table_schema = 'public') AS public_table_count,
             to_regclass('public.work_tasks') IS NOT NULL AS has_work_tasks,
-            to_regclass('public.work_events') IS NOT NULL AS has_work_events
+            to_regclass('public.work_events') IS NOT NULL AS has_work_events,
+            to_regclass('public.structured_ledger_entries') IS NOT NULL AS has_structured_ledger,
+            EXISTS (SELECT 1 FROM pg_trigger WHERE tgrelid = to_regclass('public.structured_ledger_entries') AND tgname = 'structured_ledger_no_mutation' AND NOT tgisinternal)
+              AND EXISTS (SELECT 1 FROM pg_trigger WHERE tgrelid = to_regclass('public.structured_ledger_entries') AND tgname = 'structured_ledger_no_truncate' AND NOT tgisinternal) AS has_structured_ledger_guard
           FROM information_schema.tables
           WHERE table_schema = 'public';
         `);
         const schemaState = check.rows[0];
         const count = Number(schemaState?.public_table_count || 0);
-        if (count > 0 && schemaState?.has_work_tasks && schemaState?.has_work_events) {
+        if (count > 0 && schemaState?.has_work_tasks && schemaState?.has_work_events && schemaState?.has_structured_ledger && schemaState?.has_structured_ledger_guard) {
           console.log(`[HAL PostgreSQL] Managed schema active (${count} public tables; operating-layer tables verified).`);
           return;
         }
         throw new Error(
           'Database role cannot apply schema changes and the managed schema is incomplete. ' +
-          'Provision public.work_tasks and public.work_events with the database owner, then restart HAL.'
+          'Provision public.work_tasks, public.work_events, and public.structured_ledger_entries (including its append-only trigger) with the database owner, then restart HAL.'
         );
       } catch (_) {
         // Fall through to rethrow original error
@@ -1106,12 +1156,15 @@ export async function testPostgresConnection(customUrl?: string): Promise<{
         to_regclass('public.contractors') IS NOT NULL AS has_contractors,
         to_regclass('public.leads') IS NOT NULL AS has_leads,
         to_regclass('public.work_tasks') IS NOT NULL AS has_work_tasks,
-        to_regclass('public.work_events') IS NOT NULL AS has_work_events
+        to_regclass('public.work_events') IS NOT NULL AS has_work_events,
+        to_regclass('public.structured_ledger_entries') IS NOT NULL AS has_structured_ledger,
+        EXISTS (SELECT 1 FROM pg_trigger WHERE tgrelid = to_regclass('public.structured_ledger_entries') AND tgname = 'structured_ledger_no_mutation' AND NOT tgisinternal)
+          AND EXISTS (SELECT 1 FROM pg_trigger WHERE tgrelid = to_regclass('public.structured_ledger_entries') AND tgname = 'structured_ledger_no_truncate' AND NOT tgisinternal) AS has_structured_ledger_guard
       FROM information_schema.tables
       WHERE table_schema = 'public';
     `);
     const schemaState = tablesRes.rows[0] || {};
-    const schemaReady = Boolean(schemaState.has_contractors && schemaState.has_leads && schemaState.has_work_tasks && schemaState.has_work_events);
+    const schemaReady = Boolean(schemaState.has_contractors && schemaState.has_leads && schemaState.has_work_tasks && schemaState.has_work_events && schemaState.has_structured_ledger && schemaState.has_structured_ledger_guard);
     const latencyMs = Date.now() - startTime;
     const versionStr = result.rows[0]?.version || 'PostgreSQL';
     const provider = (customUrl || activeConnectionString || process.env.DATABASE_URL || process.env.NEON_DATABASE_URL || '').includes('neon.tech') || versionStr.toLowerCase().includes('neon')

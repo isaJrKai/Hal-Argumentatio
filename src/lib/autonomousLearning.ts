@@ -1,6 +1,6 @@
 import { getDrizzleDb } from '../db/postgres';
 import { neuralState } from '../db/schema';
-import { eq } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 /**
  * HAL Autonomous Self-Teaching Neural Learning & Offline Policy Engine
  * 
@@ -298,8 +298,26 @@ export function classifySemanticObjectionIntent(objectionText: string): Semantic
 
 export class AutonomousLearningEngine {
   private state: LearningState;
+  private readonly storageKey: string;
+  private initialized = false;
+  private initializationPromise: Promise<void> | null = null;
+  private persistedAt: Date | null = null;
+  private mutationQueue: Promise<void> = Promise.resolve();
 
-  constructor() {
+  private async withMutationLock<T>(operation: () => Promise<T>): Promise<T> {
+    const previous = this.mutationQueue;
+    let release!: () => void;
+    this.mutationQueue = new Promise<void>(resolve => { release = resolve; });
+    await previous;
+    try {
+      return await operation();
+    } finally {
+      release();
+    }
+  }
+
+  constructor(storageKey = 'singleton') {
+    this.storageKey = storageKey;
     this.state = this.loadState();
   }
 
@@ -321,16 +339,38 @@ export class AutonomousLearningEngine {
         emailChannelMultiplier: 0.92,
         smsChannelMultiplier: 1.18
       },
-      nicheMap: DEFAULT_NICHE_PROFILES,
-      objections: DEFAULT_OBJECTION_RULES,
+      nicheMap: structuredClone(DEFAULT_NICHE_PROFILES),
+      objections: structuredClone(DEFAULT_OBJECTION_RULES),
       recentLearningLogs: []
     };
   }
 
+  private async ensureInitializedLocked(): Promise<void> {
+    if (this.initialized) return;
+    await this.loadFromDb();
+    this.initialized = true;
+  }
+
   public async initializeFromDb(): Promise<void> {
+    if (this.initialized) return;
+    if (this.initializationPromise) return this.initializationPromise;
+    this.initializationPromise = this.withMutationLock(async () => {
+      await this.ensureInitializedLocked();
+    });
     try {
-      const [record] = await getDrizzleDb().select().from(neuralState).where(eq(neuralState.id, 'singleton'));
+      await this.initializationPromise;
+    } finally {
+      this.initializationPromise = null;
+    }
+  }
+
+  private async loadFromDb(): Promise<void> {
+    try {
+      const database = getDrizzleDb();
+      if (!database) throw new Error('PostgreSQL is not configured; learning state cannot be initialized.');
+      const [record] = await database.select().from(neuralState).where(eq(neuralState.id, this.storageKey));
       if (record) {
+        this.persistedAt = record.updatedAt;
         const storedNiches = (record.nicheMap || {}) as Record<string, NicheCalibration>;
         const nicheMap: Record<string, NicheCalibration> = {};
         for (const [key, profile] of Object.entries(storedNiches)) {
@@ -338,7 +378,7 @@ export class AutonomousLearningEngine {
           nicheMap[key] = profile.calibrationSource === 'measured_outcomes'
             ? profile
             : {
-                ...(DEFAULT_NICHE_PROFILES[key] || DEFAULT_NICHE_PROFILES.general),
+                ...structuredClone(DEFAULT_NICHE_PROFILES[key] || DEFAULT_NICHE_PROFILES.general),
                 niche: profile.niche || key,
                 calibrationSource: 'unverified_legacy'
               };
@@ -349,7 +389,7 @@ export class AutonomousLearningEngine {
         const storedObjections = (record.objections || []) as ObjectionRule[];
         const objections = DEFAULT_OBJECTION_RULES.map(defaultRule => {
           const storedRule = storedObjections.find(rule => rule.id === defaultRule.id);
-          return storedRule?.calibrationSource === 'recorded_events' ? storedRule : defaultRule;
+          return structuredClone(storedRule?.calibrationSource === 'recorded_events' ? storedRule : defaultRule);
         });
         this.state = {
           version: '2.5-untrained',
@@ -359,66 +399,101 @@ export class AutonomousLearningEngine {
           autonomyReadinessScore: Math.min(100, trustedOutcomes),
           isOfflineModeActive: record.isOfflineModeActive,
           technicalWeights: record.technicalWeights as TechnicalWeights,
-          nicheMap: Object.keys(nicheMap).length ? nicheMap : DEFAULT_NICHE_PROFILES,
+          nicheMap: Object.keys(nicheMap).length ? nicheMap : structuredClone(DEFAULT_NICHE_PROFILES),
           objections,
           recentLearningLogs: this.state.recentLearningLogs || []
         };
         // Persist the sanitized state so legacy seeded statistics are not reloaded.
         await this.saveState();
       } else {
+        this.persistedAt = null;
         await this.saveState();
       }
-    } catch (e: any) {
-      console.info('[Autonomous Learning] Neural engine initialized with memory state (database offline or unconfigured).');
+    } catch (error) {
+      console.error('[Autonomous Learning] Persistent learning-state initialization failed.', error);
+      throw error;
     }
   }
 
   public async saveState(): Promise<void> {
-    this.state.lastUpdated = new Date().toISOString();
-    try {
-      await getDrizzleDb().insert(neuralState).values({
-        id: 'singleton',
-        version: this.state.version,
-        calibrationEpoch: this.state.calibrationEpoch,
-        totalOutcomesDigested: this.state.totalOutcomesDigested,
-        autonomyReadinessScore: this.state.autonomyReadinessScore,
-        isOfflineModeActive: this.state.isOfflineModeActive,
-        technicalWeights: this.state.technicalWeights,
-        nicheMap: this.state.nicheMap,
-        objections: this.state.objections,
-        activeNodes: []
-      }).onConflictDoUpdate({
-        target: neuralState.id,
-        set: {
-          version: this.state.version,
-          calibrationEpoch: this.state.calibrationEpoch,
-          totalOutcomesDigested: this.state.totalOutcomesDigested,
-          autonomyReadinessScore: this.state.autonomyReadinessScore,
-          isOfflineModeActive: this.state.isOfflineModeActive,
-          technicalWeights: this.state.technicalWeights,
-          nicheMap: this.state.nicheMap,
-          objections: this.state.objections,
-          updatedAt: new Date()
-        }
-      });
-    } catch(e) {
-      console.warn('Failed to persist neural state to DB:', e);
+    const database = getDrizzleDb();
+    if (!database) {
+      throw new Error('PostgreSQL is not configured; learning state was not persisted.');
     }
+
+    const updatedAt = this.persistedAt
+      ? new Date(Math.max(new Date().getTime(), this.persistedAt.getTime() + 1))
+      : new Date();
+    const values = {
+      version: this.state.version,
+      calibrationEpoch: this.state.calibrationEpoch,
+      totalOutcomesDigested: this.state.totalOutcomesDigested,
+      autonomyReadinessScore: this.state.autonomyReadinessScore,
+      isOfflineModeActive: this.state.isOfflineModeActive,
+      technicalWeights: this.state.technicalWeights,
+      nicheMap: this.state.nicheMap,
+      objections: this.state.objections,
+      activeNodes: [],
+      updatedAt
+    };
+
+    if (this.persistedAt) {
+      // Compare-and-swap prevents another application instance from silently
+      // overwriting a newer tenant state with a stale in-memory snapshot.
+      const updated = await database.update(neuralState)
+        .set(values)
+        .where(and(
+          eq(neuralState.id, this.storageKey),
+          sql`date_trunc('milliseconds', ${neuralState.updatedAt}) = ${this.persistedAt}`
+        ))
+        .returning({ updatedAt: neuralState.updatedAt });
+      if (updated.length !== 1) {
+        // Force the next authenticated request to reload the current tenant row.
+        // Keeping the stale revision marked initialized would make every later
+        // compare-and-swap fail until this process restarted.
+        this.initialized = false;
+        this.persistedAt = null;
+        throw new Error('Learning state changed in another application instance; reload before retrying this update.');
+      }
+      this.persistedAt = updated[0].updatedAt;
+    } else {
+      const inserted = await database.insert(neuralState)
+        .values({ id: this.storageKey, ...values })
+        .onConflictDoNothing()
+        .returning({ updatedAt: neuralState.updatedAt });
+      if (inserted.length !== 1) {
+        this.initialized = false;
+        this.persistedAt = null;
+        throw new Error('Learning state was initialized by another application instance; reload before retrying this update.');
+      }
+      this.persistedAt = inserted[0].updatedAt;
+    }
+
+    this.state.lastUpdated = updatedAt.toISOString();
   }
 
   public getState(): LearningState {
     return { ...this.state };
   }
 
-  public setOfflineMode(active: boolean): void {
-    this.state.isOfflineModeActive = active;
-    this.saveState();
+  public async setOfflineMode(active: boolean): Promise<void> {
+    return this.withMutationLock(async () => {
+      await this.ensureInitializedLocked();
+      const previousState = structuredClone(this.state);
+      this.state.isOfflineModeActive = active;
+    try {
+      await this.saveState();
+    } catch (error) {
+      this.state = previousState;
+      throw error;
+    }
+    });
   }
 
   /**
    * Slowly learns and recalibrates weights whenever a deal outcome is recorded (Win, Loss, Pitch, Objection)
    */
-  public digestBusinessOutcome(params: {
+  public async digestBusinessOutcome(params: {
     niche: string;
     city?: string;
     outcome: 'won' | 'lost' | 'objection_encountered' | 'outreach_sent';
@@ -430,8 +505,11 @@ export class AutonomousLearningEngine {
       mobileSpeedScore?: number;
       reviewScore?: number;
     };
-  }): { updatedNiche: NicheCalibration; newEpoch: number; logMessage: string } {
-    const cleanNiche = (params.niche || 'general').toLowerCase().trim();
+  }): Promise<{ updatedNiche: NicheCalibration; newEpoch: number; logMessage: string }> {
+    return this.withMutationLock(async () => {
+      await this.ensureInitializedLocked();
+      const previousState = structuredClone(this.state);
+      const cleanNiche = (params.niche || 'general').toLowerCase().trim();
     const current = this.state.nicheMap[cleanNiche] || {
       niche: cleanNiche,
       sampleCount: 0,
@@ -504,13 +582,19 @@ export class AutonomousLearningEngine {
       this.state.recentLearningLogs = this.state.recentLearningLogs.slice(0, 20);
     }
 
-    this.saveState();
+    try {
+      await this.saveState();
+    } catch (error) {
+      this.state = previousState;
+      throw error;
+    }
 
     return {
       updatedNiche: current,
       newEpoch: this.state.calibrationEpoch,
       logMessage
     };
+    });
   }
 
   private trainObjectionMatcher(objectionText: string): void {
@@ -686,5 +770,19 @@ export class AutonomousLearningEngine {
   }
 }
 
-// Global Singleton Instance
+// System-wide defaults remain available for unauthenticated diagnostics only.
+// Authenticated tenant learning must use a tenant-keyed engine and row.
 export const autonomousLearning = new AutonomousLearningEngine();
+
+const tenantLearningEngines = new Map<string, AutonomousLearningEngine>();
+
+export function getTenantAutonomousLearning(contractorId: string): AutonomousLearningEngine {
+  const cleanContractorId = String(contractorId || '').trim();
+  if (!cleanContractorId) throw new Error('A contractor ID is required for tenant learning state.');
+  let engine = tenantLearningEngines.get(cleanContractorId);
+  if (!engine) {
+    engine = new AutonomousLearningEngine(`tenant:${cleanContractorId}`);
+    tenantLearningEngines.set(cleanContractorId, engine);
+  }
+  return engine;
+}

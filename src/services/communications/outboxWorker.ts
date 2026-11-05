@@ -18,6 +18,7 @@ export interface WorkerResult {
   retrying: number;
   deadLettered: number;
   failed: number;
+  reconciliationPending: number;
 }
 
 export type CommunicationSender = (record: DueCommunication) => Promise<{ providerMessageId: string }>;
@@ -46,10 +47,11 @@ export async function runCommunicationsOutboxWorker(
       `WITH due AS (
         SELECT id FROM communications_outbox
         WHERE provider = 'resend' AND channel = 'email'
-          AND (
-            (status IN ('queued','retrying') AND (next_attempt_at IS NULL OR next_attempt_at <= $1))
-            OR (status = 'processing' AND updated_at < $1 - INTERVAL '5 minutes')
-          )
+          -- A stale processing row may already have been accepted by the provider
+          -- before the process lost its database connection. Never resend it
+          -- automatically; reconcile it against provider records first.
+          AND status IN ('queued','retrying')
+          AND (next_attempt_at IS NULL OR next_attempt_at <= $1)
         ORDER BY COALESCE(next_attempt_at, created_at), created_at
         FOR UPDATE SKIP LOCKED
         LIMIT $2
@@ -71,17 +73,18 @@ export async function runCommunicationsOutboxWorker(
     client.release();
   }
 
-  const result: WorkerResult = { claimed: records.length, submitted: 0, retrying: 0, deadLettered: 0, failed: 0 };
+  const result: WorkerResult = {
+    claimed: records.length,
+    submitted: 0,
+    retrying: 0,
+    deadLettered: 0,
+    failed: 0,
+    reconciliationPending: 0
+  };
   for (const record of records) {
+    let sent: { providerMessageId: string };
     try {
-      const sent = await send(record);
-      await pool.query(
-        `UPDATE communications_outbox SET status='submitted', provider_message_id=$2,
-          submitted_at=NOW(), next_attempt_at=NULL, error_code=NULL, error_message=NULL,
-          updated_at=NOW() WHERE id=$1 AND status='processing'`,
-        [record.id, sent.providerMessageId]
-      );
-      result.submitted++;
+      sent = await send(record);
     } catch (error) {
       const canRetry = retryable(error);
       const exhausted = record.attempts >= maxAttempts;
@@ -99,6 +102,31 @@ export async function runCommunicationsOutboxWorker(
       if (status === 'retrying') result.retrying++;
       else if (status === 'dead_letter') result.deadLettered++;
       else result.failed++;
+      continue;
+    }
+
+    // Provider acceptance is a point of no return for automatic sending.
+    // If persistence fails, leave the row in processing: the claim query
+    // deliberately excludes that state until provider reconciliation.
+    try {
+      const persisted = await pool.query(
+        `UPDATE communications_outbox SET status='submitted', provider_message_id=$2,
+          submitted_at=NOW(), next_attempt_at=NULL, error_code=NULL, error_message=NULL,
+          updated_at=NOW() WHERE id=$1 AND status='processing'`,
+        [record.id, sent.providerMessageId]
+      );
+      if (persisted.rowCount === 0) {
+        throw new Error('Accepted email outbox row was not updated; provider reconciliation is required.');
+      }
+      result.submitted++;
+    } catch (persistenceError) {
+      result.reconciliationPending++;
+      console.error('[Communications Outbox] Provider accepted an email, but submission state persistence failed; automatic resend is disabled.', {
+        outboxId: record.id,
+        providerMessageId: sent.providerMessageId,
+        idempotencyKey: record.idempotency_key,
+        error: persistenceError instanceof Error ? persistenceError.message : String(persistenceError)
+      });
     }
   }
   return result;

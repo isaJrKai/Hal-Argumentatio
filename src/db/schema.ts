@@ -1,4 +1,4 @@
-import { pgTable, text, timestamp, integer, doublePrecision, boolean, jsonb } from 'drizzle-orm/pg-core';
+import { pgTable, text, timestamp, integer, doublePrecision, boolean, jsonb, bigint } from 'drizzle-orm/pg-core';
 
 export const contractors = pgTable('contractors', {
   id: text('id').primaryKey(),
@@ -284,8 +284,9 @@ export const outreachSequences = pgTable('outreach_sequences', {
 export const apiKeys = pgTable('api_keys', {
   id: text('id').primaryKey(),
   contractorId: text('contractor_id').notNull(),
-  keyHash: text('key_hash').notNull(), // One-way cryptographic SHA-256 or bcrypt hash
-  prefix: text('prefix').notNull(), // Safe display prefix (e.g. hlbz_1a2b...)
+  // Nullable during the legacy-to-hashed-key transition; enforce only after a versioned backfill.
+  keyHash: text('key_hash'), // One-way cryptographic SHA-256 or bcrypt hash
+  prefix: text('prefix'), // Safe display prefix (e.g. hlbz_1a2b...)
   key: text('key'), // DEPRECATED: Plaintext key column; optional for legacy backward compatibility
   label: text('label').notNull(),
   lastUsedAt: timestamp('last_used_at'),
@@ -342,7 +343,8 @@ export const leadEvents = pgTable('lead_events', {
 
 export const auditLogs = pgTable('audit_logs', {
   id: text('id').primaryKey(),
-  contractorId: text('contractor_id').notNull(),
+  // Existing bootstrap schema permits system-level audit rows without a tenant.
+  contractorId: text('contractor_id'),
   action: text('action').notNull(),
   details: text('details').notNull(),
   timestamp: timestamp('timestamp').defaultNow().notNull(),
@@ -380,7 +382,8 @@ export const campaigns = pgTable('campaigns', {
 });
 
 export const neuralState = pgTable('neural_state', {
-  id: text('id').primaryKey(), // Usually "singleton"
+  // "singleton" is reserved for system defaults; authenticated tenants use "tenant:<contractorId>".
+  id: text('id').primaryKey(),
   version: text('version').notNull(),
   calibrationEpoch: integer('calibration_epoch').default(0).notNull(),
   totalOutcomesDigested: integer('total_outcomes_digested').default(0).notNull(),
@@ -747,6 +750,24 @@ export const workTasks = pgTable('work_tasks', {
   completedAt: timestamp('completed_at'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
+});
+
+/** Global cryptographic chain; tenant_id filters reads, never sequence allocation. */
+export const structuredLedgerEntries = pgTable('structured_ledger_entries', {
+  id: text('id').primaryKey(),
+  contractorId: text('contractor_id').notNull(),
+  sequenceNumber: bigint('sequence_number', { mode: 'number' }).notNull().unique(),
+  eventType: text('event_type').notNull(),
+  entityType: text('entity_type').notNull(),
+  entityId: text('entity_id').notNull(),
+  actor: text('actor').notNull(),
+  payloadJson: text('payload_json').notNull(),
+  payloadHash: text('payload_hash').notNull(),
+  prevHash: text('prev_hash').notNull(),
+  entryHash: text('entry_hash').notNull().unique(),
+  details: text('details'),
+  metadata: jsonb('metadata'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
 });
 
 /** Append-only, tenant-scoped timeline shared by workflows and authorized agents. */

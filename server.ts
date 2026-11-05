@@ -36,7 +36,9 @@ import {
 } from './src/lib/gemini';
 import { callNemotron } from './src/services/nemotron.ts';
 import { runProviderProbe } from './src/services/aiProviderDiagnostics.ts';
-import { autonomousLearning } from './src/lib/autonomousLearning';
+import { autonomousLearning, getTenantAutonomousLearning } from './src/lib/autonomousLearning';
+import { getConnectorCredentials, importConnectorCredentialIfAbsent, saveConnectorCredential } from './src/db/connectorCredentials';
+import { appendStructuredLedgerEntry, appendStructuredLedgerEntryInTransaction, getStructuredLedgerEntries, importLegacyStructuredLedgerEntries, verifyStructuredLedgerIntegrity } from './src/db/structuredLedger';
 import { getAllSkills, executeSkill, registerCustomSkill, unregisterCustomSkill } from './src/skills/registry';
 import { HAL_MCP_TOOLS, executeMcpTool } from './src/services/mcp/dispatcher';
 import { McpJsonRpcRequest, McpJsonRpcResponse } from './src/services/mcp/types';
@@ -103,6 +105,36 @@ import {
   DEFAULT_CIRCUIT_BREAKER_CONFIG
 } from './src/lib/circuitBreaker';
 
+
+
+type StructuredLedgerInput = Parameters<typeof db.recordLedgerEntry>[0];
+const postgresStructuredLedgerEnabled = () => process.env.HAL_STRUCTURED_LEDGER_POSTGRES_ENABLED === 'true';
+
+async function recordStructuredLedgerEntry(input: StructuredLedgerInput) {
+  return postgresStructuredLedgerEnabled()
+    ? appendStructuredLedgerEntry(input)
+    : db.recordLedgerEntry(input);
+}
+
+async function recordStructuredLedgerEntryInTransaction(tx: { execute: (query: any) => Promise<any> }, input: StructuredLedgerInput) {
+  // JSON writes cannot participate in a PostgreSQL transaction. In legacy mode
+  // the caller appends to JSON only after its PostgreSQL business transaction commits.
+  return postgresStructuredLedgerEnabled()
+    ? appendStructuredLedgerEntryInTransaction(tx, input)
+    : null;
+}
+
+async function readStructuredLedger(contractorId?: string, limit = 10000) {
+  return postgresStructuredLedgerEnabled()
+    ? getStructuredLedgerEntries(contractorId, limit)
+    : db.getStructuredLedger(contractorId, limit);
+}
+
+async function checkStructuredLedgerIntegrity(contractorId?: string) {
+  return postgresStructuredLedgerEnabled()
+    ? verifyStructuredLedgerIntegrity(contractorId)
+    : db.verifyLedgerIntegrity(contractorId);
+}
 
 // Setup environment variables
 import dotenv from 'dotenv';
@@ -436,7 +468,23 @@ function checkRateLimit(req: express.Request, res: express.Response, email: stri
   return true;
 }
 
-function recordAuthFailure(req: express.Request, email: string) {
+async function persistAuditLog(entry: { contractorId?: string; action: string; details: string }): Promise<boolean> {
+  try {
+    await pgDb.insert(auditLogs).values({
+      id: crypto.randomUUID(),
+      contractorId: entry.contractorId || null,
+      action: entry.action,
+      details: entry.details,
+      timestamp: new Date()
+    });
+    return true;
+  } catch (error) {
+    console.error('[HAL Audit] PostgreSQL audit write failed:', error);
+    return false;
+  }
+}
+
+async function recordAuthFailure(req: express.Request, email: string) {
   const ip = getClientIp(req);
   const limitKey = `${ip}:${email.toLowerCase().trim()}`;
   const now = Date.now();
@@ -447,10 +495,9 @@ function recordAuthFailure(req: express.Request, email: string) {
   failure.attempts += 1;
   if (failure.attempts >= 5) {
     failure.lockoutUntil = now + 15 * 60 * 1000; // 15 minutes lockout
-    db.addAuditLog({
+    await persistAuditLog({
       action: 'RATE_LIMIT_TRIGGERED',
-      ipAddress: ip,
-      details: `Lockout triggered for ${email} following 5 failed attempts.`
+      details: `Lockout triggered for ${email} from IP ${ip} following 5 failed attempts.`
     });
   }
   loginFailures.set(limitKey, failure);
@@ -955,7 +1002,7 @@ app.post('/api/auth/change-password', authenticate, async (req, res) => {
     if (!account) return res.status(401).json({ error: 'Your account could not be verified.' });
     if (!checkRateLimit(req, res, account.email)) return;
     if (!verifyPassword(currentPassword, account.passwordHash || '')) {
-      recordAuthFailure(req, account.email);
+      await recordAuthFailure(req, account.email);
       return res.status(401).json({ error: 'Your current password is incorrect.' });
     }
     recordAuthSuccess(req, account.email);
@@ -1008,7 +1055,7 @@ app.post('/api/auth/register', async (req, res) => {
   try {
     const existing = await pgDb.select().from(contractors).where(eq(contractors.email, cleanEmail));
     if (existing.length > 0) {
-      recordAuthFailure(req, cleanEmail);
+      await recordAuthFailure(req, cleanEmail);
       return res.status(400).json({ error: 'Contractor already exists with this email address' });
     }
 
@@ -1063,13 +1110,13 @@ app.post('/api/auth/login', async (req, res) => {
 
     // PostgreSQL is the sole source of truth. Never issue a session from a local-only account.
     if (!contractor) {
-      recordAuthFailure(req, cleanEmail);
+      await recordAuthFailure(req, cleanEmail);
       return res.status(401).json({ error: 'Invalid email or password' });
     }
 
     const storedHash = typeof contractor.passwordHash === 'string' ? contractor.passwordHash : '';
     if (!verifyPassword(password, storedHash)) {
-      recordAuthFailure(req, cleanEmail);
+      await recordAuthFailure(req, cleanEmail);
       return res.status(401).json({ error: 'Invalid email or password' });
     }
 
@@ -1112,7 +1159,7 @@ app.post('/api/auth/login', async (req, res) => {
     });
   } catch (error: any) {
     console.error('[HAL Login Error]', error?.message || error);
-    recordAuthFailure(req, cleanEmail);
+    await recordAuthFailure(req, cleanEmail);
     return res.status(503).json({ error: 'Authentication service unavailable. Please try again later.' });
   }
 });
@@ -1146,7 +1193,7 @@ app.post('/api/auth/google', async (req, res) => {
     idToken.length < 20 ||
     idToken.length > 12_000
   ) {
-    recordAuthFailure(req, attemptedEmail);
+    await recordAuthFailure(req, attemptedEmail);
     return res.status(401).json({ error: 'Google sign-in could not be verified. Please try again.' });
   }
 
@@ -1165,7 +1212,7 @@ app.post('/api/auth/google', async (req, res) => {
   }
 
   if (!identity) {
-    recordAuthFailure(req, attemptedEmail);
+    await recordAuthFailure(req, attemptedEmail);
     return res.status(401).json({ error: 'Google sign-in could not be verified. Please use a verified Google account.' });
   }
 
@@ -1174,7 +1221,7 @@ app.post('/api/auth/google', async (req, res) => {
     !cleanEmail ||
     (typeof email === 'string' && email.trim() && email.toLowerCase().trim() !== cleanEmail)
   ) {
-    recordAuthFailure(req, cleanEmail || attemptedEmail);
+    await recordAuthFailure(req, cleanEmail || attemptedEmail);
     return res.status(401).json({ error: 'The Google account identity did not match the submitted account.' });
   }
 
@@ -2160,23 +2207,7 @@ app.post('/api/public/landing-leads', async (req, res) => {
         summary: `Inbound inquiry from ${normalizedName} was added to the human review queue.`,
         payload: { taskId, landingPageId: landingPageId.trim() }
       });
-    });
-
-    try {
-      db.addLead({
-        ...leadValues,
-        // db.addLead encrypts a supplied plaintext phone; pass undefined here
-        // so it preserves the already-encrypted value rather than encrypting
-        // the database display placeholder "[ENCRYPTED]".
-        phone: undefined,
-        phoneEncrypted,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-      } as any);
-    } catch (_) {}
-
-    try {
-      db.recordLedgerEntry({
+      await recordStructuredLedgerEntryInTransaction(tx, {
         contractorId: targetContractorId,
         eventType: 'lead_captured',
         entityType: 'lead',
@@ -2189,7 +2220,25 @@ app.post('/api/public/landing-leads', async (req, res) => {
           city: pageCity
         }
       });
-    } catch (_) {}
+    });
+
+    // In PostgreSQL-ledger mode the hash-chain append committed with the lead.
+    // Legacy JSON mode appends only after the PostgreSQL business transaction commits.
+    if (!postgresStructuredLedgerEnabled()) {
+      await recordStructuredLedgerEntry({
+        contractorId: targetContractorId,
+        eventType: 'lead_captured',
+        entityType: 'lead',
+        entityId: leadId,
+        actor: 'LandingPageLeadIngest',
+        details: `A visitor submitted an inquiry through landing page ${landingPageId.trim()}.`,
+        metadata: {
+          landingPageId: landingPageId.trim(),
+          serviceDetails: normalizedDetails,
+          city: pageCity
+        }
+      });
+    }
 
     try {
       broadcastNotification(
@@ -2903,35 +2952,43 @@ app.all(['/api/webhooks/twilio', '/api/webhooks/whatsapp'], async (req, res) => 
 
     console.log(`[Inbound Webhook Received] Channel: ${isWhatsApp ? 'WhatsApp' : 'SMS'} | From: ${cleanFrom} | Body: "${rawBody}"`);
 
-    // Only update a lead when the sender can be matched unambiguously.
-    // Never assign an unmatched sender to the first contractor or invent business data.
-    const allLeads = db.getLeads() || [];
-    const matchedCandidates = allLeads.filter(l => {
-      const p = (l.phone || '').replace(/\D/g, '');
-      return p.length >= 7 && fromDigits.length >= 7 && (p === fromDigits);
+    // Match against encrypted PostgreSQL phone values; the JSON mirror stores only
+    // a display placeholder and must never be used for routing inbound messages.
+    if (fromDigits.length < 7) {
+      return res.status(400).type('text/xml').send('<?xml version="1.0" encoding="UTF-8"?><Response></Response>');
+    }
+    const phoneRows = await pgDb.select({
+      id: leads.id,
+      contractorId: leads.contractorId,
+      businessName: leads.businessName,
+      phoneEncrypted: leads.phoneEncrypted,
+      status: leads.status,
+      notes: leads.notes
+    }).from(leads).where(sql`${leads.phoneEncrypted} IS NOT NULL`);
+    const matchedCandidates = phoneRows.filter(row => {
+      const decryptedPhone = row.phoneEncrypted ? decrypt(row.phoneEncrypted) : '';
+      const candidateDigits = decryptedPhone.replace(/\D/g, '');
+      return candidateDigits.length >= 7 && candidateDigits === fromDigits;
     });
 
     if (matchedCandidates.length !== 1) {
       return res.status(404).type('text/xml').send('<?xml version="1.0" encoding="UTF-8"?><Response></Response>');
     }
 
-    let matchedLead = matchedCandidates[0];
+    const matchedLead = matchedCandidates[0];
     const targetContractorId = matchedLead.contractorId;
-    const now = new Date().toISOString();
+    const now = new Date();
+    const newStatus = (matchedLead.status === 'new' ? 'contacted' : matchedLead.status) as 'new' | 'contacted' | 'converted' | 'dead';
+    const updatedNotes = `${matchedLead.notes || ''}\n[Inbound ${isWhatsApp ? 'WhatsApp' : 'SMS'} - ${now.toISOString().slice(0, 16)}]: ${rawBody}`.trim();
 
-    // Advance lead status to 'contacted' if it was new
-      const newStatus = (matchedLead.status === 'new' ? 'contacted' : matchedLead.status) as 'new' | 'contacted' | 'converted' | 'dead';
-      const updatedNotes = `${matchedLead.notes || ''}\n[Inbound ${isWhatsApp ? 'WhatsApp' : 'SMS'} - ${now.slice(0, 16)}]: ${rawBody}`.trim();
-      
-      db.updateLead(matchedLead.id, matchedLead.contractorId, {
+    await pgDb.transaction(async tx => {
+      await tx.update(leads).set({
         status: newStatus,
-        notes: updatedNotes
-      });
-      matchedLead.status = newStatus;
+        notes: updatedNotes,
+        updatedAt: now
+      }).where(and(eq(leads.id, matchedLead.id), eq(leads.contractorId, targetContractorId)));
 
-    // Commit cryptographic ledger audit entry
-    try {
-      db.recordLedgerEntry({
+      await recordStructuredLedgerEntryInTransaction(tx, {
         contractorId: targetContractorId,
         eventType: 'lead_captured',
         entityType: 'lead',
@@ -2945,8 +3002,23 @@ app.all(['/api/webhooks/twilio', '/api/webhooks/whatsapp'], async (req, res) => 
           bodySnippet: rawBody.slice(0, 140)
         }
       });
-    } catch (e) {
-      console.warn('Ledger commit skipped for webhook:', e);
+    });
+
+    if (!postgresStructuredLedgerEnabled()) {
+      await recordStructuredLedgerEntry({
+        contractorId: targetContractorId,
+        eventType: 'lead_captured',
+        entityType: 'lead',
+        entityId: matchedLead.id,
+        actor: 'carrier_webhook',
+        metadata: {
+          from: cleanFrom,
+          channel: isWhatsApp ? 'whatsapp' : 'sms',
+          messageSid,
+          leadId: matchedLead.id,
+          bodySnippet: rawBody.slice(0, 140)
+        }
+      });
     }
 
     // Broadcast instant real-time notification alert via SSE to the dashboard
@@ -3134,9 +3206,6 @@ app.post('/api/system/purge-fake-data', authenticate, async (req, res) => {
 
     // Best-effort cleanup of this workspace's legacy lead mirror only. Never
     // invoke the old global purge method from an authenticated tenant route.
-    try { db.purgeMockLeads(contractorId); }
-    catch (mirrorError) { console.warn('[HAL Purge] Legacy tenant lead mirror cleanup failed.', mirrorError); }
-
     const remaining = await pgDb.select({ id: leads.id }).from(leads).where(eq(leads.contractorId, contractorId));
     const remainingRealLeads = remaining.filter(row => !row.id.startsWith('lead_seed_')).length;
     return res.json({
@@ -3594,7 +3663,6 @@ app.post('/api/leads/ingest', authenticate, async (req, res) => {
     const now = new Date();
     const committed = await pgDb.transaction(async tx => {
       const addedItems: any[] = [];
-      const legacyMirrors: any[] = [];
 
       for (const item of accepted) {
         const id = crypto.randomUUID();
@@ -3693,29 +3761,7 @@ app.post('/api/leads/ingest', authenticate, async (req, res) => {
         });
 
         addedItems.push(addedLead);
-        legacyMirrors.push({
-          id,
-          contractorId,
-          businessName: item.businessName.trim(),
-          ownerName: item.ownerName || undefined,
-          email: rawEmail || '',
-          phone: rawPhone || '',
-          city: item.city.trim(),
-          serviceType: item.serviceType.trim(),
-          source: 'harvested_intelligence',
-          status: 'new',
-          urgencyScore: null,
-          predictedLtvUsd: null,
-          notes,
-          websiteUrl: item.websiteUrl,
-          sourceType: item.sourceType || 'unknown',
-          isSynthetic: Boolean(item.isSynthetic),
-          verificationStatus,
-          dnsVerified,
-          groundingEvidence: item.groundingEvidence || null,
-          createdAt: now.toISOString(),
-          updatedAt: now.toISOString()
-        });
+
       }
 
       await tx.insert(auditLogs).values({
@@ -3724,15 +3770,8 @@ app.post('/api/leads/ingest', authenticate, async (req, res) => {
         action: 'LEADS_INGESTED',
         details: `Imported ${addedItems.length} unique territory prospects and created ${addedItems.length} human qualification tasks. Verification remains required before outreach.`
       });
-      return { addedItems, legacyMirrors };
+      return { addedItems };
     });
-
-    // The JSON store is a temporary compatibility mirror only. A mirror failure
-    // must not undo or misreport the authoritative PostgreSQL transaction.
-    for (const legacyLead of committed.legacyMirrors) {
-      try { db.addLead(legacyLead); }
-      catch (mirrorError) { console.warn('[HAL Lead Ingest] Legacy mirror failed; PostgreSQL lead is committed.', mirrorError); }
-    }
 
     broadcastNotification(
       contractorId,
@@ -3792,7 +3831,6 @@ app.post('/api/leads/purge-and-replace', authenticate, async (req, res) => {
       const normalize = (value: any) => String(value || '').trim().toLowerCase().replace(/\s+/g, ' ');
       const seen = new Set(existingRows.map(row => [normalize(row.businessName), normalize(row.city), normalize(row.niche)].join('|')));
       const addedItems: any[] = [];
-      const legacyMirrors: any[] = [];
       let skippedCount = 0;
 
       for (const item of harvestedLeads) {
@@ -3905,29 +3943,7 @@ app.post('/api/leads/purge-and-replace', authenticate, async (req, res) => {
         });
 
         addedItems.push(addedLead);
-        legacyMirrors.push({
-          id,
-          contractorId,
-          businessName: item.businessName.trim(),
-          ownerName: item.ownerName || undefined,
-          email: rawEmail || '',
-          phone: rawPhone || '',
-          city: item.city.trim(),
-          serviceType: item.serviceType.trim(),
-          source: 'harvested_intelligence',
-          status: 'new',
-          urgencyScore: null,
-          predictedLtvUsd: null,
-          notes,
-          websiteUrl: item.websiteUrl,
-          sourceType: item.sourceType || 'unknown',
-          isSynthetic: Boolean(item.isSynthetic),
-          verificationStatus,
-          dnsVerified,
-          groundingEvidence: item.groundingEvidence || null,
-          createdAt: now.toISOString(),
-          updatedAt: now.toISOString()
-        });
+
       }
 
       await tx.insert(auditLogs).values({
@@ -3949,15 +3965,9 @@ app.post('/api/leads/purge-and-replace', authenticate, async (req, res) => {
         summary: `Replaced ${seedIds.length} mock seed leads with ${addedItems.length} unique imported prospects.`,
         payload: { removedSeedLeads: seedIds.length, importedLeads: addedItems.length, queuedTasks: addedItems.length, skippedCount }
       });
-      return { addedItems, legacyMirrors, removedSeedCount: seedIds.length, skippedCount };
+      return { addedItems, removedSeedCount: seedIds.length, skippedCount };
     });
 
-    try { db.purgeMockLeads(contractorId); }
-    catch (mirrorError) { console.warn('[HAL Lead Replace] Legacy seed purge mirror failed.', mirrorError); }
-    for (const legacyLead of committed.legacyMirrors) {
-      try { db.addLead(legacyLead); }
-      catch (mirrorError) { console.warn('[HAL Lead Replace] Legacy lead mirror failed; PostgreSQL lead is committed.', mirrorError); }
-    }
 
     broadcastNotification(
       contractorId,
@@ -4371,25 +4381,67 @@ app.post('/api/recommendations/:id/approve', authenticate, async (req, res) => {
       return res.status(404).json({ error: 'Recommendation not found or inaccessible' });
     }
 
-    const [updated] = await pgDb.update(recommendations).set({
-      status: 'approved',
-      outcome: 'Operation approved. Enqueued for campaign synchronization.',
-      updatedAt: new Date()
-    }).where(and(eq(recommendations.id, id), eq(recommendations.contractorId, contractorId))).returning();
+    const approval = await pgDb.transaction(async tx => {
+      const [current] = await tx.select().from(recommendations)
+        .where(and(eq(recommendations.id, id), eq(recommendations.contractorId, contractorId)))
+        .for('update');
+      if (!current) {
+        throw new Error('Recommendation changed before approval could be committed.');
+      }
+      if (current.status === 'approved') {
+        return { recommendation: current, transitioned: false };
+      }
+      const [approved] = await tx.update(recommendations).set({
+        status: 'approved',
+        outcome: 'Operation approved. Enqueued for campaign synchronization.',
+        updatedAt: new Date()
+      }).where(and(eq(recommendations.id, id), eq(recommendations.contractorId, contractorId))).returning();
 
-    await pgDb.insert(auditLogs).values({
-      id: crypto.randomUUID(),
-      contractorId,
-      action: 'RECOMMENDATION_APPROVED',
-      details: `Approved recommendation: ${updated.action}`
+      if (!approved) {
+        throw new Error('Recommendation changed before approval could be committed.');
+      }
+      await tx.insert(auditLogs).values({
+        id: crypto.randomUUID(),
+        contractorId,
+        action: 'RECOMMENDATION_APPROVED',
+        details: `Approved recommendation: ${approved.action}`
+      });
+      await tx.insert(revenueRecommendationEvents).values({
+        id: crypto.randomUUID(),
+        contractorId,
+        recommendationId: approved.id,
+        previousStatus: current.status,
+        newStatus: 'approved',
+        actor: String(contractorId),
+        metadata: {
+          action: approved.action,
+          outcome: 'Operation approved. Enqueued for campaign synchronization.'
+        }
+      });
+      await recordStructuredLedgerEntryInTransaction(tx, {
+        contractorId,
+        eventType: 'recommendation_approved',
+        entityType: 'recommendation',
+        entityId: approved.id,
+        actor: String(contractorId),
+        details: `Approved recommendation: ${approved.action}`,
+        metadata: { previousStatus: current.status, newStatus: 'approved' }
+      });
+      return { recommendation: approved, transitioned: true };
     });
+    const updated = approval.recommendation;
 
-    // We can't update outcome records yet, not migrated
-    db.addOutcomeRecord({
-      actionType: 'BUDGET_REALLOCATION',
-      actionDetails: updated.action,
-      predictedResult: 'Improve Cost-Per-Lead efficiency based on confidence profile'
-    });
+    if (!postgresStructuredLedgerEnabled() && approval.transitioned) {
+      await recordStructuredLedgerEntry({
+        contractorId,
+        eventType: 'recommendation_approved',
+        entityType: 'recommendation',
+        entityId: updated.id,
+        actor: String(contractorId),
+        details: `Approved recommendation: ${updated.action}`,
+        metadata: { newStatus: 'approved' }
+      });
+    }
 
     broadcastNotification(
       contractorId,
@@ -4495,7 +4547,7 @@ app.post('/api/skills/:id/execute', authenticate, async (req, res) => {
     const result = await executeSkill(id, inputs || {}, contractorId);
     
     // Log Audit Action
-    db.addAuditLog({
+    await persistAuditLog({
       contractorId,
       action: 'SKILL_EXECUTED',
       details: `Executed intelligence skill: "${id}"`
@@ -5274,7 +5326,7 @@ app.post('/api/audit/website', authenticate, async (req, res) => {
       payload: { targetUrl: formattedUrl, measurementStatus: report.measurementStatus, dnsResolved: report.dnsResolved, httpReachable: report.httpReachable, sslStatus: report.sslStatus, pageSpeedStatus: report.pageSpeedStatus }
     });
 
-    db.addAuditLog({
+    await persistAuditLog({
       contractorId,
       action: 'SITE_CONNECTIVITY_CHECK_EXECUTED',
       details: 'Ran public DNS and pinned HTTP/TLS connectivity checks for ' + formattedUrl + '. PageSpeed, SEO, and revenue impact were not measured.'
@@ -5799,7 +5851,7 @@ app.post('/api/dispatch/webhook', authenticate, async (req, res) => {
 
   const durationMs = Date.now() - startTime;
 
-  db.addAuditLog({
+  await persistAuditLog({
     contractorId,
     action: `WEBHOOK_DISPATCH_${status.toUpperCase()}`,
     details: `Dispatched webhook to ${targetUrl} (HTTP ${statusCode} in ${durationMs}ms)`
@@ -5953,7 +6005,7 @@ app.post('/api/dispatch/campaign-batch', authenticate, async (req, res) => {
     payload: { campaignId: campaignId || null, channel, simulated, failed, totalTargeted: targetLeads.length, providerContacted: false }
   });
 
-  const auditBlock = db.recordLedgerEntry({
+  const auditBlock = await recordStructuredLedgerEntry({
     contractorId,
     eventType: 'conversion_outbox',
     entityType: 'campaign_dispatch',
@@ -5985,7 +6037,7 @@ app.post('/api/dispatch/campaign-batch', authenticate, async (req, res) => {
     channel,
     results,
     block: auditBlock,
-    integrity: db.verifyLedgerIntegrity(contractorId)
+    integrity: await checkStructuredLedgerIntegrity(contractorId)
   });
 });
 
@@ -6573,8 +6625,9 @@ app.post('/api/outreach/dispatch', authenticate, async (req, res) => {
       return res.status(503).json({ success: false, code: 'OUTBOX_UNAVAILABLE', error: 'Durable communications outbox is unavailable. No email was sent.' });
     }
 
+    let result: any;
     try {
-      const result = await sendResendEmail({
+      result = await sendResendEmail({
         to: String(recipient),
         subject: customizedSubject,
         text: customizedMessage,
@@ -6582,72 +6635,6 @@ app.post('/api/outreach/dispatch', authenticate, async (req, res) => {
       }, {
         apiKey: emailBridge.email.apiKey,
         from: emailBridge.email.senderEmail
-      });
-      const submittedAt = new Date().toISOString();
-      await pgDb.update(communicationsOutbox).set({
-        status: 'submitted',
-        providerMessageId: result.providerMessageId,
-        attempts: 1,
-        submittedAt: new Date(submittedAt),
-        lastAttemptAt: new Date(submittedAt),
-        updatedAt: new Date(submittedAt),
-        errorCode: null,
-        errorMessage: null
-      }).where(and(eq(communicationsOutbox.id, outboxId), eq(communicationsOutbox.contractorId, contractorId)));
-      const entry: DispatchLogEntry = {
-        id: outboxId,
-        contractorId,
-        channel,
-        recipient: String(recipient),
-        leadId,
-        leadBusinessName: leadBusinessName || 'Direct Recipient',
-        status: 'submitted',
-        mode: 'live',
-        providerId: result.providerMessageId,
-        timestamp: submittedAt,
-        subject: customizedSubject,
-        preview: customizedMessage.slice(0, 100)
-      };
-      await recordWorkEvent(pgDb, {
-        contractorId, eventType: 'outreach.email.submitted', entityType: leadId ? 'lead' : 'outreach_dispatch', entityId: leadId || entry.id,
-        actorType: 'human', actorId: contractorId, sourceModule: 'outreach_dispatch', correlationId: entry.id,
-        summary: `Email accepted by Resend for ${leadBusinessName || 'a direct recipient'}; delivery is not confirmed.`,
-        payload: { channel: 'email', provider: result.provider, providerMessageId: result.providerMessageId, status: result.status, deliveryConfirmed: false }
-      });
-      const auditBlock = db.recordLedgerEntry({
-        contractorId,
-        eventType: 'phase3_live_dispatch',
-        entityType: 'outreach_email',
-        entityId: entry.id,
-        actor: 'HAL Resend Adapter',
-        details: 'Email accepted by Resend API. This is provider submission, not recipient delivery confirmation.',
-        metadata: {
-          channel: 'email',
-          provider: result.provider,
-          providerMessageId: result.providerMessageId,
-          leadId: leadId || null,
-          status: result.status,
-          deliveryConfirmed: false
-        }
-      });
-      broadcastNotification(
-        contractorId,
-        'info',
-        'Email submitted to Resend',
-        `Resend accepted an email request for ${String(recipient)}. Delivery is not yet confirmed.`
-      );
-      return res.json({
-        success: true,
-        dispatchId: entry.id,
-        idempotencyKey,
-        provider: result.provider,
-        providerMessageId: result.providerMessageId,
-        status: result.status,
-        mode: 'live',
-        providerContacted: true,
-        deliveryConfirmed: false,
-        timestamp: submittedAt,
-        block: auditBlock
       });
     } catch (err: any) {
       const providerStatus = Number(String(err?.message || '').match(/HTTP (\d{3})/i)?.[1] || 0);
@@ -6684,6 +6671,125 @@ app.post('/api/outreach/dispatch', authenticate, async (req, res) => {
         error: 'Email provider request failed. Delivery status is unknown.'
       });
     }
+
+    // From this point Resend has accepted the message. Persistence or audit
+    // failures must never relabel an accepted external send as retryable/failed.
+    const submittedAt = new Date().toISOString();
+    const entry: DispatchLogEntry = {
+      id: outboxId,
+      contractorId,
+      channel,
+      recipient: String(recipient),
+      leadId,
+      leadBusinessName: leadBusinessName || 'Direct Recipient',
+      status: 'submitted',
+      mode: 'live',
+      providerId: result.providerMessageId,
+      timestamp: submittedAt,
+      subject: customizedSubject,
+      preview: customizedMessage.slice(0, 100)
+    };
+    const ledgerInput: StructuredLedgerInput = {
+      contractorId,
+      eventType: 'phase3_live_dispatch',
+      entityType: 'outreach_email',
+      entityId: entry.id,
+      actor: 'HAL Resend Adapter',
+      details: 'Email accepted by Resend API. This is provider submission, not recipient delivery confirmation.',
+      metadata: {
+        channel: 'email',
+        provider: result.provider,
+        providerMessageId: result.providerMessageId,
+        leadId: leadId || null,
+        status: result.status,
+        deliveryConfirmed: false
+      }
+    };
+
+    let auditBlock: any = null;
+    let auditRecorded = true;
+    let persistencePending = false;
+    try {
+      await pgDb.transaction(async tx => {
+        await tx.update(communicationsOutbox).set({
+          status: 'submitted',
+          providerMessageId: result.providerMessageId,
+          attempts: 1,
+          submittedAt: new Date(submittedAt),
+          lastAttemptAt: new Date(submittedAt),
+          updatedAt: new Date(submittedAt),
+          errorCode: null,
+          errorMessage: null
+        }).where(and(eq(communicationsOutbox.id, outboxId), eq(communicationsOutbox.contractorId, contractorId)));
+        await recordWorkEvent(tx, {
+          contractorId, eventType: 'outreach.email.submitted', entityType: leadId ? 'lead' : 'outreach_dispatch', entityId: leadId || entry.id,
+          actorType: 'human', actorId: contractorId, sourceModule: 'outreach_dispatch', correlationId: entry.id,
+          summary: `Email accepted by Resend for ${leadBusinessName || 'a direct recipient'}; delivery is not confirmed.`,
+          payload: { channel: 'email', provider: result.provider, providerMessageId: result.providerMessageId, status: result.status, deliveryConfirmed: false }
+        });
+        auditBlock = await recordStructuredLedgerEntryInTransaction(tx, ledgerInput);
+      });
+    } catch (persistenceError) {
+      // A ledger failure must not cause a provider-accepted email to be retried.
+      // Retry the authoritative submitted state without the optional ledger append.
+      auditRecorded = false;
+      console.error('[HAL Email Dispatch] Resend accepted the email, but atomic audit persistence failed:', persistenceError);
+      try {
+        await pgDb.transaction(async tx => {
+          await tx.update(communicationsOutbox).set({
+            status: 'submitted',
+            providerMessageId: result.providerMessageId,
+            attempts: 1,
+            submittedAt: new Date(submittedAt),
+            lastAttemptAt: new Date(submittedAt),
+            updatedAt: new Date(submittedAt),
+            errorCode: null,
+            errorMessage: null
+          }).where(and(eq(communicationsOutbox.id, outboxId), eq(communicationsOutbox.contractorId, contractorId)));
+          await recordWorkEvent(tx, {
+            contractorId, eventType: 'outreach.email.submitted', entityType: leadId ? 'lead' : 'outreach_dispatch', entityId: leadId || entry.id,
+            actorType: 'human', actorId: contractorId, sourceModule: 'outreach_dispatch', correlationId: entry.id,
+            summary: `Email accepted by Resend for ${leadBusinessName || 'a direct recipient'}; delivery is not confirmed.`,
+            payload: { channel: 'email', provider: result.provider, providerMessageId: result.providerMessageId, status: result.status, deliveryConfirmed: false, ledgerPersistenceFailed: true }
+          });
+        });
+        persistencePending = false;
+      } catch (reconciliationError) {
+        persistencePending = true;
+        console.error('[HAL Email Dispatch] Provider accepted the email, but the submitted state could not be persisted:', reconciliationError);
+      }
+    }
+
+    if (!postgresStructuredLedgerEnabled()) {
+      try {
+        auditBlock = await recordStructuredLedgerEntry(ledgerInput);
+      } catch (ledgerError) {
+        auditRecorded = false;
+        console.error('[HAL Email Dispatch] Provider accepted the email, but legacy ledger append failed:', ledgerError);
+      }
+    }
+
+    broadcastNotification(
+      contractorId,
+      'info',
+      'Email submitted to Resend',
+      `Resend accepted an email request for ${String(recipient)}. Delivery is not yet confirmed.`
+    );
+    return res.json({
+      success: true,
+      dispatchId: entry.id,
+      idempotencyKey,
+      provider: result.provider,
+      providerMessageId: result.providerMessageId,
+      status: 'submitted',
+      mode: 'live',
+      providerContacted: true,
+      deliveryConfirmed: false,
+      auditRecorded,
+      persistencePending,
+      timestamp: submittedAt,
+      block: auditBlock
+    });
   }
 
   if (mode !== 'simulation') {
@@ -6746,7 +6852,7 @@ app.post('/api/outreach/dispatch', authenticate, async (req, res) => {
     payload: { channel, mode: 'simulation', status: 'simulated', providerContacted: false, dispatchId }
   });
 
-  const auditBlock = db.recordLedgerEntry({
+  const auditBlock = await recordStructuredLedgerEntry({
     contractorId,
     eventType: 'phase3_verification_audit',
     entityType: 'outreach_simulation',
@@ -7893,7 +7999,7 @@ app.post('/api/projects', authenticate, async (req, res) => {
       return created;
     });
 
-    db.addAuditLog({
+    await persistAuditLog({
       contractorId,
       action: 'PROJECT_ONBOARDED',
       details: `Initiated delivery project for ${businessName.trim()} (${project.monthlyRetainerUsd}/mo).`
@@ -8002,7 +8108,7 @@ app.put('/api/projects/:id', authenticate, async (req, res) => {
     }
 
     if (updates.status === 'completed' && existingProject.status !== 'completed') {
-      db.addAuditLog({
+      await persistAuditLog({
         contractorId,
         action: 'REVIEW_REQUEST_QUEUED',
         details: `Project completed for ${updated.businessName}. Automated SMS/Email review and referral incentive queued for operator review.`
@@ -8113,25 +8219,33 @@ app.post('/api/forecasting/google-ads/sync', authenticate, async (req, res) => {
   }
 });
 
+const legacyConnectorCredentialImports = new Map<string, Promise<void>>();
+
+async function importLegacyConnectorCredentialsOnce(contractorId: string): Promise<void> {
+  const inFlight = legacyConnectorCredentialImports.get(contractorId);
+  if (inFlight) return inFlight;
+
+  const migration = (async () => {
+    const legacyCredentials = db.getConnectorCredentials(contractorId) || {};
+    for (const [service, value] of Object.entries(legacyCredentials)) {
+      if (typeof value !== 'string' || !value) continue;
+      await importConnectorCredentialIfAbsent(contractorId, service, value);
+    }
+  })();
+  legacyConnectorCredentialImports.set(contractorId, migration);
+  try {
+    await migration;
+  } catch (error) {
+    legacyConnectorCredentialImports.delete(contractorId);
+    throw error;
+  }
+}
+
 async function getTenantConnectorCredentials(contractorId: string): Promise<Record<string, string>> {
-  // Import existing encrypted JSON-store values once. PostgreSQL becomes the
-  // durable source after first read; conflicts never overwrite newer DB values.
-  const legacyCredentials = db.getConnectorCredentials(contractorId) || {};
-  for (const [service, value] of Object.entries(legacyCredentials)) {
-    if (typeof value !== 'string' || !value) continue;
-    const id = 'conn_' + crypto.createHash('sha256').update(`${contractorId}:${service}`).digest('hex');
-    await pgDb.insert(connectorCredentials).values({
-      id, contractorId, service, encryptedValue: encrypt(value), updatedAt: new Date()
-    }).onConflictDoNothing();
-  }
-  const rows = await pgDb.select().from(connectorCredentials)
-    .where(eq(connectorCredentials.contractorId, contractorId));
-  const credentials: Record<string, string> = {};
-  for (const row of rows) {
-    const value = decrypt(row.encryptedValue);
-    if (value) credentials[row.service] = value;
-  }
-  return credentials;
+  // Read the legacy aggregate once per tenant/process for compatibility, then
+  // use the tested PostgreSQL repository as the sole credential read path.
+  await importLegacyConnectorCredentialsOnce(contractorId);
+  return getConnectorCredentials(contractorId);
 }
 
 app.get('/api/connectors/credentials', authenticate, async (req, res) => {
@@ -8164,13 +8278,7 @@ app.post('/api/connectors/credentials', authenticate, async (req, res) => {
   }
   try {
     const id = 'conn_' + crypto.createHash('sha256').update(`${contractorId}:${service}`).digest('hex');
-    const encryptedValue = encrypt(keyVal.trim());
-    await pgDb.insert(connectorCredentials).values({
-      id, contractorId, service, encryptedValue, updatedAt: new Date()
-    }).onConflictDoUpdate({
-      target: connectorCredentials.id,
-      set: { encryptedValue, updatedAt: new Date() }
-    });
+    await saveConnectorCredential(contractorId, service, keyVal.trim());
     await pgDb.insert(auditLogs).values({
       id: crypto.randomUUID(),
       contractorId,
@@ -8564,7 +8672,9 @@ app.get('/api/ai/engine-status', authenticate, async (req, res) => {
     requestedPreference === 'nemotron' && nvidiaKeySet ? 'nemotron' :
     geminiKeySet ? 'gemini' :
     nvidiaKeySet ? 'nemotron' : 'unavailable';
-  const learningState = autonomousLearning.getState();
+  const tenantLearning = getTenantAutonomousLearning(String((req as any).contractorId || ''));
+  await tenantLearning.initializeFromDb();
+  const learningState = tenantLearning.getState();
 
   res.json({
     activeEngine: activeAiPreference,
@@ -8746,7 +8856,7 @@ app.post(['/api/ai/test-timesfm', '/api/forecast/scenario'], authenticate, async
       targetCac: resolvedTargetCac
     });
 
-    db.addAuditLog({
+    await persistAuditLog({
       contractorId,
       action: 'TIMESFM_BRAIN_SYNCHRONIZED_INFERENCE',
       details: `TimesFM 2.5 demand inference used ${result.googleAdsBaseline.weeklyObservations ?? 0} weekly observations for ${targetNiche} in ${targetCity}. Weather was context only; CAC guardrails ${result.budgetGuardrails.maxAllowableCpl === null ? 'were not evaluated' : 'were evaluated as advisory only'}. No ad budget was changed.`
@@ -8865,28 +8975,42 @@ app.post('/api/geocode', authenticate, async (req, res) => {
   }
 });
 
-app.post('/api/ai/engine-select', authenticate, (req, res) => {
+app.post('/api/ai/engine-select', authenticate, async (req, res) => {
   const { preferredEngine, offlineSimulation } = req.body;
-  
-  if (preferredEngine === 'gemini' || preferredEngine === 'nemotron' || preferredEngine === 'dual') {
-    process.env.HAL_ACTIVE_AI = preferredEngine;
-  }
-  
-  if (typeof offlineSimulation === 'boolean') {
-    autonomousLearning.setOfflineMode(offlineSimulation);
-  }
+  const tenantLearning = getTenantAutonomousLearning(String((req as any).contractorId || ''));
 
-  res.json({
-    success: true,
-    activeEngine: process.env.HAL_ACTIVE_AI || 'dual',
-    isOfflineModeActive: autonomousLearning.getState().isOfflineModeActive
-  });
+  try {
+    await tenantLearning.initializeFromDb();
+    // Persist learning mode before reporting success or changing the active provider.
+    if (typeof offlineSimulation === 'boolean') {
+      await tenantLearning.setOfflineMode(offlineSimulation);
+    }
+
+    if (preferredEngine === 'gemini' || preferredEngine === 'nemotron' || preferredEngine === 'dual') {
+      process.env.HAL_ACTIVE_AI = preferredEngine;
+    }
+
+    return res.json({
+      success: true,
+      activeEngine: process.env.HAL_ACTIVE_AI || 'dual',
+      isOfflineModeActive: tenantLearning.getState().isOfflineModeActive
+    });
+  } catch (error) {
+    console.error('[AI Engine Select] Learning-state persistence failed.', error);
+    return res.status(503).json({
+      success: false,
+      code: 'LEARNING_STATE_PERSISTENCE_FAILED',
+      error: 'The learning-mode change was not saved. PostgreSQL must be available before this setting can be changed.'
+    });
+  }
 });
 
 app.post('/api/ai/dual-drive-synthesis', authenticate, async (req, res) => {
   const { prompt, systemInstruction, leadContext } = req.body;
+  const tenantLearning = getTenantAutonomousLearning(String((req as any).contractorId || ''));
 
   try {
+    await tenantLearning.initializeFromDb();
     const { generateDualDriveResponse } = await import('./src/services/nemotron');
     const result = await generateDualDriveResponse(
       prompt || `Generate a high-converting contractor growth strategy and discovery audit for ${leadContext?.businessName || 'the prospect'}.`,
@@ -8900,7 +9024,7 @@ app.post('/api/ai/dual-drive-synthesis', authenticate, async (req, res) => {
     });
   } catch (err: any) {
     // If cloud calls fail, gracefully fall back to local autonomous engine
-    const pitch = autonomousLearning.generateOfflinePitch(leadContext || {
+    const pitch = tenantLearning.generateOfflinePitch(leadContext || {
       businessName: 'Target Contractor',
       city: 'Calgary',
       niche: 'roofing',
@@ -8924,58 +9048,101 @@ app.post('/api/ai/dual-drive-synthesis', authenticate, async (req, res) => {
 
 // ─── AUTONOMOUS SELF-TEACHING SYSTEM ENDPOINTS ───────────────────────────────
 
-app.get('/api/autonomous/weights', authenticate, (req, res) => {
-  const state = autonomousLearning.getState();
-  res.json(state);
+app.get('/api/autonomous/weights', authenticate, async (req, res) => {
+  try {
+    const tenantLearning = getTenantAutonomousLearning(String((req as any).contractorId || ''));
+    await tenantLearning.initializeFromDb();
+    return res.json(tenantLearning.getState());
+  } catch (error) {
+    console.error('[Autonomous Learning] Tenant state read failed.', error);
+    return res.status(503).json({ error: 'Tenant learning state is temporarily unavailable.' });
+  }
 });
 
-app.post('/api/autonomous/learn-step', authenticate, (req, res) => {
+app.post('/api/autonomous/learn-step', authenticate, async (req, res) => {
   const contractorId = (req as any).contractorId;
   const { niche, city, outcome, closedValueUsd, channelUsed, objectionText, auditFindings } = req.body;
+  const tenantLearning = getTenantAutonomousLearning(String(contractorId || ''));
 
-  const result = autonomousLearning.digestBusinessOutcome({
-    niche,
-    city,
-    outcome: outcome || 'won',
-    closedValueUsd: Number(closedValueUsd) || 0,
-    channelUsed,
-    objectionText,
-    auditFindings
-  });
+  try {
+    await tenantLearning.initializeFromDb();
+    const result = await tenantLearning.digestBusinessOutcome({
+      niche,
+      city,
+      outcome: outcome || 'won',
+      closedValueUsd: Number(closedValueUsd) || 0,
+      channelUsed,
+      objectionText,
+      auditFindings
+    });
 
-  db.addAuditLog({
-    contractorId,
-    action: 'AUTONOMOUS_LEARNING_CALIBRATED',
-    details: `Epoch ${result.newEpoch}: ${result.logMessage}`
-  });
+    let auditPersisted = true;
+    try {
+      await pgDb.insert(auditLogs).values({
+        id: crypto.randomUUID(),
+        contractorId,
+        action: 'AUTONOMOUS_LEARNING_CALIBRATED',
+        details: `Epoch ${result.newEpoch}: ${result.logMessage}`,
+        timestamp: new Date()
+      });
+    } catch (auditError) {
+      // The learning-state transaction has already committed. Do not invite a
+      // retry that would count the same business outcome twice; report the
+      // audit gap explicitly while preserving the committed learning result.
+      auditPersisted = false;
+      console.error('[Autonomous Learning] Outcome saved but audit log write failed.', auditError);
+    }
 
-  res.json({
-    success: true,
-    epoch: result.newEpoch,
-    updatedNiche: result.updatedNiche,
-    message: result.logMessage,
-    fullState: autonomousLearning.getState()
-  });
+    return res.json({
+      success: true,
+      persisted: true,
+      auditPersisted,
+      warning: auditPersisted ? undefined : 'Learning state was saved, but its audit-log entry could not be persisted.',
+      epoch: result.newEpoch,
+      updatedNiche: result.updatedNiche,
+      message: result.logMessage,
+      fullState: tenantLearning.getState()
+    });
+  } catch (error) {
+    console.error('[Autonomous Learning] Outcome persistence failed.', error);
+    return res.status(503).json({
+      success: false,
+      code: 'LEARNING_PERSISTENCE_FAILED',
+      error: 'The learning outcome could not be durably saved. No successful learning update is being reported.'
+    });
+  }
 });
 
-app.post('/api/autonomous/offline-pitch', authenticate, (req, res) => {
+app.post('/api/autonomous/offline-pitch', authenticate, async (req, res) => {
   const { lead, channel } = req.body;
   if (!lead || !lead.businessName) {
     return res.status(400).json({ error: 'Lead data with businessName is required' });
   }
 
-  const pitch = autonomousLearning.generateOfflinePitch(lead, channel || 'phone');
-  res.json(pitch);
+  try {
+    const tenantLearning = getTenantAutonomousLearning(String((req as any).contractorId || ''));
+    await tenantLearning.initializeFromDb();
+    return res.json(tenantLearning.generateOfflinePitch(lead, channel || 'phone'));
+  } catch (error) {
+    console.error('[Autonomous Learning] Tenant pitch state unavailable.', error);
+    return res.status(503).json({ error: 'Tenant learning state is temporarily unavailable.' });
+  }
 });
 
-app.post('/api/autonomous/offline-objection', authenticate, (req, res) => {
+app.post('/api/autonomous/offline-objection', authenticate, async (req, res) => {
   const { objectionText, niche } = req.body;
   if (!objectionText) {
     return res.status(400).json({ error: 'objectionText is required' });
   }
 
-  const solution = autonomousLearning.solveOfflineObjection(objectionText, niche || 'general');
-  res.json(solution);
+  try {
+    const tenantLearning = getTenantAutonomousLearning(String((req as any).contractorId || ''));
+    await tenantLearning.initializeFromDb();
+    return res.json(tenantLearning.solveOfflineObjection(objectionText, niche || 'general'));
+  } catch (error) {
+    console.error('[Autonomous Learning] Tenant objection state unavailable.', error);
+    return res.status(503).json({ error: 'Tenant learning state is temporarily unavailable.' });
+  }
 });
 
 // ─── NEON POSTGRESQL CONNECTION & DATA SYNC ENDPOINTS ────────────────────────
@@ -8991,7 +9158,7 @@ app.post('/api/system/postgres-connect', authenticate, requireRole('admin'), asy
     // the database pool used by live application queries.
     const result = await testPostgresConnection(databaseUrl);
     
-    db.addAuditLog({
+    await persistAuditLog({
       contractorId: (req as any).contractorId,
       action: 'POSTGRES_DATABASE_CONNECTED',
       details: `Connected to ${result.provider || 'PostgreSQL'} (${result.latencyMs}ms latency)`
@@ -9029,9 +9196,12 @@ app.post('/api/system/postgres-sync', authenticate, requireRole('admin'), async 
     const client = await pool.connect();
 
     try {
-      const localLeads = db.getLeads(contractorId);
+      // Exclude retired mock seed rows: an old JSON export must never resurrect them.
+      const localLeads = db.getLeads(contractorId).filter(lead => !lead.id.startsWith('lead_seed_'));
       const localWinLoss = db.getWinLossRecords(contractorId);
-      const learningState = autonomousLearning.getState();
+      const tenantLearning = getTenantAutonomousLearning(String(contractorId || ''));
+      await tenantLearning.initializeFromDb();
+      const learningState = tenantLearning.getState();
 
       const existingLeadRows = localLeads.length
         ? await client.query('SELECT id FROM leads WHERE contractor_id = $1', [contractorId])
@@ -9133,18 +9303,19 @@ app.post('/api/system/postgres-sync', authenticate, requireRole('admin'), async 
         syncedWinLoss += winLossInsert.rowCount || 0;
       }
 
-      // Sync Learned Weights
+      // Sync learned weights under this contractor's own key; never share a global row.
       await client.query(`
         INSERT INTO learned_weights (id, epoch, autonomy_score, weights_json, updated_at)
-        VALUES ('global_weights', $1, $2, $3, CURRENT_TIMESTAMP)
+        VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP)
         ON CONFLICT (id) DO NOTHING;
       `, [
+        `tenant:${contractorId}`,
         learningState.calibrationEpoch,
         learningState.autonomyReadinessScore,
         JSON.stringify(learningState)
       ]);
 
-      db.addAuditLog({
+      await persistAuditLog({
         contractorId,
         action: 'NEON_POSTGRES_SYNC_SUCCESS',
         details: `Synchronized ${syncedLeads} leads, ${syncedWinLoss} win/loss records, and Epoch ${learningState.calibrationEpoch} neural weights to Neon PostgreSQL.`
@@ -9464,19 +9635,7 @@ app.post('/api/scheduler', authenticate, async (req, res) => {
           });
         });
 
-        // Legacy lesson history is retained for older screens during migration.
-        try {
-          db.addLesson({
-            category: learning.category,
-            title: `Forecast Deviation Lesson (${forecast.metric.toUpperCase()})`,
-            description: learning.insight,
-            confidence: confidenceShift,
-            timesObserved: 1,
-            lastObserved: evaluatedAt.toISOString()
-          });
-        } catch (legacyError) {
-          console.warn('[HAL Learning] Legacy lesson mirror failed; PostgreSQL insight remains authoritative.', legacyError);
-        }
+        // The tenant-scoped learning_insights row above is the durable lesson record.
         evaluatedCount++;
       }
 
@@ -10549,6 +10708,36 @@ async function startServer() {
     try {
       const pool = getApplicationPostgresPool();
       await bootstrapPostgresTables(pool);
+      if (postgresStructuredLedgerEnabled()) {
+        // Legacy JSON is an optional import source, not a runtime dependency.
+        // Fresh/replacement instances may have no local file after cutover.
+        const legacyLedger = db.hasLegacyStore()
+          ? db.getStructuredLedger(undefined, Number.MAX_SAFE_INTEGER).reverse()
+          : [];
+        let reconciliation = { imported: 0, alreadyPresent: 0, total: 0 };
+        if (legacyLedger.length > 0) {
+          const legacyIntegrity = db.verifyLedgerIntegrity();
+          if (!legacyIntegrity.valid) {
+            throw new Error(`Legacy structured ledger integrity check failed: ${legacyIntegrity.auditMessage}`);
+          }
+          reconciliation = await importLegacyStructuredLedgerEntries(legacyLedger, pool);
+        }
+        const postgresIntegrity = await verifyStructuredLedgerIntegrity(undefined, pool);
+        // A valid writer may append after import releases its advisory lock.
+        // Verify that the imported prefix remains present, not that the global
+        // chain count stayed frozen while other application instances started.
+        if (!postgresIntegrity.valid || postgresIntegrity.totalEntries < reconciliation.total || postgresIntegrity.totalEntries < legacyLedger.length) {
+          throw new Error(`PostgreSQL structured ledger verification failed after reconciliation: ${postgresIntegrity.auditMessage}`);
+        }
+        console.info(`[HAL PostgreSQL] Structured ledger verified: ${reconciliation.imported} imported, ${reconciliation.alreadyPresent} legacy entries already present, ${postgresIntegrity.totalEntries} total global entries.`);
+      } else {
+        const ledgerState = await pool.query<{ total: string }>(
+          'SELECT count(*)::text AS total FROM structured_ledger_entries',
+        );
+        if (Number(ledgerState.rows[0]?.total || 0) > 0) {
+          throw new Error('PostgreSQL structured ledger already contains history. Keep HAL_STRUCTURED_LEDGER_POSTGRES_ENABLED=true; refusing to downgrade writes to the legacy JSON ledger.');
+        }
+      }
       const migratedLeadPii = await migrateExistingLeadPii(pool);
       if (migratedLeadPii > 0) {
         console.info(`[HAL PostgreSQL] Encrypted PII for ${migratedLeadPii} existing lead records.`);
@@ -11097,38 +11286,40 @@ async function startServer() {
         newStatus = 'completed';
       }
 
-      const [updated] = await pgDb.update(halLoops).set({
-        currentStage: nextStage,
-        status: newStatus,
-        criticFindings,
-        stateSnapshot: { ...existingSnapshot, lastStage: loop.currentStage, currentStage: nextStage, updated: new Date().toISOString() },
-        updatedAt: new Date()
-      }).where(and(eq(halLoops.id, id), eq(halLoops.contractorId, contractorId))).returning();
-
-      await pgDb.insert(halLoopEvents).values({
-        id: crypto.randomUUID(),
-        loopId: id,
-        contractorId,
-        previousState: loop.currentStage,
-        newState: nextStage,
-        eventType: 'stage_transition',
-        actor: 'HAL Operator',
-        metadata: { status: newStatus }
-      });
-
-      db.recordLedgerEntry({
+      const stageLedgerInput: StructuredLedgerInput = {
         contractorId,
         eventType: 'stage_transition',
         entityType: 'hal_loop',
         entityId: id,
         actor: 'HAL Operator',
         details: `Operating Loop advanced from '${loop.currentStage}' to '${nextStage}'.`,
-        metadata: {
-          previousStage: loop.currentStage,
-          newStage: nextStage,
-          status: newStatus
-        }
+        metadata: { previousStage: loop.currentStage, newStage: nextStage, status: newStatus }
+      };
+      const updated = await pgDb.transaction(async tx => {
+        const [saved] = await tx.update(halLoops).set({
+          currentStage: nextStage,
+          status: newStatus,
+          criticFindings,
+          stateSnapshot: { ...existingSnapshot, lastStage: loop.currentStage, currentStage: nextStage, updated: new Date().toISOString() },
+          updatedAt: new Date()
+        }).where(and(eq(halLoops.id, id), eq(halLoops.contractorId, contractorId))).returning();
+        if (!saved) throw new Error('Operating loop disappeared before its stage transition could be committed.');
+        await tx.insert(halLoopEvents).values({
+          id: crypto.randomUUID(),
+          loopId: id,
+          contractorId,
+          previousState: loop.currentStage,
+          newState: nextStage,
+          eventType: 'stage_transition',
+          actor: 'HAL Operator',
+          metadata: { status: newStatus }
+        });
+        await recordStructuredLedgerEntryInTransaction(tx, stageLedgerInput);
+        return saved;
       });
+      if (!postgresStructuredLedgerEnabled()) {
+        await recordStructuredLedgerEntry(stageLedgerInput);
+      }
 
       res.json({ success: true, loop: updated });
     } catch (err: any) {
@@ -11164,29 +11355,39 @@ async function startServer() {
       const harvested = await harvestRealBusinesses(city, niche);
       const totalDiscovered = harvested.length;
 
-      // Ensure all harvested items are securely encrypted and optionally saved into leads
-      if (saveToLeads) {
-        for (const hl of harvested) {
-          db.addLead({
-            contractorId,
-            businessName: hl.businessName,
-            ownerName: hl.ownerName || undefined,
-            phone: hl.phone || undefined,
-            email: hl.email || undefined,
-            city: hl.city || city,
-            serviceType: hl.serviceType || niche,
-            status: 'new',
-            urgencyScore: Math.round((hl.sentimentScore || 0.8) * 100),
-            predictedLtvUsd: (hl as any).predictedLtvUsd ?? 0,
-            source: 'loop_stage1_harvest',
-            isSynthetic: hl.isSynthetic ?? false,
-            sourceType: hl.sourceType || 'live_harvest',
-            verificationStatus: hl.verificationStatus || (hl.dnsVerified ? 'VERIFIED' : 'UNVERIFIED_STAGING'),
-            dnsVerified: hl.dnsVerified ?? false,
-            groundingEvidence: hl.groundingEvidence
-          });
-        }
-      }
+      // Prepare tenant-owned lead rows with PII encrypted before PostgreSQL persistence.
+      const leadsToPersist = saveToLeads ? harvested.map(hl => ({
+        id: 'lead_' + crypto.randomUUID(),
+        contractorId,
+        businessName: hl.businessName,
+        city: hl.city || city,
+        niche: hl.serviceType || niche,
+        ownerName: hl.ownerName || null,
+        phone: hl.phone ? '[ENCRYPTED]' : null,
+        email: hl.email ? '[ENCRYPTED]' : null,
+        phoneEncrypted: hl.phone ? encrypt(hl.phone) : null,
+        emailEncrypted: hl.email ? encrypt(hl.email) : null,
+        isSynthetic: hl.isSynthetic ?? false,
+        sourceType: hl.sourceType || 'live_harvest',
+        verificationStatus: hl.verificationStatus || (hl.dnsVerified ? 'VERIFIED' : 'UNVERIFIED_STAGING'),
+        dnsVerified: hl.dnsVerified ?? false,
+        groundingEvidence: hl.groundingEvidence || null,
+        status: 'new',
+        source: 'loop_stage1_harvest',
+        performanceScore: hl.performanceScore ?? null,
+        sslStatus: hl.sslStatus || null,
+        urgencyScore: Math.round((hl.sentimentScore || 0.8) * 100),
+        predictedLtv: Number((hl as any).predictedLtvUsd ?? 0),
+        seoScore: hl.seoScore ?? null,
+        googleRating: hl.googleRating ?? null,
+        reviewCount: hl.reviewCount ?? null,
+        reviewScore: hl.googleRating ?? null,
+        sentimentScore: hl.sentimentScore ?? null,
+        outreachStrategy: hl.outreachStrategy || null,
+        notes: hl.notes || null,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      })) : [];
 
       // Compute summary analytics
       const avgSeoScore = Math.round(harvested.reduce((s, h) => s + (h.seoScore || 70), 0) / (harvested.length || 1));
@@ -11267,45 +11468,48 @@ async function startServer() {
         lastUpdated: new Date().toISOString()
       };
 
-      const [updatedLoop] = await pgDb.update(halLoops).set({
-        stateSnapshot: updatedSnapshot,
-        updatedAt: new Date()
-      }).where(and(eq(halLoops.id, id), eq(halLoops.contractorId, contractorId))).returning();
-
-      // Log event
-      await pgDb.insert(halLoopEvents).values({
-        id: crypto.randomUUID(),
-        loopId: id,
-        contractorId,
-        previousState: loop.currentStage,
-        newState: loop.currentStage,
-        eventType: 'evidence_gathered',
-        actor: 'HAL Stage 1 Harvest Engine',
-        metadata: {
-          territory: city,
-          niche,
-          recordsCount: totalDiscovered,
-          completenessScore: 95,
-          validationPassed: true
+      const gatherResult = await pgDb.transaction(async tx => {
+        if (leadsToPersist.length) {
+          await tx.insert(leads).values(leadsToPersist);
         }
-      });
+        const [updated] = await tx.update(halLoops).set({
+          stateSnapshot: updatedSnapshot,
+          updatedAt: new Date()
+        }).where(and(eq(halLoops.id, id), eq(halLoops.contractorId, contractorId))).returning();
+        if (!updated) throw new Error('Operating loop disappeared before evidence could be committed.');
 
-      // Commit to immutable structured ledger
-      db.recordLedgerEntry({
-        contractorId,
-        eventType: 'evidence_gathered',
-        entityType: 'hal_loop',
-        entityId: id,
-        actor: 'HAL Stage 1 Harvest Engine',
-        details: `Harvested and validated ${totalDiscovered} territory entities in ${city} (${niche}) for Operating Loop.`,
-        metadata: {
+        const evidenceLedgerInput: StructuredLedgerInput = {
+          contractorId,
+          eventType: 'evidence_gathered',
+          entityType: 'hal_loop',
+          entityId: id,
+          actor: 'HAL Stage 1 Harvest Engine',
+          details: `Harvested and validated ${totalDiscovered} territory entities in ${city} (${niche}) for Operating Loop.`,
+          metadata: { loopId: id, territory: city, niche, recordsCount: totalDiscovered, completenessScore: 95 }
+        };
+        await tx.insert(halLoopEvents).values({
+          id: crypto.randomUUID(),
           loopId: id,
-          territory: city,
-          niche,
-          recordsCount: totalDiscovered,
-          completenessScore: 95
-        }
+          contractorId,
+          previousState: loop.currentStage,
+          newState: loop.currentStage,
+          eventType: 'evidence_gathered',
+          actor: 'HAL Stage 1 Harvest Engine',
+          metadata: {
+            territory: city,
+            niche,
+            recordsCount: totalDiscovered,
+            completenessScore: 95,
+            validationPassed: true
+          }
+        });
+        await recordStructuredLedgerEntryInTransaction(tx, evidenceLedgerInput);
+        return { updated, evidenceLedgerInput };
       });
+      const updatedLoop = gatherResult.updated;
+      if (!postgresStructuredLedgerEnabled()) {
+        await recordStructuredLedgerEntry(gatherResult.evidenceLedgerInput);
+      }
 
       res.json({
         success: true,
@@ -11776,8 +11980,8 @@ async function startServer() {
     const contractorId = (req as any).contractorId;
 
     try {
-      const ledger = db.getStructuredLedger(contractorId, 10);
-      const integrity = db.verifyLedgerIntegrity(contractorId);
+      const ledger = await readStructuredLedger(contractorId, 10);
+      const integrity = await checkStructuredLedgerIntegrity(contractorId);
       const allLeads = await pgDb.select().from(leads).where(eq(leads.contractorId, contractorId));
 
       const stageCounts = {
@@ -11937,15 +12141,16 @@ async function startServer() {
   // 2. Query Structured Ledger Entries
   app.get('/api/roadmap/phase1/ledger', authenticate, async (req, res) => {
     const contractorId = (req as any).contractorId;
-    const limit = parseInt(req.query.limit as string) || 50;
+    const requestedLimit = parseInt(req.query.limit as string) || 50;
+    const limit = Math.min(Math.max(requestedLimit, 1), 10000);
     const eventType = req.query.eventType as string;
 
     try {
-      let entries = db.getStructuredLedger(contractorId, limit);
+      let entries = await readStructuredLedger(contractorId, limit);
       if (eventType) {
         entries = entries.filter(e => e.eventType === eventType);
       }
-      const integrity = db.verifyLedgerIntegrity(contractorId);
+      const integrity = await checkStructuredLedgerIntegrity(contractorId);
 
       res.json({
         success: true,
@@ -11966,7 +12171,7 @@ async function startServer() {
 
     try {
       // Test 1: Cryptographic Ledger Chain Verification
-      const ledgerIntegrity = db.verifyLedgerIntegrity(contractorId);
+      const ledgerIntegrity = await checkStructuredLedgerIntegrity(contractorId);
 
       // Test 2: PII Encryption Roundtrip & Non-Deterministic IV Verification
       const testSecret = 'hal_phase1_audit_secret_' + Date.now();
@@ -12011,7 +12216,7 @@ async function startServer() {
       const allPassed = tests.every(t => t.status === 'PASSED');
 
       // Record this verification in the structured ledger
-      db.recordLedgerEntry({
+      await recordStructuredLedgerEntry({
         contractorId,
         eventType: 'security_event',
         entityType: 'audit_verification',
@@ -12067,7 +12272,7 @@ async function startServer() {
       });
 
       // Step 2: Record Lead Ingestion in Structured Ledger
-      const ingestBlock = db.recordLedgerEntry({
+      const ingestBlock = await recordStructuredLedgerEntry({
         contractorId,
         eventType: 'lead_captured',
         entityType: 'lead',
@@ -12081,7 +12286,7 @@ async function startServer() {
       const updatedLead = db.updateLead(newLead.id, contractorId, { status: 'contacted' });
 
       // Step 4: Record CRM Stage Transition in Structured Ledger
-      const transitionBlock = db.recordLedgerEntry({
+      const transitionBlock = await recordStructuredLedgerEntry({
         contractorId,
         eventType: 'crm_transition',
         entityType: 'lead',
@@ -12092,7 +12297,7 @@ async function startServer() {
       });
 
       // Step 5: Recognize Pipeline Opportunity in Ledger
-      const revenueBlock = db.recordLedgerEntry({
+      const revenueBlock = await recordStructuredLedgerEntry({
         contractorId,
         eventType: 'pipeline_mutation',
         entityType: 'pipeline_opportunity',
@@ -12103,7 +12308,7 @@ async function startServer() {
       });
 
       // Verify chain integrity after the simulated transaction
-      const integrity = db.verifyLedgerIntegrity(contractorId);
+      const integrity = await checkStructuredLedgerIntegrity(contractorId);
 
       res.json({
         success: true,
@@ -12131,7 +12336,7 @@ async function startServer() {
     const contractorId = (req as any).contractorId;
 
     try {
-      const integrity = db.verifyLedgerIntegrity(contractorId);
+      const integrity = await checkStructuredLedgerIntegrity(contractorId);
       const allLeads = await pgDb.select().from(leads).where(eq(leads.contractorId, contractorId));
       
       const verification = verifyPhase2Pillars(allLeads as any);
@@ -12141,7 +12346,7 @@ async function startServer() {
         message: 'Competitor rankings, ratings, reviews, performance, and spend are unavailable until a verified data source is configured.'
       };
 
-      const ledgerEntries = db.getStructuredLedger(contractorId, 20);
+      const ledgerEntries = await readStructuredLedger(contractorId, 20);
       const recentAudits = ledgerEntries.filter(e => e.eventType === 'competitor_audit_completed' || e.eventType === 'lead_harvested');
 
       res.json({
@@ -12171,7 +12376,7 @@ async function startServer() {
       const verification = verifyPhase2Pillars(allLeads as any);
 
       // Record verification block in the tamper-evident structured ledger
-      const auditBlock = db.recordLedgerEntry({
+      const auditBlock = await recordStructuredLedgerEntry({
         contractorId,
         eventType: 'phase2_verification_audit',
         entityType: 'roadmap_milestone',
@@ -12187,7 +12392,7 @@ async function startServer() {
         }
       });
 
-      const integrity = db.verifyLedgerIntegrity(contractorId);
+      const integrity = await checkStructuredLedgerIntegrity(contractorId);
 
       res.json({
         success: true,
@@ -12220,90 +12425,89 @@ async function startServer() {
     }
 
     try {
-      // 1. Optionally purge static mock seed files
-      let purgedCount = 0;
-      if (purgeMock) {
-        const deletedSeeds = await pgDb.delete(leads)
-          .where(and(eq(leads.contractorId, contractorId), like(leads.id, 'lead_seed_%')))
-          .returning({ id: leads.id });
-        purgedCount = deletedSeeds.length;
-      }
-
-      // 2. Harvest actual active businesses
+      // Harvest first: a provider failure must never delete existing seed records.
       const harvested = await harvestRealBusinesses(city, niche);
+      const committed = await pgDb.transaction(async tx => {
+        let purgedCount = 0;
+        if (purgeMock) {
+          const deletedSeeds = await tx.delete(leads)
+            .where(and(eq(leads.contractorId, contractorId), like(leads.id, 'lead_seed_%')))
+            .returning({ id: leads.id });
+          purgedCount = deletedSeeds.length;
+        }
 
-      // 3. Save each with AES-GCM-256 encrypted PII and create a human review assignment.
-      const savedLeads = [];
-      let queuedTasks = 0;
-      for (const hl of harvested) {
-        const id = crypto.randomUUID();
-        const rawEmail = hl.email ? String(hl.email) : null;
-        const rawPhone = hl.phone ? String(hl.phone) : null;
-        const sourceVerified = hl.verificationStatus === 'VERIFIED' && !hl.isSynthetic;
-        const verifiedEmail = sourceVerified ? rawEmail : null;
-        const verifiedPhone = sourceVerified ? rawPhone : null;
-        const emailEncrypted = verifiedEmail ? encrypt(verifiedEmail) : null;
-        const phoneEncrypted = verifiedPhone ? encrypt(verifiedPhone) : null;
+        const savedLeads: any[] = [];
+        const ledgerInputs: StructuredLedgerInput[] = [];
+        let queuedTasks = 0;
 
-        const [addedLead] = await pgDb.insert(leads).values({
-          id,
-          contractorId,
-          businessName: hl.businessName,
-          ownerName: sourceVerified ? (hl.ownerName || null) : null,
-          email: verifiedEmail ? '[ENCRYPTED]' : null,
-          phone: verifiedPhone ? '[ENCRYPTED]' : null,
-          emailEncrypted,
-          phoneEncrypted,
-          isSynthetic: Boolean(hl.isSynthetic),
-          sourceType: hl.sourceType || 'live_harvest',
-          city: hl.city || city,
-          niche: hl.serviceType || niche,
-          source: 'harvested_intelligence',
-          status: 'new',
-          urgencyScore: null,
-          predictedLtv: null,
-          notes: hl.notes ? `AI-generated research note (not independently verified): ${hl.notes}` : 'AI-assisted discovery candidate; independently verified details are not available.',
-          websiteUrl: sourceVerified ? hl.websiteUrl : null,
-          performanceScore: null,
-          sslStatus: null,
-          reviewCount: null,
-          verificationStatus: (hl as any).verificationStatus || (hl.isSynthetic ? 'FABRICATED_REJECTED' : 'UNVERIFIED_STAGING'),
-          dnsVerified: (hl as any).dnsVerified !== undefined ? Boolean((hl as any).dnsVerified) : false,
-          groundingEvidence: (hl as any).groundingEvidence || null,
-        }).returning();
+        for (const hl of harvested) {
+          const id = crypto.randomUUID();
+          const rawEmail = hl.email ? String(hl.email) : null;
+          const rawPhone = hl.phone ? String(hl.phone) : null;
+          const sourceVerified = hl.verificationStatus === 'VERIFIED' && !hl.isSynthetic;
+          const verifiedEmail = sourceVerified ? rawEmail : null;
+          const verifiedPhone = sourceVerified ? rawPhone : null;
+          const emailEncrypted = verifiedEmail ? encrypt(verifiedEmail) : null;
+          const phoneEncrypted = verifiedPhone ? encrypt(verifiedPhone) : null;
 
-        // Add lead creation event
-        await pgDb.insert(leadEvents).values({
-          id: crypto.randomUUID(),
-          leadId: addedLead.id,
-          eventType: 'LeadCreated',
-          newStage: 'new',
-          notes: `AI-assisted discovery candidate; verification status: ${(hl as any).verificationStatus || 'UNVERIFIED_STAGING'}.`
-        });
+          const [addedLead] = await tx.insert(leads).values({
+            id,
+            contractorId,
+            businessName: hl.businessName,
+            ownerName: sourceVerified ? (hl.ownerName || null) : null,
+            email: verifiedEmail ? '[ENCRYPTED]' : null,
+            phone: verifiedPhone ? '[ENCRYPTED]' : null,
+            emailEncrypted,
+            phoneEncrypted,
+            isSynthetic: Boolean(hl.isSynthetic),
+            sourceType: hl.sourceType || 'live_harvest',
+            city: hl.city || city,
+            niche: hl.serviceType || niche,
+            source: 'harvested_intelligence',
+            status: 'new',
+            urgencyScore: null,
+            predictedLtv: null,
+            notes: hl.notes ? `AI-generated research note (not independently verified): ${hl.notes}` : 'AI-assisted discovery candidate; independently verified details are not available.',
+            websiteUrl: sourceVerified ? hl.websiteUrl : null,
+            performanceScore: null,
+            sslStatus: null,
+            reviewCount: null,
+            verificationStatus: (hl as any).verificationStatus || (hl.isSynthetic ? 'FABRICATED_REJECTED' : 'UNVERIFIED_STAGING'),
+            dnsVerified: (hl as any).dnsVerified !== undefined ? Boolean((hl as any).dnsVerified) : false,
+            groundingEvidence: (hl as any).groundingEvidence || null,
+          }).returning();
 
-        // Record in cryptographic ledger
-        db.recordLedgerEntry({
-          contractorId,
-          eventType: 'lead_harvested',
-          entityType: 'lead',
-          entityId: addedLead.id,
-          actor: 'HAL Territory Intelligence Harvester',
-          details: `Recorded discovery candidate: ${addedLead.businessName} (${addedLead.city}); verification status: ${addedLead.verificationStatus || 'UNVERIFIED_STAGING'}.`,
-          metadata: { city: addedLead.city, niche: addedLead.niche, source: 'harvested_intelligence' }
-        });
+          await tx.insert(leadEvents).values({
+            id: crypto.randomUUID(),
+            leadId: addedLead.id,
+            eventType: 'LeadCreated',
+            newStage: 'new',
+            notes: `AI-assisted discovery candidate; verification status: ${(hl as any).verificationStatus || 'UNVERIFIED_STAGING'}.`
+          });
 
-        const [activeReviewTask] = await pgDb.select({ id: workTasks.id }).from(workTasks).where(and(
-          eq(workTasks.contractorId, contractorId),
-          eq(workTasks.taskType, 'lead_follow_up'),
-          eq(workTasks.entityType, 'lead'),
-          eq(workTasks.entityId, addedLead.id),
-          eq(workTasks.assignedWorker, 'human'),
-          inArray(workTasks.status, ['queued', 'running', 'awaiting_approval'])
-        )).limit(1);
-        if (!activeReviewTask) {
-          const taskId = 'task_' + crypto.randomUUID();
-          const correlationId = taskId;
-          await pgDb.transaction(async tx => {
+          const ledgerInput: StructuredLedgerInput = {
+            contractorId,
+            eventType: 'lead_harvested',
+            entityType: 'lead',
+            entityId: addedLead.id,
+            actor: 'HAL Territory Intelligence Harvester',
+            details: `Recorded discovery candidate: ${addedLead.businessName} (${addedLead.city}); verification status: ${addedLead.verificationStatus || 'UNVERIFIED_STAGING'}.`,
+            metadata: { city: addedLead.city, niche: addedLead.niche, source: 'harvested_intelligence' }
+          };
+          ledgerInputs.push(ledgerInput);
+          await recordStructuredLedgerEntryInTransaction(tx, ledgerInput);
+
+          const [activeReviewTask] = await tx.select({ id: workTasks.id }).from(workTasks).where(and(
+            eq(workTasks.contractorId, contractorId),
+            eq(workTasks.taskType, 'lead_follow_up'),
+            eq(workTasks.entityType, 'lead'),
+            eq(workTasks.entityId, addedLead.id),
+            eq(workTasks.assignedWorker, 'human'),
+            inArray(workTasks.status, ['queued', 'running', 'awaiting_approval'])
+          )).limit(1);
+          if (!activeReviewTask) {
+            const taskId = 'task_' + crypto.randomUUID();
+            const correlationId = taskId;
             await tx.insert(workTasks).values({
               id: taskId, contractorId, taskType: 'lead_follow_up',
               title: `Review and qualify: ${addedLead.businessName}`,
@@ -12327,22 +12531,32 @@ async function startServer() {
               correlationId, summary: `${addedLead.businessName} was added to the human review queue.`,
               payload: { taskId, verificationStatus: addedLead.verificationStatus || 'UNVERIFIED_STAGING' }
             });
-          });
-          queuedTasks++;
+            queuedTasks++;
+          }
+          savedLeads.push(addedLead);
         }
-        savedLeads.push(addedLead);
-      }
 
-      // 4. Log overarching harvest block
-      const harvestBlock = db.recordLedgerEntry({
-        contractorId,
-        eventType: 'territory_harvest_completed',
-        entityType: 'territory_intel',
-        entityId: 'harvest_' + Date.now(),
-        actor: 'HAL Territory Intelligence Harvester',
-        details: `Processed ${savedLeads.length} discovery candidates in ${city} (${niche}); verified: ${savedLeads.filter(lead => lead.verificationStatus === 'VERIFIED' && !lead.isSynthetic).length}; unverified: ${savedLeads.filter(lead => lead.verificationStatus !== 'VERIFIED' || lead.isSynthetic).length}.`,
-        metadata: { city, niche, harvestedCount: savedLeads.length, purgedMockSeeds: purgeMock }
+        const harvestLedgerInput: StructuredLedgerInput = {
+          contractorId,
+          eventType: 'territory_harvest_completed',
+          entityType: 'territory_intel',
+          entityId: 'harvest_' + Date.now(),
+          actor: 'HAL Territory Intelligence Harvester',
+          details: `Processed ${savedLeads.length} discovery candidates in ${city} (${niche}); verified: ${savedLeads.filter(lead => lead.verificationStatus === 'VERIFIED' && !lead.isSynthetic).length}; unverified: ${savedLeads.filter(lead => lead.verificationStatus !== 'VERIFIED' || lead.isSynthetic).length}.`,
+          metadata: { city, niche, harvestedCount: savedLeads.length, purgedMockSeeds: purgeMock }
+        };
+        const persistedHarvestBlock = await recordStructuredLedgerEntryInTransaction(tx, harvestLedgerInput);
+        return { savedLeads, queuedTasks, purgedCount, ledgerInputs, harvestLedgerInput, persistedHarvestBlock };
       });
+
+      let harvestBlock: any = committed.persistedHarvestBlock;
+      if (!postgresStructuredLedgerEnabled()) {
+        for (const ledgerInput of committed.ledgerInputs) {
+          await recordStructuredLedgerEntry(ledgerInput);
+        }
+        harvestBlock = await recordStructuredLedgerEntry(committed.harvestLedgerInput);
+      }
+      const { savedLeads, queuedTasks, purgedCount } = committed;
 
       res.json({
         success: true,
@@ -12354,7 +12568,7 @@ async function startServer() {
         purgedMock: Boolean(purgeMock),
         purgedCount,
         block: harvestBlock,
-        integrity: db.verifyLedgerIntegrity(contractorId)
+        integrity: await checkStructuredLedgerIntegrity(contractorId)
       });
     } catch (err: any) {
       console.error('[Roadmap Phase 2 Harvest Error]', err);
@@ -12371,7 +12585,7 @@ async function startServer() {
     const contractorId = (req as any).contractorId;
 
     try {
-      const integrity = db.verifyLedgerIntegrity(contractorId);
+      const integrity = await checkStructuredLedgerIntegrity(contractorId);
       const sequences = await getTenantOutreachSequences(contractorId);
       const sequenceTemplates = getDefaultCadenceSequences();
       const outbox = await pgDb.select().from(conversionOutbox).where(eq(conversionOutbox.contractorId, contractorId));
@@ -12379,7 +12593,7 @@ async function startServer() {
       const schedulerTemplates = getDefaultSchedulerRules();
 
       const verification = await verifyPhase3Pillars(sequences, outbox, jobs);
-      const ledgerEntries = db.getStructuredLedger(contractorId, 20);
+      const ledgerEntries = await readStructuredLedger(contractorId, 20);
       const recentAutomationEvents = ledgerEntries.filter(e =>
         e.eventType.startsWith('phase3_') ||
         e.eventType.includes('sequence') ||
@@ -12418,7 +12632,7 @@ async function startServer() {
       const jobs = await pgDb.select().from(schedulerJobs).where(eq(schedulerJobs.contractorId, contractorId)).orderBy(desc(schedulerJobs.createdAt));
       const verification = await verifyPhase3Pillars(sequences, outbox, jobs);
 
-      const auditBlock = db.recordLedgerEntry({
+      const auditBlock = await recordStructuredLedgerEntry({
         contractorId,
         eventType: 'phase3_verification_audit',
         entityType: 'roadmap_milestone',
@@ -12434,7 +12648,7 @@ async function startServer() {
         }
       });
 
-      const integrity = db.verifyLedgerIntegrity(contractorId);
+      const integrity = await checkStructuredLedgerIntegrity(contractorId);
 
       res.json({
         success: true,
@@ -12483,7 +12697,7 @@ async function startServer() {
       if (!targetSeq) return res.status(404).json({ success: false, error: 'No saved sequence or preview template is available.' });
 
       const scheduledSteps = calculateCadenceSchedule(new Date(), targetSeq.steps);
-      const auditBlock = db.recordLedgerEntry({
+      const auditBlock = await recordStructuredLedgerEntry({
         contractorId,
         eventType: 'phase3_sequence_previewed',
         entityType: 'cadence_sequence_preview',
@@ -12512,7 +12726,7 @@ async function startServer() {
         sequence: targetSeq,
         scheduledSteps,
         block: auditBlock,
-        integrity: db.verifyLedgerIntegrity(contractorId)
+        integrity: await checkStructuredLedgerIntegrity(contractorId)
       });
     } catch (err: any) {
       console.error('[Roadmap Phase 3 Sequence Preview Error]', err);
@@ -12531,7 +12745,7 @@ async function startServer() {
         ['pending', 'queued', 'retrying'].includes(String(record.status).toLowerCase())
       ).length;
 
-      const auditBlock = db.recordLedgerEntry({
+      const auditBlock = await recordStructuredLedgerEntry({
         contractorId,
         eventType: 'phase3_outbox_inspected',
         entityType: 'conversion_outbox',
@@ -12555,7 +12769,7 @@ async function startServer() {
         message: 'Inspection only. No verified conversion-upload adapter is configured; no records were sent or marked successful.',
         records: existingOutbox,
         block: auditBlock,
-        integrity: db.verifyLedgerIntegrity(contractorId)
+        integrity: await checkStructuredLedgerIntegrity(contractorId)
       });
     } catch (err: any) {
       console.error('[Roadmap Phase 3 Outbox Inspection Error]', err);
@@ -12572,32 +12786,43 @@ async function startServer() {
       const configuredRules: any[] = [];
       const now = new Date().toISOString();
       const jobTime = new Date(now);
-      const [jobRecord] = await pgDb.insert(schedulerJobs).values({
-        id: 'job_' + crypto.randomUUID(),
+      const schedulerLedgerInputBase = {
         contractorId,
-        job: 'phase3_scheduler_configuration_check',
-        status: 'completed',
-        startedAt: jobTime,
-        completedAt: jobTime,
-        result: 'No persisted scheduler rules are configured; no calendar or outreach triggers were executed.',
-        createdAt: jobTime
-      }).returning();
-
-      const auditBlock = db.recordLedgerEntry({
-        contractorId,
-        eventType: 'phase3_scheduler_configuration_checked',
+        eventType: 'phase3_scheduler_configuration_checked' as const,
         entityType: 'scheduler_system',
-        entityId: jobRecord.id,
         actor: 'HAL Scheduler Configuration Check',
         details: 'Checked scheduler configuration. Templates are available, but no persisted rules or background trigger execution were found.',
         metadata: {
           configuredRulesCount: configuredRules.length,
           availableTemplatesCount: templates.length,
           triggersExecuted: 0,
-          jobId: jobRecord.id,
           status: 'NO_RULES_CONFIGURED'
         }
+      };
+      const committed = await pgDb.transaction(async tx => {
+        const [jobRecord] = await tx.insert(schedulerJobs).values({
+          id: 'job_' + crypto.randomUUID(),
+          contractorId,
+          job: 'phase3_scheduler_configuration_check',
+          status: 'completed',
+          startedAt: jobTime,
+          completedAt: jobTime,
+          result: 'No persisted scheduler rules are configured; no calendar or outreach triggers were executed.',
+          createdAt: jobTime
+        }).returning();
+        const ledgerInput: StructuredLedgerInput = {
+          ...schedulerLedgerInputBase,
+          entityId: jobRecord.id,
+          metadata: { ...schedulerLedgerInputBase.metadata, jobId: jobRecord.id }
+        };
+        const auditBlock = await recordStructuredLedgerEntryInTransaction(tx, ledgerInput);
+        return { jobRecord, ledgerInput, auditBlock };
       });
+      const { jobRecord } = committed;
+      let auditBlock = committed.auditBlock;
+      if (!postgresStructuredLedgerEnabled()) {
+        auditBlock = await recordStructuredLedgerEntry(committed.ledgerInput);
+      }
 
       res.json({
         success: true,
@@ -12608,7 +12833,7 @@ async function startServer() {
         message: 'No persisted scheduler rules are configured. No jobs or external triggers were executed.',
         jobRecord,
         block: auditBlock,
-        integrity: db.verifyLedgerIntegrity(contractorId)
+        integrity: await checkStructuredLedgerIntegrity(contractorId)
       });
     } catch (err: any) {
       console.error('[Roadmap Phase 3 Scheduler Configuration Error]', err);
@@ -12649,7 +12874,7 @@ async function startServer() {
         subject: row.subjectEncrypted ? decrypt(row.subjectEncrypted) : undefined,
         preview: row.bodyEncrypted ? decrypt(row.bodyEncrypted).slice(0, 100) : ''
       }));
-      const ledgerHistory = db.getStructuredLedger(contractorId, 20).filter(entry =>
+      const ledgerHistory = (await readStructuredLedger(contractorId, 20)).filter(entry =>
         entry.eventType === 'phase3_live_dispatch' ||
         entry.eventType === 'phase3_outbox_inspected' ||
         entry.entityType === 'conversion_outbox'
@@ -12664,7 +12889,7 @@ async function startServer() {
         { id: 'webhook_ingest', name: 'Inbound CRM Webhook Verification', type: 'webhook', configured: Boolean(process.env.CRM_WEBHOOK_SECRET), status: process.env.CRM_WEBHOOK_SECRET ? 'configured_unverified' : 'not_configured', mode: process.env.CRM_WEBHOOK_SECRET ? 'Inbound signature secret configured; delivery not verified' : 'No webhook secret configured', latencyMs: null, encryption: 'HMAC-SHA256 verification path', deliverability: null, lastHeartbeat: null }
       ];
       const configuredGatewaysCount = gateways.filter(gateway => gateway.configured).length;
-      const integrity = db.verifyLedgerIntegrity(contractorId);
+      const integrity = await checkStructuredLedgerIntegrity(contractorId);
 
       res.json({
         success: true,
@@ -12706,7 +12931,7 @@ async function startServer() {
     const contractorId = (req as any).contractorId;
 
     try {
-      const integrity = db.verifyLedgerIntegrity(contractorId);
+      const integrity = await checkStructuredLedgerIntegrity(contractorId);
       // No persistent consensus-history or neural-node store is connected yet.
       // Demo templates are returned separately and never used as verification evidence.
       const consensusHistory: any[] = [];
@@ -12767,7 +12992,7 @@ async function startServer() {
       // Consensus history and calibrated neural nodes are not persisted. Estimated
       // arbitrage suggestions are not treated as a verified closed-loop action.
       const verification = verifyPhase4Pillars([], [], []);
-      const auditBlock = db.recordLedgerEntry({
+      const auditBlock = await recordStructuredLedgerEntry({
         contractorId,
         eventType: 'phase4_verification_audit',
         entityType: 'roadmap_phase',
@@ -12788,7 +13013,7 @@ async function startServer() {
         verification,
         estimatedArbitrageOpportunityCount: estimateResult.opportunities.length,
         block: auditBlock,
-        integrity: db.verifyLedgerIntegrity(contractorId)
+        integrity: await checkStructuredLedgerIntegrity(contractorId)
       });
     } catch (err: any) {
       console.error('[Roadmap Phase 4 Verify Error]', err);
@@ -12870,7 +13095,9 @@ async function startServer() {
       const syntheticLeadsCount = allLeads.filter(l => l.isSynthetic).length;
       const verifiedLeadsCount = allLeads.filter(l => (l as any).verificationStatus === 'VERIFIED' && !l.isSynthetic).length;
       
-      const learningState = autonomousLearning.getState();
+      const tenantLearning = getTenantAutonomousLearning(String(contractorId || ''));
+      await tenantLearning.initializeFromDb();
+      const learningState = tenantLearning.getState();
 
       const orgNodes = getDefaultOrganizationNodes();
       const edgeRegions = getDefaultEdgeRegions();
@@ -12881,7 +13108,7 @@ async function startServer() {
         totalLeadsCount,
         syntheticLeadsCount,
         verifiedLeadsCount,
-        cryptoVerified: db.verifyLedgerIntegrity(contractorId).valid,
+        cryptoVerified: (await checkStructuredLedgerIntegrity(contractorId)).valid,
         autonomyReadinessScore: learningState.autonomyReadinessScore,
         learningEpoch: learningState.calibrationEpoch
       };
@@ -12911,7 +13138,9 @@ async function startServer() {
       const totalLeadsCount = allLeads.length;
       const syntheticLeadsCount = allLeads.filter(l => l.isSynthetic).length;
       const verifiedLeadsCount = allLeads.filter(l => (l as any).verificationStatus === 'VERIFIED' && !l.isSynthetic).length;
-      const learningState = autonomousLearning.getState();
+      const tenantLearning = getTenantAutonomousLearning(String(contractorId || ''));
+      await tenantLearning.initializeFromDb();
+      const learningState = tenantLearning.getState();
 
       const activeDiagnostics = {
         hasGeminiKey: Boolean(process.env.GEMINI_API_KEY),
@@ -12919,7 +13148,7 @@ async function startServer() {
         totalLeadsCount,
         syntheticLeadsCount,
         verifiedLeadsCount,
-        cryptoVerified: db.verifyLedgerIntegrity(contractorId).valid,
+        cryptoVerified: (await checkStructuredLedgerIntegrity(contractorId)).valid,
         autonomyReadinessScore: learningState.autonomyReadinessScore,
         learningEpoch: learningState.calibrationEpoch
       };
@@ -12929,7 +13158,7 @@ async function startServer() {
       const ontologies = getDefaultBusinessOntologies();
       const verificationResult = verifyPhase5Pillars(orgNodes, edgeRegions, ontologies, activeDiagnostics);
 
-      const auditBlock = db.recordLedgerEntry({
+      const auditBlock = await recordStructuredLedgerEntry({
         contractorId,
         eventType: 'phase5_verification_audit',
         entityType: 'roadmap_milestone',
@@ -12950,7 +13179,7 @@ async function startServer() {
         verified: verificationResult.allPassed,
         verificationResult,
         block: auditBlock,
-        integrity: db.verifyLedgerIntegrity(contractorId)
+        integrity: await checkStructuredLedgerIntegrity(contractorId)
       });
     } catch (err: any) {
       console.error('[Roadmap Phase 5 Verify Error]', err);
@@ -12965,7 +13194,7 @@ async function startServer() {
     const contractorId = (req as any).contractorId;
     try {
       const tenantLeads = await pgDb.select().from(leads).where(eq(leads.contractorId, contractorId));
-      const ledger = db.verifyLedgerIntegrity(contractorId);
+      const ledger = await checkStructuredLedgerIntegrity(contractorId);
       const diagnostics = {
         checkedAt: new Date().toISOString(),
         database: { status: 'reachable', tenantLeadCount: tenantLeads.length },
@@ -12987,7 +13216,7 @@ async function startServer() {
           reason: 'Layer-level runtime instrumentation and persistent synchronization evidence are not implemented.'
         }
       };
-      const block = db.recordLedgerEntry({
+      const block = await recordStructuredLedgerEntry({
         contractorId,
         eventType: 'phase5_runtime_diagnostic',
         entityType: 'roadmap_milestone',
