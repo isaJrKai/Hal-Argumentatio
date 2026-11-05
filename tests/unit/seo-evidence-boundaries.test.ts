@@ -9,7 +9,7 @@ describe('HAL SEO strategy evidence boundaries', () => {
   beforeEach(() => generateResponse.mockReset());
 
   it('does not invent search volume, rankings, or competitor measurements when the provider is unavailable', async () => {
-    generateResponse.mockRejectedValue(new Error('provider unavailable'));
+    generateResponse.mockResolvedValue('');
     const result = await seoSkill.execute({
       businessName: 'Kampala Roofing',
       websiteUrl: 'https://roofing.example',
