@@ -38,18 +38,21 @@ export const competitorAnalyzerSkill: Skill = {
 
 
 
-    const systemPrompt = `You are HAL, the premier Local Market Penetration Planner. 
-Your analysis is Swiss-style, objective, data-driven, and highly actionable. No fluff or conversational filler.`;
-
-    const userPrompt = `Generate a localized competitor research plan, not a claim that a live audit has been run:
-- Target Territory: ${city}
-- Industry Niche: ${niche}
-- Provided Competitor Names: ${competitorNames || 'Unspecified'}
-
-Compile the report following this structure:
-1. TERRITORY PENETRATION DIFFICULTY: Map the baseline competition volume in ${city} for ${niche} services and determine if the market is saturated or open.
-2. COMPETITIVE DEFICIT MATRIX: Contrast the main visual indicators (Review counts, rating averages, website speed, photo density, and GMB posting activity).
-3. MAPS PACK PENETRATION PLAN: A 4-step tactical blueprint on how to secure a top-3 spot in the local maps pack.`;
+    const systemPrompt = 'You are HAL, a careful local-market research planner. Do not invent live Google Maps results, competitor ratings, review counts, posting frequency, market saturation, rankings, or market share. Clearly distinguish supplied names from verified external facts.';
+    const userPrompt = [
+      'Create a localized competitor research plan, not a claim that a live audit has been run.',
+      'Target territory: ' + city,
+      'Industry niche: ' + niche,
+      'User-supplied competitor names: ' + (competitorNames || 'None'),
+      '',
+      'Requirements:',
+      '1. State that no live Google Maps or search results were queried.',
+      '2. Provide a comparison template for rating, review count/date, website, service area, photos, and posting activity. Leave unknown values blank or unavailable.',
+      '3. Suggest testable research questions without claiming market saturation or competitor weaknesses.',
+      '4. Provide ethical local SEO steps without promising a top-three Maps position.',
+      '5. Do not invent statistics, ratings, review counts, market share, backlinks, or ranking positions.',
+      'Return concise Markdown.'
+    ].join('\\n');
 
     let reportText = '';
 
