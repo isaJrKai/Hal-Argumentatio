@@ -4397,24 +4397,44 @@ app.post('/api/recommendations/:id/approve', authenticate, async (req, res) => {
       return res.status(404).json({ error: 'Recommendation not found or inaccessible' });
     }
 
-    const [updated] = await pgDb.update(recommendations).set({
-      status: 'approved',
-      outcome: 'Operation approved. Enqueued for campaign synchronization.',
-      updatedAt: new Date()
-    }).where(and(eq(recommendations.id, id), eq(recommendations.contractorId, contractorId))).returning();
+    const [updated] = await pgDb.transaction(async tx => {
+      const [approved] = await tx.update(recommendations).set({
+        status: 'approved',
+        outcome: 'Operation approved. Enqueued for campaign synchronization.',
+        updatedAt: new Date()
+      }).where(and(eq(recommendations.id, id), eq(recommendations.contractorId, contractorId))).returning();
 
-    await pgDb.insert(auditLogs).values({
-      id: crypto.randomUUID(),
-      contractorId,
-      action: 'RECOMMENDATION_APPROVED',
-      details: `Approved recommendation: ${updated.action}`
-    });
-
-    // We can't update outcome records yet, not migrated
-    db.addOutcomeRecord({
-      actionType: 'BUDGET_REALLOCATION',
-      actionDetails: updated.action,
-      predictedResult: 'Improve Cost-Per-Lead efficiency based on confidence profile'
+      if (!approved) {
+        throw new Error('Recommendation changed before approval could be committed.');
+      }
+      await tx.insert(auditLogs).values({
+        id: crypto.randomUUID(),
+        contractorId,
+        action: 'RECOMMENDATION_APPROVED',
+        details: `Approved recommendation: ${approved.action}`
+      });
+      await tx.insert(revenueRecommendationEvents).values({
+        id: crypto.randomUUID(),
+        contractorId,
+        recommendationId: approved.id,
+        previousStatus: 'pending',
+        newStatus: 'approved',
+        actor: String(contractorId),
+        metadata: {
+          action: approved.action,
+          outcome: 'Operation approved. Enqueued for campaign synchronization.'
+        }
+      });
+      await recordStructuredLedgerEntryInTransaction(tx, {
+        contractorId,
+        eventType: 'recommendation_approved',
+        entityType: 'recommendation',
+        entityId: approved.id,
+        actor: String(contractorId),
+        details: `Approved recommendation: ${approved.action}`,
+        metadata: { previousStatus: 'pending', newStatus: 'approved' }
+      });
+      return [approved];
     });
 
     broadcastNotification(
@@ -8930,19 +8950,7 @@ app.post('/api/scheduler', authenticate, async (req, res) => {
           });
         });
 
-        // Legacy lesson history is retained for older screens during migration.
-        try {
-          db.addLesson({
-            category: learning.category,
-            title: `Forecast Deviation Lesson (${forecast.metric.toUpperCase()})`,
-            description: learning.insight,
-            confidence: confidenceShift,
-            timesObserved: 1,
-            lastObserved: evaluatedAt.toISOString()
-          });
-        } catch (legacyError) {
-          console.warn('[HAL Learning] Legacy lesson mirror failed; PostgreSQL insight remains authoritative.', legacyError);
-        }
+        // The tenant-scoped learning_insights row above is the durable lesson record.
         evaluatedCount++;
       }
 
