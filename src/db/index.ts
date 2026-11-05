@@ -2,6 +2,7 @@ import { drizzle } from 'drizzle-orm/node-postgres';
 import { Pool } from 'pg';
 import * as schema from './schema.ts';
 import { resolveValidSqlHost } from './postgres.ts';
+import { normalizePostgresConnectionString } from './connectionString';
 
 // Add global connection pool caching to persist across hot-reloads
 declare global {
@@ -22,11 +23,12 @@ export const createPool = () => {
         connectionTimeoutMillis: 5000,
       });
     } else {
-      const connectionString = process.env.DATABASE_URL || process.env.NEON_DATABASE_URL;
+      const rawConnectionString = process.env.DATABASE_URL || process.env.NEON_DATABASE_URL;
+      const connectionString = rawConnectionString ? normalizePostgresConnectionString(rawConnectionString) : undefined;
       if (connectionString) {
         global._postgresPool = new Pool({
           connectionString,
-          ssl: connectionString.includes('neon.tech') || connectionString.includes('sslmode=require') ? { rejectUnauthorized: true } : undefined,
+          ssl: connectionString.includes('neon.tech') || connectionString.includes('supabase') || connectionString.includes('sslmode=verify-full') ? { rejectUnauthorized: true } : undefined,
           max: 10,
           connectionTimeoutMillis: 5000,
         });
