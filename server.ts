@@ -1285,14 +1285,18 @@ app.post('/api/auth/forgot-password', async (req, res) => {
       const rawToken = crypto.randomBytes(32).toString('hex');
       const tokenHash = crypto.createHash('sha256').update(rawToken).digest('hex');
       const contractorId = result[0].id;
-      await pgDb.update(passwordResetTokens)
-        .set({ usedAt: new Date() })
-        .where(and(eq(passwordResetTokens.contractorId, contractorId), isNull(passwordResetTokens.usedAt)));
-      await pgDb.insert(passwordResetTokens).values({
-        id: crypto.randomUUID(),
-        contractorId,
-        tokenHash,
-        expiresAt: new Date(Date.now() + 60 * 60 * 1000),
+      await pgDb.transaction(async (tx) => {
+        // Serialize requests for this account so only the newest reset link remains active.
+        await tx.execute(sql`SELECT id FROM ${contractors} WHERE ${contractors.id} = ${contractorId} FOR UPDATE`);
+        await tx.update(passwordResetTokens)
+          .set({ usedAt: new Date() })
+          .where(and(eq(passwordResetTokens.contractorId, contractorId), isNull(passwordResetTokens.usedAt)));
+        await tx.insert(passwordResetTokens).values({
+          id: crypto.randomUUID(),
+          contractorId,
+          tokenHash,
+          expiresAt: new Date(Date.now() + 60 * 60 * 1000),
+        });
       });
 
       try {
