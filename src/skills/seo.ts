@@ -1,108 +1,107 @@
 import { Skill } from './types';
 import { generateResponse } from '../services/nemotron';
 
+function slug(value: string): string {
+  return value.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+}
+
 export const seoSkill: Skill = {
   id: 'seo_analytics',
-  name: 'SEO & Keyword Stratagems',
-  description: "Evaluates localized keyword gaps, competitor search real estate, and drafts a geo-targeted landing page structure using NEMOTRON.",
+  name: 'SEO & Keyword Strategy',
+  description: 'Creates a localized SEO hypothesis and site-structure plan. Search volume, rankings, competitor positions, backlinks, and difficulty are not measured unless a verified search-data provider is connected.',
   category: 'seo',
   icon: 'TrendingUp',
   inputs: [
-    {
-      name: 'businessName',
-      label: 'Business Name',
-      type: 'string',
-      required: true,
-      defaultValue: '',
-    },
-    {
-      name: 'websiteUrl',
-      label: 'Website URL',
-      type: 'string',
-      required: true,
-      defaultValue: '',
-    },
-    {
-      name: 'niche',
-      label: 'Niche Service',
-      type: 'string',
-      required: true,
-      defaultValue: '',
-    },
-    {
-      name: 'city',
-      label: 'Target City',
-      type: 'string',
-      required: true,
-      defaultValue: '',
-    }
+    { name: 'businessName', label: 'Business Name', type: 'string', required: true, defaultValue: '' },
+    { name: 'websiteUrl', label: 'Website URL', type: 'string', required: false, defaultValue: '' },
+    { name: 'niche', label: 'Niche Service', type: 'string', required: true, defaultValue: '' },
+    { name: 'city', label: 'Target City', type: 'string', required: true, defaultValue: '' }
   ],
-  execute: async (inputs, contractorId) => {
-    const { businessName, websiteUrl, niche, city } = inputs;
+  execute: async (inputs) => {
+    const businessName = String(inputs.businessName || '').trim();
+    const websiteUrl = String(inputs.websiteUrl || '').trim();
+    const niche = String(inputs.niche || '').trim();
+    const city = String(inputs.city || '').trim();
     if (!businessName || !niche || !city) {
-      throw new Error('Business Name, Niche, and Target City are required for SEO Stratagems');
+      throw new Error('Business Name, Niche, and Target City are required for SEO strategy.');
     }
 
-    const systemPrompt = `You are HAL, the core SEO Intelligence Auditor of HALBiz.
-Generate highly specific, localized search engine optimization plans. Skip general advice, intro/outro paragraphs, or marketing fluff.
-Format all findings as direct, engineering-grade strategic assessments.`;
-
-    const userPrompt = `Create a localized SEO strategy for:
-Business Name: ${businessName}
-Website: ${websiteUrl || 'No current website'}
-Niche: ${niche}
+    const phrases = [
+      `${niche} services in ${city}`,
+      `${niche} contractor ${city}`,
+      `${niche} quote ${city}`
+    ];
+    const userPrompt = `Create a localized SEO planning hypothesis for this business:
+Business: ${businessName}
+Website: ${websiteUrl || 'Not supplied'}
+Service: ${niche}
 City: ${city}
 
-Your plan MUST outline:
-1. TARGET LOCAL KEYWORDS: Provide 3 high-intent geo-targeted search phrases (e.g. "${niche} repair ${city}") with estimated search volumes and difficulty index.
-2. COMPETITIVE SEARCH GAP: Analyze what competitors occupying the top-3 Google spots are doing (e.g. local backlinks, domain authority) and where ${businessName} falls short.
-3. SITE STRUCTURE RECOMMENDATION: Recommend a clean folder URL structure (e.g., /services/${niche}-${city}) to capture suburban and neighboring traffic.
+Use these candidate search phrases as hypotheses, not verified demand:
+${phrases.map((phrase, index) => `${index + 1}. ${phrase}`).join('\\n')}
 
-Format your output in clean Markdown.`;
+Suggest page structure, useful service-page content, title/description ideas, and what evidence should be collected next.
+Strict evidence rules:
+- Do not invent search volume, keyword difficulty, rankings, competitor names/positions, backlink counts, domain authority, traffic, conversion rates, or performance scores.
+- Do not claim that you checked Google or a search-results page.
+- Clearly label all keyword phrases and competitor ideas as hypotheses requiring validation.
+- State that no live search-volume or competitor-data provider was queried.
+- Do not assert that the named business has a specific SEO defect unless that defect is supplied as evidence.
+Return concise Markdown with sections: Candidate keyword hypotheses, Recommended site structure, Content opportunities, Evidence still needed.`;
 
     let reportText = '';
-
+    let providerUsed = false;
     try {
       reportText = await generateResponse(
         userPrompt,
-        systemPrompt,
+        'You are HAL SEO planning assistant. Be precise and evidence-bound. Never manufacture external search or competitor measurements.',
         0.2
       );
-    } catch (err) {
-      console.error('NEMOTRON SEO call failed. Reverting to custom heuristic.', err);
+      providerUsed = Boolean(reportText);
+    } catch (error) {
+      console.error('NEMOTRON SEO strategy request failed; using deterministic planning template.', error);
     }
 
     if (!reportText) {
-      reportText = `### TARGET LOCAL KEYWORDS
-1. **"${niche} emergency service ${city}"**
-   * *Est. Monthly Volume*: 480
-   * *Difficulty Index*: Medium (45/100)
-   * *Intent*: Immediate transactional (high convert rate)
-2. **"licensed ${niche} contractors ${city}"**
-   * *Est. Monthly Volume*: 320
-   * *Difficulty Index*: Low (28/100)
-   * *Intent*: Commercial evaluation
-3. **"best ${niche} quote ${city}"**
-   * *Est. Monthly Volume*: 150
-   * *Difficulty Index*: Low-Medium (32/100)
-   * *Intent*: High budget quote validation
-
-### COMPETITIVE SEARCH GAP
-- **Backlink Velocity**: Top ranking competitors average 45 referring local domains (neighborhood association directories, local news citations), whereas **${businessName}** has less than 5.
-- **Content Density**: Competitor service pages contain ~1,200 words of technical guidance on regional regulations, weather freeze-thaw issues, and diagnostic costs.
-
-### SITE STRUCTURE RECOMMENDATION
-Implement a siloed, geo-folder URL layout to capture satellite and surrounding suburban search volumes:
-- \`/services/${niche.toLowerCase().replace(/\s+/g, '-')}\` (Main hub page)
-- \`/locations/${city.toLowerCase().replace(/\s+/g, '-')}-${niche.toLowerCase().replace(/\s+/g, '-')}\` (Dedicated high-conversion landing page with schema tags)
-- \`/frequently-asked-questions\` (Targeting long-tail query rich snippets)`;
+      reportText = [
+        '### Candidate keyword hypotheses',
+        ...phrases.map((phrase, index) => `${index + 1}. “${phrase}” — suggested phrase only; search demand and difficulty have not been measured.`),
+        '',
+        '### Recommended site structure',
+        `- /services/${slug(niche)} — primary service overview`,
+        `- /locations/${slug(city)}/${slug(niche)} — location-specific service page`,
+        '- /contact — clear enquiry options and business contact details',
+        '- /frequently-asked-questions — answers based on real customer questions',
+        '',
+        '### Content opportunities',
+        '- Explain the actual services, service area, process, credentials and warranty terms supplied by the business.',
+        '- Add clear calls to action and consistent business contact information.',
+        '',
+        '### Evidence still needed',
+        '- Search-volume and keyword-difficulty data from a connected, verified search-data provider.',
+        '- Current Google search results and competitor URLs for the target location.',
+        '- Search Console or analytics data before making traffic or conversion claims.',
+        '- A measured website audit before describing specific technical SEO defects.'
+      ].join('\\n');
     }
 
     return {
       success: true,
       businessName,
+      websiteUrl: websiteUrl || null,
       city,
       niche,
+      evidenceStatus: 'planning_hypotheses_only',
+      liveSearchDataQueried: false,
+      providerUsed,
+      metrics: {
+        searchVolume: null,
+        keywordDifficulty: null,
+        rankingPosition: null,
+        competitorBacklinks: null,
+        organicTraffic: null
+      },
+      candidateKeywords: phrases,
       report: reportText,
       compiledAt: new Date().toISOString()
     };
