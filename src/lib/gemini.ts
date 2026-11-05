@@ -873,7 +873,9 @@ RESPONSE STANDARD
         if (toolCalls.length) {
           return {
             text: 'HAL processed tool calls before the Gemini response failed. Check each recorded success or failure in Work Queue and Work History; no tool was retried automatically.',
-            toolCalls
+            toolCalls,
+            provider: 'gemini',
+            model: selectedModel
           };
         }
         console.error("Gemini chatbot error, trying Nemotron fallback:", err);
@@ -906,11 +908,12 @@ RESPONSE STANDARD
             text: result.text || (result.toolCalls.length
               ? 'I processed the available tool calls, but the model did not return a final explanation. Review Work Queue and Work History for their results.'
               : 'Nemotron returned no response.'),
-            toolCalls: result.toolCalls.length ? result.toolCalls : undefined
+            toolCalls: result.toolCalls.length ? result.toolCalls : undefined,
+            provider: 'nvidia'
           };
         }
         const text = await callNemotron(messages, 0.3);
-        return { text };
+        return { text, provider: 'nvidia' };
       } catch (err: any) {
         console.error("NVIDIA Nemotron chatbot fallback error:", err);
       }
@@ -942,7 +945,8 @@ RESPONSE STANDARD
             text: result.text || (result.toolCalls.length
               ? 'I processed the available tool calls, but the model did not return a final explanation. Review Work Queue and Work History for their results.'
               : 'Nemotron returned no response.'),
-            toolCalls: result.toolCalls.length ? result.toolCalls : undefined
+            toolCalls: result.toolCalls.length ? result.toolCalls : undefined,
+            provider: 'nvidia'
           };
         }
 
