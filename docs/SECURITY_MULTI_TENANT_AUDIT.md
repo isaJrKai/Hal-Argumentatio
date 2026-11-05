@@ -50,6 +50,15 @@ An MCP client connected for one configured contractor could therefore read anoth
 
 **Fix:** Event history now joins through the owning lead and filters on the authenticated/configured contractor. Scheduler-job listing and counts now filter by `scheduler_jobs.contractor_id`. The status event count uses the same tenant join. A regression test guards all three query paths.
 
+## Additional confirmed finding fixed in this branch
+
+### HIGH — Contractor-controlled landing-page content could execute as stored XSS
+**Area:** `src/components/landing/htmlGenerator.ts` and public landing-page rendering.
+
+The landing-page HTML generator interpolated contractor/AI-provided business details and section content directly into HTML text and attribute contexts. It also embedded page identifiers and business details directly into JavaScript string literals. A crafted value containing HTML/script delimiters could break out of its intended context and execute script when a published page was viewed on the HAL origin.
+
+**Fix:** The generator now recursively HTML-escapes dynamic string values before HTML interpolation, serializes the small set of inline form data with `JSON.stringify` and escapes script-closing delimiters, and no longer embeds the contractor ID in the public form request. A regression test exercises malicious business name, city, section text and page ID values.
+
 ## Prioritized review observations
 
 | Priority | Area | Observation / remaining evidence |
