@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useToast } from '../context/ToastContext';
+import { Card } from './ui/Card';
 
 export function CommunicationsSetupPanel() {
   const { toast } = useToast();
