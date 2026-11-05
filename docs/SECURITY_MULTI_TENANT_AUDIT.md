@@ -20,6 +20,22 @@ Both routes previously required authentication but did not require the administr
 
 **Fix:** The status endpoint now requires `requireRole('admin')`. The legacy push endpoint now requires the same role and returns HTTP 410 without executing Git commands. This removes the unsafe server-side force-push capability; reviewed CI/CD is the supported deployment path. A regression test checks both protections and ensures the endpoint contains no shell execution.
 
+## Additional confirmed finding fixed in this branch
+
+### HIGH — Unauthenticated public routes exposed unpublished contractor artifacts
+**Area:** `GET /api/public/landing/:id` and `GET /landing/:id` in `server.ts`.
+
+Both public routes previously loaded artifacts by ID without checking publication status or artifact type. The JSON route returned the entire database row, including `contractorId`, metadata and the full content payload. The HTML route rendered `renderedOutput` for draft, ready and archived artifacts as well as deployed pages. This allowed anyone possessing or discovering an artifact ID to access unpublished contractor work.
+
+**Fix:** Both routes now require `status = 'deployed'` and `toolId = 'landing_page'`. The JSON route returns an explicit public-field projection rather than the full row. Public responses set no-store, no-referrer and nosniff headers, and database failures return generic errors.
+
+### MEDIUM — Public audit reports included internal sales intelligence
+**Area:** `GET /api/public/audit/:id` in `server.ts`.
+
+The unauthenticated report response included internal lead notes, urgency score and predicted deal LTV. These fields are not used by the public audit page and should not be disclosed to prospects or anyone holding the report ID.
+
+**Fix:** Removed those internal fields from the public response while preserving the report's public technical assessment data. A regression test guards the response projection.
+
 ## Prioritized review observations
 
 | Priority | Area | Observation / remaining evidence |
