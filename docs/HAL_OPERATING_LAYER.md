@@ -72,7 +72,7 @@ A configured Gemini or NVIDIA API key does not mean that provider can claim queu
 - [x] Extend the existing Hermes executor to support Hermes Lab asset generation and Hermes Studio analysis or explicitly requested artifact revisions, with atomic claims and persisted receipts.
 - [x] Add Gemini and Nemotron function-calling loops with bounded rounds, authenticated tool execution, tool-result hand-back, and retry protection against repeating already executed actions.
 - [x] Record Hermes tool calls, success/failure and artifact provenance in Work History; keep provider failures visibly failed instead of reporting a successful execution.
-- [ ] Complete executor claim/heartbeat/receipt protocol for all remaining specialist workflows. Gemini and Nemotron remain model providers, not standalone queue executors.
+- [x] Complete atomic claim, attempt-scoped heartbeat/lease expiry, fenced terminal receipts and explicit failure recovery for the two registered Hermes task types. Other specialist workflows remain unsupported; Gemini and Nemotron are model providers, not standalone queue executors.
 - [x] Extend the territory intelligence graph with tenant-scoped work-history event nodes, real lead/outcome/campaign records, actual graph subsystem IDs, and a chronological historical-state scrubber. Model confidence and learning epoch remain explicitly unmeasured until there is validated evidence.
 
 ### Verification and release
@@ -107,3 +107,10 @@ If no configured model provider returns a valid structured result, the determini
 
 A generated artifact is not the same as a published asset, a sent communication, a connected CRM, or a completed external action. The legacy `POST /api/hermes/execute` endpoint now creates and executes a durable Hermes task through the same queue path. Listing artifacts is read-only and no longer auto-generates starter assets for an empty workspace.
 
+
+
+## Hermes execution lifecycle boundary (2026-11-05)
+
+The existing Hermes executor now maintains a 120-second execution lease by refreshing the task `updated_at` heartbeat every 15 seconds. The monotonically incremented `attempt_count` fences heartbeat and terminal receipt writes to the exact attempt that claimed the task. An expired running task is persisted as failed with a `lease_expired` receipt and requires an explicit operator retry; it is never silently requeued. Success and failure receipts contain task/worker identity, attempt, timestamps, duration and structured result/error evidence. See `docs/HERMES_EXECUTION_AUDIT.md` for the inspected tool registry and limitations.
+
+This completes the lifecycle protocol only for `hermes_lab_asset` and `hermes_agent_task`. It does not make Hermes a general-purpose executor for live outreach, ad changes, publishing, contracts, CRM connections or finance operations. No always-on Hermes polling worker is configured; execution is request-triggered. CI PostgreSQL integration tests are not production or browser end-to-end verification.
