@@ -84,6 +84,7 @@ import {
   verifyPhase5Pillars
 } from './src/lib/phase5-enterprise';
 import { executeBrainSynchronizedForecast } from './src/lib/brainForecastBridge';
+import { getTimesFmBatchEvaluationWindow, evaluateTimesFmBatchActual } from './src/lib/forecastEvaluation';
 import {
   verifyLeadGrounding,
   enforceFailClosedOutreachGate,
@@ -8214,17 +8215,26 @@ app.post('/api/scheduler', authenticate, async (req, res) => {
 
     if (job === 'evaluate_forecasts') {
       const now = new Date();
-      const expiredUnevaluated = await pgDb.select().from(forecasts).where(and(
+      const expiredRows = await pgDb.select().from(forecasts).where(and(
         eq(forecasts.contractorId, contractorId),
         eq(forecasts.evaluated, false),
         lte(forecasts.targetDate, now)
       )).orderBy(desc(forecasts.targetDate));
+      // TimesFM batch rows represent a complete target week beginning at target_date.
+      // Do not evaluate them until the entire Monday-Sunday observation window has elapsed.
+      const expiredUnevaluated = expiredRows.filter(forecast =>
+        forecast.modelVersion !== 'timesfm-2.5-batch-v1'
+        || getTimesFmBatchEvaluationWindow(forecast.targetDate, now) !== null
+      );
 
       const [tenantLeads, tenantCampaigns, tenantRevenues] = await Promise.all([
         pgDb.select().from(leads).where(eq(leads.contractorId, contractorId)),
         pgDb.select({ id: campaigns.id }).from(campaigns).where(eq(campaigns.contractorId, contractorId)),
         pgDb.select().from(revenueRecords).where(eq(revenueRecords.contractorId, contractorId))
       ]);
+      const tenantGoogleAds = expiredUnevaluated.some(forecast => forecast.modelVersion === 'timesfm-2.5-batch-v1')
+        ? await pgDb.select().from(googleAdsDailyPerformance).where(eq(googleAdsDailyPerformance.contractorId, contractorId))
+        : [];
       const campaignIds = tenantCampaigns.map(row => row.id);
       const snapshots = campaignIds.length
         ? await pgDb.select().from(performanceSnapshots).where(inArray(performanceSnapshots.campaignId, campaignIds))
@@ -8239,15 +8249,22 @@ app.post('/api/scheduler', authenticate, async (req, res) => {
 
       let evaluatedCount = 0;
       for (const forecast of expiredUnevaluated) {
-        const targetEnd = new Date(forecast.targetDate);
-        const targetStart = new Date(forecast.createdAt);
+        const isTimesFmBatchForecast = forecast.modelVersion === 'timesfm-2.5-batch-v1';
+        const timesFmWindow = isTimesFmBatchForecast
+          ? getTimesFmBatchEvaluationWindow(forecast.targetDate, now)
+          : null;
+        if (isTimesFmBatchForecast && !timesFmWindow) continue;
+        const targetEnd = timesFmWindow?.end ?? new Date(forecast.targetDate);
+        const targetStart = timesFmWindow?.start ?? new Date(forecast.createdAt);
         if (!Number.isFinite(targetStart.getTime()) || !Number.isFinite(targetEnd.getTime()) || targetStart >= targetEnd) continue;
         const inWindow = (value: any) => {
           const timestamp = new Date(value).getTime();
-          return Number.isFinite(timestamp) && timestamp >= targetStart.getTime() && timestamp <= targetEnd.getTime();
+          return Number.isFinite(timestamp) && timestamp >= targetStart.getTime()
+            && (timesFmWindow ? timestamp < targetEnd.getTime() : timestamp <= targetEnd.getTime());
         };
 
         let actualValue: number | null = null;
+        let actualSource = 'tenant_postgres_observations';
         if (forecast.metric === 'lead_volume') {
           actualValue = tenantLeads.length
             ? tenantLeads.filter(lead => inWindow(lead.createdAt)).length
@@ -8262,9 +8279,22 @@ app.post('/api/scheduler', authenticate, async (req, res) => {
             ? tenantRevenues.filter(revenue => inWindow(revenue.createdAt)).reduce((sum, revenue) => sum + Number(revenue.amountUsd || 0), 0)
             : null;
         } else if (forecast.metric === 'conversions') {
-          actualValue = closedWonEvents.length
-            ? closedWonEvents.filter(event => inWindow(event.createdAt)).length
-            : null;
+          if (isTimesFmBatchForecast) {
+            let provenance: any;
+            try {
+              provenance = typeof forecast.assumptions === 'string' ? JSON.parse(forecast.assumptions) : forecast.assumptions;
+            } catch { provenance = null; }
+            const city = String(provenance?.territory_city || '').trim();
+            const niche = String(provenance?.territory_trade || '').trim();
+            if (!city || !niche || !timesFmWindow) continue;
+            actualValue = evaluateTimesFmBatchActual(tenantGoogleAds, city, niche, timesFmWindow);
+            actualSource = 'google_ads_daily_performance';
+          } else {
+            actualValue = closedWonEvents.length
+              ? closedWonEvents.filter(event => inWindow(event.createdAt)).length
+              : null;
+            actualSource = 'crm_closed_won_events';
+          }
         }
 
         // A missing measurement is not a zero. Keep the forecast unevaluated.
@@ -8310,7 +8340,12 @@ app.post('/api/scheduler', authenticate, async (req, res) => {
             sourceModule: 'intelligence',
             correlationId: forecast.id,
             summary: `Evaluated ${forecast.metric} forecast against recorded observations.`,
-            payload: { predicted: forecast.predicted, actual: actualValue, deviation, learningInsight: learning.insight }
+            payload: {
+              predicted: forecast.predicted, actual: actualValue, deviation, actualSource,
+              targetWindowStart: targetStart.toISOString(),
+              targetWindowEndExclusive: timesFmWindow ? targetEnd.toISOString() : undefined,
+              learningInsight: learning.insight
+            }
           });
         });
 

@@ -15,6 +15,7 @@ import numpy as np
 import psycopg
 from psycopg.rows import dict_row
 import timesfm
+from forecast_contract import first_target_week
 
 DATABASE_URL = os.environ["DATABASE_URL"]
 MODEL_ID = "google/timesfm-2.5-200m-pytorch"
@@ -140,8 +141,7 @@ def main() -> None:
             batch_rows = []
             last_week = weeks[-1][0]
             today_utc = datetime.now(timezone.utc).date()
-            next_monday = today_utc - timedelta(days=today_utc.weekday()) + timedelta(days=7)
-            first_forecast_week = max(last_week + timedelta(days=7), next_monday)
+            first_forecast_week = first_target_week(last_week, today_utc)
             total_cost = sum(float(row["cost"] or 0) for row in scoped)
             total_conversions = sum(float(row["conversions"] or 0) for row in scoped)
             observed_cpl = total_cost / total_conversions if total_conversions > 0 else 0.0
@@ -160,7 +160,7 @@ def main() -> None:
                 lower = max(0.0, min(lower, median))
                 upper = max(median, upper)
                 target_date = datetime.combine(
-                    last_week + timedelta(days=7 * (index + 1)),
+                    first_forecast_week + timedelta(days=7 * index),
                     datetime.min.time(),
                     tzinfo=timezone.utc,
                 )

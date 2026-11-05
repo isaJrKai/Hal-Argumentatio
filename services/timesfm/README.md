@@ -63,12 +63,31 @@ scheduled batch job, not a live HTTP inference API.
 1. In the GitHub repository, open **Settings → Secrets and variables → Actions**.
 2. Add repository secret `HAL_FORECAST_DATABASE_URL` containing a PostgreSQL
    connection string for a dedicated least-privilege database role.
-3. Grant that role only the permissions needed to read `contractors` and
-   `google_ads_daily_performance`, and insert/update rows in `forecasts`.
-   Do not use a database owner or admin credential.
+3. Create a dedicated login role (run as a database administrator and replace
+   the role/database placeholders securely):
+
+   ```sql
+   CREATE ROLE hal_timesfm_batch LOGIN PASSWORD '<generate-a-unique-secret>';
+   GRANT CONNECT ON DATABASE <database_name> TO hal_timesfm_batch;
+   GRANT USAGE ON SCHEMA public TO hal_timesfm_batch;
+   GRANT SELECT (id, city, service_type, active_territories)
+     ON TABLE public.contractors TO hal_timesfm_batch;
+   GRANT SELECT (contractor_id, date, conversions, cost, geo, campaign_name, keyword, search_term)
+     ON TABLE public.google_ads_daily_performance TO hal_timesfm_batch;
+   GRANT SELECT (id) ON TABLE public.forecasts TO hal_timesfm_batch;
+   GRANT INSERT (id, contractor_id, metric, predicted, confidence_score, target_date,
+                 model_version, assumptions, created_at, updated_at)
+     ON TABLE public.forecasts TO hal_timesfm_batch;
+   GRANT UPDATE (predicted, confidence_score, assumptions, updated_at)
+     ON TABLE public.forecasts TO hal_timesfm_batch;
+   ```
+
+   Do not grant table ownership, `DELETE`, `TRUNCATE`, `CREATE`, or `BYPASSRLS`.
+   Store the URL only as the GitHub Actions secret `HAL_FORECAST_DATABASE_URL`;
+   never commit it or print it in logs.
 4. Run **Actions → HAL TimesFM scheduled forecasts → Run workflow** manually
-   to test. Scheduled runs execute from `main` every six hours after this
-   workflow is merged into the default branch.
+   after verifying grants and confirming genuine Google Ads history exists.
+   Scheduled runs execute from `main` every six hours after workflow merge.
 
 The workflow does not print connection strings, customer records, or model
 inputs. Do not enable verbose SQL logging or add personal/customer fields to
@@ -83,9 +102,14 @@ workflow logs.
   time limits. A failed run does not delete or overwrite the last successful
   forecasts.
 - Forecasts are refreshed on the schedule, not immediately on dashboard
-  interaction. HAL reads only a fresh complete snapshot (up to 24 hours old)
-  and shows its generation timestamp. A later failed run does not delete or
-  overwrite the last successful forecasts.
+  interaction. The first target is the later of the week after the last complete
+  observed week and the current UTC week, preventing expired targets from stale
+  history. HAL reads only a fresh complete snapshot (up to 24 hours old).
+- TimesFM conversion forecasts are evaluated only after their complete target
+  Monday-Sunday week has elapsed, against the same tenant's Google Ads daily
+  conversion observations filtered to the forecast city and service type. At
+  least five observed days spanning Monday-Friday are required; missing history
+  is not interpreted as zero. Outcomes and source-window provenance are persisted.
 - The `confidence_score` field is set to zero because a calibrated confidence
   score has not been established. q10/q90 values are stored separately in
   `assumptions`; they are model quantile bounds, not a guarantee.
