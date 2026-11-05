@@ -45,11 +45,15 @@ suite('PostgreSQL global structured ledger', () => {
       CREATE FUNCTION prevent_structured_ledger_mutation() RETURNS trigger AS $ledger$
       BEGIN
         RAISE EXCEPTION 'structured_ledger_entries is append-only' USING ERRCODE = '55000';
+        RETURN OLD;
       END;
       $ledger$ LANGUAGE plpgsql;
       CREATE TRIGGER structured_ledger_no_mutation
         BEFORE UPDATE OR DELETE ON structured_ledger_entries
         FOR EACH ROW EXECUTE FUNCTION prevent_structured_ledger_mutation();
+      CREATE TRIGGER structured_ledger_no_truncate
+        BEFORE TRUNCATE ON structured_ledger_entries
+        FOR EACH STATEMENT EXECUTE FUNCTION prevent_structured_ledger_mutation();
     `);
   }, 20000);
 
@@ -101,6 +105,13 @@ suite('PostgreSQL global structured ledger', () => {
     expect(reconciliation.imported).toBe(0);
     expect(reconciliation.alreadyPresent).toBe(source.length);
     expect(reconciliation.total).toBe(source.length);
+  });
+
+  it('blocks destructive truncate operations', async () => {
+    await expect(writerA.query('TRUNCATE TABLE structured_ledger_entries'))
+      .rejects.toMatchObject({ code: '55000' });
+    const integrity = await verifyStructuredLedgerIntegrity(undefined, writerB);
+    expect(integrity.valid).toBe(true);
   });
 
   it('detects tampering with the exact serialized payload', async () => {
