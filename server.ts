@@ -320,6 +320,7 @@ app.get('/api/ready', async (_req, res) => {
         to_regclass('public.lead_events') IS NOT NULL AS lead_events,
         to_regclass('public.revenue_outcomes') IS NOT NULL AS revenue_outcomes,
         to_regclass('public.client_projects') IS NOT NULL AS client_projects,
+        to_regclass('public.proposals') IS NOT NULL AS proposals,
         to_regclass('public.revenue_records') IS NOT NULL AS revenue_records,
         to_regclass('public.campaigns') IS NOT NULL AS campaigns,
         to_regclass('public.work_tasks') IS NOT NULL AS work_tasks,
