@@ -50,6 +50,7 @@ import {
 } from 'lucide-react';
 
 const AuthPage = lazy(() => import('./components/AuthPage'));
+const AdminConsolePanel = lazy(() => import('./components/AdminConsolePanel'));
 const OverviewPanel = lazy(() => import('./components/OverviewPanel'));
 const WorkLedgerPanel = lazy(() => import('./components/WorkLedgerPanel'));
 const WorkQueuePanel = lazy(() => import('./components/WorkQueuePanel'));
@@ -1046,6 +1047,10 @@ export default function App() {
     }
   ];
 
+  if (contractor?.role === 'admin') {
+    navigationGroups.push({ group: 'PLATFORM ADMINISTRATION', items: [{ id: 'admin', label: 'Admin Console', icon: Shield }] });
+  }
+
   const unreadNotificationsCount = notifications.filter(notification => !notification.read).length;
   const contractorFirstName = contractor?.name ? contractor.name.split(' ')[0] : 'Operator';
 
@@ -1477,6 +1482,10 @@ export default function App() {
 
                   {activeTab === 'health' && (
                     <SystemHealthPanel token={token} />
+                  )}
+
+                  {activeTab === 'admin' && contractor?.role === 'admin' && (
+                    <AdminConsolePanel token={token || ''} />
                   )}
 
                   {activeTab === 'drive' && (

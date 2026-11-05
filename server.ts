@@ -608,6 +608,10 @@ async function authenticate(req: express.Request, res: express.Response, next: e
       return res.status(401).json({ error: 'Account is no longer available' });
     }
 
+    if (contractor.accountStatus === 'suspended') {
+      return res.status(403).json({ error: 'This account is suspended. Contact the platform administrator.' });
+    }
+
     (req as any).contractorId = contractor.id;
     (req as any).contractorEmail = contractor.email;
     (req as any).contractorRole = contractor.role === 'admin' ? 'admin' : 'user';
@@ -628,6 +632,90 @@ function requireRole(role: 'admin' | 'user') {
     next();
   };
 }
+
+
+app.get('/api/admin/overview', authenticate, requireRole('admin'), async (_req, res) => {
+  try {
+    const [total, active, suspended, admins] = await Promise.all([
+      pgDb.select({ count: sql<number>`count(*)::int` }).from(contractors),
+      pgDb.select({ count: sql<number>`count(*)::int` }).from(contractors).where(eq(contractors.accountStatus, 'active')),
+      pgDb.select({ count: sql<number>`count(*)::int` }).from(contractors).where(eq(contractors.accountStatus, 'suspended')),
+      pgDb.select({ count: sql<number>`count(*)::int` }).from(contractors).where(and(eq(contractors.role, 'admin'), eq(contractors.accountStatus, 'active')))
+    ]);
+    res.setHeader('Cache-Control', 'no-store');
+    return res.json({ contractors: total[0]?.count ?? 0, active: active[0]?.count ?? 0, suspended: suspended[0]?.count ?? 0, activeAdministrators: admins[0]?.count ?? 0 });
+  } catch (error) {
+    console.error('[HAL Admin] Overview query failed:', error);
+    return res.status(503).json({ error: 'Platform overview is temporarily unavailable.' });
+  }
+});
+
+app.get('/api/admin/contractors', authenticate, requireRole('admin'), async (req, res) => {
+  const search = typeof req.query.search === 'string' ? req.query.search.trim().slice(0, 120) : '';
+  try {
+    const rows = await pgDb.select({
+      id: contractors.id, companyName: contractors.companyName, email: contractors.email,
+      city: contractors.city, serviceType: contractors.serviceType, role: contractors.role,
+      accountStatus: contractors.accountStatus, createdAt: contractors.createdAt, lastLoginAt: contractors.lastLoginAt
+    }).from(contractors)
+      .where(search ? or(like(contractors.companyName, `%${search}%`), like(contractors.email, `%${search}%`), like(contractors.city, `%${search}%`)) : undefined)
+      .orderBy(desc(contractors.createdAt)).limit(200);
+    res.setHeader('Cache-Control', 'no-store');
+    return res.json({ contractors: rows });
+  } catch (error) {
+    console.error('[HAL Admin] Directory query failed:', error);
+    return res.status(503).json({ error: 'Contractor directory is temporarily unavailable.' });
+  }
+});
+
+app.patch('/api/admin/contractors/:id', authenticate, requireRole('admin'), async (req, res) => {
+  const actorId = (req as any).contractorId as string;
+  const targetId = String(req.params.id || '').trim();
+  const role = req.body?.role;
+  const accountStatus = req.body?.accountStatus;
+  if (!targetId || (role === undefined && accountStatus === undefined)) return res.status(400).json({ error: 'Provide a role and/or accountStatus change.' });
+  if (role !== undefined && !['admin', 'user'].includes(role)) return res.status(400).json({ error: 'Invalid role.' });
+  if (accountStatus !== undefined && !['active', 'suspended'].includes(accountStatus)) return res.status(400).json({ error: 'Invalid account status.' });
+  if (targetId === actorId && (role === 'user' || accountStatus === 'suspended')) {
+    return res.status(409).json({ error: 'You cannot remove your own administrator access or suspend your own account.' });
+  }
+  try {
+    const result = await pgDb.transaction(async tx => {
+      const [target] = await tx.select().from(contractors).where(eq(contractors.id, targetId)).limit(1);
+      if (!target) return { kind: 'missing' as const };
+      const nextRole = role ?? target.role;
+      const nextStatus = accountStatus ?? target.accountStatus;
+      const removesActiveAdmin = target.role === 'admin' && target.accountStatus === 'active' && (nextRole !== 'admin' || nextStatus !== 'active');
+      if (removesActiveAdmin) {
+        // Lock the active administrator set so concurrent demotions cannot both pass the last-admin check.
+        const activeAdmins = await tx.select({ id: contractors.id }).from(contractors)
+          .where(and(eq(contractors.role, 'admin'), eq(contractors.accountStatus, 'active')))
+          .for('update');
+        if (activeAdmins.length <= 1) return { kind: 'last_admin' as const };
+      }
+      const [updated] = await tx.update(contractors).set({ role: nextRole, accountStatus: nextStatus })
+        .where(eq(contractors.id, targetId)).returning({
+          id: contractors.id, companyName: contractors.companyName, email: contractors.email,
+          role: contractors.role, accountStatus: contractors.accountStatus
+        });
+      await tx.insert(auditLogs).values({
+        id: crypto.randomUUID(), contractorId: actorId, action: 'ADMIN_CONTRACTOR_ACCESS_CHANGED',
+        details: JSON.stringify({
+          targetContractorId: target.id, previousRole: target.role, role: nextRole,
+          previousAccountStatus: target.accountStatus, accountStatus: nextStatus
+        }),
+        timestamp: new Date()
+      });
+      return { kind: 'updated' as const, contractor: updated };
+    });
+    if (result.kind === 'missing') return res.status(404).json({ error: 'Contractor account not found.' });
+    if (result.kind === 'last_admin') return res.status(409).json({ error: 'At least one active administrator must remain.' });
+    return res.json({ contractor: result.contractor });
+  } catch (error) {
+    console.error('[HAL Admin] Access update failed:', error);
+    return res.status(503).json({ error: 'Account access could not be updated.' });
+  }
+});
 
 // ─── VERIFIED WORKER CAPABILITIES ───────────────────────────────────────────
 // This endpoint exposes the difference between a model provider and an executor.
@@ -943,11 +1031,9 @@ app.patch('/api/work-tasks/:id', authenticate, async (req, res) => {
   }
 });
 
-// Helper to resolve workspace contractor IDs (allows admins to view full primary workspace)
-function getTargetContractorIds(contractorId: string, role?: string): string[] {
-  if (role === 'admin') {
-    return ['con_admin_seed', contractorId];
-  }
+// Workspace APIs are always tenant-local, including for platform administrators.
+// Cross-tenant account administration belongs exclusively to dedicated admin endpoints.
+function getTargetContractorIds(contractorId: string, _role?: string): string[] {
   return [contractorId];
 }
 
