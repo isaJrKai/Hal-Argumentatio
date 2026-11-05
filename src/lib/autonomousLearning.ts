@@ -298,8 +298,12 @@ export function classifySemanticObjectionIntent(objectionText: string): Semantic
 
 export class AutonomousLearningEngine {
   private state: LearningState;
+  private readonly storageKey: string;
+  private initialized = false;
+  private initializationPromise: Promise<void> | null = null;
 
-  constructor() {
+  constructor(storageKey = 'singleton') {
+    this.storageKey = storageKey;
     this.state = this.loadState();
   }
 
@@ -328,8 +332,22 @@ export class AutonomousLearningEngine {
   }
 
   public async initializeFromDb(): Promise<void> {
+    if (this.initialized) return;
+    if (this.initializationPromise) return this.initializationPromise;
+    this.initializationPromise = this.loadFromDb();
     try {
-      const [record] = await getDrizzleDb().select().from(neuralState).where(eq(neuralState.id, 'singleton'));
+      await this.initializationPromise;
+      this.initialized = true;
+    } finally {
+      this.initializationPromise = null;
+    }
+  }
+
+  private async loadFromDb(): Promise<void> {
+    try {
+      const database = getDrizzleDb();
+      if (!database) throw new Error('PostgreSQL is not configured; learning state cannot be initialized.');
+      const [record] = await database.select().from(neuralState).where(eq(neuralState.id, this.storageKey));
       if (record) {
         const storedNiches = (record.nicheMap || {}) as Record<string, NicheCalibration>;
         const nicheMap: Record<string, NicheCalibration> = {};
@@ -382,7 +400,7 @@ export class AutonomousLearningEngine {
 
     const updatedAt = new Date();
     await database.insert(neuralState).values({
-      id: 'singleton',
+      id: this.storageKey,
       version: this.state.version,
       calibrationEpoch: this.state.calibrationEpoch,
       totalOutcomesDigested: this.state.totalOutcomesDigested,
@@ -701,5 +719,19 @@ export class AutonomousLearningEngine {
   }
 }
 
-// Global Singleton Instance
+// System-wide defaults remain available for unauthenticated diagnostics only.
+// Authenticated tenant learning must use a tenant-keyed engine and row.
 export const autonomousLearning = new AutonomousLearningEngine();
+
+const tenantLearningEngines = new Map<string, AutonomousLearningEngine>();
+
+export function getTenantAutonomousLearning(contractorId: string): AutonomousLearningEngine {
+  const cleanContractorId = String(contractorId || '').trim();
+  if (!cleanContractorId) throw new Error('A contractor ID is required for tenant learning state.');
+  let engine = tenantLearningEngines.get(cleanContractorId);
+  if (!engine) {
+    engine = new AutonomousLearningEngine(`tenant:${cleanContractorId}`);
+    tenantLearningEngines.set(cleanContractorId, engine);
+  }
+  return engine;
+}
