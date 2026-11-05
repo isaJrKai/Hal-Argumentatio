@@ -870,9 +870,9 @@ export async function executeMcpTool(
         eventType: 'website_audit.completed',
         entityType: linkedLead ? 'lead' : 'website_audit',
         entityId: linkedLead?.id || auditId,
-        actorType: 'agent',
-        actorId: 'hal_assistant',
-        sourceModule: 'website_audit',
+        actorType: actor.actorType,
+        actorId: actor.actorId,
+        sourceModule: actor.sourceModule || 'website_audit',
         correlationId: linkedLead?.id || auditId,
         summary: `Completed DNS/HTTP/TLS connectivity check for ${report.businessName || targetUrl}.`,
         payload: { targetUrl, measurementStatus: report.measurementStatus, dnsResolved: report.dnsResolved, httpReachable: report.httpReachable, sslStatus: report.sslStatus, pageSpeedStatus: report.pageSpeedStatus }
