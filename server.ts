@@ -2181,8 +2181,8 @@ app.post('/api/landing-pages/save', authenticate, async (req, res) => {
 
 app.post('/api/landing-pages/:id/publish', authenticate, async (req, res) => {
   const contractorId = (req as any).contractorId;
-  if (req.body?.confirmPublish !== true) {
-    return res.status(400).json({ success: false, error: 'Explicit publish confirmation is required.' });
+  if (req.body?.confirmPublish !== true || req.body?.contentReviewed !== true) {
+    return res.status(400).json({ success: false, error: 'Explicit publish confirmation and content-review acknowledgement are required.' });
   }
 
   try {
@@ -2273,7 +2273,7 @@ app.post('/api/landing-pages/:id/publish', authenticate, async (req, res) => {
       sourceModule: 'landing_page_studio',
       correlationId: artifact.id,
       summary: `Published landing page: ${artifact.title}.`,
-      payload: { sourceLeadId: sourceLeadId || null, sourceAuditId: content.sourceAuditId || null, publishedAt: now.toISOString() }
+      payload: { sourceLeadId: sourceLeadId || null, sourceAuditId: content.sourceAuditId || null, contentReviewed: true, publishedAt: now.toISOString() }
     });
 
     return res.json({
