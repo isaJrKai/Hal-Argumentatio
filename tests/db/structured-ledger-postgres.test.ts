@@ -149,7 +149,7 @@ suite('PostgreSQL global structured ledger', () => {
   });
 
   it('detects tampering with the exact serialized payload', async () => {
-    await appendStructuredLedgerEntry({
+    const tamperedEntry = await appendStructuredLedgerEntry({
       contractorId: 'tenant-tamper',
       eventType: 'security_event',
       entityType: 'test',
@@ -176,7 +176,7 @@ suite('PostgreSQL global structured ledger', () => {
 
     const integrity = await verifyStructuredLedgerIntegrity(undefined, writerB);
     expect(integrity.valid).toBe(false);
-    expect(integrity.brokenAtSequence).toBe(26);
+    expect(integrity.brokenAtSequence).toBe(tamperedEntry.sequenceNumber);
     expect(integrity.auditMessage).toContain('Payload hash mismatch');
   }, 20000);
 });
