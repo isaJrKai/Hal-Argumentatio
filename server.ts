@@ -1600,10 +1600,8 @@ app.get('/api/public/audit/:id', async (req, res) => {
       googleRating: null,
       reviewCount: lead.reviewCount ?? null,
       sentimentScore: null,
-      notes: lead.notes || '',
-      outreachStrategy: '',
-      urgencyScore: lead.urgencyScore ?? null,
-      predictedLtvUsd: lead.predictedLtv ?? null,
+      // Deliberately exclude internal notes, sales strategy, urgency and
+      // predicted deal value from the unauthenticated prospect-facing report.
       createdAt: lead.createdAt
     });
   } catch (err: any) {
@@ -1727,20 +1725,39 @@ app.post('/api/public/webhooks/delivery', async (req, res) => {
 app.get('/api/public/landing/:id', async (req, res) => {
   const { id } = req.params;
   try {
-    const [artifact] = await pgDb.select().from(hermesLabArtifacts).where(eq(hermesLabArtifacts.id, id));
+    const [artifact] = await pgDb.select({
+      id: hermesLabArtifacts.id,
+      toolId: hermesLabArtifacts.toolId,
+      title: hermesLabArtifacts.title,
+      category: hermesLabArtifacts.category,
+      content: hermesLabArtifacts.content,
+      status: hermesLabArtifacts.status,
+      updatedAt: hermesLabArtifacts.updatedAt
+    }).from(hermesLabArtifacts).where(and(
+      eq(hermesLabArtifacts.id, id),
+      eq(hermesLabArtifacts.status, 'deployed'),
+      eq(hermesLabArtifacts.toolId, 'landing_page')
+    ));
     if (!artifact) {
-      return res.status(404).json({ error: 'Landing page artifact not found.' });
+      return res.status(404).json({ error: 'Published landing page not found.' });
     }
-    res.json({ success: true, artifact });
-  } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    res.setHeader('Cache-Control', 'no-store');
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('Referrer-Policy', 'no-referrer');
+    return res.json({ success: true, artifact });
+  } catch {
+    return res.status(503).json({ error: 'Published landing page is temporarily unavailable.' });
   }
 });
 
 app.get('/landing/:id', async (req, res) => {
   const { id } = req.params;
   try {
-    const [artifact] = await pgDb.select().from(hermesLabArtifacts).where(eq(hermesLabArtifacts.id, id));
+    const [artifact] = await pgDb.select().from(hermesLabArtifacts).where(and(
+      eq(hermesLabArtifacts.id, id),
+      eq(hermesLabArtifacts.status, 'deployed'),
+      eq(hermesLabArtifacts.toolId, 'landing_page')
+    ));
     if (!artifact) {
       try {
         const { TRADE_TEMPLATES } = await import('./src/components/landing/templates');
@@ -1779,6 +1796,9 @@ app.get('/landing/:id', async (req, res) => {
     const html = (artifact.content as any)?.renderedOutput;
     if (html && typeof html === 'string') {
       res.setHeader('Content-Type', 'text/html; charset=utf-8');
+      res.setHeader('X-Content-Type-Options', 'nosniff');
+      res.setHeader('Referrer-Policy', 'no-referrer');
+      res.setHeader('Cache-Control', 'no-store');
       return res.send(html);
     }
     return res.status(400).send('<h1>No rendered HTML available for this artifact.</h1>');
