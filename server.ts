@@ -117,9 +117,11 @@ async function recordStructuredLedgerEntry(input: StructuredLedgerInput) {
 }
 
 async function recordStructuredLedgerEntryInTransaction(tx: { execute: (query: any) => Promise<any> }, input: StructuredLedgerInput) {
+  // JSON writes cannot participate in a PostgreSQL transaction. In legacy mode
+  // the caller appends to JSON only after its PostgreSQL business transaction commits.
   return postgresStructuredLedgerEnabled()
     ? appendStructuredLedgerEntryInTransaction(tx, input)
-    : db.recordLedgerEntry(input);
+    : null;
 }
 
 async function readStructuredLedger(contractorId?: string, limit = 10000) {
@@ -2216,7 +2218,23 @@ app.post('/api/public/landing-leads', async (req, res) => {
       });
     });
 
-    // Lead, review task, work events, and cryptographic ledger entry committed atomically.
+    // In PostgreSQL-ledger mode the hash-chain append committed with the lead.
+    // Legacy JSON mode appends only after the PostgreSQL business transaction commits.
+    if (!postgresStructuredLedgerEnabled()) {
+      await recordStructuredLedgerEntry({
+        contractorId: targetContractorId,
+        eventType: 'lead_captured',
+        entityType: 'lead',
+        entityId: leadId,
+        actor: 'LandingPageLeadIngest',
+        details: `A visitor submitted an inquiry through landing page ${landingPageId.trim()}.`,
+        metadata: {
+          landingPageId: landingPageId.trim(),
+          serviceDetails: normalizedDetails,
+          city: pageCity
+        }
+      });
+    }
 
     try {
       broadcastNotification(
@@ -2981,6 +2999,23 @@ app.all(['/api/webhooks/twilio', '/api/webhooks/whatsapp'], async (req, res) => 
         }
       });
     });
+
+    if (!postgresStructuredLedgerEnabled()) {
+      await recordStructuredLedgerEntry({
+        contractorId: targetContractorId,
+        eventType: 'lead_captured',
+        entityType: 'lead',
+        entityId: matchedLead.id,
+        actor: 'carrier_webhook',
+        metadata: {
+          from: cleanFrom,
+          channel: isWhatsApp ? 'whatsapp' : 'sms',
+          messageSid,
+          leadId: matchedLead.id,
+          bodySnippet: rawBody.slice(0, 140)
+        }
+      });
+    }
 
     // Broadcast instant real-time notification alert via SSE to the dashboard
     const channelLabel = isWhatsApp ? 'WhatsApp' : 'SMS';
@@ -4383,6 +4418,18 @@ app.post('/api/recommendations/:id/approve', authenticate, async (req, res) => {
       });
       return [approved];
     });
+
+    if (!postgresStructuredLedgerEnabled()) {
+      await recordStructuredLedgerEntry({
+        contractorId,
+        eventType: 'recommendation_approved',
+        entityType: 'recommendation',
+        entityId: updated.id,
+        actor: String(contractorId),
+        details: `Approved recommendation: ${updated.action}`,
+        metadata: { newStatus: 'approved' }
+      });
+    }
 
     broadcastNotification(
       contractorId,
