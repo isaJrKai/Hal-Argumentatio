@@ -210,7 +210,7 @@ describe('client project HTTP route tenant isolation', () => {
     const republishAfterEdit = await request(app)
       .post(`/api/landing-pages/${landingAuditArtifactId}/publish`)
       .set('Authorization', `Bearer ${tokenA}`)
-      .send({ confirmPublish: true });
+      .send({ confirmPublish: true, contentReviewed: true });
     expect(republishAfterEdit.status).toBe(409);
   });
 
