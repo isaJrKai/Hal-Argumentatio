@@ -208,7 +208,7 @@ export function auditLandingPage(config: LandingPageConfig): QualityGateAuditRep
 
   // Gate 8: Proof Specificity & Verification
   const reviewsCount = config.sections.reviews?.items?.length || 0;
-  const hasLicense = Boolean(config.licenseNumber && config.licenseNumber.trim().length > 3);
+  const hasLicense = Boolean(config.licenseNumber && config.licenseNumber.trim().length > 3 && !/add verified|remove this field|placeholder/i.test(config.licenseNumber));
   const unverifiedReviews = config.sections.reviews?.items?.filter(r => !r.verified) || [];
 
   if (reviewsCount === 0 || !hasLicense) {
