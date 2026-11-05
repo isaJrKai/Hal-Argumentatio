@@ -90,6 +90,7 @@ export const websiteAuditSkill: Skill = {
   category: 'website',
   icon: 'Globe',
   inputs: [
+    { name: 'leadId', label: 'Existing HAL Lead (optional)', type: 'string', required: false, defaultValue: '' },
     { name: 'websiteUrl', label: 'Website URL', type: 'string', required: true, defaultValue: '' },
     { name: 'businessName', label: 'Business Name', type: 'string', required: false, defaultValue: '' }
   ],
