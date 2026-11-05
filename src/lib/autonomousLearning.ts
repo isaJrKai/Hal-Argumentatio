@@ -345,13 +345,20 @@ export class AutonomousLearningEngine {
     };
   }
 
+  private async ensureInitializedLocked(): Promise<void> {
+    if (this.initialized) return;
+    await this.loadFromDb();
+    this.initialized = true;
+  }
+
   public async initializeFromDb(): Promise<void> {
     if (this.initialized) return;
     if (this.initializationPromise) return this.initializationPromise;
-    this.initializationPromise = this.loadFromDb();
+    this.initializationPromise = this.withMutationLock(async () => {
+      await this.ensureInitializedLocked();
+    });
     try {
       await this.initializationPromise;
-      this.initialized = true;
     } finally {
       this.initializationPromise = null;
     }
@@ -471,8 +478,9 @@ export class AutonomousLearningEngine {
 
   public async setOfflineMode(active: boolean): Promise<void> {
     return this.withMutationLock(async () => {
-    const previousState = structuredClone(this.state);
-    this.state.isOfflineModeActive = active;
+      await this.ensureInitializedLocked();
+      const previousState = structuredClone(this.state);
+      this.state.isOfflineModeActive = active;
     try {
       await this.saveState();
     } catch (error) {
@@ -499,8 +507,9 @@ export class AutonomousLearningEngine {
     };
   }): Promise<{ updatedNiche: NicheCalibration; newEpoch: number; logMessage: string }> {
     return this.withMutationLock(async () => {
-    const previousState = structuredClone(this.state);
-    const cleanNiche = (params.niche || 'general').toLowerCase().trim();
+      await this.ensureInitializedLocked();
+      const previousState = structuredClone(this.state);
+      const cleanNiche = (params.niche || 'general').toLowerCase().trim();
     const current = this.state.nicheMap[cleanNiche] || {
       niche: cleanNiche,
       sampleCount: 0,
