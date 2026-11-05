@@ -217,11 +217,29 @@ export const proposals = pgTable('proposals', {
   approvedBy: text('approved_by'),
   voidedAt: timestamp('voided_at'),
   voidedBy: text('voided_by'),
+  signedAt: timestamp('signed_at'),
+  signerName: text('signer_name'),
+  signerEmail: text('signer_email'),
+  signerIp: text('signer_ip'),
+  signerUserAgent: text('signer_user_agent'),
+  signedContentHash: text('signed_content_hash'),
+  signatureConsent: boolean('signature_consent').default(false).notNull(),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });
 
 /** Tenant-owned invoices and manual payment ledger. Amounts are stored in minor currency units. */
+/** One-time bearer links for client proposal acceptance; only token hashes are stored. */
+export const proposalSigningLinks = pgTable('proposal_signing_links', {
+  id: text('id').primaryKey(),
+  contractorId: text('contractor_id').notNull(),
+  proposalId: text('proposal_id').notNull(),
+  tokenHash: text('token_hash').notNull().unique(),
+  expiresAt: timestamp('expires_at').notNull(),
+  usedAt: timestamp('used_at'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+});
+
 export const invoices = pgTable('invoices', {
   id: text('id').primaryKey(),
   contractorId: text('contractor_id').notNull(),
