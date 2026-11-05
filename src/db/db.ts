@@ -507,6 +507,14 @@ export function decrypt(encryptedText: string): string {
   return '';
 }
 
+export function parseLegacyDatabase(raw: string): Partial<DBStructure> {
+  const parsed: unknown = JSON.parse(raw);
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    throw new Error('Legacy database content must be a JSON object.');
+  }
+  return parsed as Partial<DBStructure>;
+}
+
 class Database {
   private data: DBStructure = {
     contractors: [],
@@ -545,7 +553,7 @@ class Database {
     if (fs.existsSync(DB_FILE)) {
       try {
         const raw = fs.readFileSync(DB_FILE, 'utf8');
-        const parsed = JSON.parse(raw);
+        const parsed = parseLegacyDatabase(raw);
         // Load with proper fallbacks
         this.data = { ...this.data, ...parsed };
         console.log('Database loaded successfully with', this.data.leads.length, 'leads.');
