@@ -2065,18 +2065,53 @@ app.post('/api/landing-pages/regenerate-section', authenticate, async (req, res)
 
 app.post('/api/landing-pages/save', authenticate, async (req, res) => {
   const contractorId = (req as any).contractorId;
-  const { id, title, pageConfig } = req.body || {};
+  const { id, title, pageConfig, leadId } = req.body || {};
 
   if (typeof title !== 'string' || !title.trim() || title.length > 160 ||
       !pageConfig || typeof pageConfig !== 'object' || Array.isArray(pageConfig) ||
       JSON.stringify(pageConfig).length > 80_000 ||
-      (id !== undefined && (typeof id !== 'string' || id.length > 128))) {
-    return res.status(400).json({ success: false, error: 'A valid title and landing-page configuration are required.' });
+      (id !== undefined && (typeof id !== 'string' || id.length > 128)) ||
+      (leadId !== undefined && leadId !== null && (typeof leadId !== 'string' || leadId.length > 128))) {
+    return res.status(400).json({ success: false, error: 'A valid title, landing-page configuration, and optional saved lead are required.' });
   }
 
   try {
     const artifactId = typeof id === 'string' && id.length > 5 ? id : ('lp_' + crypto.randomUUID().slice(0, 8));
-    const ownedPageConfig = { ...pageConfig, id: artifactId, contractorId };
+    let sourceLead: any = null;
+    const requestedLeadId = typeof leadId === 'string' && leadId.trim()
+      ? leadId.trim()
+      : (typeof pageConfig.sourceLeadId === 'string' ? pageConfig.sourceLeadId.trim() : '');
+
+    if (requestedLeadId) {
+      const [ownedLead] = await pgDb.select().from(leads).where(and(
+        eq(leads.id, requestedLeadId),
+        eq(leads.contractorId, contractorId)
+      )).limit(1);
+      if (!ownedLead) return res.status(404).json({ success: false, error: 'The selected prospect was not found in this workspace.' });
+      sourceLead = ownedLead;
+    }
+
+    const sourcePhone = sourceLead
+      ? (sourceLead.phoneEncrypted ? (decrypt(sourceLead.phoneEncrypted) || sourceLead.phone) : sourceLead.phone)
+      : null;
+    const sourceEvidence = sourceLead?.groundingEvidence && typeof sourceLead.groundingEvidence === 'object'
+      ? sourceLead.groundingEvidence as Record<string, any>
+      : {};
+    const sourceAudit = sourceEvidence.websiteAudit && typeof sourceEvidence.websiteAudit === 'object'
+      ? sourceEvidence.websiteAudit
+      : null;
+    const ownedPageConfig = {
+      ...pageConfig,
+      ...(sourceLead ? {
+        businessName: sourceLead.businessName,
+        city: sourceLead.city,
+        ...(sourcePhone ? { phone: sourcePhone } : {})
+      } : {}),
+      id: artifactId,
+      contractorId,
+      ...(sourceLead ? { sourceLeadId: sourceLead.id } : {})
+    };
+
     // Never trust client-supplied rendered HTML. Render from the validated,
     // tenant-owned configuration using the escaping server-side generator.
     const ownedRenderedHtml = generateLandingPageHtml(ownedPageConfig);
@@ -2086,26 +2121,34 @@ app.post('/api/landing-pages/save', authenticate, async (req, res) => {
       .from(hermesLabArtifacts)
       .where(and(eq(hermesLabArtifacts.id, artifactId), eq(hermesLabArtifacts.contractorId, contractorId)));
 
+    const content = {
+      pageConfig: ownedPageConfig,
+      renderedOutput: ownedRenderedHtml,
+      sourceLeadId: sourceLead?.id || null,
+      sourceAuditId: sourceAudit?.auditId || null,
+      sourceAuditAt: sourceAudit?.auditedAt || null
+    };
+
     await recordWorkEvent(pgDb, {
-      contractorId, eventType: existing ? 'landing_page.updated' : 'landing_page.saved',
-      entityType: 'landing_page', entityId: artifactId, actorType: 'human', actorId: contractorId,
-      sourceModule: 'landing_page_studio', correlationId: artifactId,
-      summary: `${existing ? 'Updated' : 'Saved'} landing page: ${title}.`, payload: { title }
+      contractorId,
+      eventType: existing ? 'landing_page.updated' : 'landing_page.saved',
+      entityType: 'landing_page',
+      entityId: artifactId,
+      actorType: 'human',
+      actorId: contractorId,
+      sourceModule: 'landing_page_studio',
+      correlationId: artifactId,
+      summary: `${existing ? 'Updated' : 'Saved'} landing page: ${title}.`,
+      payload: { title, sourceLeadId: sourceLead?.id || null, sourceAuditId: sourceAudit?.auditId || null }
     });
 
     if (existing) {
-      await pgDb
-        .update(hermesLabArtifacts)
-        .set({
-          title,
-          content: {
-            pageConfig: ownedPageConfig,
-            renderedOutput: ownedRenderedHtml
-          },
-          status: 'ready',
-          updatedAt: new Date()
-        })
-        .where(and(eq(hermesLabArtifacts.id, artifactId), eq(hermesLabArtifacts.contractorId, contractorId)));
+      await pgDb.update(hermesLabArtifacts).set({
+        title,
+        content,
+        status: 'ready',
+        updatedAt: new Date()
+      }).where(and(eq(hermesLabArtifacts.id, artifactId), eq(hermesLabArtifacts.contractorId, contractorId)));
     } else {
       await pgDb.insert(hermesLabArtifacts).values({
         id: artifactId,
@@ -2114,24 +2157,23 @@ app.post('/api/landing-pages/save', authenticate, async (req, res) => {
         category: 'web',
         title,
         status: 'ready',
-        content: {
-          pageConfig: ownedPageConfig,
-          renderedOutput: ownedRenderedHtml
-        },
+        content,
         createdAt: new Date(),
         updatedAt: new Date()
       });
     }
 
-    res.json({
+    return res.json({
       success: true,
       id: artifactId,
       contractorId,
+      sourceLeadId: sourceLead?.id || null,
+      sourceAuditId: sourceAudit?.auditId || null,
       liveUrl: `/landing/${artifactId}`
     });
   } catch (err: any) {
     console.error('[Save Landing Page Error]', err);
-    res.status(500).json({ success: false, error: err.message });
+    return res.status(503).json({ success: false, error: err.message || 'Landing page could not be saved.' });
   }
 });
 
