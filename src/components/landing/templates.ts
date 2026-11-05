@@ -904,56 +904,62 @@ for (const template of Object.values(TRADE_TEMPLATES)) {
   template.licenseNumber = '';
   template.emergencyService = false;
   template.dispatchWindow = 'Set your actual availability before publishing';
-  template.branding.logoText = 'YOUR BUSINESS';
+  if (template.branding) template.branding.logoText = 'YOUR BUSINESS';
 
-  template.sections.announcement_bar.active = false;
-  template.sections.announcement_bar.text = '';
-  template.sections.announcement_bar.urgencyBadge = '';
-  template.sections.header.ctaText = 'Contact the business';
+  const sections = template.sections as any;
+  const disableSection = (key: string) => {
+    const section = sections[key];
+    if (!section || typeof section !== 'object') return;
+    section.active = false;
+    if (Array.isArray(section.items)) section.items = [];
+    if (Array.isArray(section.badges)) section.badges = [];
+    if (Array.isArray(section.cities)) section.cities = [];
+  };
 
-  template.sections.hero.headline = `Professional ${template.trade.replace(/_/g, ' ')} services in your area`;
-  template.sections.hero.subheadline = 'Describe the services your business provides, the areas you serve, and how customers can contact you.';
-  template.sections.hero.badgeText = '';
-  template.sections.hero.heroImageUrl = undefined;
+  [
+    'announcement_bar', 'trust_bar', 'bento_features', 'pricing_packages',
+    'seasonal_alert', 'services', 'before_after', 'reviews', 'service_areas',
+    'guarantee', 'online_booking', 'faq', 'sticky_mobile_call'
+  ].forEach(disableSection);
 
-  template.sections.lead_form.active = true;
-  template.sections.lead_form.title = 'Request a service enquiry';
-  template.sections.lead_form.subtitle = 'Share your contact details and a short description of the work required.';
-  template.sections.lead_form.buttonText = 'Request a call back';
-  template.sections.lead_form.dispatchNote = 'Confirm service availability, response times, and any call-out fees directly with the business.';
+  if (sections.announcement_bar) {
+    sections.announcement_bar.text = '';
+    sections.announcement_bar.urgencyBadge = '';
+  }
+  if (sections.header) sections.header.ctaText = 'Contact the business';
+  if (sections.hero) {
+    sections.hero.headline = `Professional ${template.trade.replace(/_/g, ' ')} services in your area`;
+    sections.hero.subheadline = 'Describe the services your business provides, the areas you serve, and how customers can contact you.';
+    sections.hero.badgeText = '';
+    sections.hero.heroImageUrl = undefined;
+  }
+  if (sections.lead_form) {
+    sections.lead_form.active = true;
+    sections.lead_form.title = 'Request a service enquiry';
+    sections.lead_form.subtitle = 'Share your contact details and a short description of the work required.';
+    sections.lead_form.buttonText = 'Request a call back';
+    sections.lead_form.dispatchNote = 'Confirm service availability, response times, and any call-out fees directly with the business.';
+  }
+  if (sections.before_after) sections.before_after.subtitle = 'Add genuine project photos with customer permission.';
+  if (sections.reviews) {
+    sections.reviews.rating = 0;
+    sections.reviews.totalReviews = 0;
+    sections.reviews.subtitle = 'Add genuine customer reviews with permission.';
+  }
+  if (sections.service_areas) sections.service_areas.subtitle = 'List only locations the business currently serves.';
+  if (sections.guarantee) sections.guarantee.description = 'Add written service terms approved by the business.';
+  if (sections.sticky_mobile_call) {
+    sections.sticky_mobile_call.crewStatus = '';
+    sections.sticky_mobile_call.buttonText = 'Contact the business';
+  }
+  if (sections.footer) {
+    sections.footer.address = 'Add the business address or remove this field before publishing.';
+    sections.footer.copyright = '';
+  }
 
-  template.sections.trust_bar.active = false;
-  template.sections.trust_bar.badges = [];
-  template.sections.bento_features.active = false;
-  template.sections.bento_features.items = [];
-  template.sections.pricing_packages.active = false;
-  template.sections.pricing_packages.items = [];
-  template.sections.seasonal_alert.active = false;
-  template.sections.services.active = false;
-  template.sections.services.items = [];
-  template.sections.before_after.active = false;
-  template.sections.before_after.items = [];
-  template.sections.before_after.subtitle = 'Add genuine project photos with customer permission.';
-  template.sections.reviews.active = false;
-  template.sections.reviews.rating = 0;
-  template.sections.reviews.totalReviews = 0;
-  template.sections.reviews.items = [];
-  template.sections.reviews.subtitle = 'Add genuine customer reviews with permission.';
-  template.sections.service_areas.active = false;
-  template.sections.service_areas.cities = [];
-  template.sections.service_areas.subtitle = 'List only locations the business currently serves.';
-  template.sections.guarantee.active = false;
-  template.sections.guarantee.description = 'Add written service terms approved by the business.';
-  template.sections.online_booking.active = false;
-  template.sections.faq.active = false;
-  template.sections.faq.items = [];
-  template.sections.sticky_mobile_call.active = false;
-  template.sections.sticky_mobile_call.crewStatus = '';
-  template.sections.sticky_mobile_call.buttonText = 'Contact the business';
-  template.sections.footer.address = 'Add the business address or remove this field before publishing.';
-  template.sections.footer.copyright = '';
-
-  template.seo.metaTitle = `Your Business Name — ${template.trade.replace(/_/g, ' ')}`;
-  template.seo.metaDescription = 'Learn about the services offered by Your Business Name. Contact the business for current service details.';
-  template.seo.schemaType = 'LocalBusiness';
+  if (template.seo) {
+    template.seo.metaTitle = `Your Business Name — ${template.trade.replace(/_/g, ' ')}`;
+    template.seo.metaDescription = 'Learn about the services offered by Your Business Name. Contact the business for current service details.';
+    template.seo.schemaType = 'LocalBusiness';
+  }
 }
