@@ -2,7 +2,7 @@ name: Communications Outbox Worker
 
 on:
   schedule:
-    - cron: "*/5 * * * *"
+    - cron: "*/30 * * * *"
   workflow_dispatch:
 
 permissions:
@@ -15,7 +15,7 @@ concurrency:
 jobs:
   dispatch:
     runs-on: ubuntu-latest
-    timeout-minutes: 2
+    timeout-minutes: 3
     steps:
       - name: Invoke the protected outbox worker
         shell: bash
@@ -32,7 +32,7 @@ jobs:
             https://*) ;;
             *) echo "::error::HAL_APP_URL must be an HTTPS origin."; exit 1 ;;
           esac
-          curl --fail-with-body --silent --show-error --max-time 60 \
+          curl --fail-with-body --silent --show-error --max-time 120 \
             -X POST "${HAL_APP_URL%/}/api/internal/communications/outbox/run" \
             -H "Authorization: Bearer ${HAL_COMMUNICATIONS_WORKER_SECRET}" \
             -H "Content-Type: application/json" \
