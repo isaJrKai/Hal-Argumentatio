@@ -1831,8 +1831,8 @@ app.get('/landing/:id', async (req, res) => {
       return res.send(html);
     }
     return res.status(400).send('<h1>No rendered HTML available for this artifact.</h1>');
-  } catch (err: any) {
-    res.status(500).send('Error rendering landing page: ' + err.message);
+  } catch {
+    res.status(503).send('Landing page is temporarily unavailable.');
   }
 });
 
