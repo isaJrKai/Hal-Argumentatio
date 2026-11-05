@@ -9318,7 +9318,9 @@ app.post('/api/revenue/recommendations/:id/transition', authenticate, async (req
       updateValues.status = newStatus;
       updateValues.executedAt = now;
       updateValues.executedBy = userEmail;
-      updateValues.executionReference = executionReference || `Manual Ref #${Math.floor(Math.random() * 90000 + 10000)}`;
+      updateValues.executionReference = typeof executionReference === 'string' && executionReference.trim()
+        ? executionReference.trim()
+        : null;
       eventMetadata.executionReference = updateValues.executionReference;
     } else if (action === 'expire') {
       if (currentStatus !== 'proposed' && currentStatus !== 'approved') {
@@ -9336,32 +9338,48 @@ app.post('/api/revenue/recommendations/:id/transition', authenticate, async (req
       return res.json({ success: true, message: `Recommendation is already in '${newStatus}' state.`, recommendation: rec });
     }
 
-    // Perform update
-    const [updated] = await pgDb.update(revenueRecommendations)
-      .set(updateValues)
-      .where(and(eq(revenueRecommendations.id, id), eq(revenueRecommendations.contractorId, contractorId)))
-      .returning();
+    // Persist the state transition and its immutable event atomically. The
+    // current-status predicate prevents concurrent requests from overwriting a
+    // transition that another request has already committed.
+    const committed = await pgDb.transaction(async tx => {
+      const [updated] = await tx.update(revenueRecommendations)
+        .set(updateValues)
+        .where(and(
+          eq(revenueRecommendations.id, id),
+          eq(revenueRecommendations.contractorId, contractorId),
+          eq(revenueRecommendations.status, currentStatus)
+        ))
+        .returning();
 
-    // Append immutable lifecycle event
-    const [eventRecord] = await pgDb.insert(revenueRecommendationEvents).values({
-      id: crypto.randomUUID(),
-      contractorId,
-      recommendationId: id,
-      previousStatus: currentStatus,
-      newStatus,
-      actor: userEmail,
-      metadata: eventMetadata
-    }).returning();
+      if (!updated) {
+        throw new Error('Recommendation changed before the transition could be committed.');
+      }
+
+      const [eventRecord] = await tx.insert(revenueRecommendationEvents).values({
+        id: crypto.randomUUID(),
+        contractorId,
+        recommendationId: id,
+        previousStatus: currentStatus,
+        newStatus,
+        actor: userEmail,
+        metadata: eventMetadata
+      }).returning();
+
+      return { updated, eventRecord };
+    });
 
     res.json({
       success: true,
       previousStatus: currentStatus,
       newStatus,
-      recommendation: updated,
-      event: eventRecord
+      recommendation: committed.updated,
+      event: committed.eventRecord
     });
 
   } catch (err: any) {
+    if (err.message === 'Recommendation changed before the transition could be committed.') {
+      return res.status(409).json({ error: err.message });
+    }
     res.status(500).json({ error: err.message });
   }
 });
