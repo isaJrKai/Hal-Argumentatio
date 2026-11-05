@@ -330,7 +330,7 @@ export default function App() {
     document.addEventListener('keydown', handleKeyDown);
     return () => {
       document.removeEventListener('keydown', handleKeyDown);
-      document.querySelector<HTMLElement>('[aria-controls="mobile-navigation"]')?.focus();
+      document.querySelector<HTMLElement>('[aria-label="Open navigation menu"]')?.focus();
     };
   }, [isMobileMenuOpen]);
 
