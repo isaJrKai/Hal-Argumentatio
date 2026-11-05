@@ -6987,7 +6987,7 @@ async function googleAdsAccessToken(credentials: ReturnType<typeof parseGoogleAd
 }
 async function googleAdsSearch(accessToken: string, credentials: ReturnType<typeof parseGoogleAdsConnection>, query: string): Promise<any[]> {
   const headers: Record<string,string> = { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' };
-  if (credentials.developerToken) headers['developer-token'] = credentials.developerToken;
+  headers['developer-token'] = credentials.developerToken;
   if (credentials.loginCustomerId) headers['login-customer-id'] = credentials.loginCustomerId;
   const response = await fetch(`https://googleads.googleapis.com/v25/customers/${credentials.customerId}/googleAds:searchStream`, {
     method: 'POST', headers, body: JSON.stringify({ query }), signal: AbortSignal.timeout(45000)

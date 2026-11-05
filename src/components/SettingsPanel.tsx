@@ -1190,7 +1190,7 @@ export default function SettingsPanel({
                 type="password"
                 value={connectorKeys.googleAds}
                 onChange={(e) => setConnectorKeys(prev => ({ ...prev, googleAds: e.target.value }))}
-                placeholder="JSON OAuth connection: clientId, clientSecret, refreshToken, customerId"
+                placeholder="JSON: clientId, clientSecret, refreshToken, customerId, developerToken"
                 className={`w-full border rounded p-2 focus:outline-none focus:border-accent text-inherit font-mono text-xs ${innerBg} ${borderCol}`}
               />
               <div className="flex justify-end">
@@ -1198,7 +1198,7 @@ export default function SettingsPanel({
                   {connectorSaving.googleAds ? 'Saving…' : 'Save credential'}
                 </button>
               </div>
-              <p className="text-[11px] text-inherit opacity-70 leading-relaxed">Save a JSON OAuth connection object. The refresh token must include the Google Ads API scope (https://www.googleapis.com/auth/adwords) and offline access. Credentials are encrypted in this workspace vault; saving does not verify connectivity.</p>
+              <p className="text-[11px] text-inherit opacity-70 leading-relaxed">Save a JSON OAuth connection object including developerToken. The refresh token must include the Google Ads API scope (https://www.googleapis.com/auth/adwords) and offline access. Credentials are encrypted in this workspace vault; saving does not verify connectivity.</p>
               <div className="flex justify-end"><button type="button" onClick={handleGoogleAdsHistorySync} disabled={!connectorConfigured.googleAds || googleAdsSyncing} className="px-3 py-2 rounded-md border border-accent/50 text-accent text-xs font-semibold disabled:opacity-40 disabled:cursor-not-allowed">{googleAdsSyncing ? 'Syncing history…' : 'Verify & import last 365 days'}</button></div>
               {googleAdsSyncResult && <p role="status" className="text-xs text-text-secondary">{googleAdsSyncResult}</p>}
             </div>

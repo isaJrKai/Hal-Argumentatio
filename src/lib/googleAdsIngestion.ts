@@ -9,7 +9,7 @@ export function parseGoogleAdsConnection(raw:string):GoogleAdsConnection {
  const customerId=typeof v.customerId==='string'?v.customerId.replace(/[-\\s]/g,''):'';
  const loginCustomerId=typeof v.loginCustomerId==='string'?v.loginCustomerId.replace(/[-\\s]/g,''):'';
  const developerToken=typeof v.developerToken==='string'?v.developerToken.trim():'';
- if(!clientId||!clientSecret||!refreshToken||!/^\\d{10}$/.test(customerId))throw new Error('Invalid Google Ads connection: clientId, clientSecret, refreshToken and a 10-digit customerId are required.');
+ if(!clientId||!clientSecret||!refreshToken||!developerToken||!/^\\d{10}$/.test(customerId))throw new Error('Invalid Google Ads connection: clientId, clientSecret, refreshToken, developerToken and a 10-digit customerId are required.');
  if(loginCustomerId&&!/^\\d{10}$/.test(loginCustomerId))throw new Error('Invalid Google Ads connection: loginCustomerId must contain exactly 10 digits.');
  return {clientId,clientSecret,refreshToken,customerId,loginCustomerId:loginCustomerId||undefined,developerToken:developerToken||undefined};
 }

@@ -65,9 +65,8 @@ available from Settings using **Verify & import last 365 days**. The credential
 object is stored in the existing contractor-scoped encrypted connector vault
 and is never returned to the browser.
 
-Required JSON fields: `clientId`, `clientSecret`, `refreshToken`, and
-10-digit `customerId`. Optional: `loginCustomerId` for manager-account access
-and `developerToken` for legacy projects. The refresh token must be authorized
+Required JSON fields: `clientId`, `clientSecret`, `refreshToken`, `developerToken`, and
+10-digit `customerId`. Optional: `loginCustomerId` for manager-account access. The refresh token must be authorized
 for `https://www.googleapis.com/auth/adwords` with offline access. HAL refreshes
 the token server-side, queries Google Ads v25 city-level geographic performance
 for the last 365 days, resolves city names, and idempotently upserts daily
