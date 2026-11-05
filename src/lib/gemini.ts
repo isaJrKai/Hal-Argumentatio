@@ -10,7 +10,14 @@ let aiClient: GoogleGenAI | null = null;
 function getAIClient(apiKeyOverride?: string): GoogleGenAI | null {
   const apiKey = apiKeyOverride || process.env.GEMINI_API_KEY;
   if (apiKeyOverride) {
-    return new GoogleGenAI({ apiKey: apiKeyOverride, httpOptions: { headers: { 'User-Agent': 'aistudio-build' } } });
+    return new GoogleGenAI({
+      apiKey: apiKeyOverride,
+      httpOptions: {
+        headers: { 'User-Agent': 'aistudio-build' },
+        timeout: 20_000,
+        retryOptions: { attempts: 1 }
+      }
+    });
   }
   if (!aiClient) {
     if (!apiKey) {
@@ -22,7 +29,9 @@ function getAIClient(apiKeyOverride?: string): GoogleGenAI | null {
       httpOptions: {
         headers: {
           'User-Agent': 'aistudio-build',
-        }
+        },
+        timeout: 20_000,
+        retryOptions: { attempts: 1 }
       }
     });
   }
@@ -758,6 +767,9 @@ RESPONSE STANDARD
         const config: any = {
           systemInstruction,
           temperature: 0.3,
+          // Bound all Gemini rounds (including tool follow-ups) to one deadline.
+          abortSignal: AbortSignal.timeout(45_000),
+          automaticContinuation: false
         };
 
         let usedGrounding = !!enableGrounding;
@@ -946,6 +958,8 @@ RESPONSE STANDARD
         const config: any = {
           systemInstruction,
           temperature: 0.3,
+          abortSignal: AbortSignal.timeout(45_000),
+          automaticContinuation: false
         };
 
         let usedGrounding = !!enableGrounding;
