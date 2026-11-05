@@ -160,7 +160,7 @@ export function buildHalMcpServer(): McpServer {
             pgDb.select({ count: sql<number>`count(*)` }).from(campaigns).where(eq(campaigns.contractorId, contractorId)),
             pgDb.select({ count: sql<number>`count(*)` }).from(outreachSequences).where(eq(outreachSequences.contractorId, contractorId)),
             pgDb.select({ count: sql<number>`count(*)` }).from(clientProjects).where(eq(clientProjects.contractorId, contractorId)),
-            pgDb.select({ count: sql<number>`count(*)` }).from(leadEvents),
+            pgDb.select({ count: sql<number>`count(*)` }).from(leadEvents).innerJoin(leads, eq(leadEvents.leadId, leads.id)).where(eq(leads.contractorId, contractorId)),
             pgDb.select({ count: sql<number>`count(*)` }).from(auditLogs).where(eq(auditLogs.contractorId, contractorId)),
             pgDb.select({ count: sql<number>`count(*)` }).from(revenueRecords).where(eq(revenueRecords.contractorId, contractorId)),
             pgDb.select({ count: sql<number>`count(*)` }).from(forecasts).where(eq(forecasts.contractorId, contractorId)),
@@ -169,7 +169,7 @@ export function buildHalMcpServer(): McpServer {
             pgDb.select({ count: sql<number>`count(*)` }).from(halLoops).where(eq(halLoops.contractorId, contractorId)),
             pgDb.select({ count: sql<number>`count(*)` }).from(hermesDiagnosticIncidents).where(eq(hermesDiagnosticIncidents.contractorId, contractorId)),
             pgDb.select({ count: sql<number>`count(*)` }).from(hermesLabArtifacts).where(eq(hermesLabArtifacts.contractorId, contractorId)),
-            pgDb.select({ count: sql<number>`count(*)` }).from(schedulerJobs)
+            pgDb.select({ count: sql<number>`count(*)` }).from(schedulerJobs).where(eq(schedulerJobs.contractorId, contractorId))
           ]);
 
           counts = {
@@ -562,8 +562,22 @@ export function buildHalMcpServer(): McpServer {
       let records: any[] = [];
       try {
         records = await pgDb
-          .select()
+          .select({
+            id: leadEvents.id,
+            leadId: leadEvents.leadId,
+            eventType: leadEvents.eventType,
+            previousStage: leadEvents.previousStage,
+            newStage: leadEvents.newStage,
+            dealValue: leadEvents.dealValue,
+            currency: leadEvents.currency,
+            notes: leadEvents.notes,
+            createdBy: leadEvents.createdBy,
+            occurredAt: leadEvents.occurredAt,
+            createdAt: leadEvents.createdAt
+          })
           .from(leadEvents)
+          .innerJoin(leads, eq(leadEvents.leadId, leads.id))
+          .where(eq(leads.contractorId, contractorId))
           .orderBy(desc(leadEvents.createdAt));
       } catch (err: any) {
         throw err;
@@ -640,6 +654,7 @@ export function buildHalMcpServer(): McpServer {
         records = await pgDb
           .select()
           .from(schedulerJobs)
+          .where(eq(schedulerJobs.contractorId, contractorId))
           .orderBy(desc(schedulerJobs.createdAt));
       } catch (err: any) {
         throw err;
