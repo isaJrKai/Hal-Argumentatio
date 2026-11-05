@@ -8552,12 +8552,13 @@ app.post('/api/system/postgres-sync', authenticate, requireRole('admin'), async 
         syncedWinLoss += winLossInsert.rowCount || 0;
       }
 
-      // Sync Learned Weights
+      // Sync learned weights under this contractor's own key; never share a global row.
       await client.query(`
         INSERT INTO learned_weights (id, epoch, autonomy_score, weights_json, updated_at)
-        VALUES ('global_weights', $1, $2, $3, CURRENT_TIMESTAMP)
+        VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP)
         ON CONFLICT (id) DO NOTHING;
       `, [
+        `tenant:${contractorId}`,
         learningState.calibrationEpoch,
         learningState.autonomyReadinessScore,
         JSON.stringify(learningState)
