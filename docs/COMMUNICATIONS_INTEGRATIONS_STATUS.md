@@ -72,15 +72,15 @@ This report separates code implementation from provider configuration and live v
 
 No production secrets are copied into Git or exposed in this report. An operator must verify the following in Render and Google/Meta provider consoles:
 
-- Render: `RESEND_API_KEY`, `HAL_SENDER_EMAIL`, `RESEND_WEBHOOK_SECRET`, canonical HTTPS `APP_URL`, `WHATSAPP_APP_SECRET`, `WHATSAPP_VERIFY_TOKEN`.
+- Render: `RESEND_API_KEY`, `HAL_SENDER_EMAIL`, `RESEND_WEBHOOK_SECRET`, canonical HTTPS `APP_URL`, `WHATSAPP_APP_SECRET`, `WHATSAPP_VERIFY_TOKEN`, `HAL_COMMUNICATIONS_WORKER_SECRET` (32+ characters), `TWILIO_INBOUND_WEBHOOK_URL`, and `TWILIO_STATUS_CALLBACK_URL`.
 - Resend: sender domain verified; webhook registered to `/api/webhooks/resend` for sent, delivered, delayed, bounced, complained, opened and clicked events; secret matches Render.
 - Firebase/Google Cloud: Firebase web app values configured as build-time variables; Google sign-in enabled; Drive API, Calendar API and Gmail API enabled; OAuth consent and requested scopes approved.
 - Meta: WhatsApp Business app, phone number, webhook subscription and app secret configured; tenant mapping must be explicitly provisioned and verified before enabling inbound routing.
-- Twilio: no live capability should be enabled until the provider adapter, signed callback flow, tenant opt-in evidence and live acceptance test are completed.
+- Twilio: configure tenant-owned Account SID/auth token and E.164 sender number, register it through `/api/outreach/sms/connect-number`, configure the exact HTTPS inbound/status callback URLs above in Twilio, and complete a real opt-in → send → delivery callback → STOP acceptance test before representing the integration as production-ready.
 
 ## Verification evidence
 
-This PR adds unit/security coverage for trusted HTML email bodies and reset-link origin/delivery handling. GitHub Actions results are to be attached after the PR is opened. Production provider and browser verification remain explicitly unverified because no provider-console access or production credentials are available in this repository audit.
+This PR adds unit/security coverage for trusted HTML email bodies, reset-link origin/delivery handling, outbox retries, Resend idempotency, Meta webhook signatures, Twilio SMS submission and Twilio callback signatures. Production provider and browser verification remain explicitly unverified because no provider-console access or production credentials are available in this repository audit.
 
 ## Production Render inspection (2026-11-05)
 
@@ -101,7 +101,7 @@ No production environment, deploy, secret, service setting, or database was modi
 
 ## Release decision
 
-**Do not treat this workstream as fully production-verified.** Password-reset submission is hardened; Resend has a durable retry/dead-letter worker but still needs a trusted scheduler and live provider acceptance; WhatsApp inbound has verified tenant routing and encrypted event persistence but still needs Meta account/webhook acceptance and a tenant inbox; WhatsApp outbound and SMS/Twilio remain unavailable; Google Workspace still needs OAuth/browser/provider acceptance.
+**Do not treat this workstream as fully production-verified.** Password-reset submission is hardened; Resend has a durable retry/dead-letter worker but still needs a trusted scheduler and live provider acceptance; WhatsApp inbound has verified tenant routing and encrypted event persistence but still needs Meta account/webhook acceptance and a tenant inbox; WhatsApp outbound remains unavailable; Twilio SMS now has consent-gated send, opt-out and signed callback code but still needs account configuration and live acceptance; Google Workspace still needs OAuth/browser/provider acceptance.
 
 
 ## Follow-up implementation (2026-11-05)
