@@ -928,8 +928,11 @@ for (const template of Object.values(TRADE_TEMPLATES)) {
   }
   if (sections.header) sections.header.ctaText = 'Contact the business';
   if (sections.hero) {
-    sections.hero.headline = `Professional ${template.trade.replace(/_/g, ' ')} services in your area`;
-    sections.hero.subheadline = 'Describe the services your business provides, the areas you serve, and how customers can contact you.';
+    const isSpecialistTemplate = ['sump_pump', 'waterproofing', 'flood_restoration', 'emergency_dispatch'].includes(template.trade);
+    if (!isSpecialistTemplate) {
+      sections.hero.headline = `Professional ${template.trade.replace(/_/g, ' ')} services in your area`;
+      sections.hero.subheadline = 'Describe the services your business provides, the areas you serve, and how customers can contact you.';
+    }
     sections.hero.badgeText = 'Add verified credentials or remove this badge before publishing';
   }
   if (sections.services) {
