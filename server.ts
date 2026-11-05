@@ -41,6 +41,7 @@ import { getConnectorCredentials, importConnectorCredentialIfAbsent, saveConnect
 import { appendStructuredLedgerEntry, appendStructuredLedgerEntryInTransaction, getStructuredLedgerEntries, importLegacyStructuredLedgerEntries, verifyStructuredLedgerIntegrity } from './src/db/structuredLedger';
 import { getAllSkills, executeSkill, registerCustomSkill, unregisterCustomSkill } from './src/skills/registry';
 import { HAL_MCP_TOOLS, executeMcpTool } from './src/services/mcp/dispatcher';
+import { getProviderCapabilityTools } from './src/services/ai/capabilityRegistry';
 import { McpJsonRpcRequest, McpJsonRpcResponse } from './src/services/mcp/types';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { buildHalMcpServer } from './src/services/mcp/halMcpServer';
@@ -4885,7 +4886,7 @@ app.post('/api/intelligence/chat', authenticate, async (req, res) => {
     const result = await askHalBot(message, formattedHistory, !!enableGrounding, activeAi, {
       // Only the authenticated server supplies this runtime. Tool calls inherit
       // the contractor ID from the verified session, never from model arguments.
-      tools: HAL_MCP_TOOLS.filter(tool => tool.name !== 'hermes_synthesize_lab_asset'),
+      tools: getProviderCapabilityTools(),
       execute: async (toolName, toolArgs) => {
         const correlationId = conversationId;
         let toolResult: any;
