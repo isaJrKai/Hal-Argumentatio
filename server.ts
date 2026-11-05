@@ -6947,8 +6947,18 @@ app.put('/api/projects/:id', authenticate, async (req, res) => {
     const safeUpdates: Partial<typeof clientProjects.$inferInsert> = { updatedAt: new Date() };
     if (Array.isArray(updates.milestones)) safeUpdates.milestones = updates.milestones;
     if (Array.isArray(updates.assets)) safeUpdates.assets = updates.assets;
-    if (typeof updates.status === 'string' && ['onboarding', 'active_delivery', 'review', 'completed'].includes(updates.status)) {
+    if (updates.status !== undefined) {
+      const allowedStatuses = ['onboarding', 'active_delivery', 'review', 'completed', 'cancelled', 'canceled', 'churned', 'archived'];
+      if (typeof updates.status !== 'string' || !allowedStatuses.includes(updates.status)) {
+        return res.status(400).json({ error: 'Unsupported client project status.' });
+      }
       safeUpdates.status = updates.status;
+    }
+    if (updates.monthlyRetainerUsd !== undefined) {
+      if (!Number.isSafeInteger(updates.monthlyRetainerUsd) || updates.monthlyRetainerUsd < 0) {
+        return res.status(400).json({ error: 'Monthly retainer must be a non-negative whole-dollar amount.' });
+      }
+      safeUpdates.monthlyRetainerUsd = updates.monthlyRetainerUsd;
     }
     if (typeof updates.notes === 'string') safeUpdates.notes = updates.notes.slice(0, 10000);
 
@@ -6962,7 +6972,12 @@ app.put('/api/projects/:id', authenticate, async (req, res) => {
         contractorId, eventType: 'client_project.updated', entityType: 'client_project', entityId: id,
         actorType: 'human', actorId: contractorId, sourceModule: 'client_operations', correlationId: id,
         summary: `Updated client project for ${updated.businessName}.`,
-        payload: { previousStatus: existingProject.status, currentStatus: updated.status }
+        payload: {
+          previousStatus: existingProject.status,
+          currentStatus: updated.status,
+          previousMonthlyRetainerUsd: existingProject.monthlyRetainerUsd,
+          currentMonthlyRetainerUsd: updated.monthlyRetainerUsd
+        }
       });
     } catch (ledgerError) {
       console.error('[Client Projects] Update ledger event failed:', ledgerError);
