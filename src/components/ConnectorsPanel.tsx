@@ -872,7 +872,7 @@ export default function ConnectorsPanel() {
                       {window.location.origin}/api/outreach/whatsapp/webhook
                     </code>
                     <p className="mt-2 text-[10px] text-amber-700 dark:text-amber-300">
-                      Signature validation is implemented. Inbound messages are not yet routed to a specific workspace; tenant mapping must be configured before message processing is enabled.
+                      Signature validation and tenant routing are implemented. Save this workspace's Meta token and register its phone-number ID with POST /api/outreach/whatsapp/connect-number before enabling the Meta webhook.
                     </p>
                   </div>
 
@@ -882,10 +882,10 @@ export default function ConnectorsPanel() {
                         <Radio className="w-3.5 h-3.5" />
                         SMS Inbound Webhook
                       </span>
-                      <span className="text-[10px] font-mono text-zinc-500">NOT IMPLEMENTED</span>
+                      <span className="text-[10px] font-mono text-zinc-500">CONFIG REQUIRED</span>
                     </div>
                     <p className="text-[11px] text-zinc-600 dark:text-zinc-400">
-                      No Twilio inbound webhook route is registered. SMS remains simulation-only until a signed provider callback is implemented and verified.
+                      Signed Twilio inbound STOP handling and delivery callbacks are implemented. Register this workspace's sender with POST /api/outreach/sms/connect-number and configure the HTTPS inbound/status callback URLs. Live sends require recorded lead consent.
                     </p>
                   </div>
                 </div>
