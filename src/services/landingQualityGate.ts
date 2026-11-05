@@ -164,8 +164,9 @@ export function auditLandingPage(config: LandingPageConfig): QualityGateAuditRep
     title: 'Contrast & Accessibility (WCAG AA)',
     category: 'a11y',
     status: 'pass',
-    summary: 'High-contrast typography verified (≥4.5:1 ratio)',
-    details: 'White body text on dark slate surfaces (#0f172a) and dark navy hero titles meet WCAG AA standards. Focus rings defined.',
+    summary: 'Contrast has not been programmatically measured',
+    details: 'This configuration-level gate does not compute foreground/background contrast ratios or verify keyboard focus in a rendered browser. Run an accessibility audit before claiming WCAG AA conformance.',
+    remedyHint: 'Use a contrast checker and keyboard/screen-reader testing on the rendered page.',
   });
 
   // Gate 6: Mobile Layout & Touch Targets
@@ -189,8 +190,8 @@ export function auditLandingPage(config: LandingPageConfig): QualityGateAuditRep
       title: 'Mobile Verification & Touch Targets',
       category: 'design',
       status: 'pass',
-      summary: 'Mobile responsive layout with 48px+ touch targets and sticky caller bar',
-      details: 'Zero horizontal scroll, responsive flex wrapping, sticky 1-tap call bar enabled.',
+      summary: 'Sticky mobile call control is configured; viewport behavior is not browser-verified',
+      details: 'The sticky call control is enabled in configuration. Actual touch-target size, overflow, and physical-device behavior require browser/device testing.',
     });
   }
 
@@ -201,8 +202,8 @@ export function auditLandingPage(config: LandingPageConfig): QualityGateAuditRep
     title: 'Motion & Interaction Rules (Tactile Motion Bar)',
     category: 'motion',
     status: 'pass',
-    summary: 'Purposeful transform + opacity animations with reduced-motion fallback',
-    details: '180ms cubic-bezier micro-interactions. @media(prefers-reduced-motion) overrides active. Zero layout thrashing.',
+    summary: 'Motion behavior not measured by this configuration audit',
+    details: 'This gate does not inspect runtime animations, layout shifts, or reduced-motion behavior. Verify these in a rendered browser before claiming performance compliance.',
   });
 
   // Gate 8: Proof Specificity & Verification
@@ -222,17 +223,17 @@ export function auditLandingPage(config: LandingPageConfig): QualityGateAuditRep
       remedyHint: 'Enter your valid municipal/state license number and at least 3 genuine customer reviews.',
       autoFixAvailable: false
     });
-  } else if (unverifiedReviews.length > 0) {
+  } else if (unverifiedReviews.length > 0 || reviewsCount > 0 || hasLicense) {
     gates.push({
       id: 'proof_specificity',
       ruleNumber: 5,
       title: 'Concrete Proof & Facts (No Fabrications)',
       category: 'trust',
       status: 'warning',
-      summary: `${unverifiedReviews.length} review(s) flagged as unverified placeholder`,
-      details: 'Placeholders must be transparently acknowledged before production publishing.',
-      remedyHint: 'Mark reviews as verified or replace them with real customer quotes.',
-      autoFixAvailable: true
+      summary: 'Proof details are user-supplied and require independent verification',
+      details: 'A checkbox or entered license number is not independent proof. Verify the license with the issuing authority and retain permission/source evidence for every customer quote.',
+      remedyHint: 'Attach authoritative license evidence and source/permission records for customer reviews. Do not mark reviews verified without evidence.',
+      autoFixAvailable: false
     });
   } else {
     gates.push({
@@ -269,8 +270,8 @@ export function auditLandingPage(config: LandingPageConfig): QualityGateAuditRep
       title: 'Performance & LocalBusiness Schema.org',
       category: 'performance',
       status: 'pass',
-      summary: 'Schema.org JSON-LD and zero render-blocking scripts validated',
-      details: `Schema: ${config.seo.schemaType}, Meta Title: "${config.seo.metaTitle.substring(0, 40)}...". Instant FCP.`,
+      summary: 'SEO metadata fields are configured; rendered output and performance are not validated',
+      details: `Schema type is configured as ${config.seo.schemaType} and a meta title is present. This gate does not validate rendered JSON-LD, render-blocking scripts, Core Web Vitals, or FCP.`,
     });
   }
 
@@ -279,7 +280,7 @@ export function auditLandingPage(config: LandingPageConfig): QualityGateAuditRep
   const failCount = gates.filter(g => g.status === 'fail').length;
   const totalCount = gates.length;
   const overallScore = Math.round(((passedCount + (warningCount * 0.5)) / totalCount) * 100);
-  const readyToPublish = failCount === 0 && overallScore >= 80;
+  const readyToPublish = failCount === 0 && warningCount === 0 && overallScore >= 90;
 
   return {
     overallScore,
@@ -311,14 +312,12 @@ export function autoRemediateGate(config: LandingPageConfig, gateId: string): La
       if (cloned.sections.hero) {
         cloned.sections.hero.active = true;
         if (!cloned.sections.hero.headline || cloned.sections.hero.headline.length < 10) {
-          cloned.sections.hero.headline = `Fast, Certified 24/7 ${cloned.city} ${cloned.trade.toUpperCase()} Experts`;
+          cloned.sections.hero.headline = `Professional ${cloned.trade.toUpperCase()} Services in ${cloned.city}`;
         }
         if (!cloned.sections.hero.subheadline || cloned.sections.hero.subheadline.length < 15) {
-          cloned.sections.hero.subheadline = `Licensed master tradespeople dispatched in ${cloned.dispatchWindow}. Upfront flat-rate pricing with 100% satisfaction warranty.`;
+          cloned.sections.hero.subheadline = `Contact ${cloned.businessName} to discuss your ${cloned.trade} project, service area, and available options.`;
         }
-        if (!cloned.licenseNumber) {
-          cloned.licenseNumber = 'Master Trade License #PRO-88421';
-        }
+        // Never invent or auto-fill a license number.
       }
       if (cloned.sections.lead_form) {
         cloned.sections.lead_form.active = true;
@@ -343,12 +342,7 @@ export function autoRemediateGate(config: LandingPageConfig, gateId: string): La
       break;
 
     case 'proof_specificity':
-      if (cloned.sections.reviews && cloned.sections.reviews.items) {
-        cloned.sections.reviews.items.forEach(r => { r.verified = true; });
-      }
-      if (!cloned.licenseNumber) {
-        cloned.licenseNumber = 'Master Contractor Lic #M-90214';
-      }
+      // Proof is never auto-verified. Require real source evidence and human review.
       break;
 
     case 'performance_seo':
@@ -359,8 +353,8 @@ export function autoRemediateGate(config: LandingPageConfig, gateId: string): La
           schemaType: 'HomeAndConstructionBusiness'
         };
       } else {
-        if (!cloned.seo.metaTitle) cloned.seo.metaTitle = `${cloned.businessName} - 24/7 ${cloned.trade} in ${cloned.city}`;
-        if (!cloned.seo.metaDescription) cloned.seo.metaDescription = `Licensed, insured 24/7 ${cloned.trade} services in ${cloned.city}. Call ${cloned.phone}.`;
+        if (!cloned.seo.metaTitle) cloned.seo.metaTitle = `${cloned.businessName} - ${cloned.trade} in ${cloned.city}`;
+        if (!cloned.seo.metaDescription) cloned.seo.metaDescription = `${cloned.businessName} provides ${cloned.trade} services in ${cloned.city}. Contact the business for current service details.`;
         if (!cloned.seo.schemaType) cloned.seo.schemaType = 'HomeAndConstructionBusiness';
       }
       break;
