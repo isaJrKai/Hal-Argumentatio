@@ -40,6 +40,7 @@ describe('HAL passive website security auditor', () => {
       applicationVulnerabilities: 'not_measured',
       pageContent: 'not_measured'
     });
+    expect(result.evidence.ipAddresses).toEqual(['93.184.216.34']);
     expect(result.report).toContain('Successful TLS connection');
     expect(result.report).toContain('HTTP response security headers');
     expect(result.report).toContain('Missing security headers and application vulnerabilities remain unknown.');
@@ -54,12 +55,13 @@ describe('HAL passive website security auditor', () => {
     expect(validateDomainAndDns).not.toHaveBeenCalled();
   });
 
-  it('does not turn failed probes into invented security findings', async () => {
+  it('does not turn failed probes into invented security findings or disclose rejected IPs', async () => {
     validateDomainAndDns.mockResolvedValue({
       dnsResolved: false,
       httpReachable: false,
       sslSecured: false,
       hostname: 'unknown.example',
+      ipAddresses: ['127.0.0.1', '10.0.0.2'],
       rejectionReason: 'DNS resolution failed: NXDOMAIN'
     });
 
@@ -68,8 +70,12 @@ describe('HAL passive website security auditor', () => {
     expect(result.coverage.dns).toBe('failed');
     expect(result.coverage.https).toBe('not_confirmed');
     expect(result.evidence.rejectionReason).toContain('NXDOMAIN');
+    expect(result.evidence.ipAddresses).toBeUndefined();
     expect(result.report).toContain('Not confirmed');
     expect(result.report).toContain('Not measured in this run');
+    expect(result.report).toContain('Resolved IPs:** Not available');
+    expect(result.report).not.toContain('127.0.0.1');
+    expect(result.report).not.toContain('10.0.0.2');
     expect(result.report).not.toContain('Detected contact forms');
   });
 });
