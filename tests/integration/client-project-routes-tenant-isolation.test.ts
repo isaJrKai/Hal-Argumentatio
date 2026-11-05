@@ -74,6 +74,8 @@ describe('client project HTTP route tenant isolation', () => {
   afterAll(async () => {
     if (dbAvailable) {
       await pool.query('DELETE FROM work_events WHERE contractor_id = ANY($1::text[])', [[tenantA, tenantB]]);
+      await pool.query('DELETE FROM invoice_payments WHERE contractor_id = ANY($1::text[])', [[tenantA, tenantB]]);
+      await pool.query('DELETE FROM invoices WHERE contractor_id = ANY($1::text[])', [[tenantA, tenantB]]);
       await pool.query('DELETE FROM proposals WHERE contractor_id = ANY($1::text[])', [[tenantA, tenantB]]);
       await pool.query('DELETE FROM revenue_records WHERE contractor_id = ANY($1::text[])', [[tenantA, tenantB]]);
       await pool.query('DELETE FROM client_projects WHERE contractor_id = ANY($1::text[])', [[tenantA, tenantB]]);
@@ -135,6 +137,38 @@ describe('client project HTTP route tenant isolation', () => {
     expect(overview.status).toBe(200);
     expect(overview.body.currentMrrUsd).toBe(1450);
 
+    const invoice = await request(app)
+      .post('/api/invoices')
+      .set('Authorization', `Bearer ${tokenA}`)
+      .send({ projectId: project.body.id, description: 'First month delivery retainer', amountMinor: 145000, currency: 'USD' });
+    expect(invoice.status).toBe(201);
+    expect(invoice.body.status).toBe('issued');
+    expect(invoice.body.balanceDueMinor).toBe(145000);
+
+    const firstReceipt = await request(app)
+      .post(`/api/invoices/${invoice.body.id}/payments`)
+      .set('Authorization', `Bearer ${tokenA}`)
+      .send({ amountMinor: 45000, method: 'bank_transfer', reference: 'TEST-RECEIPT-1' });
+    expect(firstReceipt.status).toBe(201);
+    expect(firstReceipt.body.invoiceStatus).toBe('partially_paid');
+    expect(firstReceipt.body.balanceDueMinor).toBe(100000);
+
+    const finalReceipt = await request(app)
+      .post(`/api/invoices/${invoice.body.id}/payments`)
+      .set('Authorization', `Bearer ${tokenA}`)
+      .send({ amountMinor: 100000, method: 'cash', reference: 'TEST-RECEIPT-2' });
+    expect(finalReceipt.status).toBe(201);
+    expect(finalReceipt.body.invoiceStatus).toBe('paid');
+    expect(finalReceipt.body.balanceDueMinor).toBe(0);
+    expect(finalReceipt.body.settlementVerified).toBe(false);
+
+    const invoiceDetail = await request(app)
+      .get(`/api/invoices/${invoice.body.id}`)
+      .set('Authorization', `Bearer ${tokenA}`);
+    expect(invoiceDetail.status).toBe(200);
+    expect(invoiceDetail.body.payments).toHaveLength(2);
+    expect(invoiceDetail.body.amountPaidMinor).toBe(145000);
+
     const [lead] = (await pool.query(
       'SELECT status FROM leads WHERE id = $1 AND contractor_id = $2',
       [leadFullFlowA, tenantA]
@@ -150,6 +184,55 @@ describe('client project HTTP route tenant isolation', () => {
     expect(lead.status).toBe('closed_won');
     expect(revenue.amount_usd).toBe(900);
     expect(persistedProject).toMatchObject({ status: 'active_delivery', monthly_retainer_usd: 1450 });
+  });
+
+  it('isolates invoices and serializes concurrent receipts without allowing overpayment', async (ctx) => {
+    if (!dbAvailable) return ctx.skip();
+
+    const created = await request(app)
+      .post('/api/invoices')
+      .set('Authorization', `Bearer ${tokenA}`)
+      .send({ leadId: leadA, description: 'Concurrent payment test', amountMinor: 10000, currency: 'USD' });
+    expect(created.status).toBe(201);
+
+    const crossTenantRead = await request(app)
+      .get(`/api/invoices/${created.body.id}`)
+      .set('Authorization', `Bearer ${tokenB}`);
+    expect(crossTenantRead.status).toBe(404);
+
+    const receipts = await Promise.all([
+      request(app).post(`/api/invoices/${created.body.id}/payments`).set('Authorization', `Bearer ${tokenA}`).send({ amountMinor: 6000, method: 'bank_transfer' }),
+      request(app).post(`/api/invoices/${created.body.id}/payments`).set('Authorization', `Bearer ${tokenA}`).send({ amountMinor: 6000, method: 'cash' })
+    ]);
+    expect(receipts.map(response => response.status).sort()).toEqual([201, 409]);
+
+    const detail = await request(app)
+      .get(`/api/invoices/${created.body.id}`)
+      .set('Authorization', `Bearer ${tokenA}`);
+    expect(detail.status).toBe(200);
+    expect(detail.body.amountPaidMinor).toBe(6000);
+    expect(detail.body.balanceDueMinor).toBe(4000);
+    expect(detail.body.status).toBe('partially_paid');
+
+    const voidable = await request(app)
+      .post('/api/invoices')
+      .set('Authorization', `Bearer ${tokenA}`)
+      .send({ leadId: leadA, description: 'Void workflow test', amountMinor: 3000, currency: 'USD' });
+    expect(voidable.status).toBe(201);
+    const voided = await request(app)
+      .post(`/api/invoices/${voidable.body.id}/void`)
+      .set('Authorization', `Bearer ${tokenA}`);
+    expect(voided.status).toBe(200);
+    expect(voided.body.status).toBe('void');
+    const paymentAfterVoid = await request(app)
+      .post(`/api/invoices/${voidable.body.id}/payments`)
+      .set('Authorization', `Bearer ${tokenA}`)
+      .send({ amountMinor: 1000, method: 'cash' });
+    expect(paymentAfterVoid.status).toBe(409);
+
+    const tenantBList = await request(app).get('/api/invoices').set('Authorization', `Bearer ${tokenB}`);
+    expect(tenantBList.status).toBe(200);
+    expect(tenantBList.body).toEqual([]);
   });
 
   it('rejects a tenant B attempt to convert tenant A\'s won lead without creating records', async (ctx) => {
