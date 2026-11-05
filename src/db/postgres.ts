@@ -1043,13 +1043,14 @@ export async function bootstrapPostgresTables(poolInstance?: Pool): Promise<void
             count(*) FILTER (WHERE table_schema = 'public') AS public_table_count,
             to_regclass('public.work_tasks') IS NOT NULL AS has_work_tasks,
             to_regclass('public.work_events') IS NOT NULL AS has_work_events,
-            to_regclass('public.structured_ledger_entries') IS NOT NULL AS has_structured_ledger
+            to_regclass('public.structured_ledger_entries') IS NOT NULL AS has_structured_ledger,
+            EXISTS (SELECT 1 FROM pg_trigger WHERE tgrelid = to_regclass('public.structured_ledger_entries') AND tgname = 'structured_ledger_no_mutation' AND NOT tgisinternal) AS has_structured_ledger_guard
           FROM information_schema.tables
           WHERE table_schema = 'public';
         `);
         const schemaState = check.rows[0];
         const count = Number(schemaState?.public_table_count || 0);
-        if (count > 0 && schemaState?.has_work_tasks && schemaState?.has_work_events && schemaState?.has_structured_ledger) {
+        if (count > 0 && schemaState?.has_work_tasks && schemaState?.has_work_events && schemaState?.has_structured_ledger && schemaState?.has_structured_ledger_guard) {
           console.log(`[HAL PostgreSQL] Managed schema active (${count} public tables; operating-layer tables verified).`);
           return;
         }
@@ -1110,7 +1111,7 @@ export async function testPostgresConnection(customUrl?: string): Promise<{
       WHERE table_schema = 'public';
     `);
     const schemaState = tablesRes.rows[0] || {};
-    const schemaReady = Boolean(schemaState.has_contractors && schemaState.has_leads && schemaState.has_work_tasks && schemaState.has_work_events);
+    const schemaReady = Boolean(schemaState.has_contractors && schemaState.has_leads && schemaState.has_work_tasks && schemaState.has_work_events && schemaState.has_structured_ledger && schemaState.has_structured_ledger_guard);
     const latencyMs = Date.now() - startTime;
     const versionStr = result.rows[0]?.version || 'PostgreSQL';
     const provider = (customUrl || activeConnectionString || process.env.DATABASE_URL || process.env.NEON_DATABASE_URL || '').includes('neon.tech') || versionStr.toLowerCase().includes('neon')
