@@ -26,6 +26,7 @@ import {
 import { ClientProject, ClientMilestone, ClientAsset, Lead } from '../types';
 import { useBusinessContext } from '../context/BusinessContext';
 import { readApiResponse } from '../lib/apiResponse';
+import InvoiceLedgerPanel from './InvoiceLedgerPanel';
 
 interface DeliveryHubProps {
   token: string;
@@ -322,7 +323,13 @@ export default function DeliveryHub({ token, leads = [] }: DeliveryHubProps) {
         <div className="lg:col-span-8 space-y-6">
           {selectedProject ? (
             <div className="space-y-6">
-              
+              <InvoiceLedgerPanel
+                token={token}
+                projectId={selectedProject.id}
+                leadId={selectedProject.leadId}
+                businessName={selectedProject.businessName}
+              />
+
               {/* PROJECT HERO METRICS CARD */}
               <div className="bg-bg-raised border border-border-dim rounded-sm p-5 space-y-4">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border-dim/60 pb-4">
