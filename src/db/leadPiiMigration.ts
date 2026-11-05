@@ -1,5 +1,5 @@
 import type { Pool } from 'pg';
-import { decrypt, encrypt } from './db';
+import { decrypt, encrypt } from './encryption';
 
 interface LeadPiiRow {
   id: string;
