@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 
 const server = readFileSync(new URL('../../server.ts', import.meta.url), 'utf8');
+const deliveryHub = readFileSync(new URL('../../src/components/DeliveryHub.tsx', import.meta.url), 'utf8');
 const start = server.indexOf("app.post('/api/revenue/outcomes/measure'");
 const end = server.indexOf("\n  });", start);
 const handler = server.slice(start, end);
@@ -85,5 +86,25 @@ describe('client project financial integrity', () => {
     expect(projectHandler).toContain("includes(String(linkedLead.status).toLowerCase())");
     expect(projectHandler).toContain('A client project can only be converted from a lead recorded as closed-won.');
     expect(projectHandler).toContain('A client project already exists for this won lead.');
+  });
+});
+
+const projectUpdateStart = server.indexOf("app.put('/api/projects/:id'");
+const projectUpdateEnd = server.indexOf("app.get('/api/financials/overview'", projectUpdateStart);
+const projectUpdateHandler = server.slice(projectUpdateStart, projectUpdateEnd);
+
+describe('client project retainer lifecycle', () => {
+  it('allows only explicit whole-dollar retainer updates and terminal cancellation states', () => {
+    expect(projectUpdateHandler).toContain("'cancelled', 'canceled', 'churned', 'archived'");
+    expect(projectUpdateHandler).toContain('Number.isSafeInteger(updates.monthlyRetainerUsd)');
+    expect(projectUpdateHandler).toContain('safeUpdates.monthlyRetainerUsd = updates.monthlyRetainerUsd');
+    expect(projectUpdateHandler).toContain('previousMonthlyRetainerUsd');
+    expect(projectUpdateHandler).toContain('currentMonthlyRetainerUsd');
+  });
+
+  it('does not prefill a new client project with an assumed retainer', () => {
+    expect(deliveryHub).toContain('useState(0)');
+    expect(deliveryHub).not.toContain('useState(2400)');
+    expect(deliveryHub).toContain('Link a closed-won lead (Optional)');
   });
 });
