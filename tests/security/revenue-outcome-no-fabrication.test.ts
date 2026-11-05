@@ -47,7 +47,7 @@ describe('revenue outcome evaluation integrity', () => {
 });
 
 const transitionStart = server.indexOf("app.post('/api/revenue/recommendations/:id/transition'");
-const transitionEnd = server.indexOf("\n  });", transitionStart);
+const transitionEnd = server.indexOf("// ─── SERVER STARTUP", transitionStart);
 const transitionHandler = server.slice(transitionStart, transitionEnd);
 
 describe('recommendation transition integrity', () => {
@@ -106,5 +106,48 @@ describe('client project retainer lifecycle', () => {
     expect(deliveryHub).toContain('useState(0)');
     expect(deliveryHub).not.toContain('useState(2400)');
     expect(deliveryHub).toContain('Link a closed-won lead (Optional)');
+  });
+});
+
+const recommendationsStart = server.indexOf("app.get('/api/revenue/recommendations'");
+const recommendationsEnd = server.indexOf("app.get('/api/revenue/recommendations/:id/events'", recommendationsStart);
+const recommendationsHandler = server.slice(recommendationsStart, recommendationsEnd);
+
+describe('recommendation empty-state integrity', () => {
+  it('returns an empty tenant list instead of seeding example campaign results', () => {
+    expect(recommendationsHandler).toContain('res.json(recs)');
+    expect(recommendationsHandler).not.toContain('3.4x higher');
+    expect(recommendationsHandler).not.toContain('Campaign B');
+    expect(recommendationsHandler).not.toContain('38700');
+    expect(recommendationsHandler).not.toContain('24,500');
+  });
+});
+
+const simulationStart = server.indexOf("app.post('/api/revenue/simulations'");
+const simulationEnd = server.indexOf("app.get('/api/revenue/recommendations'", simulationStart);
+const simulationHandler = server.slice(simulationStart, simulationEnd);
+
+describe('revenue simulation evidence integrity', () => {
+  it('rejects unsupported or unparameterized scenarios instead of inventing defaults', () => {
+    expect(simulationHandler).toContain('SCENARIO_NOT_SUPPORTED_WITH_VERIFIED_DATA');
+    expect(simulationHandler).toContain('Select two different campaigns');
+    expect(simulationHandler).not.toContain('params.shiftAmount || 500');
+    expect(simulationHandler).not.toContain('percentChange || 10');
+    expect(simulationHandler).not.toContain('Primary Territory');
+  });
+
+  it('uses only unambiguous lead-to-campaign revenue attribution', () => {
+    expect(simulationHandler).toContain('if (names.size !== 1) continue');
+    expect(simulationHandler).toContain('if (!campaign) continue');
+    expect(simulationHandler).not.toContain("Object.keys(campaignMap)[0]");
+    expect(simulationHandler).not.toContain('toRoas = 2.5');
+    expect(simulationHandler).not.toContain('fromRoas = 1.0');
+  });
+
+  it('does not fabricate confidence or percentage uplift when evidence is absent', () => {
+    expect(simulationHandler).toContain('confidenceScore: 0');
+    expect(simulationHandler).toContain('totalRevenue > 0 ? Number');
+    expect(simulationHandler).not.toContain('totalRevenue * 1.15');
+    expect(simulationHandler).not.toContain(': 15.0');
   });
 });
