@@ -44,6 +44,108 @@ export const DocumentStudioPanel: React.FC<{ token?: string | null }> = ({ token
 
   const [leadRecords, setLeadRecords] = useState<any[]>([]);
   const [leadLoadError, setLeadLoadError] = useState<string | null>(null);
+  const [proposals, setProposals] = useState<any[]>([]);
+  const [proposalLeadId, setProposalLeadId] = useState('');
+  const [proposalPackageTier, setProposalPackageTier] = useState<'Growth' | 'Dominance' | 'Enterprise'>('Growth');
+  const [proposalRetainer, setProposalRetainer] = useState('1200');
+  const [proposalSetupFee, setProposalSetupFee] = useState('500');
+  const [proposalError, setProposalError] = useState<string | null>(null);
+  const [proposalNotice, setProposalNotice] = useState<string | null>(null);
+  const [proposalBusyId, setProposalBusyId] = useState<string | null>(null);
+
+  const getEffectiveToken = () => token || (typeof window !== 'undefined'
+    ? (localStorage.getItem('halbiz_auth_token') || localStorage.getItem('token') || '')
+    : '');
+
+  const refreshProposals = async () => {
+    const effectiveToken = getEffectiveToken();
+    if (!effectiveToken) { setProposals([]); return; }
+    const response = await fetch('/api/proposals', { headers: { Authorization: `Bearer ${effectiveToken}` } });
+    const payload = await response.json().catch(() => []);
+    if (!response.ok) throw new Error(payload?.error || `Proposal list could not be loaded (HTTP ${response.status}).`);
+    if (!Array.isArray(payload)) throw new Error('Proposal list response was not a valid array.');
+    setProposals(payload);
+  };
+
+  useEffect(() => {
+    let cancelled = false;
+    const effectiveToken = getEffectiveToken();
+    if (!effectiveToken) return;
+    fetch('/api/proposals', { headers: { Authorization: `Bearer ${effectiveToken}` } })
+      .then(async response => {
+        const payload = await response.json().catch(() => []);
+        if (!response.ok) throw new Error(payload?.error || `Proposal list could not be loaded (HTTP ${response.status}).`);
+        if (!Array.isArray(payload)) throw new Error('Proposal list response was not a valid array.');
+        if (!cancelled) setProposals(payload);
+      })
+      .catch(error => {
+        if (!cancelled) setProposalError(error instanceof Error ? error.message : 'Saved proposals could not be loaded.');
+      });
+    return () => { cancelled = true; };
+  }, [token]);
+
+  const handleGenerateProposal = async (event: React.FormEvent) => {
+    event.preventDefault();
+    const effectiveToken = getEffectiveToken();
+    const retainer = Number(proposalRetainer);
+    const setupFee = Number(proposalSetupFee);
+    if (!effectiveToken || !proposalLeadId || !Number.isSafeInteger(retainer) || retainer <= 0 || !Number.isSafeInteger(setupFee) || setupFee <= 0) {
+      setProposalError('Select a saved lead and enter positive whole-dollar retainer and setup fees.');
+      return;
+    }
+    setProposalError(null); setProposalNotice(null); setProposalBusyId('generate');
+    try {
+      const response = await fetch('/api/proposals/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${effectiveToken}` },
+        body: JSON.stringify({ leadId: proposalLeadId, packageTier: proposalPackageTier, monthlyRetainerUsd: retainer, setupFeeUsd: setupFee })
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(payload.error || `Proposal generation failed (HTTP ${response.status}).`);
+      await refreshProposals();
+      setProposalNotice('Proposal draft saved to the workspace. It is not yet internally approved or accepted by the client.');
+    } catch (error) {
+      setProposalError(error instanceof Error ? error.message : 'Proposal draft could not be saved.');
+    } finally { setProposalBusyId(null); }
+  };
+
+  const handleApproveProposal = async (proposalId: string) => {
+    const effectiveToken = getEffectiveToken();
+    if (!effectiveToken) { setProposalError('Sign in again to approve this proposal.'); return; }
+    setProposalBusyId(proposalId); setProposalError(null);
+    try {
+      const response = await fetch(`/api/proposals/${proposalId}/status`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${effectiveToken}` },
+        body: JSON.stringify({ status: 'approved' })
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(payload.error || `Proposal approval failed (HTTP ${response.status}).`);
+      await refreshProposals();
+      setProposalNotice('Proposal approved internally. This is not client acceptance.');
+    } catch (error) {
+      setProposalError(error instanceof Error ? error.message : 'Proposal could not be approved.');
+    } finally { setProposalBusyId(null); }
+  };
+
+  const handleCreateSigningLink = async (proposalId: string) => {
+    const effectiveToken = getEffectiveToken();
+    if (!effectiveToken) { setProposalError('Sign in again to create a client acceptance link.'); return; }
+    setProposalBusyId(proposalId); setProposalError(null); setProposalNotice(null);
+    try {
+      const response = await fetch(`/api/proposals/${proposalId}/signing-link`, {
+        method: 'POST', headers: { Authorization: `Bearer ${effectiveToken}` }
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(payload.error || `Acceptance link creation failed (HTTP ${response.status}).`);
+      const absoluteUrl = new URL(payload.signingUrl, window.location.origin).toString();
+      await navigator.clipboard.writeText(absoluteUrl);
+      setProposalNotice('One-time client acceptance link copied. It expires in seven days; external identity verification is not configured.');
+    } catch (error) {
+      setProposalError(error instanceof Error ? error.message : 'Client acceptance link could not be created or copied.');
+    } finally { setProposalBusyId(null); }
+  };
+
 
   useEffect(() => {
     let cancelled = false;
@@ -367,6 +469,54 @@ export const DocumentStudioPanel: React.FC<{ token?: string | null }> = ({ token
           </button>
         </div>
       </div>
+
+      <section className="mx-4 my-3 rounded-lg border border-border-dim bg-bg-raised p-4 space-y-4">
+        <div>
+          <h3 className="text-sm font-bold text-text-primary">Persisted client proposals</h3>
+          <p className="mt-1 text-xs text-text-secondary">Generate drafts from saved leads, approve internally, and create one-time client acceptance links. Acceptance is first-party typed-name consent, not external e-sign provider verification.</p>
+        </div>
+        {proposalError && <div role="alert" className="rounded border border-rose-500/30 bg-rose-500/5 p-2 text-xs text-rose-200">{proposalError}</div>}
+        {proposalNotice && <div role="status" className="rounded border border-emerald-500/30 bg-emerald-500/5 p-2 text-xs text-emerald-200">{proposalNotice}</div>}
+        <form onSubmit={handleGenerateProposal} className="grid grid-cols-1 md:grid-cols-5 gap-2 items-end">
+          <label className="text-xs text-text-secondary md:col-span-2">Saved lead
+            <select value={proposalLeadId} onChange={event => setProposalLeadId(event.target.value)} required className="mt-1 w-full rounded border border-border-dim bg-bg-base p-2 text-xs text-text-primary">
+              <option value="">Select a real saved lead</option>
+              {leadRecords.map(lead => <option key={lead.id} value={lead.id}>{lead.businessName} · {lead.city}</option>)}
+            </select>
+          </label>
+          <label className="text-xs text-text-secondary">Package
+            <select value={proposalPackageTier} onChange={event => setProposalPackageTier(event.target.value as 'Growth' | 'Dominance' | 'Enterprise')} className="mt-1 w-full rounded border border-border-dim bg-bg-base p-2 text-xs text-text-primary">
+              <option value="Growth">Growth</option><option value="Dominance">Dominance</option><option value="Enterprise">Enterprise</option>
+            </select>
+          </label>
+          <label className="text-xs text-text-secondary">Monthly retainer (USD)
+            <input type="number" min="1" step="1" value={proposalRetainer} onChange={event => setProposalRetainer(event.target.value)} className="mt-1 w-full rounded border border-border-dim bg-bg-base p-2 text-xs text-text-primary" />
+          </label>
+          <label className="text-xs text-text-secondary">Setup fee (USD)
+            <input type="number" min="1" step="1" value={proposalSetupFee} onChange={event => setProposalSetupFee(event.target.value)} className="mt-1 w-full rounded border border-border-dim bg-bg-base p-2 text-xs text-text-primary" />
+          </label>
+          <button type="submit" disabled={proposalBusyId === 'generate' || leadRecords.length === 0} className="md:col-span-5 justify-self-start rounded bg-accent px-3 py-2 text-xs font-semibold text-black disabled:opacity-50">
+            {proposalBusyId === 'generate' ? 'Saving draft…' : 'Generate and save proposal draft'}
+          </button>
+        </form>
+        <div className="space-y-2">
+          {proposals.length === 0 ? <p className="text-xs text-text-secondary">No persisted proposals yet.</p> : proposals.map(proposal => {
+            const proposalContent = proposal.content || {};
+            const status = String(proposal.status || 'draft');
+            return <div key={proposal.id} className="flex flex-col md:flex-row md:items-center justify-between gap-3 rounded border border-border-dim bg-bg-base p-3">
+              <div className="min-w-0">
+                <div className="text-xs font-semibold text-text-primary">{proposalContent.companyName || 'Client proposal'} · {proposalContent.packageTier || 'Package'}</div>
+                <div className="mt-1 text-[11px] text-text-secondary">{proposalContent.clientName || 'Client'} · ${Number(proposalContent.monthlyRetainerUsd || 0).toLocaleString()}/mo · Setup ${Number(proposalContent.setupFeeUsd || 0).toLocaleString()}</div>
+                <div className="mt-1 text-[10px] uppercase tracking-wide text-text-secondary">Status: {status === 'signed' ? 'Client accepted (first-party)' : status === 'approved' ? 'Internally approved' : status}</div>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {status === 'draft' && <button type="button" disabled={proposalBusyId === proposal.id} onClick={() => handleApproveProposal(proposal.id)} className="rounded border border-border-dim px-2.5 py-1.5 text-[11px] text-text-primary disabled:opacity-50">Approve internally</button>}
+                {status === 'approved' && <button type="button" disabled={proposalBusyId === proposal.id} onClick={() => handleCreateSigningLink(proposal.id)} className="rounded border border-border-dim px-2.5 py-1.5 text-[11px] text-text-primary disabled:opacity-50">Copy client acceptance link</button>}
+              </div>
+            </div>;
+          })}
+        </div>
+      </section>
 
       {/* The 8-Tab Word Ribbon Toolbar */}
       <DocumentRibbon
