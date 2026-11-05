@@ -3,6 +3,20 @@ import { autoRemediateGate, auditLandingPage } from '../../src/services/landingQ
 import { TRADE_TEMPLATES } from '../../src/components/landing/templates';
 
 describe('landing page quality gate evidence boundaries', () => {
+  it('ships every template as a neutral draft scaffold without sample business claims', () => {
+    for (const template of Object.values(TRADE_TEMPLATES)) {
+      expect(template.businessName).toBe('Your Business Name');
+      expect(template.city).toBe('Your service area');
+      expect(template.phone).toBe('');
+      expect(template.licenseNumber).toBe('');
+      expect(template.sections.trust_bar.active).toBe(false);
+      expect(template.sections.pricing_packages.active).toBe(false);
+      expect(template.sections.reviews.active).toBe(false);
+      expect(template.sections.before_after.active).toBe(false);
+      expect(template.sections.services.active).toBe(false);
+    }
+  });
+
   it('never auto-verifies reviews or invents license credentials', () => {
     const config = JSON.parse(JSON.stringify(TRADE_TEMPLATES.plumbing));
     config.licenseNumber = '';
