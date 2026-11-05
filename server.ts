@@ -10593,29 +10593,39 @@ async function startServer() {
       const harvested = await harvestRealBusinesses(city, niche);
       const totalDiscovered = harvested.length;
 
-      // Ensure all harvested items are securely encrypted and optionally saved into leads
-      if (saveToLeads) {
-        for (const hl of harvested) {
-          db.addLead({
-            contractorId,
-            businessName: hl.businessName,
-            ownerName: hl.ownerName || undefined,
-            phone: hl.phone || undefined,
-            email: hl.email || undefined,
-            city: hl.city || city,
-            serviceType: hl.serviceType || niche,
-            status: 'new',
-            urgencyScore: Math.round((hl.sentimentScore || 0.8) * 100),
-            predictedLtvUsd: (hl as any).predictedLtvUsd ?? 0,
-            source: 'loop_stage1_harvest',
-            isSynthetic: hl.isSynthetic ?? false,
-            sourceType: hl.sourceType || 'live_harvest',
-            verificationStatus: hl.verificationStatus || (hl.dnsVerified ? 'VERIFIED' : 'UNVERIFIED_STAGING'),
-            dnsVerified: hl.dnsVerified ?? false,
-            groundingEvidence: hl.groundingEvidence
-          });
-        }
-      }
+      // Prepare tenant-owned lead rows with PII encrypted before PostgreSQL persistence.
+      const leadsToPersist = saveToLeads ? harvested.map(hl => ({
+        id: 'lead_' + crypto.randomUUID(),
+        contractorId,
+        businessName: hl.businessName,
+        city: hl.city || city,
+        niche: hl.serviceType || niche,
+        ownerName: hl.ownerName || null,
+        phone: hl.phone ? '[ENCRYPTED]' : null,
+        email: hl.email ? '[ENCRYPTED]' : null,
+        phoneEncrypted: hl.phone ? encrypt(hl.phone) : null,
+        emailEncrypted: hl.email ? encrypt(hl.email) : null,
+        isSynthetic: hl.isSynthetic ?? false,
+        sourceType: hl.sourceType || 'live_harvest',
+        verificationStatus: hl.verificationStatus || (hl.dnsVerified ? 'VERIFIED' : 'UNVERIFIED_STAGING'),
+        dnsVerified: hl.dnsVerified ?? false,
+        groundingEvidence: hl.groundingEvidence || null,
+        status: 'new',
+        source: 'loop_stage1_harvest',
+        performanceScore: hl.performanceScore ?? null,
+        sslStatus: hl.sslStatus || null,
+        urgencyScore: Math.round((hl.sentimentScore || 0.8) * 100),
+        predictedLtv: Number((hl as any).predictedLtvUsd ?? 0),
+        seoScore: hl.seoScore ?? null,
+        googleRating: hl.googleRating ?? null,
+        reviewCount: hl.reviewCount ?? null,
+        reviewScore: hl.googleRating ?? null,
+        sentimentScore: hl.sentimentScore ?? null,
+        outreachStrategy: hl.outreachStrategy || null,
+        notes: hl.notes || null,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      })) : [];
 
       // Compute summary analytics
       const avgSeoScore = Math.round(harvested.reduce((s, h) => s + (h.seoScore || 70), 0) / (harvested.length || 1));
@@ -10696,27 +10706,33 @@ async function startServer() {
         lastUpdated: new Date().toISOString()
       };
 
-      const [updatedLoop] = await pgDb.update(halLoops).set({
-        stateSnapshot: updatedSnapshot,
-        updatedAt: new Date()
-      }).where(and(eq(halLoops.id, id), eq(halLoops.contractorId, contractorId))).returning();
-
-      // Log event
-      await pgDb.insert(halLoopEvents).values({
-        id: crypto.randomUUID(),
-        loopId: id,
-        contractorId,
-        previousState: loop.currentStage,
-        newState: loop.currentStage,
-        eventType: 'evidence_gathered',
-        actor: 'HAL Stage 1 Harvest Engine',
-        metadata: {
-          territory: city,
-          niche,
-          recordsCount: totalDiscovered,
-          completenessScore: 95,
-          validationPassed: true
+      const updatedLoop = await pgDb.transaction(async tx => {
+        if (leadsToPersist.length) {
+          await tx.insert(leads).values(leadsToPersist);
         }
+        const [updated] = await tx.update(halLoops).set({
+          stateSnapshot: updatedSnapshot,
+          updatedAt: new Date()
+        }).where(and(eq(halLoops.id, id), eq(halLoops.contractorId, contractorId))).returning();
+        if (!updated) throw new Error('Operating loop disappeared before evidence could be committed.');
+
+        await tx.insert(halLoopEvents).values({
+          id: crypto.randomUUID(),
+          loopId: id,
+          contractorId,
+          previousState: loop.currentStage,
+          newState: loop.currentStage,
+          eventType: 'evidence_gathered',
+          actor: 'HAL Stage 1 Harvest Engine',
+          metadata: {
+            territory: city,
+            niche,
+            recordsCount: totalDiscovered,
+            completenessScore: 95,
+            validationPassed: true
+          }
+        });
+        return updated;
       });
 
       // Commit to immutable structured ledger
