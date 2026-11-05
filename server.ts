@@ -4918,7 +4918,7 @@ app.post('/api/intelligence/chat', authenticate, async (req, res) => {
         }
         return toolResult;
       }
-    }, { gemini: tenantAiCredentials.gemini, anthropic: tenantAiCredentials.anthropic });
+    }, { gemini: tenantAiCredentials.gemini, anthropic: tenantAiCredentials.anthropic, hermesTenantId: contractorId, hermesConversationId: conversationId });
 
     // 5. Save HAL's reply to the database
     const replyDate = new Date();
