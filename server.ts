@@ -8319,16 +8319,28 @@ app.post('/api/autonomous/learn-step', authenticate, async (req, res) => {
       auditFindings
     });
 
-    await pgDb.insert(auditLogs).values({
-      id: crypto.randomUUID(),
-      contractorId,
-      action: 'AUTONOMOUS_LEARNING_CALIBRATED',
-      details: `Epoch ${result.newEpoch}: ${result.logMessage}`,
-      timestamp: new Date()
-    });
+    let auditPersisted = true;
+    try {
+      await pgDb.insert(auditLogs).values({
+        id: crypto.randomUUID(),
+        contractorId,
+        action: 'AUTONOMOUS_LEARNING_CALIBRATED',
+        details: `Epoch ${result.newEpoch}: ${result.logMessage}`,
+        timestamp: new Date()
+      });
+    } catch (auditError) {
+      // The learning-state transaction has already committed. Do not invite a
+      // retry that would count the same business outcome twice; report the
+      // audit gap explicitly while preserving the committed learning result.
+      auditPersisted = false;
+      console.error('[Autonomous Learning] Outcome saved but audit log write failed.', auditError);
+    }
 
     return res.json({
       success: true,
+      persisted: true,
+      auditPersisted,
+      warning: auditPersisted ? undefined : 'Learning state was saved, but its audit-log entry could not be persisted.',
       epoch: result.newEpoch,
       updatedNiche: result.updatedNiche,
       message: result.logMessage,
