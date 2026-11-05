@@ -14,9 +14,9 @@ This substantially reduces the risk that normal server requests are writing to e
 
 ## Implemented on this branch
 
-1. **Malformed JSON fails closed.** `parseLegacyDatabase` rejects malformed and non-object JSON. The legacy store now aborts startup instead of catching a parse error and overwriting the file with empty defaults. Regression tests cover malformed and non-object values.
+1. **Malformed JSON fails closed.** `parseLegacyDatabase` rejects malformed and non-object JSON. The legacy store now aborts startup instead of catching a parse error and overwriting the file with empty defaults. In test mode, its file is isolated under a per-process temporary directory rather than sharing the repository's `data/db.json` path. Regression tests cover malformed and non-object values.
 2. **Geo-map uses Neon.** `src/skills/geo-map.ts` now reads leads through `src/db/index.ts` and the Drizzle `leads` table, always filtering by `contractorId`. It omits phone/email because the canonical table stores encrypted contact fields and the visualization does not need to expose them.
-3. **Encryption no longer imports the JSON singleton.** AES-256-GCM helpers live in `src/db/encryption.ts`. `db.ts` re-exports them for legacy tests, while `leadPiiMigration.ts` and the encryption unit tests import the standalone module.
+3. **Encryption no longer imports the JSON singleton.** AES-256-GCM helpers live in `src/db/encryption.ts`. `db.ts` re-exports them for legacy tests, while `leadPiiMigration.ts`, the encryption unit tests and tenant-isolation tests import the standalone module. The legacy JSON parser is also isolated in `src/db/legacyJsonStore.ts`, so parser tests do not initialize the singleton.
 4. **Runtime import guard.** `tests/security/legacy-json-store-runtime-boundary.test.ts` scans application source for direct imports of the legacy JSON aggregate store.
 5. **Branch synchronization.** The workstream is based on current `main` and is no longer behind it.
 
