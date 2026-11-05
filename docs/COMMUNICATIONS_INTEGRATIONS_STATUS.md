@@ -30,7 +30,7 @@ This report separates code implementation from provider configuration and live v
 - Live email dispatch writes a tenant-scoped encrypted communications outbox record before provider submission. The response and audit events correctly distinguish provider acceptance from recipient delivery.
 - `POST /api/webhooks/resend` verifies Svix signatures against the exact raw request body, applies a timestamp tolerance, deduplicates event IDs, persists delivery events, and reconciles matching outbox records.
 - The webhook can only reconcile records for which a provider message ID matches an outbox row. Unmatched events are retained without assigning them to a tenant.
-- **Remaining:** production sender-domain verification, webhook endpoint registration/secret validation, real delivery/bounce/complaint tests, and a durable retry worker/dead-letter process.
+- **Remaining:** production sender-domain verification, webhook endpoint registration/secret validation, and real delivery/bounce/complaint acceptance tests.
 
 ### 2. Password reset
 
@@ -64,7 +64,7 @@ This report separates code implementation from provider configuration and live v
 ### 6. Outbox, retries and dead letters
 
 - The PostgreSQL communications outbox stores encrypted recipient/subject/body values, tenant ID, idempotency key, attempts, provider message ID, submission/delivery timestamps and terminal/provider status fields.
-- Dispatch is currently synchronous after the outbox record is created. A process crash or transient provider failure does not yet have a durable worker that reclaims and retries queued records.
+- The initial dispatch path remains synchronous, with a separate durable worker now able to reclaim retryable and stale-processing records.
 - **Implemented in this branch:** due-time scheduling, atomic concurrent claims, stale-processing recovery, bounded exponential backoff, maximum attempts, terminal failure/dead-letter statuses, and provider-side idempotency for Resend.
 - **Remaining:** operator replay UI, operational alerting, and a trusted scheduler invocation. Configure `HAL_COMMUNICATIONS_WORKER_SECRET` (32+ characters) and call `POST /api/internal/communications/outbox/run` from a private scheduler. The endpoint itself is not a continuously running worker.
 
@@ -101,7 +101,7 @@ No production environment, deploy, secret, service setting, or database was modi
 
 ## Release decision
 
-**Do not treat this workstream as fully production-verified.** The password-reset submission path is hardened in code; Resend submission/webhook reconciliation and Google API call paths exist; SMS and WhatsApp outbound remain simulations/unavailable; WhatsApp inbound remains fail-closed; durable retries/dead-letter processing and real provider/browser acceptance tests remain outstanding.
+**Do not treat this workstream as fully production-verified.** Password-reset submission is hardened; Resend has a durable retry/dead-letter worker but still needs a trusted scheduler and live provider acceptance; WhatsApp inbound has verified tenant routing and encrypted event persistence but still needs Meta account/webhook acceptance and a tenant inbox; WhatsApp outbound and SMS/Twilio remain unavailable; Google Workspace still needs OAuth/browser/provider acceptance.
 
 
 ## Follow-up implementation (2026-11-05)
