@@ -6768,12 +6768,6 @@ app.post('/api/outreach/sms/consent', authenticate, async (req, res) => {
   const consentPhone = consentLead?.phoneEncrypted ? decrypt(consentLead.phoneEncrypted) : (consentLead?.phone || '');
   const normalizedConsentPhone = consentPhone.replace(/[^+\d]/g, '');
   const consentPhoneHash = normalizedConsentPhone ? crypto.createHash('sha256').update(normalizedConsentPhone).digest('hex') : '';
-  if (status === 'opted_in' && consentPhoneHash) {
-    await pgDb.delete(communicationsOptOuts).where(and(
-      eq(communicationsOptOuts.contractorId, contractorId), eq(communicationsOptOuts.channel, 'sms'),
-      eq(communicationsOptOuts.phoneHash, consentPhoneHash)
-    ));
-  }
   if (status === 'opted_out' && consentPhoneHash) {
     await pgDb.insert(communicationsOptOuts).values({
       id: 'smsout_' + crypto.createHash('sha256').update(`${contractorId}:sms:${consentPhoneHash}`).digest('hex'),
@@ -6800,6 +6794,12 @@ app.post('/api/outreach/sms/consent', authenticate, async (req, res) => {
         updatedAt: now
       }
     });
+    if (status === 'opted_in' && consentPhoneHash) {
+      await pgDb.delete(communicationsOptOuts).where(and(
+        eq(communicationsOptOuts.contractorId, contractorId), eq(communicationsOptOuts.channel, 'sms'),
+        eq(communicationsOptOuts.phoneHash, consentPhoneHash)
+      ));
+    }
     return res.json({ success: true, leadId, channel: 'sms', status, recordedAt: now.toISOString() });
   } catch (error: any) {
     console.error('[SMS Consent] Could not persist consent:', error?.message || error);
