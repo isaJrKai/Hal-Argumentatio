@@ -4739,22 +4739,92 @@ app.get('/api/skills', authenticate, (req, res) => {
 app.post('/api/skills/:id/execute', authenticate, async (req, res) => {
   const contractorId = (req as any).contractorId;
   const { id } = req.params;
-  const { inputs } = req.body;
+  const submittedInputs = req.body?.inputs && typeof req.body.inputs === 'object' && !Array.isArray(req.body.inputs)
+    ? req.body.inputs
+    : {};
 
   try {
-    const result = await executeSkill(id, inputs || {}, contractorId);
-    
-    // Log Audit Action
+    let executionInputs = { ...submittedInputs };
+    let auditLead: typeof leads.$inferSelect | null = null;
+
+    if (id === 'website_audit' && typeof executionInputs.leadId === 'string' && executionInputs.leadId.trim()) {
+      const [ownedLead] = await pgDb.select().from(leads).where(and(
+        eq(leads.id, executionInputs.leadId.trim()),
+        eq(leads.contractorId, contractorId)
+      )).limit(1);
+      if (!ownedLead) return res.status(404).json({ error: 'The selected lead was not found in this workspace.' });
+      if (!ownedLead.websiteUrl) return res.status(400).json({ error: 'This lead has no saved website URL. Add and verify its public website before auditing.' });
+      auditLead = ownedLead;
+      // The saved tenant-owned lead is authoritative. Do not let a browser change
+      // the target URL or business name while claiming the audit belongs to it.
+      executionInputs = {
+        ...executionInputs,
+        websiteUrl: ownedLead.websiteUrl,
+        businessName: ownedLead.businessName
+      };
+    }
+
+    const result = await executeSkill(id, executionInputs, contractorId);
+
+    if (id === 'website_audit' && auditLead && result?.success === true) {
+      const existingEvidence = auditLead.groundingEvidence && typeof auditLead.groundingEvidence === 'object'
+        ? auditLead.groundingEvidence as Record<string, any>
+        : {};
+      const auditId = crypto.randomUUID();
+      const auditRecord = {
+        auditId,
+        status: result.status,
+        websiteUrl: result.websiteUrl,
+        auditedAt: result.auditedAt || new Date().toISOString(),
+        evidence: result.evidence || null,
+        measurements: result.measurements || null,
+        securityHeaders: result.securityHeaders || null,
+        missingSecurityHeaders: result.missingSecurityHeaders || [],
+        findings: result.findings || [],
+        report: result.report || null
+      };
+
+      await pgDb.update(leads).set({
+        groundingEvidence: { ...existingEvidence, websiteAudit: auditRecord },
+        updatedAt: new Date()
+      }).where(and(eq(leads.id, auditLead.id), eq(leads.contractorId, contractorId)));
+
+      await pgDb.insert(leadEvents).values({
+        id: crypto.randomUUID(),
+        leadId: auditLead.id,
+        eventType: 'WebsiteAuditCompleted',
+        newStage: auditLead.status,
+        notes: `Website audit ${auditRecord.status} recorded for ${auditRecord.websiteUrl} at ${auditRecord.auditedAt}.`
+      });
+
+      await recordWorkEvent(pgDb, {
+        contractorId,
+        eventType: 'website.audit_completed',
+        entityType: 'lead',
+        entityId: auditLead.id,
+        actorType: 'human',
+        actorId: contractorId,
+        sourceModule: 'website_auditor',
+        correlationId: auditId,
+        summary: `Recorded a ${auditRecord.status} website audit for ${auditLead.businessName}.`,
+        payload: { auditId, websiteUrl: auditRecord.websiteUrl, status: auditRecord.status, findingCount: auditRecord.findings.length }
+      });
+
+      result.leadId = auditLead.id;
+      result.auditId = auditId;
+      result.persistedToLead = true;
+    }
+
     await persistAuditLog({
       contractorId,
       action: 'SKILL_EXECUTED',
       details: `Executed intelligence skill: "${id}"`
     });
 
-    res.json(result);
+    return res.json(result);
   } catch (err: any) {
     console.error(`Skill "${id}" execution failed:`, err);
-    res.status(500).json({ error: err.message });
+    return res.status(503).json({ error: err.message || 'Skill execution could not be completed.' });
   }
 });
 
