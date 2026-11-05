@@ -1,7 +1,7 @@
 # CRM, Finance and Business Workflow Audit
 
-**Work branch:** `audit/crm-finance-business-workflows`  
-**Base:** `main`  
+**Work branch:** `integration/crm-finance-mainline`  
+**Base:** `main` at `080726d677823eeef69bc1cd882367fc8d12ebc1`  
 **Production:** No production writes, migrations, or deployment performed.
 
 ## Scope and evidence standard
@@ -57,16 +57,16 @@ These items remain unverified and must not be represented as complete:
 2. Exact frontend-to-backend route coverage for every proposal, contract, client-project and communications action.
 3. Tenant A/B integration tests against a disposable PostgreSQL test database for CRUD, foreign-record access, duplicate requests, concurrent close-out, and rollback after partial failure.
 4. Contract/proposal persistence and signature/execution semantics, including proof that draft/approved/signed are distinct states. The current proposal generator returns a generated response but no canonical proposal/contract table or durable signature workflow has been verified.
-5. Integration coverage for won-lead project conversion, duplicate prevention under concurrent requests, lead linkage, and retainer changes/cancellation semantics. The conversion now uses a transaction-scoped PostgreSQL advisory lock and rechecks the tenant-owned lead/project inside the transaction. Isolated PostgreSQL tests cover same-lead concurrency serialization, tenant-scoped lookup, and rejection of a stale update after a concurrent terminal-status change; a full route-level lifecycle test remains outstanding.
+5. Integration coverage for won-lead project conversion, duplicate prevention under concurrent requests, lead linkage, and retainer changes/cancellation semantics. The conversion now uses a transaction-scoped PostgreSQL advisory lock and rechecks the tenant-owned lead/project inside the transaction. Isolated PostgreSQL tests cover same-lead advisory-lock serialization, tenant-scoped lookup, and the optimistic status/timestamp predicate rejecting a stale update after a concurrent terminal-status change. The stale-update test mirrors the production predicate on an isolated test table; it is not a full route-level concurrency test. A full route-level lifecycle test remains outstanding.
 6. Revenue recognition versus cash collection/payment recording. The current `/api/revenues` close-out endpoint records a positive whole-dollar amount against a lead; it is not a payment processor or a complete invoice/receivables ledger.
 7. End-to-end event correlation and ordering across audit, landing-page, outreach, deal, project, revenue, and forecast records.
 8. Forecast evaluation against correctly attributed observations and evidence that only actual outcomes feed learning.
-9. GitHub Actions CI run #1217 passed on earlier branch head `1218bbe4e1b4210550078c588014029840a61a97`: type-check, automated tests, production build, and production dependency audit succeeded. Two subsequent commits (`1c997135b80737de1f0e825f6ef1b68ab61ecfc3` and `1e9f77f952b6564c2c233e2e25690de8c1672f61`) add optimistic concurrency protection and a PostgreSQL regression test; CI for the current head has not yet been confirmed. The workflow provisions PostgreSQL 16 as a healthy service and supplies `DATABASE_URL`. Re-run CI after any subsequent branch change.
+9. The old workstream's CI run #1217 passed before the final concurrency corrections and before integration with current `main`; it is not accepted as release evidence for this branch. GitHub Actions CI run #1252 was triggered for the integrated branch head `8bd6ffb2bb281ab4eb96a88eb34ea51675ce2b49` and was in progress at the time this audit revision was prepared. The workflow provisions PostgreSQL 16 as a healthy service and supplies `DATABASE_URL`. Re-run CI after any subsequent branch change.
 
 ## Safety and release
 
 - Dedicated branch only; no direct `main` writes.
 - No production data was read or modified through a privileged database connection.
 - No production migration or deployment was performed.
-- The branch is currently 61 commits ahead and 58 behind `main`; GitHub currently reports the PR as not mergeable. Reconcile the branch with the current `main`, review the integrated diff, and rerun CI before merge.
+- This integration branch was created directly from current `main`; its initial comparison was 8 commits ahead and 0 behind. The original workstream branch remains untouched and is not the release candidate.
 - Do not merge until the branch CI is green and the remaining end-to-end/tenant-isolation gates have been addressed or explicitly accepted as limitations.
