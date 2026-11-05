@@ -48,6 +48,9 @@ export const geoSkill: Skill = {
       const current = weatherData.current_weather || {};
       const temp = current.temperature;
       const windspeed = current.windspeed;
+      if (!Number.isFinite(temp) || !Number.isFinite(windspeed)) {
+        throw new Error('Weather provider response did not include valid current temperature and wind speed.');
+      }
       const weathercode = current.weathercode;
       const hourly = weatherData.hourly || {};
       const precipArray = hourly.precipitation || [0];
@@ -84,7 +87,8 @@ export const geoSkill: Skill = {
           climateDemand: climateDemandIndex,
         },
         strategicActionableDirective: strategy,
-        demandIndexMethod: 'HAL heuristic based on current weather and the next 12 forecast hours; not a measured service-demand forecast.',\n        fetchedAt: new Date().toISOString()
+        demandIndexMethod: 'HAL heuristic based on current weather and the next 12 forecast hours; not a measured service-demand forecast.',
+        fetchedAt: new Date().toISOString()
       };
 
     } catch (err: any) {
