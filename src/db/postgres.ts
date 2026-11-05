@@ -135,14 +135,10 @@ export async function bootstrapPostgresTables(poolInstance?: Pool): Promise<void
         target_monthly_revenue_usd INTEGER DEFAULT 0,
         active_territories TEXT[],
         role TEXT DEFAULT 'user' NOT NULL,
-        account_status TEXT DEFAULT 'active' NOT NULL,
         password_hash TEXT NOT NULL,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
         last_login_at TIMESTAMP
       );
-
-      ALTER TABLE contractors ADD COLUMN IF NOT EXISTS account_status TEXT DEFAULT 'active' NOT NULL;
-      CREATE INDEX IF NOT EXISTS contractors_account_status_idx ON contractors (account_status);
 
       CREATE TABLE IF NOT EXISTS revoked_tokens (
         token_hash TEXT PRIMARY KEY,
