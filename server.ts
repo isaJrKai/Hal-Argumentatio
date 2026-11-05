@@ -6829,36 +6829,59 @@ app.post('/api/projects', authenticate, async (req, res) => {
   const contractorId = (req as any).contractorId;
   const { leadId, clientName, businessName, city, serviceType, packageTier, monthlyRetainerUsd, initialAuditScore } = req.body || {};
 
-  if (typeof businessName !== 'string' || !businessName.trim()) {
-    return res.status(400).json({ error: 'Business name is required to create a project' });
+  if (typeof businessName !== 'string' || !businessName.trim() ||
+      typeof city !== 'string' || !city.trim() ||
+      typeof serviceType !== 'string' || !serviceType.trim() ||
+      !['Growth', 'Dominance', 'Enterprise'].includes(packageTier) ||
+      !Number.isSafeInteger(monthlyRetainerUsd) || monthlyRetainerUsd <= 0) {
+    return res.status(400).json({
+      error: 'Business name, city, service type, a valid package tier, and a positive whole-dollar monthly retainer are required.'
+    });
+  }
+
+  const normalizedLeadId = typeof leadId === 'string' && leadId.trim() ? leadId.trim() : null;
+  const auditScore = initialAuditScore === undefined || initialAuditScore === null || initialAuditScore === ''
+    ? null
+    : Number(initialAuditScore);
+  if (auditScore !== null && (!Number.isFinite(auditScore) || auditScore < 0 || auditScore > 100)) {
+    return res.status(400).json({ error: 'Initial audit score must be a measured value from 0 to 100.' });
   }
 
   try {
-    if (typeof leadId === 'string' && leadId.trim()) {
-      const [linkedLead] = await pgDb.select({ id: leads.id }).from(leads)
-        .where(and(eq(leads.id, leadId.trim()), eq(leads.contractorId, contractorId)))
+    if (normalizedLeadId) {
+      const [linkedLead] = await pgDb.select({ id: leads.id, status: leads.status }).from(leads)
+        .where(and(eq(leads.id, normalizedLeadId), eq(leads.contractorId, contractorId)))
         .limit(1);
-      if (!linkedLead) return res.status(400).json({ error: 'The selected lead does not belong to this workspace.' });
+      if (!linkedLead) return res.status(404).json({ error: 'The selected lead does not belong to this workspace.' });
+      if (!['closed_won', 'won', 'converted', 'customer'].includes(String(linkedLead.status).toLowerCase())) {
+        return res.status(409).json({ error: 'A client project can only be converted from a lead recorded as closed-won.' });
+      }
+
+      const [existingProject] = await pgDb.select({ id: clientProjects.id }).from(clientProjects)
+        .where(and(eq(clientProjects.leadId, normalizedLeadId), eq(clientProjects.contractorId, contractorId)))
+        .limit(1);
+      if (existingProject) {
+        return res.status(409).json({ error: 'A client project already exists for this won lead.', projectId: existingProject.id });
+      }
     }
 
     const now = new Date();
-    const score = Number.isFinite(Number(initialAuditScore)) ? Number(initialAuditScore) : 50;
     const projectId = 'proj_' + crypto.randomBytes(6).toString('hex');
     const projectValues = {
       id: projectId,
       contractorId,
-      leadId: typeof leadId === 'string' ? leadId : '',
-      clientName: typeof clientName === 'string' && clientName.trim() ? clientName.trim() : 'Business Owner',
+      leadId: normalizedLeadId || '',
+      clientName: typeof clientName === 'string' && clientName.trim() ? clientName.trim() : businessName.trim(),
       businessName: businessName.trim(),
-      city: typeof city === 'string' && city.trim() ? city.trim() : 'Calgary',
-      serviceType: typeof serviceType === 'string' && serviceType.trim() ? serviceType.trim() : 'General Trade',
-      packageTier: ['Growth', 'Dominance', 'Enterprise'].includes(packageTier) ? packageTier : 'Dominance',
-      monthlyRetainerUsd: Number.isFinite(Number(monthlyRetainerUsd)) && Number(monthlyRetainerUsd) > 0 ? Math.round(Number(monthlyRetainerUsd)) : 2400,
+      city: city.trim(),
+      serviceType: serviceType.trim(),
+      packageTier,
+      monthlyRetainerUsd,
       startDate: now,
       status: 'onboarding',
-      initialAuditScore: score,
-      currentScore: score,
-      targetScore: 95,
+      initialAuditScore: auditScore,
+      currentScore: auditScore,
+      targetScore: null,
       portalAccessToken: crypto.randomBytes(12).toString('hex'),
       createdAt: now,
       updatedAt: now,
@@ -6870,9 +6893,9 @@ app.post('/api/projects', authenticate, async (req, res) => {
       milestones: [
         { id: 'ms_1', title: 'Onboarding & Asset Intake', description: 'Intake and verify client DNS, assets, and service radius.', status: 'in_progress' },
         { id: 'ms_2', title: 'Technical Speed & SSL Hardening', description: 'Compress images, configure TLS 1.3, optimize Core Web Vitals.', status: 'pending' },
-        { id: 'ms_3', title: 'Geo-SEO Schema & Map Pack Synchronization', description: 'Inject JSON-LD structured data and align 40+ local citations.', status: 'pending' },
-        { id: 'ms_4', title: 'Autonomous Funnel Activation', description: 'Launch lead capture forms and direct SMS dispatch routing.', status: 'pending' },
-        { id: 'ms_5', title: 'Monthly Executive ROI Review', description: 'Deliver progress comparison report and growth metrics breakdown.', status: 'pending' }
+        { id: 'ms_3', title: 'Geo-SEO Schema & Map Pack Synchronization', description: 'Inject JSON-LD structured data and align local citations.', status: 'pending' },
+        { id: 'ms_4', title: 'Funnel Activation', description: 'Configure and verify lead capture and notification routing.', status: 'pending' },
+        { id: 'ms_5', title: 'Monthly Performance Review', description: 'Review verified progress and recorded business outcomes.', status: 'pending' }
       ]
     };
     const [project] = await pgDb.insert(clientProjects).values(projectValues).returning();
@@ -6882,18 +6905,16 @@ app.post('/api/projects', authenticate, async (req, res) => {
         contractorId, eventType: 'client_project.created', entityType: 'client_project', entityId: project.id,
         actorType: 'human', actorId: contractorId, sourceModule: 'client_operations', correlationId: project.id,
         summary: `Created client delivery project for ${businessName.trim()}.`,
-        payload: { leadId: leadId || null, status: project.status, packageTier: project.packageTier, monthlyRetainerUsd: project.monthlyRetainerUsd }
+        payload: { leadId: normalizedLeadId, status: project.status, packageTier: project.packageTier, monthlyRetainerUsd: project.monthlyRetainerUsd }
       });
     } catch (ledgerError) {
-      // The project row is already durable. A secondary ledger outage must not
-      // tell the operator creation failed and invite a duplicate retry.
       console.error('[Client Projects] Creation ledger event failed:', ledgerError);
     }
 
     db.addAuditLog({
       contractorId,
       action: 'PROJECT_ONBOARDED',
-      details: `Initiated active delivery project for ${businessName.trim()} (${project.monthlyRetainerUsd}/mo).`
+      details: `Initiated delivery project for ${businessName.trim()} (${project.monthlyRetainerUsd}/mo).`
     });
 
     broadcastNotification(
