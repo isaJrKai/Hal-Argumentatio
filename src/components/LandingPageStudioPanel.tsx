@@ -78,6 +78,7 @@ export const LandingPageStudioPanel: React.FC<{ token: string | null }> = ({ tok
   const [mobileActiveView, setMobileActiveView] = useState<'editor' | 'preview'>('editor');
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isPublishing, setIsPublishing] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
   const [showAiModal, setShowAiModal] = useState(false);
   const [showHistoryModal, setShowHistoryModal] = useState(false);
@@ -117,6 +118,9 @@ export const LandingPageStudioPanel: React.FC<{ token: string | null }> = ({ tok
 
   // Live URL for current page
   const liveUrl = typeof window !== 'undefined' ? `${window.location.origin}/landing/${config.id}` : '';
+  const currentArtifact = artifacts.find(artifact => artifact.id === config.id);
+  const isPagePublished = currentArtifact?.status === 'ready' || currentArtifact?.status === 'deployed';
+  const isSavedDraft = currentArtifact?.status === 'draft';
 
   // Record a version snapshot
   const saveSnapshot = (label: string, snapshotConfig: LandingPageConfig) => {
@@ -259,7 +263,7 @@ export const LandingPageStudioPanel: React.FC<{ token: string | null }> = ({ tok
         saveSnapshot(`Saved: ${config.title}`, savedConfig);
         showToast({
           title: 'Landing Page Saved',
-          message: data.sourceLeadId ? `Saved and linked to CRM prospect ${data.sourceLeadId}. Public URL: ${data.liveUrl}` : `Saved to your landing-page workspace. Public URL: ${data.liveUrl}`,
+          message: data.sourceLeadId ? `Saved as a private draft linked to CRM prospect ${data.sourceLeadId}. Verify the prospect and publish when ready.` : 'Saved as a private draft. It is not public until you publish it.',
           type: 'success'
         });
         fetchArtifacts();
@@ -277,8 +281,40 @@ export const LandingPageStudioPanel: React.FC<{ token: string | null }> = ({ tok
     }
   };
 
+  const handlePublishPage = async () => {
+    if (!config.id || !token) {
+      showToast({ title: 'Cannot Publish', message: 'Save the page and sign in before publishing.', type: 'warning' });
+      return;
+    }
+    setIsPublishing(true);
+    try {
+      const res = await fetch(`/api/landing-pages/${encodeURIComponent(config.id)}/publish`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ confirmPublish: true })
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.success) throw new Error(data.error || `Publish failed (HTTP ${res.status}).`);
+      setArtifacts(prev => prev.map(artifact => artifact.id === config.id ? { ...artifact, status: 'deployed' } : artifact));
+      showToast({
+        title: 'Landing Page Published',
+        message: `The approved page is now public at ${data.liveUrl}`,
+        type: 'success'
+      });
+      fetchArtifacts();
+    } catch (err: any) {
+      showToast({ title: 'Publish Blocked', message: err?.message || 'The page could not be published.', type: 'error' });
+    } finally {
+      setIsPublishing(false);
+    }
+  };
+
   // Copy live link to clipboard
   const handleCopyLink = () => {
+    if (!isPagePublished) {
+      showToast({ title: 'Draft Is Private', message: 'Publish the page before sharing a public link.', type: 'warning' });
+      return;
+    }
     navigator.clipboard.writeText(liveUrl);
     setCopiedLink(true);
     showToast({
@@ -670,7 +706,7 @@ export const LandingPageStudioPanel: React.FC<{ token: string | null }> = ({ tok
           {/* Simulate Inbound Lead Capture */}
           <button
             type="button"
-            disabled={isSimulatingLead}
+            disabled={isSimulatingLead || !isPagePublished}
             onClick={handleSimulateLead}
             title="Simulate inbound homeowner dispatch request (validates encryption, database persistence, and SSE alert)"
             className="px-2.5 py-1.5 rounded-xl border border-emerald-500/40 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 text-xs font-bold transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
@@ -722,11 +758,22 @@ export const LandingPageStudioPanel: React.FC<{ token: string | null }> = ({ tok
             <span>{isSaving ? 'Saving...' : 'Save'}</span>
           </button>
 
+          <button
+            type="button"
+            disabled={!isSavedDraft || isPublishing}
+            onClick={handlePublishPage}
+            title={isSavedDraft ? 'Publish after reviewing the page and verifying linked prospect identity' : 'Save a draft before publishing'}
+            className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs transition flex items-center gap-1.5 shadow disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            <span>{isPublishing ? 'Publishing...' : isPagePublished ? 'Published' : 'Publish'}</span>
+          </button>
+
           {/* Copy URL */}
           <button
             type="button"
             onClick={handleCopyLink}
-            title="Copy Public Landing Page Link"
+            disabled={!isPagePublished}
+            title={isPagePublished ? 'Copy Public Landing Page Link' : 'Publish the draft before copying a public link'}
             className="p-1.5 rounded-xl border border-border-dim bg-bg-raised hover:bg-bg-subtle text-text-secondary transition"
           >
             {copiedLink ? <Check className="w-4 h-4 text-emerald-400" /> : <Share2 className="w-4 h-4" />}
@@ -743,15 +790,19 @@ export const LandingPageStudioPanel: React.FC<{ token: string | null }> = ({ tok
           </button>
 
           {/* Open Live */}
-          <a
-            href={liveUrl}
-            target="_blank"
-            rel="noreferrer"
-            className="px-3 py-1.5 rounded-xl bg-bg-subtle hover:bg-slate-700 text-text-primary font-bold text-xs transition flex items-center gap-1.5 border border-border-dim"
-          >
-            <ExternalLink className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">Live</span>
-          </a>
+          {isPagePublished ? (
+            <a
+              href={liveUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="px-3 py-1.5 rounded-xl bg-bg-subtle hover:bg-slate-700 text-text-primary font-bold text-xs transition flex items-center gap-1.5 border border-border-dim"
+            >
+              <ExternalLink className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Live</span>
+            </a>
+          ) : (
+            <span className="px-3 py-1.5 rounded-xl bg-bg-subtle text-text-tertiary text-xs border border-border-dim" title="This draft is private until published">Draft</span>
+          )}
         </div>
 
         {/* Mobile View Toggle (Editor vs Preview) */}
