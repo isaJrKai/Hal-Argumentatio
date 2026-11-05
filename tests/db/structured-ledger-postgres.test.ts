@@ -42,7 +42,7 @@ suite('PostgreSQL global structured ledger', () => {
       )
     `);
     await writerA.query(`
-      CREATE FUNCTION prevent_structured_ledger_mutation() RETURNS trigger AS $
+      CREATE FUNCTION prevent_structured_ledger_mutation() RETURNS trigger AS $ledger$
       BEGIN
         RAISE EXCEPTION 'structured_ledger_entries is append-only' USING ERRCODE = '55000';
       END;
