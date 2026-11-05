@@ -747,7 +747,7 @@ RESPONSE STANDARD
           ];
         }
 
-        const candidateModels = ["gemini-3.8-flash", "gemini-flash-latest", "gemini-3.1-flash-lite"];
+        const candidateModels = ["gemini-3.8-flash", "gemini-flash-latest"];
         let response: any = null;
         let lastError: any = null;
         let selectedModel = candidateModels[0];
@@ -928,7 +928,7 @@ RESPONSE STANDARD
           { role: 'user', parts: [{ text: message }] }
         ];
 
-        const candidateModels = ["gemini-3.8-flash", "gemini-flash-latest", "gemini-3.1-flash-lite"];
+        const candidateModels = ["gemini-3.8-flash", "gemini-flash-latest"];
         let response: any = null;
         let lastError: any = null;
 
