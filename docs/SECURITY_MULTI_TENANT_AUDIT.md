@@ -59,6 +59,22 @@ The landing-page HTML generator interpolated contractor/AI-provided business det
 
 **Fix:** The generator now recursively HTML-escapes dynamic string values before HTML interpolation, serializes the small set of inline form data with `JSON.stringify` and escapes script-closing delimiters, and no longer embeds the contractor ID in the public form request. The save API now requires a page configuration and always renders it server-side; client-supplied HTML is ignored. Public serving additionally requires a matching server-owned `pageConfig.id` and `pageConfig.contractorId`, so raw AI/provider HTML artifacts without that trusted config are not published. A regression test exercises malicious business name, city, section text and page ID values.
 
+## Newly confirmed findings from the follow-up review
+
+### HIGH — Administrator workspace APIs mix a hard-coded seed tenant into the signed-in administrator's workspace
+**Area:** `getTargetContractorIds()` in `server.ts`, consumed by the leads, revenue, campaigns, forecasts and recommendations list routes.
+
+The helper returns both `con_admin_seed` and the authenticated administrator's contractor ID whenever the persisted role is `admin`. This means those ordinary workspace endpoints intentionally combine records from a second tenant into the administrator's workspace. It is not a general all-tenant query, but it is still an implicit cross-tenant exception and makes tenant boundaries depend on a magic account ID.
+
+**Required remediation:** make ordinary workspace APIs strictly tenant-local for every role. Put platform-wide account administration behind separate admin-only endpoints that expose account metadata and aggregate platform metrics, not tenant business records. Any exceptional support access should require an explicit, time-limited, reason-recorded support session.
+
+### HIGH — No dedicated platform administrator console or account suspension state exists in the current schema
+**Area:** `src/App.tsx`, `src/db/schema.ts`, and `contractors` bootstrap DDL.
+
+The UI has no dedicated admin console. The contractor schema has a persisted `role` but no persisted account status, so there is no durable account suspension control that shared authentication can enforce. Existing admin-only system controls do not constitute a platform account-management console.
+
+**Required remediation:** add a server-enforced persisted account status with a safe additive migration; provide an admin-only contractor directory and account status/role actions; audit every change; prevent self-demotion and removal/suspension of the final active administrator. Do not bootstrap an administrator by email pattern, fixed seed ID, default password, or unauthenticated endpoint.
+
 ## Prioritized review observations
 
 | Priority | Area | Observation / remaining evidence |
