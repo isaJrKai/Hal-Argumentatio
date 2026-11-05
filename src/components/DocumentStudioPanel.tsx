@@ -85,81 +85,31 @@ export const DocumentStudioPanel: React.FC<{ token?: string | null }> = () => {
   const [gridBackground, setGridBackground] = useState<'none' | 'ruled' | 'grid'>('none');
 
   // Mailings & Merge Fields (Populated dynamically from HAL context!)
-  const recipients: DocumentRecipient[] = useMemo(() => {
-    if (leads && leads.length > 0) {
-      return leads.slice(0, 15).map(lead => ({
-        id: lead.id,
-        businessName: lead.name || 'Apex Mechanical Corp',
-        ownerName: lead.contactName || 'Lead Executive',
-        city: lead.city || activeCity || 'Austin',
-        phone: lead.phone || '(512) 883-9201',
-        email: lead.email || 'dispatch@apexcommercial.com',
-        tradeNiche: lead.niche || activeNiche || 'Plumbing & Mechanical',
-        website: lead.website || 'https://apexcommercial.com',
-        missingSsl: !lead.website?.startsWith('https://'),
-        lcpSpeed: '3.8s',
-        recommendedSlaUsd: lead.estimatedValue ? Math.round(lead.estimatedValue * 0.15) : 1500
-      }));
-    }
-
-    // Default fallback recipients if lead list is empty
-    return [
-      {
-        id: 'rec-1',
-        businessName: 'Vanguard Heating & Air',
-        ownerName: 'Robert Sterling',
-        city: activeCity || 'Dallas',
-        phone: '(214) 774-1290',
-        email: 'r.sterling@vanguardhvac.com',
-        tradeNiche: activeNiche || 'HVAC Commercial',
-        website: 'http://vanguardhvac.com',
-        missingSsl: true,
-        lcpSpeed: '4.2s',
-        recommendedSlaUsd: 1850
-      },
-      {
-        id: 'rec-2',
-        businessName: 'Apex Plumbing Systems',
-        ownerName: 'Marcus Vance',
-        city: activeCity || 'Fort Worth',
-        phone: '(817) 502-3344',
-        email: 'marcus@apexplumbing.com',
-        tradeNiche: 'Commercial Plumbing',
-        website: 'https://apexplumbing.com',
-        missingSsl: false,
-        lcpSpeed: '2.9s',
-        recommendedSlaUsd: 2200
-      },
-      {
-        id: 'rec-3',
-        businessName: 'Titan Roofing & Restoration',
-        ownerName: 'Elena Rostova',
-        city: activeCity || 'Houston',
-        phone: '(713) 901-4432',
-        email: 'elena@titanroofing.com',
-        tradeNiche: 'Roofing Commercial',
-        website: 'http://titanroofing.net',
-        missingSsl: true,
-        lcpSpeed: '5.1s',
-        recommendedSlaUsd: 3500
-      }
-    ];
-  }, [leads, activeCity, activeNiche]);
-
+  // Mail-merge recipients come only from saved workspace leads; never invent sample businesses or metrics.
+  const recipients: DocumentRecipient[] = useMemo(() => (leads || []).map((lead: any) => {
+    const website = typeof lead.website === 'string' ? lead.website : '';
+    const estimatedValue = Number(lead.estimatedValue);
+    return {
+      id: String(lead.id),
+      businessName: lead.name || 'Business name not recorded',
+      ownerName: lead.contactName || 'Contact not recorded',
+      city: lead.city || 'City not recorded',
+      phone: lead.phone || 'Phone not recorded',
+      email: lead.email || 'Email not recorded',
+      tradeNiche: lead.niche || activeNiche || 'Industry not recorded',
+      website,
+      missingSsl: website ? !website.startsWith('https://') : false,
+      lcpSpeed: typeof lead.lcpSpeed === 'string' && lead.lcpSpeed.trim() ? lead.lcpSpeed : 'Not measured',
+      recommendedSlaUsd: Number.isFinite(estimatedValue) && estimatedValue > 0 ? Math.round(estimatedValue * 0.15) : null
+    };
+  }), [leads, activeNiche]);
   const [currentRecipientIndex, setCurrentRecipientIndex] = useState<number>(0);
   const [previewMerge, setPreviewMerge] = useState<boolean>(false);
 
   // Review & Speech
   const [isSpeaking, setIsSpeaking] = useState<boolean>(false);
   const [showComments, setShowComments] = useState<boolean>(false);
-  const [comments, setComments] = useState<DocumentComment[]>([
-    {
-      id: 'c1',
-      author: 'HAL Operating System',
-      date: 'Today at 09:15 AM',
-      text: 'Verified client diagnostic parameters against real-world PageSpeed API results.'
-    }
-  ]);
+  const [comments, setComments] = useState<DocumentComment[]>([]);
 
   // Word & Character count calculation
   const wordCount = useMemo(() => {
@@ -461,7 +411,7 @@ export const DocumentStudioPanel: React.FC<{ token?: string | null }> = () => {
           <span>{wordCount.chars} characters</span>
           <span className="text-emerald-400 flex items-center space-x-1">
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 inline-block"></span>
-            <span>Document Auto-Saved</span>
+            <span>Editor state only · not persisted</span>
           </span>
         </div>
 
