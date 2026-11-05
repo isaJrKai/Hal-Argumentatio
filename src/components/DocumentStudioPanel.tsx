@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useBusinessContext } from '../context/BusinessContext';
 import { useToast } from '../context/ToastContext';
 import { 
@@ -31,9 +31,9 @@ import {
   FolderOpen
 } from 'lucide-react';
 
-export const DocumentStudioPanel: React.FC<{ token?: string | null }> = () => {
+export const DocumentStudioPanel: React.FC<{ token?: string | null }> = ({ token }) => {
   const { 
-    leads, 
+    
     activeCity, 
     activeNiche, 
     workspaceConfig, 
@@ -41,6 +41,39 @@ export const DocumentStudioPanel: React.FC<{ token?: string | null }> = () => {
   } = useBusinessContext();
   
   const { showToast } = useToast();
+
+  const [leadRecords, setLeadRecords] = useState<any[]>([]);
+  const [leadLoadError, setLeadLoadError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    const effectiveToken = token || (typeof window !== 'undefined'
+      ? (localStorage.getItem('halbiz_auth_token') || localStorage.getItem('token') || '')
+      : '');
+    if (!effectiveToken) {
+      setLeadRecords([]);
+      setLeadLoadError('Sign in to load saved workspace leads for mail merge.');
+      return () => { cancelled = true; };
+    }
+    fetch('/api/leads', { headers: { Authorization: `Bearer ${effectiveToken}` } })
+      .then(async response => {
+        const payload = await response.json().catch(() => []);
+        if (!response.ok) throw new Error(payload?.error || `Lead list could not be loaded (HTTP ${response.status}).`);
+        if (!Array.isArray(payload)) throw new Error('Lead list response was not a valid array.');
+        if (!cancelled) {
+          setLeadRecords(payload);
+          setLeadLoadError(null);
+        }
+      })
+      .catch(error => {
+        if (!cancelled) {
+          setLeadRecords([]);
+          setLeadLoadError(error instanceof Error ? error.message : 'Saved leads could not be loaded.');
+        }
+      });
+    return () => { cancelled = true; };
+  }, [token]);
+
 
   // Active Ribbon Tab (Default to 'design' or 'home' matching user request)
   const [activeTab, setActiveTab] = useState<RibbonTab>('design');
@@ -85,24 +118,20 @@ export const DocumentStudioPanel: React.FC<{ token?: string | null }> = () => {
   const [gridBackground, setGridBackground] = useState<'none' | 'ruled' | 'grid'>('none');
 
   // Mailings & Merge Fields (Populated dynamically from HAL context!)
-  // Mail-merge recipients come only from saved workspace leads; never invent sample businesses or metrics.
-  const recipients: DocumentRecipient[] = useMemo(() => (leads || []).map((lead: any) => {
-    const website = typeof lead.website === 'string' ? lead.website : '';
-    const estimatedValue = Number(lead.estimatedValue);
-    return {
-      id: String(lead.id),
-      businessName: lead.name || 'Business name not recorded',
-      ownerName: lead.contactName || 'Contact not recorded',
-      city: lead.city || 'City not recorded',
-      phone: lead.phone || 'Phone not recorded',
-      email: lead.email || 'Email not recorded',
-      tradeNiche: lead.niche || activeNiche || 'Industry not recorded',
-      website,
-      missingSsl: website ? !website.startsWith('https://') : false,
-      lcpSpeed: typeof lead.lcpSpeed === 'string' && lead.lcpSpeed.trim() ? lead.lcpSpeed : 'Not measured',
-      recommendedSlaUsd: Number.isFinite(estimatedValue) && estimatedValue > 0 ? Math.round(estimatedValue * 0.15) : null
-    };
-  }), [leads, activeNiche]);
+  // Mail-merge recipients come only from tenant-owned API records.
+  const recipients: DocumentRecipient[] = useMemo(() => leadRecords.map(lead => ({
+    id: String(lead.id),
+    businessName: lead.businessName || 'Business name not recorded',
+    ownerName: lead.ownerName || 'Contact not recorded',
+    city: lead.city || 'City not recorded',
+    phone: lead.phone || 'Phone not recorded',
+    email: lead.email || 'Email not recorded',
+    tradeNiche: lead.niche || 'Industry not recorded',
+    website: lead.websiteUrl || '',
+    sslStatus: lead.sslStatus === 'secured' || lead.sslStatus === 'missing' ? lead.sslStatus : 'unknown',
+    lcpSpeed: 'Not measured',
+    recommendedSlaUsd: null
+  })), [leadRecords]);
   const [currentRecipientIndex, setCurrentRecipientIndex] = useState<number>(0);
   const [previewMerge, setPreviewMerge] = useState<boolean>(false);
 
@@ -381,6 +410,17 @@ export const DocumentStudioPanel: React.FC<{ token?: string | null }> = () => {
         insertToc={insertToc}
         insertSignatureBlock={insertSignatureBlock}
       />
+
+      {leadLoadError && (
+        <div role="alert" className="mx-4 my-2 rounded border border-amber-500/30 bg-amber-500/5 p-3 text-xs text-amber-200">
+          {leadLoadError}
+        </div>
+      )}
+      {!leadLoadError && recipients.length === 0 && (
+        <div role="status" className="mx-4 my-2 rounded border border-slate-700 bg-slate-900/40 p-3 text-xs text-slate-300">
+          No saved leads are available for mail merge. Add and verify a real lead in CRM first; HAL will not insert sample recipients.
+        </div>
+      )}
 
       {/* Main Interactive Paper Canvas Area */}
       <DocumentCanvas
