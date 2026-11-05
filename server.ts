@@ -11388,7 +11388,8 @@ async function startServer() {
   // 2. Query Structured Ledger Entries
   app.get('/api/roadmap/phase1/ledger', authenticate, async (req, res) => {
     const contractorId = (req as any).contractorId;
-    const limit = parseInt(req.query.limit as string) || 50;
+    const requestedLimit = parseInt(req.query.limit as string) || 50;
+    const limit = Math.min(Math.max(requestedLimit, 1), 10000);
     const eventType = req.query.eventType as string;
 
     try {
