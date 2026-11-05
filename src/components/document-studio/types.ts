@@ -61,7 +61,7 @@ export interface DocumentRecipient {
   website: string;
   missingSsl: boolean;
   lcpSpeed: string;
-  recommendedSlaUsd: number;
+  recommendedSlaUsd: number | null;
 }
 
 export interface DocumentComment {
