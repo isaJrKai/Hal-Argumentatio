@@ -93,3 +93,21 @@ A core capability is complete only when all relevant points pass:
 - [ ] Full browser E2E, production deploy and post-deploy verification.
 
 **Do not use this document as a claim that the unchecked items are implemented. Update the evidence and checkboxes as each acceptance test passes.**
+
+
+## 9. Wider skill-library evidence review (additional findings)
+
+The second pass found that several existing specialist skills were exposed in the Skills UI but could return convincing-looking statements without actually querying their claimed external sources. This workstream is correcting those existing modules rather than adding replacements:
+
+- **Outbound Strategy & Copywriter:** fallback copy previously claimed a prospect's mobile load time was 4.5 seconds, asserted a 30% visitor loss, and said the prospect ranked well without an audit. Fallback now asks permission for an audit when no evidence is supplied and labels user-entered observations as unverified.
+- **Local Competitor & Maps Analyzer:** fallback previously invented market saturation, competitor ratings, review freshness, Maps activity, and a profitable entry window. It is now a comparison/research plan and states that live Maps data was not queried.
+- **Geo & Weather Intelligence:** fallback previously returned Winnipeg/Manitoba coordinates and synthetic temperatures for arbitrary cities. It now fails clearly when live geocoding/weather data is unavailable and labels next-12-hour weather-based indices as HAL heuristics, not measured demand.
+- **SEO Schema Generator:** fallback previously inserted a stock image, example.com URL, US address, Winnipeg coordinates, and a 35% ranking uplift. It now creates JSON-LD from supplied business details only and omits unavailable fields.
+- **Review Booster:** copy previously referenced invented response-rate statistics and offered technician incentives for named reviews. It now asks for honest, unbiased feedback and prohibits incentives/review gating.
+- **Compliance Screener:** no watchlist provider was connected, yet fallback returned no sanctions/PEP hits and LOW RISK. It now returns unknown screening status and a checklist; no clearance is issued.
+- **Due Diligence & Underwriting:** fallback previously claimed active corporate standing, no lawsuits, a 1.45x liquidity proxy, and AML clearance without registry/financial/news sources. It now returns a diligence evidence checklist and REVIEW REQUIRED.
+- **M&A Target Intelligence:** fallback previously invented 15% EBITDA margin, market multiples, route savings, customer counts, and annual synergies. It is being converted to explicit user-assumption valuation scenarios only.
+- **Ad Spend Optimizer / Break-even Scoper:** these calculate arithmetic from user inputs. They are now labelled as scenarios, validate inputs, and must not imply actual campaign results or a guaranteed ROI.
+
+The wider inventory also includes custom skills, MCP tools, Hermes, forecasting, revenue attribution, financial ledgers, CRM, document workflows, and connected apps. Their availability must be verified independently from the existence of a UI panel or registry entry.
+
