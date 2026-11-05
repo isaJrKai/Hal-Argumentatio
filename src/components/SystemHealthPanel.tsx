@@ -59,7 +59,7 @@ export default function SystemHealthPanel({ token }: SystemHealthPanelProps) {
   
   const [checks, setChecks] = useState<HealthCheck[]>([
     { name: 'Application database readiness', category: 'database', status: 'warning', details: 'Not yet checked.', metric: 'PENDING' },
-    { name: 'AI provider configuration', category: 'ai', status: 'warning', details: 'Not yet checked.', metric: 'PENDING' },
+    { name: 'Live AI provider inference', category: 'ai', status: 'warning', details: 'Not yet checked.', metric: 'PENDING' },
     { name: 'Hermes provider configuration', category: 'ai', status: 'warning', details: 'Not yet checked.', metric: 'PENDING' },
     { name: 'Google Maps connector', category: 'core', status: 'warning', details: 'Not yet checked.', metric: 'PENDING' },
     { name: 'AES-256-GCM round-trip', category: 'security', status: 'warning', details: 'Not yet checked.', metric: 'PENDING' },
