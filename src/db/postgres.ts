@@ -117,6 +117,9 @@ export async function bootstrapPostgresTables(poolInstance?: Pool): Promise<void
   if (!p) return;
   const client = await p.connect();
   try {
+    // Bootstrap DDL is one unit: a failed statement must not leave a partially
+    // upgraded schema for the next application restart.
+    await client.query('BEGIN');
     await client.query(`
       CREATE TABLE IF NOT EXISTS contractors (
         id TEXT PRIMARY KEY,
@@ -358,8 +361,8 @@ export async function bootstrapPostgresTables(poolInstance?: Pool): Promise<void
       ALTER TABLE api_keys ADD COLUMN IF NOT EXISTS last_used_at TIMESTAMP;
       ALTER TABLE api_keys ADD COLUMN IF NOT EXISTS expires_at TIMESTAMP;
       ALTER TABLE api_keys ALTER COLUMN key DROP NOT NULL;
-      ALTER TABLE api_keys ALTER COLUMN key_hash SET NOT NULL;
-      ALTER TABLE api_keys ALTER COLUMN prefix SET NOT NULL;
+      -- Keep the new columns nullable until a versioned, data-aware backfill
+      -- has reconciled every legacy key row. Drizzle mirrors this transition.
 
       CREATE TABLE IF NOT EXISTS connector_credentials (
         id TEXT PRIMARY KEY,
@@ -992,7 +995,11 @@ export async function bootstrapPostgresTables(poolInstance?: Pool): Promise<void
       ALTER TABLE leads ADD COLUMN IF NOT EXISTS external_crm_id TEXT;
       ALTER TABLE leads ADD COLUMN IF NOT EXISTS external_source TEXT;
     `);
+    await client.query('COMMIT');
   } catch (err: any) {
+    // Roll back every bootstrap statement before checking whether an externally
+    // provisioned managed schema is already complete.
+    await client.query('ROLLBACK').catch(() => undefined);
     // If running in a managed Cloud SQL environment where DDL is provisioned via drizzle-kit / admin runner
     if (err?.code === '42501' || err?.routine === 'aclcheck_error') {
       try {
