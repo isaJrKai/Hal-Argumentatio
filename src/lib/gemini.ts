@@ -865,7 +865,9 @@ RESPONSE STANDARD
         return {
           text,
           sources: sources.length > 0 ? sources : undefined,
-          toolCalls: toolCalls.length ? toolCalls : undefined
+          toolCalls: toolCalls.length ? toolCalls : undefined,
+          provider: 'gemini',
+          model: selectedModel
         };
       } catch (err: any) {
         if (toolCalls.length) {
@@ -1027,7 +1029,9 @@ RESPONSE STANDARD
 
         return {
           text,
-          sources: sources.length > 0 ? sources : undefined
+          sources: sources.length > 0 ? sources : undefined,
+          provider: 'gemini',
+          model: candidateModels[0]
         };
       } catch (err: any) {
         console.error("Gemini chatbot fallback error:", err);
