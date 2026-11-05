@@ -385,6 +385,12 @@ export { encrypt, decrypt } from './encryption';
 import { encrypt, decrypt } from './encryption';
 
 class Database {
+  private legacyStorePresent = false;
+
+  public hasLegacyStore(): boolean {
+    return this.legacyStorePresent;
+  }
+
   private data: DBStructure = {
     contractors: [],
     sessions: [],
@@ -418,8 +424,11 @@ class Database {
     if (!fs.existsSync(DATA_DIR)) {
       fs.mkdirSync(DATA_DIR, { recursive: true });
     }
-    
-    if (fs.existsSync(DB_FILE)) {
+
+    this.legacyStorePresent = fs.existsSync(DB_FILE);
+    const postgresLedgerMode = process.env.HAL_STRUCTURED_LEDGER_POSTGRES_ENABLED === 'true';
+
+    if (this.legacyStorePresent) {
       try {
         const raw = fs.readFileSync(DB_FILE, 'utf8');
         const parsed = parseLegacyDatabase(raw) as Partial<DBStructure>;
@@ -436,12 +445,14 @@ class Database {
           { cause: e }
         );
       }
-    } else {
+    } else if (!postgresLedgerMode) {
+      // In PostgreSQL-ledger mode, a fresh instance must not manufacture a new
+      // local JSON genesis chain that can conflict with the durable DB ledger.
       this.save();
     }
 
     // Ensure Phase 1 Genesis Block in Structured Ledger
-    if (!this.data.structuredLedger || this.data.structuredLedger.length === 0) {
+    if ((!this.data.structuredLedger || this.data.structuredLedger.length === 0) && !postgresLedgerMode) {
       this.data.structuredLedger = [];
       this.recordLedgerEntry({
         contractorId: 'system_genesis',
@@ -454,7 +465,7 @@ class Database {
       });
     }
 
-    if (this.data.contractors.length === 0) {
+    if (this.data.contractors.length === 0 && !postgresLedgerMode) {
       this.seed();
     }
 
