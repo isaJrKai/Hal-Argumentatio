@@ -1331,48 +1331,55 @@ app.post('/api/auth/forgot-password', async (req, res) => {
         });
       } catch (_) {}
 
-      // Construct standard clickable reset link
-      const host = req.get('x-forwarded-host') || req.get('host') || 'localhost:3000';
-      const proto = req.headers['x-forwarded-proto'] || (req.secure ? 'https' : 'http');
-      const origin = req.headers.origin || `${proto}://${host}`;
-      const resetUrl = `${origin}/?reset_token=${rawToken}`;
-
-      let emailDispatched = false;
-      const resendApiKey = process.env.RESEND_API_KEY || (db as any).getConnectorCredentials?.('con_admin_seed')?.resend;
-
-      // If an external email provider like Resend is configured, send the real email with link
-      if (resendApiKey) {
-        try {
-          const emailRes = await fetch('https://api.resend.com/emails', {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${resendApiKey}`,
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-              from: process.env.HAL_SENDER_EMAIL || 'HAL Operating System <support@hal-intelligence.ai>',
-              to: cleanEmail,
-              subject: 'Reset Your HAL Password',
-              html: `
-                <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 560px; margin: 0 auto; padding: 32px 24px; background: #0b0f17; color: #f3f4f6; border-radius: 12px; border: 1px solid #1f2937;">
-                  <div style="font-size: 18px; font-weight: bold; color: #3b82f6; margin-bottom: 20px; letter-spacing: 0.05em;">HAL OPERATING SYSTEM</div>
-                  <h2 style="font-size: 20px; font-weight: 600; margin: 0 0 12px 0; color: #ffffff;">Reset Your Account Password</h2>
-                  <p style="font-size: 14px; line-height: 1.6; color: #9ca3af; margin: 0 0 24px 0;">We received a password reset request for your HAL workspace account (${cleanEmail}). Click the button below to choose your new password:</p>
-                  <div style="margin: 28px 0; text-align: left;">
-                    <a href="${resetUrl}" style="background-color: #2563eb; color: #ffffff; padding: 12px 28px; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 14px; display: inline-block;">Reset Password</a>
-                  </div>
-                  <p style="font-size: 12px; color: #6b7280; line-height: 1.5; margin: 24px 0 0 0;">If the button does not work, copy and paste this link into your browser:<br/><a href="${resetUrl}" style="color: #60a5fa; word-break: break-all;">${resetUrl}</a></p>
-                  <p style="font-size: 11px; color: #4b5563; margin-top: 24px; border-top: 1px solid #1f2937; padding-top: 16px;">This link will expire in 60 minutes and can only be used once. If you did not request this change, you can ignore this email.</p>
-                </div>
-              `
-            })
-          });
-          if (emailRes.ok) {
-            emailDispatched = true;
-          }
-        } catch (emailErr) {
-          console.error('[HAL Auth] Failed to dispatch reset email via Resend:', emailErr);
+      // Reset links must use the operator-configured canonical origin. Never
+      // trust Host, X-Forwarded-Host, or Origin headers for credential links.
+      let appOrigin = '';
+      try {
+        const configuredUrl = new URL(process.env.APP_URL || '');
+        const isLocalDevelopment = process.env.NODE_ENV !== 'production' &&
+          (configuredUrl.hostname === 'localhost' || configuredUrl.hostname === '127.0.0.1');
+        if ((configuredUrl.protocol === 'https:' || isLocalDevelopment) &&
+            !configuredUrl.username && !configuredUrl.password) {
+          appOrigin = configuredUrl.origin;
         }
+      } catch {
+        appOrigin = '';
+      }
+
+      const resendApiKey = process.env.RESEND_API_KEY;
+      const senderEmail = process.env.HAL_SENDER_EMAIL;
+      if (resendApiKey && senderEmail && appOrigin) {
+        const resetUrl = `${appOrigin}/?reset_token=${rawToken}`;
+        const textBody = `We received a password reset request for your HAL account. Open this link within 60 minutes to choose a new password: ${resetUrl}\\n\\nIf you did not request this change, ignore this email.`;
+        const htmlBody = `
+          <div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;padding:32px 24px">
+            <h2>Reset your HAL password</h2>
+            <p>We received a password reset request for your HAL account.</p>
+            <p><a href="${resetUrl}">Reset password</a></p>
+            <p>If the button does not work, copy this link: <a href="${resetUrl}">${resetUrl}</a></p>
+            <p>This link expires in 60 minutes and can only be used once. If you did not request this change, ignore this email.</p>
+          </div>
+        `;
+        try {
+          // Resend's accepted response is recorded as submission only. A
+          // verified webhook is required before claiming recipient delivery.
+          await sendResendEmail({
+            to: cleanEmail,
+            subject: 'Reset Your HAL Password',
+            text: textBody,
+            html: htmlBody
+          }, { apiKey: resendApiKey, from: senderEmail });
+        } catch (emailError: any) {
+          console.error('[HAL Auth] Password reset email submission failed:', emailError?.name || 'provider_error');
+          await pgDb.update(passwordResetTokens)
+            .set({ usedAt: new Date() })
+            .where(and(eq(passwordResetTokens.tokenHash, tokenHash), isNull(passwordResetTokens.usedAt)));
+        }
+      } else {
+        // Do not leave an active reset token that cannot be delivered.
+        await pgDb.update(passwordResetTokens)
+          .set({ usedAt: new Date() })
+          .where(and(eq(passwordResetTokens.tokenHash, tokenHash), isNull(passwordResetTokens.usedAt)));
       }
 
       return res.json(buildPasswordResetResponse());
