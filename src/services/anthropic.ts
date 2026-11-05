@@ -20,16 +20,20 @@ export async function callAnthropicWithTools(args: {
   }));
   const messages: AnthropicChatMessage[] = args.messages.map(message => ({ ...message }));
   const toolCalls: Array<{ name: string; result: any }> = [];
+  // One wall-clock budget covers the full conversation, not four independent waits.
+  const requestDeadline = AbortSignal.timeout(45_000);
 
   for (let round = 0; round < 4; round += 1) {
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
+    let response: Response;
+    try {
+      response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
         'x-api-key': args.apiKey,
         'anthropic-version': '2023-06-01',
         'content-type': 'application/json'
       },
-      signal: AbortSignal.timeout(20_000),
+      signal: requestDeadline,
       body: JSON.stringify({
         model,
         max_tokens: 1400,
@@ -37,7 +41,19 @@ export async function callAnthropicWithTools(args: {
         messages,
         ...(tools.length && args.execute ? { tools, tool_choice: { type: 'auto' } } : {})
       })
-    });
+      });
+    } catch (error) {
+      // Once a tool has run, never fall through to another provider and risk
+      // repeating that action. Return the durable results already collected.
+      if (toolCalls.length) {
+        return {
+          text: 'Claude connection ended after HAL tool execution. Review each recorded result in Work Queue and Work History; HAL did not retry those actions.',
+          toolCalls,
+          model
+        };
+      }
+      throw error;
+    }
 
     if (!response.ok) {
       const detail = (await response.text()).slice(0, 500);
