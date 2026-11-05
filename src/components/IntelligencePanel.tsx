@@ -116,6 +116,7 @@ export default function IntelligencePanel({
 
   // Grounding state
   const [enableGrounding, setEnableGrounding] = useState(true);
+  const [lastInferenceLabel, setLastInferenceLabel] = useState('');
   const [activeAi, setActiveAi] = useState<'gemini' | 'nemotron' | 'anthropic'>(() => {
     const saved = localStorage.getItem('hal_active_ai');
     return (saved === 'gemini' || saved === 'nemotron' || saved === 'anthropic') ? saved : 'gemini';
@@ -218,6 +219,7 @@ export default function IntelligencePanel({
 
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to communicate with HAL.");
+      setLastInferenceLabel([data.provider || activeAi, data.model].filter(Boolean).join(' · '));
 
       // Replace temporary/optimistic query message with database-saved structures
       setMessages(prev => {
@@ -522,6 +524,11 @@ export default function IntelligencePanel({
                     </button>
                   </div>
 
+                  {lastInferenceLabel && (
+                    <span className="hidden xl:inline text-[9px] font-mono text-text-tertiary" title="Provider and model returned by the server for the last completed reply">
+                      Last reply: {lastInferenceLabel}
+                    </span>
+                  )}
                   <button
                     type="button"
                     onClick={() => setEnableGrounding(!enableGrounding)}
