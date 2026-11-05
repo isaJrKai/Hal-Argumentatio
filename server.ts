@@ -7035,26 +7035,33 @@ app.put('/api/projects/:id', authenticate, async (req, res) => {
     }
     if (typeof updates.notes === 'string') safeUpdates.notes = updates.notes.slice(0, 10000);
 
-    const [updated] = await pgDb.update(clientProjects).set(safeUpdates)
-      .where(and(eq(clientProjects.id, id), eq(clientProjects.contractorId, contractorId)))
-      .returning();
-    if (!updated) return res.status(404).json({ error: 'Project not found or unauthorized' });
+    const updated = await pgDb.transaction(async tx => {
+      const [savedProject] = await tx.update(clientProjects).set(safeUpdates)
+        .where(and(eq(clientProjects.id, id), eq(clientProjects.contractorId, contractorId)))
+        .returning();
+      if (!savedProject) return null;
 
-    try {
-      await recordWorkEvent(pgDb, {
-        contractorId, eventType: 'client_project.updated', entityType: 'client_project', entityId: id,
-        actorType: 'human', actorId: contractorId, sourceModule: 'client_operations', correlationId: id,
-        summary: `Updated client project for ${updated.businessName}.`,
+      await tx.insert(workEvents).values({
+        id: 'evt_' + crypto.randomUUID(),
+        contractorId,
+        eventType: 'client_project.updated',
+        entityType: 'client_project',
+        entityId: id,
+        actorType: 'human',
+        actorId: contractorId,
+        sourceModule: 'client_operations',
+        correlationId: id,
+        summary: `Updated client project for ${savedProject.businessName}.`,
         payload: {
           previousStatus: existingProject.status,
-          currentStatus: updated.status,
+          currentStatus: savedProject.status,
           previousMonthlyRetainerUsd: existingProject.monthlyRetainerUsd,
-          currentMonthlyRetainerUsd: updated.monthlyRetainerUsd
+          currentMonthlyRetainerUsd: savedProject.monthlyRetainerUsd
         }
       });
-    } catch (ledgerError) {
-      console.error('[Client Projects] Update ledger event failed:', ledgerError);
-    }
+      return savedProject;
+    });
+    if (!updated) return res.status(404).json({ error: 'Project not found or unauthorized' });
 
     if (updates.status === 'completed' && existingProject.status !== 'completed') {
       db.addAuditLog({
