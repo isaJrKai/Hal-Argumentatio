@@ -950,6 +950,7 @@ export async function bootstrapPostgresTables(poolInstance?: Pool): Promise<void
       BEGIN
         RAISE EXCEPTION 'structured_ledger_entries is append-only; % is prohibited', TG_OP
           USING ERRCODE = '55000';
+        RETURN OLD;
       END;
       $ledger$ LANGUAGE plpgsql;
 
@@ -957,6 +958,10 @@ export async function bootstrapPostgresTables(poolInstance?: Pool): Promise<void
       CREATE TRIGGER structured_ledger_no_mutation
         BEFORE UPDATE OR DELETE ON structured_ledger_entries
         FOR EACH ROW EXECUTE FUNCTION prevent_structured_ledger_mutation();
+      DROP TRIGGER IF EXISTS structured_ledger_no_truncate ON structured_ledger_entries;
+      CREATE TRIGGER structured_ledger_no_truncate
+        BEFORE TRUNCATE ON structured_ledger_entries
+        FOR EACH STATEMENT EXECUTE FUNCTION prevent_structured_ledger_mutation();
 
       CREATE TABLE IF NOT EXISTS hermes_lab_artifacts (
         id TEXT PRIMARY KEY,
@@ -1044,7 +1049,7 @@ export async function bootstrapPostgresTables(poolInstance?: Pool): Promise<void
             to_regclass('public.work_tasks') IS NOT NULL AS has_work_tasks,
             to_regclass('public.work_events') IS NOT NULL AS has_work_events,
             to_regclass('public.structured_ledger_entries') IS NOT NULL AS has_structured_ledger,
-            EXISTS (SELECT 1 FROM pg_trigger WHERE tgrelid = to_regclass('public.structured_ledger_entries') AND tgname = 'structured_ledger_no_mutation' AND NOT tgisinternal) AS has_structured_ledger_guard
+            EXISTS (SELECT 1 FROM pg_trigger WHERE tgrelid = to_regclass('public.structured_ledger_entries') AND tgname = 'structured_ledger_no_mutation' AND NOT tgisinternal)\n              AND EXISTS (SELECT 1 FROM pg_trigger WHERE tgrelid = to_regclass('public.structured_ledger_entries') AND tgname = 'structured_ledger_no_truncate' AND NOT tgisinternal) AS has_structured_ledger_guard
           FROM information_schema.tables
           WHERE table_schema = 'public';
         `);
