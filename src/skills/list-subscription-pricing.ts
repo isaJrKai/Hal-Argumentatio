@@ -1,142 +1,77 @@
 import { Skill } from './types';
-import { generateResponse } from '../services/nemotron';
 
 export const listSubscriptionPricingSkill: Skill = {
   id: 'list_subscription_pricing',
-  name: 'Lead List Pricing Optimizer',
-  description: "Calculates compilation and verification labor costs versus licensing or subscription pricing models to maximize Return on Time Invested (ROTI) using NEMOTRON.",
+  name: 'Lead List Pricing Scenario Calculator',
+  description: 'Calculates illustrative list-product pricing and build-cost scenarios from user-supplied assumptions. It does not retrieve leads, validate contacts, or measure market willingness to pay.',
   category: 'general',
   icon: 'Database',
   inputs: [
-    {
-      name: 'listHours',
-      label: 'Hours Spent Compiling & Verifying List',
-      type: 'string',
-      required: true,
-      defaultValue: '6'
-    },
-    {
-      name: 'hourlyRate',
-      label: 'Hourly Labor Valuation Rate (USD/hr)',
-      type: 'string',
-      required: true,
-      defaultValue: '50'
-    },
-    {
-      name: 'toolCosts',
-      label: 'Software & Proxy Overhead Costs (USD)',
-      type: 'string',
-      required: true,
-      defaultValue: '20'
-    },
-    {
-      name: 'modelType',
-      label: 'Sales Model (one-time or subscription)',
-      type: 'select',
-      required: true,
-      defaultValue: 'subscription',
-      options: ['one-time', 'subscription']
-    },
-    {
-      name: 'unitPrice',
-      label: 'Unit Sale Price / Monthly Subscription Rate (USD)',
-      type: 'string',
-      required: true,
-      defaultValue: '99'
-    },
-    {
-      name: 'volume',
-      label: 'Target Volume (Licenses sold or Subscribers signed)',
-      type: 'string',
-      required: true,
-      defaultValue: '12'
-    }
+    { name: 'listHours', label: 'Hours Spent Compiling & Verifying List', type: 'string', required: true, defaultValue: '' },
+    { name: 'hourlyRate', label: 'Hourly Labor Valuation Rate (USD/hr)', type: 'string', required: true, defaultValue: '' },
+    { name: 'toolCosts', label: 'Software & Tool Overhead Costs (USD)', type: 'string', required: true, defaultValue: '' },
+    { name: 'modelType', label: 'Sales Model', type: 'select', required: true, defaultValue: 'subscription', options: ['one-time', 'subscription'] },
+    { name: 'unitPrice', label: 'Unit Sale Price / Monthly Subscription Rate (USD)', type: 'string', required: true, defaultValue: '' },
+    { name: 'volume', label: 'Target Licenses Sold / Active Subscribers', type: 'string', required: true, defaultValue: '' }
   ],
-  execute: async (inputs, contractorId) => {
-    const { listHours, hourlyRate, toolCosts, modelType, unitPrice, volume } = inputs;
+  execute: async (inputs) => {
+    const hours = Number(inputs.listHours);
+    const rate = Number(inputs.hourlyRate);
+    const tools = Number(inputs.toolCosts);
+    const price = Number(inputs.unitPrice);
+    const volume = Number(inputs.volume);
+    const modelType = String(inputs.modelType || 'subscription');
 
-    const hours = parseFloat(listHours) || 6;
-    const rate = parseFloat(hourlyRate) || 50;
-    const tools = parseFloat(toolCosts) || 20;
-    const price = parseFloat(unitPrice) || 99;
-    const targetVolume = parseFloat(volume) || 12;
+    if (!['one-time', 'subscription'].includes(modelType)) throw new Error('Choose one-time or subscription.');
+    if (![hours, rate, tools, price, volume].every(Number.isFinite) ||
+        hours <= 0 || rate <= 0 || tools < 0 || price <= 0 || volume <= 0) {
+      throw new Error('Enter positive hours, labor rate, unit price and volume; tool costs may be zero but not negative.');
+    }
 
-    const totalBuildCost = (hours * rate) + tools;
-    let grossRevenue = 0;
-    let netProfit = 0;
-    let breakEvenSales = 0;
-    let roti = 0;
-    let modelDetailLine = '';
+    const buildCost = hours * rate + tools;
+    const breakEvenUnits = Math.ceil(buildCost / price);
+    let revenue = 0;
+    let contribution = 0;
+    let periodLabel = '';
 
     if (modelType === 'one-time') {
-      grossRevenue = price * targetVolume;
-      netProfit = grossRevenue - totalBuildCost;
-      breakEvenSales = price > 0 ? Math.ceil(totalBuildCost / price) : 0;
-      roti = totalBuildCost > 0 ? (netProfit / totalBuildCost) * 100 : 0;
-      modelDetailLine = `- **Target License Sales Count:** ${targetVolume} licenses at $${price} each`;
+      revenue = price * volume;
+      contribution = revenue - buildCost;
+      periodLabel = 'one-time sales';
     } else {
-      // subscription monthly and annualization
-      const monthlyRevenue = price * targetVolume;
-      grossRevenue = monthlyRevenue * 12; // Annual projections
-      netProfit = grossRevenue - totalBuildCost;
-      breakEvenSales = price > 0 ? Math.ceil(totalBuildCost / price) : 0;
-      roti = totalBuildCost > 0 ? (netProfit / totalBuildCost) * 100 : 0;
-      modelDetailLine = `- **Target Active Subscribers:** ${targetVolume} subscribers at $${price}/mo
-- **Monthly Recurring Revenue (MRR):** $${monthlyRevenue.toFixed(2)}
-- **Projected Annualized Gross Revenue:** $${grossRevenue.toFixed(2)}`;
+      const monthlyRevenue = price * volume;
+      revenue = monthlyRevenue * 12;
+      contribution = revenue - buildCost;
+      periodLabel = '12-month gross subscription revenue scenario';
     }
+    const rotiPercent = buildCost > 0 ? contribution / buildCost * 100 : 0;
 
-    const unitEconomicsSummary = `### LEAD LIST DATABASE PRODUCT UNIT ECONOMICS
-
-**Internal Creation Costs (Asset Build):**
-- **Labor Valuation (${hours} hrs @ $${rate}/hr):** $${(hours * rate).toFixed(2)}
-- **API, Enrichment, Scraper Costs:** $${tools.toFixed(2)}
-- **Total Asset Cost to Build:** $${totalBuildCost.toFixed(2)}
-
-**Distribution Models Metrics:**
-- **Product Model:** ${modelType === 'one-time' ? 'One-time Database Purchase' : 'Monthly Recurring Database Subscription'}
-${modelDetailLine}
-- **Projected Net Profit Run-rate:** $${netProfit.toFixed(2)}
-- **Return on Time Invested (ROTI):** ${roti.toFixed(1)}%
-- **Break-Even Volume Required:** ${breakEvenSales} accounts/licenses`;
-
-    const systemPrompt = `You are HAL, the premier AI Business Operating Intelligence system.
-Evaluate the market viability of digital information products and curated data lists. Outline Swiss-style, highly strategic action steps.`;
-
-    const userPrompt = `A digital entrepreneur is preparing to launch a verified lead-list product with these parameters:
-${unitEconomicsSummary}
-
-Analyze this business model and detail a 3-step marketing and launch playbook designed to secure the target active subscriber or license sales volume with maximum velocity. Keep it concise, high-impact, and fully custom-tailored to selling curated list databases.`;
-
-    let reportText = '';
-
-    try {
-      reportText = await generateResponse(
-        userPrompt,
-        systemPrompt,
-        0.2
-      );
-    } catch (err) {
-      console.error('NEMOTRON calculations failed, using fallback report.', err);
-    }
-
-    if (!reportText) {
-      reportText = `### LEAD-LIST PACKAGING & LAUNCH PLAYBOOK
-
-1. **Offer a Sample Teaser Database (The Cold Outreach Hook):**
-   - Package a 10-line, 100% verified sample list of elite leads in your chosen city/niche. Deliver this sample directly to prospects in your outreach. Let them verify the email delivery rates themselves to prove your lists have 0% bounce rate.
-
-2. **Position as "Trigger Event" Enrichment:**
-   - Rather than selling a static list, market the subscription as a live stream of "Trigger Events" (e.g. newly registered LLCs, businesses running heavy ads but lacking active websites). This converts a commodities purchase into high-value strategic trigger insights, reducing subscription churn.
-
-3. **Deploy "Found Money" Risk-Free Trials:**
-   - Offer a pilot group of 5 agencies the list with a guarantee: "If you do not book at least 1 meeting from this 100-contact list, your subscription is free." This builds overwhelming case studies, enabling you to scale the subscriber base rapidly.`;
-    }
+    const report = [
+      '### LEAD LIST PRODUCT PRICING SCENARIO',
+      '- Sales model: ' + modelType,
+      '- Labor hours assumption: ' + hours,
+      '- Hourly labor valuation assumption: $' + rate.toFixed(2),
+      '- Tool-cost assumption: $' + tools.toFixed(2),
+      '- One-time build cost: $' + buildCost.toFixed(2),
+      '- Unit price assumption: $' + price.toFixed(2) + (modelType === 'subscription' ? '/month' : ''),
+      '- Volume assumption: ' + volume,
+      '- ' + periodLabel + ': $' + revenue.toFixed(2),
+      '- Contribution after one-time build cost: $' + contribution.toFixed(2),
+      '- Scenario return on build cost: ' + rotiPercent.toFixed(1) + '%',
+      '- Break-even units at the assumed price: ' + breakEvenUnits,
+      '',
+      '**Important limitations:** This calculation excludes ongoing list refresh and verification labor, customer acquisition, payment fees, support, refunds, churn, taxes, legal compliance, and the cost of acquiring source data. A subscription model must include recurring update costs before being treated as profitable.',
+      '**Evidence boundary:** No records were collected or verified, and no market pricing or demand data was queried. These are user-entered assumptions, not a forecast.'
+    ].join('\n');
 
     return {
       success: true,
-      unitEconomicsSummary,
-      launchPlaybook: reportText,
+      modelType,
+      assumptions: { hours, hourlyRateUsd: rate, toolCostsUsd: tools, unitPriceUsd: price, volume },
+      calculations: { buildCostUsd: buildCost, revenueScenarioUsd: revenue, contributionScenarioUsd: contribution, rotiScenarioPercent: rotiPercent, breakEvenUnits },
+      scenarioOnly: true,
+      evidenceStatus: 'user_supplied_assumptions_only_no_lead_data_retrieved',
+      report,
       executedAt: new Date().toISOString()
     };
   }
