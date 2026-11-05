@@ -5,5 +5,5 @@
  * explicit before the URL reaches node-postgres.
  */
 export function normalizePostgresConnectionString(connectionString: string): string {
-  return connectionString.replace(/([?&]sslmode=)(?:prefer|require|verify-ca)(?=(&|#|$)/gi, '$1verify-full');
+  return connectionString.replace(/([?&]sslmode=)(?:prefer|require|verify-ca)(?=&|#|$)/gi, '$1verify-full');
 }
