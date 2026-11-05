@@ -11221,7 +11221,7 @@ async function startServer() {
       const jobs = await pgDb.select().from(schedulerJobs).where(eq(schedulerJobs.contractorId, contractorId)).orderBy(desc(schedulerJobs.createdAt));
       const schedulerTemplates = getDefaultSchedulerRules();
 
-      const verification = verifyPhase3Pillars(sequences, outbox, jobs);
+      const verification = await verifyPhase3Pillars(sequences, outbox, jobs);
       const ledgerEntries = db.getStructuredLedger(contractorId, 20);
       const recentAutomationEvents = ledgerEntries.filter(e =>
         e.eventType.startsWith('phase3_') ||
@@ -11259,7 +11259,7 @@ async function startServer() {
       const sequences = await getTenantOutreachSequences(contractorId);
       const outbox = await pgDb.select().from(conversionOutbox).where(eq(conversionOutbox.contractorId, contractorId));
       const jobs = await pgDb.select().from(schedulerJobs).where(eq(schedulerJobs.contractorId, contractorId)).orderBy(desc(schedulerJobs.createdAt));
-      const verification = verifyPhase3Pillars(sequences, outbox, jobs);
+      const verification = await verifyPhase3Pillars(sequences, outbox, jobs);
 
       const auditBlock = db.recordLedgerEntry({
         contractorId,

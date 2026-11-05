@@ -82,6 +82,7 @@ export const HalRoadmapPhase3View: React.FC = () => {
   const [outboxProcessResult, setOutboxProcessResult] = useState<any | null>(null);
   const [testBackoffAttempt, setTestBackoffAttempt] = useState<number>(3);
   const [testWebhookSecret, setTestWebhookSecret] = useState('');
+  const [sampleSignature, setSampleSignature] = useState('');
   const [copiedSignature, setCopiedSignature] = useState(false);
 
   // Provider Configuration & Delivery Status State
@@ -305,13 +306,27 @@ export const HalRoadmapPhase3View: React.FC = () => {
   const computedSchedule = currentSequence ? calculateCadenceSchedule(new Date(), currentSequence.steps) : [];
 
   const backoffCalc = calculateExponentialBackoff(testBackoffAttempt);
-  const samplePayload = {
+  const samplePayload = React.useMemo(() => ({
     conversionAction: 'TestOnly',
     contractorId: 'test-only',
     dealValue: 0,
     timestamp: new Date().toISOString()
-  };
-  const sampleSignature = testWebhookSecret ? signWebhookPayload(testWebhookSecret, samplePayload) : '';
+  }), []);
+
+  useEffect(() => {
+    let active = true;
+    if (!testWebhookSecret) {
+      setSampleSignature('');
+      return;
+    }
+    signWebhookPayload(testWebhookSecret, samplePayload)
+      .then(signature => { if (active) setSampleSignature(signature); })
+      .catch(error => {
+        if (active) setSampleSignature('');
+        console.warn('[Phase 3] Browser HMAC test failed:', error);
+      });
+    return () => { active = false; };
+  }, [testWebhookSecret, samplePayload]);
 
   const p1 = statusData?.verification?.pillar1;
   const p2 = statusData?.verification?.pillar2;

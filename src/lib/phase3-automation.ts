@@ -7,7 +7,6 @@
  * 3. Automated Calendar & Scheduled Triggers (Autonomous cron scans, booking triggers)
  */
 
-import crypto from 'crypto';
 
 export interface SequenceStep {
   id: string;
@@ -271,9 +270,34 @@ export function calculateExponentialBackoff(
 /**
  * Computes standard HMAC-SHA256 signature for secure webhook payload delivery
  */
-export function signWebhookPayload(secret: string, payload: any): string {
+async function importWebhookHmacKey(secret: string): Promise<CryptoKey> {
+  return globalThis.crypto.subtle.importKey(
+    'raw',
+    new TextEncoder().encode(secret),
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign', 'verify']
+  );
+}
+
+/**
+ * Computes a standard HMAC-SHA256 signature using Web Crypto. This is safe in
+ * both browsers and Node 22, so the shared Phase 3 module has no Node-only
+ * crypto dependency.
+ */
+export async function signWebhookPayload(secret: string, payload: any): Promise<string> {
   const normalized = typeof payload === 'string' ? payload : JSON.stringify(payload);
-  return crypto.createHmac('sha256', secret).update(normalized).digest('hex');
+  const key = await importWebhookHmacKey(secret);
+  const signature = await globalThis.crypto.subtle.sign('HMAC', key, new TextEncoder().encode(normalized));
+  return Array.from(new Uint8Array(signature), byte => byte.toString(16).padStart(2, '0')).join('');
+}
+
+export async function verifyWebhookPayloadSignature(secret: string, payload: any, signature: string): Promise<boolean> {
+  if (!/^[a-f0-9]{64}$/i.test(signature)) return false;
+  const normalized = typeof payload === 'string' ? payload : JSON.stringify(payload);
+  const key = await importWebhookHmacKey(secret);
+  const signatureBytes = new Uint8Array(signature.match(/.{2}/g)!.map(pair => Number.parseInt(pair, 16)));
+  return globalThis.crypto.subtle.verify('HMAC', key, signatureBytes, new TextEncoder().encode(normalized));
 }
 
 /**
@@ -286,11 +310,11 @@ export function getDefaultSchedulerRules(): ScheduledTriggerRule[] {
 /**
  * Verifies all 3 pillars of Roadmap Phase 3: Automation Engine
  */
-export function verifyPhase3Pillars(
+export async function verifyPhase3Pillars(
   sequencesList: any[] = [],
   outboxRecords: any[] = [],
   schedulerRecords: any[] = []
-): Phase3VerificationReport {
+): Promise<Phase3VerificationReport> {
   // Pillar 1: Durable Multi-Step Outreach Sequencer
   const sequences = sequencesList;
   const totalSequences = sequences.length;
@@ -304,11 +328,11 @@ export function verifyPhase3Pillars(
   const retryingCount = outboxRecords.filter(r => r.status === 'retrying' || r.status === 'pending').length;
 
   // Test HMAC-SHA256 signature generation and verify roundtrip
-  const testSecret = crypto.randomBytes(32).toString('hex');
+  const testSecret = Array.from(globalThis.crypto.getRandomValues(new Uint8Array(32)), byte => byte.toString(16).padStart(2, '0')).join('');
   const testPayload = { test: 'phase3_verification', timestamp: Date.now() };
-  const signature = signWebhookPayload(testSecret, testPayload);
-  const reSignature = signWebhookPayload(testSecret, testPayload);
-  const hmacSignatureCheck = (signature === reSignature && signature.length === 64) ? 'PASSED' : 'FAILED';
+  const signature = await signWebhookPayload(testSecret, testPayload);
+  const hmacVerified = await verifyWebhookPayloadSignature(testSecret, testPayload, signature);
+  const hmacSignatureCheck = (hmacVerified && signature.length === 64) ? 'PASSED' : 'FAILED';
 
   // Exponential backoff test (attempt 3 = 8000ms = 8s)
   const backoff3 = calculateExponentialBackoff(3);
