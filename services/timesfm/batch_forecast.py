@@ -15,7 +15,7 @@ import numpy as np
 import psycopg
 from psycopg.rows import dict_row
 import timesfm
-from forecast_contract import first_target_week, matches_trade_context
+from forecast_contract import first_target_week, matches_trade_context, validate_batch_result
 
 DATABASE_URL = os.environ["DATABASE_URL"]
 MODEL_ID = "google/timesfm-2.5-200m-pytorch"
@@ -90,6 +90,9 @@ def main() -> None:
             ORDER BY c.id, territory.city
             """
         ).fetchall()
+
+        if not contractors:
+            validate_batch_result(0, 0)
 
         for contractor in contractors:
             city = str(contractor["city"]).split(",")[0].strip().lower()
@@ -211,8 +214,7 @@ def main() -> None:
             generated += len(batch_rows)
 
     print(f"TimesFM batch complete: {generated} forecast points saved; {skipped} contractor-territories skipped.")
-    if generated == 0:
-        print("No contractor-territories had enough eligible history yet; no forecasts were changed.")
+    validate_batch_result(len(contractors), generated)
 
 
 if __name__ == "__main__":

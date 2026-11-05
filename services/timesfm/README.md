@@ -120,12 +120,14 @@ idempotently. It does not invent missing days or fabricate sample rows. The
 batch runner consumes only rows whose city and campaign text match the selected
 territory and service type.
 
-The code path and its input/query contracts are covered by CI tests. However,
-no production Google Ads OAuth consent, live account query, or Neon row count
-has yet been verified. The ingestion feature is therefore implemented but
+The code path and its input/query contracts are covered by CI tests. No
+production Google Ads OAuth consent, live account query, or non-zero Neon
+history has yet been verified. The ingestion feature is implemented but
 production-unverified until a workspace owner saves valid OAuth credentials and
-the UI reports a non-zero imported row count. The database table existing by
-itself is not proof of genuine historical ingestion.
+the UI reports a non-zero imported row count. The batch runner now fails rather
+than reporting a successful empty run when the configured database has no
+contractor territories or when no eligible history produces forecast points.
+The database table existing by itself is not proof of genuine historical ingestion.
 
 ### Resource and product limitations
 

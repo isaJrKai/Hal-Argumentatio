@@ -25,3 +25,10 @@ def matches_trade_context(campaign_text: str, niche: str) -> bool:
     tokens = [token for token in re.split(r"[^a-z0-9]+", requested)
               if len(token) >= 3 and token not in GENERIC_TRADE_WORDS]
     return any(token in haystack for token in tokens) if tokens else requested in haystack
+
+
+def validate_batch_result(contractor_territory_count: int, generated_forecast_count: int) -> None:
+    if contractor_territory_count < 1:
+        raise RuntimeError("No contractor territories were found in the configured database; verify HAL_FORECAST_DATABASE_URL.")
+    if generated_forecast_count < 1:
+        raise RuntimeError("No TimesFM forecasts were generated from eligible tenant histories; import verified Google Ads history and retry.")
