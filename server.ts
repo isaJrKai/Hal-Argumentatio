@@ -10050,17 +10050,27 @@ async function startServer() {
       const pool = getApplicationPostgresPool();
       await bootstrapPostgresTables(pool);
       if (postgresStructuredLedgerEnabled()) {
-        const legacyLedger = db.getStructuredLedger(undefined, Number.MAX_SAFE_INTEGER).reverse();
-        const legacyIntegrity = db.verifyLedgerIntegrity();
-        if (!legacyIntegrity.valid) {
-          throw new Error(`Legacy structured ledger integrity check failed: ${legacyIntegrity.auditMessage}`);
+        // Legacy JSON is an optional import source, not a runtime dependency.
+        // Fresh/replacement instances may have no local file after cutover.
+        const legacyLedger = db.hasLegacyStore()
+          ? db.getStructuredLedger(undefined, Number.MAX_SAFE_INTEGER).reverse()
+          : [];
+        let reconciliation = { imported: 0, alreadyPresent: 0, total: 0 };
+        if (legacyLedger.length > 0) {
+          const legacyIntegrity = db.verifyLedgerIntegrity();
+          if (!legacyIntegrity.valid) {
+            throw new Error(`Legacy structured ledger integrity check failed: ${legacyIntegrity.auditMessage}`);
+          }
+          reconciliation = await importLegacyStructuredLedgerEntries(legacyLedger, pool);
         }
-        const reconciliation = await importLegacyStructuredLedgerEntries(legacyLedger, pool);
         const postgresIntegrity = await verifyStructuredLedgerIntegrity(undefined, pool);
-        if (!postgresIntegrity.valid || postgresIntegrity.totalEntries !== reconciliation.total || postgresIntegrity.totalEntries < legacyLedger.length) {
+        // A valid writer may append after import releases its advisory lock.
+        // Verify that the imported prefix remains present, not that the global
+        // chain count stayed frozen while other application instances started.
+        if (!postgresIntegrity.valid || postgresIntegrity.totalEntries < reconciliation.total || postgresIntegrity.totalEntries < legacyLedger.length) {
           throw new Error(`PostgreSQL structured ledger verification failed after reconciliation: ${postgresIntegrity.auditMessage}`);
         }
-        console.info(`[HAL PostgreSQL] Structured ledger cutover verified: ${reconciliation.imported} imported, ${reconciliation.alreadyPresent} legacy entries already present, ${postgresIntegrity.totalEntries} total global entries.`);
+        console.info(`[HAL PostgreSQL] Structured ledger verified: ${reconciliation.imported} imported, ${reconciliation.alreadyPresent} legacy entries already present, ${postgresIntegrity.totalEntries} total global entries.`);
       } else {
         const ledgerState = await pool.query<{ total: string }>(
           'SELECT count(*)::text AS total FROM structured_ledger_entries',
