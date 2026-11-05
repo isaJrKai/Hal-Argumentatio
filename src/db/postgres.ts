@@ -493,6 +493,32 @@ export async function bootstrapPostgresTables(poolInstance?: Pool): Promise<void
       ALTER TABLE communications_outbox DROP CONSTRAINT IF EXISTS communications_outbox_idempotency_key_key;
       CREATE UNIQUE INDEX IF NOT EXISTS communications_outbox_tenant_idempotency_idx ON communications_outbox (contractor_id, idempotency_key);
 
+      CREATE TABLE IF NOT EXISTS whatsapp_phone_number_mappings (
+        id TEXT PRIMARY KEY,
+        contractor_id TEXT NOT NULL,
+        phone_number_id TEXT NOT NULL UNIQUE,
+        display_phone_number TEXT,
+        verified_name TEXT,
+        verified_at TIMESTAMP NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS whatsapp_phone_mapping_tenant_idx
+        ON whatsapp_phone_number_mappings (contractor_id);
+
+      CREATE TABLE IF NOT EXISTS whatsapp_inbound_events (
+        id TEXT PRIMARY KEY,
+        contractor_id TEXT NOT NULL,
+        phone_number_id TEXT NOT NULL,
+        provider_message_id TEXT NOT NULL UNIQUE,
+        sender_encrypted TEXT NOT NULL,
+        message_encrypted TEXT NOT NULL,
+        message_type TEXT NOT NULL,
+        received_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS whatsapp_inbound_tenant_received_idx
+        ON whatsapp_inbound_events (contractor_id, received_at DESC);
+
       CREATE TABLE IF NOT EXISTS communications_delivery_events (
         id TEXT PRIMARY KEY,
         outbox_id TEXT,
