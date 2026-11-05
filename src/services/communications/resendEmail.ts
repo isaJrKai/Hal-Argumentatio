@@ -16,6 +16,8 @@ export interface ResendEmailInput {
   to: string;
   subject: string;
   text: string;
+  /** Optional trusted HTML body for system emails such as password resets. */
+  html?: string;
 }
 
 export interface ResendEmailResult {
@@ -81,7 +83,7 @@ export async function sendResendEmail(
         to: [to],
         subject,
         text,
-        html: `<div style="white-space:pre-wrap;font-family:Arial,sans-serif">${escapeHtml(text)}</div>`,
+        html: input.html ?? `<div style="white-space:pre-wrap;font-family:Arial,sans-serif">${escapeHtml(text)}</div>`,
       }),
       signal: AbortSignal.timeout(15000),
     });
