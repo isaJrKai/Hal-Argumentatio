@@ -26,7 +26,7 @@ test('Document Studio persists, approves, and captures client proposal acceptanc
 
     await pool.query(
       `INSERT INTO leads (id, contractor_id, business_name, city, niche, status, source)
-       VALUES ($1, $2, $3, $4, $5, 'closed_won', 'manual')`,
+       VALUES ($1, $2, $3, $4, $5, 'proposal', 'manual')`,
       [leadId, contractorId, 'Browser E2E Mechanical', 'Kampala', 'mechanical services']
     );
 
@@ -59,6 +59,57 @@ test('Document Studio persists, approves, and captures client proposal acceptanc
     await clientPage.getByRole('button', { name: 'Accept proposal' }).click();
     await expect(clientPage.getByRole('heading', { name: 'Acceptance recorded' })).toBeVisible();
 
+    const closeOut = await request.post('/api/revenues', {
+      headers: { Authorization: `Bearer ${token}` },
+      data: { leadId, amountUsd: 500, source: 'client_accepted_proposal' }
+    });
+    expect(closeOut.status()).toBe(201);
+
+    const projectResponse = await request.post('/api/projects', {
+      headers: { Authorization: `Bearer ${token}` },
+      data: {
+        leadId,
+        businessName: 'Browser E2E Mechanical',
+        city: 'Kampala',
+        serviceType: 'Mechanical services',
+        packageTier: 'Growth',
+        monthlyRetainerUsd: 1200
+      }
+    });
+    expect(projectResponse.status()).toBe(201);
+    const project = await projectResponse.json();
+
+    const activated = await request.put(`/api/projects/${project.id}`, {
+      headers: { Authorization: `Bearer ${token}` },
+      data: { status: 'active_delivery' }
+    });
+    expect(activated.status()).toBe(200);
+
+    await page.getByText('Client Work Orders', { exact: true }).first().click();
+    await page.getByText('Browser E2E Mechanical', { exact: true }).first().click();
+    await expect(page.getByText('Invoices & receipts')).toBeVisible();
+    await page.getByLabel('Invoice description').fill('First month service');
+    await page.getByLabel('Amount (USD)').fill('1200');
+    await page.getByRole('button', { name: 'Issue invoice' }).click();
+    await expect(page.getByText(/HAL-/)).toBeVisible();
+
+    await page.getByLabel('Receipt amount in USD').fill('1200');
+    await page.getByRole('button', { name: 'Record receipt' }).click();
+    await expect(page.getByText(/Receipt recorded/)).toBeVisible();
+
+    const invoiceRows = await pool.query(
+      'SELECT id, status, amount_due_minor FROM invoices WHERE contractor_id = $1 AND project_id = $2',
+      [contractorId, project.id]
+    );
+    expect(invoiceRows.rows).toHaveLength(1);
+    expect(invoiceRows.rows[0]).toMatchObject({ status: 'paid', amount_due_minor: 120000 });
+    const paymentRows = await pool.query(
+      'SELECT amount_minor, method FROM invoice_payments WHERE contractor_id = $1 AND invoice_id = $2',
+      [contractorId, invoiceRows.rows[0].id]
+    );
+    expect(paymentRows.rows).toHaveLength(1);
+    expect(paymentRows.rows[0].amount_minor).toBe(120000);
+
     const persisted = await pool.query(
       'SELECT status, signer_name, signer_email, signature_consent, signed_content_hash FROM proposals WHERE contractor_id = $1 AND lead_id = $2',
       [contractorId, leadId]
@@ -77,6 +128,10 @@ test('Document Studio persists, approves, and captures client proposal acceptanc
       await pool.query('DELETE FROM proposal_signing_links WHERE contractor_id = $1', [contractorId]);
       await pool.query('DELETE FROM proposals WHERE contractor_id = $1', [contractorId]);
       await pool.query('DELETE FROM invoice_payments WHERE contractor_id = $1', [contractorId]);
+      await pool.query('DELETE FROM invoices WHERE contractor_id = $1', [contractorId]);
+      await pool.query('DELETE FROM client_projects WHERE contractor_id = $1', [contractorId]);
+      await pool.query('DELETE FROM revenue_records WHERE contractor_id = $1', [contractorId]);
+      await pool.query('DELETE FROM lead_events WHERE lead_id = $1', [leadId]);
       await pool.query('DELETE FROM invoices WHERE contractor_id = $1', [contractorId]);
       await pool.query('DELETE FROM leads WHERE contractor_id = $1', [contractorId]);
       await pool.query('DELETE FROM audit_logs WHERE contractor_id = $1', [contractorId]);
