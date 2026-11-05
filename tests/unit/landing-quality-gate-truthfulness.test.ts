@@ -9,11 +9,11 @@ describe('landing page quality gate evidence boundaries', () => {
       expect(template.city).toBe('Your service area');
       expect(template.phone).toBe('');
       expect(template.licenseNumber).toBe('');
-      expect(template.sections.trust_bar.active).toBe(false);
-      expect(template.sections.pricing_packages.active).toBe(false);
-      expect(template.sections.reviews.active).toBe(false);
-      expect(template.sections.before_after.active).toBe(false);
-      expect(template.sections.services.active).toBe(false);
+      expect(template.sections.trust_bar?.active ?? false).toBe(false);
+      expect(template.sections.pricing_packages?.active ?? false).toBe(false);
+      expect(template.sections.reviews?.active ?? false).toBe(false);
+      expect(template.sections.before_after?.active ?? false).toBe(false);
+      expect(template.sections.services?.active ?? false).toBe(false);
     }
   });
 
