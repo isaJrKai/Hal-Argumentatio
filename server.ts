@@ -4826,7 +4826,7 @@ app.post('/api/intelligence/chat', authenticate, async (req, res) => {
           .orderBy(desc(chatMessages.createdAt)).limit(20);
     const formattedHistory = contextRows.reverse().map(m => ({
       role: m.role as 'user' | 'model',
-      parts: [{ text: m.text.slice(-1800) }]
+      parts: [{ text: m.conversationId === conversationId ? m.text.slice(-1800) : `[Earlier conversation in this project] ${m.text.slice(-1800)}` }]
     }));
 
     // Load the always-useful workspace summary plus only the domains this
