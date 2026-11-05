@@ -384,6 +384,7 @@ export const communicationsOutbox = pgTable('communications_outbox', {
   providerMessageId: text('provider_message_id').unique(),
   idempotencyKey: text('idempotency_key').notNull().unique(),
   attempts: integer('attempts').default(0).notNull(),
+  nextAttemptAt: timestamp('next_attempt_at'),
   lastAttemptAt: timestamp('last_attempt_at'),
   submittedAt: timestamp('submitted_at'),
   deliveredAt: timestamp('delivered_at'),
