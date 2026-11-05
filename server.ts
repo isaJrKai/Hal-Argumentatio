@@ -5510,6 +5510,7 @@ interface DispatchLogEntry {
 }
 
 const liveEmailDispatchLimits = new Map<string, { count: number; resetAt: number }>();
+const liveSmsDispatchLimits = new Map<string, { count: number; resetAt: number }>();
 
 app.post('/api/webhooks/resend', async (req, res) => {
   const webhookSecret = process.env.RESEND_WEBHOOK_SECRET || '';
@@ -6330,6 +6331,20 @@ app.post('/api/outreach/dispatch', authenticate, async (req, res) => {
           deliveryConfirmed: existingDispatch.status === 'delivered',
           error: existingDispatch.errorMessage || undefined
         });
+      }
+      const rateNow = Date.now();
+      const smsLimit = liveSmsDispatchLimits.get(contractorId);
+      if (smsLimit && smsLimit.resetAt > rateNow && smsLimit.count >= 5) {
+        return res.status(429).json({
+          success: false, code: 'LIVE_SMS_RATE_LIMITED',
+          error: 'Live SMS limit reached. Try again after the current 10-minute window.',
+          retryAfterSeconds: Math.ceil((smsLimit.resetAt - rateNow) / 1000)
+        });
+      }
+      if (!smsLimit || smsLimit.resetAt <= rateNow) {
+        liveSmsDispatchLimits.set(contractorId, { count: 1, resetAt: rateNow + 10 * 60 * 1000 });
+      } else {
+        smsLimit.count += 1;
       }
       const outboxId = crypto.randomUUID();
       await pgDb.insert(communicationsOutbox).values({
