@@ -550,8 +550,14 @@ class Database {
         this.data = { ...this.data, ...parsed };
         console.log('Database loaded successfully with', this.data.leads.length, 'leads.');
       } catch (e) {
-        console.error('Error loading database, resetting...', e);
-        this.save();
+        // Never replace an unreadable store with empty defaults. A truncated or
+        // malformed file may contain the only copy of customer/business data.
+        // Fail startup and require an operator-led recovery from a verified backup.
+        console.error('Database file is unreadable; refusing to reset or overwrite it.', e);
+        throw new Error(
+          'HAL legacy database could not be parsed. Startup aborted to prevent data loss; restore a verified backup before restarting.',
+          { cause: e }
+        );
       }
     } else {
       this.save();
