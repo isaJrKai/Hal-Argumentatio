@@ -189,7 +189,7 @@ export function auditLandingPage(config: LandingPageConfig): QualityGateAuditRep
       ruleNumber: 3,
       title: 'Mobile Verification & Touch Targets',
       category: 'design',
-      status: 'pass',
+      status: 'warning',
       summary: 'Sticky mobile call control is configured; viewport behavior is not browser-verified',
       details: 'The sticky call control is enabled in configuration. Actual touch-target size, overflow, and physical-device behavior require browser/device testing.',
     });
@@ -201,7 +201,7 @@ export function auditLandingPage(config: LandingPageConfig): QualityGateAuditRep
     ruleNumber: 4,
     title: 'Motion & Interaction Rules (Tactile Motion Bar)',
     category: 'motion',
-    status: 'pass',
+    status: 'warning',
     summary: 'Motion behavior not measured by this configuration audit',
     details: 'This gate does not inspect runtime animations, layout shifts, or reduced-motion behavior. Verify these in a rendered browser before claiming performance compliance.',
   });
@@ -269,7 +269,7 @@ export function auditLandingPage(config: LandingPageConfig): QualityGateAuditRep
       ruleNumber: 5,
       title: 'Performance & LocalBusiness Schema.org',
       category: 'performance',
-      status: 'pass',
+      status: 'warning',
       summary: 'SEO metadata fields are configured; rendered output and performance are not validated',
       details: `Schema type is configured as ${config.seo.schemaType} and a meta title is present. This gate does not validate rendered JSON-LD, render-blocking scripts, Core Web Vitals, or FCP.`,
     });
@@ -336,8 +336,8 @@ export function autoRemediateGate(config: LandingPageConfig, gateId: string): La
     case 'mobile_readiness':
       if (cloned.sections.sticky_mobile_call) {
         cloned.sections.sticky_mobile_call.active = true;
-        cloned.sections.sticky_mobile_call.buttonText = `Call ${cloned.phone || '(800) 555-0199'}`;
-        cloned.sections.sticky_mobile_call.crewStatus = '2 Crews On Duty In Your Area';
+        cloned.sections.sticky_mobile_call.buttonText = cloned.phone ? `Call ${cloned.phone}` : `Contact ${cloned.businessName}`;
+        cloned.sections.sticky_mobile_call.crewStatus = 'Confirm availability with the business';
       }
       break;
 
@@ -348,8 +348,8 @@ export function autoRemediateGate(config: LandingPageConfig, gateId: string): La
     case 'performance_seo':
       if (!cloned.seo) {
         cloned.seo = {
-          metaTitle: `${cloned.businessName} - 24/7 ${cloned.trade} in ${cloned.city}`,
-          metaDescription: `Licensed, insured 24/7 ${cloned.trade} services in ${cloned.city}. Flat-rate upfront quotes, rapid local dispatch.`,
+          metaTitle: `${cloned.businessName} - ${cloned.trade} in ${cloned.city}`,
+          metaDescription: `${cloned.businessName} provides ${cloned.trade} services in ${cloned.city}. Contact the business for current service details.`,
           schemaType: 'HomeAndConstructionBusiness'
         };
       } else {
