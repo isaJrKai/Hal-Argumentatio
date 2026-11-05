@@ -86,6 +86,9 @@ describe('client project financial integrity', () => {
     expect(projectHandler).toContain("includes(String(linkedLead.status).toLowerCase())");
     expect(projectHandler).toContain('A client project can only be converted from a lead recorded as closed-won.');
     expect(projectHandler).toContain('A client project already exists for this won lead.');
+    expect(projectHandler).toContain('pg_advisory_xact_lock');
+    expect(projectHandler).toContain('tx.insert(workEvents)');
+    expect(projectHandler).toContain('pgDb.transaction(async tx =>');
   });
 });
 
