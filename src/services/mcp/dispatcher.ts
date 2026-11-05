@@ -488,6 +488,7 @@ export async function executeMcpTool(
           taskId, taskType: task.taskType, attempt: claimed.attemptCount,
           startedAt: executionStartedAt.toISOString(), completedAt: completedAt.toISOString(),
           durationMs: Math.max(0, completedAt.getTime() - executionStartedAt.getTime()),
+          ...resultReceipt,
           result: resultReceipt
         };
         const [completed] = await pgDb.update(workTasks).set({
