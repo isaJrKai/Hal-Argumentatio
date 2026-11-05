@@ -10,7 +10,7 @@ HALBiz's server entrypoint uses PostgreSQL/Drizzle: `server.ts` imports the appl
 
 A separate legacy singleton remains in `src/db/db.ts`. It loads and saves a complete `data/db.json` aggregate synchronously. `server.ts` still imports this singleton and makes 77 calls across 17 legacy methods, including audit logs, leads, lessons, win/loss records, scheduler jobs, structured-ledger entries and integrity checks. This branch migrates the `src/skills/geo-map.ts` consumer, but does not retire the root server's legacy runtime paths. The PII migration helper was decoupled from the singleton by extracting encryption into `src/db/encryption.ts`. The static regression test currently scans `src/` only; it does not cover the root `server.ts` import.
 
-This substantially reduces the risk that normal server requests are writing to ephemeral local JSON, but it does not yet prove every runtime persistence path is durable, tenant-safe, and failure-closed.
+The geo-map and credential paths now use PostgreSQL, but the root server still has many active JSON-backed request paths. This is a partial reduction only; it does not prove that the broader runtime persistence boundary is durable, tenant-safe, or failure-closed.
 
 ## Implemented on this branch
 
@@ -37,7 +37,7 @@ This substantially reduces the risk that normal server requests are writing to e
 
 | Domain | Existing PostgreSQL table/schema | Remaining verification |
 |---|---|---|
-| Leads | `leads` | Tenant-scoped Drizzle queries are used by current services; verify all create/update/delete paths and ensure encrypted contact fields remain the only persisted PII. |
+| Leads | `leads` | Current Drizzle services use tenant-scoped queries, but root `server.ts` still uses legacy JSON methods for lead creation/update and some reads. Migrate and verify every active route before claiming PostgreSQL is canonical. |
 | Structured ledger | No `structured_ledger` table found in current Drizzle schema/bootstrap | The legacy hash chain has no canonical PostgreSQL table. Add an append-only, transactionally sequenced store and verify hash continuity before migrating any historical entries. |
 | Missions | `missions`, with `steps JSONB` | Confirm every active writer and reader uses tenant-scoped SQL. |
 | Scheduler jobs | `scheduler_jobs` | Confirm all create/update/list paths use PostgreSQL and tenant-scoped predicates. |
@@ -45,11 +45,11 @@ This substantially reduces the risk that normal server requests are writing to e
 | Outreach sequences | `outreach_sequences`, with `steps JSONB` | Verify all CRUD paths and ownership checks. |
 | Client projects | `client_projects`, with `milestones JSONB` and `assets JSONB` | Verify tenant-scoped CRUD and uniqueness/handling of portal access tokens. |
 | Learning state | `neural_state`, currently a singleton row | PostgreSQL persistence now fails closed, but the singleton is shared across tenants. Tenant attribution and isolation must be designed before treating learned outcomes as tenant-private or using them for tenant-specific decisions. |
-| Connector credentials | `connector_credentials`, with `encrypted_value` | Transactional repository and PostgreSQL tests now exist. Wire it to any future/current connector integration consumers; preserve the AES envelope and reconcile historical duplicate rows before adding a unique constraint. |
+| Connector credentials | `connector_credentials`, with `encrypted_value` | Credential read/save APIs now use the transactional repository and legacy imports are insert-if-absent. Add end-to-end route/concurrency tests and reconcile historical duplicate rows before adding a unique constraint. |
 | API keys | `api_keys`, with transitional `key_hash` and `prefix` columns | Startup no longer forces NOT NULL on potentially unbackfilled legacy rows. New-key creation must enforce both values in application validation until a versioned, data-aware backfill is shipped. |
 | Password reset tokens | `password_reset_tokens` | Table existence alone does not establish a complete reset flow; token persistence, single-use semantics and delivery must be verified together. |
 | Chat messages | `chat_messages` | Confirm every active UI/API path uses the same tenant-scoped PostgreSQL records. |
-| Audit logs | `audit_logs` | Reconcile bootstrap nullability with Drizzle schema and verify all writes/read paths use consistent tenant semantics. |
+| Audit logs | `audit_logs` | Bootstrap and Drizzle nullability now agree. Most root-server audit writes and the merged legacy audit read path still touch the JSON aggregate; migrate all remaining paths and verify tenant scoping. |
 
 ## Risks still open
 
