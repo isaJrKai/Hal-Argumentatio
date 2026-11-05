@@ -38,6 +38,7 @@ import { callNemotron } from './src/services/nemotron.ts';
 import { runProviderProbe } from './src/services/aiProviderDiagnostics.ts';
 import { autonomousLearning, getTenantAutonomousLearning } from './src/lib/autonomousLearning';
 import { getConnectorCredentials, importConnectorCredentialIfAbsent, saveConnectorCredential } from './src/db/connectorCredentials';
+import { appendStructuredLedgerEntry, getStructuredLedgerEntries, importLegacyStructuredLedgerEntries, verifyStructuredLedgerIntegrity } from './src/db/structuredLedger';
 import { getAllSkills, executeSkill, registerCustomSkill, unregisterCustomSkill } from './src/skills/registry';
 import { HAL_MCP_TOOLS, executeMcpTool } from './src/services/mcp/dispatcher';
 import { McpJsonRpcRequest, McpJsonRpcResponse } from './src/services/mcp/types';
@@ -104,6 +105,28 @@ import {
   DEFAULT_CIRCUIT_BREAKER_CONFIG
 } from './src/lib/circuitBreaker';
 
+
+
+type StructuredLedgerInput = Parameters<typeof db.recordLedgerEntry>[0];
+const postgresStructuredLedgerEnabled = () => process.env.HAL_STRUCTURED_LEDGER_POSTGRES_ENABLED === 'true';
+
+async function recordStructuredLedgerEntry(input: StructuredLedgerInput) {
+  return postgresStructuredLedgerEnabled()
+    ? appendStructuredLedgerEntry(input)
+    : db.recordLedgerEntry(input);
+}
+
+async function readStructuredLedger(contractorId?: string, limit = 10000) {
+  return postgresStructuredLedgerEnabled()
+    ? getStructuredLedgerEntries(contractorId, limit)
+    : db.getStructuredLedger(contractorId, limit);
+}
+
+async function checkStructuredLedgerIntegrity(contractorId?: string) {
+  return postgresStructuredLedgerEnabled()
+    ? verifyStructuredLedgerIntegrity(contractorId)
+    : db.verifyLedgerIntegrity(contractorId);
+}
 
 // Setup environment variables
 import dotenv from 'dotenv';
@@ -2177,21 +2200,19 @@ app.post('/api/public/landing-leads', async (req, res) => {
     // The lead and its review events were committed in the PostgreSQL transaction above.
     // Do not mirror this write into the legacy JSON aggregate.
     
-    try {
-      db.recordLedgerEntry({
-        contractorId: targetContractorId,
-        eventType: 'lead_captured',
-        entityType: 'lead',
-        entityId: leadId,
-        actor: 'LandingPageLeadIngest',
-        details: `A visitor submitted an inquiry through landing page ${landingPageId.trim()}.`,
-        metadata: {
-          landingPageId: landingPageId.trim(),
-          serviceDetails: normalizedDetails,
-          city: pageCity
-        }
-      });
-    } catch (_) {}
+    await recordStructuredLedgerEntry({
+      contractorId: targetContractorId,
+      eventType: 'lead_captured',
+      entityType: 'lead',
+      entityId: leadId,
+      actor: 'LandingPageLeadIngest',
+      details: `A visitor submitted an inquiry through landing page ${landingPageId.trim()}.`,
+      metadata: {
+        landingPageId: landingPageId.trim(),
+        serviceDetails: normalizedDetails,
+        city: pageCity
+      }
+    });
 
     try {
       broadcastNotification(
@@ -2941,24 +2962,20 @@ app.all(['/api/webhooks/twilio', '/api/webhooks/whatsapp'], async (req, res) => 
     }).where(and(eq(leads.id, matchedLead.id), eq(leads.contractorId, targetContractorId)));
 
     // Commit cryptographic ledger audit entry
-    try {
-      db.recordLedgerEntry({
-        contractorId: targetContractorId,
-        eventType: 'lead_captured',
-        entityType: 'lead',
-        entityId: matchedLead.id,
-        actor: 'carrier_webhook',
-        metadata: {
-          from: cleanFrom,
-          channel: isWhatsApp ? 'whatsapp' : 'sms',
-          messageSid,
-          leadId: matchedLead.id,
-          bodySnippet: rawBody.slice(0, 140)
-        }
-      });
-    } catch (e) {
-      console.warn('Ledger commit skipped for webhook:', e);
-    }
+    await recordStructuredLedgerEntry({
+      contractorId: targetContractorId,
+      eventType: 'lead_captured',
+      entityType: 'lead',
+      entityId: matchedLead.id,
+      actor: 'carrier_webhook',
+      metadata: {
+        from: cleanFrom,
+        channel: isWhatsApp ? 'whatsapp' : 'sms',
+        messageSid,
+        leadId: matchedLead.id,
+        bodySnippet: rawBody.slice(0, 140)
+      }
+    });
 
     // Broadcast instant real-time notification alert via SSE to the dashboard
     const channelLabel = isWhatsApp ? 'WhatsApp' : 'SMS';
@@ -5957,7 +5974,7 @@ app.post('/api/dispatch/campaign-batch', authenticate, async (req, res) => {
     payload: { campaignId: campaignId || null, channel, simulated, failed, totalTargeted: targetLeads.length, providerContacted: false }
   });
 
-  const auditBlock = db.recordLedgerEntry({
+  const auditBlock = await recordStructuredLedgerEntry({
     contractorId,
     eventType: 'conversion_outbox',
     entityType: 'campaign_dispatch',
@@ -5989,7 +6006,7 @@ app.post('/api/dispatch/campaign-batch', authenticate, async (req, res) => {
     channel,
     results,
     block: auditBlock,
-    integrity: db.verifyLedgerIntegrity(contractorId)
+    integrity: await checkStructuredLedgerIntegrity(contractorId)
   });
 });
 
@@ -6618,7 +6635,7 @@ app.post('/api/outreach/dispatch', authenticate, async (req, res) => {
         summary: `Email accepted by Resend for ${leadBusinessName || 'a direct recipient'}; delivery is not confirmed.`,
         payload: { channel: 'email', provider: result.provider, providerMessageId: result.providerMessageId, status: result.status, deliveryConfirmed: false }
       });
-      const auditBlock = db.recordLedgerEntry({
+      const auditBlock = await recordStructuredLedgerEntry({
         contractorId,
         eventType: 'phase3_live_dispatch',
         entityType: 'outreach_email',
@@ -6750,7 +6767,7 @@ app.post('/api/outreach/dispatch', authenticate, async (req, res) => {
     payload: { channel, mode: 'simulation', status: 'simulated', providerContacted: false, dispatchId }
   });
 
-  const auditBlock = db.recordLedgerEntry({
+  const auditBlock = await recordStructuredLedgerEntry({
     contractorId,
     eventType: 'phase3_verification_audit',
     entityType: 'outreach_simulation',
@@ -9969,6 +9986,19 @@ async function startServer() {
     try {
       const pool = getApplicationPostgresPool();
       await bootstrapPostgresTables(pool);
+      if (postgresStructuredLedgerEnabled()) {
+        const legacyLedger = db.getStructuredLedger(undefined, Number.MAX_SAFE_INTEGER).reverse();
+        const legacyIntegrity = db.verifyLedgerIntegrity();
+        if (!legacyIntegrity.valid) {
+          throw new Error(`Legacy structured ledger integrity check failed: ${legacyIntegrity.auditMessage}`);
+        }
+        const reconciliation = await importLegacyStructuredLedgerEntries(legacyLedger, pool);
+        const postgresIntegrity = await verifyStructuredLedgerIntegrity(undefined, pool);
+        if (!postgresIntegrity.valid || postgresIntegrity.totalEntries !== legacyLedger.length) {
+          throw new Error(`PostgreSQL structured ledger verification failed after reconciliation: ${postgresIntegrity.auditMessage}`);
+        }
+        console.info(`[HAL PostgreSQL] Structured ledger cutover verified: ${reconciliation.imported} imported, ${reconciliation.alreadyPresent} already present, ${postgresIntegrity.totalEntries} total global entries.`);
+      }
       const migratedLeadPii = await migrateExistingLeadPii(pool);
       if (migratedLeadPii > 0) {
         console.info(`[HAL PostgreSQL] Encrypted PII for ${migratedLeadPii} existing lead records.`);
@@ -10553,7 +10583,7 @@ async function startServer() {
         metadata: { status: newStatus }
       });
 
-      db.recordLedgerEntry({
+      await recordStructuredLedgerEntry({
         contractorId,
         eventType: 'stage_transition',
         entityType: 'hal_loop',
@@ -10744,7 +10774,7 @@ async function startServer() {
       });
 
       // Commit to immutable structured ledger
-      db.recordLedgerEntry({
+      await recordStructuredLedgerEntry({
         contractorId,
         eventType: 'evidence_gathered',
         entityType: 'hal_loop',
@@ -11229,8 +11259,8 @@ async function startServer() {
     const contractorId = (req as any).contractorId;
 
     try {
-      const ledger = db.getStructuredLedger(contractorId, 10);
-      const integrity = db.verifyLedgerIntegrity(contractorId);
+      const ledger = await readStructuredLedger(contractorId, 10);
+      const integrity = await checkStructuredLedgerIntegrity(contractorId);
       const allLeads = await pgDb.select().from(leads).where(eq(leads.contractorId, contractorId));
 
       const stageCounts = {
@@ -11394,11 +11424,11 @@ async function startServer() {
     const eventType = req.query.eventType as string;
 
     try {
-      let entries = db.getStructuredLedger(contractorId, limit);
+      let entries = await readStructuredLedger(contractorId, limit);
       if (eventType) {
         entries = entries.filter(e => e.eventType === eventType);
       }
-      const integrity = db.verifyLedgerIntegrity(contractorId);
+      const integrity = await checkStructuredLedgerIntegrity(contractorId);
 
       res.json({
         success: true,
@@ -11419,7 +11449,7 @@ async function startServer() {
 
     try {
       // Test 1: Cryptographic Ledger Chain Verification
-      const ledgerIntegrity = db.verifyLedgerIntegrity(contractorId);
+      const ledgerIntegrity = await checkStructuredLedgerIntegrity(contractorId);
 
       // Test 2: PII Encryption Roundtrip & Non-Deterministic IV Verification
       const testSecret = 'hal_phase1_audit_secret_' + Date.now();
@@ -11464,7 +11494,7 @@ async function startServer() {
       const allPassed = tests.every(t => t.status === 'PASSED');
 
       // Record this verification in the structured ledger
-      db.recordLedgerEntry({
+      await recordStructuredLedgerEntry({
         contractorId,
         eventType: 'security_event',
         entityType: 'audit_verification',
@@ -11520,7 +11550,7 @@ async function startServer() {
       });
 
       // Step 2: Record Lead Ingestion in Structured Ledger
-      const ingestBlock = db.recordLedgerEntry({
+      const ingestBlock = await recordStructuredLedgerEntry({
         contractorId,
         eventType: 'lead_captured',
         entityType: 'lead',
@@ -11534,7 +11564,7 @@ async function startServer() {
       const updatedLead = db.updateLead(newLead.id, contractorId, { status: 'contacted' });
 
       // Step 4: Record CRM Stage Transition in Structured Ledger
-      const transitionBlock = db.recordLedgerEntry({
+      const transitionBlock = await recordStructuredLedgerEntry({
         contractorId,
         eventType: 'crm_transition',
         entityType: 'lead',
@@ -11545,7 +11575,7 @@ async function startServer() {
       });
 
       // Step 5: Recognize Pipeline Opportunity in Ledger
-      const revenueBlock = db.recordLedgerEntry({
+      const revenueBlock = await recordStructuredLedgerEntry({
         contractorId,
         eventType: 'pipeline_mutation',
         entityType: 'pipeline_opportunity',
@@ -11556,7 +11586,7 @@ async function startServer() {
       });
 
       // Verify chain integrity after the simulated transaction
-      const integrity = db.verifyLedgerIntegrity(contractorId);
+      const integrity = await checkStructuredLedgerIntegrity(contractorId);
 
       res.json({
         success: true,
@@ -11584,7 +11614,7 @@ async function startServer() {
     const contractorId = (req as any).contractorId;
 
     try {
-      const integrity = db.verifyLedgerIntegrity(contractorId);
+      const integrity = await checkStructuredLedgerIntegrity(contractorId);
       const allLeads = await pgDb.select().from(leads).where(eq(leads.contractorId, contractorId));
       
       const verification = verifyPhase2Pillars(allLeads as any);
@@ -11594,7 +11624,7 @@ async function startServer() {
         message: 'Competitor rankings, ratings, reviews, performance, and spend are unavailable until a verified data source is configured.'
       };
 
-      const ledgerEntries = db.getStructuredLedger(contractorId, 20);
+      const ledgerEntries = await readStructuredLedger(contractorId, 20);
       const recentAudits = ledgerEntries.filter(e => e.eventType === 'competitor_audit_completed' || e.eventType === 'lead_harvested');
 
       res.json({
@@ -11624,7 +11654,7 @@ async function startServer() {
       const verification = verifyPhase2Pillars(allLeads as any);
 
       // Record verification block in the tamper-evident structured ledger
-      const auditBlock = db.recordLedgerEntry({
+      const auditBlock = await recordStructuredLedgerEntry({
         contractorId,
         eventType: 'phase2_verification_audit',
         entityType: 'roadmap_milestone',
@@ -11640,7 +11670,7 @@ async function startServer() {
         }
       });
 
-      const integrity = db.verifyLedgerIntegrity(contractorId);
+      const integrity = await checkStructuredLedgerIntegrity(contractorId);
 
       res.json({
         success: true,
@@ -11735,7 +11765,7 @@ async function startServer() {
         });
 
         // Record in cryptographic ledger
-        db.recordLedgerEntry({
+        await recordStructuredLedgerEntry({
           contractorId,
           eventType: 'lead_harvested',
           entityType: 'lead',
@@ -11787,7 +11817,7 @@ async function startServer() {
       }
 
       // 4. Log overarching harvest block
-      const harvestBlock = db.recordLedgerEntry({
+      const harvestBlock = await recordStructuredLedgerEntry({
         contractorId,
         eventType: 'territory_harvest_completed',
         entityType: 'territory_intel',
@@ -11807,7 +11837,7 @@ async function startServer() {
         purgedMock: Boolean(purgeMock),
         purgedCount,
         block: harvestBlock,
-        integrity: db.verifyLedgerIntegrity(contractorId)
+        integrity: await checkStructuredLedgerIntegrity(contractorId)
       });
     } catch (err: any) {
       console.error('[Roadmap Phase 2 Harvest Error]', err);
@@ -11824,7 +11854,7 @@ async function startServer() {
     const contractorId = (req as any).contractorId;
 
     try {
-      const integrity = db.verifyLedgerIntegrity(contractorId);
+      const integrity = await checkStructuredLedgerIntegrity(contractorId);
       const sequences = await getTenantOutreachSequences(contractorId);
       const sequenceTemplates = getDefaultCadenceSequences();
       const outbox = await pgDb.select().from(conversionOutbox).where(eq(conversionOutbox.contractorId, contractorId));
@@ -11832,7 +11862,7 @@ async function startServer() {
       const schedulerTemplates = getDefaultSchedulerRules();
 
       const verification = await verifyPhase3Pillars(sequences, outbox, jobs);
-      const ledgerEntries = db.getStructuredLedger(contractorId, 20);
+      const ledgerEntries = await readStructuredLedger(contractorId, 20);
       const recentAutomationEvents = ledgerEntries.filter(e =>
         e.eventType.startsWith('phase3_') ||
         e.eventType.includes('sequence') ||
@@ -11871,7 +11901,7 @@ async function startServer() {
       const jobs = await pgDb.select().from(schedulerJobs).where(eq(schedulerJobs.contractorId, contractorId)).orderBy(desc(schedulerJobs.createdAt));
       const verification = await verifyPhase3Pillars(sequences, outbox, jobs);
 
-      const auditBlock = db.recordLedgerEntry({
+      const auditBlock = await recordStructuredLedgerEntry({
         contractorId,
         eventType: 'phase3_verification_audit',
         entityType: 'roadmap_milestone',
@@ -11887,7 +11917,7 @@ async function startServer() {
         }
       });
 
-      const integrity = db.verifyLedgerIntegrity(contractorId);
+      const integrity = await checkStructuredLedgerIntegrity(contractorId);
 
       res.json({
         success: true,
@@ -11936,7 +11966,7 @@ async function startServer() {
       if (!targetSeq) return res.status(404).json({ success: false, error: 'No saved sequence or preview template is available.' });
 
       const scheduledSteps = calculateCadenceSchedule(new Date(), targetSeq.steps);
-      const auditBlock = db.recordLedgerEntry({
+      const auditBlock = await recordStructuredLedgerEntry({
         contractorId,
         eventType: 'phase3_sequence_previewed',
         entityType: 'cadence_sequence_preview',
@@ -11965,7 +11995,7 @@ async function startServer() {
         sequence: targetSeq,
         scheduledSteps,
         block: auditBlock,
-        integrity: db.verifyLedgerIntegrity(contractorId)
+        integrity: await checkStructuredLedgerIntegrity(contractorId)
       });
     } catch (err: any) {
       console.error('[Roadmap Phase 3 Sequence Preview Error]', err);
@@ -11984,7 +12014,7 @@ async function startServer() {
         ['pending', 'queued', 'retrying'].includes(String(record.status).toLowerCase())
       ).length;
 
-      const auditBlock = db.recordLedgerEntry({
+      const auditBlock = await recordStructuredLedgerEntry({
         contractorId,
         eventType: 'phase3_outbox_inspected',
         entityType: 'conversion_outbox',
@@ -12008,7 +12038,7 @@ async function startServer() {
         message: 'Inspection only. No verified conversion-upload adapter is configured; no records were sent or marked successful.',
         records: existingOutbox,
         block: auditBlock,
-        integrity: db.verifyLedgerIntegrity(contractorId)
+        integrity: await checkStructuredLedgerIntegrity(contractorId)
       });
     } catch (err: any) {
       console.error('[Roadmap Phase 3 Outbox Inspection Error]', err);
@@ -12036,7 +12066,7 @@ async function startServer() {
         createdAt: jobTime
       }).returning();
 
-      const auditBlock = db.recordLedgerEntry({
+      const auditBlock = await recordStructuredLedgerEntry({
         contractorId,
         eventType: 'phase3_scheduler_configuration_checked',
         entityType: 'scheduler_system',
@@ -12061,7 +12091,7 @@ async function startServer() {
         message: 'No persisted scheduler rules are configured. No jobs or external triggers were executed.',
         jobRecord,
         block: auditBlock,
-        integrity: db.verifyLedgerIntegrity(contractorId)
+        integrity: await checkStructuredLedgerIntegrity(contractorId)
       });
     } catch (err: any) {
       console.error('[Roadmap Phase 3 Scheduler Configuration Error]', err);
@@ -12102,7 +12132,7 @@ async function startServer() {
         subject: row.subjectEncrypted ? decrypt(row.subjectEncrypted) : undefined,
         preview: row.bodyEncrypted ? decrypt(row.bodyEncrypted).slice(0, 100) : ''
       }));
-      const ledgerHistory = db.getStructuredLedger(contractorId, 20).filter(entry =>
+      const ledgerHistory = await readStructuredLedger(contractorId, 20).filter(entry =>
         entry.eventType === 'phase3_live_dispatch' ||
         entry.eventType === 'phase3_outbox_inspected' ||
         entry.entityType === 'conversion_outbox'
@@ -12117,7 +12147,7 @@ async function startServer() {
         { id: 'webhook_ingest', name: 'Inbound CRM Webhook Verification', type: 'webhook', configured: Boolean(process.env.CRM_WEBHOOK_SECRET), status: process.env.CRM_WEBHOOK_SECRET ? 'configured_unverified' : 'not_configured', mode: process.env.CRM_WEBHOOK_SECRET ? 'Inbound signature secret configured; delivery not verified' : 'No webhook secret configured', latencyMs: null, encryption: 'HMAC-SHA256 verification path', deliverability: null, lastHeartbeat: null }
       ];
       const configuredGatewaysCount = gateways.filter(gateway => gateway.configured).length;
-      const integrity = db.verifyLedgerIntegrity(contractorId);
+      const integrity = await checkStructuredLedgerIntegrity(contractorId);
 
       res.json({
         success: true,
@@ -12159,7 +12189,7 @@ async function startServer() {
     const contractorId = (req as any).contractorId;
 
     try {
-      const integrity = db.verifyLedgerIntegrity(contractorId);
+      const integrity = await checkStructuredLedgerIntegrity(contractorId);
       // No persistent consensus-history or neural-node store is connected yet.
       // Demo templates are returned separately and never used as verification evidence.
       const consensusHistory: any[] = [];
@@ -12220,7 +12250,7 @@ async function startServer() {
       // Consensus history and calibrated neural nodes are not persisted. Estimated
       // arbitrage suggestions are not treated as a verified closed-loop action.
       const verification = verifyPhase4Pillars([], [], []);
-      const auditBlock = db.recordLedgerEntry({
+      const auditBlock = await recordStructuredLedgerEntry({
         contractorId,
         eventType: 'phase4_verification_audit',
         entityType: 'roadmap_phase',
@@ -12241,7 +12271,7 @@ async function startServer() {
         verification,
         estimatedArbitrageOpportunityCount: estimateResult.opportunities.length,
         block: auditBlock,
-        integrity: db.verifyLedgerIntegrity(contractorId)
+        integrity: await checkStructuredLedgerIntegrity(contractorId)
       });
     } catch (err: any) {
       console.error('[Roadmap Phase 4 Verify Error]', err);
@@ -12336,7 +12366,7 @@ async function startServer() {
         totalLeadsCount,
         syntheticLeadsCount,
         verifiedLeadsCount,
-        cryptoVerified: db.verifyLedgerIntegrity(contractorId).valid,
+        cryptoVerified: await checkStructuredLedgerIntegrity(contractorId).valid,
         autonomyReadinessScore: learningState.autonomyReadinessScore,
         learningEpoch: learningState.calibrationEpoch
       };
@@ -12376,7 +12406,7 @@ async function startServer() {
         totalLeadsCount,
         syntheticLeadsCount,
         verifiedLeadsCount,
-        cryptoVerified: db.verifyLedgerIntegrity(contractorId).valid,
+        cryptoVerified: await checkStructuredLedgerIntegrity(contractorId).valid,
         autonomyReadinessScore: learningState.autonomyReadinessScore,
         learningEpoch: learningState.calibrationEpoch
       };
@@ -12386,7 +12416,7 @@ async function startServer() {
       const ontologies = getDefaultBusinessOntologies();
       const verificationResult = verifyPhase5Pillars(orgNodes, edgeRegions, ontologies, activeDiagnostics);
 
-      const auditBlock = db.recordLedgerEntry({
+      const auditBlock = await recordStructuredLedgerEntry({
         contractorId,
         eventType: 'phase5_verification_audit',
         entityType: 'roadmap_milestone',
@@ -12407,7 +12437,7 @@ async function startServer() {
         verified: verificationResult.allPassed,
         verificationResult,
         block: auditBlock,
-        integrity: db.verifyLedgerIntegrity(contractorId)
+        integrity: await checkStructuredLedgerIntegrity(contractorId)
       });
     } catch (err: any) {
       console.error('[Roadmap Phase 5 Verify Error]', err);
@@ -12422,7 +12452,7 @@ async function startServer() {
     const contractorId = (req as any).contractorId;
     try {
       const tenantLeads = await pgDb.select().from(leads).where(eq(leads.contractorId, contractorId));
-      const ledger = db.verifyLedgerIntegrity(contractorId);
+      const ledger = await checkStructuredLedgerIntegrity(contractorId);
       const diagnostics = {
         checkedAt: new Date().toISOString(),
         database: { status: 'reachable', tenantLeadCount: tenantLeads.length },
@@ -12444,7 +12474,7 @@ async function startServer() {
           reason: 'Layer-level runtime instrumentation and persistent synchronization evidence are not implemented.'
         }
       };
-      const block = db.recordLedgerEntry({
+      const block = await recordStructuredLedgerEntry({
         contractorId,
         eventType: 'phase5_runtime_diagnostic',
         entityType: 'roadmap_milestone',
