@@ -1080,6 +1080,10 @@ export default function App() {
             animate={{ x: 0 }}
             exit={{ x: '-100%' }}
             transition={{ type: 'spring', damping: 25, stiffness: 220 }}
+            id="mobile-navigation"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Main navigation"
             className={`fixed top-0 bottom-0 left-0 w-72 max-w-[85vw] z-50 flex flex-col justify-between select-none border-r md:hidden shadow-2xl h-full ${sidebarBg}`}
           >
               <div className="flex flex-col flex-1 overflow-hidden">
