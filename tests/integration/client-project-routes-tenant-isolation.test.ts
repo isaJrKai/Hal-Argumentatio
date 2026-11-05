@@ -19,6 +19,8 @@ const emailB = `${tenantB}@example.test`;
 const password = 'Route-Test-Only-Password-42!';
 const leadA = `lead_${suffix}`;
 const projectA = `project_${suffix}`;
+const leadRevenueA = `revenue_lead_${suffix}`;
+const leadB = `lead_b_${suffix}`;
 
 let dbAvailable = false;
 let tokenA = '';
@@ -47,8 +49,12 @@ describe('client project HTTP route tenant isolation', () => {
       );
       await pool.query(
         `INSERT INTO leads (id, contractor_id, business_name, city, niche, status)
-         VALUES ($1, $2, $3, $4, $5, 'closed_won')`,
-        [leadA, tenantA, 'Tenant A Roofing', 'Kampala', 'roofing']
+         VALUES ($1, $2, $3, $4, $5, 'closed_won'),
+                ($6, $7, $8, $9, $10, 'proposal'),
+                ($11, $12, $13, $14, $15, 'qualified')`,
+        [leadA, tenantA, 'Tenant A Roofing', 'Kampala', 'roofing',
+          leadRevenueA, tenantA, 'Tenant A HVAC', 'Kampala', 'hvac',
+          leadB, tenantB, 'Tenant B Electrical', 'London', 'electrical']
       );
 
       tokenA = await login(emailA);
@@ -62,7 +68,9 @@ describe('client project HTTP route tenant isolation', () => {
   afterAll(async () => {
     if (dbAvailable) {
       await pool.query('DELETE FROM work_events WHERE contractor_id = ANY($1::text[])', [[tenantA, tenantB]]);
+      await pool.query('DELETE FROM revenue_records WHERE contractor_id = ANY($1::text[])', [[tenantA, tenantB]]);
       await pool.query('DELETE FROM client_projects WHERE contractor_id = ANY($1::text[])', [[tenantA, tenantB]]);
+      await pool.query('DELETE FROM lead_events WHERE lead_id = ANY($1::text[])', [[leadA, leadRevenueA, leadB]]);
       await pool.query('DELETE FROM leads WHERE contractor_id = ANY($1::text[])', [[tenantA, tenantB]]);
       await pool.query('DELETE FROM audit_logs WHERE contractor_id = ANY($1::text[])', [[tenantA, tenantB]]);
       await pool.query('DELETE FROM contractors WHERE id = ANY($1::text[])', [[tenantA, tenantB]]);
@@ -201,5 +209,102 @@ describe('client project HTTP route tenant isolation', () => {
     expect(events.rows).toHaveLength(1);
     expect(events.rows[0].correlation_id).toBe(generated.body.id);
     expect(events.rows[0].payload.persistenceStatus).toBe('generated_only_not_persisted');
+  });
+
+  it('enforces lead read, update, and delete ownership through HTTP routes', async (ctx) => {
+    if (!dbAvailable) return ctx.skip();
+
+    const ownerRead = await request(app)
+      .get(`/api/leads/${leadA}`)
+      .set('Authorization', `Bearer ${tokenA}`);
+    expect(ownerRead.status).toBe(200);
+    expect(ownerRead.body.contractorId).toBe(tenantA);
+
+    const foreignRead = await request(app)
+      .get(`/api/leads/${leadA}`)
+      .set('Authorization', `Bearer ${tokenB}`);
+    expect(foreignRead.status).toBe(404);
+
+    const foreignUpdate = await request(app)
+      .put(`/api/leads/${leadA}`)
+      .set('Authorization', `Bearer ${tokenB}`)
+      .send({ businessName: 'Tampered by Tenant B', status: 'closed_lost' });
+    expect(foreignUpdate.status).toBe(404);
+
+    const foreignDelete = await request(app)
+      .delete(`/api/leads/${leadA}`)
+      .set('Authorization', `Bearer ${tokenB}`);
+    expect(foreignDelete.status).toBe(404);
+
+    const [unchanged] = (await pool.query(
+      'SELECT business_name, status FROM leads WHERE id = $1 AND contractor_id = $2',
+      [leadA, tenantA]
+    )).rows;
+    expect(unchanged).toMatchObject({ business_name: 'Tenant A Roofing', status: 'closed_won' });
+  });
+
+  it('closes a qualified tenant-owned deal atomically and keeps revenue tenant-scoped', async (ctx) => {
+    if (!dbAvailable) return ctx.skip();
+
+    const foreignAttempt = await request(app)
+      .post('/api/revenues')
+      .set('Authorization', `Bearer ${tokenB}`)
+      .send({ leadId: leadRevenueA, amountUsd: 2400, source: 'route_test' });
+    expect(foreignAttempt.status).toBe(404);
+
+    const created = await request(app)
+      .post('/api/revenues')
+      .set('Authorization', `Bearer ${tokenA}`)
+      .send({ leadId: leadRevenueA, amountUsd: 2400, source: 'route_test' });
+    expect(created.status).toBe(201);
+    expect(created.body.contractorId).toBe(tenantA);
+    expect(created.body.leadId).toBe(leadRevenueA);
+    expect(created.body.amountUsd).toBe(2400);
+    expect(created.body.leadStatus).toBe('closed_won');
+
+    const duplicate = await request(app)
+      .post('/api/revenues')
+      .set('Authorization', `Bearer ${tokenA}`)
+      .send({ leadId: leadRevenueA, amountUsd: 2400, source: 'route_test' });
+    expect(duplicate.status).toBe(409);
+
+    const tenantARevenue = await request(app)
+      .get('/api/revenues')
+      .set('Authorization', `Bearer ${tokenA}`);
+    expect(tenantARevenue.status).toBe(200);
+    expect(tenantARevenue.body).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: created.body.id, contractorId: tenantA, amountUsd: 2400 })
+    ]));
+
+    const tenantBRevenue = await request(app)
+      .get('/api/revenues')
+      .set('Authorization', `Bearer ${tokenB}`);
+    expect(tenantBRevenue.status).toBe(200);
+    expect(tenantBRevenue.body).toEqual([]);
+
+    const [persistedLead] = (await pool.query(
+      'SELECT status FROM leads WHERE id = $1 AND contractor_id = $2',
+      [leadRevenueA, tenantA]
+    )).rows;
+    expect(persistedLead.status).toBe('closed_won');
+
+    const revenueRows = await pool.query(
+      'SELECT contractor_id, lead_id, amount_usd FROM revenue_records WHERE lead_id = $1',
+      [leadRevenueA]
+    );
+    expect(revenueRows.rows).toHaveLength(1);
+    expect(revenueRows.rows[0]).toMatchObject({
+      contractor_id: tenantA,
+      lead_id: leadRevenueA,
+      amount_usd: 2400
+    });
+
+    const eventRows = await pool.query(
+      `SELECT event_type FROM lead_events
+       WHERE lead_id = $1 AND event_type IN ('ClosedWon', 'RevenueRecorded')`,
+      [leadRevenueA]
+    );
+    expect(eventRows.rows.map((row: { event_type: string }) => row.event_type).sort())
+      .toEqual(['ClosedWon', 'RevenueRecorded']);
   });
 });
