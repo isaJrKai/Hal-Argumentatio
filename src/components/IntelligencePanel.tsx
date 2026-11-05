@@ -476,7 +476,7 @@ export default function IntelligencePanel({
                           ? 'bg-accent/15 text-accent border border-accent/20'
                           : 'text-text-tertiary hover:text-text-secondary border border-transparent'
                       }`}
-                      title="Google Gemini 3.5 is selected for supported requests; provider access is not verified here."
+                      title="Google Gemini is selected for supported requests; the exact model is determined by the server and must be verified per request."
                     >
                       Gemini
                     </button>
@@ -526,7 +526,7 @@ export default function IntelligencePanel({
                   </button>
 
                   <span className="text-[9px] font-mono text-text-tertiary hidden xl:inline">
-                    PROVIDER: {activeAi === 'gemini' ? 'GEMINI-3.5-FLASH' : 'NEMOTRON-70B'}
+                    PROVIDER: {activeAi === 'gemini' ? 'GOOGLE GEMINI' : 'NVIDIA NEMOTRON'}
                   </span>
                 </div>
               </div>
