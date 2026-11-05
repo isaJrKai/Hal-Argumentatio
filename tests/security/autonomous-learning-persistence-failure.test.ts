@@ -100,27 +100,17 @@ describe('autonomous learning persistence failure handling', () => {
     expect(second.newEpoch).toBe(2);
     expect(engine.getState().nicheMap.roofing.sampleCount).toBe(2);
     expect(mocks.insert).toHaveBeenCalledTimes(1);
-    expect(mocks.update).toHaveBeenCalledTimes(1);
+    expect(mocks.update).toHaveBeenCalledTimes(2);
   });
 
-  it('rejects a stale write from another application instance', async () => {
-    const engine = new AutonomousLearningEngine('tenant:stale');
-    await engine.saveState();
-    const before = structuredClone(engine.getState());
-    mocks.updateReturning.mockResolvedValueOnce([]);
-
-    await expect(engine.digestBusinessOutcome({ niche: 'roofing', outcome: 'won' }))
-      .rejects.toThrow('Learning state changed in another application instance');
-    expect(engine.getState()).toEqual(before);
-  });
-
-  it('reloads the latest tenant revision after a cross-instance conflict', async () => {
-    const revisionOne = new Date('2026-01-01T00:00:00.000Z');
+  it('serializes conflict recovery with queued mutations from already-initialized requests', async () => {
+    const revisionZero = new Date('2026-01-01T00:00:00.000Z');
+    const revisionOne = new Date('2026-01-01T00:00:01.000Z');
     const revisionTwo = new Date('2026-01-01T00:00:02.000Z');
     const revisionThree = new Date('2026-01-01T00:00:03.000Z');
     const revisionFour = new Date('2026-01-01T00:00:04.000Z');
     mocks.selectRecord = {
-      updatedAt: revisionOne,
+      updatedAt: revisionZero,
       isOfflineModeActive: false,
       technicalWeights: {
         missingSslUrgency: 8.8, slowSpeedUrgency: 7.6, lowReviewCountWeight: 6.9,
@@ -133,27 +123,35 @@ describe('autonomous learning persistence failure handling', () => {
     const engineA = new AutonomousLearningEngine('tenant:shared');
     const engineB = new AutonomousLearningEngine('tenant:shared');
 
-    mocks.updateReturning.mockResolvedValueOnce([{ updatedAt: revisionTwo }]);
+    mocks.updateReturning.mockResolvedValueOnce([{ updatedAt: revisionOne }]);
     await engineA.initializeFromDb();
 
-    mocks.selectRecord.updatedAt = revisionTwo;
+    mocks.selectRecord.updatedAt = revisionOne;
     mocks.updateReturning.mockResolvedValueOnce([{ updatedAt: revisionTwo }]);
     await engineB.initializeFromDb();
 
-    mocks.updateReturning.mockResolvedValueOnce([]);
-    await expect(engineA.digestBusinessOutcome({ niche: 'roofing', outcome: 'won' }))
-      .rejects.toThrow('Learning state changed in another application instance');
+    // Request A enters its mutation and pauses at the stale compare-and-swap.
+    let resolveConflict!: (rows: Array<{ updatedAt: Date }>) => void;
+    const conflict = new Promise<Array<{ updatedAt: Date }>>(resolve => { resolveConflict = resolve; });
+    mocks.updateReturning.mockReturnValueOnce(conflict);
+    const requestA = engineA.digestBusinessOutcome({ niche: 'roofing', outcome: 'won' });
+    await vi.waitFor(() => expect(mocks.updateReturning).toHaveBeenCalledTimes(3));
 
+    // Request B has already passed initializeFromDb before A invalidates the
+    // cache. It must reload after entering the same mutation queue.
+    const requestB = engineB.digestBusinessOutcome({ niche: 'roofing', outcome: 'lost' });
     mocks.selectRecord.updatedAt = revisionTwo;
-    mocks.updateReturning.mockResolvedValueOnce([{ updatedAt: revisionThree }]);
-    await engineA.initializeFromDb();
+    resolveConflict([]);
 
+    await expect(requestA).rejects.toThrow('Learning state changed in another application instance');
+    mocks.updateReturning.mockResolvedValueOnce([{ updatedAt: revisionThree }]);
     mocks.updateReturning.mockResolvedValueOnce([{ updatedAt: revisionFour }]);
-    const recovered = await engineA.digestBusinessOutcome({ niche: 'roofing', outcome: 'won' });
+    const recovered = await requestB;
 
     expect(recovered.newEpoch).toBe(1);
-    expect(engineA.getState().nicheMap.roofing.sampleCount).toBe(1);
+    expect(engineB.getState().nicheMap.roofing.sampleCount).toBe(1);
     expect(mocks.select).toHaveBeenCalledTimes(3);
+    expect(mocks.updateReturning).toHaveBeenCalledTimes(5);
   });
 
   it('rejects persistence when no PostgreSQL connection is configured', async () => {
