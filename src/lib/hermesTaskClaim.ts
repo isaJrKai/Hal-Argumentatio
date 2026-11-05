@@ -69,7 +69,11 @@ export async function failExpiredHermesWorkTask(
       'success', false,
       'worker', 'hermes',
       'taskId', ${taskId}::text,
+      'taskType', ${taskTable.taskType},
       'attempt', ${taskTable.attemptCount},
+      'startedAt', COALESCE(${taskTable.startedAt}, ${taskTable.updatedAt})::text,
+      'completedAt', ${now.toISOString()}::timestamp::text,
+      'durationMs', GREATEST(0, FLOOR(EXTRACT(EPOCH FROM (${now.toISOString()}::timestamp - COALESCE(${taskTable.startedAt}, ${taskTable.updatedAt}))) * 1000)),
       'recordedAt', ${now.toISOString()}::text,
       'message', 'The executor stopped heartbeating. No successful completion was recorded; operator review is required before retry.'
     )`,
