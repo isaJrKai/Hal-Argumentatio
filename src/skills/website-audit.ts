@@ -127,14 +127,14 @@ export const websiteAuditSkill: Skill = {
     const measurements = analyzeHtml(page.body, page.finalUrl);
     const tls = new URL(page.requestedUrl).protocol === 'https:';
     const securityHeaders = {
-      hsts: Boolean(page.headers['strict-transport-security']),
+      hsts: tls ? Boolean(page.headers['strict-transport-security']) : null,
       contentSecurityPolicy: Boolean(page.headers['content-security-policy']),
       xFrameOptions: Boolean(page.headers['x-frame-options']),
       xContentTypeOptions: Boolean(page.headers['x-content-type-options']),
       referrerPolicy: Boolean(page.headers['referrer-policy']),
       permissionsPolicy: Boolean(page.headers['permissions-policy'])
     };
-    const missingHeaders = Object.entries(securityHeaders).filter(([, present]) => !present).map(([name]) => name);
+    const missingHeaders = Object.entries(securityHeaders).filter(([, present]) => present === false).map(([name]) => name);
     const findings: string[] = [];
     if (!measurements.title) findings.push('No HTML title element was found.');
     else if (measurements.titleLength < 20 || measurements.titleLength > 60) findings.push(`The title is ${measurements.titleLength} characters; review whether it accurately describes the page and fits typical search snippets.`);
@@ -170,7 +170,7 @@ export const websiteAuditSkill: Skill = {
       `- Structured data: ${measurements.structuredDataPresent ? 'Detected' : 'Not detected'}`,
       '',
       '### Observed response security headers',
-      ...Object.entries(securityHeaders).map(([name, present]) => `- ${name}: ${present ? 'Present' : 'Not observed'}`),
+      ...Object.entries(securityHeaders).map(([name, present]) => `- ${name}: ${present === true ? 'Present' : present === null ? 'Not applicable (HTTP)' : 'Not observed'}`),
       '',
       '### Evidence-based opportunities',
       ...(findings.length ? findings.map(item => `- ${item}`) : ['- No issues were identified within this limited single-page inspection.']),
