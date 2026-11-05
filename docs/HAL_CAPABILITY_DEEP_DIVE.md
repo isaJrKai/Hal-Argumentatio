@@ -111,3 +111,30 @@ The second pass found that several existing specialist skills were exposed in th
 
 The wider inventory also includes custom skills, MCP tools, Hermes, forecasting, revenue attribution, financial ledgers, CRM, document workflows, and connected apps. Their availability must be verified independently from the existence of a UI panel or registry entry.
 
+
+
+## 10. Connected prospect-to-proposal workflow now implemented on the work branch
+
+The existing modules are being connected rather than replaced:
+
+1. **Territory Harvester → CRM:** Google Search grounding source URLs are retained when present. Each discovered record remains `UNVERIFIED_STAGING`; DNS and phone-format checks are not treated as proof of business identity.
+2. **Website Auditor → CRM:** the existing Website Review & Technical Audit skill can be run against a selected tenant-owned lead. The server overrides the submitted URL with the saved lead URL, runs the bounded single-page inspection, and persists the measured report, headers, findings, and audit ID in that lead's `groundingEvidence.websiteAudit`. Cross-tenant lead IDs are rejected.
+3. **Human identity review:** a lead can become `VERIFIED` only after DNS/HTTP/phone checks and an explicit human confirmation referencing a public source URL and review notes. Editing core identity fields invalidates that confirmation and marks the prior website audit stale.
+4. **Landing Page Studio → CRM:** the existing studio now loads saved leads, can use a selected lead's canonical business name/city/contact context, and saves the page artifact with `sourceLeadId` and `sourceAuditId`. Client-supplied rendered HTML is ignored; the server renders from the tenant-owned configuration.
+5. **Draft and publish separation:** saving creates a private `draft`; publishing is a separate action requiring an explicit content-review acknowledgement. A linked page cannot publish while the prospect identity is unverified. Default template placeholders and sample trust claims must be removed or replaced before publishing.
+6. **Proposal & Contracts:** proposal drafts now read website audit findings and the latest linked Landing Page Studio artifact from the same tenant-owned lead. Client-supplied audit scores are no longer treated as evidence.
+7. **Business Intelligence / work ledger:** audit, landing-page save/publish, and proposal events are written with tenant, entity, source-module, and correlation identifiers so the existing operating layer can attribute the workflow.
+
+### Exact scope of the current Website Auditor
+
+This is a bounded single-public-page HTML inspection, not a full website crawler. It can measure the fetched page's response status, title/meta description, viewport configuration, headings, image alt attributes, and selected response headers. It does **not** measure Google rankings, traffic, Core Web Vitals, conversion rates, revenue loss, authenticated areas, application CVEs, or exploitability. Intrusive tests remain out of scope without explicit written authorization.
+
+### Additional truthfulness corrections in the existing skill library
+
+- Territory Map Visualizer no longer fabricates per-business coordinates by jittering a city centroid or falls back to Winnipeg. It uses geocoded city-centroid precision and states that individual business addresses were not geocoded.
+- Verified Lead Lists now reports zero records retrieved and provides an empty verification schema until a real source connector exists.
+- Patent Landscape no longer reports a clear trademark/patent position without registry searches.
+- Compliance and Due Diligence tools return screening status as unknown and provide evidence checklists instead of invented clearances.
+- M&A, pricing/margin, ad-spend, and list-pricing calculators label outputs as user-assumption scenarios and disclose excluded costs.
+- Automation Ops Product no longer recommends review gating or claims integrations/recovered revenue that were not executed.
+
