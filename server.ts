@@ -8959,183 +8959,158 @@ app.post('/api/revenue/experiments/:id/status', authenticate, async (req, res) =
 app.post('/api/revenue/decision-engine/run', authenticate, async (req, res) => {
   const contractorId = (req as any).contractorId;
   try {
-    // 1. Retrieve tenant-scoped performance and lead attribution data
-    const adRecords = await pgDb.select().from(googleAdsDailyPerformance).where(eq(googleAdsDailyPerformance.contractorId, contractorId));
-    const tenantLeads = await pgDb.select().from(leads).where(eq(leads.contractorId, contractorId));
-    const leadIds = tenantLeads.map(l => l.id);
+    const adRecords = await pgDb.select().from(googleAdsDailyPerformance)
+      .where(eq(googleAdsDailyPerformance.contractorId, contractorId));
+    const tenantLeads = await pgDb.select().from(leads)
+      .where(eq(leads.contractorId, contractorId));
+    const leadIds = tenantLeads.map(lead => lead.id);
 
-    let attributions: any[] = [];
-    let events: any[] = [];
-    let revenues: any[] = [];
-
-    if (leadIds.length > 0) {
-      attributions = await pgDb.select().from(leadAttribution).where(inArray(leadAttribution.leadId, leadIds));
-      events = await pgDb.select().from(leadEvents).where(inArray(leadEvents.leadId, leadIds));
-      revenues = await pgDb.select().from(revenueRecords).where(inArray(revenueRecords.leadId, leadIds));
-    }
-
-    // 2. Check for insufficient data
-    const insufficientData = adRecords.length === 0 && tenantLeads.length === 0;
-    if (insufficientData) {
+    if (adRecords.length === 0 || leadIds.length === 0) {
       return res.json({
         success: true,
         recommendationsGenerated: 0,
         recommendationsSkipped: 0,
         insufficientData: true,
-        message: 'Insufficient performance and lead data to run decision engine analysis.'
+        analyzedCampaigns: 0,
+        analyzedGeos: 0,
+        geoRecommendationsSupported: false,
+        message: 'Recorded campaign spend and tenant leads are required before decision analysis.'
       });
     }
 
-    // 3. Aggregate Campaign Economics
-    const campaignMap: { [key: string]: { spend: number; clicks: number; leads: number; closedWon: number; revenue: number } } = {};
+    const attributions = await pgDb.select().from(leadAttribution)
+      .where(inArray(leadAttribution.leadId, leadIds));
+    const revenues = await pgDb.select().from(revenueRecords)
+      .where(inArray(revenueRecords.leadId, leadIds));
+
+    const campaignMap: Record<string, {
+      spend: number;
+      clicks: number;
+      leads: Set<string>;
+      closedWon: Set<string>;
+      revenue: number;
+    }> = {};
+    const ensureCampaign = (name: string) => {
+      if (!campaignMap[name]) {
+        campaignMap[name] = { spend: 0, clicks: 0, leads: new Set<string>(), closedWon: new Set<string>(), revenue: 0 };
+      }
+      return campaignMap[name];
+    };
+
     for (const ad of adRecords) {
-      const camp = ad.campaignName || 'Unknown Campaign';
-      if (!campaignMap[camp]) {
-        campaignMap[camp] = { spend: 0, clicks: 0, leads: 0, closedWon: 0, revenue: 0 };
-      }
-      campaignMap[camp].spend += Number(ad.cost || 0);
-      campaignMap[camp].clicks += Number(ad.clicks || 0);
-      campaignMap[camp].leads += Number(ad.conversions || 0);
+      const campaign = typeof ad.campaignName === 'string' ? ad.campaignName.trim() : '';
+      if (!campaign) continue;
+      const data = ensureCampaign(campaign);
+      const spend = Number(ad.cost);
+      const clicks = Number(ad.clicks);
+      if (Number.isFinite(spend) && spend >= 0) data.spend += spend;
+      if (Number.isFinite(clicks) && clicks >= 0) data.clicks += clicks;
     }
 
-    // Map attribution and revenue to campaigns
-    for (const attr of attributions) {
-      const camp = attr.utmCampaign || 'Unknown Campaign';
-      if (!campaignMap[camp]) {
-        campaignMap[camp] = { spend: 0, clicks: 0, leads: 0, closedWon: 0, revenue: 0 };
-      }
-      campaignMap[camp].leads += 1;
+    const attributionNamesByLead = new Map<string, Set<string>>();
+    for (const attribution of attributions) {
+      const leadId = String(attribution.leadId || '');
+      const campaign = typeof attribution.utmCampaign === 'string' ? attribution.utmCampaign.trim() : '';
+      if (!leadId || !campaign) continue;
+      const names = attributionNamesByLead.get(leadId) || new Set<string>();
+      names.add(campaign);
+      attributionNamesByLead.set(leadId, names);
     }
 
-    for (const rev of revenues) {
-      // Find matching attribution or lead
-      const lead = tenantLeads.find(l => l.id === rev.leadId);
-      const attr = attributions.find(a => a.leadId === rev.leadId);
-      const camp = attr?.utmCampaign || 'Unknown Campaign';
-      if (!campaignMap[camp]) {
-        campaignMap[camp] = { spend: 0, clicks: 0, leads: 0, closedWon: 0, revenue: 0 };
-      }
-      campaignMap[camp].closedWon += 1;
-      campaignMap[camp].revenue += getRevenueAmountUsd(rev);
+    const campaignByLead = new Map<string, string>();
+    for (const [leadId, names] of attributionNamesByLead) {
+      // Ambiguous multi-touch attribution is excluded until an explicit attribution
+      // policy exists; never assign a deal to an arbitrary/first campaign.
+      if (names.size !== 1) continue;
+      const campaign = Array.from(names)[0];
+      campaignByLead.set(leadId, campaign);
+      ensureCampaign(campaign).leads.add(leadId);
     }
 
-    // Calculate ROAS, CPL, CAC for each campaign
-    const campaignList = Object.keys(campaignMap).map(camp => {
-      const d = campaignMap[camp];
-      const roas = d.spend > 0 ? Number((d.revenue / d.spend).toFixed(2)) : 0;
-      const cpl = d.leads > 0 ? Number((d.spend / d.leads).toFixed(2)) : d.spend > 0 ? d.spend : 0;
-      const cac = d.closedWon > 0 ? Number((d.spend / d.closedWon).toFixed(2)) : 0;
-      return { camp, ...d, roas, cpl, cac };
-    });
+    for (const revenue of revenues) {
+      const leadId = String(revenue.leadId || '');
+      const campaign = campaignByLead.get(leadId);
+      if (!campaign) continue;
+      const amount = getRevenueAmountUsd(revenue);
+      if (!Number.isFinite(amount) || amount <= 0) continue;
+      const data = ensureCampaign(campaign);
+      data.closedWon.add(leadId);
+      data.revenue += amount;
+    }
 
+    const campaignList = Object.entries(campaignMap)
+      .filter(([, data]) => data.spend > 0 && data.revenue > 0 && data.closedWon.size > 0)
+      .map(([camp, data]) => ({
+        camp,
+        spend: Number(data.spend.toFixed(2)),
+        clicks: data.clicks,
+        leads: data.leads.size,
+        closedWon: data.closedWon.size,
+        revenue: Number(data.revenue.toFixed(2)),
+        roas: Number((data.revenue / data.spend).toFixed(4)),
+        cpl: data.leads.size > 0 ? Number((data.spend / data.leads.size).toFixed(2)) : null,
+        cac: Number((data.spend / data.closedWon.size).toFixed(2))
+      }));
+
+    if (campaignList.length < 2) {
+      return res.json({
+        success: true,
+        recommendationsGenerated: 0,
+        recommendationsSkipped: 0,
+        insufficientData: true,
+        analyzedCampaigns: campaignList.length,
+        analyzedGeos: 0,
+        geoRecommendationsSupported: false,
+        message: 'At least two campaigns with recorded spend and unambiguous lead-linked closed-won revenue are required for a comparative recommendation.'
+      });
+    }
+
+    campaignList.sort((a, b) => b.roas - a.roas);
+    const topCamp = campaignList[0];
+    const bottomCamp = campaignList[campaignList.length - 1];
     let generatedCount = 0;
     let skippedCount = 0;
-    const existingRecs = await pgDb.select().from(revenueRecommendations).where(eq(revenueRecommendations.contractorId, contractorId));
 
-    // 4. Opportunity Detection & Recommendation Generation
-    // A) Campaign Budget Reallocation Opportunity
-    if (campaignList.length >= 2) {
-      campaignList.sort((a, b) => b.roas - a.roas);
-      const topCamp = campaignList[0];
-      const bottomCamp = campaignList[campaignList.length - 1];
+    if (topCamp.roas > 2.0 && bottomCamp.roas < topCamp.roas * 0.5 && topCamp.revenue > 1000) {
+      const title = `Review budget allocation from ${bottomCamp.camp} to ${topCamp.camp}`;
+      const rationale = `${topCamp.camp} has recorded ${topCamp.roas}x attributed ROAS across ${topCamp.closedWon} closed-won lead(s) ($${topCamp.revenue} attributed revenue); ${bottomCamp.camp} has ${bottomCamp.roas}x attributed ROAS. This is a comparative review signal, not a quantified uplift forecast.`;
+      const existingRecs = await pgDb.select().from(revenueRecommendations)
+        .where(eq(revenueRecommendations.contractorId, contractorId));
+      const alreadyExists = existingRecs.some(rec => rec.title === title && rec.status === 'proposed');
 
-      if (topCamp.roas > 2.0 && bottomCamp.roas < topCamp.roas * 0.5 && topCamp.revenue > 1000) {
-        const title = `Reallocate Budget from ${bottomCamp.camp} to ${topCamp.camp}`;
-        const rationale = `${topCamp.camp} demonstrates strong economic efficiency with a ${topCamp.roas}x ROAS and $${topCamp.revenue} attributed revenue, whereas ${bottomCamp.camp} underperforms at ${bottomCamp.roas}x ROAS.`;
-        
-        // Deduplication check
-        const alreadyExists = existingRecs.some(r => r.title === title && r.status === 'proposed');
-        if (!alreadyExists) {
-          const confidenceScore = Math.min(95, Math.max(60, 70 + (topCamp.closedWon * 2)));
-          const [newRec] = await pgDb.insert(revenueRecommendations).values({
+      if (alreadyExists) {
+        skippedCount++;
+      } else {
+        const committed = await pgDb.transaction(async tx => {
+          const [newRec] = await tx.insert(revenueRecommendations).values({
             id: crypto.randomUUID(),
             contractorId,
             category: 'budget',
             title,
             rationale,
-            citationData: { topCampaign: topCamp, bottomCampaign: bottomCamp, analysisBasis: 'Comparative ROAS and Attribution Revenue' },
-            impactScore: Number((topCamp.roas * 15).toFixed(1)),
-            confidenceScore,
-            expectedImpact: `Estimated efficiency lift of +$${Math.round(topCamp.spend * 0.2)} quarterly pipeline value`,
+            citationData: {
+              topCampaign: topCamp,
+              bottomCampaign: bottomCamp,
+              analysisBasis: 'Recorded spend and unambiguous lead-linked closed-won revenue'
+            },
+            impactScore: 0,
+            confidenceScore: null,
+            expectedImpact: 'Potential efficiency opportunity; no revenue uplift forecast or calibrated confidence is claimed.',
             status: 'proposed'
           }).returning();
 
-          await pgDb.insert(revenueRecommendationEvents).values({
+          const [event] = await tx.insert(revenueRecommendationEvents).values({
             id: crypto.randomUUID(),
             contractorId,
             recommendationId: newRec.id,
             previousStatus: null,
             newStatus: 'proposed',
             actor: 'HAL Automated Decision Engine',
-            metadata: { rationale }
-          });
-          generatedCount++;
-        } else {
-          skippedCount++;
-        }
-      }
-    }
-
-    // B) Geo Performance Optimization
-    const geoMap: { [key: string]: { spend: number; leads: number; closedWon: number; revenue: number } } = {};
-    for (const ad of adRecords) {
-      const geo = ad.geo || 'Primary Territory';
-      if (!geoMap[geo]) {
-        geoMap[geo] = { spend: 0, leads: 0, closedWon: 0, revenue: 0 };
-      }
-      geoMap[geo].spend += Number(ad.cost || 0);
-      geoMap[geo].leads += Number(ad.conversions || 0);
-    }
-
-    for (const rev of revenues) {
-      const attr = attributions.find(a => a.leadId === rev.leadId);
-      const geo = attr?.landingPage ? 'Targeted Geo' : 'Primary Territory';
-      if (!geoMap[geo]) {
-        geoMap[geo] = { spend: 0, leads: 0, closedWon: 0, revenue: 0 };
-      }
-      geoMap[geo].closedWon += 1;
-      geoMap[geo].revenue += getRevenueAmountUsd(rev);
-    }
-
-    const geoList = Object.keys(geoMap).map(geo => {
-      const d = geoMap[geo];
-      const roas = d.spend > 0 ? Number((d.revenue / d.spend).toFixed(2)) : 0;
-      return { geo, ...d, roas };
-    });
-
-    if (geoList.length > 0) {
-      const topGeo = geoList.sort((a, b) => b.roas - a.roas)[0];
-      if (topGeo && topGeo.roas >= 3.0) {
-        const title = `Expand Territory Ad Allocation in ${topGeo.geo}`;
-        const rationale = `Territory ${topGeo.geo} produces exceptionally strong revenue efficiency (${topGeo.roas}x ROAS). Recommend scaling targeted presence.`;
-        const alreadyExists = existingRecs.some(r => r.title === title && r.status === 'proposed');
-        if (!alreadyExists) {
-          const [newRec] = await pgDb.insert(revenueRecommendations).values({
-            id: crypto.randomUUID(),
-            contractorId,
-            category: 'geo',
-            title,
-            rationale,
-            citationData: { territory: topGeo, sampleSize: topGeo.closedWon },
-            impactScore: 88.0,
-            confidenceScore: 84.0,
-            expectedImpact: 'Territory market share expansion',
-            status: 'proposed'
+            metadata: { rationale, analysisBasis: 'Recorded campaign economics' }
           }).returning();
-
-          await pgDb.insert(revenueRecommendationEvents).values({
-            id: crypto.randomUUID(),
-            contractorId,
-            recommendationId: newRec.id,
-            previousStatus: null,
-            newStatus: 'proposed',
-            actor: 'HAL Automated Decision Engine',
-            metadata: { rationale }
-          });
-          generatedCount++;
-        } else {
-          skippedCount++;
-        }
+          return { newRec, event };
+        });
+        generatedCount++;
       }
     }
 
@@ -9145,9 +9120,10 @@ app.post('/api/revenue/decision-engine/run', authenticate, async (req, res) => {
       recommendationsSkipped: skippedCount,
       insufficientData: false,
       analyzedCampaigns: campaignList.length,
-      analyzedGeos: geoList.length
+      analyzedGeos: 0,
+      geoRecommendationsSupported: false,
+      message: 'Campaign comparisons use only unambiguous lead-linked revenue. Geographic recommendations remain unavailable until revenue-to-geo attribution is recorded.'
     });
-
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
