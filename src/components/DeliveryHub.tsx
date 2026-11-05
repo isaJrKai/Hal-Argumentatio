@@ -253,7 +253,7 @@ export default function DeliveryHub({ token, leads = [] }: DeliveryHubProps) {
                 Client Projects ({projects.length})
               </span>
               <span className="text-[9px] font-mono text-brand font-bold uppercase">
-                ${projects.filter(project => ['active', 'active_delivery', 'in_progress'].includes(String(project.status || '').toLowerCase()) && typeof project.monthlyRetainerUsd === 'number' && Number.isFinite(project.monthlyRetainerUsd)).reduce((sum, project) => sum + project.monthlyRetainerUsd, 0).toLocaleString()}/mo MRR
+                ${projects.filter(project => ['active', 'active_delivery', 'in_progress'].includes(String(project.status || '').toLowerCase()) && typeof project.monthlyRetainerUsd === 'number' && Number.isFinite(project.monthlyRetainerUsd)).reduce((sum, project) => sum + project.monthlyRetainerUsd, 0).toLocaleString()}/mo contract MRR
               </span>
             </div>
 
