@@ -952,10 +952,11 @@ export async function testPostgresConnection(customUrl?: string): Promise<{
 }> {
   // A supplied URL is an isolated diagnostic target. Never replace the pool used
   // by application queries and never run DDL just because an admin tested a URL.
-  const temporaryPool = customUrl
+  const normalizedCustomUrl = customUrl ? normalizePostgresConnectionString(customUrl) : undefined;
+  const temporaryPool = normalizedCustomUrl
     ? new Pool({
-        connectionString: normalizedUrl,
-        ssl: normalizedUrl.includes('sslmode=verify-full') || customUrl.includes('neon.tech') || customUrl.includes('supabase')
+        connectionString: normalizedCustomUrl,
+        ssl: normalizedCustomUrl.includes('sslmode=verify-full') || normalizedCustomUrl.includes('neon.tech') || normalizedCustomUrl.includes('supabase')
           ? { rejectUnauthorized: true }
           : undefined,
         max: 1,
