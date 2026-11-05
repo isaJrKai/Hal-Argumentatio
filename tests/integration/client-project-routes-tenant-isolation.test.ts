@@ -173,6 +173,24 @@ describe('client project HTTP route tenant isolation', () => {
     expect(invoiceDetail.body.payments).toHaveLength(2);
     expect(invoiceDetail.body.amountPaidMinor).toBe(145000);
 
+    const correlatedEvents = await pool.query(
+      `SELECT event_type, payload->>'workflowId' AS workflow_id
+       FROM work_events
+       WHERE contractor_id = $1 AND payload->>'workflowId' = $2
+       ORDER BY created_at ASC`,
+      [tenantA, leadFullFlowA]
+    );
+    const correlatedTypes = correlatedEvents.rows.map(row => row.event_type);
+    expect(correlatedTypes).toEqual(expect.arrayContaining([
+      'proposal.generated',
+      'proposal.approved',
+      'lead.closed_won',
+      'client_project.created',
+      'invoice.issued',
+      'invoice.payment_recorded'
+    ]));
+    expect(correlatedEvents.rows.every(row => row.workflow_id === leadFullFlowA)).toBe(true);
+
     const [lead] = (await pool.query(
       'SELECT status FROM leads WHERE id = $1 AND contractor_id = $2',
       [leadFullFlowA, tenantA]
