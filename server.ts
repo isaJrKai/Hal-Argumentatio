@@ -12552,4 +12552,9 @@ async function startServer() {
   });
 }
 
-startServer();
+export { app };
+
+// Tests import the Express application without opening listeners or starting background workers.
+if (process.env.NODE_ENV !== 'test') {
+  startServer();
+}
