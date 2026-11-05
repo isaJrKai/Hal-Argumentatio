@@ -151,3 +151,25 @@ describe('revenue simulation evidence integrity', () => {
     expect(simulationHandler).not.toContain(': 15.0');
   });
 });
+
+const proposalStart = server.indexOf("app.post('/api/proposals/generate'");
+const proposalEnd = server.indexOf("// ─── PHASE 4: CLIENT PROJECTS", proposalStart);
+const proposalHandler = server.slice(proposalStart, proposalEnd);
+
+describe('proposal integrity', () => {
+  it('requires a tenant-owned lead and explicit commercial terms', () => {
+    expect(proposalHandler).toContain("eq(leads.contractorId, contractorId)");
+    expect(proposalHandler).toContain('Number.isSafeInteger(retainer)');
+    expect(proposalHandler).toContain('Number.isSafeInteger(setup)');
+    expect(proposalHandler).not.toContain("|| (tier === 'Dominance'");
+  });
+
+  it('does not invent ROI or audit scores and labels the generated draft as non-persistent', () => {
+    expect(proposalHandler).toContain('roiEstimateAnnualUsd: null');
+    expect(proposalHandler).toContain('persistenceStatus:');
+    expect(proposalHandler).not.toContain('retainer * 12 * 4.5');
+    expect(proposalHandler).not.toContain('mobileSpeedScore || 52');
+    expect(proposalHandler).not.toContain('seoHealthScore || 64');
+    expect(proposalHandler).not.toContain("'Secured'");
+  });
+});
