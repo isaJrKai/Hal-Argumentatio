@@ -4398,6 +4398,15 @@ app.post('/api/recommendations/:id/approve', authenticate, async (req, res) => {
     }
 
     const [updated] = await pgDb.transaction(async tx => {
+      const [current] = await tx.select().from(recommendations)
+        .where(and(eq(recommendations.id, id), eq(recommendations.contractorId, contractorId)))
+        .for('update');
+      if (!current) {
+        throw new Error('Recommendation changed before approval could be committed.');
+      }
+      if (current.status === 'approved') {
+        return [current];
+      }
       const [approved] = await tx.update(recommendations).set({
         status: 'approved',
         outcome: 'Operation approved. Enqueued for campaign synchronization.',
@@ -4417,7 +4426,7 @@ app.post('/api/recommendations/:id/approve', authenticate, async (req, res) => {
         id: crypto.randomUUID(),
         contractorId,
         recommendationId: approved.id,
-        previousStatus: 'pending',
+        previousStatus: current.status,
         newStatus: 'approved',
         actor: String(contractorId),
         metadata: {
@@ -4432,7 +4441,7 @@ app.post('/api/recommendations/:id/approve', authenticate, async (req, res) => {
         entityId: approved.id,
         actor: String(contractorId),
         details: `Approved recommendation: ${approved.action}`,
-        metadata: { previousStatus: 'pending', newStatus: 'approved' }
+        metadata: { previousStatus: current.status, newStatus: 'approved' }
       });
       return [approved];
     });
