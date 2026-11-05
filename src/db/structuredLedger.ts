@@ -233,7 +233,9 @@ export async function importLegacyStructuredLedgerEntries(
           current.contractorId !== source.contractorId ||
           current.entryHash !== source.entryHash ||
           current.prevHash !== source.prevHash ||
-          current.payloadHash !== source.payloadHash
+          current.payloadHash !== source.payloadHash ||
+          current.details !== source.details ||
+          !isDeepStrictEqual(current.metadata ?? {}, source.metadata ?? {})
         ) {
           throw new Error(`PostgreSQL ledger diverges from the verified legacy chain at sequence ${index + 1}; import refused.`);
         }
