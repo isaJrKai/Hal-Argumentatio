@@ -221,6 +221,38 @@ export const proposals = pgTable('proposals', {
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });
 
+/** Tenant-owned invoices and manual payment ledger. Amounts are stored in minor currency units. */
+export const invoices = pgTable('invoices', {
+  id: text('id').primaryKey(),
+  contractorId: text('contractor_id').notNull(),
+  invoiceNumber: text('invoice_number').notNull(),
+  leadId: text('lead_id'),
+  projectId: text('project_id'),
+  description: text('description').notNull(),
+  currency: text('currency').default('USD').notNull(),
+  amountDueMinor: integer('amount_due_minor').notNull(),
+  status: text('status').default('issued').notNull(), // issued | partially_paid | paid | void
+  issuedAt: timestamp('issued_at').defaultNow().notNull(),
+  dueAt: timestamp('due_at'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+});
+
+/** Manually recorded receipts; a ledger entry is not proof of a card/bank provider settlement. */
+export const invoicePayments = pgTable('invoice_payments', {
+  id: text('id').primaryKey(),
+  contractorId: text('contractor_id').notNull(),
+  invoiceId: text('invoice_id').notNull(),
+  amountMinor: integer('amount_minor').notNull(),
+  currency: text('currency').notNull(),
+  method: text('method').notNull(), // cash | bank_transfer | card_terminal | cheque | other
+  reference: text('reference'),
+  notes: text('notes'),
+  receivedAt: timestamp('received_at').defaultNow().notNull(),
+  recordedBy: text('recorded_by').notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+});
+
 export const outreachSequences = pgTable('outreach_sequences', {
   id: text('id').primaryKey(),
   contractorId: text('contractor_id').notNull(),
