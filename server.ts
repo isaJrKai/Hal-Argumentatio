@@ -24,7 +24,7 @@ import {
   Recommendation
 } from './src/db/db';
 import { db as pgDb, createPool as getApplicationPostgresPool } from './src/db/index.ts';
-import { contractors, auditLogs, leads, leadEvents, revenueRecords, campaigns, winLossRecords, performanceSnapshots, recommendations, forecasts, predictionOutcomes, learningInsights, chatMessages, chatProjects, chatConversations, missions, clientProjects, outreachSequences, apiKeys, connectorCredentials, notifications, schedulerJobs, passwordResetTokens, leadAttribution, conversionOutbox, googleAdsDailyPerformance, revenueExperiments, revenueRecommendations, revenueRecommendationEvents, revenueSimulations, revenueOutcomes, communicationsOutbox, communicationsDeliveryEvents, communicationsOptOuts, communicationsConsents, twilioPhoneNumberMappings, twilioInboundEvents, whatsappPhoneNumberMappings, whatsappInboundEvents, halLoops, halLoopEvents, hermesLabArtifacts, hermesDiagnosticIncidents, hermesLabMessages, staffMembers, workEvents, workTasks, revokedTokens } from './src/db/schema.ts';
+import { contractors, auditLogs, leads, leadEvents, revenueRecords, campaigns, winLossRecords, performanceSnapshots, recommendations, forecasts, predictionOutcomes, learningInsights, chatMessages, chatProjects, chatConversations, missions, clientProjects, outreachSequences, apiKeys, connectorCredentials, notifications, schedulerJobs, passwordResetTokens, leadAttribution, conversionOutbox, googleAdsDailyPerformance, revenueExperiments, proposals, revenueRecommendations, revenueRecommendationEvents, revenueSimulations, revenueOutcomes, communicationsOutbox, communicationsDeliveryEvents, communicationsOptOuts, communicationsConsents, twilioPhoneNumberMappings, twilioInboundEvents, whatsappPhoneNumberMappings, whatsappInboundEvents, halLoops, halLoopEvents, hermesLabArtifacts, hermesDiagnosticIncidents, hermesLabMessages, staffMembers, workEvents, workTasks, revokedTokens } from './src/db/schema.ts';
 import { eq, inArray, desc, and, or, like, sql, gte, lte, gt, isNull } from 'drizzle-orm';
 import { 
   generateLearningFromOutcome, 
@@ -7232,7 +7232,17 @@ app.post('/api/proposals/generate', authenticate, async (req, res) => {
       persistenceStatus: 'generated_only_not_persisted'
     };
 
-    await recordWorkEvent(pgDb, {
+    await pgDb.transaction(async tx => {
+      await tx.insert(proposals).values({
+        id: proposal.id,
+        contractorId,
+        leadId: lead.id,
+        status: 'draft',
+        content: proposal,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      });
+      await recordWorkEvent(tx, {
       contractorId,
       eventType: 'proposal.generated',
       entityType: 'lead',
@@ -7247,14 +7257,96 @@ app.post('/api/proposals/generate', authenticate, async (req, res) => {
         packageTier,
         monthlyRetainerUsd: retainer,
         setupFeeUsd: setup,
-        persistenceStatus: proposal.persistenceStatus
+        persistenceStatus: 'persisted_draft'
       }
+      });
     });
 
-    return res.status(201).json(proposal);
+    const persistedProposal = { ...proposal, persistenceStatus: 'persisted_draft' };
+    return res.status(201).json(persistedProposal);
   } catch (err: any) {
     console.error('[Proposal Generation] Failed:', err);
     return res.status(503).json({ error: 'Proposal draft could not be generated from the saved lead and verified inputs.' });
+  }
+});
+
+// Proposal records are tenant-scoped and versioned by immutable generated content.
+// "approved" is an internal approval state; it is not a client signature or executed contract.
+app.get('/api/proposals', authenticate, async (req, res) => {
+  const contractorId = (req as any).contractorId;
+  try {
+    const rows = await pgDb.select().from(proposals)
+      .where(eq(proposals.contractorId, contractorId))
+      .orderBy(desc(proposals.createdAt));
+    return res.json(rows);
+  } catch (err) {
+    console.error('[Proposals] List failed:', err);
+    return res.status(503).json({ error: 'Proposals are temporarily unavailable.' });
+  }
+});
+
+app.get('/api/proposals/:id', authenticate, async (req, res) => {
+  const contractorId = (req as any).contractorId;
+  try {
+    const [proposal] = await pgDb.select().from(proposals)
+      .where(and(eq(proposals.id, req.params.id), eq(proposals.contractorId, contractorId)))
+      .limit(1);
+    if (!proposal) return res.status(404).json({ error: 'Proposal not found or inaccessible.' });
+    return res.json(proposal);
+  } catch (err) {
+    console.error('[Proposals] Read failed:', err);
+    return res.status(503).json({ error: 'Proposal could not be loaded.' });
+  }
+});
+
+app.patch('/api/proposals/:id/status', authenticate, async (req, res) => {
+  const contractorId = (req as any).contractorId;
+  const nextStatus = req.body?.status;
+  if (!['approved', 'void'].includes(nextStatus)) {
+    return res.status(400).json({ error: 'Proposal status must be approved or void.' });
+  }
+  try {
+    const updated = await pgDb.transaction(async tx => {
+      const [current] = await tx.select().from(proposals)
+        .where(and(eq(proposals.id, req.params.id), eq(proposals.contractorId, contractorId)))
+        .limit(1);
+      if (!current) return { kind: 'not_found' as const };
+      if (current.status !== 'draft') return { kind: 'conflict' as const };
+      const now = new Date();
+      const [saved] = await tx.update(proposals).set({
+        status: nextStatus,
+        approvedAt: nextStatus === 'approved' ? now : null,
+        approvedBy: nextStatus === 'approved' ? contractorId : null,
+        voidedAt: nextStatus === 'void' ? now : null,
+        voidedBy: nextStatus === 'void' ? contractorId : null,
+        updatedAt: now
+      }).where(and(
+        eq(proposals.id, current.id),
+        eq(proposals.contractorId, contractorId),
+        eq(proposals.status, 'draft'),
+        eq(proposals.updatedAt, current.updatedAt)
+      )).returning();
+      if (!saved) return { kind: 'conflict' as const };
+      await recordWorkEvent(tx, {
+        contractorId,
+        eventType: nextStatus === 'approved' ? 'proposal.approved' : 'proposal.voided',
+        entityType: 'proposal',
+        entityId: saved.id,
+        actorType: 'human',
+        actorId: contractorId,
+        sourceModule: 'proposal_studio',
+        correlationId: saved.id,
+        summary: nextStatus === 'approved' ? 'Proposal draft approved internally.' : 'Proposal draft voided.',
+        payload: { status: nextStatus, leadId: saved.leadId }
+      });
+      return { kind: 'saved' as const, proposal: saved };
+    });
+    if (updated.kind === 'not_found') return res.status(404).json({ error: 'Proposal not found or inaccessible.' });
+    if (updated.kind === 'conflict') return res.status(409).json({ error: 'Only a draft proposal can transition; reload before retrying.' });
+    return res.json(updated.proposal);
+  } catch (err) {
+    console.error('[Proposals] Status update failed:', err);
+    return res.status(503).json({ error: 'Proposal status could not be updated.' });
   }
 });
 
