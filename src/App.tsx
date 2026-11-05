@@ -49,7 +49,7 @@ import {
   Send
 } from 'lucide-react';
 
-import AuthPage from './components/AuthPage';
+const AuthPage = lazy(() => import('./components/AuthPage'));
 const OverviewPanel = lazy(() => import('./components/OverviewPanel'));
 const WorkLedgerPanel = lazy(() => import('./components/WorkLedgerPanel'));
 const WorkQueuePanel = lazy(() => import('./components/WorkQueuePanel'));
@@ -988,7 +988,11 @@ export default function App() {
   }
 
   if ((!token || !contractor) && !reviewMode) {
-    return <AuthPage onAuthSuccess={handleAuthSuccess} />;
+    return (
+      <Suspense fallback={<div className="min-h-screen flex items-center justify-center text-xs font-mono text-text-tertiary">Loading sign-in…</div>}>
+        <AuthPage onAuthSuccess={handleAuthSuccess} />
+      </Suspense>
+    );
   }
 
   // Structured navigation hierarchy for left panel (tools not represented in the top ribbon)
