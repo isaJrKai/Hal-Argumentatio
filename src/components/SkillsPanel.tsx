@@ -88,7 +88,8 @@ const CORE_SKILL_IDS = [
 export default function SkillsPanel({ token }: SkillsPanelProps) {
   const { toast } = useToast();
   const { activeCity, activeNiche } = useBusinessContext();
-  const [skills, setSkills] = useState<Skill[]>([]);\n  const [auditLeads, setAuditLeads] = useState<any[]>([]);
+  const [skills, setSkills] = useState<Skill[]>([]);
+  const [auditLeads, setAuditLeads] = useState<any[]>([]);
   const [selectedSkill, setSelectedSkill] = useState<Skill | null>(null);
   const [formInputs, setFormInputs] = useState<Record<string, any>>({});
   const [loading, setLoading] = useState(false);
