@@ -21,16 +21,16 @@ describe('TimesFM batch forecast evaluation window', () => {
   });
   it('sums actual Google Ads conversions only for the requested territory and niche', () => {
     const rows = [...adsRows(), ...adsRows('Austin, TX', 'Roofing Leads'), ...adsRows('Calgary, AB', 'Plumbing Leads')];
-    expect(evaluateTimesFmBatchActual(rows, 'Calgary', 'Roofing', completeWindow)).toBe(15);
+    expect(evaluateTimesFmBatchActual(rows, 'Calgary, AB', 'Roofing', completeWindow)).toBe(15);
   });
   it('does not turn an incomplete target week into a zero actual', () => {
-    expect(evaluateTimesFmBatchActual(adsRows().slice(0, 4), 'Calgary', 'Roofing', completeWindow)).toBeNull();
+    expect(evaluateTimesFmBatchActual(adsRows().slice(0, 4), 'Calgary, AB', 'Roofing', completeWindow)).toBeNull();
   });
   it('does not evaluate data that lacks the requested city or niche', () => {
-    expect(evaluateTimesFmBatchActual(adsRows('Austin, TX'), 'Calgary', 'Roofing', completeWindow)).toBeNull();
-    expect(evaluateTimesFmBatchActual(adsRows('Calgary, AB', 'Plumbing Leads'), 'Calgary', 'Roofing', completeWindow)).toBeNull();
+    expect(evaluateTimesFmBatchActual(adsRows('Austin, TX'), 'Calgary, AB', 'Roofing', completeWindow)).toBeNull();
+    expect(evaluateTimesFmBatchActual(adsRows('Calgary, AB', 'Plumbing Leads'), 'Calgary, AB', 'Roofing', completeWindow)).toBeNull();
   });
   it('preserves a measured zero when a complete week has observed zero conversions', () => {
-    expect(evaluateTimesFmBatchActual(adsRows().map(row => ({ ...row, conversions: 0 })), 'Calgary', 'Roofing', completeWindow)).toBe(0);
+    expect(evaluateTimesFmBatchActual(adsRows().map(row => ({ ...row, conversions: 0 })), 'Calgary, AB', 'Roofing', completeWindow)).toBe(0);
   });
 });

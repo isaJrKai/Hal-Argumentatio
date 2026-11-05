@@ -4,7 +4,7 @@ export function matchesTerritoryContext(
   targetCity: string,
   targetNiche: string
 ): boolean {
-  const cityNeedle = targetCity.trim().toLocaleLowerCase();
+  const cityNeedle = targetCity.split(',')[0].trim().toLocaleLowerCase();
   const nicheNeedle = targetNiche.trim().toLocaleLowerCase();
   const cityValue = String(recordCity || '').trim().toLocaleLowerCase();
   const nicheValue = String(recordNiche || '').trim().toLocaleLowerCase();

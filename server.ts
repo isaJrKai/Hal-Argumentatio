@@ -54,7 +54,7 @@ import { validateStaffInput, getEffectiveStaffAvailability } from './src/lib/sta
 import { getWorkerCapabilities } from './src/lib/workerCapabilities';
 import { resolvePublishedLandingPageOwner } from './src/lib/landingPageOwnership';
 import { validateLoopGate } from './src/lib/loopGating';
-import { parseGoogleAdsConnection, buildGoogleAdsCityPerformanceQuery, buildGoogleAdsGeoConstantQuery, extractGoogleAdsStreamRows } from './src/lib/googleAdsIngestion';
+import { parseGoogleAdsConnection, buildGoogleAdsCityPerformanceQuery, buildGoogleAdsGeoConstantQuery, extractGoogleAdsStreamRows, GOOGLE_ADS_API_VERSION } from './src/lib/googleAdsIngestion';
 import { 
   auditCompetitorFootprint, 
   calculateSpatialQuadrants, 
@@ -6989,7 +6989,7 @@ async function googleAdsSearch(accessToken: string, credentials: ReturnType<type
   const headers: Record<string,string> = { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' };
   headers['developer-token'] = credentials.developerToken;
   if (credentials.loginCustomerId) headers['login-customer-id'] = credentials.loginCustomerId;
-  const response = await fetch(`https://googleads.googleapis.com/v25/customers/${credentials.customerId}/googleAds:searchStream`, {
+  const response = await fetch(`https://googleads.googleapis.com/${GOOGLE_ADS_API_VERSION}/customers/${credentials.customerId}/googleAds:searchStream`, {
     method: 'POST', headers, body: JSON.stringify({ query }), signal: AbortSignal.timeout(45000)
   });
   if (!response.ok) throw new Error(`Google Ads query failed (HTTP ${response.status}). Check the connected account's access and API project authorization.`);

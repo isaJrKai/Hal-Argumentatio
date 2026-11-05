@@ -92,7 +92,7 @@ def main() -> None:
         ).fetchall()
 
         for contractor in contractors:
-            city = str(contractor["city"]).strip().lower()
+            city = str(contractor["city"]).split(",")[0].strip().lower()
             niche = str(contractor["service_type"]).strip().lower()
             if not city or not niche:
                 skipped += 1

@@ -30,6 +30,8 @@ export function parseGoogleAdsConnection(raw: string): GoogleAdsConnection {
   return { clientId, clientSecret, refreshToken, customerId, loginCustomerId: loginCustomerId || undefined, developerToken };
 }
 
+export const GOOGLE_ADS_API_VERSION = 'v26';
+
 export function buildGoogleAdsCityPerformanceQuery(): string {
   return [
     'SELECT segments.date, segments.geo_target_city, campaign.id, campaign.name, geographic_view.location_type, metrics.impressions, metrics.clicks, metrics.cost_micros, metrics.conversions, metrics.conversions_value',
