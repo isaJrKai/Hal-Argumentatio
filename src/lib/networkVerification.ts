@@ -585,7 +585,7 @@ export async function fetchPublicWebsitePage(
   const maxBytes = Math.min(Math.max(options.maxBytes ?? 512 * 1024, 16 * 1024), 1024 * 1024);
   let url: URL;
   try {
-    url = new URL(/^https?:\\/\\//i.test(rawUrl.trim()) ? rawUrl.trim() : `https://${rawUrl.trim()}`);
+    url = new URL(/^https?:\/\//i.test(rawUrl.trim()) ? rawUrl.trim() : 'https://' + rawUrl.trim());
   } catch {
     throw new Error('Enter a valid website URL.');
   }
