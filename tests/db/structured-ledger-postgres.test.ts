@@ -1,8 +1,10 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { Pool } from 'pg';
 import { randomUUID } from 'node:crypto';
+import { drizzle } from 'drizzle-orm/node-postgres';
 import {
   appendStructuredLedgerEntry,
+  appendStructuredLedgerEntryInTransaction,
   getStructuredLedgerEntries,
   verifyStructuredLedgerIntegrity,
   importLegacyStructuredLedgerEntries,
@@ -98,6 +100,38 @@ suite('PostgreSQL global structured ledger', () => {
     expect(tenantA.every(entry => entry.contractorId === 'tenant-a' || entry.contractorId === 'system_genesis')).toBe(true);
     expect(tenantA).toHaveLength(13);
   }, 30000);
+
+  it('rolls back the ledger append when the surrounding business transaction fails', async () => {
+    const transactionDb = drizzle(writerA);
+    const before = await getStructuredLedgerEntries(undefined, 100, writerA);
+    await expect(transactionDb.transaction(async tx => {
+      await appendStructuredLedgerEntryInTransaction(tx as any, {
+        contractorId: 'tenant-atomic-rollback',
+        eventType: 'security_event',
+        entityType: 'test',
+        entityId: 'must-rollback',
+        actor: 'transaction-test',
+      });
+      throw new Error('simulate business transaction failure');
+    })).rejects.toThrow('simulate business transaction failure');
+
+    const afterRollback = await getStructuredLedgerEntries(undefined, 100, writerB);
+    expect(afterRollback).toHaveLength(before.length);
+    expect(afterRollback.some(entry => entry.entityId === 'must-rollback')).toBe(false);
+
+    await transactionDb.transaction(async tx => {
+      await appendStructuredLedgerEntryInTransaction(tx as any, {
+        contractorId: 'tenant-atomic-commit',
+        eventType: 'security_event',
+        entityType: 'test',
+        entityId: 'committed-with-business-write',
+        actor: 'transaction-test',
+      });
+    });
+    const afterCommit = await getStructuredLedgerEntries(undefined, 100, writerB);
+    expect(afterCommit.some(entry => entry.entityId === 'committed-with-business-write')).toBe(true);
+    expect((await verifyStructuredLedgerIntegrity(undefined, writerB)).valid).toBe(true);
+  }, 20000);
 
   it('reconciles an already-imported legacy prefix idempotently', async () => {
     const source = (await getStructuredLedgerEntries(undefined, 100, writerA)).reverse();
