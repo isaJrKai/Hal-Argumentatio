@@ -103,7 +103,7 @@ def main() -> None:
 
             rows = conn.execute(
                 """
-                SELECT date, conversions, cost, geo, campaign_name, keyword, search_term
+                SELECT date, conversions, cost, geo, campaign_name, keyword, search_term, currency_code
                 FROM google_ads_daily_performance
                 WHERE contractor_id = %s
                 ORDER BY date ASC
@@ -149,7 +149,9 @@ def main() -> None:
             first_forecast_week = first_target_week(last_week, today_utc)
             total_cost = sum(float(row["cost"] or 0) for row in scoped)
             total_conversions = sum(float(row["conversions"] or 0) for row in scoped)
-            observed_cpl = total_cost / total_conversions if total_conversions > 0 else 0.0
+            currency_codes = {str(row["currency_code"] or "").strip().upper() for row in scoped if row["currency_code"]}
+            account_currency_code = next(iter(currency_codes)) if len(currency_codes) == 1 else None
+            observed_cpl = total_cost / total_conversions if total_conversions > 0 and account_currency_code else None
             observed_days = {
                 row["date"].date() if isinstance(row["date"], datetime) else row["date"]
                 for row in scoped
@@ -181,7 +183,8 @@ def main() -> None:
                     "input_days": len(observed_days),
                     "input_total_cost": total_cost,
                     "input_total_conversions": total_conversions,
-                    "observed_cpl_usd": observed_cpl,
+                    "account_currency_code": account_currency_code,
+                    "observed_cpl_account_currency": observed_cpl,
                     "historical_mean": historical_mean,
                     "input_start_week": weeks[0][0].isoformat(),
                     "input_end_week": last_week.isoformat(),

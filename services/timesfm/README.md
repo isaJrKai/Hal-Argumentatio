@@ -90,7 +90,7 @@ be eligible. OAuth success with zero imported rows is not successful ingestion.
    GRANT USAGE ON SCHEMA public TO hal_timesfm_batch;
    GRANT SELECT (id, city, service_type, active_territories)
      ON TABLE public.contractors TO hal_timesfm_batch;
-   GRANT SELECT (contractor_id, date, conversions, cost, geo, campaign_name, keyword, search_term)
+   GRANT SELECT (contractor_id, date, conversions, cost, geo, campaign_name, keyword, search_term, currency_code)
      ON TABLE public.google_ads_daily_performance TO hal_timesfm_batch;
    GRANT INSERT (id, contractor_id, metric, predicted, confidence_score, target_date,
                  model_version, assumptions, created_at, updated_at)

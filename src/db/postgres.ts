@@ -562,6 +562,7 @@ export async function bootstrapPostgresTables(poolInstance?: Pool): Promise<void
         search_term TEXT,
         geo TEXT,
         device TEXT DEFAULT 'desktop' NOT NULL,
+        currency_code TEXT,
         date TIMESTAMP NOT NULL,
         impressions INTEGER DEFAULT 0 NOT NULL,
         clicks INTEGER DEFAULT 0 NOT NULL,
@@ -572,6 +573,8 @@ export async function bootstrapPostgresTables(poolInstance?: Pool): Promise<void
         asset_group TEXT,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
       );
+
+      ALTER TABLE google_ads_daily_performance ADD COLUMN IF NOT EXISTS currency_code TEXT;
 
       CREATE TABLE IF NOT EXISTS revenue_experiments (
         id TEXT PRIMARY KEY,

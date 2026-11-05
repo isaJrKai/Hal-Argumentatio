@@ -7025,17 +7025,18 @@ app.post('/api/forecasting/google-ads/sync', authenticate, async (req, res) => {
       const impressions=Number(row.metrics?.impressions||0), clicks=Number(row.metrics?.clicks||0);
       const costMicros=Number(row.metrics?.costMicros||0), conversions=Number(row.metrics?.conversions||0);
       const conversionValue=Number(row.metrics?.conversionsValue||0);
+      const currencyCode=String(row.customer?.currencyCode||'').trim().toUpperCase() || null;
       if (![impressions,clicks,costMicros,conversions,conversionValue].every(Number.isFinite) ||
           [impressions,clicks,costMicros,conversions,conversionValue].some(v=>v<0)) continue;
       const id='gads_'+crypto.createHash('sha256').update(`${contractorId}|${credentials.customerId}|${unique}`).digest('hex');
-      values.push({id,contractorId,campaignId,campaignName,geo:city,date:new Date(`${day}T00:00:00.000Z`),
+      values.push({id,contractorId,campaignId,campaignName,geo:city,device:'all',currencyCode,date:new Date(`${day}T00:00:00.000Z`),
         impressions,clicks,cost:costMicros/1000000,conversions,conversionValue,createdAt:now});
     }
     for(let offset=0;offset<values.length;offset+=500) {
       await pgDb.insert(googleAdsDailyPerformance).values(values.slice(offset,offset+500)).onConflictDoUpdate({
         target:googleAdsDailyPerformance.id,
         set:{
-          campaignName:sql`excluded.campaign_name`,geo:sql`excluded.geo`,date:sql`excluded.date`,
+          campaignName:sql`excluded.campaign_name`,geo:sql`excluded.geo`,currencyCode:sql`excluded.currency_code`,date:sql`excluded.date`,
           impressions:sql`excluded.impressions`,clicks:sql`excluded.clicks`,cost:sql`excluded.cost`,
           conversions:sql`excluded.conversions`,conversionValue:sql`excluded.conversion_value`
         }

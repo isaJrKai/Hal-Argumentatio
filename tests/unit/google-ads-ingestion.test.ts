@@ -10,7 +10,7 @@ describe('Google Ads history ingestion contract',()=>{
   expect(()=>parseGoogleAdsConnection(JSON.stringify({clientId:'x',clientSecret:'x',refreshToken:'x',customerId:'123',developerToken:'x'}))).toThrow(/10-digit/);
  });
  it('queries genuine city-level daily conversions over the last year',()=>{
-  const q=buildGoogleAdsCityPerformanceQuery(); expect(q).toContain('FROM geographic_view'); expect(q).toContain('segments.geo_target_city'); expect(q).toContain('metrics.conversions'); expect(q).toContain('LAST_365_DAYS'); expect(q).toContain('LOCATION_OF_PRESENCE');
+  const q=buildGoogleAdsCityPerformanceQuery(); expect(q).toContain('FROM geographic_view'); expect(q).toContain('segments.geo_target_city'); expect(q).toContain('metrics.conversions'); expect(q).toContain('customer.currency_code'); expect(q).toContain('LAST_365_DAYS'); expect(q).toContain('LOCATION_OF_PRESENCE');
  });
  it('rejects unsafe geo-target resource names',()=>{
   expect(buildGoogleAdsGeoConstantQuery(['geoTargetConstants/123'])).toContain("'geoTargetConstants/123'");

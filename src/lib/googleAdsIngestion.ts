@@ -34,7 +34,7 @@ export const GOOGLE_ADS_API_VERSION = 'v26';
 
 export function buildGoogleAdsCityPerformanceQuery(): string {
   return [
-    'SELECT segments.date, segments.geo_target_city, campaign.id, campaign.name, geographic_view.location_type, metrics.impressions, metrics.clicks, metrics.cost_micros, metrics.conversions, metrics.conversions_value',
+    'SELECT segments.date, segments.geo_target_city, campaign.id, campaign.name, customer.currency_code, geographic_view.location_type, metrics.impressions, metrics.clicks, metrics.cost_micros, metrics.conversions, metrics.conversions_value',
     'FROM geographic_view',
     'WHERE segments.date DURING LAST_365_DAYS',
     "AND geographic_view.location_type = 'LOCATION_OF_PRESENCE'",
