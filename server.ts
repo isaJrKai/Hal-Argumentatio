@@ -6263,6 +6263,102 @@ app.post('/api/outreach/dispatch', authenticate, async (req, res) => {
   }
 
   if (mode === 'live') {
+    if (channel === 'sms') {
+      if (!leadId) return res.status(400).json({ success: false, code: 'LEAD_ID_REQUIRED', error: 'Live SMS requires a saved lead with recorded consent.' });
+      const [storedLead] = await pgDb.select().from(leads).where(
+        and(eq(leads.id, String(leadId)), eq(leads.contractorId, contractorId))
+      ).limit(1);
+      if (!storedLead) return res.status(404).json({ success: false, code: 'LEAD_NOT_FOUND', error: 'The selected lead was not found in this workspace.' });
+      const verifiedPhone = storedLead.phoneEncrypted
+        ? decrypt(storedLead.phoneEncrypted)
+        : (storedLead.phone && !storedLead.phone.includes('[ENCRYPTED]') ? storedLead.phone : '');
+      const normalizedRecipient = verifiedPhone.replace(/[^+\d]/g, '');
+      if (!normalizedRecipient || normalizedRecipient !== String(recipient).replace(/[^+\d]/g, '')) {
+        return res.status(409).json({ success: false, code: 'RECIPIENT_DOES_NOT_MATCH_LEAD', error: 'SMS recipient does not match the saved lead phone number.' });
+      }
+      try {
+        enforceFailClosedOutreachGate({
+          id: storedLead.id, businessName: storedLead.businessName, isSynthetic: storedLead.isSynthetic,
+          sourceType: storedLead.sourceType || undefined, verificationStatus: storedLead.verificationStatus || undefined,
+          dnsVerified: storedLead.dnsVerified, websiteUrl: storedLead.websiteUrl || undefined,
+          phone: verifiedPhone, channel: 'sms'
+        });
+      } catch (gateError: any) {
+        if (gateError instanceof FailClosedOutreachError) return res.status(409).json({ success: false, code: 'OUTREACH_GROUNDING_BLOCKED', error: gateError.message });
+        throw gateError;
+      }
+      const [consent] = await pgDb.select().from(communicationsConsents).where(and(
+        eq(communicationsConsents.contractorId, contractorId),
+        eq(communicationsConsents.leadId, storedLead.id),
+        eq(communicationsConsents.channel, 'sms'),
+        eq(communicationsConsents.status, 'opted_in'),
+        isNull(communicationsConsents.optedOutAt)
+      )).limit(1);
+      if (!consent) return res.status(409).json({ success: false, code: 'SMS_CONSENT_REQUIRED', error: 'No current recorded SMS opt-in exists for this lead.' });
+
+      const bridge = await getBridgesForContractor(contractorId);
+      const statusCallbackUrl = process.env.TWILIO_STATUS_CALLBACK_URL || '';
+      const inboundWebhookUrl = process.env.TWILIO_INBOUND_WEBHOOK_URL || '';
+      if (!bridge.sms.accountSid || !bridge.sms.authToken || !bridge.sms.virtualNumber ||
+          !statusCallbackUrl.startsWith('https://') || !inboundWebhookUrl.startsWith('https://')) {
+        return res.status(503).json({ success: false, code: 'SMS_PROVIDER_NOT_CONFIGURED', error: 'Twilio credentials, verified sender and HTTPS inbound/status callback URLs are required.' });
+      }
+      const [senderMapping] = await pgDb.select().from(twilioPhoneNumberMappings).where(and(
+        eq(twilioPhoneNumberMappings.phoneNumber, bridge.sms.virtualNumber),
+        eq(twilioPhoneNumberMappings.contractorId, contractorId),
+        eq(twilioPhoneNumberMappings.accountSid, bridge.sms.accountSid)
+      )).limit(1);
+      if (!senderMapping) return res.status(409).json({ success: false, code: 'TWILIO_SENDER_NOT_VERIFIED', error: 'Register and verify this workspace Twilio sender number before sending SMS.' });
+
+      const idempotencyKey = String(requestedIdempotencyKey || req.headers['idempotency-key'] || crypto.randomUUID()).trim();
+      if (!idempotencyKey || idempotencyKey.length > 200) return res.status(400).json({ success: false, code: 'INVALID_IDEMPOTENCY_KEY', error: 'Idempotency key must be 1-200 characters.' });
+      const [existingDispatch] = await pgDb.select().from(communicationsOutbox).where(and(
+        eq(communicationsOutbox.contractorId, contractorId), eq(communicationsOutbox.idempotencyKey, idempotencyKey)
+      )).limit(1);
+      if (existingDispatch) {
+        const completed = ['submitted', 'sent', 'delivered'].includes(existingDispatch.status);
+        return res.status(completed ? 200 : 409).json({
+          success: completed, duplicate: true, dispatchId: existingDispatch.id,
+          providerMessageId: existingDispatch.providerMessageId, status: existingDispatch.status,
+          deliveryConfirmed: existingDispatch.status === 'delivered',
+          error: existingDispatch.errorMessage || undefined
+        });
+      }
+      const outboxId = crypto.randomUUID();
+      await pgDb.insert(communicationsOutbox).values({
+        id: outboxId, contractorId, leadId: storedLead.id, channel: 'sms', provider: 'twilio',
+        recipientEncrypted: encrypt(verifiedPhone), subjectEncrypted: null, bodyEncrypted: encrypt(customizedMessage),
+        status: 'processing', idempotencyKey, attempts: 0, lastAttemptAt: new Date(), updatedAt: new Date()
+      });
+      try {
+        const sent = await sendTwilioSms({
+          to: normalizedRecipient, from: bridge.sms.virtualNumber, body: customizedMessage,
+          statusCallbackUrl
+        }, { accountSid: bridge.sms.accountSid, authToken: bridge.sms.authToken });
+        const submittedAt = new Date();
+        await pgDb.update(communicationsOutbox).set({
+          status: 'submitted', providerMessageId: sent.providerMessageId, attempts: 1,
+          submittedAt, lastAttemptAt: submittedAt, updatedAt: submittedAt, errorCode: null, errorMessage: null
+        }).where(and(eq(communicationsOutbox.id, outboxId), eq(communicationsOutbox.contractorId, contractorId)));
+        return res.json({
+          success: true, dispatchId: outboxId, idempotencyKey, provider: 'twilio',
+          providerMessageId: sent.providerMessageId, status: 'submitted', mode: 'live',
+          providerContacted: true, deliveryConfirmed: false, timestamp: submittedAt.toISOString()
+        });
+      } catch (error: any) {
+        const uncertain = error instanceof TwilioRequestError;
+        await pgDb.update(communicationsOutbox).set({
+          status: uncertain ? 'unknown' : 'failed', attempts: 1, lastAttemptAt: new Date(), updatedAt: new Date(),
+          errorCode: error instanceof TwilioConfigurationError ? 'PROVIDER_NOT_CONFIGURED' : 'PROVIDER_REQUEST_FAILED',
+          errorMessage: String(error?.message || 'Twilio request failed').slice(0, 500)
+        }).where(and(eq(communicationsOutbox.id, outboxId), eq(communicationsOutbox.contractorId, contractorId))).catch(() => undefined);
+        return res.status(502).json({
+          success: false, code: 'SMS_PROVIDER_REQUEST_FAILED',
+          error: 'Twilio did not confirm submission. Automatic retry is disabled to avoid duplicate texts.'
+        });
+      }
+    }
+
     if (channel !== 'email') {
       return res.status(501).json({
         success: false,
