@@ -4179,7 +4179,7 @@ app.post('/api/revenues', authenticate, async (req, res) => {
         sourceModule: 'financial_intelligence',
         correlationId: revenue.id,
         summary: `Closed ${existingLead.businessName} and recorded $${amount} USD.`,
-        payload: { amountUsd: amount, source: revenue.source, revenueRecordId: revenue.id, previousStage: existingLead.status, currentStage: 'closed_won' }
+        payload: { amountUsd: amount, source: revenue.source, revenueRecordId: revenue.id, previousStage: existingLead.status, currentStage: 'closed_won', workflowId: leadId }
       });
       await tx.insert(auditLogs).values({
         id: crypto.randomUUID(),
@@ -7258,6 +7258,7 @@ app.post('/api/proposals/generate', authenticate, async (req, res) => {
       summary: `Generated a proposal draft for ${lead.businessName}; it has not been persisted as a contract.`,
       payload: {
         proposalId: proposal.id,
+        workflowId: lead.id,
         packageTier,
         monthlyRetainerUsd: retainer,
         setupFeeUsd: setup,
@@ -7341,7 +7342,7 @@ app.patch('/api/proposals/:id/status', authenticate, async (req, res) => {
         sourceModule: 'proposal_studio',
         correlationId: saved.id,
         summary: nextStatus === 'approved' ? 'Proposal draft approved internally.' : 'Proposal draft voided.',
-        payload: { status: nextStatus, leadId: saved.leadId }
+        payload: { status: nextStatus, leadId: saved.leadId, workflowId: saved.leadId }
       });
       return { kind: 'saved' as const, proposal: saved };
     });
@@ -7404,7 +7405,7 @@ app.post('/api/proposals/:id/signing-link', authenticate, async (req, res) => {
         sourceModule: 'proposal_studio',
         correlationId: proposal.id,
         summary: 'Created a seven-day one-time client proposal acceptance link.',
-        payload: { expiresAt: expiresAt.toISOString(), acceptanceMode: 'first_party_typed_name_and_consent', externalESignProviderVerified: false }
+        payload: { expiresAt: expiresAt.toISOString(), acceptanceMode: 'first_party_typed_name_and_consent', externalESignProviderVerified: false, workflowId: proposal.leadId }
       });
     });
     const signingUrl = `/sign/proposal/${token}`;
@@ -7481,7 +7482,7 @@ app.post('/api/public/proposals/:token', async (req, res) => {
         sourceModule: 'proposal_studio',
         correlationId: saved.id,
         summary: 'Client recorded electronic acceptance of the approved proposal.',
-        payload: { signerName, signerEmail, signedAt: now.toISOString(), signedContentHash: contentHash, consentRecorded: true, captureMode: 'first_party_typed_name_and_consent', identityVerifiedByExternalProvider: false }
+        payload: { signerName, signerEmail, signedAt: now.toISOString(), signedContentHash: contentHash, consentRecorded: true, captureMode: 'first_party_typed_name_and_consent', identityVerifiedByExternalProvider: false, workflowId: saved.leadId }
       });
       return { kind: 'saved' as const, signedAt: now.toISOString(), contentHash };
     });
@@ -7616,7 +7617,7 @@ app.post('/api/invoices', authenticate, async (req, res) => {
         sourceModule: 'finance_ledger',
         correlationId: invoice.id,
         summary: `Issued invoice ${invoice.invoiceNumber} for ${invoice.amountDueMinor} ${invoice.currency} minor units.`,
-        payload: { invoiceNumber: invoice.invoiceNumber, leadId: linkedLeadId, projectId: normalizedProjectId, amountDueMinor: amountMinor, currency: normalizedCurrency }
+        payload: { invoiceNumber: invoice.invoiceNumber, leadId: linkedLeadId, projectId: normalizedProjectId, amountDueMinor: amountMinor, currency: normalizedCurrency, workflowId: linkedLeadId || normalizedProjectId || invoice.id }
       });
     });
     return res.status(201).json({ ...invoice, amountPaidMinor: 0, balanceDueMinor: amountMinor });
@@ -7693,7 +7694,7 @@ app.post('/api/invoices/:id/payments', authenticate, async (req, res) => {
         sourceModule: 'finance_ledger',
         correlationId: invoice.id,
         summary: `Recorded a ${amountMinor} ${invoice.currency} minor-unit receipt against invoice ${invoice.invoiceNumber}.`,
-        payload: { paymentId: payment.id, amountMinor, currency: invoice.currency, method, remainingMinor: invoice.amountDueMinor - nextPaid, invoiceStatus: nextStatus, settlementVerified: false }
+        payload: { paymentId: payment.id, amountMinor, currency: invoice.currency, method, remainingMinor: invoice.amountDueMinor - nextPaid, invoiceStatus: nextStatus, settlementVerified: false, workflowId: invoice.leadId || invoice.projectId || invoice.id }
       });
       return { kind: 'saved' as const, payment, invoiceStatus: nextStatus, amountPaidMinor: nextPaid, balanceDueMinor: invoice.amountDueMinor - nextPaid };
     });
@@ -7729,7 +7730,7 @@ app.post('/api/invoices/:id/void', authenticate, async (req, res) => {
         sourceModule: 'finance_ledger',
         correlationId: invoice.id,
         summary: `Voided invoice ${invoice.invoiceNumber}; no receipts had been recorded.`,
-        payload: { invoiceNumber: invoice.invoiceNumber }
+        payload: { invoiceNumber: invoice.invoiceNumber, workflowId: invoice.leadId || invoice.projectId || invoice.id }
       });
       return { kind: 'saved' as const, invoice: saved };
     });
