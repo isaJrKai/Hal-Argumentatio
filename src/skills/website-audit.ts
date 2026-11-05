@@ -1,5 +1,5 @@
 import { Skill } from './types';
-import { fetchPublicWebsitePage, validateDomainAndDns } from '../lib/networkVerification';
+import { fetchPublicWebsitePage } from '../lib/networkVerification';
 
 function cleanText(value: string): string {
   return value
