@@ -64,6 +64,27 @@ describe('Resend email adapter', () => {
     expect(payload.html).not.toContain('<script>');
   });
 
+  it('uses an explicitly supplied trusted HTML body for system messages', async () => {
+    const fetchImpl = vi.fn().mockResolvedValue(new Response(JSON.stringify({ id: 're_html_123' }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    }));
+    await sendResendEmail({
+      to: 'owner@example.com',
+      subject: 'Reset your password',
+      text: 'Open the reset link.',
+      html: '<p><a href="https://example.com/reset">Reset password</a></p>',
+    }, {
+      apiKey: 'server-secret',
+      from: 'HAL <verified@example.com>',
+      fetchImpl: fetchImpl as unknown as typeof fetch,
+    });
+
+    const [, request] = fetchImpl.mock.calls[0] as unknown as [string, RequestInit];
+    const payload = JSON.parse(String(request.body));
+    expect(payload.html).toBe('<p><a href="https://example.com/reset">Reset password</a></p>');
+  });
+
   it('does not claim success when Resend rejects a request', async () => {
     const fetchImpl = vi.fn().mockResolvedValue(new Response('provider error', { status: 401 }));
     await expect(sendResendEmail({
