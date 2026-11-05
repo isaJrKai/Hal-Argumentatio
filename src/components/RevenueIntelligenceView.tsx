@@ -158,9 +158,9 @@ export default function RevenueIntelligenceView({ token }: RevenueIntelligenceVi
           <div className="text-[10px] text-text-secondary font-mono mt-0.5">{summary.totalCustomers || 0} customers</div>
         </div>
         <div className="p-4 rounded-xl border border-border-dim bg-bg-raised">
-          <div className="text-[10px] font-mono text-text-tertiary uppercase">Closed Revenue</div>
+          <div className="text-[10px] font-mono text-text-tertiary uppercase">Closed-Won CRM Value</div>
           <div className="text-lg font-bold font-mono text-emerald-400 mt-1">${(summary.totalRevenue || 0).toLocaleString()}</div>
-          <div className="text-[10px] text-emerald-400/80 font-mono mt-0.5">Verified CRM</div>
+          <div className="text-[10px] text-emerald-400/80 font-mono mt-0.5">Lead-linked value; not cash collected</div>
         </div>
         <div className="p-4 rounded-xl border border-border-dim bg-bg-raised">
           <div className="text-[10px] font-mono text-text-tertiary uppercase">Blended ROAS</div>
