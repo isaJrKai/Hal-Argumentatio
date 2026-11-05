@@ -38,7 +38,7 @@ Service: ${niche}
 City: ${city}
 
 Use these candidate search phrases as hypotheses, not verified demand:
-${phrases.map((phrase, index) => `${index + 1}. ${phrase}`).join('\\n')}
+${phrases.map((phrase, index) => `${index + 1}. ${phrase}`).join('\n')}
 
 Suggest page structure, useful service-page content, title/description ideas, and what evidence should be collected next.
 Strict evidence rules:
@@ -82,7 +82,7 @@ Return concise Markdown with sections: Candidate keyword hypotheses, Recommended
         '- Current Google search results and competitor URLs for the target location.',
         '- Search Console or analytics data before making traffic or conversion claims.',
         '- A measured website audit before describing specific technical SEO defects.'
-      ].join('\\n');
+      ].join('\n');
     }
 
     return {
