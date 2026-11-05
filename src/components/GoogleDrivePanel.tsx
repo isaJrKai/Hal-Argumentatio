@@ -784,7 +784,7 @@ Analyze this file according to the User Goal, offering concrete business strateg
                         Model provider:
                       </span>
                       <span className="text-[9px] font-mono px-1.5 py-0.5 rounded uppercase font-semibold bg-accent/10 text-accent border border-accent/20">
-                        {activeAi === 'gemini' ? 'Gemini 3.5' : 'Nemotron'}
+                        {activeAi === 'gemini' ? 'Google Gemini' : 'Nemotron'}
                       </span>
                     </div>
 
@@ -806,7 +806,7 @@ Analyze this file according to the User Goal, offering concrete business strateg
                             : 'bg-bg-base/30 border-border-dim text-text-secondary hover:border-border-default hover:text-text-primary'
                         }`}
                       >
-                        <span className="text-[10px] font-bold font-sans uppercase">Gemini 3.5</span>
+                        <span className="text-[10px] font-bold font-sans uppercase">Google Gemini</span>
                         <span className="text-[8px] font-mono opacity-80 mt-1 uppercase">Preferred provider</span>
                       </button>
 
@@ -878,14 +878,14 @@ Analyze this file according to the User Goal, offering concrete business strateg
                     onClick={handleAiAudit}
                     isLoading={isGeneratingAi}
                   >
-                    Analyze with {activeAi === 'gemini' ? 'Gemini 3.5' : 'Nemotron'}
+                    Analyze with {activeAi === 'gemini' ? 'Google Gemini' : 'Nemotron'}
                   </Button>
 
                   {/* AI Response output area */}
                   {aiResponse && (
                     <div className="flex-1 flex flex-col space-y-1.5">
                       <span className="text-[8px] font-mono text-accent uppercase block tracking-wider">
-                        {activeAi === 'gemini' ? 'Gemini 3.5' : 'Nemotron'} Tactical Intelligence Summary:
+                        {activeAi === 'gemini' ? 'Google Gemini' : 'Nemotron'} Tactical Intelligence Summary:
                       </span>
                       <div className="flex-1 h-44 overflow-y-auto bg-bg-base/60 border border-accent/20 rounded-sm p-3 font-sans text-[11px] text-text-secondary leading-relaxed whitespace-pre-wrap">
                         {aiResponse}
