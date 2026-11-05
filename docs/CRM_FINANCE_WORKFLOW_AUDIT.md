@@ -43,6 +43,8 @@ A regression test asserts these fail-closed invariants.
 - The project form no longer pre-fills a $2,400 retainer, and its lead picker offers only closed-won leads.
 - Project updates accept explicit non-negative whole-dollar retainer changes and terminal cancellation states. The work event records prior/current retainer values.
 - Financial MRR now counts only explicit active-delivery statuses (active, active_delivery, in_progress); onboarding and review projects are excluded until delivery is active.
+- The recommendations endpoint now returns an empty tenant-scoped list instead of inserting a fabricated sample campaign recommendation.
+- Revenue simulations now require two campaigns with recorded spend and unambiguous lead-linked revenue. Ambiguous multi-touch attribution is excluded; unverified geo/general-growth scenarios are explicitly unsupported rather than assigned invented ROAS, percentage lift, or confidence values.
 ## Remaining verification gates
 
 These items remain unverified and must not be represented as complete:
