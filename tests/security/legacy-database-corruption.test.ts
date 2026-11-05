@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseLegacyDatabase } from '../../src/db/db';
+import { parseLegacyDatabase } from '../../src/db/legacyJsonStore';
 
 describe('legacy database file parsing', () => {
   it('parses a JSON object without changing its data', () => {
