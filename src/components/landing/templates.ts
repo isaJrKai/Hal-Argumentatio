@@ -900,6 +900,7 @@ Object.assign(TRADE_TEMPLATES, {
 for (const template of Object.values(TRADE_TEMPLATES)) {
   template.businessName = 'Your Business Name';
   template.city = 'Your service area';
+  template.title = `Your Business Name — ${template.trade.replace(/_/g, ' ')} Services in Your Service Area`;
   template.phone = '';
   template.licenseNumber = 'Add verified licence details or remove this field before publishing';
   template.emergencyService = false;
