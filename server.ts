@@ -2230,8 +2230,15 @@ app.post('/api/landing-pages/:id/publish', authenticate, async (req, res) => {
       : {};
     if (!String(pageConfig.businessName || '').trim() || !String(pageConfig.city || '').trim() ||
         String(pageConfig.businessName).trim().toLowerCase() === 'your business name' ||
-        String(pageConfig.city).trim().toLowerCase() === 'your service area') {
-      return res.status(409).json({ success: false, error: 'Replace the template business name and service area with accurate business details before publishing.' });
+        String(pageConfig.city).trim().toLowerCase() === 'your service area' ||
+        /your business name|your service area/i.test(String(pageConfig.title || artifact.title || ''))) {
+      return res.status(409).json({ success: false, error: 'Replace the template page title, business name, and service area with accurate details before publishing.' });
+    }
+
+    const seoConfig = pageConfig.seo && typeof pageConfig.seo === 'object' ? pageConfig.seo : {};
+    if (/your business name|your service area|learn about the services offered by/i.test(String(seoConfig.metaTitle || '')) ||
+        /your business name|your service area|learn about the services offered by/i.test(String(seoConfig.metaDescription || ''))) {
+      return res.status(409).json({ success: false, code: 'SEO_PLACEHOLDER_CONTENT', error: 'Replace the default SEO title and description with accurate business-specific metadata before publishing.' });
     }
 
     const pageSections = pageConfig.sections && typeof pageConfig.sections === 'object' ? pageConfig.sections : {};
