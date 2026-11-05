@@ -8,12 +8,13 @@ describe('landing page quality gate evidence boundaries', () => {
       expect(template.businessName).toBe('Your Business Name');
       expect(template.city).toBe('Your service area');
       expect(template.phone).toBe('');
-      expect(template.licenseNumber).toBe('');
+      expect(template.licenseNumber).toMatch(/Add verified/i);
       expect(template.sections.trust_bar?.active ?? false).toBe(false);
       expect(template.sections.pricing_packages?.active ?? false).toBe(false);
       expect(template.sections.reviews?.active ?? false).toBe(false);
       expect(template.sections.before_after?.active ?? false).toBe(false);
-      expect(template.sections.services?.active ?? false).toBe(false);
+      expect(template.sections.services?.active ?? false).toBe(true);
+      expect(template.sections.services?.subtitle).toContain('only the services your business actually provides');
     }
   });
 
