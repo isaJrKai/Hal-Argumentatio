@@ -180,6 +180,95 @@ export async function getStructuredLedgerEntries(
 }
 
 /**
+ * One-time, insert-only reconciliation of a verified legacy JSON ledger.
+ * Existing PostgreSQL rows must be an exact prefix of the source chain. This
+ * never overwrites or deletes PostgreSQL history and is safe to retry.
+ */
+export async function importLegacyStructuredLedgerEntries(
+  legacyEntries: StructuredLedgerEntry[],
+  poolOverride?: Pool,
+): Promise<{ imported: number; alreadyPresent: number; total: number }> {
+  const pool = getPool(poolOverride);
+  let previousHash = ZERO_HASH;
+  for (let index = 0; index < legacyEntries.length; index += 1) {
+    const entry = legacyEntries[index];
+    const expectedSequence = index + 1;
+    if (entry.sequenceNumber !== expectedSequence || entry.prevHash !== previousHash) {
+      throw new Error(`Legacy structured ledger chain is invalid at sequence ${expectedSequence}; import aborted.`);
+    }
+    const payloadJson = payloadFor(entry);
+    const expectedPayloadHash = hash(payloadJson);
+    if (entry.payloadHash !== expectedPayloadHash) {
+      throw new Error(`Legacy structured ledger payload hash mismatch at sequence ${expectedSequence}; import aborted.`);
+    }
+    const createdAt = new Date(entry.createdAt);
+    if (!Number.isFinite(createdAt.getTime())) {
+      throw new Error(`Legacy structured ledger timestamp is invalid at sequence ${expectedSequence}; import aborted.`);
+    }
+    const expectedEntryHash = hash(
+      `${entry.sequenceNumber}:${entry.prevHash}:${entry.payloadHash}:${entry.actor}:${entry.createdAt}`,
+    );
+    if (entry.entryHash !== expectedEntryHash) {
+      throw new Error(`Legacy structured ledger entry hash mismatch at sequence ${expectedSequence}; import aborted.`);
+    }
+    previousHash = entry.entryHash;
+  }
+
+  return withClient(pool, async (client) => {
+    await client.query('BEGIN');
+    try {
+      await client.query('SELECT pg_advisory_xact_lock($1, $2)', [LEDGER_LOCK_CLASS, LEDGER_LOCK_ID]);
+      const existing = await client.query<LedgerRow>(
+        `SELECT id, contractor_id, sequence_number, event_type, entity_type, entity_id, actor,
+          payload_json, payload_hash, prev_hash, entry_hash, details, metadata, created_at
+         FROM structured_ledger_entries ORDER BY sequence_number ASC`,
+      );
+      const sharedLength = Math.min(existing.rows.length, legacyEntries.length);
+      for (let index = 0; index < sharedLength; index += 1) {
+        const current = asEntry(existing.rows[index]);
+        const source = legacyEntries[index];
+        if (
+          current.sequenceNumber !== source.sequenceNumber ||
+          current.id !== source.id ||
+          current.contractorId !== source.contractorId ||
+          current.entryHash !== source.entryHash ||
+          current.prevHash !== source.prevHash ||
+          current.payloadHash !== source.payloadHash
+        ) {
+          throw new Error(`PostgreSQL ledger diverges from the verified legacy chain at sequence ${index + 1}; import refused.`);
+        }
+      }
+      if (existing.rows.length > legacyEntries.length) {
+        await client.query('COMMIT');
+        return { imported: 0, alreadyPresent: legacyEntries.length, total: existing.rows.length };
+      }
+
+      let imported = 0;
+      for (const entry of legacyEntries.slice(existing.rows.length)) {
+        const payloadJson = payloadFor(entry);
+        await client.query(
+          `INSERT INTO structured_ledger_entries
+            (id, contractor_id, sequence_number, event_type, entity_type, entity_id, actor,
+             payload_json, payload_hash, prev_hash, entry_hash, details, metadata, created_at)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13::jsonb, $14::timestamptz)`,
+          [
+            entry.id, entry.contractorId, entry.sequenceNumber, entry.eventType, entry.entityType,
+            entry.entityId, entry.actor, payloadJson, entry.payloadHash, entry.prevHash,
+            entry.entryHash, entry.details ?? null, JSON.stringify(entry.metadata ?? null), entry.createdAt,
+          ],
+        );
+        imported += 1;
+      }
+      await client.query('COMMIT');
+      return { imported, alreadyPresent: existing.rows.length, total: legacyEntries.length };
+    } catch (error) {
+      await client.query('ROLLBACK').catch(() => undefined);
+      throw error;
+    }
+  });
+}
+
+/**
  * Verify the entire global chain, even when a contractorId is supplied. A
  * tenant-filtered subset cannot be verified because it omits other tenants'
  * hashes and would produce false integrity failures or false confidence.
