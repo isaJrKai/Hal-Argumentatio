@@ -208,7 +208,7 @@ export const LandingPageStudioPanel: React.FC<{ token: string | null }> = ({ tok
     }));
     showToast({
       title: 'Prospect Context Loaded',
-      message: `Using saved CRM details for ${lead.businessName}. Only verified business details are copied into the page configuration.`,
+      message: `Using saved CRM details for ${lead.businessName}. The selected CRM details are copied into a private draft; verify the prospect before publishing.`,
       type: 'info'
     });
   };
