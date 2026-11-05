@@ -37,6 +37,7 @@ import {
 import { callNemotron } from './src/services/nemotron.ts';
 import { runProviderProbe } from './src/services/aiProviderDiagnostics.ts';
 import { autonomousLearning } from './src/lib/autonomousLearning';
+import { getConnectorCredentials, importConnectorCredentialIfAbsent, saveConnectorCredential } from './src/db/connectorCredentials';
 import { getAllSkills, executeSkill, registerCustomSkill, unregisterCustomSkill } from './src/skills/registry';
 import { HAL_MCP_TOOLS, executeMcpTool } from './src/services/mcp/dispatcher';
 import { McpJsonRpcRequest, McpJsonRpcResponse } from './src/services/mcp/types';
@@ -7478,25 +7479,33 @@ app.post('/api/forecasting/google-ads/sync', authenticate, async (req, res) => {
   }
 });
 
+const legacyConnectorCredentialImports = new Map<string, Promise<void>>();
+
+async function importLegacyConnectorCredentialsOnce(contractorId: string): Promise<void> {
+  const inFlight = legacyConnectorCredentialImports.get(contractorId);
+  if (inFlight) return inFlight;
+
+  const migration = (async () => {
+    const legacyCredentials = db.getConnectorCredentials(contractorId) || {};
+    for (const [service, value] of Object.entries(legacyCredentials)) {
+      if (typeof value !== 'string' || !value) continue;
+      await importConnectorCredentialIfAbsent(contractorId, service, value);
+    }
+  })();
+  legacyConnectorCredentialImports.set(contractorId, migration);
+  try {
+    await migration;
+  } catch (error) {
+    legacyConnectorCredentialImports.delete(contractorId);
+    throw error;
+  }
+}
+
 async function getTenantConnectorCredentials(contractorId: string): Promise<Record<string, string>> {
-  // Import existing encrypted JSON-store values once. PostgreSQL becomes the
-  // durable source after first read; conflicts never overwrite newer DB values.
-  const legacyCredentials = db.getConnectorCredentials(contractorId) || {};
-  for (const [service, value] of Object.entries(legacyCredentials)) {
-    if (typeof value !== 'string' || !value) continue;
-    const id = 'conn_' + crypto.createHash('sha256').update(`${contractorId}:${service}`).digest('hex');
-    await pgDb.insert(connectorCredentials).values({
-      id, contractorId, service, encryptedValue: encrypt(value), updatedAt: new Date()
-    }).onConflictDoNothing();
-  }
-  const rows = await pgDb.select().from(connectorCredentials)
-    .where(eq(connectorCredentials.contractorId, contractorId));
-  const credentials: Record<string, string> = {};
-  for (const row of rows) {
-    const value = decrypt(row.encryptedValue);
-    if (value) credentials[row.service] = value;
-  }
-  return credentials;
+  // Read the legacy aggregate once per tenant/process for compatibility, then
+  // use the tested PostgreSQL repository as the sole credential read path.
+  await importLegacyConnectorCredentialsOnce(contractorId);
+  return getConnectorCredentials(contractorId);
 }
 
 app.get('/api/connectors/credentials', authenticate, async (req, res) => {
@@ -7529,13 +7538,7 @@ app.post('/api/connectors/credentials', authenticate, async (req, res) => {
   }
   try {
     const id = 'conn_' + crypto.createHash('sha256').update(`${contractorId}:${service}`).digest('hex');
-    const encryptedValue = encrypt(keyVal.trim());
-    await pgDb.insert(connectorCredentials).values({
-      id, contractorId, service, encryptedValue, updatedAt: new Date()
-    }).onConflictDoUpdate({
-      target: connectorCredentials.id,
-      set: { encryptedValue, updatedAt: new Date() }
-    });
+    await saveConnectorCredential(contractorId, service, keyVal.trim());
     await pgDb.insert(auditLogs).values({
       id: crypto.randomUUID(),
       contractorId,
