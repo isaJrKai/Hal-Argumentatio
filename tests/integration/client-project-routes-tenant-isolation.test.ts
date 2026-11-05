@@ -178,7 +178,7 @@ describe('client project HTTP route tenant isolation', () => {
     const publishedPage = await request(app)
       .post(`/api/landing-pages/${landingAuditArtifactId}/publish`)
       .set('Authorization', `Bearer ${tokenA}`)
-      .send({ confirmPublish: true });
+      .send({ confirmPublish: true, contentReviewed: true });
     expect(publishedPage.status).toBe(200);
     expect(publishedPage.body.status).toBe('deployed');
 
@@ -665,9 +665,12 @@ describe('client project HTTP route tenant isolation', () => {
     const events = await pool.query(
       `SELECT payload FROM work_events
        WHERE contractor_id = $1 AND event_type = 'client_project.updated'
-         AND entity_id = $2`,
+         AND entity_id = $2
+       ORDER BY created_at DESC LIMIT 1`,
       [tenantA, project.id]
     );
+    // The preceding concurrency test updates this same project; inspect the
+    // latest committed event rather than assuming the tenant has no history.
     expect(events.rows).toHaveLength(1);
     expect(events.rows[0].payload.currentMonthlyRetainerUsd).toBe(persisted.monthly_retainer_usd);
   });
