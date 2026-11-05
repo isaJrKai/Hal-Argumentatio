@@ -11839,18 +11839,16 @@ async function startServer() {
           details: `Processed ${savedLeads.length} discovery candidates in ${city} (${niche}); verified: ${savedLeads.filter(lead => lead.verificationStatus === 'VERIFIED' && !lead.isSynthetic).length}; unverified: ${savedLeads.filter(lead => lead.verificationStatus !== 'VERIFIED' || lead.isSynthetic).length}.`,
           metadata: { city, niche, harvestedCount: savedLeads.length, purgedMockSeeds: purgeMock }
         };
-        await recordStructuredLedgerEntryInTransaction(tx, harvestLedgerInput);
-        return { savedLeads, queuedTasks, purgedCount, ledgerInputs, harvestLedgerInput };
+        const persistedHarvestBlock = await recordStructuredLedgerEntryInTransaction(tx, harvestLedgerInput);
+        return { savedLeads, queuedTasks, purgedCount, ledgerInputs, harvestLedgerInput, persistedHarvestBlock };
       });
 
-      let harvestBlock: any = null;
+      let harvestBlock: any = committed.persistedHarvestBlock;
       if (!postgresStructuredLedgerEnabled()) {
         for (const ledgerInput of committed.ledgerInputs) {
           await recordStructuredLedgerEntry(ledgerInput);
         }
         harvestBlock = await recordStructuredLedgerEntry(committed.harvestLedgerInput);
-      } else {
-        harvestBlock = committed.harvestLedgerInput;
       }
       const { savedLeads, queuedTasks, purgedCount } = committed;
 
