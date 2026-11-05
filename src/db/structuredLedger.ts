@@ -2,7 +2,7 @@ import crypto from 'node:crypto';
 import { isDeepStrictEqual } from 'node:util';
 import type { Pool, PoolClient } from 'pg';
 import { getPostgresPool } from './postgres';
-import type { StructuredLedgerEntry } from './db';
+import type { StructuredLedgerEntry } from './structuredLedgerTypes';
 
 const ZERO_HASH = '0'.repeat(64);
 // A fixed, application-wide advisory-lock key. Every HAL instance must use the
