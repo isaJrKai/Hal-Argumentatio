@@ -115,7 +115,7 @@ workflow logs.
 A tenant-authenticated Google Ads API ingestion endpoint is now implemented at
 `POST /api/forecasting/google-ads/sync`. It uses the current encrypted
 workspace credential, queries city-level physical-presence daily performance,
-resolves Google geo-target city names, and upserts tenant-owned records
+resolves canonical Google geo-target city names, and upserts tenant-owned records
 idempotently. It does not invent missing days or fabricate sample rows. The
 batch runner consumes only rows whose city and campaign text match the selected
 territory and service type.

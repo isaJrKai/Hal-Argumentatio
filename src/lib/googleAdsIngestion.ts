@@ -48,7 +48,7 @@ export function buildGoogleAdsGeoConstantQuery(resources: string[]): string {
     throw new Error('Invalid Google Ads geo target resource list.');
   }
   const literals = safe.map(value => "'" + value + "'").join(', ');
-  return 'SELECT geo_target_constant.resource_name, geo_target_constant.name FROM geo_target_constant WHERE geo_target_constant.resource_name IN (' + literals + ')';
+  return 'SELECT geo_target_constant.resource_name, geo_target_constant.canonical_name FROM geo_target_constant WHERE geo_target_constant.resource_name IN (' + literals + ')';
 }
 
 export function extractGoogleAdsStreamRows(payload: unknown): any[] {

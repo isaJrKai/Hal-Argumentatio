@@ -14,6 +14,7 @@ describe('Google Ads history ingestion contract',()=>{
  });
  it('rejects unsafe geo-target resource names',()=>{
   expect(buildGoogleAdsGeoConstantQuery(['geoTargetConstants/123'])).toContain("'geoTargetConstants/123'");
+  expect(buildGoogleAdsGeoConstantQuery(['geoTargetConstants/123'])).toContain('canonical_name');
   expect(()=>buildGoogleAdsGeoConstantQuery(["x' OR 1=1 --"])).toThrow(/resource list/);
  });
  it('flattens SearchStream batches and rejects invalid envelopes',()=>{

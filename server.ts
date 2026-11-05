@@ -7010,7 +7010,7 @@ app.post('/api/forecasting/google-ads/sync', authenticate, async (req, res) => {
     for (let offset=0; offset<cityResources.length; offset+=100) {
       const rows = await googleAdsSearch(accessToken, credentials, buildGoogleAdsGeoConstantQuery(cityResources.slice(offset,offset+100)));
       for (const row of rows) {
-        const resource=row.geoTargetConstant?.resourceName, name=row.geoTargetConstant?.name;
+        const resource=row.geoTargetConstant?.resourceName, name=row.geoTargetConstant?.canonicalName;
         if (typeof resource==='string' && typeof name==='string' && name.trim()) cityNames.set(resource,name.trim());
       }
     }
