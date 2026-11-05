@@ -368,16 +368,33 @@ export class AutonomousLearningEngine {
       } else {
         await this.saveState();
       }
-    } catch (e: any) {
-      console.info('[Autonomous Learning] Neural engine initialized with memory state (database offline or unconfigured).');
+    } catch (error) {
+      console.error('[Autonomous Learning] Persistent learning-state initialization failed.', error);
+      throw error;
     }
   }
 
   public async saveState(): Promise<void> {
-    this.state.lastUpdated = new Date().toISOString();
-    try {
-      await getDrizzleDb().insert(neuralState).values({
-        id: 'singleton',
+    const database = getDrizzleDb();
+    if (!database) {
+      throw new Error('PostgreSQL is not configured; learning state was not persisted.');
+    }
+
+    const updatedAt = new Date();
+    await database.insert(neuralState).values({
+      id: 'singleton',
+      version: this.state.version,
+      calibrationEpoch: this.state.calibrationEpoch,
+      totalOutcomesDigested: this.state.totalOutcomesDigested,
+      autonomyReadinessScore: this.state.autonomyReadinessScore,
+      isOfflineModeActive: this.state.isOfflineModeActive,
+      technicalWeights: this.state.technicalWeights,
+      nicheMap: this.state.nicheMap,
+      objections: this.state.objections,
+      activeNodes: []
+    }).onConflictDoUpdate({
+      target: neuralState.id,
+      set: {
         version: this.state.version,
         calibrationEpoch: this.state.calibrationEpoch,
         totalOutcomesDigested: this.state.totalOutcomesDigested,
@@ -386,33 +403,25 @@ export class AutonomousLearningEngine {
         technicalWeights: this.state.technicalWeights,
         nicheMap: this.state.nicheMap,
         objections: this.state.objections,
-        activeNodes: []
-      }).onConflictDoUpdate({
-        target: neuralState.id,
-        set: {
-          version: this.state.version,
-          calibrationEpoch: this.state.calibrationEpoch,
-          totalOutcomesDigested: this.state.totalOutcomesDigested,
-          autonomyReadinessScore: this.state.autonomyReadinessScore,
-          isOfflineModeActive: this.state.isOfflineModeActive,
-          technicalWeights: this.state.technicalWeights,
-          nicheMap: this.state.nicheMap,
-          objections: this.state.objections,
-          updatedAt: new Date()
-        }
-      });
-    } catch(e) {
-      console.warn('Failed to persist neural state to DB:', e);
-    }
+        updatedAt
+      }
+    });
+    this.state.lastUpdated = updatedAt.toISOString();
   }
 
   public getState(): LearningState {
     return { ...this.state };
   }
 
-  public setOfflineMode(active: boolean): void {
+  public async setOfflineMode(active: boolean): Promise<void> {
+    const previousState = structuredClone(this.state);
     this.state.isOfflineModeActive = active;
-    this.saveState();
+    try {
+      await this.saveState();
+    } catch (error) {
+      this.state = previousState;
+      throw error;
+    }
   }
 
   /**
@@ -430,7 +439,8 @@ export class AutonomousLearningEngine {
       mobileSpeedScore?: number;
       reviewScore?: number;
     };
-  }): { updatedNiche: NicheCalibration; newEpoch: number; logMessage: string } {
+  }): Promise<{ updatedNiche: NicheCalibration; newEpoch: number; logMessage: string }> {
+    const previousState = structuredClone(this.state);
     const cleanNiche = (params.niche || 'general').toLowerCase().trim();
     const current = this.state.nicheMap[cleanNiche] || {
       niche: cleanNiche,
@@ -504,7 +514,12 @@ export class AutonomousLearningEngine {
       this.state.recentLearningLogs = this.state.recentLearningLogs.slice(0, 20);
     }
 
-    this.saveState();
+    try {
+      await this.saveState();
+    } catch (error) {
+      this.state = previousState;
+      throw error;
+    }
 
     return {
       updatedNiche: current,
