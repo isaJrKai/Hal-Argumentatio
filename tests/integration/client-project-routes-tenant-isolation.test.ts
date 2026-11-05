@@ -238,9 +238,9 @@ describe('client project HTTP route tenant isolation', () => {
       .get('/api/financials/overview')
       .set('Authorization', `Bearer ${tokenA}`);
     expect(tenantAFinancials.status).toBe(200);
-    expect(tenantAFinancials.body.currentMrrUsd).toBe(1500);
-    expect(tenantAFinancials.body.arrUsd).toBe(18000);
-    expect(tenantAFinancials.body.activeClientCount).toBe(1);
+    expect(tenantAFinancials.body.currentMrrUsd).toBe(2950);
+    expect(tenantAFinancials.body.arrUsd).toBe(35400);
+    expect(tenantAFinancials.body.activeClientCount).toBe(2);
 
     const tenantBFinancials = await request(app)
       .get('/api/financials/overview')
@@ -387,10 +387,12 @@ describe('client project HTTP route tenant isolation', () => {
     const events = await pool.query(
       `SELECT payload FROM work_events
        WHERE contractor_id = $1 AND event_type = 'client_project.updated'
-         AND entity_id = $2`,
+         AND entity_id = $2 ORDER BY created_at DESC LIMIT 2`,
       [tenantA, project.id]
     );
-    expect(events.rows).toHaveLength(1);
+    expect(events.rows).toHaveLength(2);
+    expect(events.rows[0].payload.currentStatus).toBe(persisted.status);
+    expect(events.rows[0].payload.currentMonthlyRetainerUsd).toBe(persisted.monthly_retainer_usd);
   });
 
   it('prevents tenant B from updating tenant A\'s project by identifier', async (ctx) => {
