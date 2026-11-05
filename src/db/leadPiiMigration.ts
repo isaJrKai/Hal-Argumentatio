@@ -60,8 +60,7 @@ export async function migrateExistingLeadPii(pool: Pool): Promise<number> {
            email = CASE WHEN $2 THEN '[ENCRYPTED]' ELSE email END,
            email_encrypted = CASE WHEN $2 THEN $3 ELSE email_encrypted END,
            phone = CASE WHEN $4 THEN '[ENCRYPTED]' ELSE phone END,
-           phone_encrypted = CASE WHEN $4 THEN $5 ELSE phone_encrypted END,
-           updated_at = CURRENT_TIMESTAMP
+           phone_encrypted = CASE WHEN $4 THEN $5 ELSE phone_encrypted END
          WHERE id = $1`,
         [row.id, hasPlainEmail, emailEncrypted, hasPlainPhone, phoneEncrypted]
       );
