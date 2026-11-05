@@ -14,6 +14,18 @@ export default defineConfig(() => {
         '@': path.resolve(__dirname, '.'),
       },
     },
+    build: {
+      rollupOptions: {
+        output: {
+          manualChunks(id) {
+            if (id.includes('node_modules')) {
+              if (id.includes('@vis.gl/react-google-maps') || id.includes('@googlemaps') || id.includes('/leaflet/')) return 'maps';
+              if (id.includes('/recharts/') || id.includes('/d3-')) return 'charts';
+            }
+          },
+        },
+      },
+    },
     server: {
       // HMR is disabled in AI Studio via DISABLE_HMR env var.
       // Do not modifyâfile watching is disabled to prevent flickering during agent edits.
