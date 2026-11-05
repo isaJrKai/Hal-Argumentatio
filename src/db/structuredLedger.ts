@@ -1,6 +1,7 @@
 import crypto from 'node:crypto';
 import { isDeepStrictEqual } from 'node:util';
 import type { Pool, PoolClient } from 'pg';
+import { sql } from 'drizzle-orm';
 import { getPostgresPool } from './postgres';
 import type { StructuredLedgerEntry } from './structuredLedgerTypes';
 
@@ -149,6 +150,66 @@ export async function appendStructuredLedgerEntry(
       throw error;
     }
   });
+}
+
+/**
+ * Append inside an existing Drizzle transaction so a business mutation and its
+ * cryptographic audit record commit or roll back together. The caller owns the
+ * transaction boundary; the global advisory lock is held until that transaction
+ * completes.
+ */
+export async function appendStructuredLedgerEntryInTransaction(
+  tx: { execute: (query: any) => Promise<any> },
+  input: LedgerInput,
+): Promise<StructuredLedgerEntry> {
+  if (!input.contractorId || !input.eventType || !input.entityType || !input.entityId || !input.actor) {
+    throw new Error('Structured ledger entries require contractor, event, entity, and actor identifiers.');
+  }
+  await tx.execute(sql`SELECT pg_advisory_xact_lock(${LEDGER_LOCK_CLASS}, ${LEDGER_LOCK_ID})`);
+  const latestResult = await tx.execute(sql`
+    SELECT sequence_number, entry_hash
+    FROM structured_ledger_entries
+    ORDER BY sequence_number DESC
+    LIMIT 1
+  `);
+  const latest = latestResult.rows?.[0];
+  const previousSequence = latest ? Number(latest.sequence_number) : 0;
+  if (!Number.isSafeInteger(previousSequence) || previousSequence < 0 || previousSequence >= Number.MAX_SAFE_INTEGER) {
+    throw new Error('Structured ledger sequence is invalid or exhausted.');
+  }
+  const sequenceNumber = previousSequence + 1;
+  const prevHash = latest?.entry_hash || ZERO_HASH;
+  const payloadJson = payloadFor(input);
+  const payloadHash = hash(payloadJson);
+  const createdAt = new Date().toISOString();
+  const id = 'led_' + crypto.randomBytes(8).toString('hex');
+  const entryHash = hash(`${sequenceNumber}:${prevHash}:${payloadHash}:${input.actor}:${createdAt}`);
+  await tx.execute(sql`
+    INSERT INTO structured_ledger_entries
+      (id, contractor_id, sequence_number, event_type, entity_type, entity_id, actor,
+       payload_json, payload_hash, prev_hash, entry_hash, details, metadata, created_at)
+    VALUES (
+      ${id}, ${input.contractorId}, ${sequenceNumber}, ${input.eventType},
+      ${input.entityType}, ${input.entityId}, ${input.actor}, ${payloadJson},
+      ${payloadHash}, ${prevHash}, ${entryHash}, ${input.details ?? null},
+      ${JSON.stringify(input.metadata ?? null)}::jsonb, ${createdAt}::timestamptz
+    )
+  `);
+  return {
+    id,
+    contractorId: input.contractorId,
+    sequenceNumber,
+    eventType: input.eventType,
+    entityType: input.entityType,
+    entityId: input.entityId,
+    actor: input.actor,
+    payloadHash,
+    prevHash,
+    entryHash,
+    ...(input.details === undefined ? {} : { details: input.details }),
+    ...(input.metadata === undefined ? {} : { metadata: input.metadata }),
+    createdAt,
+  };
 }
 
 /** Tenant-filtered retrieval; system genesis remains visible as in the legacy API. */
