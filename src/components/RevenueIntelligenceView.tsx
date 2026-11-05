@@ -31,6 +31,9 @@ export default function RevenueIntelligenceView({ token }: RevenueIntelligenceVi
   const [showNewExpModal, setShowNewExpModal] = useState(false);
   const [newHypothesis, setNewHypothesis] = useState('');
   const [newVariable, setNewVariable] = useState('');
+  const [newBaseline, setNewBaseline] = useState('');
+  const [newExpectedOutcome, setNewExpectedOutcome] = useState('');
+  const [experimentFormError, setExperimentFormError] = useState('');
 
   const fetchData = async () => {
     const effectiveToken = token || (typeof window !== 'undefined' ? (localStorage.getItem('token') || localStorage.getItem('halbiz_auth_token')) : '');
@@ -61,7 +64,8 @@ export default function RevenueIntelligenceView({ token }: RevenueIntelligenceVi
   const handleCreateExperiment = async (e: React.FormEvent) => {
     e.preventDefault();
     const effectiveToken = token || (typeof window !== 'undefined' ? (localStorage.getItem('token') || localStorage.getItem('halbiz_auth_token')) : '');
-    if (!newHypothesis || !newVariable || !effectiveToken) return;
+    if (!newHypothesis.trim() || !newVariable.trim() || !newBaseline.trim() || !newExpectedOutcome.trim() || !effectiveToken) return;
+    setExperimentFormError('');
     try {
       const res = await fetch('/api/revenue/experiments', {
         method: 'POST',
@@ -69,15 +73,26 @@ export default function RevenueIntelligenceView({ token }: RevenueIntelligenceVi
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${effectiveToken}`
         },
-        body: JSON.stringify({ hypothesis: newHypothesis, variable: newVariable })
+        body: JSON.stringify({
+          hypothesis: newHypothesis.trim(),
+          variable: newVariable.trim(),
+          baseline: newBaseline.trim(),
+          expectedOutcome: newExpectedOutcome.trim()
+        })
       });
-      if (res.ok) {
-        setNewHypothesis('');
-        setNewVariable('');
-        setShowNewExpModal(false);
-        fetchData();
+      const responseData = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setExperimentFormError(responseData.error || `Experiment creation failed (HTTP ${res.status}).`);
+        return;
       }
+      setNewHypothesis('');
+      setNewVariable('');
+      setNewBaseline('');
+      setNewExpectedOutcome('');
+      setShowNewExpModal(false);
+      fetchData();
     } catch (err: any) {
+      setExperimentFormError(err?.message || 'Experiment could not be created. Please retry.');
       console.warn('Failed to create experiment:', err?.message || err);
     }
   };
@@ -464,6 +479,31 @@ export default function RevenueIntelligenceView({ token }: RevenueIntelligenceVi
                   required
                 />
               </div>
+              <div>
+                <label className="block text-xs font-mono text-text-secondary mb-1">Measured Baseline</label>
+                <textarea
+                  value={newBaseline}
+                  onChange={e => setNewBaseline(e.target.value)}
+                  placeholder="Record the starting value, measurement period, and source"
+                  className="w-full px-3 py-2 rounded-lg border border-border-dim bg-bg-base text-xs font-mono text-text-primary focus:outline-none focus:border-accent"
+                  rows={2}
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-mono text-text-secondary mb-1">Expected Outcome</label>
+                <textarea
+                  value={newExpectedOutcome}
+                  onChange={e => setNewExpectedOutcome(e.target.value)}
+                  placeholder="State the measurable target and the period for evaluating it"
+                  className="w-full px-3 py-2 rounded-lg border border-border-dim bg-bg-base text-xs font-mono text-text-primary focus:outline-none focus:border-accent"
+                  rows={2}
+                  required
+                />
+              </div>
+              {experimentFormError && (
+                <p role="alert" className="text-xs text-red-400">{experimentFormError}</p>
+              )}
               <div className="flex justify-end gap-2 pt-2">
                 <button
                   type="button"
