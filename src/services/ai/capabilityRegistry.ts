@@ -95,8 +95,8 @@ export const HAL_CAPABILITY_REGISTRY: readonly HalCapability[] = [
   },
   {
     id: 'websites.audit.full',
-    name: 'Audit a customer website',
-    description: 'Run a measured website audit with explicit coverage and evidence reporting.',
+    name: 'Full multi-page website audit',
+    description: 'Planned site-wide crawl and analysis. The existing Website Review & Technical Audit skill currently performs a bounded single-page inspection; it does not yet provide a full multi-page crawl.',
     category: 'web',
     risk: 'read_only',
     status: 'planned',
@@ -105,8 +105,8 @@ export const HAL_CAPABILITY_REGISTRY: readonly HalCapability[] = [
   },
   {
     id: 'websites.redesign',
-    name: 'Design and revise a customer website',
-    description: 'Review a site, generate a replacement draft, iterate on feedback, and preserve version history.',
+    name: 'Full website redesign from an existing site',
+    description: 'Planned multi-page redesign workflow. The existing Landing Page Studio creates standalone lead-linked page drafts, not a full replacement of an existing customer website.',
     category: 'web',
     risk: 'draft_write',
     status: 'planned',
@@ -115,8 +115,8 @@ export const HAL_CAPABILITY_REGISTRY: readonly HalCapability[] = [
   },
   {
     id: 'websites.publish',
-    name: 'Publish an approved website',
-    description: 'Publish a customer-approved website version with a durable execution receipt.',
+    name: 'Deploy a customer website to its own domain',
+    description: 'Planned customer-hosting/domain deployment workflow. The existing Landing Page Studio can publish an approved standalone HAL-hosted landing page, but does not deploy to a customer-owned domain.',
     category: 'web',
     risk: 'approval_gated',
     status: 'planned',
