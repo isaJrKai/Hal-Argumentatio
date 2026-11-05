@@ -1720,6 +1720,20 @@ app.post('/api/public/webhooks/delivery', async (req, res) => {
   }
 });
 
+// Public pages must be saved through the server-owned config renderer. Arbitrary
+// Hermes/provider HTML is never eligible for same-origin public publication.
+function hasOwnedLandingPageConfig(artifact: any): boolean {
+  const config = artifact?.content?.pageConfig;
+  return Boolean(
+    artifact &&
+    config &&
+    typeof config === 'object' &&
+    !Array.isArray(config) &&
+    config.id === artifact.id &&
+    config.contractorId === artifact.contractorId
+  );
+}
+
 // ─── PUBLIC LANDING PAGE SERVING (Direct Client & External Auditor Access) ───
 
 app.get('/api/public/landing/:id', async (req, res) => {
@@ -1727,6 +1741,7 @@ app.get('/api/public/landing/:id', async (req, res) => {
   try {
     const [artifact] = await pgDb.select({
       id: hermesLabArtifacts.id,
+      contractorId: hermesLabArtifacts.contractorId,
       toolId: hermesLabArtifacts.toolId,
       title: hermesLabArtifacts.title,
       category: hermesLabArtifacts.category,
@@ -1738,13 +1753,24 @@ app.get('/api/public/landing/:id', async (req, res) => {
       inArray(hermesLabArtifacts.status, ['ready', 'deployed']),
       eq(hermesLabArtifacts.toolId, 'landing_page')
     ));
-    if (!artifact) {
+    if (!artifact || !hasOwnedLandingPageConfig(artifact)) {
       return res.status(404).json({ error: 'Published landing page not found.' });
     }
     res.setHeader('Cache-Control', 'no-store');
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('Referrer-Policy', 'no-referrer');
-    return res.json({ success: true, artifact });
+    return res.json({
+      success: true,
+      artifact: {
+        id: artifact.id,
+        toolId: artifact.toolId,
+        title: artifact.title,
+        category: artifact.category,
+        content: { renderedOutput: (artifact.content as any).renderedOutput },
+        status: artifact.status,
+        updatedAt: artifact.updatedAt
+      }
+    });
   } catch {
     return res.status(503).json({ error: 'Published landing page is temporarily unavailable.' });
   }
@@ -1758,7 +1784,7 @@ app.get('/landing/:id', async (req, res) => {
       inArray(hermesLabArtifacts.status, ['ready', 'deployed']),
       eq(hermesLabArtifacts.toolId, 'landing_page')
     ));
-    if (!artifact) {
+    if (!artifact || !hasOwnedLandingPageConfig(artifact)) {
       try {
         const { TRADE_TEMPLATES } = await import('./src/components/landing/templates');
         const { generateLandingPageHtml } = await import('./src/components/landing/htmlGenerator');
@@ -1885,18 +1911,21 @@ app.post('/api/landing-pages/regenerate-section', authenticate, async (req, res)
 
 app.post('/api/landing-pages/save', authenticate, async (req, res) => {
   const contractorId = (req as any).contractorId;
-  const { id, title, pageConfig, renderedHtml } = req.body;
+  const { id, title, pageConfig } = req.body || {};
 
-  if (!title || !renderedHtml) {
-    return res.status(400).json({ success: false, error: 'Title and renderedHtml are required' });
+  if (typeof title !== 'string' || !title.trim() || title.length > 160 ||
+      !pageConfig || typeof pageConfig !== 'object' || Array.isArray(pageConfig) ||
+      JSON.stringify(pageConfig).length > 80_000 ||
+      (id !== undefined && (typeof id !== 'string' || id.length > 128))) {
+    return res.status(400).json({ success: false, error: 'A valid title and landing-page configuration are required.' });
   }
 
   try {
-    const artifactId = id && id.length > 5 ? id : ('lp_' + crypto.randomUUID().slice(0, 8));
-    const ownedPageConfig = pageConfig && typeof pageConfig === 'object'
-      ? { ...pageConfig, id: artifactId, contractorId }
-      : null;
-    const ownedRenderedHtml = ownedPageConfig ? generateLandingPageHtml(ownedPageConfig) : renderedHtml;
+    const artifactId = typeof id === 'string' && id.length > 5 ? id : ('lp_' + crypto.randomUUID().slice(0, 8));
+    const ownedPageConfig = { ...pageConfig, id: artifactId, contractorId };
+    // Never trust client-supplied rendered HTML. Render from the validated,
+    // tenant-owned configuration using the escaping server-side generator.
+    const ownedRenderedHtml = generateLandingPageHtml(ownedPageConfig);
 
     const [existing] = await pgDb
       .select()
@@ -1922,7 +1951,7 @@ app.post('/api/landing-pages/save', authenticate, async (req, res) => {
           status: 'ready',
           updatedAt: new Date()
         })
-        .where(eq(hermesLabArtifacts.id, artifactId));
+        .where(and(eq(hermesLabArtifacts.id, artifactId), eq(hermesLabArtifacts.contractorId, contractorId)));
     } else {
       await pgDb.insert(hermesLabArtifacts).values({
         id: artifactId,
