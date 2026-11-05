@@ -79,6 +79,7 @@ export async function callNemotronWithTools(
     'nvidia/nemotron-3.5-lightning-30b-a3b',
     'nvidia/nemotron-3-nano-30b-a3b',
   ];
+  const overallDeadline = AbortSignal.timeout(30_000);
   let lastError: any = null;
 
   for (const model of candidates) {
@@ -89,7 +90,7 @@ export async function callNemotronWithTools(
         const response = await fetch('https://integrate.api.nvidia.com/v1/chat/completions', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
-          signal: AbortSignal.timeout(10_000),
+          signal: AbortSignal.any([overallDeadline, AbortSignal.timeout(10_000)]),
           body: JSON.stringify({
             model,
             messages: conversation,

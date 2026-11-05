@@ -10,7 +10,14 @@ let aiClient: GoogleGenAI | null = null;
 function getAIClient(apiKeyOverride?: string): GoogleGenAI | null {
   const apiKey = apiKeyOverride || process.env.GEMINI_API_KEY;
   if (apiKeyOverride) {
-    return new GoogleGenAI({ apiKey: apiKeyOverride, httpOptions: { headers: { 'User-Agent': 'aistudio-build' } } });
+    return new GoogleGenAI({
+      apiKey: apiKeyOverride,
+      httpOptions: {
+        headers: { 'User-Agent': 'aistudio-build' },
+        timeout: 20_000,
+        retryOptions: { attempts: 1 }
+      }
+    });
   }
   if (!aiClient) {
     if (!apiKey) {
@@ -22,7 +29,9 @@ function getAIClient(apiKeyOverride?: string): GoogleGenAI | null {
       httpOptions: {
         headers: {
           'User-Agent': 'aistudio-build',
-        }
+        },
+        timeout: 20_000,
+        retryOptions: { attempts: 1 }
       }
     });
   }
@@ -758,6 +767,9 @@ RESPONSE STANDARD
         const config: any = {
           systemInstruction,
           temperature: 0.3,
+          // Bound all Gemini rounds (including tool follow-ups) to one deadline.
+          abortSignal: AbortSignal.timeout(30_000),
+          automaticContinuation: false
         };
 
         let usedGrounding = !!enableGrounding;
@@ -853,13 +865,17 @@ RESPONSE STANDARD
         return {
           text,
           sources: sources.length > 0 ? sources : undefined,
-          toolCalls: toolCalls.length ? toolCalls : undefined
+          toolCalls: toolCalls.length ? toolCalls : undefined,
+          provider: 'gemini',
+          model: selectedModel
         };
       } catch (err: any) {
         if (toolCalls.length) {
           return {
             text: 'HAL processed tool calls before the Gemini response failed. Check each recorded success or failure in Work Queue and Work History; no tool was retried automatically.',
-            toolCalls
+            toolCalls,
+            provider: 'gemini',
+            model: 'gemini-3.8-flash'
           };
         }
         console.error("Gemini chatbot error, trying Nemotron fallback:", err);
@@ -892,11 +908,12 @@ RESPONSE STANDARD
             text: result.text || (result.toolCalls.length
               ? 'I processed the available tool calls, but the model did not return a final explanation. Review Work Queue and Work History for their results.'
               : 'Nemotron returned no response.'),
-            toolCalls: result.toolCalls.length ? result.toolCalls : undefined
+            toolCalls: result.toolCalls.length ? result.toolCalls : undefined,
+            provider: 'nvidia'
           };
         }
         const text = await callNemotron(messages, 0.3);
-        return { text };
+        return { text, provider: 'nvidia' };
       } catch (err: any) {
         console.error("NVIDIA Nemotron chatbot fallback error:", err);
       }
@@ -928,12 +945,13 @@ RESPONSE STANDARD
             text: result.text || (result.toolCalls.length
               ? 'I processed the available tool calls, but the model did not return a final explanation. Review Work Queue and Work History for their results.'
               : 'Nemotron returned no response.'),
-            toolCalls: result.toolCalls.length ? result.toolCalls : undefined
+            toolCalls: result.toolCalls.length ? result.toolCalls : undefined,
+            provider: 'nvidia'
           };
         }
 
         const text = await callNemotron(messages, 0.3);
-        return { text };
+        return { text, provider: 'nvidia' };
       } catch (err: any) {
         console.error("NVIDIA Nemotron chatbot error, trying Gemini fallback:", err);
       }
@@ -946,6 +964,8 @@ RESPONSE STANDARD
         const config: any = {
           systemInstruction,
           temperature: 0.3,
+          abortSignal: AbortSignal.timeout(45_000),
+          automaticContinuation: false
         };
 
         let usedGrounding = !!enableGrounding;
@@ -1013,7 +1033,9 @@ RESPONSE STANDARD
 
         return {
           text,
-          sources: sources.length > 0 ? sources : undefined
+          sources: sources.length > 0 ? sources : undefined,
+          provider: 'gemini',
+          model: candidateModels[0]
         };
       } catch (err: any) {
         console.error("Gemini chatbot fallback error:", err);
