@@ -131,6 +131,12 @@ describe('client project HTTP route tenant isolation', () => {
     pageConfig.businessName = 'Tenant A Audit Flow Contractor';
     pageConfig.city = 'Kampala';
     pageConfig.sourceLeadId = leadAuditFlowA;
+    pageConfig.licenseNumber = '';
+    pageConfig.sections.hero.badgeText = '';
+    pageConfig.sections.services.title = 'Services offered';
+    pageConfig.sections.services.subtitle = 'Plumbing services confirmed by the business.';
+    pageConfig.sections.services.items = [{ id: 'svc-1', title: 'Plumbing repairs', description: 'Residential plumbing repair services.' }];
+    pageConfig.sections.footer.address = '';
 
     const savedPage = await request(app)
       .post('/api/landing-pages/save')
@@ -156,7 +162,7 @@ describe('client project HTTP route tenant isolation', () => {
     const blockedPublish = await request(app)
       .post(`/api/landing-pages/${landingAuditArtifactId}/publish`)
       .set('Authorization', `Bearer ${tokenA}`)
-      .send({ confirmPublish: true });
+      .send({ confirmPublish: true, contentReviewed: true });
     expect(blockedPublish.status).toBe(409);
     expect(blockedPublish.body.code).toBe('SOURCE_LEAD_NOT_VERIFIED');
 
