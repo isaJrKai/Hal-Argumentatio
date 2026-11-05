@@ -9994,10 +9994,17 @@ async function startServer() {
         }
         const reconciliation = await importLegacyStructuredLedgerEntries(legacyLedger, pool);
         const postgresIntegrity = await verifyStructuredLedgerIntegrity(undefined, pool);
-        if (!postgresIntegrity.valid || postgresIntegrity.totalEntries !== legacyLedger.length) {
+        if (!postgresIntegrity.valid || postgresIntegrity.totalEntries !== reconciliation.total || postgresIntegrity.totalEntries < legacyLedger.length) {
           throw new Error(`PostgreSQL structured ledger verification failed after reconciliation: ${postgresIntegrity.auditMessage}`);
         }
-        console.info(`[HAL PostgreSQL] Structured ledger cutover verified: ${reconciliation.imported} imported, ${reconciliation.alreadyPresent} already present, ${postgresIntegrity.totalEntries} total global entries.`);
+        console.info(`[HAL PostgreSQL] Structured ledger cutover verified: ${reconciliation.imported} imported, ${reconciliation.alreadyPresent} legacy entries already present, ${postgresIntegrity.totalEntries} total global entries.`);
+      } else {
+        const ledgerState = await pool.query<{ total: string }>(
+          'SELECT count(*)::text AS total FROM structured_ledger_entries',
+        );
+        if (Number(ledgerState.rows[0]?.total || 0) > 0) {
+          throw new Error('PostgreSQL structured ledger already contains history. Keep HAL_STRUCTURED_LEDGER_POSTGRES_ENABLED=true; refusing to downgrade writes to the legacy JSON ledger.');
+        }
       }
       const migratedLeadPii = await migrateExistingLeadPii(pool);
       if (migratedLeadPii > 0) {
