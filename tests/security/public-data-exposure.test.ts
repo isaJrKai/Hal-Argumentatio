@@ -26,7 +26,7 @@ describe('Public data exposure security', () => {
     const jsonRoute = source.slice(jsonStart, htmlStart);
     const htmlRoute = source.slice(htmlStart, htmlEnd);
     for (const route of [jsonRoute, htmlRoute]) {
-      expect(route).toContain("eq(hermesLabArtifacts.status, 'deployed')");
+      expect(route).toContain("inArray(hermesLabArtifacts.status, ['ready', 'deployed'])");
       expect(route).toContain("eq(hermesLabArtifacts.toolId, 'landing_page')");
     }
     expect(jsonRoute).not.toContain('res.json({ success: true, artifact })');
