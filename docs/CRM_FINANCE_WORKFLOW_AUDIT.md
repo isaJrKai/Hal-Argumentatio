@@ -57,6 +57,7 @@ A real HTTP integration suite imports the Express application and uses Supertest
 - Project listing and updates are tenant-scoped.
 - Tenant B cannot read, update, or delete Tenant A's lead through the HTTP routes.
 - Tenant B cannot record revenue against Tenant A's lead; Tenant A can close a qualified proposal-stage lead and atomically persist the revenue record, lead-stage events, and work-ledger event.
+- Two concurrent HTTP close-out attempts for the same lead are expected to produce exactly one successful close and one HTTP 409 conflict; the conditional-update race is mapped to a business conflict rather than a database-unavailable response.
 - Duplicate revenue close-out is rejected, and revenue listing remains tenant-scoped.
 - An activated client project contributes to Tenant A's contract MRR/ARR, while Tenant B's financial overview remains zero for that project.
 - Proposal generation is tenant-scoped and explicitly reports a generated-only, non-persisted draft.
@@ -69,18 +70,18 @@ These items remain unverified and must not be represented as complete:
 
 1. Full browser-level discovery → lead → audit → landing-page artifact → proposal/contract → approved outreach → delivery/follow-up → deal outcome → client project → revenue flow.
 2. Exact frontend-to-backend route coverage for every proposal, contract, client-project and communications action.
-3. Extend PostgreSQL-backed Tenant A/B HTTP tests to the remaining CRM/finance routes and add concurrent revenue close-out plus rollback-after-partial-failure coverage.
+3. Extend PostgreSQL-backed Tenant A/B HTTP tests to the remaining CRM/finance routes and add rollback-after-partial-failure coverage. Concurrent revenue close-out is now covered by the new HTTP test and must pass CI on the final branch head.
 4. Contract/proposal persistence and signature/execution semantics, including proof that draft/approved/signed are distinct states. The current proposal generator returns a generated response but no canonical proposal/contract table or durable signature workflow has been verified.
 5. Add route-level concurrency coverage for won-lead project conversion, retainer changes, and cancellation. The current HTTP suite verifies tenant ownership, duplicate conversion, persistence, and event creation; separate isolated PostgreSQL tests cover same-lead advisory-lock serialization and the optimistic status/timestamp predicate. The stale-update test mirrors the production predicate on an isolated test table and is not a full route-level concurrency test.
 6. Revenue recognition versus cash collection/payment recording. The current `/api/revenues` close-out endpoint records a positive whole-dollar amount against a lead; it is not a payment processor or a complete invoice/receivables ledger.
 7. End-to-end event correlation and ordering across audit, landing-page, outreach, deal, project, revenue, and forecast records.
 8. Forecast evaluation against correctly attributed observations and evidence that only actual outcomes feed learning.
-9. The old workstream's CI run #1217 passed before the final concurrency corrections and before integration with current `main`; it is not accepted as release evidence for this branch. GitHub Actions CI run #1252 was triggered for the integrated branch head `8bd6ffb2bb281ab4eb96a88eb34ea51675ce2b49` and was in progress at the time this audit revision was prepared. The workflow provisions PostgreSQL 16 as a healthy service and supplies `DATABASE_URL`. Re-run CI after any subsequent branch change.
+9. Earlier integrated-branch CI run #1264 passed with 85 test files and 418 tests before the financial-overview assertions and concurrent revenue-close-out coverage were added. Subsequent runs exposed an order-dependent test assertion (the project had correctly been activated by another test); that assertion has been changed to compare persisted state before and after the foreign-tenant attempt. A fresh green run on the final branch head is required before merge. CI provisions PostgreSQL 16 as a healthy service and supplies `DATABASE_URL`.
 
 ## Safety and release
 
 - Dedicated branch only; no direct `main` writes.
 - No production data was read or modified through a privileged database connection.
 - No production migration or deployment was performed.
-- This integration branch was created directly from current `main`; its initial comparison was 8 commits ahead and 0 behind. The original workstream branch remains untouched and is not the release candidate.
+- This integration branch was created directly from current `main`; it is currently 26 commits ahead and 0 behind. The original workstream branch remains untouched and is not the release candidate.
 - Do not merge until the branch CI is green and the remaining end-to-end/tenant-isolation gates have been addressed or explicitly accepted as limitations.
