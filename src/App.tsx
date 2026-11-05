@@ -688,18 +688,33 @@ export default function App() {
     ];
 
     try {
+      const syncStartedAt = performance.now();
+      const endpointTimings: Array<{ label: string; durationMs: number; status: 'fulfilled' | 'failed' }> = [];
       const headers = { 'Authorization': `Bearer ${token}` };
       const results = await Promise.allSettled(endpoints.map(async endpoint => {
-        const response = await fetch(endpoint.url, { headers, signal: controller.signal });
-        const payload = await readApiResponse<unknown>(response, endpoint.label);
-        if (!Array.isArray(payload)) {
-          throw new Error(`${endpoint.label}: expected an array response but received ${payload === null ? 'null' : typeof payload}.`);
+        const endpointStartedAt = performance.now();
+        let status: 'fulfilled' | 'failed' = 'failed';
+        try {
+          const response = await fetch(endpoint.url, { headers, signal: controller.signal });
+          const payload = await readApiResponse<unknown>(response, endpoint.label);
+          if (!Array.isArray(payload)) {
+            throw new Error(`${endpoint.label}: expected an array response but received ${payload === null ? 'null' : typeof payload}.`);
+          }
+          status = 'fulfilled';
+          return { payload, degraded: response.headers.get('X-HAL-Degraded') === 'true' };
+        } finally {
+          endpointTimings.push({
+            label: endpoint.label,
+            durationMs: Math.round(performance.now() - endpointStartedAt),
+            status
+          });
         }
-        return { payload, degraded: response.headers.get('X-HAL-Degraded') === 'true' };
       }));
 
       // Ignore results belonging to a session that has since changed or logged out.
       if (generation !== dataSyncGenerationRef.current || controller.signal.aborted) return;
+
+      console.info('[HAL performance] dashboard_sync', JSON.stringify({ totalMs: Math.round(performance.now() - syncStartedAt), endpoints: endpointTimings }));
 
       const failedEndpoints: string[] = [];
       const degradedEndpoints: string[] = [];
