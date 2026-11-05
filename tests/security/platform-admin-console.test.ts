@@ -32,6 +32,7 @@ describe('Platform administrator tenant and account controls', () => {
     expect(server).toContain("contractor.accountStatus === 'suspended'");
     expect(server).toContain("action: 'ADMIN_CONTRACTOR_ACCESS_CHANGED'");
     expect(server).toContain('At least one active administrator must remain.');
+    expect(server).toContain(".for('update')");
     expect(server).toContain('You cannot remove your own administrator access');
   });
 
