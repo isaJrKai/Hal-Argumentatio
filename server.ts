@@ -8955,7 +8955,7 @@ app.post('/api/revenue/experiments/:id/status', authenticate, async (req, res) =
     return res.status(400).json({ error: 'A completed experiment requires a recorded actual outcome.' });
   }
   for (const [field, value] of [['pipelineImpact', pipelineImpact], ['revenueImpact', revenueImpact]] as const) {
-    if (value !== undefined && (!Number.isFinite(Number(value)) || Number(value) < 0)) {
+    if (value !== undefined && (value === null || value === '' || !Number.isFinite(Number(value)) || Number(value) < 0)) {
       return res.status(400).json({ error: `${field} must be a finite non-negative measured value.` });
     }
   }
