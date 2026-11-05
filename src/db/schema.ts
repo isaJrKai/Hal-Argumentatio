@@ -1,4 +1,4 @@
-import { pgTable, text, timestamp, integer, doublePrecision, boolean, jsonb } from 'drizzle-orm/pg-core';
+import { pgTable, text, timestamp, integer, doublePrecision, boolean, jsonb, bigint } from 'drizzle-orm/pg-core';
 
 export const contractors = pgTable('contractors', {
   id: text('id').primaryKey(),
@@ -685,6 +685,24 @@ export const workTasks = pgTable('work_tasks', {
   completedAt: timestamp('completed_at'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
+});
+
+/** Global cryptographic chain; tenant_id filters reads, never sequence allocation. */
+export const structuredLedgerEntries = pgTable('structured_ledger_entries', {
+  id: text('id').primaryKey(),
+  contractorId: text('contractor_id').notNull(),
+  sequenceNumber: bigint('sequence_number', { mode: 'number' }).notNull().unique(),
+  eventType: text('event_type').notNull(),
+  entityType: text('entity_type').notNull(),
+  entityId: text('entity_id').notNull(),
+  actor: text('actor').notNull(),
+  payloadJson: text('payload_json').notNull(),
+  payloadHash: text('payload_hash').notNull(),
+  prevHash: text('prev_hash').notNull(),
+  entryHash: text('entry_hash').notNull().unique(),
+  details: text('details'),
+  metadata: jsonb('metadata'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
 });
 
 /** Append-only, tenant-scoped timeline shared by workflows and authorized agents. */
