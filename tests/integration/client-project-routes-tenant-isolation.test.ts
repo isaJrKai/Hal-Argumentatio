@@ -242,6 +242,45 @@ describe('client project HTTP route tenant isolation', () => {
     expect(events.rows).toHaveLength(1);
   });
 
+  it('rejects stale concurrent retainer updates through the real HTTP route', async (ctx) => {
+    if (!dbAvailable) return ctx.skip();
+
+    const [project] = (await pool.query(
+      'SELECT id, status, updated_at FROM client_projects WHERE lead_id = $1 AND contractor_id = $2',
+      [leadConcurrentA, tenantA]
+    )).rows;
+    expect(project).toBeTruthy();
+    expect(project.status).toBe('onboarding');
+
+    const attempts = await Promise.all([
+      request(app).put(`/api/projects/${project.id}`)
+        .set('Authorization', `Bearer ${tokenA}`)
+        .send({ monthlyRetainerUsd: 1350 }),
+      request(app).put(`/api/projects/${project.id}`)
+        .set('Authorization', `Bearer ${tokenA}`)
+        .send({ monthlyRetainerUsd: 1600 })
+    ]);
+
+    expect(attempts.filter(response => response.status === 200)).toHaveLength(1);
+    expect(attempts.filter(response => response.status === 409)).toHaveLength(1);
+
+    const [persisted] = (await pool.query(
+      'SELECT monthly_retainer_usd, status FROM client_projects WHERE id = $1 AND contractor_id = $2',
+      [project.id, tenantA]
+    )).rows;
+    expect([1350, 1600]).toContain(persisted.monthly_retainer_usd);
+    expect(persisted.status).toBe('onboarding');
+
+    const events = await pool.query(
+      `SELECT payload FROM work_events
+       WHERE contractor_id = $1 AND event_type = 'client_project.updated'
+         AND entity_id = $2`,
+      [tenantA, project.id]
+    );
+    expect(events.rows).toHaveLength(1);
+    expect(events.rows[0].payload.currentMonthlyRetainerUsd).toBe(persisted.monthly_retainer_usd);
+  });
+
   it('prevents tenant B from updating tenant A\'s project by identifier', async (ctx) => {
     if (!dbAvailable) return ctx.skip();
 
