@@ -54,6 +54,7 @@ import { validateStaffInput, getEffectiveStaffAvailability } from './src/lib/sta
 import { getWorkerCapabilities } from './src/lib/workerCapabilities';
 import { resolvePublishedLandingPageOwner } from './src/lib/landingPageOwnership';
 import { validateLoopGate } from './src/lib/loopGating';
+import { parseGoogleAdsConnection, buildGoogleAdsCityPerformanceQuery, buildGoogleAdsGeoConstantQuery, extractGoogleAdsStreamRows } from './src/lib/googleAdsIngestion';
 import { 
   auditCompetitorFootprint, 
   calculateSpatialQuadrants, 
@@ -6970,6 +6971,94 @@ app.put('/api/projects/:id', authenticate, async (req, res) => {
 });
 
 // ─── CONNECTORS CREDENTIALS & HEALTH API ──────────────────────────────────────
+
+
+async function googleAdsAccessToken(credentials: ReturnType<typeof parseGoogleAdsConnection>): Promise<string> {
+  const response = await fetch('https://oauth2.googleapis.com/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({ grant_type: 'refresh_token', client_id: credentials.clientId, client_secret: credentials.clientSecret, refresh_token: credentials.refreshToken }),
+    signal: AbortSignal.timeout(20000)
+  });
+  if (!response.ok) throw new Error(`Google OAuth token exchange failed (HTTP ${response.status}).`);
+  const result = await response.json() as { access_token?: string; token_type?: string };
+  if (!result.access_token || result.token_type?.toLowerCase() !== 'bearer') throw new Error('Google OAuth did not return a bearer access token.');
+  return result.access_token;
+}
+async function googleAdsSearch(accessToken: string, credentials: ReturnType<typeof parseGoogleAdsConnection>, query: string): Promise<any[]> {
+  const headers: Record<string,string> = { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' };
+  if (credentials.developerToken) headers['developer-token'] = credentials.developerToken;
+  if (credentials.loginCustomerId) headers['login-customer-id'] = credentials.loginCustomerId;
+  const response = await fetch(`https://googleads.googleapis.com/v25/customers/${credentials.customerId}/googleAds:searchStream`, {
+    method: 'POST', headers, body: JSON.stringify({ query }), signal: AbortSignal.timeout(45000)
+  });
+  if (!response.ok) throw new Error(`Google Ads query failed (HTTP ${response.status}). Check the connected account's access and API project authorization.`);
+  return extractGoogleAdsStreamRows(await response.json());
+}
+
+app.post('/api/forecasting/google-ads/sync', authenticate, async (req, res) => {
+  const contractorId = (req as any).contractorId as string;
+  try {
+    const saved = await getTenantConnectorCredentials(contractorId);
+    if (!saved.googleAds) return res.status(409).json({ success: false, error: 'Google Ads OAuth connection is not configured for this workspace.' });
+    const credentials = parseGoogleAdsConnection(saved.googleAds);
+    const accessToken = await googleAdsAccessToken(credentials);
+    const records = await googleAdsSearch(accessToken, credentials, buildGoogleAdsCityPerformanceQuery());
+    const cityResources = [...new Set(records.map(row => row.segments?.geoTargetCity)
+      .filter((value): value is string => typeof value === 'string' && /^geoTargetConstants\/\d+$/.test(value)))];
+    const cityNames = new Map<string,string>();
+    for (let offset=0; offset<cityResources.length; offset+=100) {
+      const rows = await googleAdsSearch(accessToken, credentials, buildGoogleAdsGeoConstantQuery(cityResources.slice(offset,offset+100)));
+      for (const row of rows) {
+        const resource=row.geoTargetConstant?.resourceName, name=row.geoTargetConstant?.name;
+        if (typeof resource==='string' && typeof name==='string' && name.trim()) cityNames.set(resource,name.trim());
+      }
+    }
+    const now=new Date(), seen=new Set<string>(), values:any[]=[];
+    for (const row of records) {
+      const campaignId=String(row.campaign?.id||''), campaignName=String(row.campaign?.name||'').trim();
+      const resource=row.segments?.geoTargetCity, city=typeof resource==='string'?cityNames.get(resource):undefined;
+      const day=String(row.segments?.date||'');
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(day) || !/^\d+$/.test(campaignId) || !campaignName || !city) continue;
+      const unique=`${campaignId}|${day}|${city.toLowerCase()}`;
+      if(seen.has(unique)) continue; seen.add(unique);
+      const impressions=Number(row.metrics?.impressions||0), clicks=Number(row.metrics?.clicks||0);
+      const costMicros=Number(row.metrics?.costMicros||0), conversions=Number(row.metrics?.conversions||0);
+      const conversionValue=Number(row.metrics?.conversionsValue||0);
+      if (![impressions,clicks,costMicros,conversions,conversionValue].every(Number.isFinite) ||
+          [impressions,clicks,costMicros,conversions,conversionValue].some(v=>v<0)) continue;
+      const id='gads_'+crypto.createHash('sha256').update(`${contractorId}|${credentials.customerId}|${unique}`).digest('hex');
+      values.push({id,contractorId,campaignId,campaignName,geo:city,date:new Date(`${day}T00:00:00.000Z`),
+        impressions,clicks,cost:costMicros/1000000,conversions,conversionValue,createdAt:now});
+    }
+    for(let offset=0;offset<values.length;offset+=500) {
+      await pgDb.insert(googleAdsDailyPerformance).values(values.slice(offset,offset+500)).onConflictDoUpdate({
+        target:googleAdsDailyPerformance.id,
+        set:{
+          campaignName:sql`excluded.campaign_name`,geo:sql`excluded.geo`,date:sql`excluded.date`,
+          impressions:sql`excluded.impressions`,clicks:sql`excluded.clicks`,cost:sql`excluded.cost`,
+          conversions:sql`excluded.conversions`,conversionValue:sql`excluded.conversion_value`
+        }
+      });
+    }
+    await pgDb.insert(workEvents).values({
+      id:'evt_'+crypto.randomUUID(),contractorId,eventType:'forecasting.google_ads_history_synced',
+      entityType:'google_ads_daily_performance',entityId:credentials.customerId,actorType:'human',
+      actorId:contractorId,sourceModule:'forecasting',correlationId:crypto.randomUUID(),
+      summary:`Imported ${values.length} Google Ads city-level daily performance records.`,
+      payload:{provider:'google_ads_api',imported:values.length,queriedRows:records.length,range:'last_365_days',cityDimensions:cityNames.size}
+    });
+    return res.json({success:true,source:'google_ads_api',imported:values.length,queriedRows:records.length,
+      cities:cityNames.size,range:'last_365_days',
+      message:values.length?`Imported or refreshed ${values.length} real Google Ads city/day/campaign observations.`:
+      'Google Ads authenticated, but no eligible city-level daily rows were imported.'});
+  } catch(error:any) {
+    const message=String(error?.message||'');
+    const safe=message.startsWith('Google ')||message.startsWith('Invalid Google Ads')?message:
+      'Google Ads history sync failed. Verify the OAuth connection, account access and API configuration.';
+    return res.status(502).json({success:false,error:safe});
+  }
+});
 
 async function getTenantConnectorCredentials(contractorId: string): Promise<Record<string, string>> {
   // Import existing encrypted JSON-store values once. PostgreSQL becomes the

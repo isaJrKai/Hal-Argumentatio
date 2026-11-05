@@ -58,6 +58,25 @@ the median forecast plus q10/q90 bounds into the existing `forecasts` table.
 Other niche selections require the optional HTTP inference mode. It is a
 scheduled batch job, not a live HTTP inference API.
 
+### Real Google Ads history ingestion
+
+The authenticated tenant endpoint `POST /api/forecasting/google-ads/sync` is
+available from Settings using **Verify & import last 365 days**. The credential
+object is stored in the existing contractor-scoped encrypted connector vault
+and is never returned to the browser.
+
+Required JSON fields: `clientId`, `clientSecret`, `refreshToken`, and
+10-digit `customerId`. Optional: `loginCustomerId` for manager-account access
+and `developerToken` for legacy projects. The refresh token must be authorized
+for `https://www.googleapis.com/auth/adwords` with offline access. HAL refreshes
+the token server-side, queries Google Ads v25 city-level geographic performance
+for the last 365 days, resolves city names, and idempotently upserts daily
+campaign/city observations into the same tenant's
+`google_ads_daily_performance` table. Only physical-presence geography is
+imported. The TimesFM batch job subsequently filters campaign names against the
+tenant's service type; campaign names must identify the trade for forecasts to
+be eligible. OAuth success with zero imported rows is not successful ingestion.
+
 ### Required setup
 
 1. In the GitHub repository, open **Settings → Secrets and variables → Actions**.
