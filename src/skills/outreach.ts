@@ -41,7 +41,7 @@ export const outreachSkill: Skill = {
       label: 'Digital Weaknesses',
       type: 'string',
       required: false,
-      defaultValue: 'Slow mobile page load speed, no call-to-actions, missing SSL security.',
+      defaultValue: '',
     },
     {
       name: 'channel',
@@ -62,14 +62,14 @@ export const outreachSkill: Skill = {
 
     const systemPrompt = `You are HAL, the core Outreach & Communication Agent of HALBiz.
 Your objective is to craft hyper-personalized, non-spammy, highly professional cold-outreach templates and scripts. 
-You speak directly, offering heavy value first. Do not use generic corporate language, exclamation marks, or greetings like "I hope this email finds you well."`;
+You speak directly, offering heavy value first. Avoid generic corporate language. Never invent audit findings, rankings, website speed, lost leads, conversion rates, or revenue. Only state weaknesses explicitly supplied by the user and label them unverified. If no evidence is supplied, write an honest introduction and ask permission to review the website.
 
     const userPrompt = `Generate a comprehensive outbound campaign plan for:
 Business: ${businessName}
 Owner Name: ${ownerName || 'Owner'}
 Location: ${city}
 Niche: ${serviceType}
-Identified Weaknesses: ${weaknesses || 'General web speed and CTA issues'}
+User-supplied observations (not independently verified): ${weaknesses || 'None supplied'}
 Outreach Channel Mode: ${channel}
 
 Include these distinct sections in your output:
@@ -80,7 +80,7 @@ Include these distinct sections in your output:
    - If "Combined Omnichannel", provide both a quick touchpoint LinkedIn message and an email.
 3. OBJECTION HANDLING MATRIX: Provide 2 common objections the business owner might raise (e.g. "We have enough work", "I already have a web guy") and exactly how to dismantle them professionally.
 
-Format your response in clean Markdown.`;
+Evidence rules: If no observations are supplied, do not imply you inspected the website or found a defect. Do not invent performance measurements, rankings, percentages, missed jobs, competitor behavior, or revenue loss. If observations are supplied, qualify them as items to verify. Format your response in clean Markdown.`;
 
     let reportText = '';
 
@@ -95,31 +95,23 @@ Format your response in clean Markdown.`;
     }
 
     if (!reportText) {
-      // Elegant fallback script matching HAL style
-      reportText = `### CAMPAIGN ANGLE & HOOK
-We approach **${ownerName || 'Owner'}** with an "Evidence-Based Revenue Audit." Instead of proposing a general redesign, we demonstrate the specific mathematical volume of local homeowners they are currently losing directly due to load-speed friction in **${city}**.
-
-### OUTBOUND TEMPLATE / SCRIPT (Channel: ${channel})
-**Subject**: Winnipeg homeowners clicking away from ${businessName}? 
-
-Hi ${ownerName || 'Owner'},
-
-I was reviewing the digital visibility for home services in **${city}** and noticed **${businessName}** ranking well, but your website load speed on mobile devices is lagging by almost 4.5 seconds. 
-
-For emergency plumbing and local services, a delay like that causes about 30% of visitors to click back and call a competitor instead. 
-
-I’ve compiled a quick 2-minute video showing where this leak is happening and the 3 quick fixes to secure those leads. Would it be helpful if I sent that over?
-
-Best,
-
-Territory Director
-HAL Intelligence Operating Systems
-
-### OBJECTION HANDLING MATRIX
-1. **"We have too much work already / fully booked"**
-   * *Counter*: "That is a great problem to have. This isn't about getting more volume, it’s about margin efficiency. By stopping these leaks, you can afford to selectively pick the highest-paying sewer backups and waterproofing jobs and drop the low-margin diagnostic calls."
-2. **"I already have a web developer who manages this"**
-   * *Counter*: "Completely understand, most premium shops do. Feel free to pass this report directly to them—it contains the exact speed and caching metrics they need to speed up your page load times. If they have any questions on the code optimizations, I'm happy to jump on a quick call with them."`;
+      const evidenceNote = weaknesses?.trim()
+        ? 'I have a few observations from the information provided: ' + weaknesses.trim() + '. I have not independently verified them.'
+        : 'I have not audited your website yet, so I do not want to guess at issues or make claims about its performance.';
+      const email = 'Subject: A quick website review for ' + businessName + '\n\nHi ' + (ownerName || 'there') + ',\n\nI work with ' + serviceType.toLowerCase() + ' businesses in ' + city + ' on improving their online presence and enquiry process.\n\n' + evidenceNote + '\n\nWould you be open to me reviewing the public website and sending you a short, evidence-based list of opportunities? No obligation.\n\nBest,\nHALBiz';
+      reportText = [
+        '### CAMPAIGN ANGLE & HOOK',
+        weaknesses?.trim() ? 'Use supplied observations as discussion points, but verify each before presenting it as fact.' : 'Ask permission to conduct a short review; do not imply an audit has already happened.',
+        '',
+        '### OUTBOUND TEMPLATE / SCRIPT (Channel: ' + channel + ')',
+        email,
+        '',
+        '### OBJECTION HANDLING MATRIX',
+        '1. We already have a provider — I can share the findings with your existing provider if a second perspective would be useful.',
+        '2. We are not looking for help — Understood. I can send a short checklist with no follow-up unless you ask for it.',
+        '',
+        '**Evidence boundary:** No website measurements, rankings, lead-loss estimates, or revenue claims were available for this draft.'
+      ].join('\n');
     }
 
     return {
@@ -127,6 +119,7 @@ HAL Intelligence Operating Systems
       businessName,
       ownerName,
       channel,
+      evidenceStatus: weaknesses?.trim() ? 'user_supplied_unverified_observations' : 'no_audit_evidence',
       report: reportText,
       generatedAt: new Date().toISOString()
     };
