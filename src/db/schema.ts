@@ -277,7 +277,8 @@ export const leadEvents = pgTable('lead_events', {
 
 export const auditLogs = pgTable('audit_logs', {
   id: text('id').primaryKey(),
-  contractorId: text('contractor_id').notNull(),
+  // Existing bootstrap schema permits system-level audit rows without a tenant.
+  contractorId: text('contractor_id'),
   action: text('action').notNull(),
   details: text('details').notNull(),
   timestamp: timestamp('timestamp').defaultNow().notNull(),
