@@ -599,16 +599,22 @@ export async function fetchPublicWebsitePage(
     throw new Error('Only public HTTP(S) websites on standard ports can be inspected.');
   }
 
-  const dnsResult = await resolveDnsWithTimeout(url.hostname, timeoutMs);
-  if (!dnsResult.resolved || !dnsResult.ips?.length) {
-    throw new Error('Website DNS lookup failed: ' + (dnsResult.error || 'No public DNS records returned'));
+  let resolvedIps: string[];
+  try {
+    const records = await dns.promises.lookup(url.hostname, { all: true, verbatim: true });
+    resolvedIps = records.map(record => record.address);
+  } catch (error: any) {
+    throw new Error('Website DNS lookup failed: ' + (error?.message || 'No DNS records returned'));
   }
-  if (dnsResult.ips.some(address => !isPubliclyRoutableIp(address))) {
+  if (!resolvedIps.length) {
+    throw new Error('Website DNS lookup failed: no DNS records returned');
+  }
+  if (resolvedIps.some(address => !isPubliclyRoutableIp(address))) {
     throw new Error('Website resolves to a private, reserved, or non-public network address; request blocked.');
   }
 
-  const hostname = dnsResult.resolvedHostname || url.hostname;
-  const address = dnsResult.ips[0];
+  const hostname = url.hostname;
+  const address = resolvedIps[0];
   const transport = url.protocol === 'https:' ? https : http;
   const requestPath = `${url.pathname || '/'}${url.search}`;
 
@@ -665,7 +671,7 @@ export async function fetchPublicWebsitePage(
           body: '',
           fetchedAt: new Date().toISOString(),
           resolvedHostname: hostname,
-          resolvedIps: dnsResult.ips || []
+          resolvedIps: resolvedIps
         });
         return;
       }
@@ -704,7 +710,7 @@ export async function fetchPublicWebsitePage(
           body: Buffer.concat(chunks).toString('utf8'),
           fetchedAt: new Date().toISOString(),
           resolvedHostname: hostname,
-          resolvedIps: dnsResult.ips || []
+          resolvedIps: resolvedIps
         });
       });
       response.on('error', error => finishError(error));
