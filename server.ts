@@ -2169,7 +2169,8 @@ app.post('/api/landing-pages/save', authenticate, async (req, res) => {
       contractorId,
       sourceLeadId: sourceLead?.id || null,
       sourceAuditId: sourceAudit?.auditId || null,
-      draftUrl: `/landing/${artifactId}`,\n      published: false
+      draftUrl: `/landing/${artifactId}`,
+      published: false
     });
   } catch (err: any) {
     console.error('[Save Landing Page Error]', err);
