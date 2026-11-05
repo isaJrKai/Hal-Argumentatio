@@ -28,6 +28,16 @@ describe('PostgreSQL password reset persistence', () => {
     expect(forgotRoute).not.toContain('db.createPasswordReset');
   });
 
+  it('sends reset links only through the shared Resend adapter and trusted APP_URL origin', () => {
+    expect(forgotRoute).toContain('new URL(process.env.APP_URL || \'\')');
+    expect(forgotRoute).toContain('sendResendEmail({');
+    expect(forgotRoute).toContain('apiKey: resendApiKey');
+    expect(forgotRoute).not.toContain('req.headers.origin');
+    expect(forgotRoute).not.toContain('x-forwarded-host');
+    expect(forgotRoute).not.toContain('getConnectorCredentials');
+    expect(forgotRoute).toContain('.set({ usedAt: new Date() })');
+  });
+
   it('consumes the reset token and updates the PostgreSQL password in one transaction', () => {
     expect(resetRoute).toContain('pgDb.transaction');
     expect(resetRoute).toContain('eq(passwordResetTokens.tokenHash, tokenHash)');

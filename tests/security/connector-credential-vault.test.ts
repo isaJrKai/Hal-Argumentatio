@@ -1,12 +1,17 @@
-import { afterEach, describe, expect, it } from 'vitest';
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { db } from '../../src/db/db';
 
 const testContractorId = 'credential-vault-regression-test';
+let saveSpy: ReturnType<typeof vi.spyOn>;
+
+beforeEach(() => {
+  (db as any).data.connectorCredentials[testContractorId] = {};
+  saveSpy = vi.spyOn(db, 'save').mockImplementation(() => undefined);
+});
 
 afterEach(() => {
-  db.saveConnectorCredential(testContractorId, 'stripe', '');
+  (db as any).data.connectorCredentials[testContractorId] = {};
+  vi.restoreAllMocks();
 });
 
 describe('connector credential vault', () => {
@@ -14,9 +19,8 @@ describe('connector credential vault', () => {
     const secret = 'test-secret-do-not-store-in-plaintext';
     db.saveConnectorCredential(testContractorId, 'stripe', secret);
 
-    const persisted = JSON.parse(readFileSync(join(process.cwd(), 'data', 'db.json'), 'utf8'));
-    const storedValue = persisted.connectorCredentials[testContractorId].stripe;
-
+    const storedValue = (db as any).data.connectorCredentials[testContractorId].stripe;
+    expect(saveSpy).toHaveBeenCalled();
     expect(storedValue).not.toBe(secret);
     expect(storedValue).toMatch(/^[a-f0-9]{24}:[a-f0-9]+:[a-f0-9]{32}$/i);
     expect(db.getConnectorCredentials(testContractorId).stripe).toBe(secret);
@@ -28,10 +32,10 @@ describe('connector credential vault', () => {
     };
 
     const credentials = db.getConnectorCredentials(testContractorId);
-    const persisted = JSON.parse(readFileSync(join(process.cwd(), 'data', 'db.json'), 'utf8'));
-    const storedValue = persisted.connectorCredentials[testContractorId].legacyProvider;
+    const storedValue = (db as any).data.connectorCredentials[testContractorId].legacyProvider;
 
     expect(credentials.legacyProvider).toBe('legacy-plaintext-secret');
+    expect(saveSpy).toHaveBeenCalled();
     expect(storedValue).not.toBe('legacy-plaintext-secret');
     expect(storedValue).toMatch(/^[a-f0-9]{24}:[a-f0-9]+:[a-f0-9]{32}$/i);
   });

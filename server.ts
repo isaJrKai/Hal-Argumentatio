@@ -8,6 +8,9 @@ import { isIP } from 'node:net';
 import { execSync } from 'child_process';
 import { sendResendEmail, EmailProviderConfigurationError, EmailProviderRequestError } from './src/services/communications/resendEmail';
 import { verifySvixWebhookSignature } from './src/lib/resendWebhook';
+import { runCommunicationsOutboxWorker } from './src/services/communications/outboxWorker';
+import { verifyMetaWebhookSignature, isMetaPhoneNumberId } from './src/lib/whatsappWebhook';
+import { sendTwilioSms, verifyTwilioRequestSignature, TwilioConfigurationError, TwilioRequestError } from './src/services/communications/twilioSms';
 import { 
   db, 
   encrypt, 
@@ -21,7 +24,7 @@ import {
   Recommendation
 } from './src/db/db';
 import { db as pgDb, createPool as getApplicationPostgresPool } from './src/db/index.ts';
-import { contractors, auditLogs, leads, leadEvents, revenueRecords, campaigns, winLossRecords, performanceSnapshots, recommendations, forecasts, predictionOutcomes, learningInsights, chatMessages, chatProjects, chatConversations, missions, clientProjects, outreachSequences, apiKeys, connectorCredentials, notifications, schedulerJobs, passwordResetTokens, leadAttribution, conversionOutbox, googleAdsDailyPerformance, revenueExperiments, revenueRecommendations, revenueRecommendationEvents, revenueSimulations, revenueOutcomes, communicationsOutbox, communicationsDeliveryEvents, halLoops, halLoopEvents, hermesLabArtifacts, hermesDiagnosticIncidents, hermesLabMessages, staffMembers, workEvents, workTasks, revokedTokens } from './src/db/schema.ts';
+import { contractors, auditLogs, leads, leadEvents, revenueRecords, campaigns, winLossRecords, performanceSnapshots, recommendations, forecasts, predictionOutcomes, learningInsights, chatMessages, chatProjects, chatConversations, missions, clientProjects, outreachSequences, apiKeys, connectorCredentials, notifications, schedulerJobs, passwordResetTokens, leadAttribution, conversionOutbox, googleAdsDailyPerformance, revenueExperiments, revenueRecommendations, revenueRecommendationEvents, revenueSimulations, revenueOutcomes, communicationsOutbox, communicationsDeliveryEvents, communicationsOptOuts, communicationsConsents, twilioPhoneNumberMappings, twilioInboundEvents, whatsappPhoneNumberMappings, whatsappInboundEvents, halLoops, halLoopEvents, hermesLabArtifacts, hermesDiagnosticIncidents, hermesLabMessages, staffMembers, workEvents, workTasks, revokedTokens } from './src/db/schema.ts';
 import { eq, inArray, desc, and, or, like, sql, gte, lte, gt, isNull } from 'drizzle-orm';
 import { 
   generateLearningFromOutcome, 
@@ -1333,48 +1336,55 @@ app.post('/api/auth/forgot-password', async (req, res) => {
         });
       } catch (_) {}
 
-      // Construct standard clickable reset link
-      const host = req.get('x-forwarded-host') || req.get('host') || 'localhost:3000';
-      const proto = req.headers['x-forwarded-proto'] || (req.secure ? 'https' : 'http');
-      const origin = req.headers.origin || `${proto}://${host}`;
-      const resetUrl = `${origin}/?reset_token=${rawToken}`;
-
-      let emailDispatched = false;
-      const resendApiKey = process.env.RESEND_API_KEY || (db as any).getConnectorCredentials?.('con_admin_seed')?.resend;
-
-      // If an external email provider like Resend is configured, send the real email with link
-      if (resendApiKey) {
-        try {
-          const emailRes = await fetch('https://api.resend.com/emails', {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${resendApiKey}`,
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-              from: process.env.HAL_SENDER_EMAIL || 'HAL Operating System <support@hal-intelligence.ai>',
-              to: cleanEmail,
-              subject: 'Reset Your HAL Password',
-              html: `
-                <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 560px; margin: 0 auto; padding: 32px 24px; background: #0b0f17; color: #f3f4f6; border-radius: 12px; border: 1px solid #1f2937;">
-                  <div style="font-size: 18px; font-weight: bold; color: #3b82f6; margin-bottom: 20px; letter-spacing: 0.05em;">HAL OPERATING SYSTEM</div>
-                  <h2 style="font-size: 20px; font-weight: 600; margin: 0 0 12px 0; color: #ffffff;">Reset Your Account Password</h2>
-                  <p style="font-size: 14px; line-height: 1.6; color: #9ca3af; margin: 0 0 24px 0;">We received a password reset request for your HAL workspace account (${cleanEmail}). Click the button below to choose your new password:</p>
-                  <div style="margin: 28px 0; text-align: left;">
-                    <a href="${resetUrl}" style="background-color: #2563eb; color: #ffffff; padding: 12px 28px; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 14px; display: inline-block;">Reset Password</a>
-                  </div>
-                  <p style="font-size: 12px; color: #6b7280; line-height: 1.5; margin: 24px 0 0 0;">If the button does not work, copy and paste this link into your browser:<br/><a href="${resetUrl}" style="color: #60a5fa; word-break: break-all;">${resetUrl}</a></p>
-                  <p style="font-size: 11px; color: #4b5563; margin-top: 24px; border-top: 1px solid #1f2937; padding-top: 16px;">This link will expire in 60 minutes and can only be used once. If you did not request this change, you can ignore this email.</p>
-                </div>
-              `
-            })
-          });
-          if (emailRes.ok) {
-            emailDispatched = true;
-          }
-        } catch (emailErr) {
-          console.error('[HAL Auth] Failed to dispatch reset email via Resend:', emailErr);
+      // Reset links must use the operator-configured canonical origin. Never
+      // trust Host, X-Forwarded-Host, or Origin headers for credential links.
+      let appOrigin = '';
+      try {
+        const configuredUrl = new URL(process.env.APP_URL || '');
+        const isLocalDevelopment = process.env.NODE_ENV !== 'production' &&
+          (configuredUrl.hostname === 'localhost' || configuredUrl.hostname === '127.0.0.1');
+        if ((configuredUrl.protocol === 'https:' || isLocalDevelopment) &&
+            !configuredUrl.username && !configuredUrl.password) {
+          appOrigin = configuredUrl.origin;
         }
+      } catch {
+        appOrigin = '';
+      }
+
+      const resendApiKey = process.env.RESEND_API_KEY;
+      const senderEmail = process.env.HAL_SENDER_EMAIL;
+      if (resendApiKey && senderEmail && appOrigin) {
+        const resetUrl = `${appOrigin}/?reset_token=${rawToken}`;
+        const textBody = `We received a password reset request for your HAL account. Open this link within 60 minutes to choose a new password: ${resetUrl}\\n\\nIf you did not request this change, ignore this email.`;
+        const htmlBody = `
+          <div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;padding:32px 24px">
+            <h2>Reset your HAL password</h2>
+            <p>We received a password reset request for your HAL account.</p>
+            <p><a href="${resetUrl}">Reset password</a></p>
+            <p>If the button does not work, copy this link: <a href="${resetUrl}">${resetUrl}</a></p>
+            <p>This link expires in 60 minutes and can only be used once. If you did not request this change, ignore this email.</p>
+          </div>
+        `;
+        try {
+          // Resend's accepted response is recorded as submission only. A
+          // verified webhook is required before claiming recipient delivery.
+          await sendResendEmail({
+            to: cleanEmail,
+            subject: 'Reset Your HAL Password',
+            text: textBody,
+            html: htmlBody
+          }, { apiKey: resendApiKey, from: senderEmail });
+        } catch (emailError: any) {
+          console.error('[HAL Auth] Password reset email submission failed:', emailError?.name || 'provider_error');
+          await pgDb.update(passwordResetTokens)
+            .set({ usedAt: new Date() })
+            .where(and(eq(passwordResetTokens.tokenHash, tokenHash), isNull(passwordResetTokens.usedAt)));
+        }
+      } else {
+        // Do not leave an active reset token that cannot be delivered.
+        await pgDb.update(passwordResetTokens)
+          .set({ usedAt: new Date() })
+          .where(and(eq(passwordResetTokens.tokenHash, tokenHash), isNull(passwordResetTokens.usedAt)));
       }
 
       return res.json(buildPasswordResetResponse());
@@ -5556,6 +5566,7 @@ interface DispatchLogEntry {
 }
 
 const liveEmailDispatchLimits = new Map<string, { count: number; resetAt: number }>();
+const liveSmsDispatchLimits = new Map<string, { count: number; resetAt: number }>();
 
 app.post('/api/webhooks/resend', async (req, res) => {
   const webhookSecret = process.env.RESEND_WEBHOOK_SECRET || '';
@@ -6242,6 +6253,41 @@ app.post('/api/outreach/draft-ai', authenticate, async (req, res) => {
   }
 });
 
+// Internal durable communications worker. Configure HAL_COMMUNICATIONS_WORKER_SECRET (32+ chars)
+// and invoke this endpoint from a trusted scheduler; never expose the secret to browsers.
+app.post('/api/internal/communications/outbox/run', async (req, res) => {
+  const secret = process.env.HAL_COMMUNICATIONS_WORKER_SECRET || '';
+  const supplied = String(req.header('authorization') || '').replace(/^Bearer\s+/i, '');
+  if (secret.length < 32 || supplied.length !== secret.length ||
+      !crypto.timingSafeEqual(Buffer.from(supplied), Buffer.from(secret))) {
+    return res.status(401).json({ success: false, error: 'Unauthorized worker request.' });
+  }
+  try {
+    const pool = getApplicationPostgresPool();
+    const result = await runCommunicationsOutboxWorker(pool, async (record) => {
+      const bridge = await getBridgesForContractor(record.contractor_id);
+      if (record.provider !== 'resend' || record.channel !== 'email' ||
+          !bridge.email.apiKey || !bridge.email.senderEmail) {
+        throw new EmailProviderConfigurationError('Tenant Resend sender configuration is unavailable.');
+      }
+      const sent = await sendResendEmail({
+        to: decrypt(record.recipient_encrypted),
+        subject: record.subject_encrypted ? decrypt(record.subject_encrypted) : 'Message from HAL',
+        text: decrypt(record.body_encrypted),
+        idempotencyKey: record.idempotency_key
+      }, { apiKey: bridge.email.apiKey, from: bridge.email.senderEmail });
+      return { providerMessageId: sent.providerMessageId };
+    }, {
+      batchSize: Number(process.env.HAL_COMMUNICATIONS_WORKER_BATCH_SIZE) || 10,
+      maxAttempts: 5
+    });
+    return res.json({ success: true, ...result });
+  } catch (error: any) {
+    console.error('[Communications Outbox Worker] Batch failed:', error?.message || error);
+    return res.status(503).json({ success: false, error: 'Communications outbox batch could not be processed.' });
+  }
+});
+
 app.post('/api/outreach/dispatch', authenticate, async (req, res) => {
   const contractorId = (req as any).contractorId;
   const {
@@ -6274,6 +6320,123 @@ app.post('/api/outreach/dispatch', authenticate, async (req, res) => {
   }
 
   if (mode === 'live') {
+    if (channel === 'sms') {
+      if (!leadId) return res.status(400).json({ success: false, code: 'LEAD_ID_REQUIRED', error: 'Live SMS requires a saved lead with recorded consent.' });
+      const [storedLead] = await pgDb.select().from(leads).where(
+        and(eq(leads.id, String(leadId)), eq(leads.contractorId, contractorId))
+      ).limit(1);
+      if (!storedLead) return res.status(404).json({ success: false, code: 'LEAD_NOT_FOUND', error: 'The selected lead was not found in this workspace.' });
+      const verifiedPhone = storedLead.phoneEncrypted
+        ? decrypt(storedLead.phoneEncrypted)
+        : (storedLead.phone && !storedLead.phone.includes('[ENCRYPTED]') ? storedLead.phone : '');
+      const normalizedRecipient = verifiedPhone.replace(/[^+\d]/g, '');
+      if (!normalizedRecipient || normalizedRecipient !== String(recipient).replace(/[^+\d]/g, '')) {
+        return res.status(409).json({ success: false, code: 'RECIPIENT_DOES_NOT_MATCH_LEAD', error: 'SMS recipient does not match the saved lead phone number.' });
+      }
+      try {
+        enforceFailClosedOutreachGate({
+          id: storedLead.id, businessName: storedLead.businessName, isSynthetic: storedLead.isSynthetic,
+          sourceType: storedLead.sourceType || undefined, verificationStatus: storedLead.verificationStatus || undefined,
+          dnsVerified: storedLead.dnsVerified, websiteUrl: storedLead.websiteUrl || undefined,
+          phone: verifiedPhone, channel: 'sms'
+        });
+      } catch (gateError: any) {
+        if (gateError instanceof FailClosedOutreachError) return res.status(409).json({ success: false, code: 'OUTREACH_GROUNDING_BLOCKED', error: gateError.message });
+        throw gateError;
+      }
+      const phoneHash = crypto.createHash('sha256').update(normalizedRecipient).digest('hex');
+      const [suppression] = await pgDb.select().from(communicationsOptOuts).where(and(
+        eq(communicationsOptOuts.contractorId, contractorId),
+        eq(communicationsOptOuts.channel, 'sms'),
+        eq(communicationsOptOuts.phoneHash, phoneHash)
+      )).limit(1);
+      if (suppression) return res.status(409).json({ success: false, code: 'SMS_RECIPIENT_OPTED_OUT', error: 'This phone number has opted out of SMS. A new explicit opt-in is required before sending.' });
+      const [consent] = await pgDb.select().from(communicationsConsents).where(and(
+        eq(communicationsConsents.contractorId, contractorId),
+        eq(communicationsConsents.leadId, storedLead.id),
+        eq(communicationsConsents.channel, 'sms'),
+        eq(communicationsConsents.status, 'opted_in'),
+        isNull(communicationsConsents.optedOutAt)
+      )).limit(1);
+      if (!consent) return res.status(409).json({ success: false, code: 'SMS_CONSENT_REQUIRED', error: 'No current recorded SMS opt-in exists for this lead.' });
+
+      const bridge = await getBridgesForContractor(contractorId);
+      const statusCallbackUrl = process.env.TWILIO_STATUS_CALLBACK_URL || '';
+      const inboundWebhookUrl = process.env.TWILIO_INBOUND_WEBHOOK_URL || '';
+      if (bridge.sms.provider !== 'twilio' || !bridge.sms.accountSid || !bridge.sms.authToken || !bridge.sms.virtualNumber ||
+          !statusCallbackUrl.startsWith('https://') || !inboundWebhookUrl.startsWith('https://')) {
+        return res.status(503).json({ success: false, code: 'SMS_PROVIDER_NOT_CONFIGURED', error: 'Twilio credentials, verified sender and HTTPS inbound/status callback URLs are required.' });
+      }
+      const [senderMapping] = await pgDb.select().from(twilioPhoneNumberMappings).where(and(
+        eq(twilioPhoneNumberMappings.phoneNumber, bridge.sms.virtualNumber),
+        eq(twilioPhoneNumberMappings.contractorId, contractorId),
+        eq(twilioPhoneNumberMappings.accountSid, bridge.sms.accountSid)
+      )).limit(1);
+      if (!senderMapping) return res.status(409).json({ success: false, code: 'TWILIO_SENDER_NOT_VERIFIED', error: 'Register and verify this workspace Twilio sender number before sending SMS.' });
+
+      const idempotencyKey = String(requestedIdempotencyKey || req.headers['idempotency-key'] || crypto.randomUUID()).trim();
+      if (!idempotencyKey || idempotencyKey.length > 200) return res.status(400).json({ success: false, code: 'INVALID_IDEMPOTENCY_KEY', error: 'Idempotency key must be 1-200 characters.' });
+      const [existingDispatch] = await pgDb.select().from(communicationsOutbox).where(and(
+        eq(communicationsOutbox.contractorId, contractorId), eq(communicationsOutbox.idempotencyKey, idempotencyKey)
+      )).limit(1);
+      if (existingDispatch) {
+        const completed = ['submitted', 'sent', 'delivered'].includes(existingDispatch.status);
+        return res.status(completed ? 200 : 409).json({
+          success: completed, duplicate: true, dispatchId: existingDispatch.id,
+          providerMessageId: existingDispatch.providerMessageId, status: existingDispatch.status,
+          deliveryConfirmed: existingDispatch.status === 'delivered',
+          error: existingDispatch.errorMessage || undefined
+        });
+      }
+      const rateNow = Date.now();
+      const smsLimit = liveSmsDispatchLimits.get(contractorId);
+      if (smsLimit && smsLimit.resetAt > rateNow && smsLimit.count >= 5) {
+        return res.status(429).json({
+          success: false, code: 'LIVE_SMS_RATE_LIMITED',
+          error: 'Live SMS limit reached. Try again after the current 10-minute window.',
+          retryAfterSeconds: Math.ceil((smsLimit.resetAt - rateNow) / 1000)
+        });
+      }
+      if (!smsLimit || smsLimit.resetAt <= rateNow) {
+        liveSmsDispatchLimits.set(contractorId, { count: 1, resetAt: rateNow + 10 * 60 * 1000 });
+      } else {
+        smsLimit.count += 1;
+      }
+      const outboxId = crypto.randomUUID();
+      await pgDb.insert(communicationsOutbox).values({
+        id: outboxId, contractorId, leadId: storedLead.id, channel: 'sms', provider: 'twilio',
+        recipientEncrypted: encrypt(verifiedPhone), subjectEncrypted: null, bodyEncrypted: encrypt(customizedMessage),
+        status: 'processing', idempotencyKey, attempts: 0, lastAttemptAt: new Date(), updatedAt: new Date()
+      });
+      try {
+        const sent = await sendTwilioSms({
+          to: normalizedRecipient, from: bridge.sms.virtualNumber, body: customizedMessage,
+          statusCallbackUrl
+        }, { accountSid: bridge.sms.accountSid, authToken: bridge.sms.authToken });
+        const submittedAt = new Date();
+        await pgDb.update(communicationsOutbox).set({
+          status: 'submitted', providerMessageId: sent.providerMessageId, attempts: 1,
+          submittedAt, lastAttemptAt: submittedAt, updatedAt: submittedAt, errorCode: null, errorMessage: null
+        }).where(and(eq(communicationsOutbox.id, outboxId), eq(communicationsOutbox.contractorId, contractorId), eq(communicationsOutbox.status, 'processing')));
+        return res.json({
+          success: true, dispatchId: outboxId, idempotencyKey, provider: 'twilio',
+          providerMessageId: sent.providerMessageId, status: 'submitted', mode: 'live',
+          providerContacted: true, deliveryConfirmed: false, timestamp: submittedAt.toISOString()
+        });
+      } catch (error: any) {
+        const uncertain = error instanceof TwilioRequestError;
+        await pgDb.update(communicationsOutbox).set({
+          status: uncertain ? 'unknown' : 'failed', attempts: 1, lastAttemptAt: new Date(), updatedAt: new Date(),
+          errorCode: error instanceof TwilioConfigurationError ? 'PROVIDER_NOT_CONFIGURED' : 'PROVIDER_REQUEST_FAILED',
+          errorMessage: String(error?.message || 'Twilio request failed').slice(0, 500)
+        }).where(and(eq(communicationsOutbox.id, outboxId), eq(communicationsOutbox.contractorId, contractorId), eq(communicationsOutbox.status, 'processing'))).catch(() => undefined);
+        return res.status(502).json({
+          success: false, code: 'SMS_PROVIDER_REQUEST_FAILED',
+          error: 'Twilio did not confirm submission. Automatic retry is disabled to avoid duplicate texts.'
+        });
+      }
+    }
+
     if (channel !== 'email') {
       return res.status(501).json({
         success: false,
@@ -6402,7 +6565,8 @@ app.post('/api/outreach/dispatch', authenticate, async (req, res) => {
       const result = await sendResendEmail({
         to: String(recipient),
         subject: customizedSubject,
-        text: customizedMessage
+        text: customizedMessage,
+        idempotencyKey
       }, {
         apiKey: emailBridge.email.apiKey,
         from: emailBridge.email.senderEmail
@@ -6474,9 +6638,14 @@ app.post('/api/outreach/dispatch', authenticate, async (req, res) => {
         block: auditBlock
       });
     } catch (err: any) {
+      const providerStatus = Number(String(err?.message || '').match(/HTTP (\d{3})/i)?.[1] || 0);
+      const retryableFailure = !(err instanceof EmailProviderConfigurationError) &&
+        (!providerStatus || providerStatus === 408 || providerStatus === 409 || providerStatus === 425 || providerStatus === 429 || providerStatus >= 500);
+      const nextStatus = retryableFailure ? 'retrying' : 'failed';
       await pgDb.update(communicationsOutbox).set({
-        status: 'failed',
+        status: nextStatus,
         attempts: 1,
+        nextAttemptAt: retryableFailure ? new Date(Date.now() + 30000) : null,
         lastAttemptAt: new Date(),
         updatedAt: new Date(),
         errorCode: err instanceof EmailProviderConfigurationError ? 'PROVIDER_NOT_CONFIGURED' : err instanceof EmailProviderRequestError ? 'PROVIDER_REQUEST_FAILED' : 'PROVIDER_UNKNOWN_FAILURE',
@@ -6613,43 +6782,310 @@ app.get('/api/outreach/whatsapp/webhook', (req, res) => {
 });
 
 // WhatsApp Inbound Message Listener
-app.post('/api/outreach/whatsapp/webhook', (req, res) => {
-  const appSecret = process.env.WHATSAPP_APP_SECRET;
-  const signature = req.header('x-hub-signature-256');
-  const rawBody = (req as any).rawBody as Buffer | undefined;
-
-  if (!appSecret) {
-    return res.status(503).json({ error: 'WhatsApp inbound signature verification is not configured.' });
-  }
-  if (!signature || !rawBody || !signature.startsWith('sha256=')) {
-    return res.status(401).json({ error: 'Missing or invalid webhook signature.' });
-  }
-
-  const expected = Buffer.from('sha256=' + crypto.createHmac('sha256', appSecret).update(rawBody).digest('hex'));
-  const received = Buffer.from(signature);
-  if (expected.length !== received.length || !crypto.timingSafeEqual(expected, received)) {
-    return res.status(401).json({ error: 'Invalid webhook signature.' });
-  }
-
-  const body = req.body;
+// Workspace-owned Twilio sender registration. The account API must confirm ownership.
+app.post('/api/outreach/sms/connect-number', authenticate, async (req, res) => {
+  const contractorId = (req as any).contractorId;
+  const phoneNumber = String(req.body?.phoneNumber || '').trim();
+  if (!/^\+[1-9]\d{7,14}$/.test(phoneNumber)) return res.status(400).json({ success: false, error: 'A valid E.164 Twilio phone number is required.' });
   try {
-    if (body?.object === 'whatsapp_business_account') {
-      const hasInboundMessages = (body.entry || []).some((entry: any) =>
-        (entry.changes || []).some((change: any) => Array.isArray(change.value?.messages) && change.value.messages.length > 0)
-      );
-      if (hasInboundMessages) {
-        // Never fan out an inbound message to every connected workspace. A
-        // verified signature authenticates Meta, not the tenant that owns the
-        // destination phone number. Tenant routing must be configured first.
-        console.warn('[WhatsApp Webhook] Signed inbound message received without a verified phone-number-to-tenant mapping.');
-        return res.status(503).json({
-          error: 'WhatsApp signature verified, but tenant routing is not configured. The message was not exposed to any workspace.'
+    const bridge = await getBridgesForContractor(contractorId);
+    const { accountSid, authToken } = bridge.sms;
+    if (!accountSid || !authToken || !/^AC[0-9a-f]{32}$/i.test(accountSid)) {
+      return res.status(503).json({ success: false, error: 'Save valid workspace Twilio credentials before registering a sender.' });
+    }
+    const existing = await pgDb.select().from(twilioPhoneNumberMappings)
+      .where(eq(twilioPhoneNumberMappings.phoneNumber, phoneNumber)).limit(1);
+    if (existing[0] && existing[0].contractorId !== contractorId) {
+      return res.status(409).json({ success: false, error: 'This Twilio number is already assigned to another workspace.' });
+    }
+    const auth = 'Basic ' + Buffer.from(accountSid + ':' + authToken).toString('base64');
+    const verifyResponse = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${accountSid}/IncomingPhoneNumbers.json?PhoneNumber=${encodeURIComponent(phoneNumber)}`, {
+      headers: { Authorization: auth }, signal: AbortSignal.timeout(10000)
+    });
+    if (!verifyResponse.ok) return res.status(502).json({ success: false, error: 'Twilio could not verify number ownership for this workspace.' });
+    const inventory = await verifyResponse.json() as { incoming_phone_numbers?: Array<{ phone_number?: string; account_sid?: string }> };
+    const owned = (inventory.incoming_phone_numbers || []).some(number => number.phone_number === phoneNumber && number.account_sid === accountSid);
+    if (!owned) return res.status(403).json({ success: false, error: 'The selected phone number is not owned by this Twilio account.' });
+    const now = new Date();
+    const id = 'twilio_' + crypto.createHash('sha256').update(phoneNumber).digest('hex');
+    await pgDb.insert(twilioPhoneNumberMappings).values({
+      id, contractorId, phoneNumber, accountSid, verifiedAt: now, createdAt: now, updatedAt: now
+    }).onConflictDoNothing();
+    const [saved] = await pgDb.select().from(twilioPhoneNumberMappings)
+      .where(eq(twilioPhoneNumberMappings.phoneNumber, phoneNumber)).limit(1);
+    if (!saved || saved.contractorId !== contractorId) return res.status(409).json({ success: false, error: 'Twilio sender ownership changed during registration.' });
+    return res.json({ success: true, phoneNumber, verified: true });
+  } catch (error: any) {
+    console.error('[Twilio Number Registration] Failed:', error?.message || error);
+    return res.status(503).json({ success: false, error: 'Twilio number ownership verification could not be completed.' });
+  }
+});
+
+// Record explicit, auditable SMS consent for a saved lead. Evidence is encrypted at rest.
+app.post('/api/outreach/sms/consent', authenticate, async (req, res) => {
+  const contractorId = (req as any).contractorId;
+  const leadId = String(req.body?.leadId || '');
+  const status = req.body?.status;
+  const source = req.body?.source;
+  const evidence = typeof req.body?.evidence === 'string' ? req.body.evidence.trim() : '';
+  if (!leadId || !['opted_in', 'opted_out'].includes(status) ||
+      !['written', 'verbal', 'web_form'].includes(source) || evidence.length < 8 || evidence.length > 2000) {
+    return res.status(400).json({ success: false, error: 'Provide a saved lead, opt-in/opt-out status, consent source and a short evidence note.' });
+  }
+  const [lead] = await pgDb.select({ id: leads.id }).from(leads)
+    .where(and(eq(leads.id, leadId), eq(leads.contractorId, contractorId))).limit(1);
+  if (!lead) return res.status(404).json({ success: false, error: 'Lead not found in this workspace.' });
+  const [consentLead] = await pgDb.select().from(leads).where(and(eq(leads.id, leadId), eq(leads.contractorId, contractorId))).limit(1);
+  const consentPhone = consentLead?.phoneEncrypted ? decrypt(consentLead.phoneEncrypted) : (consentLead?.phone || '');
+  const normalizedConsentPhone = consentPhone.replace(/[^+\d]/g, '');
+  const consentPhoneHash = normalizedConsentPhone ? crypto.createHash('sha256').update(normalizedConsentPhone).digest('hex') : '';
+  if (status === 'opted_out' && consentPhoneHash) {
+    await pgDb.insert(communicationsOptOuts).values({
+      id: 'smsout_' + crypto.createHash('sha256').update(`${contractorId}:sms:${consentPhoneHash}`).digest('hex'),
+      contractorId, channel: 'sms', phoneHash: consentPhoneHash,
+      phoneEncrypted: encrypt(normalizedConsentPhone), source: 'operator_opt_out',
+      optedOutAt: new Date(), createdAt: new Date()
+    }).onConflictDoNothing();
+  }
+  const id = 'smsconsent_' + crypto.createHash('sha256').update(`${contractorId}:${leadId}:sms`).digest('hex');
+  const now = new Date();
+  try {
+    await pgDb.insert(communicationsConsents).values({
+      id, contractorId, leadId, channel: 'sms', status, source,
+      evidenceEncrypted: encrypt(evidence),
+      consentedAt: status === 'opted_in' ? now : null,
+      optedOutAt: status === 'opted_out' ? now : null,
+      createdAt: now, updatedAt: now
+    }).onConflictDoUpdate({
+      target: communicationsConsents.id,
+      set: {
+        status, source, evidenceEncrypted: encrypt(evidence),
+        consentedAt: status === 'opted_in' ? now : null,
+        optedOutAt: status === 'opted_out' ? now : null,
+        updatedAt: now
+      }
+    });
+    if (status === 'opted_in' && consentPhoneHash) {
+      await pgDb.delete(communicationsOptOuts).where(and(
+        eq(communicationsOptOuts.contractorId, contractorId), eq(communicationsOptOuts.channel, 'sms'),
+        eq(communicationsOptOuts.phoneHash, consentPhoneHash)
+      ));
+    }
+    return res.json({ success: true, leadId, channel: 'sms', status, recordedAt: now.toISOString() });
+  } catch (error: any) {
+    console.error('[SMS Consent] Could not persist consent:', error?.message || error);
+    return res.status(503).json({ success: false, error: 'SMS consent could not be saved.' });
+  }
+});
+
+// Twilio inbound webhook: signature-verified, tenant-routed and STOP-aware.
+app.post('/api/webhooks/twilio/inbound', async (req, res) => {
+  const canonicalUrl = process.env.TWILIO_INBOUND_WEBHOOK_URL || '';
+  const from = String(req.body?.From || '');
+  const to = String(req.body?.To || '');
+  const messageSid = String(req.body?.MessageSid || '');
+  const bodyText = String(req.body?.Body || '');
+  if (!canonicalUrl.startsWith('https://') || !/^\+[1-9]\d{7,14}$/.test(to) || !messageSid) {
+    return res.status(503).send('Twilio inbound webhook is not configured.');
+  }
+  try {
+    const [mapping] = await pgDb.select().from(twilioPhoneNumberMappings)
+      .where(eq(twilioPhoneNumberMappings.phoneNumber, to)).limit(1);
+    if (!mapping) return res.status(404).send('Unknown Twilio destination.');
+    const bridge = await getBridgesForContractor(mapping.contractorId);
+    if (!bridge.sms.authToken || bridge.sms.accountSid !== mapping.accountSid ||
+        !verifyTwilioRequestSignature(canonicalUrl, req.body || {}, req.header('x-twilio-signature'), bridge.sms.authToken)) {
+      return res.status(401).send('Invalid Twilio signature.');
+    }
+    await pgDb.insert(twilioInboundEvents).values({
+      id: 'twin_' + crypto.createHash('sha256').update(messageSid).digest('hex'),
+      contractorId: mapping.contractorId,
+      providerMessageId: messageSid,
+      fromEncrypted: encrypt(from),
+      bodyEncrypted: encrypt(bodyText),
+      receivedAt: new Date()
+    }).onConflictDoNothing();
+    if (/^(STOP|STOPALL|UNSUBSCRIBE|CANCEL|END|QUIT)$/i.test(bodyText.trim())) {
+      const normalizedFrom = from.replace(/[^+\d]/g, '');
+      if (/^\+[1-9]\d{7,14}$/.test(normalizedFrom)) {
+        const phoneHash = crypto.createHash('sha256').update(normalizedFrom).digest('hex');
+        await pgDb.insert(communicationsOptOuts).values({
+          id: 'smsout_' + crypto.createHash('sha256').update(`${mapping.contractorId}:sms:${phoneHash}`).digest('hex'),
+          contractorId: mapping.contractorId, channel: 'sms', phoneHash,
+          phoneEncrypted: encrypt(normalizedFrom), source: 'twilio_stop',
+          optedOutAt: new Date(), createdAt: new Date()
+        }).onConflictDoNothing();
+      }
+      const tenantLeads = await pgDb.select().from(leads).where(eq(leads.contractorId, mapping.contractorId));
+      const matching = tenantLeads.filter(lead => {
+        const phone = lead.phoneEncrypted ? decrypt(lead.phoneEncrypted) : (lead.phone && !lead.phone.includes('[ENCRYPTED]') ? lead.phone : '');
+        return phone.replace(/[^+\d]/g, '') === from.replace(/[^+\d]/g, '');
+      });
+      for (const lead of matching) {
+        const id = 'smsconsent_' + crypto.createHash('sha256').update(`${mapping.contractorId}:${lead.id}:sms`).digest('hex');
+        const now = new Date();
+        await pgDb.insert(communicationsConsents).values({
+          id, contractorId: mapping.contractorId, leadId: lead.id, channel: 'sms',
+          status: 'opted_out', source: 'twilio_stop', evidenceEncrypted: encrypt('Recipient sent STOP via Twilio inbound webhook.'),
+          consentedAt: null, optedOutAt: now, createdAt: now, updatedAt: now
+        }).onConflictDoUpdate({
+          target: communicationsConsents.id,
+          set: { status: 'opted_out', source: 'twilio_stop', evidenceEncrypted: encrypt('Recipient sent STOP via Twilio inbound webhook.'), optedOutAt: now, updatedAt: now }
         });
       }
     }
-    return res.sendStatus(200);
-  } catch (err) {
-    console.error('[WhatsApp Webhook Error]', err);
+    return res.status(200).send('OK');
+  } catch (error: any) {
+    console.error('[Twilio Inbound] Processing failed:', error?.message || error);
+    return res.status(500).send('Webhook processing failed.');
+  }
+});
+
+// Twilio delivery callback: reconcile only a previously submitted tenant outbox record.
+app.post('/api/webhooks/twilio/status', async (req, res) => {
+  const canonicalUrl = process.env.TWILIO_STATUS_CALLBACK_URL || '';
+  const sid = String(req.body?.MessageSid || '');
+  const status = String(req.body?.MessageStatus || '').toLowerCase();
+  if (!canonicalUrl.startsWith('https://') || !sid || !status) return res.status(503).send('Twilio status callback is not configured.');
+  try {
+    const [outbox] = await pgDb.select().from(communicationsOutbox)
+      .where(and(eq(communicationsOutbox.providerMessageId, sid), eq(communicationsOutbox.provider, 'twilio'), eq(communicationsOutbox.channel, 'sms'))).limit(1);
+    if (!outbox) return res.status(404).send('Unknown Twilio message.');
+    const bridge = await getBridgesForContractor(outbox.contractorId);
+    if (!bridge.sms.authToken || !verifyTwilioRequestSignature(canonicalUrl, req.body || {}, req.header('x-twilio-signature'), bridge.sms.authToken)) {
+      return res.status(401).send('Invalid Twilio signature.');
+    }
+    const allowed = new Set(['queued', 'accepted', 'sending', 'sent', 'delivered', 'undelivered', 'failed', 'canceled']);
+    if (!allowed.has(status)) return res.status(400).send('Unknown Twilio status.');
+    const nextStatus = status === 'undelivered' ? 'bounced' : status === 'failed' || status === 'canceled' ? 'failed' : status;
+    await pgDb.insert(communicationsDeliveryEvents).values({
+      id: 'twilio_' + crypto.createHash('sha256').update(`${sid}:${status}:${String(req.body?.ErrorCode || '')}`).digest('hex'),
+      outboxId: outbox.id, provider: 'twilio', providerMessageId: sid,
+      eventType: `sms.${status}`,
+      payload: { status, errorCode: String(req.body?.ErrorCode || '') || null },
+      receivedAt: new Date()
+    }).onConflictDoNothing();
+    const statusRank: Record<string, number> = { queued: 0, accepted: 1, sending: 2, submitted: 2, sent: 3, delivered: 4, bounced: 4, failed: 5, canceled: 5 };
+    if ((statusRank[nextStatus] ?? 0) >= (statusRank[outbox.status] ?? 0)) {
+      await pgDb.update(communicationsOutbox).set({
+        status: nextStatus,
+        deliveredAt: status === 'delivered' ? new Date() : outbox.deliveredAt,
+        bouncedAt: status === 'undelivered' ? new Date() : outbox.bouncedAt,
+        errorCode: String(req.body?.ErrorCode || '') || null,
+        errorMessage: status === 'undelivered' || status === 'failed' ? 'Twilio reported message delivery failure.' : null,
+        updatedAt: new Date()
+      }).where(and(eq(communicationsOutbox.id, outbox.id), eq(communicationsOutbox.contractorId, outbox.contractorId)));
+    }
+    return res.status(200).send('OK');
+  } catch (error: any) {
+    console.error('[Twilio Status] Reconciliation failed:', error?.message || error);
+    return res.status(500).send('Status reconciliation failed.');
+  }
+});
+
+// A workspace may register only a phone number that its own Meta token can read.
+app.post('/api/outreach/whatsapp/connect-number', authenticate, async (req, res) => {
+  const contractorId = (req as any).contractorId;
+  const phoneNumberId = String(req.body?.phoneNumberId || '').trim();
+  if (!isMetaPhoneNumberId(phoneNumberId)) {
+    return res.status(400).json({ success: false, error: 'A valid Meta phone-number ID is required.' });
+  }
+  try {
+    const [existing] = await pgDb.select().from(whatsappPhoneNumberMappings)
+      .where(eq(whatsappPhoneNumberMappings.phoneNumberId, phoneNumberId)).limit(1);
+    if (existing && existing.contractorId !== contractorId) {
+      return res.status(409).json({ success: false, error: 'This WhatsApp number is already assigned to another workspace.' });
+    }
+    const credentials = await getTenantConnectorCredentials(contractorId);
+    let bridgeSettings: any = {};
+    try { bridgeSettings = credentials.bridgeSettings ? JSON.parse(credentials.bridgeSettings) : {}; } catch {}
+    const accessToken = bridgeSettings?.whatsapp?.accessToken || credentials.whatsappAccessToken;
+    if (!accessToken) {
+      return res.status(503).json({ success: false, error: 'Save a WhatsApp access token in this workspace connector before registering its number.' });
+    }
+    const graphVersion = process.env.WHATSAPP_GRAPH_API_VERSION || 'v22.0';
+    if (!/^v\d+\.\d+$/.test(graphVersion)) {
+      return res.status(503).json({ success: false, error: 'WhatsApp Graph API version is invalid.' });
+    }
+    const response = await fetch(`https://graph.facebook.com/${graphVersion}/${phoneNumberId}?fields=id,display_phone_number,verified_name`, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+      signal: AbortSignal.timeout(10000)
+    });
+    if (!response.ok) return res.status(502).json({ success: false, error: 'Meta could not verify this phone-number ID with the workspace token.' });
+    const provider = await response.json() as { id?: string; display_phone_number?: string; verified_name?: string };
+    if (provider.id !== phoneNumberId) return res.status(409).json({ success: false, error: 'Meta returned a different phone-number ID.' });
+    const now = new Date();
+    const mapping = {
+      id: existing?.id || 'wa_' + crypto.randomUUID(),
+      contractorId,
+      phoneNumberId,
+      displayPhoneNumber: provider.display_phone_number || null,
+      verifiedName: provider.verified_name || null,
+      verifiedAt: now,
+      updatedAt: now
+    };
+    await pgDb.insert(whatsappPhoneNumberMappings).values({ ...mapping, createdAt: existing?.createdAt || now })
+      .onConflictDoNothing();
+    const [saved] = await pgDb.select().from(whatsappPhoneNumberMappings)
+      .where(eq(whatsappPhoneNumberMappings.phoneNumberId, phoneNumberId)).limit(1);
+    if (!saved || saved.contractorId !== contractorId) {
+      return res.status(409).json({ success: false, error: 'Phone-number ownership changed during registration. No mapping was enabled.' });
+    }
+    return res.json({ success: true, phoneNumberId, displayPhoneNumber: saved.displayPhoneNumber, verifiedName: saved.verifiedName, verified: true });
+  } catch (error: any) {
+    console.error('[WhatsApp Number Registration] Failed:', error?.message || error);
+    return res.status(503).json({ success: false, error: 'WhatsApp number verification could not be completed.' });
+  }
+});
+
+// WhatsApp inbound events are signature-verified, mapped to exactly one tenant,
+// encrypted at rest, and deduplicated by Meta's message ID.
+app.post('/api/outreach/whatsapp/webhook', async (req, res) => {
+  const appSecret = process.env.WHATSAPP_APP_SECRET;
+  const signature = req.header('x-hub-signature-256');
+  const rawBody = (req as any).rawBody as Buffer | undefined;
+  if (!appSecret) return res.status(503).json({ error: 'WhatsApp inbound signature verification is not configured.' });
+  if (!signature || !rawBody || !signature.startsWith('sha256=')) return res.status(401).json({ error: 'Missing or invalid webhook signature.' });
+  if (!verifyMetaWebhookSignature(rawBody, signature, appSecret)) {
+    return res.status(401).json({ error: 'Invalid webhook signature.' });
+  }
+  try {
+    const body = req.body;
+    if (body?.object !== 'whatsapp_business_account') return res.sendStatus(200);
+    const messages: any[] = [];
+    for (const entry of Array.isArray(body.entry) ? body.entry : []) {
+      for (const change of Array.isArray(entry.changes) ? entry.changes : []) {
+        const value = change?.value || {};
+        for (const message of Array.isArray(value.messages) ? value.messages : []) {
+          messages.push({ phoneNumberId: String(value.metadata?.phone_number_id || ''), message });
+        }
+      }
+    }
+    if (messages.length > 50) return res.status(413).json({ error: 'Webhook message batch exceeds the supported limit.' });
+    for (const item of messages) {
+      if (!item.phoneNumberId || typeof item.message?.id !== 'string' || typeof item.message?.from !== 'string') {
+        return res.status(400).json({ error: 'Inbound message is missing its routing or provider identifier.' });
+      }
+      const [mapping] = await pgDb.select().from(whatsappPhoneNumberMappings)
+        .where(eq(whatsappPhoneNumberMappings.phoneNumberId, item.phoneNumberId)).limit(1);
+      if (!mapping) {
+        console.warn('[WhatsApp Webhook] Signed message arrived for an unregistered phone-number ID.');
+        return res.status(503).json({ error: 'No verified workspace mapping exists for this WhatsApp number.' });
+      }
+      await pgDb.insert(whatsappInboundEvents).values({
+        id: 'waevt_' + crypto.createHash('sha256').update(item.message.id).digest('hex'),
+        contractorId: mapping.contractorId,
+        phoneNumberId: item.phoneNumberId,
+        providerMessageId: item.message.id,
+        senderEncrypted: encrypt(item.message.from),
+        messageEncrypted: encrypt(JSON.stringify(item.message)),
+        messageType: String(item.message.type || 'unknown').slice(0, 40),
+        receivedAt: new Date()
+      }).onConflictDoNothing();
+    }
+    return res.status(200).json({ success: true, accepted: messages.length });
+  } catch (err: any) {
+    console.error('[WhatsApp Webhook Error]', err?.message || err);
     return res.sendStatus(500);
   }
 });
