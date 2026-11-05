@@ -7413,7 +7413,7 @@ app.post('/api/system/diagnostics/ai-providers', authenticate, async (req, res) 
 
   const [gemini, nemotron] = await Promise.all([
     runProbe(Boolean(process.env.GEMINI_API_KEY), () =>
-      callGemini(probePrompt, 'You are performing a provider connectivity check. Follow the requested exact response.', 0, false)
+      callGemini(probePrompt, 'You are performing a provider connectivity check. Follow the requested exact response.', 0)
     ),
     runProbe(Boolean(process.env.NVIDIA_API_KEY), () =>
       callNemotron([{ role: 'user', content: probePrompt }], 0, false)
