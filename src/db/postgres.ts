@@ -946,7 +946,7 @@ export async function bootstrapPostgresTables(poolInstance?: Pool): Promise<void
         ON structured_ledger_entries (contractor_id, sequence_number DESC);
 
       CREATE OR REPLACE FUNCTION prevent_structured_ledger_mutation()
-      RETURNS trigger AS $
+      RETURNS trigger AS $ledger$
       BEGIN
         RAISE EXCEPTION 'structured_ledger_entries is append-only; % is prohibited', TG_OP
           USING ERRCODE = '55000';
