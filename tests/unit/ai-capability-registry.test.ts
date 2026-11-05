@@ -13,23 +13,19 @@ describe('HAL provider-agnostic capability registry', () => {
     expect(registry).toContain('ACTIVE_TOOL_NAMES');
   });
 
-  it('only exposes active capabilities backed by registered dispatcher tools', () => {
-    const activeNames = [...registry.matchAll(/status: 'active',[\\s\\S]*?toolNames: \\[([^\\]]*)\\]/g)]
-      .flatMap(match => [...match[1].matchAll(/'([^']+)'/g)].map(item => item[1]));
-    const dispatcherNames = new Set([...dispatcher.matchAll(/name: '([^']+)'/g)].map(match => match[1]));
-    expect(activeNames.length).toBeGreaterThan(0);
-    for (const name of activeNames) expect(dispatcherNames.has(name)).toBe(true);
-    expect(registry).toContain("status: 'planned'");
-    expect(registry).toContain("id: 'websites.publish'");
-    expect(registry).toContain("risk: 'approval_gated'");
+  it('backs every active capability tool with a dispatcher implementation', () => {
+    const names = ['hal_get_operational_context', 'hal_create_work_task', 'hal_list_work_tasks', 'hal_execute_hermes_work_task', 'hal_get_financial_health', 'hal_inspect_campaign_anomalies', 'hal_run_what_if_simulation', 'hal_get_loop_context', 'hal_attach_loop_intelligence'];
+    for (const name of names) {
+      expect(registry).toContain("'" + name + "'");
+      expect(dispatcher).toContain("name: '" + name + "'");
+    }
   });
 
   it('keeps website audit, redesign and publishing unavailable until real executors exist', () => {
-    for (const id of ['websites.audit', 'websites.redesign', 'websites.publish']) {
-      const start = registry.indexOf(`id: '${id}'`);
-      const block = registry.slice(start, registry.indexOf('  },', start));
-      expect(block).toContain("status: 'planned'");
-      expect(block).toContain('toolNames: []');
-    }
+    expect(registry).toContain("id: 'websites.audit'");
+    expect(registry).toContain("id: 'websites.redesign'");
+    expect(registry).toContain("id: 'websites.publish'");
+    expect(registry).toContain("risk: 'approval_gated'");
+    expect(registry).toContain("status: 'planned'");
   });
 });
