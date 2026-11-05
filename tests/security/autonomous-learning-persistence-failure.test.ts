@@ -9,11 +9,15 @@ const mocks = vi.hoisted(() => ({
   update: vi.fn(),
   set: vi.fn(),
   where: vi.fn(),
-  updateReturning: vi.fn()
+  updateReturning: vi.fn(),
+  select: vi.fn(),
+  from: vi.fn(),
+  selectWhere: vi.fn(),
+  selectRecord: null as any
 }));
 
 vi.mock('../../src/db/postgres', () => ({
-  getDrizzleDb: () => mocks.databaseAvailable ? { insert: mocks.insert, update: mocks.update } : null
+  getDrizzleDb: () => mocks.databaseAvailable ? { insert: mocks.insert, update: mocks.update, select: mocks.select } : null
 }));
 
 import { AutonomousLearningEngine, getTenantAutonomousLearning } from '../../src/lib/autonomousLearning';
@@ -30,6 +34,10 @@ describe('autonomous learning persistence failure handling', () => {
     mocks.set.mockReturnValue({ where: mocks.where });
     mocks.where.mockReturnValue({ returning: mocks.updateReturning });
     mocks.updateReturning.mockResolvedValue([{ updatedAt: new Date('2026-01-01T00:00:01.000Z') }]);
+    mocks.select.mockReturnValue({ from: mocks.from });
+    mocks.from.mockReturnValue({ where: mocks.selectWhere });
+    mocks.selectWhere.mockImplementation(async () => mocks.selectRecord ? [mocks.selectRecord] : []);
+    mocks.selectRecord = null;
   });
 
   it('persists independent learning rows for separate contractor tenants', async () => {
@@ -104,6 +112,48 @@ describe('autonomous learning persistence failure handling', () => {
     await expect(engine.digestBusinessOutcome({ niche: 'roofing', outcome: 'won' }))
       .rejects.toThrow('Learning state changed in another application instance');
     expect(engine.getState()).toEqual(before);
+  });
+
+  it('reloads the latest tenant revision after a cross-instance conflict', async () => {
+    const revisionOne = new Date('2026-01-01T00:00:00.000Z');
+    const revisionTwo = new Date('2026-01-01T00:00:02.000Z');
+    const revisionThree = new Date('2026-01-01T00:00:03.000Z');
+    const revisionFour = new Date('2026-01-01T00:00:04.000Z');
+    mocks.selectRecord = {
+      updatedAt: revisionOne,
+      isOfflineModeActive: false,
+      technicalWeights: {
+        missingSslUrgency: 8.8, slowSpeedUrgency: 7.6, lowReviewCountWeight: 6.9,
+        poorGoogleRatingWeight: 7.4, noWebsiteWeight: 9.2, phoneChannelMultiplier: 1.38,
+        emailChannelMultiplier: 0.92, smsChannelMultiplier: 1.18
+      },
+      nicheMap: {},
+      objections: []
+    };
+    const engineA = new AutonomousLearningEngine('tenant:shared');
+    const engineB = new AutonomousLearningEngine('tenant:shared');
+
+    mocks.updateReturning.mockResolvedValueOnce([{ updatedAt: revisionTwo }]);
+    await engineA.initializeFromDb();
+
+    mocks.selectRecord.updatedAt = revisionTwo;
+    mocks.updateReturning.mockResolvedValueOnce([{ updatedAt: revisionTwo }]);
+    await engineB.initializeFromDb();
+
+    mocks.updateReturning.mockResolvedValueOnce([]);
+    await expect(engineA.digestBusinessOutcome({ niche: 'roofing', outcome: 'won' }))
+      .rejects.toThrow('Learning state changed in another application instance');
+
+    mocks.selectRecord.updatedAt = revisionTwo;
+    mocks.updateReturning.mockResolvedValueOnce([{ updatedAt: revisionThree }]);
+    await engineA.initializeFromDb();
+
+    mocks.updateReturning.mockResolvedValueOnce([{ updatedAt: revisionFour }]);
+    const recovered = await engineA.digestBusinessOutcome({ niche: 'roofing', outcome: 'won' });
+
+    expect(recovered.newEpoch).toBe(1);
+    expect(engineA.getState().nicheMap.roofing.sampleCount).toBe(1);
+    expect(mocks.select).toHaveBeenCalledTimes(3);
   });
 
   it('rejects persistence when no PostgreSQL connection is configured', async () => {
