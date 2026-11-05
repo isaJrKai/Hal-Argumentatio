@@ -1,0 +1,37 @@
+# Security and Multi-Tenant Isolation Audit
+
+**Scope:** repository review of the current `main` snapshot and a focused remediation on `security/sse-session-revocation`. No destructive production tests were performed and no production deployment was attempted.
+
+## Confirmed finding fixed in this branch
+
+### HIGH — SSE accepted revoked/deleted-account JWTs
+**Area:** `GET /api/events` in `server.ts` (previous implementation).
+
+The SSE route independently called `verifyToken` and trusted the JWT's `contractorId`. Unlike the shared `authenticate` middleware, it did not consult the durable `revoked_tokens` table or verify that the contractor still existed in PostgreSQL. A bearer token remained usable for the lifetime of the JWT on the realtime channel after logout/revocation or account deletion. This bypassed the application's normal session invalidation and current-account checks. The stream is tenant-bound to the JWT claim, so the demonstrated issue is stale-session access rather than a proven cross-tenant IDOR.
+
+**Fix:** SSE now delegates both Authorization-header and EventSource query-string tokens to the shared `authenticate` middleware. It therefore applies signature/expiry verification, durable token revocation, and current account lookup before registering a stream. SSE responses also set no-store and no-referrer headers. A regression guard test ensures the route cannot silently revert to direct JWT-only validation.
+
+## Prioritized review observations
+
+| Priority | Area | Observation / remaining evidence |
+|---|---|---|
+| HIGH | Tenant isolation | Many inspected routes derive tenant identity from `req.contractorId` and include contractor predicates in reads/writes (e.g. staff, tasks, notifications, work ledger). This is good evidence for those routes only; a complete route-by-route and MCP dispatcher audit is still required before asserting all tenant boundaries hold. |
+| HIGH | MCP | `POST /mcp/:secret` is protected by a timing-safe comparison and minimum secret length, but the secret is embedded in the URL path. Reverse-proxy/access logs can capture it. Prefer an Authorization header or dedicated header and rotate any previously used path secret during migration. |
+| MEDIUM | SSE token transport | EventSource query-string token support remains for compatibility. Query tokens may be recorded by infrastructure logs and browser history. The patch adds no-store/no-referrer response headers but cannot prevent upstream request logging. Prefer a same-site, HttpOnly, Secure cookie or a short-lived, single-use stream ticket. |
+| MEDIUM | Rate limiting | Several observed limits use process-local Maps. They reset on restart and are not shared across multiple Render instances; they are not a reliable distributed abuse control. Use a shared store or edge/WAF limits for production. |
+| MEDIUM | API-key schema migration | Startup bootstrap upgrades the legacy `api_keys` table and sets `key_hash` / `prefix` NOT NULL. Confirm this migration against a disposable copy containing legacy rows before relying on automatic bootstrap; the repository comment states the known database had zero API-key rows. |
+| MEDIUM | Secret history | The sale-readiness document records historical sample auth/encryption values and a runtime data file containing account/session material. Current-file cleanup does not remove Git history. Complete history scanning and rotate any value that was ever live. |
+| LOW | Error/log hygiene | Authentication and service errors are generally returned generically, but several catch blocks log raw error objects. Review provider/database errors for embedded request data or connection strings before broad production log access. |
+
+## Explicitly not claimed
+
+- No production tenant-to-tenant exploit was executed.
+- No live production account, database, secret, or customer data was accessed or modified.
+- No complete dependency advisory scan, full Git-history secret scan, all-route authorization audit, or end-to-end two-tenant API/MCP test was completed in this focused pass.
+- PostgreSQL TLS verification, lead PII encryption, password-reset persistence, and existing proxy-aware controls were not changed.
+
+## Verification
+
+- Added `tests/security/sse-session-auth.test.ts` as a regression guard for the SSE route's use of shared authentication and response cache/referrer protections.
+- Run `npm run test:security`, `npm run lint`, and `npm run build` in CI before merge.
+- Follow-up release gate: execute two-account negative tests for every data-bearing REST route and MCP tool against an isolated test database; verify read, update, delete, nested-resource, export, and websocket/SSE paths.
