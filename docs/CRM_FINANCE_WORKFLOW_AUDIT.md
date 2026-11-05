@@ -59,7 +59,7 @@ A real HTTP integration suite imports the Express application and uses Supertest
 - Tenant B cannot record revenue against Tenant A's lead; Tenant A can close a qualified proposal-stage lead and atomically persist the revenue record, lead-stage events, and work-ledger event.
 - Two concurrent HTTP close-out attempts for the same lead are expected to produce exactly one successful close and one HTTP 409 conflict; the conditional-update race is mapped to a business conflict rather than a database-unavailable response.
 - Duplicate revenue close-out is rejected, and revenue listing remains tenant-scoped.
-- An activated client project contributes to Tenant A's contract MRR/ARR, while Tenant B's financial overview remains zero for that project.
+- An activated client project contributes to Tenant A's contract MRR/ARR, while Tenant B's financial overview remains zero for that project; a cancelled project cannot be reactivated through the route.
 - Proposal generation is tenant-scoped and explicitly reports a generated-only, non-persisted draft.
 
 The test harness exports the Express app but skips listener/background-worker startup under `NODE_ENV=test`. Each test tenant and its records use unique identifiers and are cleaned from the CI/local PostgreSQL database. This is route-level integration coverage for the exercised CRM/finance endpoints, not the complete browser lifecycle or every route in the application.
