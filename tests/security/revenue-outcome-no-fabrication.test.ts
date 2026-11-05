@@ -262,4 +262,10 @@ describe('revenue experiment form and API contract', () => {
     expect(revenueView).toContain('role="alert"');
     expect(revenueView).toContain("if (!res.ok)");
   });
+
+  it('distinguishes contracted recurring run-rate and closed-won CRM value from cash collected', () => {
+    expect(deliveryHub).toContain('contract MRR');
+    expect(revenueView).toContain('Closed-Won CRM Value');
+    expect(revenueView).toContain('Lead-linked value; not cash collected');
+  });
 });
