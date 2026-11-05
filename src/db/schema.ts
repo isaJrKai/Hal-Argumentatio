@@ -219,8 +219,9 @@ export const outreachSequences = pgTable('outreach_sequences', {
 export const apiKeys = pgTable('api_keys', {
   id: text('id').primaryKey(),
   contractorId: text('contractor_id').notNull(),
-  keyHash: text('key_hash').notNull(), // One-way cryptographic SHA-256 or bcrypt hash
-  prefix: text('prefix').notNull(), // Safe display prefix (e.g. hlbz_1a2b...)
+  // Nullable during the legacy-to-hashed-key transition; enforce only after a versioned backfill.
+  keyHash: text('key_hash'), // One-way cryptographic SHA-256 or bcrypt hash
+  prefix: text('prefix'), // Safe display prefix (e.g. hlbz_1a2b...)
   key: text('key'), // DEPRECATED: Plaintext key column; optional for legacy backward compatibility
   label: text('label').notNull(),
   lastUsedAt: timestamp('last_used_at'),
