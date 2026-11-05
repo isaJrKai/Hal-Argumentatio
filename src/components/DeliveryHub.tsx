@@ -150,7 +150,9 @@ export default function DeliveryHub({ token, leads = [] }: DeliveryHubProps) {
     const updatedProject = {
       ...selectedProject,
       milestones: updatedMilestones,
-      status: allMilestonesComplete ? ('completed' as const) : ('active_delivery' as const)
+      status: ['cancelled', 'canceled', 'churned', 'archived'].includes(String(selectedProject.status || '').toLowerCase())
+        ? selectedProject.status
+        : allMilestonesComplete ? ('completed' as const) : ('active_delivery' as const)
     };
 
     try {
@@ -251,7 +253,7 @@ export default function DeliveryHub({ token, leads = [] }: DeliveryHubProps) {
                 Client Projects ({projects.length})
               </span>
               <span className="text-[9px] font-mono text-brand font-bold uppercase">
-                ${projects.filter(project => project.status !== 'completed' && typeof project.monthlyRetainerUsd === 'number' && Number.isFinite(project.monthlyRetainerUsd)).reduce((sum, project) => sum + project.monthlyRetainerUsd, 0).toLocaleString()}/mo MRR
+                ${projects.filter(project => ['active', 'active_delivery', 'in_progress'].includes(String(project.status || '').toLowerCase()) && typeof project.monthlyRetainerUsd === 'number' && Number.isFinite(project.monthlyRetainerUsd)).reduce((sum, project) => sum + project.monthlyRetainerUsd, 0).toLocaleString()}/mo MRR
               </span>
             </div>
 
