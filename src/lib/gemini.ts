@@ -3,6 +3,7 @@ import { generateResponse, cleanJSONResponse, callNemotron, callNemotronWithTool
 import { verifyLeadGrounding } from "./networkVerification.ts";
 import { calibrateForecastConfidence } from "./forecastConfidence";
 import { callAnthropicWithTools } from "../services/anthropic";
+import { callNousHermes } from "../services/nousHermesGateway";
 
 let aiClient: GoogleGenAI | null = null;
 
@@ -691,7 +692,7 @@ export async function askHalBot(
     tools: Array<{ name: string; description: string; inputSchema: { type: 'object'; properties: Record<string, any>; required?: string[] } }>;
     execute: (name: string, args: Record<string, any>) => Promise<any>;
   },
-  providerApiKeys?: { gemini?: string; anthropic?: string }
+  providerApiKeys?: { gemini?: string; anthropic?: string; hermesTenantId?: string; hermesConversationId?: string }
 ): Promise<{ text: string; sources?: Array<{ title: string; uri: string }>; toolCalls?: Array<{ name: string; result: any }>; provider?: string; model?: string }> {
   const systemInstruction = `You are HAL, the central business operating assistant inside HAL (Human Augmentation Layer).
 
@@ -1019,6 +1020,20 @@ RESPONSE STANDARD
       } catch (err: any) {
         console.error("Gemini chatbot fallback error:", err);
       }
+    }
+  }
+
+  if (process.env.HERMES_AGENT_URL && process.env.HERMES_AGENT_API_KEY && providerApiKeys?.hermesTenantId && providerApiKeys?.hermesConversationId) {
+    try {
+      const messages = [
+        { role: 'system' as const, content: systemInstruction },
+        ...history.map(turn => ({ role: turn.role === 'model' ? 'assistant' as const : 'user' as const, content: turn.parts.map(part => part.text).join('\\n') })),
+        { role: 'user' as const, content: message }
+      ];
+      const result = await callNousHermes({ messages, tenantId: providerApiKeys.hermesTenantId, conversationId: providerApiKeys.hermesConversationId });
+      return { text: result.text, provider: 'nous-hermes-agent', model: result.model };
+    } catch (error: any) {
+      console.error('[HAL Hermes fallback] Agent runtime unavailable:', error?.message || error);
     }
   }
 
