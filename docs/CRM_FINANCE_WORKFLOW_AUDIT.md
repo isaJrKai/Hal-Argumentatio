@@ -76,7 +76,7 @@ These items remain unverified and must not be represented as complete:
 6. Revenue recognition versus cash collection/payment recording. The current `/api/revenues` close-out endpoint records a positive whole-dollar amount against a lead; it is not a payment processor or a complete invoice/receivables ledger.
 7. End-to-end event correlation and ordering across audit, landing-page, outreach, deal, project, revenue, and forecast records.
 8. Forecast evaluation against correctly attributed observations and evidence that only actual outcomes feed learning.
-9. GitHub Actions CI run #1272 passed on code commit `46c289e47310cbcb6862b1aaa35bca425b36fab4`: 85 test files and 418 tests passed; TypeScript checks, PostgreSQL-backed integration tests, TimesFM Python checks, production build, and production dependency audit all succeeded. Non-blocking runner/toolchain warnings remain (Node.js 20 action deprecation, `punycode` deprecation, bundle-size warning, and local PostgreSQL trust-auth warning). CI provisions PostgreSQL 16 as a healthy service and supplies `DATABASE_URL`. Re-run CI after this audit-document update before merging.
+9. GitHub Actions CI run #1275 passed on final branch head `de524ed2330969ae9b3e1fd2f8ed4ec884543d94`: 85 test files and 418 tests passed; TypeScript checks, PostgreSQL-backed integration tests, TimesFM Python checks, production build, and production dependency audit all succeeded. Non-blocking runner/toolchain warnings remain (Node.js 20 action deprecation, `punycode` deprecation, bundle-size warning, and local PostgreSQL trust-auth warning). CI provisions PostgreSQL 16 as a healthy service and supplies `DATABASE_URL`. The final branch head must remain green at merge time.
 
 ## Safety and release
 
