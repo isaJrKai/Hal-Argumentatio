@@ -8956,6 +8956,9 @@ app.post('/api/revenue/experiments', authenticate, async (req, res) => {
       typeof expectedOutcome !== 'string' || !expectedOutcome.trim()) {
     return res.status(400).json({ error: 'Hypothesis, variable, measured baseline, and expected outcome are required.' });
   }
+  if (startDate === null || startDate === '') {
+    return res.status(400).json({ error: 'Experiment start date must be a valid date.' });
+  }
   const parsedStartDate = startDate === undefined ? new Date() : new Date(startDate);
   if (!Number.isFinite(parsedStartDate.getTime())) {
     return res.status(400).json({ error: 'Experiment start date must be a valid date.' });
