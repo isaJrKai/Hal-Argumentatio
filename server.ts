@@ -9081,7 +9081,7 @@ app.post('/api/revenue/decision-engine/run', authenticate, async (req, res) => {
       if (alreadyExists) {
         skippedCount++;
       } else {
-        const committed = await pgDb.transaction(async tx => {
+        await pgDb.transaction(async tx => {
           const [newRec] = await tx.insert(revenueRecommendations).values({
             id: crypto.randomUUID(),
             contractorId,
