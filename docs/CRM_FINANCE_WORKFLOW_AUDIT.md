@@ -45,6 +45,7 @@ A regression test asserts these fail-closed invariants.
 - Financial MRR now counts only explicit active-delivery statuses (active, active_delivery, in_progress); onboarding and review projects are excluded until delivery is active.
 - The recommendations endpoint now returns an empty tenant-scoped list instead of inserting a fabricated sample campaign recommendation.
 - The automated decision engine now compares only campaigns with recorded spend and unambiguous lead-linked closed-won revenue. It no longer assigns unattributed revenue to an unknown campaign or invents geo attribution, confidence, impact scores, or uplift amounts; geographic recommendations remain explicitly unsupported.
+- Revenue experiment creation now requires an explicit baseline and expected outcome; an experiment cannot be marked complete without an actual-outcome record, and optional numeric impacts are validated.
 - Proposal generation now requires a tenant-owned saved lead and explicit package/price inputs. It no longer estimates ROI from an arbitrary multiplier or invents audit scores; the response clearly identifies itself as a generated, non-persisted draft.
 - Revenue simulations now require two campaigns with recorded spend and unambiguous lead-linked revenue. Ambiguous multi-touch attribution is excluded; unverified geo/general-growth scenarios are explicitly unsupported rather than assigned invented ROAS, percentage lift, or confidence values.
 ## Remaining verification gates
