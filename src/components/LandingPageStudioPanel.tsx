@@ -66,6 +66,8 @@ export const LandingPageStudioPanel: React.FC<{ token: string | null }> = ({ tok
 
   // State management
   const [artifacts, setArtifacts] = useState<any[]>([]);
+  const [leadOptions, setLeadOptions] = useState<any[]>([]);
+  const [selectedLeadId, setSelectedLeadId] = useState<string>('');
   const [selectedArtifactId, setSelectedArtifactId] = useState<string>('');
   const [activeTab, setActiveTab] = useState<'builder' | 'templates' | 'branding' | 'seo' | 'quality_gates' | 'code'>('builder');
   const [viewport, setViewport] = useState<'desktop' | 'tablet' | 'mobile'>('desktop');
@@ -167,13 +169,51 @@ export const LandingPageStudioPanel: React.FC<{ token: string | null }> = ({ tok
 
   useEffect(() => {
     fetchArtifacts();
+    fetchLeadOptions();
   }, [token]);
+
+  const fetchLeadOptions = async () => {
+    if (!token) return;
+    try {
+      const res = await fetch('/api/leads', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (!res.ok) return;
+      const data = await res.json();
+      if (Array.isArray(data)) setLeadOptions(data);
+    } catch (err) {
+      console.warn('Could not load prospect records for Landing Page Studio:', err);
+    }
+  };
+
+  const handleSelectSourceLead = (leadId: string) => {
+    setSelectedLeadId(leadId);
+    const lead = leadOptions.find(item => item.id === leadId);
+    if (!lead) {
+      setConfig(prev => ({ ...prev, sourceLeadId: undefined }));
+      return;
+    }
+    setConfig(prev => ({
+      ...prev,
+      sourceLeadId: lead.id,
+      businessName: lead.businessName || prev.businessName,
+      city: lead.city || prev.city,
+      phone: lead.phone || prev.phone,
+      title: `${lead.businessName || prev.businessName} — ${String(prev.trade || 'business').toUpperCase()} PAGE`
+    }));
+    showToast({
+      title: 'Prospect Context Loaded',
+      message: `Using saved CRM details for ${lead.businessName}. Only verified business details are copied into the page configuration.`,
+      type: 'info'
+    });
+  };
 
   // Handle switching artifacts
   const handleSelectArtifact = (id: string) => {
     const found = artifacts.find(a => a.id === id);
     if (found) {
       setSelectedArtifactId(found.id);
+      setSelectedLeadId(found.content?.sourceLeadId || found.content?.pageConfig?.sourceLeadId || '');
       if (found.content?.pageConfig) {
         setConfig({ ...found.content.pageConfig, contractorId: found.content.pageConfig.contractorId || found.contractorId });
       } else {
@@ -205,6 +245,7 @@ export const LandingPageStudioPanel: React.FC<{ token: string | null }> = ({ tok
         body: JSON.stringify({
           id: config.id,
           title: config.title,
+          leadId: selectedLeadId || config.sourceLeadId || null,
           pageConfig: config,
           renderedHtml
         })
@@ -212,12 +253,12 @@ export const LandingPageStudioPanel: React.FC<{ token: string | null }> = ({ tok
 
       const data = await res.json();
       if (res.ok && data.success) {
-        const savedConfig = { ...config, id: data.id || config.id, contractorId: data.contractorId || config.contractorId };
+        const savedConfig = { ...config, id: data.id || config.id, contractorId: data.contractorId || config.contractorId, sourceLeadId: data.sourceLeadId || selectedLeadId || config.sourceLeadId };
         setConfig(savedConfig);
         saveSnapshot(`Saved: ${config.title}`, savedConfig);
         showToast({
           title: 'Landing Page Saved',
-          message: `Changes published live to ${data.liveUrl}`,
+          message: data.sourceLeadId ? `Saved and linked to CRM prospect ${data.sourceLeadId}. Public URL: ${data.liveUrl}` : `Saved to your landing-page workspace. Public URL: ${data.liveUrl}`,
           type: 'success'
         });
         fetchArtifacts();
