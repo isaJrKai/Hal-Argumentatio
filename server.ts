@@ -9280,7 +9280,7 @@ app.post('/api/revenue/simulations', authenticate, async (req, res) => {
       attributedLeads: data.attributedLeadIds.size,
       closedWon: data.closedWonLeadIds.size,
       attributedRevenue: Number(data.attributedRevenue.toFixed(2)),
-      roas: Number((data.attributedRevenue / data.spend).toFixed(4))
+      roas: data.spend > 0 ? Number((data.attributedRevenue / data.spend).toFixed(4)) : null
     }]));
     const totalSpend = Object.values(campaignMap).reduce((sum, data) => sum + data.spend, 0);
     const totalRevenue = Object.values(campaignMap).reduce((sum, data) => sum + data.attributedRevenue, 0);
