@@ -433,7 +433,23 @@ function checkRateLimit(req: express.Request, res: express.Response, email: stri
   return true;
 }
 
-function recordAuthFailure(req: express.Request, email: string) {
+async function persistAuditLog(entry: { contractorId?: string; action: string; details: string }): Promise<boolean> {
+  try {
+    await pgDb.insert(auditLogs).values({
+      id: crypto.randomUUID(),
+      contractorId: entry.contractorId || null,
+      action: entry.action,
+      details: entry.details,
+      timestamp: new Date()
+    });
+    return true;
+  } catch (error) {
+    console.error('[HAL Audit] PostgreSQL audit write failed:', error);
+    return false;
+  }
+}
+
+async function recordAuthFailure(req: express.Request, email: string) {
   const ip = getClientIp(req);
   const limitKey = `${ip}:${email.toLowerCase().trim()}`;
   const now = Date.now();
@@ -444,7 +460,7 @@ function recordAuthFailure(req: express.Request, email: string) {
   failure.attempts += 1;
   if (failure.attempts >= 5) {
     failure.lockoutUntil = now + 15 * 60 * 1000; // 15 minutes lockout
-    db.addAuditLog({
+    await persistAuditLog({
       action: 'RATE_LIMIT_TRIGGERED',
       ipAddress: ip,
       details: `Lockout triggered for ${email} following 5 failed attempts.`
@@ -952,7 +968,7 @@ app.post('/api/auth/change-password', authenticate, async (req, res) => {
     if (!account) return res.status(401).json({ error: 'Your account could not be verified.' });
     if (!checkRateLimit(req, res, account.email)) return;
     if (!verifyPassword(currentPassword, account.passwordHash || '')) {
-      recordAuthFailure(req, account.email);
+      await recordAuthFailure(req, account.email);
       return res.status(401).json({ error: 'Your current password is incorrect.' });
     }
     recordAuthSuccess(req, account.email);
@@ -1005,7 +1021,7 @@ app.post('/api/auth/register', async (req, res) => {
   try {
     const existing = await pgDb.select().from(contractors).where(eq(contractors.email, cleanEmail));
     if (existing.length > 0) {
-      recordAuthFailure(req, cleanEmail);
+      await recordAuthFailure(req, cleanEmail);
       return res.status(400).json({ error: 'Contractor already exists with this email address' });
     }
 
@@ -1060,13 +1076,13 @@ app.post('/api/auth/login', async (req, res) => {
 
     // PostgreSQL is the sole source of truth. Never issue a session from a local-only account.
     if (!contractor) {
-      recordAuthFailure(req, cleanEmail);
+      await recordAuthFailure(req, cleanEmail);
       return res.status(401).json({ error: 'Invalid email or password' });
     }
 
     const storedHash = typeof contractor.passwordHash === 'string' ? contractor.passwordHash : '';
     if (!verifyPassword(password, storedHash)) {
-      recordAuthFailure(req, cleanEmail);
+      await recordAuthFailure(req, cleanEmail);
       return res.status(401).json({ error: 'Invalid email or password' });
     }
 
@@ -1109,7 +1125,7 @@ app.post('/api/auth/login', async (req, res) => {
     });
   } catch (error: any) {
     console.error('[HAL Login Error]', error?.message || error);
-    recordAuthFailure(req, cleanEmail);
+    await recordAuthFailure(req, cleanEmail);
     return res.status(503).json({ error: 'Authentication service unavailable. Please try again later.' });
   }
 });
@@ -1143,7 +1159,7 @@ app.post('/api/auth/google', async (req, res) => {
     idToken.length < 20 ||
     idToken.length > 12_000
   ) {
-    recordAuthFailure(req, attemptedEmail);
+    await recordAuthFailure(req, attemptedEmail);
     return res.status(401).json({ error: 'Google sign-in could not be verified. Please try again.' });
   }
 
@@ -1162,7 +1178,7 @@ app.post('/api/auth/google', async (req, res) => {
   }
 
   if (!identity) {
-    recordAuthFailure(req, attemptedEmail);
+    await recordAuthFailure(req, attemptedEmail);
     return res.status(401).json({ error: 'Google sign-in could not be verified. Please use a verified Google account.' });
   }
 
@@ -1171,7 +1187,7 @@ app.post('/api/auth/google', async (req, res) => {
     !cleanEmail ||
     (typeof email === 'string' && email.trim() && email.toLowerCase().trim() !== cleanEmail)
   ) {
-    recordAuthFailure(req, cleanEmail || attemptedEmail);
+    await recordAuthFailure(req, cleanEmail || attemptedEmail);
     return res.status(401).json({ error: 'The Google account identity did not match the submitted account.' });
   }
 
@@ -4475,7 +4491,7 @@ app.post('/api/skills/:id/execute', authenticate, async (req, res) => {
     const result = await executeSkill(id, inputs || {}, contractorId);
     
     // Log Audit Action
-    db.addAuditLog({
+    await persistAuditLog({
       contractorId,
       action: 'SKILL_EXECUTED',
       details: `Executed intelligence skill: "${id}"`
@@ -5254,7 +5270,7 @@ app.post('/api/audit/website', authenticate, async (req, res) => {
       payload: { targetUrl: formattedUrl, measurementStatus: report.measurementStatus, dnsResolved: report.dnsResolved, httpReachable: report.httpReachable, sslStatus: report.sslStatus, pageSpeedStatus: report.pageSpeedStatus }
     });
 
-    db.addAuditLog({
+    await persistAuditLog({
       contractorId,
       action: 'SITE_CONNECTIVITY_CHECK_EXECUTED',
       details: 'Ran public DNS and pinned HTTP/TLS connectivity checks for ' + formattedUrl + '. PageSpeed, SEO, and revenue impact were not measured.'
@@ -5779,7 +5795,7 @@ app.post('/api/dispatch/webhook', authenticate, async (req, res) => {
 
   const durationMs = Date.now() - startTime;
 
-  db.addAuditLog({
+  await persistAuditLog({
     contractorId,
     action: `WEBHOOK_DISPATCH_${status.toUpperCase()}`,
     details: `Dispatched webhook to ${targetUrl} (HTTP ${statusCode} in ${durationMs}ms)`
@@ -7149,7 +7165,7 @@ app.post('/api/admin/git/push', authenticate, requireRole('admin'), (_req, res) 
 
 // ─── WHITE-LABEL CLIENT PROPOSAL GENERATOR ───────────────────────────────────
 
-app.post('/api/proposals/generate', authenticate, (req, res) => {
+app.post('/api/proposals/generate', authenticate, async (req, res) => {
   const contractorId = (req as any).contractorId;
   const { leadId, clientName, companyName, packageTier, monthlyRetainerUsd, setupFeeUsd, auditScores } = req.body;
 
@@ -7182,7 +7198,7 @@ app.post('/api/proposals/generate', authenticate, (req, res) => {
     validUntil: new Date(Date.now() + 14 * 24 * 3600 * 1000).toLocaleDateString()
   };
 
-  db.addAuditLog({
+  await persistAuditLog({
     contractorId,
     action: 'PROPOSAL_GENERATED',
     details: `Generated ${tier} Client Proposal for ${companyName} ($${retainer}/mo).`
@@ -7300,7 +7316,7 @@ app.post('/api/projects', authenticate, async (req, res) => {
       console.error('[Client Projects] Creation ledger event failed:', ledgerError);
     }
 
-    db.addAuditLog({
+    await persistAuditLog({
       contractorId,
       action: 'PROJECT_ONBOARDED',
       details: `Initiated active delivery project for ${businessName.trim()} (${project.monthlyRetainerUsd}/mo).`
@@ -7358,7 +7374,7 @@ app.put('/api/projects/:id', authenticate, async (req, res) => {
     }
 
     if (updates.status === 'completed' && existingProject.status !== 'completed') {
-      db.addAuditLog({
+      await persistAuditLog({
         contractorId,
         action: 'REVIEW_REQUEST_QUEUED',
         details: `Project completed for ${updated.businessName}. Automated SMS/Email review and referral incentive queued for operator review.`
@@ -8106,7 +8122,7 @@ app.post(['/api/ai/test-timesfm', '/api/forecast/scenario'], authenticate, async
       targetCac: resolvedTargetCac
     });
 
-    db.addAuditLog({
+    await persistAuditLog({
       contractorId,
       action: 'TIMESFM_BRAIN_SYNCHRONIZED_INFERENCE',
       details: `TimesFM 2.5 demand inference used ${result.googleAdsBaseline.weeklyObservations ?? 0} weekly observations for ${targetNiche} in ${targetCity}. Weather was context only; CAC guardrails ${result.budgetGuardrails.maxAllowableCpl === null ? 'were not evaluated' : 'were evaluated as advisory only'}. No ad budget was changed.`
@@ -8408,7 +8424,7 @@ app.post('/api/system/postgres-connect', authenticate, requireRole('admin'), asy
     // the database pool used by live application queries.
     const result = await testPostgresConnection(databaseUrl);
     
-    db.addAuditLog({
+    await persistAuditLog({
       contractorId: (req as any).contractorId,
       action: 'POSTGRES_DATABASE_CONNECTED',
       details: `Connected to ${result.provider || 'PostgreSQL'} (${result.latencyMs}ms latency)`
@@ -8564,7 +8580,7 @@ app.post('/api/system/postgres-sync', authenticate, requireRole('admin'), async 
         JSON.stringify(learningState)
       ]);
 
-      db.addAuditLog({
+      await persistAuditLog({
         contractorId,
         action: 'NEON_POSTGRES_SYNC_SUCCESS',
         details: `Synchronized ${syncedLeads} leads, ${syncedWinLoss} win/loss records, and Epoch ${learningState.calibrationEpoch} neural weights to Neon PostgreSQL.`
