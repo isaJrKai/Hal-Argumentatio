@@ -526,7 +526,7 @@ export async function callGemini(
   const ai = getAIClient();
   if (!ai) throw new Error('Gemini provider is not configured.');
 
-  const models = ['gemini-3.8-flash', 'gemini-flash-latest', 'gemini-3.1-flash-lite'];
+  const models = ['gemini-3.8-flash', 'gemini-flash-latest'];
   let lastError: unknown;
 
   for (const model of models) {
@@ -588,7 +588,7 @@ export async function callGeminiWithTools(
   const contents: any[] = [{ role: 'user', parts: [{ text: prompt }] }];
   let lastError: any = null;
 
-  for (const model of ['gemini-3.8-flash', 'gemini-flash-latest', 'gemini-3.1-flash-lite']) {
+  for (const model of ['gemini-3.8-flash', 'gemini-flash-latest']) {
     try {
       const config: any = {
         systemInstruction,
