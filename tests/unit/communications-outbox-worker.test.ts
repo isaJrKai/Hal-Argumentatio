@@ -18,7 +18,7 @@ describe('communications outbox worker', () => {
 
     const result = await runCommunicationsOutboxWorker(pool as any, send, { now: new Date('2026-01-01T00:00:00Z') });
 
-    expect(result).toEqual({ claimed: 1, submitted: 1, retrying: 0, deadLettered: 0, failed: 0 });
+    expect(result).toEqual({ claimed: 1, submitted: 1, retrying: 0, deadLettered: 0, failed: 0, reconciliationPending: 0 });
     expect(client.query.mock.calls[1][0]).toContain('FOR UPDATE SKIP LOCKED');
     expect(client.query.mock.calls[1][0]).toContain("status IN ('queued','retrying')");
     expect(client.query.mock.calls[1][0]).not.toContain("OR (status = 'processing'");
@@ -26,6 +26,34 @@ describe('communications outbox worker', () => {
     expect(send).toHaveBeenCalledWith(expect.objectContaining({ contractor_id: 'tenant-a' }));
     expect(pool.query).toHaveBeenCalledWith(expect.stringContaining("status='submitted'"), ['outbox-1', 're_123']);
     expect(client.release).toHaveBeenCalled();
+  });
+
+  it('does not retry an email after provider acceptance when submitted-state persistence fails', async () => {
+    const client = {
+      query: vi.fn()
+        .mockResolvedValueOnce({ rows: [] })
+        .mockResolvedValueOnce({ rows: [{
+          id: 'outbox-accepted', contractor_id: 'tenant-a', channel: 'email', provider: 'resend',
+          recipient_encrypted: 'enc-to', subject_encrypted: null, body_encrypted: 'enc-body',
+          attempts: 1, idempotency_key: 'email-idem-1'
+        }] })
+        .mockResolvedValue({ rows: [] }),
+      release: vi.fn()
+    };
+    const pool = {
+      connect: vi.fn().mockResolvedValue(client),
+      query: vi.fn().mockRejectedValueOnce(new Error('database unavailable'))
+    };
+    const send = vi.fn().mockResolvedValue({ providerMessageId: 're_accepted' });
+
+    const result = await runCommunicationsOutboxWorker(pool as any, send);
+
+    expect(send).toHaveBeenCalledTimes(1);
+    expect(pool.query).toHaveBeenCalledTimes(1);
+    expect(pool.query.mock.calls[0][0]).toContain("status='submitted'");
+    expect(result).toEqual({
+      claimed: 1, submitted: 0, retrying: 0, deadLettered: 0, failed: 0, reconciliationPending: 1
+    });
   });
 
   it('schedules transient provider failures and dead-letters exhausted attempts', async () => {
