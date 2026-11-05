@@ -2194,8 +2194,8 @@ app.get('/api/leads', authenticate, async (req, res) => {
     res.json(decryptedLeads);
   } catch (err: any) {
     console.error('Failed to fetch tenant leads from authoritative PostgreSQL:', err);
-    res.set('X-HAL-Degraded', 'true').set('X-HAL-Data-Source', 'tenant-local-json-fallback');
-    return res.status(200).json(db.getLeads(contractorId));
+    res.set('X-HAL-Degraded', 'true').set('X-HAL-Data-Source', 'postgres-unavailable');
+    return res.status(503).json({ error: 'Lead data is temporarily unavailable. Please retry.' });
   }
 });
 
@@ -4137,9 +4137,9 @@ app.get('/api/revenues', authenticate, async (req, res) => {
     const revenues = await pgDb.select().from(revenueRecords).where(inArray(revenueRecords.contractorId, targetIds)).orderBy(desc(revenueRecords.createdAt));
     res.json(revenues);
   } catch (err: any) {
-    console.error('[HAL Revenue] PostgreSQL read failed; using tenant-local fallback.', err);
-    res.set('X-HAL-Degraded', 'true').set('X-HAL-Data-Source', 'tenant-local-json-fallback');
-    return res.status(200).json(db.getRevenues(contractorId));
+    console.error('[HAL Revenue] PostgreSQL read failed.', err);
+    res.set('X-HAL-Degraded', 'true').set('X-HAL-Data-Source', 'postgres-unavailable');
+    return res.status(503).json({ error: 'Revenue data is temporarily unavailable. Please retry.' });
   }
 });
 
@@ -4153,9 +4153,9 @@ app.get('/api/campaigns', authenticate, async (req, res) => {
     const contractorCampaigns = await pgDb.select().from(campaigns).where(inArray(campaigns.contractorId, targetIds)).orderBy(desc(campaigns.createdAt));
     res.json(contractorCampaigns);
   } catch (err: any) {
-    console.error('[HAL Campaigns] PostgreSQL read failed; using tenant-local fallback.', err);
-    res.set('X-HAL-Degraded', 'true').set('X-HAL-Data-Source', 'tenant-local-json-fallback');
-    return res.status(200).json(db.getCampaigns(contractorId));
+    console.error('[HAL Campaigns] PostgreSQL read failed.', err);
+    res.set('X-HAL-Degraded', 'true').set('X-HAL-Data-Source', 'postgres-unavailable');
+    return res.status(503).json({ error: 'Campaign data is temporarily unavailable. Please retry.' });
   }
 });
 
@@ -4362,9 +4362,9 @@ app.get('/api/forecasts', authenticate, async (req, res) => {
     const contractorForecasts = await pgDb.select().from(forecasts).where(inArray(forecasts.contractorId, targetIds)).orderBy(desc(forecasts.createdAt));
     res.json(contractorForecasts);
   } catch (err: any) {
-    console.error('[HAL Forecasts] PostgreSQL read failed; using tenant-local fallback.', err);
-    res.set('X-HAL-Degraded', 'true').set('X-HAL-Data-Source', 'tenant-local-json-fallback');
-    return res.status(200).json(db.getForecasts(contractorId));
+    console.error('[HAL Forecasts] PostgreSQL read failed.', err);
+    res.set('X-HAL-Degraded', 'true').set('X-HAL-Data-Source', 'postgres-unavailable');
+    return res.status(503).json({ error: 'Forecast data is temporarily unavailable. Please retry.' });
   }
 });
 
@@ -4384,17 +4384,9 @@ app.get('/api/learning-insights', authenticate, async (req, res) => {
     }));
     return res.json(mappedInsights);
   } catch (err: any) {
-    console.error('[HAL Learning] PostgreSQL read failed; using tenant-scoped local fallback.', err);
-    const localInsights = db.getLearningInsights().filter((insight: any) => insight.contractorId === contractorId);
-    res.set('X-HAL-Degraded', 'true').set('X-HAL-Data-Source', 'tenant-local-json-fallback');
-    return res.status(200).json(localInsights.map((insight: any) => ({
-      id: insight.id,
-      category: insight.category,
-      insight: insight.insight,
-      confidence: insight.confidence,
-      observedCount: insight.observedCount,
-      createdAt: insight.createdAt
-    })));
+    console.error('[HAL Learning] PostgreSQL read failed.', err);
+    res.set('X-HAL-Degraded', 'true').set('X-HAL-Data-Source', 'postgres-unavailable');
+    return res.status(503).json({ error: 'Learning insights are temporarily unavailable. Please retry.' });
   }
 });
 
@@ -8132,9 +8124,9 @@ app.get('/api/scheduler/jobs', authenticate, async (req, res) => {
       .orderBy(desc(schedulerJobs.createdAt)).limit(100);
     return res.json(jobs);
   } catch (err: any) {
-    console.error('[Scheduler] PostgreSQL read failed; using tenant-local fallback.', err);
-    res.set('X-HAL-Degraded', 'true').set('X-HAL-Data-Source', 'tenant-local-json-fallback');
-    return res.status(200).json(db.getSchedulerJobs(contractorId));
+    console.error('[Scheduler] PostgreSQL read failed.', err);
+    res.set('X-HAL-Degraded', 'true').set('X-HAL-Data-Source', 'postgres-unavailable');
+    return res.status(503).json({ error: 'Scheduler history is temporarily unavailable. Please retry.' });
   }
 });
 
