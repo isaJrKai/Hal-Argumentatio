@@ -452,7 +452,7 @@ class Database {
     }
 
     // Ensure Phase 1 Genesis Block in Structured Ledger
-    if ((!this.data.structuredLedger || this.data.structuredLedger.length === 0) && !postgresLedgerMode) {
+    if ((!this.data.structuredLedger || this.data.structuredLedger.length === 0) && (!postgresLedgerMode || this.legacyStorePresent)) {
       this.data.structuredLedger = [];
       this.recordLedgerEntry({
         contractorId: 'system_genesis',
