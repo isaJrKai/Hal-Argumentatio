@@ -103,4 +103,15 @@ suite('Neon connector credential vault', () => {
     await expect(saveConnectorCredential(contractorId, 'stripe', 'replacement-secret', pool))
       .rejects.toThrow(/Duplicate connector credential records/);
   });
+  it('refuses to return an ambiguous duplicate credential set', async () => {
+    const contractorId = newTenant();
+    await pool.query(
+      'INSERT INTO connector_credentials (id, contractor_id, service, encrypted_value) VALUES ($1, $2, $3, $4), ($5, $2, $3, $6)',
+      [randomUUID(), contractorId, 'stripe', 'ciphertext-one', randomUUID(), 'ciphertext-two']
+    );
+
+    await expect(getConnectorCredentials(contractorId, pool))
+      .rejects.toThrow(/Duplicate connector credential records/);
+  });
+
 });
