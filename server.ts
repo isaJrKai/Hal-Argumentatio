@@ -9116,145 +9116,170 @@ app.get('/api/revenue/simulations', authenticate, async (req, res) => {
 
 app.post('/api/revenue/simulations', authenticate, async (req, res) => {
   const contractorId = (req as any).contractorId;
-  const { scenarioType, parameters } = req.body; 
-  // scenarioType: 'budget_reallocation' | 'geo_allocation' | 'campaign_comparison' | 'budget_shift'
-  // parameters: { fromCampaign, toCampaign, shiftAmount, percentChange, targetGeo }
+  const { scenarioType, parameters } = req.body || {};
+
+  if (!['budget_reallocation', 'budget_shift'].includes(scenarioType)) {
+    return res.status(501).json({
+      success: false,
+      code: 'SCENARIO_NOT_SUPPORTED_WITH_VERIFIED_DATA',
+      error: 'Only budget reallocation between two campaigns with recorded spend and attributed revenue is currently supported.'
+    });
+  }
+  if (!parameters || typeof parameters !== 'object' || Array.isArray(parameters)) {
+    return res.status(400).json({ error: 'Scenario parameters are required.' });
+  }
+
+  const fromCampaign = typeof parameters.fromCampaign === 'string' ? parameters.fromCampaign.trim() : '';
+  const toCampaign = typeof parameters.toCampaign === 'string' ? parameters.toCampaign.trim() : '';
+  const shiftAmount = Number(parameters.shiftAmount);
+  if (!fromCampaign || !toCampaign || fromCampaign === toCampaign ||
+      !Number.isFinite(shiftAmount) || shiftAmount <= 0) {
+    return res.status(400).json({ error: 'Select two different campaigns and provide a positive shift amount.' });
+  }
 
   try {
-    // 1. Fetch tenant performance data
-    const adRecords = await pgDb.select().from(googleAdsDailyPerformance).where(eq(googleAdsDailyPerformance.contractorId, contractorId));
-    const tenantLeads = await pgDb.select().from(leads).where(eq(leads.contractorId, contractorId));
-    const leadIds = tenantLeads.map(l => l.id);
-
-    let attributions: any[] = [];
-    let revenues: any[] = [];
-    if (leadIds.length > 0) {
-      attributions = await pgDb.select().from(leadAttribution).where(inArray(leadAttribution.leadId, leadIds));
-      revenues = await pgDb.select().from(revenueRecords).where(inArray(revenueRecords.leadId, leadIds));
+    const adRecords = await pgDb.select().from(googleAdsDailyPerformance)
+      .where(eq(googleAdsDailyPerformance.contractorId, contractorId));
+    const tenantLeads = await pgDb.select().from(leads)
+      .where(eq(leads.contractorId, contractorId));
+    const leadIds = tenantLeads.map(lead => lead.id);
+    if (adRecords.length === 0 || leadIds.length === 0) {
+      return res.status(409).json({
+        success: false,
+        code: 'INSUFFICIENT_ATTRIBUTED_DATA',
+        error: 'Campaign spend, tenant leads, and linked revenue observations are required before a revenue simulation can run.'
+      });
     }
 
-    // 2. Compute Baseline Metrics
-    let totalSpend = 0;
-    let totalRevenue = 0;
-    let totalLeads = tenantLeads.length;
-    let totalClosedWon = 0;
+    const attributions = await pgDb.select().from(leadAttribution)
+      .where(inArray(leadAttribution.leadId, leadIds));
+    const revenues = await pgDb.select().from(revenueRecords)
+      .where(inArray(revenueRecords.leadId, leadIds));
 
-    const campaignMap: { [key: string]: { spend: number; revenue: number; leads: number; closedWon: number } } = {};
-    for (const ad of adRecords) {
-      const camp = ad.campaignName || 'Unknown Campaign';
-      if (!campaignMap[camp]) campaignMap[camp] = { spend: 0, revenue: 0, leads: 0, closedWon: 0 };
-      campaignMap[camp].spend += Number(ad.cost || 0);
-      campaignMap[camp].leads += Number(ad.conversions || 0);
-      totalSpend += Number(ad.cost || 0);
-    }
+    const campaignMap: Record<string, {
+      spend: number;
+      attributedLeadIds: Set<string>;
+      closedWonLeadIds: Set<string>;
+      attributedRevenue: number;
+    }> = {};
 
-    for (const rev of revenues) {
-      const attr = attributions.find(a => a.leadId === rev.leadId);
-      const camp = attr?.utmCampaign || Object.keys(campaignMap)[0] || 'Unknown Campaign';
-      if (!campaignMap[camp]) campaignMap[camp] = { spend: 0, revenue: 0, leads: 0, closedWon: 0 };
-      campaignMap[camp].closedWon += 1;
-      campaignMap[camp].revenue += getRevenueAmountUsd(rev);
-      totalRevenue += getRevenueAmountUsd(rev);
-      totalClosedWon += 1;
-    }
-
-    const baselineRoas = totalSpend > 0 ? Number((totalRevenue / totalSpend).toFixed(2)) : 0;
-    const baselineCpl = totalLeads > 0 ? Number((totalSpend / totalLeads).toFixed(2)) : 0;
-    const baselineCac = totalClosedWon > 0 ? Number((totalSpend / totalClosedWon).toFixed(2)) : 0;
-
-    const baselineData = {
-      totalSpend,
-      totalRevenue,
-      roas: baselineRoas,
-      cpl: baselineCpl,
-      cac: baselineCac,
-      campaigns: campaignMap
-    };
-
-    // 3. Run Scenario Projection Calculation
-    let projectedSpend = totalSpend;
-    let projectedRevenue = totalRevenue;
-    let assumptions = 'Projected using historical ROAS and conversion efficiency over the available observation window.';
-    let confidenceScore = 78.0;
-
-    const sType = scenarioType || 'budget_reallocation';
-    const params = parameters || {};
-
-    if (sType === 'budget_reallocation' || sType === 'budget_shift') {
-      const fromCamp = params.fromCampaign;
-      const toCamp = params.toCampaign;
-      const shiftAmount = Number(params.shiftAmount || 500);
-
-      if (fromCamp && toCamp && campaignMap[fromCamp] && campaignMap[toCamp]) {
-        const fromData = campaignMap[fromCamp];
-        const toData = campaignMap[toCamp];
-
-        const fromRoas = fromData.spend > 0 ? fromData.revenue / fromData.spend : 1.0;
-        const toRoas = toData.spend > 0 ? toData.revenue / toData.spend : 2.5;
-
-        // Simulate shifting spend
-        const lostRevenue = shiftAmount * fromRoas;
-        const gainedRevenue = shiftAmount * toRoas;
-        const netRevenueDelta = gainedRevenue - lostRevenue;
-
-        projectedRevenue = totalRevenue + netRevenueDelta;
-        assumptions = `Shifted $${shiftAmount} from ${fromCamp} (Historical ROAS: ${fromRoas.toFixed(2)}x) to ${toCamp} (Historical ROAS: ${toRoas.toFixed(2)}x).`;
-        confidenceScore = Math.min(92.0, Math.max(65.0, 70 + (toData.closedWon * 1.5)));
-      } else {
-        // Generic percentage shift simulation
-        const pct = Number(params.percentChange || 10) / 100;
-        projectedRevenue = totalRevenue * (1 + pct * 0.6);
-        assumptions = `Simulated general budget reallocation resulting in a ${(pct * 100)}% scale across high-performing segments.`;
+    const ensureCampaign = (name: string) => {
+      if (!campaignMap[name]) {
+        campaignMap[name] = {
+          spend: 0,
+          attributedLeadIds: new Set<string>(),
+          closedWonLeadIds: new Set<string>(),
+          attributedRevenue: 0
+        };
       }
-    } else if (sType === 'geo_allocation') {
-      const targetGeo = params.targetGeo || 'Primary Territory';
-      const pctScale = Number(params.percentChange || 20) / 100;
-      projectedRevenue = totalRevenue * (1 + pctScale * 0.4);
-      assumptions = `Expanded advertising allocation in ${targetGeo} by ${(pctScale * 100)}% based on local conversion efficiency.`;
-      confidenceScore = 74.0;
-    } else {
-      projectedRevenue = totalRevenue * 1.15;
-      assumptions = 'Standard growth projection scenario based on historical acquisition trends.';
+      return campaignMap[name];
+    };
+
+    for (const ad of adRecords) {
+      const campaign = typeof ad.campaignName === 'string' ? ad.campaignName.trim() : '';
+      if (!campaign) continue;
+      const spend = Number(ad.cost);
+      if (Number.isFinite(spend) && spend >= 0) ensureCampaign(campaign).spend += spend;
     }
 
-    const projectedRoas = projectedSpend > 0 ? Number((projectedRevenue / projectedSpend).toFixed(2)) : 0;
-    const revenueDelta = Number((projectedRevenue - totalRevenue).toFixed(2));
-    const percentageChange = totalRevenue > 0 ? Number(((revenueDelta / totalRevenue) * 100).toFixed(2)) : 15.0;
+    const campaignByLead = new Map<string, string>();
+    const attributionsByLead = new Map<string, Set<string>>();
+    for (const attribution of attributions) {
+      const leadId = String(attribution.leadId || '');
+      const campaign = typeof attribution.utmCampaign === 'string' ? attribution.utmCampaign.trim() : '';
+      if (!leadId || !campaign) continue;
+      const names = attributionsByLead.get(leadId) || new Set<string>();
+      names.add(campaign);
+      attributionsByLead.set(leadId, names);
+    }
+    for (const [leadId, names] of attributionsByLead) {
+      // Ambiguous multi-touch attribution is excluded until a documented attribution
+      // model is implemented; never silently assign the revenue to the first campaign.
+      if (names.size !== 1) continue;
+      const campaign = Array.from(names)[0];
+      campaignByLead.set(leadId, campaign);
+      ensureCampaign(campaign).attributedLeadIds.add(leadId);
+    }
 
+    for (const revenue of revenues) {
+      const leadId = String(revenue.leadId || '');
+      const campaign = campaignByLead.get(leadId);
+      if (!campaign) continue;
+      const amount = getRevenueAmountUsd(revenue);
+      if (!Number.isFinite(amount) || amount <= 0) continue;
+      const campaignData = ensureCampaign(campaign);
+      campaignData.attributedRevenue += amount;
+      campaignData.closedWonLeadIds.add(leadId);
+    }
+
+    const fromData = campaignMap[fromCampaign];
+    const toData = campaignMap[toCampaign];
+    if (!fromData || !toData || fromData.spend <= 0 || toData.spend <= 0 ||
+        fromData.attributedRevenue <= 0 || toData.attributedRevenue <= 0) {
+      return res.status(409).json({
+        success: false,
+        code: 'INSUFFICIENT_ATTRIBUTED_DATA',
+        error: 'Both selected campaigns need recorded spend and unambiguous lead-linked revenue before they can be compared.'
+      });
+    }
+    if (shiftAmount > fromData.spend) {
+      return res.status(400).json({ error: 'The shift amount cannot exceed the recorded spend of the source campaign.' });
+    }
+
+    const campaigns = Object.fromEntries(Object.entries(campaignMap).map(([name, data]) => [name, {
+      spend: Number(data.spend.toFixed(2)),
+      attributedLeads: data.attributedLeadIds.size,
+      closedWon: data.closedWonLeadIds.size,
+      attributedRevenue: Number(data.attributedRevenue.toFixed(2)),
+      roas: Number((data.attributedRevenue / data.spend).toFixed(4))
+    }]));
+    const totalSpend = Object.values(campaignMap).reduce((sum, data) => sum + data.spend, 0);
+    const totalRevenue = Object.values(campaignMap).reduce((sum, data) => sum + data.attributedRevenue, 0);
+    const totalAttributedLeads = new Set(Array.from(campaignByLead.keys())).size;
+    const totalClosedWon = new Set(Object.values(campaignMap).flatMap(data => Array.from(data.closedWonLeadIds))).size;
+    const baselineRoas = Number((totalRevenue / totalSpend).toFixed(4));
+    const fromRoas = fromData.attributedRevenue / fromData.spend;
+    const toRoas = toData.attributedRevenue / toData.spend;
+
+    // This is an illustrative linear-response scenario, not a calibrated forecast.
+    const projectedRevenue = Math.max(0, totalRevenue - shiftAmount * fromRoas + shiftAmount * toRoas);
+    const revenueDelta = projectedRevenue - totalRevenue;
+    const baselineData = {
+      totalSpend: Number(totalSpend.toFixed(2)),
+      attributedRevenue: Number(totalRevenue.toFixed(2)),
+      roas: baselineRoas,
+      attributedLeads: totalAttributedLeads,
+      closedWon: totalClosedWon,
+      campaigns
+    };
     const projectedResult = {
-      projectedSpend,
-      projectedRevenue,
-      roas: projectedRoas,
-      cpl: baselineCpl,
-      cac: baselineCac
+      projectedSpend: Number(totalSpend.toFixed(2)),
+      projectedAttributedRevenue: Number(projectedRevenue.toFixed(2)),
+      roas: Number((projectedRevenue / totalSpend).toFixed(4)),
+      cpl: totalAttributedLeads > 0 ? Number((totalSpend / totalAttributedLeads).toFixed(2)) : null,
+      cac: totalClosedWon > 0 ? Number((totalSpend / totalClosedWon).toFixed(2)) : null
     };
-
     const delta = {
-      revenueDelta,
-      roasDelta: Number((projectedRoas - baselineRoas).toFixed(2)),
-      percentageChange
+      attributedRevenueDelta: Number(revenueDelta.toFixed(2)),
+      roasDelta: Number((projectedRevenue / totalSpend - baselineRoas).toFixed(4)),
+      percentageChange: totalRevenue > 0 ? Number((revenueDelta / totalRevenue * 100).toFixed(2)) : null
     };
-
-    // 4. Store Simulation Record in database
-    const simulationId = crypto.randomUUID();
+    const assumptions = 'Illustrative linear-response scenario using recorded historical campaign ROAS and unambiguous lead attribution. Marginal returns are unvalidated; this is not a forecast or guaranteed revenue.';
+    const params = { fromCampaign, toCampaign, shiftAmount };
     const [savedSim] = await pgDb.insert(revenueSimulations).values({
-      id: simulationId,
+      id: crypto.randomUUID(),
       contractorId,
-      scenarioType: sType,
+      scenarioType: scenarioType,
       baselineData,
       scenarioParameters: params,
       projectedResult,
       delta,
-      confidenceScore,
+      confidenceScore: 0,
       assumptions,
       createdBy: (req as any).user?.email || 'Operator'
     }).returning();
 
-    res.json({
-      success: true,
-      simulation: savedSim
-    });
-
+    res.json({ success: true, simulation: savedSim });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
