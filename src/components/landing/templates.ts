@@ -893,3 +893,67 @@ Object.assign(TRADE_TEMPLATES, {
     ]
   )
 });
+
+
+// Every template is a private draft scaffold, not a real contractor profile.
+// Strip seeded sample-business details and proof claims before exposing it in the UI.
+for (const template of Object.values(TRADE_TEMPLATES)) {
+  template.businessName = 'Your Business Name';
+  template.city = 'Your service area';
+  template.phone = '';
+  template.licenseNumber = '';
+  template.emergencyService = false;
+  template.dispatchWindow = 'Set your actual availability before publishing';
+  template.branding.logoText = 'YOUR BUSINESS';
+
+  template.sections.announcement_bar.active = false;
+  template.sections.announcement_bar.text = '';
+  template.sections.announcement_bar.urgencyBadge = '';
+  template.sections.header.ctaText = 'Contact the business';
+
+  template.sections.hero.headline = `Professional ${template.trade.replace(/_/g, ' ')} services in your area`;
+  template.sections.hero.subheadline = 'Describe the services your business provides, the areas you serve, and how customers can contact you.';
+  template.sections.hero.badgeText = '';
+  template.sections.hero.heroImageUrl = undefined;
+
+  template.sections.lead_form.active = true;
+  template.sections.lead_form.title = 'Request a service enquiry';
+  template.sections.lead_form.subtitle = 'Share your contact details and a short description of the work required.';
+  template.sections.lead_form.buttonText = 'Request a call back';
+  template.sections.lead_form.dispatchNote = 'Confirm service availability, response times, and any call-out fees directly with the business.';
+
+  template.sections.trust_bar.active = false;
+  template.sections.trust_bar.badges = [];
+  template.sections.bento_features.active = false;
+  template.sections.bento_features.items = [];
+  template.sections.pricing_packages.active = false;
+  template.sections.pricing_packages.items = [];
+  template.sections.seasonal_alert.active = false;
+  template.sections.services.active = false;
+  template.sections.services.items = [];
+  template.sections.before_after.active = false;
+  template.sections.before_after.items = [];
+  template.sections.before_after.subtitle = 'Add genuine project photos with customer permission.';
+  template.sections.reviews.active = false;
+  template.sections.reviews.rating = 0;
+  template.sections.reviews.totalReviews = 0;
+  template.sections.reviews.items = [];
+  template.sections.reviews.subtitle = 'Add genuine customer reviews with permission.';
+  template.sections.service_areas.active = false;
+  template.sections.service_areas.cities = [];
+  template.sections.service_areas.subtitle = 'List only locations the business currently serves.';
+  template.sections.guarantee.active = false;
+  template.sections.guarantee.description = 'Add written service terms approved by the business.';
+  template.sections.online_booking.active = false;
+  template.sections.faq.active = false;
+  template.sections.faq.items = [];
+  template.sections.sticky_mobile_call.active = false;
+  template.sections.sticky_mobile_call.crewStatus = '';
+  template.sections.sticky_mobile_call.buttonText = 'Contact the business';
+  template.sections.footer.address = 'Add the business address or remove this field before publishing.';
+  template.sections.footer.copyright = '';
+
+  template.seo.metaTitle = `Your Business Name — ${template.trade.replace(/_/g, ' ')}`;
+  template.seo.metaDescription = 'Learn about the services offered by Your Business Name. Contact the business for current service details.';
+  template.seo.schemaType = 'LocalBusiness';
+}
