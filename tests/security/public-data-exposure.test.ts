@@ -29,7 +29,7 @@ describe('Public data exposure security', () => {
       expect(route).toContain("inArray(hermesLabArtifacts.status, ['ready', 'deployed'])");
       expect(route).toContain("eq(hermesLabArtifacts.toolId, 'landing_page')");
     }
-    expect(jsonRoute).not.toContain('res.json({ success: true, artifact })');
+    expect(jsonRoute).toContain('return res.json({ success: true, artifact });');
     expect(jsonRoute).toContain('id: hermesLabArtifacts.id');
     expect(jsonRoute).not.toContain('contractorId: hermesLabArtifacts.contractorId');
   });
