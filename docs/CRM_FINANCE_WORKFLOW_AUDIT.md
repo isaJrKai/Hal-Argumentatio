@@ -61,7 +61,7 @@ These items remain unverified and must not be represented as complete:
 6. Revenue recognition versus cash collection/payment recording. The current `/api/revenues` close-out endpoint records a positive whole-dollar amount against a lead; it is not a payment processor or a complete invoice/receivables ledger.
 7. End-to-end event correlation and ordering across audit, landing-page, outreach, deal, project, revenue, and forecast records.
 8. Forecast evaluation against correctly attributed observations and evidence that only actual outcomes feed learning.
-9. Latest-head CI passed on `bf4a787541227063c372fb2ba90b7e445a435773` (GitHub Actions run #1188): type-check, full Vitest suite, production build, and production dependency audit all succeeded. Re-run CI after any subsequent branch change.
+9. Latest-head CI passed on `dd3a991a05a63099f67f670a0bd663cfb64adf0e` (GitHub Actions run #1193): type-check, full Vitest suite, production build, and production dependency audit all succeeded. Re-run CI after any subsequent branch change.
 
 ## Safety and release
 
