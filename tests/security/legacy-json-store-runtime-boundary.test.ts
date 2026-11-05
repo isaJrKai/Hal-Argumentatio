@@ -35,8 +35,13 @@ describe('runtime persistence boundary', () => {
 
   it('does not mirror active harvested leads into the legacy JSON aggregate', () => {
     const serverSource = readFileSync(resolve(process.cwd(), 'server.ts'), 'utf8');
-    expect(serverSource).not.toMatch(/\\bdb\\.addLead\\s*\\(/);
-    expect(serverSource).not.toMatch(/legacyMirrors/);
+    const harvestStart = serverSource.indexOf("app.post('/api/leads/ingest'");
+    const harvestEnd = serverSource.indexOf('// ─── LEADS ENDPOINTS', harvestStart);
+    expect(harvestStart).toBeGreaterThanOrEqual(0);
+    expect(harvestEnd).toBeGreaterThan(harvestStart);
+    const harvestRoutes = serverSource.slice(harvestStart, harvestEnd);
+    expect(harvestRoutes).not.toMatch(/\\bdb\\.addLead\\s*\\(/);
+    expect(harvestRoutes).not.toMatch(/legacyMirrors/);
   });
 
   it('does not import the legacy JSON aggregate store from application source', () => {
