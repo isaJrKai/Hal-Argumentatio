@@ -6601,7 +6601,7 @@ app.post('/api/outreach/whatsapp/webhook', (req, res) => {
 });
 
 // ─── GITHUB REPOSITORY PUSH ENGINE ───────────────────────────────────────────
-app.get('/api/admin/git/status', authenticate, (req, res) => {
+app.get('/api/admin/git/status', authenticate, requireRole('admin'), (req, res) => {
   try {
     const isRepo = fs.existsSync(path.join(process.cwd(), '.git'));
     if (!isRepo) {
@@ -6654,89 +6654,15 @@ app.get('/api/admin/git/status', authenticate, (req, res) => {
   }
 });
 
-app.post('/api/admin/git/push', authenticate, async (req, res) => {
-  const contractorId = (req as any).contractorId;
-  const { repoUrl, token, branch, commitMessage } = req.body;
-
-  if (!repoUrl) {
-    return res.status(400).json({ success: false, error: 'Repository URL is required (e.g. https://github.com/username/repo)' });
-  }
-
-  const cleanRepoUrl = repoUrl.trim();
-  const targetBranch = (branch || 'main').trim();
-  const msg = commitMessage?.trim() || `Release: HAL Operating Intelligence System v1.0 (${new Date().toISOString().slice(0, 10)})`;
-
-  try {
-    const gitDir = path.join(process.cwd(), '.git');
-    if (!fs.existsSync(gitDir)) {
-      execSync('git init -b main', { stdio: 'pipe' });
-    }
-
-    execSync('git config user.name "HAL Operator"', { stdio: 'pipe' });
-    execSync('git config user.email "operator@halbiz.ai"', { stdio: 'pipe' });
-
-    execSync('git add -A', { stdio: 'pipe' });
-    try {
-      execSync(`git commit -m "${msg.replace(/"/g, '\\"')}"`, { stdio: 'pipe' });
-    } catch (_) {
-      // Nothing to commit is fine
-    }
-
-    let authUrl = cleanRepoUrl;
-    if (token) {
-      const cleanToken = token.trim();
-      if (cleanRepoUrl.startsWith('https://')) {
-        authUrl = `https://${cleanToken}@${cleanRepoUrl.replace('https://', '')}`;
-      } else if (cleanRepoUrl.startsWith('http://')) {
-        authUrl = `http://${cleanToken}@${cleanRepoUrl.replace('http://', '')}`;
-      }
-    }
-
-    try {
-      execSync('git remote remove origin 2>/dev/null || true', { stdio: 'pipe' });
-    } catch (_) {}
-
-    execSync(`git remote add origin "${authUrl}"`, { stdio: 'pipe' });
-
-    try {
-      execSync(`git branch -M ${targetBranch}`, { stdio: 'pipe' });
-    } catch (_) {}
-
-    execSync(`git push -u origin ${targetBranch} --force`, { stdio: 'pipe' });
-
-    // Scrub token immediately from local remote configuration
-    execSync(`git remote set-url origin "${cleanRepoUrl}"`, { stdio: 'pipe' });
-
-    const latestCommitHash = execSync('git rev-parse --short HEAD', { encoding: 'utf-8' }).trim();
-
-    db.addAuditLog({
-      contractorId,
-      action: 'GIT_PUSH_SUCCESSFUL',
-      details: `Pushed code to ${cleanRepoUrl} on branch ${targetBranch} (commit: ${latestCommitHash})`
-    });
-
-    broadcastNotification(
-      contractorId,
-      'success',
-      '🚀 GitHub Push Complete',
-      `Repository synchronized to ${cleanRepoUrl} [${latestCommitHash}]`
-    );
-
-    res.json({
-      success: true,
-      repoUrl: cleanRepoUrl,
-      branch: targetBranch,
-      commitHash: latestCommitHash,
-      message: 'Codebase committed and pushed successfully to GitHub.'
-    });
-  } catch (err: any) {
-    console.error('[Git Push Error]:', err.message);
-    let safeError = err.message || 'Git push failed';
-    if (token) {
-      safeError = safeError.replace(new RegExp(token, 'g'), '••••••••');
-    }
-    res.status(500).json({ success: false, error: safeError });
-  }
+app.post('/api/admin/git/push', authenticate, requireRole('admin'), (_req, res) => {
+  // This legacy endpoint executed shell commands using request-controlled Git
+  // arguments and performed force pushes from the application server. Disable
+  // it until a dedicated, non-shell deployment workflow replaces it.
+  return res.status(410).json({
+    success: false,
+    code: 'GIT_PUSH_DISABLED',
+    error: 'Server-side Git deployment is disabled. Use the reviewed CI/CD deployment workflow.'
+  });
 });
 
 // ─── WHITE-LABEL CLIENT PROPOSAL GENERATOR ───────────────────────────────────
