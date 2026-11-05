@@ -49,7 +49,7 @@ The geo-map and credential paths now use PostgreSQL, but the root server still h
 | API keys | `api_keys`, with transitional `key_hash` and `prefix` columns | Startup no longer forces NOT NULL on potentially unbackfilled legacy rows. New-key creation must enforce both values in application validation until a versioned, data-aware backfill is shipped. |
 | Password reset tokens | `password_reset_tokens` | Table existence alone does not establish a complete reset flow; token persistence, single-use semantics and delivery must be verified together. |
 | Chat messages | `chat_messages` | Confirm every active UI/API path uses the same tenant-scoped PostgreSQL records. |
-| Audit logs | `audit_logs` | Bootstrap and Drizzle nullability now agree. Most root-server audit writes and the merged legacy audit read path still touch the JSON aggregate; migrate all remaining paths and verify tenant scoping. |
+| Audit logs | `audit_logs` | Root-server audit writes now use awaited PostgreSQL inserts (including pre-login lockout events); the activity endpoint still merges legacy JSON history for backward compatibility. Finish a one-time, insert-only historical import and remove the legacy read path after reconciliation. |
 
 ## Risks still open
 
