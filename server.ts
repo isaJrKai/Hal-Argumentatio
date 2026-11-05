@@ -7031,6 +7031,11 @@ app.put('/api/projects/:id', authenticate, async (req, res) => {
       if (typeof updates.status !== 'string' || !allowedStatuses.includes(updates.status)) {
         return res.status(400).json({ error: 'Unsupported client project status.' });
       }
+      const terminalStatuses = ['cancelled', 'canceled', 'churned', 'archived'];
+      const currentStatus = String(existingProject.status || '').toLowerCase();
+      if (terminalStatuses.includes(currentStatus) && updates.status !== existingProject.status) {
+        return res.status(409).json({ error: 'Terminal client projects cannot be reactivated or moved to another status.' });
+      }
       safeUpdates.status = updates.status;
     }
     if (updates.monthlyRetainerUsd !== undefined) {
@@ -9751,7 +9756,7 @@ async function startServer() {
       for (const rec of executedRecs) {
         const existing = existingOutcomes.find(o => o.recommendationId === rec.id);
         const obsStart = rec.executedAt || rec.updatedAt || rec.createdAt;
-        const obsEnd = new Date(new Date(obsStart).getTime() + 7 * 24 * 60 * 1000);
+        const obsEnd = new Date(new Date(obsStart).getTime() + 7 * 24 * 60 * 60 * 1000);
 
         // A recommendation currently has no canonical link to the business outcome
         // it is intended to influence. Contractor-wide revenue in the same date window
