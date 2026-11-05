@@ -321,6 +321,7 @@ app.get('/api/ready', async (_req, res) => {
         to_regclass('public.revenue_outcomes') IS NOT NULL AS revenue_outcomes,
         to_regclass('public.client_projects') IS NOT NULL AS client_projects,
         to_regclass('public.proposals') IS NOT NULL AS proposals,
+        to_regclass('public.proposal_signing_links') IS NOT NULL AS proposal_signing_links,
         to_regclass('public.invoices') IS NOT NULL AS invoices,
         to_regclass('public.invoice_payments') IS NOT NULL AS invoice_payments,
         to_regclass('public.revenue_records') IS NOT NULL AS revenue_records,
@@ -7406,7 +7407,7 @@ app.post('/api/proposals/:id/signing-link', authenticate, async (req, res) => {
         payload: { expiresAt: expiresAt.toISOString(), acceptanceMode: 'first_party_typed_name_and_consent', externalESignProviderVerified: false }
       });
     });
-    const signingUrl = `${req.protocol}://${req.get('host')}/sign/proposal/${token}`;
+    const signingUrl = `/sign/proposal/${token}`;
     return res.status(201).json({ signingUrl, expiresAt: expiresAt.toISOString(), acceptanceMode: 'first_party_typed_name_and_consent', externalESignProviderVerified: false });
   } catch (err) {
     console.error('[Proposal Signing] Link creation failed:', err);
