@@ -223,3 +223,16 @@ describe('revenue experiment integrity', () => {
     expect(experimentStatusHandler).toContain('Number.isFinite(Number(value))');
   });
 });
+
+const outcomesSummaryStart = server.indexOf("app.get('/api/revenue/outcomes'");
+const outcomesSummaryEnd = server.indexOf("app.post('/api/revenue/outcomes/measure'", outcomesSummaryStart);
+const outcomesSummaryHandler = server.slice(outcomesSummaryStart, outcomesSummaryEnd);
+
+describe('outcome reporting status integrity', () => {
+  it('does not count measured-but-unevaluated records as evaluated outcomes', () => {
+    expect(outcomesSummaryHandler).toContain("if (o.outcomeStatus === 'evaluated')");
+    expect(outcomesSummaryHandler).toContain("} else if (o.outcomeStatus === 'measured')");
+    expect(outcomesSummaryHandler).toContain('measuredCount,');
+    expect(outcomesSummaryHandler).not.toContain("o.outcomeStatus === 'evaluated' || o.outcomeStatus === 'measured'");
+  });
+});
