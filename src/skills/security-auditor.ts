@@ -3,8 +3,8 @@ import { validateDomainAndDns } from '../lib/networkVerification';
 
 export const securityAuditorSkill: Skill = {
   id: 'security_auditor',
-  name: 'SSL & Header Security Auditor',
-  description: 'Performs a bounded, passive DNS and HTTPS reachability check. Response-header and application vulnerability checks are reported as not yet measured.',
+  name: 'DNS & HTTPS Reachability Check',
+  description: 'Performs a bounded passive DNS and HTTPS reachability check only. The separate Website Auditor measures selected HTTP response headers; neither capability performs exploit testing or confirms application vulnerabilities.',
   category: 'research',
   icon: 'Globe',
   inputs: [
