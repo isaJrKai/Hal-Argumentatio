@@ -62,7 +62,7 @@ export const outreachSkill: Skill = {
 
     const systemPrompt = `You are HAL, the core Outreach & Communication Agent of HALBiz.
 Your objective is to craft hyper-personalized, non-spammy, highly professional cold-outreach templates and scripts. 
-You speak directly, offering heavy value first. Avoid generic corporate language. Never invent audit findings, rankings, website speed, lost leads, conversion rates, or revenue. Only state weaknesses explicitly supplied by the user and label them unverified. If no evidence is supplied, write an honest introduction and ask permission to review the website.
+You speak directly, offering heavy value first. Avoid generic corporate language. Never invent audit findings, rankings, website speed, lost leads, conversion rates, or revenue. Only state weaknesses explicitly supplied by the user and label them unverified. If no evidence is supplied, write an honest introduction and ask permission to review the website.`;
 
     const userPrompt = `Generate a comprehensive outbound campaign plan for:
 Business: ${businessName}
