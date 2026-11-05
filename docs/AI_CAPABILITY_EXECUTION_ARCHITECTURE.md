@@ -13,14 +13,17 @@ The registry in `src/services/ai/capabilityRegistry.ts` is the single catalogue 
 - Financial intelligence: recorded financial health and deterministic what-if simulation.
 - Marketing intelligence: recorded campaign anomaly analysis.
 - Operating loop: inspect loop context and attach evidence.
+- Website connectivity: run a public DNS lookup and pinned, non-redirecting HTTP/TLS HEAD probe; optionally update an owned lead's SSL status and append Work History evidence.
 
 The registry does not create new powers by itself. Every active entry must map to a real dispatcher implementation. Existing dispatcher validation, task ownership, approval checks, and audit events remain authoritative.
 
 ## Planned website execution capabilities
 
-These entries are deliberately marked `planned` and expose no provider tools yet:
+The full website-review workflow remains planned. The active `websites.audit.connectivity` capability is intentionally narrow: it measures public DNS and pinned HTTP/TLS reachability only. It does not crawl page content or claim PageSpeed, Lighthouse, SEO, mobile, accessibility, or conversion findings.
 
-1. **Website audit** — safely fetch and inspect a public website, report exactly which measurements ran, and distinguish measured facts from inferred recommendations. Existing DNS/HTTP/TLS checks are partial connectivity evidence, not a full Lighthouse, SEO, mobile, or conversion audit.
+The following entries are deliberately marked `planned` and expose no provider tools yet:
+
+1. **Full website audit** — safely crawl and inspect a public website, report exactly which measurements ran, and distinguish measured facts from inferred recommendations.
 2. **Website redesign** — use business context and verified site evidence to produce a versioned draft in Landing Page Studio. Claude, Gemini, Nemotron, and Hermes should be selectable as reasoning providers through the same execution contract. Iteration must preserve the source evidence and draft history.
 3. **Website publishing** — require an explicit human approval tied to the exact artifact/version hash. Publishing must be a separate executor, not a side effect of generation or saving a draft.
 
@@ -44,7 +47,7 @@ Each transition must be tenant-scoped and recorded with a correlation ID. Jobs s
 ## Delivery sequence
 
 1. Central registry and provider-neutral tool exposure (this change).
-2. Shared website audit service with SSRF protections, measured coverage, and tests.
+2. Expand website audit beyond the active DNS/HTTP/TLS connectivity probe, with SSRF protections and measured coverage.
 3. Provider-neutral landing-page draft generation and revision, with artifact ownership and version receipts.
 4. Durable job progress and review UI for multi-step agent work.
 5. Explicit version-bound publishing approval and publish receipt.
