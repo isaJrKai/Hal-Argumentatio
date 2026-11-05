@@ -9610,74 +9610,23 @@ async function startServer() {
         const obsStart = rec.executedAt || rec.updatedAt || rec.createdAt;
         const obsEnd = new Date(new Date(obsStart).getTime() + 7 * 24 * 60 * 1000);
 
-        let status = 'observing';
-        if (now < obsEnd) {
-          status = 'pending_observation';
-        } else {
-          status = 'evaluated';
-        }
-
-        const baselineMetrics = { revenue: 5000, roas: 2.5, cpl: 45, cac: 350 };
-        const expectedMetrics = { revenue: 5000 * (1 + (rec.impactScore || 10) / 100), roas: 3.2, cpl: 40, cac: 320 };
-        
-        let actualMetrics = { revenue: 5200, roas: 3.0, cpl: 42, cac: 330 };
-        if (status === 'evaluated') {
-          const obsStartDate = new Date(obsStart);
-          const measuredRevs = await pgDb.select().from(revenueRecords)
-            .where(and(
-              eq(revenueRecords.contractorId, contractorId),
-              gte(revenueRecords.createdAt, obsStartDate),
-              lte(revenueRecords.createdAt, obsEnd)
-            ));
-          const totalMeasuredRev = measuredRevs.reduce((sum, r) => sum + (Number(r.amountUsd) || 0), 0);
-
-          if (totalMeasuredRev > 0) {
-            actualMetrics = {
-              revenue: Number(totalMeasuredRev.toFixed(2)),
-              roas: Number((totalMeasuredRev / 1500).toFixed(2)),
-              cpl: 40,
-              cac: 320
-            };
-          } else {
-            const impactFactor = 1 + ((rec.impactScore || 10) * 0.08);
-            actualMetrics = {
-              revenue: Number((baselineMetrics.revenue * impactFactor).toFixed(2)),
-              roas: Number((baselineMetrics.roas * (1 + (rec.impactScore || 10) * 0.02)).toFixed(2)),
-              cpl: Math.max(20, Number((baselineMetrics.cpl * (1 - (rec.impactScore || 10) * 0.01)).toFixed(2))),
-              cac: Math.max(150, Number((baselineMetrics.cac * (1 - (rec.impactScore || 10) * 0.015)).toFixed(2)))
-            };
-          }
-        }
-
-        const variance = {
-          revenueDelta: Number((actualMetrics.revenue - expectedMetrics.revenue).toFixed(2)),
-          roasDelta: Number((actualMetrics.roas - expectedMetrics.roas).toFixed(2)),
-          cplDelta: Number((actualMetrics.cpl - expectedMetrics.cpl).toFixed(2))
-        };
-
-        const revAcc = calcAcc(expectedMetrics.revenue, actualMetrics.revenue);
-        const roasAcc = calcAcc(expectedMetrics.roas, actualMetrics.roas);
-        const predictionAccuracy = Number(((revAcc + roasAcc) / 2).toFixed(4));
-
-        let classification = 'insufficient_data';
-        if (status === 'evaluated') {
-          if (predictionAccuracy >= 0.85 && actualMetrics.revenue >= expectedMetrics.revenue * 0.9) {
-            classification = 'successful';
-          } else if (predictionAccuracy >= 0.60) {
-            classification = 'partially_successful';
-          } else if (predictionAccuracy >= 0.40) {
-            classification = 'neutral';
-          } else {
-            classification = 'failed';
-          }
-        }
-
+        // A recommendation currently has no canonical link to the business outcome
+        // it is intended to influence. Contractor-wide revenue in the same date window
+        // is not causal attribution, and synthetic fallback metrics must never train HAL.
+        // Keep the observation pending until its window closes, then explicitly mark it
+        // insufficient rather than inventing baseline, expected, or actual values.
+        const status = now < obsEnd ? 'pending_observation' : 'insufficient_data';
+        const baselineMetrics = {};
+        const expectedMetrics = {};
+        const actualMetrics = {};
+        const variance = {};
+        const predictionAccuracy = 0;
+        const classification = 'insufficient_data';
         const learningSignals = {
           category: rec.category,
-          predictionAccuracy,
           outcomeStatus: status,
-          variance,
-          insight: `Recommendation category '${rec.category}' achieved ${(predictionAccuracy * 100).toFixed(1)}% prediction accuracy with status '${classification}'.`
+          outcomeClassification: classification,
+          reason: 'No verified recommendation-to-outcome attribution record exists. No learning signal was emitted.'
         };
 
         if (existing) {
@@ -9699,7 +9648,7 @@ async function startServer() {
             id: crypto.randomUUID(),
             contractorId,
             recommendationId: rec.id,
-            executionReference: rec.executionReference || 'Exec-Ref-Auto',
+            executionReference: rec.executionReference || null,
             observationStart: obsStart,
             observationEnd: obsEnd,
             baselineMetrics,
@@ -9708,8 +9657,8 @@ async function startServer() {
             variance,
             predictionAccuracy,
             outcomeStatus: status,
-            confidenceScore: rec.confidenceScore || 85.0,
-            assumptions: 'Evaluated against pre-execution baseline over 7-day observation window.',
+            confidenceScore: rec.confidenceScore ?? 0,
+            assumptions: 'No verified recommendation-to-outcome attribution exists; outcome remains insufficient_data.',
             outcomeClassification: classification,
             learningSignals
           });
