@@ -11,17 +11,20 @@ function requirePool(pool?: Pool): Pool {
 
 /** Return only successfully decrypted credentials for the requested tenant. */
 export async function getConnectorCredentials(contractorId: string, pool?: Pool): Promise<Record<string, string>> {
-  if (!contractorId) throw new Error('A contractor ID is required.');
+  const tenantId = contractorId.trim();
+  if (!tenantId) throw new Error('A contractor ID is required.');
   const result = await requirePool(pool).query<{ service: string; encrypted_value: string }>(
     'SELECT service, encrypted_value FROM connector_credentials WHERE contractor_id = $1',
-    [contractorId]
+    [tenantId]
   );
 
   const credentials: Record<string, string> = {};
+  const seenServices = new Set<string>();
   for (const row of result.rows) {
-    if (Object.prototype.hasOwnProperty.call(credentials, row.service)) {
+    if (seenServices.has(row.service)) {
       throw new Error('Duplicate connector credential records exist for this tenant and service; reconcile them before reading.');
     }
+    seenServices.add(row.service);
     const value = decrypt(row.encrypted_value);
     if (value) credentials[row.service] = value;
   }
