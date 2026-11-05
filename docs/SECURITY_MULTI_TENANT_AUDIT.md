@@ -36,6 +36,20 @@ The unauthenticated report response included internal lead notes, urgency score 
 
 **Fix:** Removed those internal fields from the public response while preserving the report's public technical assessment data. A regression test guards the response projection.
 
+## Additional confirmed finding fixed in this branch
+
+### CRITICAL — Legacy MCP event and task tools returned cross-tenant records
+**Area:** `src/services/mcp/halMcpServer.ts`, `hal_list_events`, `hal_list_tasks`, and `hal_status`.
+
+The legacy shared-secret MCP server correctly resolved an explicit configured contractor for most tools, but three query paths omitted tenant filters:
+- `hal_list_events` selected all rows from `lead_events` without joining to the owning lead and filtering by `leads.contractor_id`.
+- `hal_list_tasks` selected all `scheduler_jobs` rows.
+- `hal_status` reported global lead-event and scheduler-job counts.
+
+An MCP client connected for one configured contractor could therefore read another contractor's event history and scheduled jobs, and infer global activity through status counts.
+
+**Fix:** Event history now joins through the owning lead and filters on the authenticated/configured contractor. Scheduler-job listing and counts now filter by `scheduler_jobs.contractor_id`. The status event count uses the same tenant join. A regression test guards all three query paths.
+
 ## Prioritized review observations
 
 | Priority | Area | Observation / remaining evidence |
