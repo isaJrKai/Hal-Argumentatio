@@ -24,7 +24,7 @@ import {
   Recommendation
 } from './src/db/db';
 import { db as pgDb, createPool as getApplicationPostgresPool } from './src/db/index.ts';
-import { contractors, auditLogs, leads, leadEvents, revenueRecords, campaigns, winLossRecords, performanceSnapshots, recommendations, forecasts, predictionOutcomes, learningInsights, chatMessages, chatProjects, chatConversations, missions, clientProjects, outreachSequences, apiKeys, connectorCredentials, notifications, schedulerJobs, passwordResetTokens, leadAttribution, conversionOutbox, googleAdsDailyPerformance, revenueExperiments, proposals, revenueRecommendations, revenueRecommendationEvents, revenueSimulations, revenueOutcomes, communicationsOutbox, communicationsDeliveryEvents, communicationsOptOuts, communicationsConsents, twilioPhoneNumberMappings, twilioInboundEvents, whatsappPhoneNumberMappings, whatsappInboundEvents, halLoops, halLoopEvents, hermesLabArtifacts, hermesDiagnosticIncidents, hermesLabMessages, staffMembers, workEvents, workTasks, revokedTokens } from './src/db/schema.ts';
+import { contractors, auditLogs, leads, leadEvents, revenueRecords, campaigns, winLossRecords, performanceSnapshots, recommendations, forecasts, predictionOutcomes, learningInsights, chatMessages, chatProjects, chatConversations, missions, clientProjects, outreachSequences, apiKeys, connectorCredentials, notifications, schedulerJobs, passwordResetTokens, leadAttribution, conversionOutbox, googleAdsDailyPerformance, revenueExperiments, proposals, invoices, invoicePayments, revenueRecommendations, revenueRecommendationEvents, revenueSimulations, revenueOutcomes, communicationsOutbox, communicationsDeliveryEvents, communicationsOptOuts, communicationsConsents, twilioPhoneNumberMappings, twilioInboundEvents, whatsappPhoneNumberMappings, whatsappInboundEvents, halLoops, halLoopEvents, hermesLabArtifacts, hermesDiagnosticIncidents, hermesLabMessages, staffMembers, workEvents, workTasks, revokedTokens } from './src/db/schema.ts';
 import { eq, inArray, desc, and, or, like, sql, gte, lte, gt, isNull } from 'drizzle-orm';
 import { 
   generateLearningFromOutcome, 
@@ -321,6 +321,8 @@ app.get('/api/ready', async (_req, res) => {
         to_regclass('public.revenue_outcomes') IS NOT NULL AS revenue_outcomes,
         to_regclass('public.client_projects') IS NOT NULL AS client_projects,
         to_regclass('public.proposals') IS NOT NULL AS proposals,
+        to_regclass('public.invoices') IS NOT NULL AS invoices,
+        to_regclass('public.invoice_payments') IS NOT NULL AS invoice_payments,
         to_regclass('public.revenue_records') IS NOT NULL AS revenue_records,
         to_regclass('public.campaigns') IS NOT NULL AS campaigns,
         to_regclass('public.work_tasks') IS NOT NULL AS work_tasks,
@@ -7348,6 +7350,227 @@ app.patch('/api/proposals/:id/status', authenticate, async (req, res) => {
   } catch (err) {
     console.error('[Proposals] Status update failed:', err);
     return res.status(503).json({ error: 'Proposal status could not be updated.' });
+  }
+});
+
+
+// ─── INVOICE AND CASH-RECEIPT LEDGER ─────────────────────────────────────────
+// This is a manual accounting ledger. It never claims a provider settlement
+// unless a separately verified provider integration supplies that evidence.
+app.get('/api/invoices', authenticate, async (req, res) => {
+  const contractorId = (req as any).contractorId;
+  try {
+    const rows = await pgDb.select().from(invoices)
+      .where(eq(invoices.contractorId, contractorId))
+      .orderBy(desc(invoices.createdAt));
+    const receipts = await pgDb.select().from(invoicePayments)
+      .where(eq(invoicePayments.contractorId, contractorId));
+    const paidByInvoice = new Map<string, number>();
+    for (const receipt of receipts) {
+      paidByInvoice.set(receipt.invoiceId, (paidByInvoice.get(receipt.invoiceId) || 0) + receipt.amountMinor);
+    }
+    return res.json(rows.map(invoice => ({
+      ...invoice,
+      amountPaidMinor: paidByInvoice.get(invoice.id) || 0,
+      balanceDueMinor: invoice.status === 'void' ? 0 : Math.max(0, invoice.amountDueMinor - (paidByInvoice.get(invoice.id) || 0))
+    })));
+  } catch (err) {
+    console.error('[Invoices] List failed:', err);
+    return res.status(503).json({ error: 'Invoice ledger is temporarily unavailable.' });
+  }
+});
+
+app.post('/api/invoices', authenticate, async (req, res) => {
+  const contractorId = (req as any).contractorId;
+  const { leadId, projectId, description, amountMinor, currency, dueAt } = req.body || {};
+  const normalizedLeadId = typeof leadId === 'string' && leadId.trim() ? leadId.trim() : null;
+  const normalizedProjectId = typeof projectId === 'string' && projectId.trim() ? projectId.trim() : null;
+  const normalizedCurrency = typeof currency === 'string' ? currency.trim().toUpperCase() : 'USD';
+  if ((!normalizedLeadId && !normalizedProjectId) ||
+      !Number.isSafeInteger(amountMinor) || amountMinor <= 0 ||
+      amountMinor > 2147483647 ||
+      !/^[A-Z]{3}$/.test(normalizedCurrency) ||
+      typeof description !== 'string' || !description.trim() || description.trim().length > 500) {
+    return res.status(400).json({ error: 'A tenant-owned lead or project, description, positive amount in minor currency units, and valid ISO currency are required.' });
+  }
+  let dueDate: Date | null = null;
+  if (dueAt !== undefined && dueAt !== null && dueAt !== '') {
+    dueDate = new Date(dueAt);
+    if (!Number.isFinite(dueDate.getTime())) return res.status(400).json({ error: 'dueAt must be a valid date.' });
+  }
+  try {
+    let linkedLeadId = normalizedLeadId;
+    if (normalizedLeadId) {
+      const [lead] = await pgDb.select({ id: leads.id, status: leads.status }).from(leads)
+        .where(and(eq(leads.id, normalizedLeadId), eq(leads.contractorId, contractorId))).limit(1);
+      if (!lead) return res.status(404).json({ error: 'Lead not found or inaccessible.' });
+      if (!['closed_won', 'converted', 'won', 'customer'].includes(String(lead.status).toLowerCase())) {
+        return res.status(409).json({ error: 'Invoices can only be issued against a closed-won lead.' });
+      }
+    }
+    if (normalizedProjectId) {
+      const [project] = await pgDb.select().from(clientProjects)
+        .where(and(eq(clientProjects.id, normalizedProjectId), eq(clientProjects.contractorId, contractorId))).limit(1);
+      if (!project) return res.status(404).json({ error: 'Client project not found or inaccessible.' });
+      if (['cancelled', 'canceled', 'churned', 'archived'].includes(String(project.status).toLowerCase())) {
+        return res.status(409).json({ error: 'Invoices cannot be issued against a terminal client project.' });
+      }
+      if (linkedLeadId && linkedLeadId !== project.leadId) {
+        return res.status(409).json({ error: 'The invoice lead must match the selected client project.' });
+      }
+      linkedLeadId = project.leadId || linkedLeadId;
+    }
+    const now = new Date();
+    const invoice = {
+      id: 'inv_' + crypto.randomBytes(12).toString('hex'),
+      contractorId,
+      invoiceNumber: 'HAL-' + now.toISOString().slice(0, 10).replace(/-/g, '') + '-' + crypto.randomBytes(3).toString('hex').toUpperCase(),
+      leadId: linkedLeadId,
+      projectId: normalizedProjectId,
+      description: description.trim(),
+      currency: normalizedCurrency,
+      amountDueMinor,
+      status: 'issued',
+      issuedAt: now,
+      dueAt: dueDate,
+      createdAt: now,
+      updatedAt: now
+    };
+    await pgDb.transaction(async tx => {
+      await tx.insert(invoices).values(invoice);
+      await recordWorkEvent(tx, {
+        contractorId,
+        eventType: 'invoice.issued',
+        entityType: 'invoice',
+        entityId: invoice.id,
+        actorType: 'human',
+        actorId: contractorId,
+        sourceModule: 'finance_ledger',
+        correlationId: invoice.id,
+        summary: `Issued invoice ${invoice.invoiceNumber} for ${invoice.amountDueMinor} ${invoice.currency} minor units.`,
+        payload: { invoiceNumber: invoice.invoiceNumber, leadId: linkedLeadId, projectId: normalizedProjectId, amountDueMinor, currency: normalizedCurrency }
+      });
+    });
+    return res.status(201).json({ ...invoice, amountPaidMinor: 0, balanceDueMinor: amountDueMinor });
+  } catch (err: any) {
+    console.error('[Invoices] Create failed:', err);
+    return res.status(503).json({ error: 'Invoice could not be saved to the ledger.' });
+  }
+});
+
+app.get('/api/invoices/:id', authenticate, async (req, res) => {
+  const contractorId = (req as any).contractorId;
+  try {
+    const [invoice] = await pgDb.select().from(invoices)
+      .where(and(eq(invoices.id, req.params.id), eq(invoices.contractorId, contractorId))).limit(1);
+    if (!invoice) return res.status(404).json({ error: 'Invoice not found or inaccessible.' });
+    const receipts = await pgDb.select().from(invoicePayments)
+      .where(and(eq(invoicePayments.invoiceId, invoice.id), eq(invoicePayments.contractorId, contractorId)))
+      .orderBy(desc(invoicePayments.receivedAt));
+    const amountPaidMinor = receipts.reduce((sum, receipt) => sum + receipt.amountMinor, 0);
+    return res.json({ ...invoice, payments: receipts, amountPaidMinor, balanceDueMinor: invoice.status === 'void' ? 0 : invoice.amountDueMinor - amountPaidMinor });
+  } catch (err) {
+    console.error('[Invoices] Read failed:', err);
+    return res.status(503).json({ error: 'Invoice could not be loaded.' });
+  }
+});
+
+app.post('/api/invoices/:id/payments', authenticate, async (req, res) => {
+  const contractorId = (req as any).contractorId;
+  const { amountMinor, method, reference, notes, receivedAt } = req.body || {};
+  const allowedMethods = ['cash', 'bank_transfer', 'card_terminal', 'cheque', 'other'];
+  if (!Number.isSafeInteger(amountMinor) || amountMinor <= 0 || amountMinor > 2147483647 || !allowedMethods.includes(method)) {
+    return res.status(400).json({ error: 'A positive whole amount in minor currency units and a supported receipt method are required.' });
+  }
+  const receiptDate = receivedAt ? new Date(receivedAt) : new Date();
+  if (!Number.isFinite(receiptDate.getTime())) return res.status(400).json({ error: 'receivedAt must be a valid date.' });
+  try {
+    const result = await pgDb.transaction(async tx => {
+      // Serialize receipts for this invoice so simultaneous requests cannot over-allocate.
+      await tx.execute(sql`SELECT id FROM invoices WHERE id = ${req.params.id} AND contractor_id = ${contractorId} FOR UPDATE`);
+      const [invoice] = await tx.select().from(invoices)
+        .where(and(eq(invoices.id, req.params.id), eq(invoices.contractorId, contractorId))).limit(1);
+      if (!invoice) return { kind: 'not_found' as const };
+      if (invoice.status === 'void') return { kind: 'void' as const };
+      const existingReceipts = await tx.select({ amountMinor: invoicePayments.amountMinor }).from(invoicePayments)
+        .where(and(eq(invoicePayments.invoiceId, invoice.id), eq(invoicePayments.contractorId, contractorId)));
+      const alreadyPaid = existingReceipts.reduce((sum, row) => sum + row.amountMinor, 0);
+      const remaining = invoice.amountDueMinor - alreadyPaid;
+      if (amountMinor > remaining) return { kind: 'overpayment' as const, remaining };
+      const payment = {
+        id: 'pay_' + crypto.randomBytes(12).toString('hex'),
+        contractorId,
+        invoiceId: invoice.id,
+        amountMinor,
+        currency: invoice.currency,
+        method,
+        reference: typeof reference === 'string' ? reference.trim().slice(0, 200) || null : null,
+        notes: typeof notes === 'string' ? notes.trim().slice(0, 1000) || null : null,
+        receivedAt: receiptDate,
+        recordedBy: contractorId,
+        createdAt: new Date()
+      };
+      await tx.insert(invoicePayments).values(payment);
+      const nextPaid = alreadyPaid + amountMinor;
+      const nextStatus = nextPaid === invoice.amountDueMinor ? 'paid' : 'partially_paid';
+      await tx.update(invoices).set({ status: nextStatus, updatedAt: new Date() })
+        .where(and(eq(invoices.id, invoice.id), eq(invoices.contractorId, contractorId)));
+      await recordWorkEvent(tx, {
+        contractorId,
+        eventType: 'invoice.payment_recorded',
+        entityType: 'invoice',
+        entityId: invoice.id,
+        actorType: 'human',
+        actorId: contractorId,
+        sourceModule: 'finance_ledger',
+        correlationId: invoice.id,
+        summary: `Recorded a ${amountMinor} ${invoice.currency} minor-unit receipt against invoice ${invoice.invoiceNumber}.`,
+        payload: { paymentId: payment.id, amountMinor, currency: invoice.currency, method, remainingMinor: invoice.amountDueMinor - nextPaid, invoiceStatus: nextStatus, settlementVerified: false }
+      });
+      return { kind: 'saved' as const, payment, invoiceStatus: nextStatus, amountPaidMinor: nextPaid, balanceDueMinor: invoice.amountDueMinor - nextPaid };
+    });
+    if (result.kind === 'not_found') return res.status(404).json({ error: 'Invoice not found or inaccessible.' });
+    if (result.kind === 'void') return res.status(409).json({ error: 'A void invoice cannot accept payments.' });
+    if (result.kind === 'overpayment') return res.status(409).json({ error: 'Receipt exceeds the outstanding invoice balance.', balanceDueMinor: result.remaining });
+    return res.status(201).json({ ...result.payment, invoiceStatus: result.invoiceStatus, amountPaidMinor: result.amountPaidMinor, balanceDueMinor: result.balanceDueMinor, settlementVerified: false });
+  } catch (err) {
+    console.error('[Invoice Payments] Record failed:', err);
+    return res.status(503).json({ error: 'Receipt could not be committed to the invoice ledger.' });
+  }
+});
+
+app.post('/api/invoices/:id/void', authenticate, async (req, res) => {
+  const contractorId = (req as any).contractorId;
+  try {
+    const result = await pgDb.transaction(async tx => {
+      await tx.execute(sql`SELECT id FROM invoices WHERE id = ${req.params.id} AND contractor_id = ${contractorId} FOR UPDATE`);
+      const [invoice] = await tx.select().from(invoices)
+        .where(and(eq(invoices.id, req.params.id), eq(invoices.contractorId, contractorId))).limit(1);
+      if (!invoice) return { kind: 'not_found' as const };
+      if (invoice.status !== 'issued') return { kind: 'conflict' as const };
+      const [saved] = await tx.update(invoices).set({ status: 'void', updatedAt: new Date() })
+        .where(and(eq(invoices.id, invoice.id), eq(invoices.contractorId, contractorId), eq(invoices.status, 'issued'))).returning();
+      if (!saved) return { kind: 'conflict' as const };
+      await recordWorkEvent(tx, {
+        contractorId,
+        eventType: 'invoice.voided',
+        entityType: 'invoice',
+        entityId: invoice.id,
+        actorType: 'human',
+        actorId: contractorId,
+        sourceModule: 'finance_ledger',
+        correlationId: invoice.id,
+        summary: `Voided invoice ${invoice.invoiceNumber}; no receipts had been recorded.`,
+        payload: { invoiceNumber: invoice.invoiceNumber }
+      });
+      return { kind: 'saved' as const, invoice: saved };
+    });
+    if (result.kind === 'not_found') return res.status(404).json({ error: 'Invoice not found or inaccessible.' });
+    if (result.kind === 'conflict') return res.status(409).json({ error: 'Only an unpaid issued invoice can be voided.' });
+    return res.json(result.invoice);
+  } catch (err) {
+    console.error('[Invoices] Void failed:', err);
+    return res.status(503).json({ error: 'Invoice could not be voided.' });
   }
 });
 
