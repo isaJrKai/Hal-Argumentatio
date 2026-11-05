@@ -12134,32 +12134,43 @@ async function startServer() {
       const configuredRules: any[] = [];
       const now = new Date().toISOString();
       const jobTime = new Date(now);
-      const [jobRecord] = await pgDb.insert(schedulerJobs).values({
-        id: 'job_' + crypto.randomUUID(),
+      const schedulerLedgerInputBase = {
         contractorId,
-        job: 'phase3_scheduler_configuration_check',
-        status: 'completed',
-        startedAt: jobTime,
-        completedAt: jobTime,
-        result: 'No persisted scheduler rules are configured; no calendar or outreach triggers were executed.',
-        createdAt: jobTime
-      }).returning();
-
-      const auditBlock = await recordStructuredLedgerEntry({
-        contractorId,
-        eventType: 'phase3_scheduler_configuration_checked',
+        eventType: 'phase3_scheduler_configuration_checked' as const,
         entityType: 'scheduler_system',
-        entityId: jobRecord.id,
         actor: 'HAL Scheduler Configuration Check',
         details: 'Checked scheduler configuration. Templates are available, but no persisted rules or background trigger execution were found.',
         metadata: {
           configuredRulesCount: configuredRules.length,
           availableTemplatesCount: templates.length,
           triggersExecuted: 0,
-          jobId: jobRecord.id,
           status: 'NO_RULES_CONFIGURED'
         }
+      };
+      const committed = await pgDb.transaction(async tx => {
+        const [jobRecord] = await tx.insert(schedulerJobs).values({
+          id: 'job_' + crypto.randomUUID(),
+          contractorId,
+          job: 'phase3_scheduler_configuration_check',
+          status: 'completed',
+          startedAt: jobTime,
+          completedAt: jobTime,
+          result: 'No persisted scheduler rules are configured; no calendar or outreach triggers were executed.',
+          createdAt: jobTime
+        }).returning();
+        const ledgerInput: StructuredLedgerInput = {
+          ...schedulerLedgerInputBase,
+          entityId: jobRecord.id,
+          metadata: { ...schedulerLedgerInputBase.metadata, jobId: jobRecord.id }
+        };
+        const auditBlock = await recordStructuredLedgerEntryInTransaction(tx, ledgerInput);
+        return { jobRecord, ledgerInput, auditBlock };
       });
+      const { jobRecord } = committed;
+      let auditBlock = committed.auditBlock;
+      if (!postgresStructuredLedgerEnabled()) {
+        auditBlock = await recordStructuredLedgerEntry(committed.ledgerInput);
+      }
 
       res.json({
         success: true,
