@@ -395,6 +395,17 @@ export const communicationsOutbox = pgTable('communications_outbox', {
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });
 
+export const communicationsOptOuts = pgTable('communications_opt_outs', {
+  id: text('id').primaryKey(),
+  contractorId: text('contractor_id').notNull(),
+  channel: text('channel').notNull(),
+  phoneHash: text('phone_hash').notNull(),
+  phoneEncrypted: text('phone_encrypted').notNull(),
+  source: text('source').notNull(),
+  optedOutAt: timestamp('opted_out_at').notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+});
+
 export const communicationsConsents = pgTable('communications_consents', {
   id: text('id').primaryKey(),
   contractorId: text('contractor_id').notNull(),
