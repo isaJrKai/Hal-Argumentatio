@@ -46,8 +46,15 @@ test('Document Studio persists, approves, and captures client proposal acceptanc
     await page.getByRole('button', { name: 'Approve internally' }).click();
     await expect(page.getByText('Internally approved', { exact: false })).toBeVisible();
 
+    const signingLinkResponsePromise = page.waitForResponse(response =>
+      response.url().includes('/api/proposals/') && response.url().endsWith('/signing-link') && response.request().method() === 'POST'
+    );
     await page.getByRole('button', { name: 'Copy client acceptance link' }).click();
-    const signingUrl = await page.evaluate(() => navigator.clipboard.readText());
+    const signingLinkResponse = await signingLinkResponsePromise;
+    expect(signingLinkResponse.ok()).toBeTruthy();
+    const signingLinkPayload = await signingLinkResponse.json();
+    const signingUrl = new URL(signingLinkPayload.signingUrl, 'http://127.0.0.1:3000').toString();
+    await expect(page.getByText(/One-time client acceptance link copied/)).toBeVisible();
     expect(signingUrl).toContain('/sign/proposal/');
 
     const clientPage = await context.newPage();
