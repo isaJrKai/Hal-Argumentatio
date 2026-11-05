@@ -427,7 +427,7 @@ export class AutonomousLearningEngine {
   /**
    * Slowly learns and recalibrates weights whenever a deal outcome is recorded (Win, Loss, Pitch, Objection)
    */
-  public digestBusinessOutcome(params: {
+  public async digestBusinessOutcome(params: {
     niche: string;
     city?: string;
     outcome: 'won' | 'lost' | 'objection_encountered' | 'outreach_sent';
