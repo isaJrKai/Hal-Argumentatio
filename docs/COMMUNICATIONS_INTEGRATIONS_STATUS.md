@@ -50,6 +50,7 @@ This report separates code implementation from provider configuration and live v
 ### 4. SMS
 
 - Implemented in this branch: Twilio REST send adapter; workspace-owned number verification against the Twilio account inventory; explicit, encrypted consent evidence; fail-closed send gate requiring current opt-in; signed inbound webhook with STOP/STOPALL/UNSUBSCRIBE/CANCEL/END/QUIT opt-out handling; signed status callbacks; and tenant-scoped outbox reconciliation.
+- The consent endpoint stores an operator-recorded attestation and encrypted evidence note; it is not independent proof of the recipient's consent. Operators must record opt-in only after obtaining valid consent through the stated source.
 - SMS dispatch returns `submitted`, never `delivered`; the status callback is required for delivery confirmation. Ambiguous provider/network errors are marked `unknown` and are not automatically retried because the Twilio create-message API path is not treated as idempotent.
 - **Remaining:** configure Twilio credentials and verified number, set the exact canonical HTTPS inbound/status callback URLs, register both webhooks in Twilio, and run a real opt-in → send → delivered/undelivered → STOP acceptance test.
 
