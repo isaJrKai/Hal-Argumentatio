@@ -61,7 +61,7 @@ These items remain unverified and must not be represented as complete:
 6. Revenue recognition versus cash collection/payment recording. The current `/api/revenues` close-out endpoint records a positive whole-dollar amount against a lead; it is not a payment processor or a complete invoice/receivables ledger.
 7. End-to-end event correlation and ordering across audit, landing-page, outreach, deal, project, revenue, and forecast records.
 8. Forecast evaluation against correctly attributed observations and evidence that only actual outcomes feed learning.
-9. Latest-head CI passed on `dd3a991a05a63099f67f670a0bd663cfb64adf0e` (GitHub Actions run #1193): type-check, full Vitest suite, production build, and production dependency audit all succeeded. Re-run CI after any subsequent branch change.
+9. GitHub Actions CI run #1216 passed on current branch head `e0216059a797ecd2269a8a2bfa48544063468bcd`: type-check, automated tests, production build, and production dependency audit succeeded. The workflow provisions PostgreSQL 16 as a healthy service and supplies `DATABASE_URL`, so the PostgreSQL integration tests are expected to execute in CI. Re-run CI after any subsequent branch change.
 
 ## Safety and release
 
