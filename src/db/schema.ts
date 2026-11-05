@@ -317,7 +317,8 @@ export const campaigns = pgTable('campaigns', {
 });
 
 export const neuralState = pgTable('neural_state', {
-  id: text('id').primaryKey(), // Usually "singleton"
+  // "singleton" is reserved for system defaults; authenticated tenants use "tenant:<contractorId>".
+  id: text('id').primaryKey(),
   version: text('version').notNull(),
   calibrationEpoch: integer('calibration_epoch').default(0).notNull(),
   totalOutcomesDigested: integer('total_outcomes_digested').default(0).notNull(),
