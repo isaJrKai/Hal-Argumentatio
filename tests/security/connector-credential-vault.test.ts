@@ -114,4 +114,43 @@ suite('Neon connector credential vault', () => {
       .rejects.toThrow(/Duplicate connector credential records/);
   });
 
+  it('survives a fresh database pool after the original writer is gone', async () => {
+    const contractorId = newTenant();
+    await saveConnectorCredential(contractorId, 'stripe', 'durable-secret', pool);
+
+    const freshPool = new Pool({ connectionString: databaseUrl });
+    try {
+      await expect(getConnectorCredentials(contractorId, freshPool))
+        .resolves.toEqual({ stripe: 'durable-secret' });
+    } finally {
+      await freshPool.end();
+    }
+  });
+
+  it('does not report a successful write when PostgreSQL is unavailable', async () => {
+    const contractorId = newTenant();
+    const unavailablePool = new Pool({
+      host: '127.0.0.1',
+      port: 1,
+      user: 'invalid',
+      password: 'invalid',
+      database: 'invalid',
+      connectionTimeoutMillis: 150,
+      max: 1,
+    });
+
+    try {
+      await expect(saveConnectorCredential(contractorId, 'stripe', 'must-not-persist', unavailablePool))
+        .rejects.toThrow();
+    } finally {
+      await unavailablePool.end();
+    }
+
+    const rows = await pool.query(
+      'SELECT id FROM connector_credentials WHERE contractor_id = $1 AND service = $2',
+      [contractorId, 'stripe']
+    );
+    expect(rows.rows).toHaveLength(0);
+  });
+
 });
