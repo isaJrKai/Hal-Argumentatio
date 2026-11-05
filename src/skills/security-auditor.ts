@@ -94,7 +94,7 @@ export const securityAuditorSkill: Skill = {
         pageContent: 'not_measured'
       },
       evidence,
-      report: lines.join('\\n'),
+      report: lines.join(String.fromCharCode(10)),
       executedAt: new Date().toISOString()
     };
   }
