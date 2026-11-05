@@ -16,7 +16,7 @@ This report separates code implementation from provider configuration and live v
 | Password reset email | Yes — hashed single-use PostgreSQL token and shared Resend adapter | Requires `RESEND_API_KEY`, `HAL_SENDER_EMAIL`, trusted `APP_URL` | Not verified against production mailbox | Submission is not delivery; undeliverable reset tokens are invalidated |
 | WhatsApp inbound | Signature validation and Meta verification challenge implemented | App secret and verify token unknown | Not verified | Inbound message events fail closed until a verified phone-number-ID → tenant mapping exists; no cross-tenant broadcast |
 | WhatsApp outbound | No live dispatch | Not configured | Not available | Simulation only; live requests return not implemented |
-| SMS/Twilio | Composer/simulation only | Twilio key presence is not sufficient | Not available | No live send, signed callback, or delivery reporting |
+| SMS/Twilio | Tenant sender registration, explicit consent gate, live Twilio adapter, inbound STOP handling, signed status callbacks | Credentials and sender ownership unknown until configured | Not verified against a live number | Can submit consented SMS and reconcile signed delivery callbacks; provider submission is not delivery |
 | Google Workspace authentication | Firebase Google OAuth flow with Drive, Calendar-read and Gmail-send scopes | Firebase web config / Google OAuth consent unknown | Browser OAuth not verified | User-authorized browser session; short-lived access token cached in sessionStorage |
 | Google Drive | List/search, folder creation, upload and delete API calls implemented | Requires Firebase + Google OAuth and Drive scope approval | Not verified | Code path exists; account access and operations unverified |
 | Google Calendar | Read-only event listing implemented | Requires Calendar read scope approval | Not verified | Read-only; event creation/update is not implemented |
@@ -49,9 +49,9 @@ This report separates code implementation from provider configuration and live v
 
 ### 4. SMS
 
-- SMS UI/composer simulation exists.
-- Live SMS dispatch is rejected as not implemented; a saved Twilio credential must not be represented as a working connection.
-- **Remaining:** provider adapter, sender-number ownership, consent/opt-out checks, signed status callbacks, idempotency, retries, and delivery reconciliation.
+- Implemented in this branch: Twilio REST send adapter; workspace-owned number verification against the Twilio account inventory; explicit, encrypted consent evidence; fail-closed send gate requiring current opt-in; signed inbound webhook with STOP/STOPALL/UNSUBSCRIBE/CANCEL/END/QUIT opt-out handling; signed status callbacks; and tenant-scoped outbox reconciliation.
+- SMS dispatch returns `submitted`, never `delivered`; the status callback is required for delivery confirmation. Ambiguous provider/network errors are marked `unknown` and are not automatically retried because the Twilio create-message API path is not treated as idempotent.
+- **Remaining:** configure Twilio credentials and verified number, set the exact canonical HTTPS inbound/status callback URLs, register both webhooks in Twilio, and run a real opt-in → send → delivered/undelivered → STOP acceptance test.
 
 ### 5. Google Workspace
 
@@ -113,4 +113,4 @@ No production environment, deploy, secret, service setting, or database was modi
 - Replaced WhatsApp inbound fail-closed placeholder with signature-verified, tenant-routed, encrypted and deduplicated inbound event persistence. Unknown phone-number IDs remain fail-closed.
 - Added unit coverage for outbox claims, retry/dead-letter decisions, and Resend idempotency headers.
 
-**Still not complete/live-verified:** Twilio SMS sending and signed delivery callbacks; provider account credentials, Meta webhook registration and real inbound acceptance; Google Workspace OAuth/browser/Drive/Calendar/Gmail acceptance. These require real provider setup and test accounts, which are not available through the repository connection. The worker also requires a trusted external scheduler; no Render service or cron job was created.
+**Still not complete/live-verified:** Twilio credentials/number/webhook acceptance; Meta account configuration/webhook registration and real inbound acceptance; Google Workspace OAuth/browser/Drive/Calendar/Gmail acceptance. These require real provider setup and test accounts, which are not available through the repository connection. The worker also requires a trusted external scheduler; no Render service or cron job was created.
