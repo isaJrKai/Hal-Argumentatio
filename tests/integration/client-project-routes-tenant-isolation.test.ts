@@ -151,6 +151,30 @@ describe('client project HTTP route tenant isolation', () => {
       .set('Authorization', `Bearer ${tokenB}`);
     expect(tenantBList.status).toBe(200);
     expect(tenantBList.body).toEqual([]);
+
+    const activated = await request(app)
+      .put(`/api/projects/${created.body.id}`)
+      .set('Authorization', `Bearer ${tokenA}`)
+      .send({ status: 'active_delivery', monthlyRetainerUsd: 1500 });
+    expect(activated.status).toBe(200);
+    expect(activated.body.status).toBe('active_delivery');
+    expect(activated.body.monthlyRetainerUsd).toBe(1500);
+
+    const tenantAFinancials = await request(app)
+      .get('/api/financials/overview')
+      .set('Authorization', `Bearer ${tokenA}`);
+    expect(tenantAFinancials.status).toBe(200);
+    expect(tenantAFinancials.body.currentMrrUsd).toBe(1500);
+    expect(tenantAFinancials.body.arrUsd).toBe(18000);
+    expect(tenantAFinancials.body.activeClientCount).toBe(1);
+
+    const tenantBFinancials = await request(app)
+      .get('/api/financials/overview')
+      .set('Authorization', `Bearer ${tokenB}`);
+    expect(tenantBFinancials.status).toBe(200);
+    expect(tenantBFinancials.body.currentMrrUsd).toBe(0);
+    expect(tenantBFinancials.body.arrUsd).toBe(0);
+    expect(tenantBFinancials.body.activeClientCount).toBe(0);
   });
 
   it('prevents tenant B from updating tenant A\'s project by identifier', async (ctx) => {
