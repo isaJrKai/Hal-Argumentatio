@@ -9,18 +9,18 @@ function cleanText(value: string): string {
     .replace(/&#39;|&apos;/gi, "'")
     .replace(/&lt;/gi, '<')
     .replace(/&gt;/gi, '>')
-    .replace(/&#(\\d+);/g, (_match, code) => String.fromCharCode(Number(code)))
+    .replace(/&#(\d+);/g, (_match, code) => String.fromCharCode(Number(code)))
     .replace(/&#x([0-9a-f]+);/gi, (_match, code) => String.fromCharCode(parseInt(code, 16)))
-    .replace(/\\s+/g, ' ')
+    .replace(/\s+/g, ' ')
     .trim();
 }
 
 function getMetaContent(html: string, name: string): string | null {
-  const tags = html.match(/<meta\\b[^>]*>/gi) || [];
+  const tags = html.match(/<meta\b[^>]*>/gi) || [];
   for (const tag of tags) {
-    const key = tag.match(/\\b(?:name|property)\\s*=\\s*["']([^"']+)["']/i)?.[1]?.toLowerCase();
+    const key = tag.match(/\b(?:name|property)\s*=\s*["']([^"']+)["']/i)?.[1]?.toLowerCase();
     if (key !== name.toLowerCase()) continue;
-    return cleanText(tag.match(/\\bcontent\\s*=\\s*["']([^"']*)["']/i)?.[1] || '');
+    return cleanText(tag.match(/\bcontent\s*=\s*["']([^"']*)["']/i)?.[1] || '');
   }
   return null;
 }
@@ -36,28 +36,28 @@ function getAttributeValues(html: string, tagName: string, attribute: string): s
 }
 
 function analyzeHtml(html: string, pageUrl: string) {
-  const title = cleanText(html.match(/<title\\b[^>]*>([\\s\\S]*?)<\\/title\\s*>/i)?.[1]?.replace(/<[^>]+>/g, '') || '');
+  const title = cleanText(html.match(/<title\b[^>]*>([\s\S]*?)<\/title\s*>/i)?.[1]?.replace(/<[^>]+>/g, '') || '');
   const description = getMetaContent(html, 'description');
   const robots = getMetaContent(html, 'robots');
   const viewport = getMetaContent(html, 'viewport');
-  const canonicalHref = (html.match(/<link\\b[^>]*rel\\s*=\\s*["']canonical["'][^>]*href\\s*=\\s*["']([^"']+)["']/i) ||
-    html.match(/<link\\b[^>]*href\\s*=\\s*["']([^"']+)["'][^>]*rel\\s*=\\s*["']canonical["']/i))?.[1] || null;
+  const canonicalHref = (html.match(/<link\b[^>]*rel\s*=\s*["']canonical["'][^>]*href\s*=\s*["']([^"']+)["']/i) ||
+    html.match(/<link\b[^>]*href\s*=\s*["']([^"']+)["'][^>]*rel\s*=\s*["']canonical["']/i))?.[1] || null;
   const h1 = getTagText(html, 'h1');
   const h2 = getTagText(html, 'h2');
   const images = getAttributeValues(html, 'img', 'alt');
   const links = getAttributeValues(html, 'a', 'href').filter(Boolean);
-  const forms = (html.match(/<form\\b/gi) || []).length;
-  const scriptsRemoved = html.replace(/<script\\b[\\s\\S]*?<\\/script>/gi, ' ').replace(/<style\\b[\\s\\S]*?<\\/style>/gi, ' ');
+  const forms = (html.match(/<form\b/gi) || []).length;
+  const scriptsRemoved = html.replace(/<script\b[\s\S]*?<\/script>/gi, ' ').replace(/<style\b[\s\S]*?<\/style>/gi, ' ');
   const visibleText = cleanText(scriptsRemoved.replace(/<[^>]+>/g, ' '));
-  const wordCount = visibleText ? visibleText.split(/\\s+/).filter(Boolean).length : 0;
+  const wordCount = visibleText ? visibleText.split(/\s+/).filter(Boolean).length : 0;
   const url = new URL(pageUrl);
   const internalLinks = links.filter(href => {
     try { return new URL(href, url).hostname === url.hostname; } catch { return false; }
   }).length;
   const externalLinks = links.length - internalLinks;
-  const htmlLang = html.match(/<html\\b[^>]*\\blang\\s*=\\s*["']([^"']+)["']/i)?.[1] || null;
-  const hasStructuredData = /application\\/ld\\+json/i.test(html) || /itemscope/i.test(html);
-  const hasNoindex = /(?:^|[,\\s])noindex(?:$|[,\\s])/i.test(robots || '');
+  const htmlLang = html.match(/<html\b[^>]*\blang\s*=\s*["']([^"']+)["']/i)?.[1] || null;
+  const hasStructuredData = /application\/ld\+json/i.test(html) || /itemscope/i.test(html);
+  const hasNoindex = /(?:^|[,\s])noindex(?:$|[,\s])/i.test(robots || '');
 
   return {
     title: title || null,
@@ -118,7 +118,7 @@ export const websiteAuditSkill: Skill = {
           '',
           'HAL did not follow this redirect. Review the destination and run a new audit against the approved public URL.',
           'No page-content, SEO, or security-header conclusions were drawn.'
-        ].join('\\n'),
+        ].join('\n'),
         auditedAt: page.fetchedAt
       };
     }
@@ -181,7 +181,7 @@ export const websiteAuditSkill: Skill = {
       '- Application vulnerabilities, authentication flaws, dependency CVEs or exploitability',
       '',
       '**Scope:** One public HTML page, one bounded GET request, no redirect following, no form submissions, no JavaScript execution, and no intrusive security testing. Findings describe only the fetched response and HTML.'
-    ].join('\\n');
+    ].join('\n');
 
     return {
       success: true,
