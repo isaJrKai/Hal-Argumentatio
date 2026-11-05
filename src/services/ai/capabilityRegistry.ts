@@ -84,7 +84,17 @@ export const HAL_CAPABILITY_REGISTRY: readonly HalCapability[] = [
     approvalRequired: false
   },
   {
-    id: 'websites.audit',
+    id: 'websites.audit.connectivity',
+    name: 'Check website connectivity',
+    description: 'Measure public DNS resolution and pinned HTTP/TLS reachability with explicit limitations.',
+    category: 'web',
+    risk: 'read_only',
+    status: 'active',
+    toolNames: ['hal_audit_website_connectivity'],
+    approvalRequired: false
+  },
+  {
+    id: 'websites.audit.full',
     name: 'Audit a customer website',
     description: 'Run a measured website audit with explicit coverage and evidence reporting.',
     category: 'web',
