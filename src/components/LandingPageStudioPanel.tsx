@@ -282,6 +282,8 @@ export const LandingPageStudioPanel: React.FC<{ token: string | null }> = ({ tok
   };
 
   const handlePublishPage = async () => {
+    const contentReviewed = window.confirm('Before publishing, confirm that you reviewed the business identity, service list, contact details, images, credentials, testimonials, pricing and all other page claims. Only publish information the business has authorized and can substantiate.');
+    if (!contentReviewed) return;
     if (!config.id || !token) {
       showToast({ title: 'Cannot Publish', message: 'Save the page and sign in before publishing.', type: 'warning' });
       return;
@@ -291,7 +293,7 @@ export const LandingPageStudioPanel: React.FC<{ token: string | null }> = ({ tok
       const res = await fetch(`/api/landing-pages/${encodeURIComponent(config.id)}/publish`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ confirmPublish: true })
+        body: JSON.stringify({ confirmPublish: true, contentReviewed: true })
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok || !data.success) throw new Error(data.error || `Publish failed (HTTP ${res.status}).`);
