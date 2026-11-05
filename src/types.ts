@@ -280,9 +280,10 @@ export interface ProposalDeck {
   monthlyRetainerUsd: number;
   setupFeeUsd: number;
   deliverables: string[];
-  roiEstimateAnnualUsd: number;
+  roiEstimateAnnualUsd: number | null;
   auditHighlights: string[];
   validUntil: string;
+  persistenceStatus?: 'generated_only_not_persisted';
 }
 
 export interface ClientMilestone {
@@ -314,10 +315,10 @@ export interface ClientProject {
   packageTier: 'Growth' | 'Dominance' | 'Enterprise';
   monthlyRetainerUsd: number;
   startDate: string;
-  status: 'onboarding' | 'active_delivery' | 'review' | 'completed';
-  initialAuditScore: number;
-  currentScore: number;
-  targetScore: number;
+  status: 'onboarding' | 'active_delivery' | 'review' | 'completed' | 'cancelled' | 'canceled' | 'churned' | 'archived';
+  initialAuditScore: number | null;
+  currentScore: number | null;
+  targetScore: number | null;
   milestones: ClientMilestone[];
   assets: ClientAsset[];
   notes?: string;
