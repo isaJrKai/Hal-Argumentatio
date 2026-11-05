@@ -63,15 +63,16 @@ export async function failExpiredHermesWorkTask(
   const [failed] = await db.update(taskTable).set({
     status: 'failed',
     errorMessage: 'Hermes execution lease expired before a terminal receipt was recorded.',
-    output: {
-      schemaVersion: 1,
-      outcome: 'lease_expired',
-      success: false,
-      worker: 'hermes',
-      taskId,
-      recordedAt: now.toISOString(),
-      message: 'The executor stopped heartbeating. No successful completion was recorded; operator review is required before retry.'
-    },
+    output: sql`jsonb_build_object(
+      'schemaVersion', 1,
+      'outcome', 'lease_expired',
+      'success', false,
+      'worker', 'hermes',
+      'taskId', ${taskId},
+      'attempt', ${taskTable.attemptCount},
+      'recordedAt', ${now.toISOString()},
+      'message', 'The executor stopped heartbeating. No successful completion was recorded; operator review is required before retry.'
+    )`,
     completedAt: now,
     updatedAt: now
   }).where(and(
