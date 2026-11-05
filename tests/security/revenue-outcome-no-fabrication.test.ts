@@ -149,6 +149,8 @@ describe('revenue simulation evidence integrity', () => {
     expect(simulationHandler).not.toContain("Object.keys(campaignMap)[0]");
     expect(simulationHandler).not.toContain('toRoas = 2.5');
     expect(simulationHandler).not.toContain('fromRoas = 1.0');
+    expect(simulationHandler).toContain('const measuredCampaigns = Object.values(campaignMap).filter');
+    expect(simulationHandler).toContain('const totalSpend = measuredCampaigns.reduce');
   });
 
   it('does not fabricate confidence or percentage uplift when evidence is absent', () => {
