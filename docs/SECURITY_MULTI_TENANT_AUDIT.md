@@ -27,7 +27,7 @@ Both routes previously required authentication but did not require the administr
 
 Both public routes previously loaded artifacts by ID without checking publication status or artifact type. The JSON route returned the entire database row, including `contractorId`, metadata and the full content payload. The HTML route rendered `renderedOutput` for draft, ready and archived artifacts as well as deployed pages. This allowed anyone possessing or discovering an artifact ID to access unpublished contractor work.
 
-**Fix:** Both routes now require `status = 'deployed'` and `toolId = 'landing_page'`. The JSON route returns an explicit public-field projection rather than the full row. Public responses set no-store, no-referrer and nosniff headers, and database failures return generic errors.
+**Fix:** Both routes now require a published status (`ready` or `deployed`) and `toolId = 'landing_page'`. The JSON route returns an explicit public-field projection rather than the full row. Public responses set no-store, no-referrer and nosniff headers, and database failures return generic errors.
 
 ### MEDIUM — Public audit reports included internal sales intelligence
 **Area:** `GET /api/public/audit/:id` in `server.ts`.
