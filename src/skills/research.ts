@@ -4,7 +4,7 @@ import { harvestRealBusinesses } from '../lib/gemini';
 export const researchSkill: Skill = {
   id: 'research_harvest',
   name: 'Local Intelligence Harvester',
-  description: 'Uses Gemini to scan, identify, and profile 4 active home-service businesses in a target territory with live digital metric estimates.',
+  description: 'Uses the shared Territory Harvester to discover candidate businesses. Google Search grounding sources are retained when available; phone and DNS checks do not by themselves confirm business identity, and unmeasured digital metrics remain unavailable.',
   category: 'research',
   icon: 'Search',
   inputs: [
