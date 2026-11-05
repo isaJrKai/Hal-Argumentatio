@@ -42,19 +42,19 @@ This substantially reduces the risk that normal server requests are writing to e
 | Outreach sequences | `outreach_sequences`, with `steps JSONB` | Verify all CRUD paths and ownership checks. |
 | Client projects | `client_projects`, with `milestones JSONB` and `assets JSONB` | Verify tenant-scoped CRUD and uniqueness/handling of portal access tokens. |
 | Connector credentials | `connector_credentials`, with `encrypted_value` | Transactional repository and PostgreSQL tests now exist. Wire it to any future/current connector integration consumers; preserve the AES envelope and reconcile historical duplicate rows before adding a unique constraint. |
-| API keys | `api_keys`, with `key_hash` and `prefix` | Bootstrap's NOT NULL transition still requires row-state verification before any production constraint/backfill change. |
+| API keys | `api_keys`, with transitional `key_hash` and `prefix` columns | Startup no longer forces NOT NULL on potentially unbackfilled legacy rows. New-key creation must enforce both values in application validation until a versioned, data-aware backfill is shipped. |
 | Password reset tokens | `password_reset_tokens` | Table existence alone does not establish a complete reset flow; token persistence, single-use semantics and delivery must be verified together. |
 | Chat messages | `chat_messages` | Confirm every active UI/API path uses the same tenant-scoped PostgreSQL records. |
 | Audit logs | `audit_logs` | Reconcile bootstrap nullability with Drizzle schema and verify all writes/read paths use consistent tenant semantics. |
 
 ## Risks still open
 
-1. **No versioned migration journal:** schema creation and upgrades remain embedded in `bootstrapPostgresTables()`. There is no complete, versioned migration ledger for deployed schema revisions.
+1. **No versioned migration journal:** schema creation and upgrades remain embedded in `bootstrapPostgresTables()`. Bootstrap DDL is now transactional, so a failed run rolls back as a unit, but there is still no complete, versioned migration ledger for deployed schema revisions.
 2. **API-key constraint transition:** bootstrap adds nullable hash/prefix columns and then sets them NOT NULL. Existing rows without values can make startup DDL fail. Do not run production changes without inspecting row state and preparing a safe backfill.
 3. **Silent learning-state fallback:** `AutonomousLearningEngine` catches initialization/save errors and can continue with defaults or memory-only state. Critical writes must surface persistence failure to callers.
 4. **Structured ledger gap:** hash-chain entries remain in the legacy JSON store; PostgreSQL needs a transactionally serialized append path before the legacy implementation can be retired.
-5. **Connector integration wiring:** the new repository is tested against PostgreSQL but is not yet connected to an active production integration consumer. The legacy credential test has been replaced; historical duplicate rows remain an explicit conflict.
-6. **Production data state unknown:** no production row counts, JSON exports, or database contents were inspected. No production SQL was executed and no production data was changed.
+5. **Learning-state writes now fail closed:** learning outcome updates and offline-mode changes await PostgreSQL persistence and roll back in-memory state when the write fails. The API no longer reports a successful update after a swallowed database error. Learning-state audit rows now use PostgreSQL `audit_logs` rather than the legacy JSON aggregate.6. **Connector integration wiring:** the new repository is tested against PostgreSQL but is not yet connected to an active production integration consumer. The legacy credential test has been replaced; historical duplicate rows remain an explicit conflict.
+7. **Production data state unknown:** no production row counts, JSON exports, or database contents were inspected. No production SQL was executed and no production data was changed.
 
 ## Next implementation sequence
 
