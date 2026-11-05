@@ -88,7 +88,7 @@ const CORE_SKILL_IDS = [
 export default function SkillsPanel({ token }: SkillsPanelProps) {
   const { toast } = useToast();
   const { activeCity, activeNiche } = useBusinessContext();
-  const [skills, setSkills] = useState<Skill[]>([]);
+  const [skills, setSkills] = useState<Skill[]>([]);\n  const [auditLeads, setAuditLeads] = useState<any[]>([]);
   const [selectedSkill, setSelectedSkill] = useState<Skill | null>(null);
   const [formInputs, setFormInputs] = useState<Record<string, any>>({});
   const [loading, setLoading] = useState(false);
@@ -152,6 +152,19 @@ export default function SkillsPanel({ token }: SkillsPanelProps) {
       }
     } catch (err) {
       console.error('Failed to load skills:', err);
+    }
+  };
+
+  const fetchAuditLeads = async () => {
+    try {
+      const res = await fetch('/api/leads', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (!res.ok) return;
+      const data = await res.json();
+      if (Array.isArray(data)) setAuditLeads(data.filter(lead => typeof lead.websiteUrl === 'string' && lead.websiteUrl.trim()));
+    } catch (err) {
+      console.error('Failed to load leads for website audit:', err);
     }
   };
 
@@ -433,7 +446,27 @@ export default function SkillsPanel({ token }: SkillsPanelProps) {
                       <label className="text-[10px] font-mono text-text-secondary uppercase tracking-wider block">
                         {inp.label} {inp.required && <span className="text-accent">*</span>}
                       </label>
-                      {inp.type === 'select' ? (
+                      {inp.name === 'leadId' && selectedSkill.id === 'website_audit' ? (
+                        <select
+                          value={formInputs.leadId || ''}
+                          onChange={(e) => {
+                            const lead = auditLeads.find(item => item.id === e.target.value);
+                            setFormInputs(prev => ({
+                              ...prev,
+                              leadId: e.target.value,
+                              ...(lead ? { businessName: lead.businessName || '', websiteUrl: lead.websiteUrl || '' } : {})
+                            }));
+                          }}
+                          className="w-full bg-bg-base border border-border-dim rounded-sm px-3 py-2 text-xs text-text-primary focus:outline-none focus:border-accent transition-colors font-sans"
+                        >
+                          <option value="" className="bg-bg-raised text-text-primary">Audit a URL without linking a lead</option>
+                          {auditLeads.map(lead => (
+                            <option key={lead.id} value={lead.id} className="bg-bg-raised text-text-primary">
+                              {lead.businessName} — {lead.city}
+                            </option>
+                          ))}
+                        </select>
+                      ) : inp.type === 'select' ? (
                         <select
                           required={inp.required}
                           value={formInputs[inp.name] || ''}
