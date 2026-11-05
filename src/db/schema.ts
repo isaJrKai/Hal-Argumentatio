@@ -395,6 +395,39 @@ export const communicationsOutbox = pgTable('communications_outbox', {
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });
 
+export const communicationsConsents = pgTable('communications_consents', {
+  id: text('id').primaryKey(),
+  contractorId: text('contractor_id').notNull(),
+  leadId: text('lead_id').notNull(),
+  channel: text('channel').notNull(),
+  status: text('status').notNull(), // opted_in | opted_out
+  source: text('source').notNull(),
+  evidenceEncrypted: text('evidence_encrypted'),
+  consentedAt: timestamp('consented_at'),
+  optedOutAt: timestamp('opted_out_at'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+});
+
+export const twilioPhoneNumberMappings = pgTable('twilio_phone_number_mappings', {
+  id: text('id').primaryKey(),
+  contractorId: text('contractor_id').notNull(),
+  phoneNumber: text('phone_number').notNull().unique(),
+  accountSid: text('account_sid').notNull(),
+  verifiedAt: timestamp('verified_at').notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+});
+
+export const twilioInboundEvents = pgTable('twilio_inbound_events', {
+  id: text('id').primaryKey(),
+  contractorId: text('contractor_id').notNull(),
+  providerMessageId: text('provider_message_id').notNull().unique(),
+  fromEncrypted: text('from_encrypted').notNull(),
+  bodyEncrypted: text('body_encrypted').notNull(),
+  receivedAt: timestamp('received_at').defaultNow().notNull(),
+});
+
 export const whatsappPhoneNumberMappings = pgTable('whatsapp_phone_number_mappings', { id: text('id').primaryKey(), contractorId: text('contractor_id').notNull(), phoneNumberId: text('phone_number_id').notNull().unique(), displayPhoneNumber: text('display_phone_number'), verifiedName: text('verified_name'), verifiedAt: timestamp('verified_at').notNull(), createdAt: timestamp('created_at').defaultNow().notNull(), updatedAt: timestamp('updated_at').defaultNow().notNull() });
 export const whatsappInboundEvents = pgTable('whatsapp_inbound_events', { id: text('id').primaryKey(), contractorId: text('contractor_id').notNull(), phoneNumberId: text('phone_number_id').notNull(), providerMessageId: text('provider_message_id').notNull().unique(), senderEncrypted: text('sender_encrypted').notNull(), messageEncrypted: text('message_encrypted').notNull(), messageType: text('message_type').notNull(), receivedAt: timestamp('received_at').defaultNow().notNull() });
 
