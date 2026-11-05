@@ -11,7 +11,7 @@ vi.mock('../../src/db/postgres', () => ({
   getDrizzleDb: () => mocks.databaseAvailable ? { insert: mocks.insert } : null
 }));
 
-import { AutonomousLearningEngine } from '../../src/lib/autonomousLearning';
+import { AutonomousLearningEngine, getTenantAutonomousLearning } from '../../src/lib/autonomousLearning';
 
 describe('autonomous learning persistence failure handling', () => {
   beforeEach(() => {
@@ -19,6 +19,18 @@ describe('autonomous learning persistence failure handling', () => {
     mocks.insert.mockReturnValue({ values: mocks.values });
     mocks.values.mockReturnValue({ onConflictDoUpdate: mocks.onConflictDoUpdate });
     mocks.onConflictDoUpdate.mockResolvedValue(undefined);
+  });
+
+  it('persists independent learning rows for separate contractor tenants', async () => {
+    const tenantA = getTenantAutonomousLearning('contractor-a');
+    const tenantB = getTenantAutonomousLearning('contractor-b');
+
+    expect(tenantA).not.toBe(tenantB);
+    await tenantA.saveState();
+    await tenantB.saveState();
+
+    expect(mocks.values.mock.calls[0][0].id).toBe('tenant:contractor-a');
+    expect(mocks.values.mock.calls[1][0].id).toBe('tenant:contractor-b');
   });
 
   it('does not retain an in-memory outcome when PostgreSQL rejects the write', async () => {
