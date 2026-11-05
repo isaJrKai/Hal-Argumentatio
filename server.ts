@@ -10,6 +10,7 @@ import { sendResendEmail, EmailProviderConfigurationError, EmailProviderRequestE
 import { verifySvixWebhookSignature } from './src/lib/resendWebhook';
 import { runCommunicationsOutboxWorker } from './src/services/communications/outboxWorker';
 import { verifyMetaWebhookSignature, isMetaPhoneNumberId } from './src/lib/whatsappWebhook';
+import { sendTwilioSms, verifyTwilioRequestSignature, TwilioConfigurationError, TwilioRequestError } from './src/services/communications/twilioSms';
 import { 
   db, 
   encrypt, 
@@ -23,7 +24,7 @@ import {
   Recommendation
 } from './src/db/db';
 import { db as pgDb, createPool as getApplicationPostgresPool } from './src/db/index.ts';
-import { contractors, auditLogs, leads, leadEvents, revenueRecords, campaigns, winLossRecords, performanceSnapshots, recommendations, forecasts, predictionOutcomes, learningInsights, chatMessages, chatProjects, chatConversations, missions, clientProjects, outreachSequences, apiKeys, connectorCredentials, notifications, schedulerJobs, passwordResetTokens, leadAttribution, conversionOutbox, googleAdsDailyPerformance, revenueExperiments, revenueRecommendations, revenueRecommendationEvents, revenueSimulations, revenueOutcomes, communicationsOutbox, communicationsDeliveryEvents, whatsappPhoneNumberMappings, whatsappInboundEvents, halLoops, halLoopEvents, hermesLabArtifacts, hermesDiagnosticIncidents, hermesLabMessages, staffMembers, workEvents, workTasks, revokedTokens } from './src/db/schema.ts';
+import { contractors, auditLogs, leads, leadEvents, revenueRecords, campaigns, winLossRecords, performanceSnapshots, recommendations, forecasts, predictionOutcomes, learningInsights, chatMessages, chatProjects, chatConversations, missions, clientProjects, outreachSequences, apiKeys, connectorCredentials, notifications, schedulerJobs, passwordResetTokens, leadAttribution, conversionOutbox, googleAdsDailyPerformance, revenueExperiments, revenueRecommendations, revenueRecommendationEvents, revenueSimulations, revenueOutcomes, communicationsOutbox, communicationsDeliveryEvents, communicationsConsents, twilioPhoneNumberMappings, twilioInboundEvents, whatsappPhoneNumberMappings, whatsappInboundEvents, halLoops, halLoopEvents, hermesLabArtifacts, hermesDiagnosticIncidents, hermesLabMessages, staffMembers, workEvents, workTasks, revokedTokens } from './src/db/schema.ts';
 import { eq, inArray, desc, and, or, like, sql, gte, lte, gt, isNull } from 'drizzle-orm';
 import { 
   generateLearningFromOutcome, 
@@ -6607,6 +6608,176 @@ app.get('/api/outreach/whatsapp/webhook', (req, res) => {
 });
 
 // WhatsApp Inbound Message Listener
+// Workspace-owned Twilio sender registration. The account API must confirm ownership.
+app.post('/api/outreach/sms/connect-number', authenticate, async (req, res) => {
+  const contractorId = (req as any).contractorId;
+  const phoneNumber = String(req.body?.phoneNumber || '').trim();
+  if (!/^\+[1-9]\d{7,14}$/.test(phoneNumber)) return res.status(400).json({ success: false, error: 'A valid E.164 Twilio phone number is required.' });
+  try {
+    const bridge = await getBridgesForContractor(contractorId);
+    const { accountSid, authToken } = bridge.sms;
+    if (!accountSid || !authToken || !/^AC[0-9a-f]{32}$/i.test(accountSid)) {
+      return res.status(503).json({ success: false, error: 'Save valid workspace Twilio credentials before registering a sender.' });
+    }
+    const existing = await pgDb.select().from(twilioPhoneNumberMappings)
+      .where(eq(twilioPhoneNumberMappings.phoneNumber, phoneNumber)).limit(1);
+    if (existing[0] && existing[0].contractorId !== contractorId) {
+      return res.status(409).json({ success: false, error: 'This Twilio number is already assigned to another workspace.' });
+    }
+    const auth = 'Basic ' + Buffer.from(accountSid + ':' + authToken).toString('base64');
+    const verifyResponse = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${accountSid}/IncomingPhoneNumbers.json?PhoneNumber=${encodeURIComponent(phoneNumber)}`, {
+      headers: { Authorization: auth }, signal: AbortSignal.timeout(10000)
+    });
+    if (!verifyResponse.ok) return res.status(502).json({ success: false, error: 'Twilio could not verify number ownership for this workspace.' });
+    const inventory = await verifyResponse.json() as { incoming_phone_numbers?: Array<{ phone_number?: string; account_sid?: string }> };
+    const owned = (inventory.incoming_phone_numbers || []).some(number => number.phone_number === phoneNumber && number.account_sid === accountSid);
+    if (!owned) return res.status(403).json({ success: false, error: 'The selected phone number is not owned by this Twilio account.' });
+    const now = new Date();
+    const id = 'twilio_' + crypto.createHash('sha256').update(phoneNumber).digest('hex');
+    await pgDb.insert(twilioPhoneNumberMappings).values({
+      id, contractorId, phoneNumber, accountSid, verifiedAt: now, createdAt: now, updatedAt: now
+    }).onConflictDoNothing();
+    const [saved] = await pgDb.select().from(twilioPhoneNumberMappings)
+      .where(eq(twilioPhoneNumberMappings.phoneNumber, phoneNumber)).limit(1);
+    if (!saved || saved.contractorId !== contractorId) return res.status(409).json({ success: false, error: 'Twilio sender ownership changed during registration.' });
+    return res.json({ success: true, phoneNumber, verified: true });
+  } catch (error: any) {
+    console.error('[Twilio Number Registration] Failed:', error?.message || error);
+    return res.status(503).json({ success: false, error: 'Twilio number ownership verification could not be completed.' });
+  }
+});
+
+// Record explicit, auditable SMS consent for a saved lead. Evidence is encrypted at rest.
+app.post('/api/outreach/sms/consent', authenticate, async (req, res) => {
+  const contractorId = (req as any).contractorId;
+  const leadId = String(req.body?.leadId || '');
+  const status = req.body?.status;
+  const source = req.body?.source;
+  const evidence = typeof req.body?.evidence === 'string' ? req.body.evidence.trim() : '';
+  if (!leadId || !['opted_in', 'opted_out'].includes(status) ||
+      !['written', 'verbal', 'web_form'].includes(source) || evidence.length < 8 || evidence.length > 2000) {
+    return res.status(400).json({ success: false, error: 'Provide a saved lead, opt-in/opt-out status, consent source and a short evidence note.' });
+  }
+  const [lead] = await pgDb.select({ id: leads.id }).from(leads)
+    .where(and(eq(leads.id, leadId), eq(leads.contractorId, contractorId))).limit(1);
+  if (!lead) return res.status(404).json({ success: false, error: 'Lead not found in this workspace.' });
+  const id = 'smsconsent_' + crypto.createHash('sha256').update(`${contractorId}:${leadId}:sms`).digest('hex');
+  const now = new Date();
+  try {
+    await pgDb.insert(communicationsConsents).values({
+      id, contractorId, leadId, channel: 'sms', status, source,
+      evidenceEncrypted: encrypt(evidence),
+      consentedAt: status === 'opted_in' ? now : null,
+      optedOutAt: status === 'opted_out' ? now : null,
+      createdAt: now, updatedAt: now
+    }).onConflictDoUpdate({
+      target: communicationsConsents.id,
+      set: {
+        status, source, evidenceEncrypted: encrypt(evidence),
+        consentedAt: status === 'opted_in' ? now : null,
+        optedOutAt: status === 'opted_out' ? now : null,
+        updatedAt: now
+      }
+    });
+    return res.json({ success: true, leadId, channel: 'sms', status, recordedAt: now.toISOString() });
+  } catch (error: any) {
+    console.error('[SMS Consent] Could not persist consent:', error?.message || error);
+    return res.status(503).json({ success: false, error: 'SMS consent could not be saved.' });
+  }
+});
+
+// Twilio inbound webhook: signature-verified, tenant-routed and STOP-aware.
+app.post('/api/webhooks/twilio/inbound', async (req, res) => {
+  const canonicalUrl = process.env.TWILIO_INBOUND_WEBHOOK_URL || '';
+  const from = String(req.body?.From || '');
+  const to = String(req.body?.To || '');
+  const messageSid = String(req.body?.MessageSid || '');
+  const bodyText = String(req.body?.Body || '');
+  if (!canonicalUrl.startsWith('https://') || !/^\+[1-9]\d{7,14}$/.test(to) || !messageSid) {
+    return res.status(503).send('Twilio inbound webhook is not configured.');
+  }
+  try {
+    const [mapping] = await pgDb.select().from(twilioPhoneNumberMappings)
+      .where(eq(twilioPhoneNumberMappings.phoneNumber, to)).limit(1);
+    if (!mapping) return res.status(404).send('Unknown Twilio destination.');
+    const bridge = await getBridgesForContractor(mapping.contractorId);
+    if (!bridge.sms.authToken || bridge.sms.accountSid !== mapping.accountSid ||
+        !verifyTwilioRequestSignature(canonicalUrl, req.body || {}, req.header('x-twilio-signature'), bridge.sms.authToken)) {
+      return res.status(401).send('Invalid Twilio signature.');
+    }
+    await pgDb.insert(twilioInboundEvents).values({
+      id: 'twin_' + crypto.createHash('sha256').update(messageSid).digest('hex'),
+      contractorId: mapping.contractorId,
+      providerMessageId: messageSid,
+      fromEncrypted: encrypt(from),
+      bodyEncrypted: encrypt(bodyText),
+      receivedAt: new Date()
+    }).onConflictDoNothing();
+    if (/^(STOP|STOPALL|UNSUBSCRIBE|CANCEL|END|QUIT)$/i.test(bodyText.trim())) {
+      const tenantLeads = await pgDb.select().from(leads).where(eq(leads.contractorId, mapping.contractorId));
+      const matching = tenantLeads.filter(lead => {
+        const phone = lead.phoneEncrypted ? decrypt(lead.phoneEncrypted) : (lead.phone && !lead.phone.includes('[ENCRYPTED]') ? lead.phone : '');
+        return phone.replace(/[^+\d]/g, '') === from.replace(/[^+\d]/g, '');
+      });
+      for (const lead of matching) {
+        const id = 'smsconsent_' + crypto.createHash('sha256').update(`${mapping.contractorId}:${lead.id}:sms`).digest('hex');
+        const now = new Date();
+        await pgDb.insert(communicationsConsents).values({
+          id, contractorId: mapping.contractorId, leadId: lead.id, channel: 'sms',
+          status: 'opted_out', source: 'twilio_stop', evidenceEncrypted: encrypt('Recipient sent STOP via Twilio inbound webhook.'),
+          consentedAt: null, optedOutAt: now, createdAt: now, updatedAt: now
+        }).onConflictDoUpdate({
+          target: communicationsConsents.id,
+          set: { status: 'opted_out', source: 'twilio_stop', evidenceEncrypted: encrypt('Recipient sent STOP via Twilio inbound webhook.'), optedOutAt: now, updatedAt: now }
+        });
+      }
+    }
+    return res.status(200).send('OK');
+  } catch (error: any) {
+    console.error('[Twilio Inbound] Processing failed:', error?.message || error);
+    return res.status(500).send('Webhook processing failed.');
+  }
+});
+
+// Twilio delivery callback: reconcile only a previously submitted tenant outbox record.
+app.post('/api/webhooks/twilio/status', async (req, res) => {
+  const canonicalUrl = process.env.TWILIO_STATUS_CALLBACK_URL || '';
+  const sid = String(req.body?.MessageSid || '');
+  const status = String(req.body?.MessageStatus || '').toLowerCase();
+  if (!canonicalUrl.startsWith('https://') || !sid || !status) return res.status(503).send('Twilio status callback is not configured.');
+  try {
+    const [outbox] = await pgDb.select().from(communicationsOutbox)
+      .where(and(eq(communicationsOutbox.providerMessageId, sid), eq(communicationsOutbox.provider, 'twilio'), eq(communicationsOutbox.channel, 'sms'))).limit(1);
+    if (!outbox) return res.status(404).send('Unknown Twilio message.');
+    const bridge = await getBridgesForContractor(outbox.contractorId);
+    if (!bridge.sms.authToken || !verifyTwilioRequestSignature(canonicalUrl, req.body || {}, req.header('x-twilio-signature'), bridge.sms.authToken)) {
+      return res.status(401).send('Invalid Twilio signature.');
+    }
+    const allowed = new Set(['queued', 'accepted', 'sending', 'sent', 'delivered', 'undelivered', 'failed', 'canceled']);
+    if (!allowed.has(status)) return res.status(400).send('Unknown Twilio status.');
+    const nextStatus = status === 'undelivered' ? 'bounced' : status === 'failed' || status === 'canceled' ? 'failed' : status;
+    await pgDb.insert(communicationsDeliveryEvents).values({
+      id: 'twilio_' + crypto.createHash('sha256').update(`${sid}:${status}:${String(req.body?.ErrorCode || '')}`).digest('hex'),
+      outboxId: outbox.id, provider: 'twilio', providerMessageId: sid,
+      eventType: `sms.${status}`,
+      payload: { status, errorCode: String(req.body?.ErrorCode || '') || null },
+      receivedAt: new Date()
+    }).onConflictDoNothing();
+    await pgDb.update(communicationsOutbox).set({
+      status: nextStatus,
+      deliveredAt: status === 'delivered' ? new Date() : outbox.deliveredAt,
+      bouncedAt: status === 'undelivered' ? new Date() : outbox.bouncedAt,
+      errorCode: String(req.body?.ErrorCode || '') || null,
+      errorMessage: status === 'undelivered' || status === 'failed' ? 'Twilio reported message delivery failure.' : null,
+      updatedAt: new Date()
+    }).where(and(eq(communicationsOutbox.id, outbox.id), eq(communicationsOutbox.contractorId, outbox.contractorId)));
+    return res.status(200).send('OK');
+  } catch (error: any) {
+    console.error('[Twilio Status] Reconciliation failed:', error?.message || error);
+    return res.status(500).send('Status reconciliation failed.');
+  }
+});
+
 // A workspace may register only a phone number that its own Meta token can read.
 app.post('/api/outreach/whatsapp/connect-number', authenticate, async (req, res) => {
   const contractorId = (req as any).contractorId;
