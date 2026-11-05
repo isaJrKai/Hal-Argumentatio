@@ -11,41 +11,45 @@ HAL is built for operators, agencies, and consultancies seeking a decision-suppo
 | Attribute | Specification |
 |---|---|
 | **Asset Type** | Full-Stack Software Platform / Intellectual Property |
-| **Frontend Architecture** | React 19, TypeScript, Vite, Tailwind CSS v4, Lucide Icons, Responsive Mobile/Desktop |
-| **Backend Architecture** | Node.js, Express, TypeScript, RESTful API, Server-Sent Events |
-| **Database & Persistence** | Neon/PostgreSQL via Drizzle for supported domains; legacy `data/db.json` persistence remains in use for other domains. These stores are not yet consolidated. A PostgreSQL failure is reported explicitly rather than treated as an empty dataset or silently replaced with stale local data. |
-| **Cryptographic Security** | AES-256-GCM field-level PII encryption, SHA-256 immutable audit ledger, PBKDF2/bcrypt salted password hashing |
-| **AI Integration Engine** | Google Gemini (`gemini-2.5-flash`, `gemini-1.5-pro`), Hugging Face, OpenRouter, and Model Context Protocol (MCP) |
-| **Test Coverage** | Latest verified main-branch CI after PR #15 and PR #14 merges: **178 tests across 34 test files passed**, with TypeScript and production build checks green. This is CI evidence, not live deployment verification. |
-| **Security Audit** | Latest PR #14 CI production dependency audit passed; two moderate development/transitive dependency advisories remain documented. |
-| **Codebase Volume** | 60,000+ lines of TypeScript |
+| **Frontend Architecture** | React 19, TypeScript, Vite, Tailwind CSS v4, responsive mobile/desktop |
+| **Backend Architecture** | Node.js, Express, TypeScript, REST API, Server-Sent Events |
+| **Database & Persistence** | Neon/PostgreSQL via Drizzle for supported domains. Some legacy domains still use the process-local `data/db.json` store; these stores are not yet consolidated. Render currently runs without a persistent disk, so JSON-backed state must not be treated as durable across restarts. |
+| **Cryptographic Security** | AES-256-GCM encryption for supported lead contact fields, SHA-256 audit hashing, and salted password hashing |
+| **AI Integration Engine** | Google Gemini, NVIDIA Nemotron, Hugging Face, OpenRouter and Model Context Protocol (MCP); actual provider availability depends on deployment credentials and live verification |
+| **Test Coverage** | See the latest successful GitHub Actions run on `main`; CI evidence is not a substitute for live production acceptance testing |
+| **Security Audit** | Dependency and application security checks run through GitHub Actions; consult current workflow results for unresolved advisories |
+| **Codebase Volume** | TypeScript application |
 
 ---
 
 ## Core Feature Modules
 
 ### 1. Territory Harvester & Prospect Finder
-- **Real-World Intelligence:** Gathers live prospect data across geographies and niches.
-- **Automated Technical Audits:** Evaluates prospect websites for mobile load latency, SSL certificates, technical SEO hygiene, and public sentiment.
-- **Encrypted PII at Rest:** All prospect contact details and PII are encrypted at rest using AES-256-GCM before storage.
+- Gathers prospect data across geographies and niches using configured sources.
+- Supports website and business audits.
+- Lead email and phone fields are encrypted at rest in the PostgreSQL-backed lead domain.
+- Source and verification metadata distinguish sourced, unverified and synthetic records.
 
 ### 2. B2B Landing Page & Website Studio
-- **Instant Client Production:** Generates responsive, high-converting agency and client websites directly from lead intelligence.
-- **Modern Bento Grid Layouts:** Built-in section blocks (Hero, Social Proof, Metrics, Feature Matrix, FAQ, CTA).
-- **Dual Export Engine:** One-click download of standalone static HTML/CSS or production-ready Next.js TSX components.
+- Generates responsive agency and client websites from lead intelligence.
+- Includes reusable page sections and layout templates.
+- Supports standalone HTML/CSS and Next.js component export where available.
+- Generated content must be reviewed before publication; proof points and testimonials must not be invented.
 
 ### 3. Unified Communications Hub
-- **Email:** Live email submission is available through the Resend API when `RESEND_API_KEY` and a verified `HAL_SENDER_EMAIL` are configured server-side. HAL records provider acceptance as `submitted`; it does not claim recipient delivery without a verified delivery event.
-- **SMS and WhatsApp:** Composer and simulation workflows are available. Live provider dispatch is not implemented and is not represented as operational.
-- **Dispatch history:** Live email submissions are recorded in the PostgreSQL communications outbox before provider submission, with idempotency keys and encrypted recipient/content fields. Provider acceptance is recorded as `submitted`; verified Resend webhook events reconcile delivery, bounce, and related states. Durable automated retry/dead-letter processing is not yet implemented. SMS and WhatsApp remain simulation-only.
-- **Calendar:** Provider connectivity and booking operations require separate live verification; do not assume calendar bookings are operational.
+- **Email:** Resend submission is implemented when the appropriate server-side or tenant credential and verified sender configuration are available. Provider acceptance is not the same as recipient delivery.
+- **SMS and WhatsApp:** Some composer and simulation workflows exist. Live SMS dispatch is not currently established. WhatsApp inbound tenant routing remains blocked until a verified phone-number-to-workspace mapping is configured.
+- **Dispatch history:** Supported communication records are persisted in PostgreSQL. Delivery, retries and provider events must be verified separately.
+- **Calendar:** Google Calendar operations require OAuth configuration, scope approval and live verification.
 
 ### 4. Neural Intelligence & Decision Graph
-- **Interactive Visual Topology:** Visualizes lead nodes, operational clusters, and autonomous recommendation confidence scores.
-- **Continuous Learning Loop:** System weights and business heuristics calibrate automatically as campaign outcomes are confirmed.
+- Visualizes supported lead and operational relationships.
+- Recommendations and model outputs depend on available data and configured providers.
+- A visualization or configured provider is not evidence of autonomous execution.
 
 ### 5. Document & Contract Studio
-- **Turnkey Legal & Sales Collateral:** Automatically compiles custom Master Services Agreements (MSAs), Statements of Work (SOWs), and strategic proposals customized to prospect audit findings.
+- Produces proposal, statement-of-work and contract drafts.
+- Generated legal and commercial documents require human review and approval before use.
 
 ---
 
@@ -53,27 +57,27 @@ HAL is built for operators, agencies, and consultancies seeking a decision-suppo
 
 ```
 ├── src/
-│   ├── components/            # Production UI modules (Prospect Harvester, Landing Page Studio,
-│   │                          # Comms Hub, Neural Graph, Contracts, Campaigns)
-│   ├── db/                    # Drizzle ORM schemas, migration tools, and AES-256-GCM encryption
-│   ├── lib/                   # Auth handlers, JWT token verification, and utility libraries
-│   ├── services/              # AI providers (Gemini, OpenRouter, HF), MCP dispatchers, webhooks
-│   └── skills/                # Agent skill registry and business heuristic executors
-├── server.ts                  # Express server, REST endpoints, CORS policies, webhooks
-├── tests/                     # 34 test suites (Unit, Integration, Security, API, Schema Drift)
-├── public/                    # Production static assets, PWA manifest, and icons
-├── docs/                      # Technical specifications, handover manifests, and architecture guides
-└── vitest.config.ts           # Automated test harness configuration
+│   ├── components/            # Application UI modules
+│   ├── db/                    # Drizzle schemas, database adapters and encryption
+│   ├── lib/                   # Authentication and shared utilities
+│   ├── services/              # AI providers, MCP dispatchers and webhooks
+│   └── skills/                # Agent skill registry and business workflows
+├── server.ts                  # Express server and REST API
+├── tests/                     # Unit, integration, security and API tests
+├── public/                    # Static assets, PWA manifest and icons
+├── docs/                      # Technical specifications and operational audits
+└── vitest.config.ts           # Automated test harness
 ```
 
 ---
 
 ## Security & Operational Standards
 
-1. **Zero-Trust Data Protection:** PII fields (emails, phones, personal notes) are encrypted with AES-256-GCM prior to database insertion.
-2. **Fail-Closed Authentication:** Authentication guards fail closed on all database errors and enforce bcrypt password hashing.
-3. **SSRF & Webhook Protection:** Outbound webhooks strictly validate HTTPS endpoints, prohibit redirects, and enforce dedicated HMAC signing secrets.
-4. **CORS Governance:** Explicit domain origin allowlists prevent cross-origin data exposure.
+1. **Data protection:** Supported lead email and phone fields use AES-256-GCM encryption. Do not assume every personal or business field in every legacy domain is encrypted.
+2. **Authentication:** Protected routes require authentication and tenant ownership checks; security tests cover selected authorization boundaries.
+3. **SSRF & webhook protection:** Outbound webhook destinations are validated and signed webhook paths enforce configured secrets.
+4. **CORS governance:** Production cross-origin access must be restricted to explicitly configured trusted origins.
+5. **Operational truth:** Liveness, database readiness, provider configuration, provider reachability and successful business execution are distinct states.
 
 ---
 
@@ -82,51 +86,49 @@ HAL is built for operators, agencies, and consultancies seeking a decision-suppo
 ### Prerequisites
 - Node.js 20 or higher
 - npm 10 or higher
-- A configured Neon/PostgreSQL database for database-backed features. Other legacy domains still use the local JSON store; configure and verify each persistence domain separately.
+- A configured PostgreSQL database for supported persistent domains
+- Required deployment secrets configured through a protected environment manager
 
 ### Installation & Launch
 
 ```bash
-# 1. Clone repository
 git clone https://github.com/isaJrKai/Hal-Argumentatio.git
 cd Hal-Argumentatio
-
-# 2. Install verified dependencies
-bun install --frozen-lockfile
-
-# 3. Configure environment
+npm ci
 cp .env.example .env
-# Edit .env with your provider credentials (GEMINI_API_KEY, JWT_SECRET, etc.)
-
-# 4. Start local development server
+# Configure required local environment variables.
 npm run dev
-
-# App runs at: http://localhost:3000
 ```
 
 ### Verification & Testing
 
 ```bash
-# Run the complete test suite
 npm test
-
-# Run production build compilation
 npm run build
-
-# Run TypeScript type-checking
 npm run lint
 ```
 
 ---
 
-## Publishing and Deployment
+## Production Hosting & Deployment
 
-The current HAL publishing workflow is the existing Google AI Studio sync/publish setup. Do not assume a successful GitHub CI run means the live application has been published or verified. After an approved change is synchronized and published through that workflow, verify the live application separately.
+- **Production host:** Render
+- **Production service:** `halbiz-full-application`
+- **Production URL:** https://halbiz-full-application.onrender.com
+- **Source repository:** https://github.com/isaJrKai/Hal-Argumentatio
+- **Deployment branch:** `main`
+- **Build command:** `npm ci && npm run build`
+- **Start command:** `npm start`
+- **Database:** Neon PostgreSQL, selected through protected deployment configuration
 
-No alternative hosting target is designated by this repository documentation.
+The Render service is configured for automatic deployment from `main`. A successful GitHub Actions run does not prove a Render deployment succeeded; check the Render deployment status and application logs after each production change. Likewise, a live deployment does not prove every external provider or business workflow works.
+
+The current Render service is on the Free plan and has no persistent disk configured. The application still has legacy JSON-backed domains; those must be migrated or explicitly retired before claiming that all application state is durable in PostgreSQL.
 
 ---
 
 ## Commercial Licensing & Transfer
 
-This codebase, associated documentation, algorithms, and design assets are delivered as a proprietary software asset. Ownership, source code, and commercial exploitation rights transfer to the acquiring party upon transaction execution.
+The codebase, associated documentation, algorithms and design assets are intended to be delivered as a proprietary software asset. Ownership, source code and commercial exploitation rights transfer to the acquiring party upon execution of the agreed transaction and transfer documentation.
+
+A buyer handover must include the source repository, domain and hosting ownership transfer, database access transfer, deployment configuration, provider credential replacement, encryption-key rotation planning, backup/restore instructions and a verified operational acceptance report. No live customer base or revenue should be represented unless independently established.
