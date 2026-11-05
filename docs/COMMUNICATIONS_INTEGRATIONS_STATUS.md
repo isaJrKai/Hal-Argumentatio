@@ -81,6 +81,23 @@ No production secrets are copied into Git or exposed in this report. An operator
 
 This PR adds unit/security coverage for trusted HTML email bodies and reset-link origin/delivery handling. GitHub Actions results are to be attached after the PR is opened. Production provider and browser verification remain explicitly unverified because no provider-console access or production credentials are available in this repository audit.
 
+## Production Render inspection (2026-11-05)
+
+The user authorized inspection of the HALBiz Render workspace. The matching service was identified by exact service name, repository and production URL:
+
+- Service: `halbiz-full-application` (`srv-dblj5ud9fdbs73dj4980`)
+- Repository/branch: `isaJrKai/Hal-Argumentatio` / `main`
+- Region/plan: Frankfurt / Free
+- Auto-deploy: enabled on commits to `main`; PR branch is not the configured production branch.
+- Latest deployment visible during inspection: succeeded at 2026-11-05 05:13 UTC, built from main commit `7c88a3abb281c4b111e2564466e2acc9fea2e608`.
+- Startup logs report the HAL server listening on port 3000, PostgreSQL schema ready, and Render marking the service live.
+- The inspected recent application log page contained no Resend, WhatsApp, Twilio/SMS, Google OAuth, Drive, Calendar, or Gmail activity. This is not proof those integrations are unconfigured; it only means no corresponding activity appeared in the retrieved log window/page.
+- A production startup message reports initialization of an empty HAL data store and no default user accounts. This should be checked against the separately assigned database-persistence/authentication workstreams before any demo or account-state claims.
+
+**Environment-variable limitation:** the available Render connection exposes service metadata and logs, and can write environment variables, but does not expose a read/list environment-variable operation. Therefore I could not verify whether the required keys are present without using an unsupported route. No secrets were read, changed, or disclosed. Render dashboard access or an operator-provided redacted key-name inventory is still needed to confirm presence (values must remain hidden).
+
+No production environment, deploy, secret, service setting, or database was modified during this inspection.
+
 ## Release decision
 
 **Do not treat this workstream as fully production-verified.** The password-reset submission path is hardened in code; Resend submission/webhook reconciliation and Google API call paths exist; SMS and WhatsApp outbound remain simulations/unavailable; WhatsApp inbound remains fail-closed; durable retries/dead-letter processing and real provider/browser acceptance tests remain outstanding.
