@@ -60,15 +60,15 @@ A real HTTP integration suite imports the Express application and uses Supertest
 - Two concurrent HTTP close-out attempts for the same lead are expected to produce exactly one successful close and one HTTP 409 conflict; the conditional-update race is mapped to a business conflict rather than a database-unavailable response.
 - Duplicate revenue close-out is rejected, and revenue listing remains tenant-scoped.
 - An activated client project contributes to Tenant A's contract MRR/ARR, while Tenant B's financial overview remains zero for that project; a cancelled project cannot be reactivated through the route.
-- Proposal generation is tenant-scoped and explicitly reports a generated-only, non-persisted draft.
+- Proposal generation is tenant-scoped, persists a durable draft, and exposes tenant-scoped list/read plus internal approve/void transitions. Internal approval is not a client signature or executed contract.
 
-The test harness exports the Express app but skips listener/background-worker startup under `NODE_ENV=test`. Each test tenant and its records use unique identifiers and are cleaned from the CI/local PostgreSQL database. This is route-level integration coverage for the exercised CRM/finance endpoints, not the complete browser lifecycle or every route in the application.
+The test harness exports the Express app but skips listener/background-worker startup under `NODE_ENV=test`. Each test tenant and its records use unique identifiers and are cleaned from the CI/local PostgreSQL database. A sequential HTTP lifecycle test now exercises persisted proposal generation → internal approval → revenue close-out → client-project creation → active delivery → financial MRR, and checks the canonical lead, revenue, project, and financial records. This is API-level integration coverage for the exercised CRM/finance endpoints, not browser automation and not the complete discovery/audit/landing-page/approved-outreach/delivery-provider lifecycle.
 
 ## Remaining verification gates
 
 These items remain unverified and must not be represented as complete:
 
-1. Full browser-level discovery → lead → audit → landing-page artifact → proposal/contract → approved outreach → delivery/follow-up → deal outcome → client project → revenue flow.
+1. Browser-level discovery → lead → audit → landing-page artifact → proposal/contract → approved outreach → delivery/follow-up → deal outcome → client project → revenue flow. The proposal-to-revenue-to-delivery API path is now covered, but the full browser journey and external landing-page/outreach delivery are not.
 2. Exact frontend-to-backend route coverage for every proposal, contract, client-project and communications action.
 3. Extend PostgreSQL-backed Tenant A/B HTTP tests to the remaining CRM/finance routes and add rollback-after-partial-failure coverage. Concurrent revenue close-out is now covered by the new HTTP test and must pass CI on the final branch head.
 4. Proposal drafts and internal approval/void states are now persisted and tenant-scoped. Client signature capture, external e-sign provider verification, executed-contract storage, and signature/execution semantics remain unimplemented; an internally approved proposal must not be represented as signed or legally executed.
