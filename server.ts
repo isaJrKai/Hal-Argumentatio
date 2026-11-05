@@ -9,6 +9,7 @@ import { execSync } from 'child_process';
 import { sendResendEmail, EmailProviderConfigurationError, EmailProviderRequestError } from './src/services/communications/resendEmail';
 import { verifySvixWebhookSignature } from './src/lib/resendWebhook';
 import { runCommunicationsOutboxWorker } from './src/services/communications/outboxWorker';
+import { verifyMetaWebhookSignature, isMetaPhoneNumberId } from './src/lib/whatsappWebhook';
 import { 
   db, 
   encrypt, 
@@ -6610,7 +6611,7 @@ app.get('/api/outreach/whatsapp/webhook', (req, res) => {
 app.post('/api/outreach/whatsapp/connect-number', authenticate, async (req, res) => {
   const contractorId = (req as any).contractorId;
   const phoneNumberId = String(req.body?.phoneNumberId || '').trim();
-  if (!/^\d{5,30}$/.test(phoneNumberId)) {
+  if (!isMetaPhoneNumberId(phoneNumberId)) {
     return res.status(400).json({ success: false, error: 'A valid Meta phone-number ID is required.' });
   }
   try {
@@ -6669,9 +6670,7 @@ app.post('/api/outreach/whatsapp/webhook', async (req, res) => {
   const rawBody = (req as any).rawBody as Buffer | undefined;
   if (!appSecret) return res.status(503).json({ error: 'WhatsApp inbound signature verification is not configured.' });
   if (!signature || !rawBody || !signature.startsWith('sha256=')) return res.status(401).json({ error: 'Missing or invalid webhook signature.' });
-  const expected = Buffer.from('sha256=' + crypto.createHmac('sha256', appSecret).update(rawBody).digest('hex'));
-  const received = Buffer.from(signature);
-  if (expected.length !== received.length || !crypto.timingSafeEqual(expected, received)) {
+  if (!verifyMetaWebhookSignature(rawBody, signature, appSecret)) {
     return res.status(401).json({ error: 'Invalid webhook signature.' });
   }
   try {
