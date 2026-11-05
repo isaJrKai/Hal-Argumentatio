@@ -139,7 +139,7 @@ describe('autonomous learning persistence failure handling', () => {
 
     // Request B has already passed initializeFromDb before A invalidates the
     // cache. It must reload after entering the same mutation queue.
-    const requestB = engineB.digestBusinessOutcome({ niche: 'roofing', outcome: 'lost' });
+    const requestB = engineA.digestBusinessOutcome({ niche: 'roofing', outcome: 'lost' });
     mocks.selectRecord.updatedAt = revisionTwo;
     mocks.updateReturning.mockResolvedValueOnce([{ updatedAt: revisionThree }]);
     mocks.updateReturning.mockResolvedValueOnce([{ updatedAt: revisionFour }]);
@@ -149,7 +149,7 @@ describe('autonomous learning persistence failure handling', () => {
     const recovered = await requestB;
 
     expect(recovered.newEpoch).toBe(1);
-    expect(engineB.getState().nicheMap.roofing.sampleCount).toBe(1);
+    expect(engineA.getState().nicheMap.roofing.sampleCount).toBe(1);
     expect(mocks.select).toHaveBeenCalledTimes(3);
     expect(mocks.updateReturning).toHaveBeenCalledTimes(5);
   });
