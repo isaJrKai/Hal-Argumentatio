@@ -30,7 +30,7 @@ function importsLegacyJsonStore(filePath: string, source: string): boolean {
 describe('runtime persistence boundary', () => {
   it('does not write audit records through the legacy JSON aggregate', () => {
     const serverSource = readFileSync(resolve(process.cwd(), 'server.ts'), 'utf8');
-    expect(serverSource).not.toMatch(/\\bdb\\.addAuditLog\\s*\\(/);
+    expect(serverSource).not.toMatch(/\bdb\.addAuditLog\s*\(/);
   });
 
   it('does not import the legacy JSON aggregate store from application source', () => {
