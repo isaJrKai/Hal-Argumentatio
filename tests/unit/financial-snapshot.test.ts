@@ -20,6 +20,19 @@ describe('financial snapshot truthfulness', () => {
     });
   });
 
+
+  it('excludes onboarding and review projects from contract MRR until delivery is active', () => {
+    const snapshot = buildFinancialSnapshotCore([
+      { id: 'onboarding', status: 'onboarding', monthlyRetainerUsd: 2400, packageTier: 'Dominance' },
+      { id: 'review', status: 'review', monthlyRetainerUsd: 1800, packageTier: 'Growth' },
+      { id: 'active-delivery', status: 'active_delivery', monthlyRetainerUsd: 1200, packageTier: 'Growth' }
+    ]);
+
+    expect(snapshot.currentMrrUsd).toBe(1200);
+    expect(snapshot.arrUsd).toBe(14400);
+    expect(snapshot.activeClientCount).toBe(1);
+  });
+
   it('does not invent CAC, LTV, churn, cash runway, projections, or historical MRR', () => {
     const snapshot = buildFinancialSnapshotCore([
       { status: 'active', monthlyRetainerUsd: 1000, packageTier: 'Growth' }
