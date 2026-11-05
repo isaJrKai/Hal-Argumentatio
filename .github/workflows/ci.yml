@@ -53,6 +53,12 @@ jobs:
         run: npm run test:ci
       - name: Build production artifacts
         run: npm run build
+      - name: Install Playwright for browser workflow verification
+        run: npm install --no-save --no-package-lock @playwright/test@1.55.0
+      - name: Install Chromium for browser workflow verification
+        run: npx playwright install --with-deps chromium
+      - name: Run browser-level proposal acceptance workflow
+        run: npx playwright test
       - name: Audit production dependency advisories
         run: bun audit --prod --audit-level=high
       - name: Report full dependency audit

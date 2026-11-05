@@ -31,6 +31,9 @@ export default function RevenueIntelligenceView({ token }: RevenueIntelligenceVi
   const [showNewExpModal, setShowNewExpModal] = useState(false);
   const [newHypothesis, setNewHypothesis] = useState('');
   const [newVariable, setNewVariable] = useState('');
+  const [newBaseline, setNewBaseline] = useState('');
+  const [newExpectedOutcome, setNewExpectedOutcome] = useState('');
+  const [experimentFormError, setExperimentFormError] = useState('');
 
   const fetchData = async () => {
     const effectiveToken = token || (typeof window !== 'undefined' ? (localStorage.getItem('token') || localStorage.getItem('halbiz_auth_token')) : '');
@@ -61,7 +64,8 @@ export default function RevenueIntelligenceView({ token }: RevenueIntelligenceVi
   const handleCreateExperiment = async (e: React.FormEvent) => {
     e.preventDefault();
     const effectiveToken = token || (typeof window !== 'undefined' ? (localStorage.getItem('token') || localStorage.getItem('halbiz_auth_token')) : '');
-    if (!newHypothesis || !newVariable || !effectiveToken) return;
+    if (!newHypothesis.trim() || !newVariable.trim() || !newBaseline.trim() || !newExpectedOutcome.trim() || !effectiveToken) return;
+    setExperimentFormError('');
     try {
       const res = await fetch('/api/revenue/experiments', {
         method: 'POST',
@@ -69,15 +73,26 @@ export default function RevenueIntelligenceView({ token }: RevenueIntelligenceVi
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${effectiveToken}`
         },
-        body: JSON.stringify({ hypothesis: newHypothesis, variable: newVariable })
+        body: JSON.stringify({
+          hypothesis: newHypothesis.trim(),
+          variable: newVariable.trim(),
+          baseline: newBaseline.trim(),
+          expectedOutcome: newExpectedOutcome.trim()
+        })
       });
-      if (res.ok) {
-        setNewHypothesis('');
-        setNewVariable('');
-        setShowNewExpModal(false);
-        fetchData();
+      const responseData = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setExperimentFormError(responseData.error || `Experiment creation failed (HTTP ${res.status}).`);
+        return;
       }
+      setNewHypothesis('');
+      setNewVariable('');
+      setNewBaseline('');
+      setNewExpectedOutcome('');
+      setShowNewExpModal(false);
+      fetchData();
     } catch (err: any) {
+      setExperimentFormError(err?.message || 'Experiment could not be created. Please retry.');
       console.warn('Failed to create experiment:', err?.message || err);
     }
   };
@@ -158,9 +173,9 @@ export default function RevenueIntelligenceView({ token }: RevenueIntelligenceVi
           <div className="text-[10px] text-text-secondary font-mono mt-0.5">{summary.totalCustomers || 0} customers</div>
         </div>
         <div className="p-4 rounded-xl border border-border-dim bg-bg-raised">
-          <div className="text-[10px] font-mono text-text-tertiary uppercase">Closed Revenue</div>
+          <div className="text-[10px] font-mono text-text-tertiary uppercase">Closed-Won CRM Value</div>
           <div className="text-lg font-bold font-mono text-emerald-400 mt-1">${(summary.totalRevenue || 0).toLocaleString()}</div>
-          <div className="text-[10px] text-emerald-400/80 font-mono mt-0.5">Verified CRM</div>
+          <div className="text-[10px] text-emerald-400/80 font-mono mt-0.5">Lead-linked value; not cash collected</div>
         </div>
         <div className="p-4 rounded-xl border border-border-dim bg-bg-raised">
           <div className="text-[10px] font-mono text-text-tertiary uppercase">Blended ROAS</div>
@@ -439,7 +454,7 @@ export default function RevenueIntelligenceView({ token }: RevenueIntelligenceVi
       {/* New Experiment Modal */}
       {showNewExpModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4">
-          <div className="bg-bg-raised border border-border-dim rounded-2xl w-full max-w-md p-6 space-y-4 shadow-2xl">
+          <div className="bg-bg-raised border border-border-dim rounded-2xl w-full max-w-md max-h-[90vh] overflow-y-auto p-6 space-y-4 shadow-2xl">
             <h3 className="text-base font-bold font-mono text-text-primary">Create Revenue Experiment</h3>
             <form onSubmit={handleCreateExperiment} className="space-y-4">
               <div>
@@ -464,6 +479,31 @@ export default function RevenueIntelligenceView({ token }: RevenueIntelligenceVi
                   required
                 />
               </div>
+              <div>
+                <label className="block text-xs font-mono text-text-secondary mb-1">Measured Baseline</label>
+                <textarea
+                  value={newBaseline}
+                  onChange={e => setNewBaseline(e.target.value)}
+                  placeholder="Record the starting value, measurement period, and source"
+                  className="w-full px-3 py-2 rounded-lg border border-border-dim bg-bg-base text-xs font-mono text-text-primary focus:outline-none focus:border-accent"
+                  rows={2}
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-mono text-text-secondary mb-1">Expected Outcome</label>
+                <textarea
+                  value={newExpectedOutcome}
+                  onChange={e => setNewExpectedOutcome(e.target.value)}
+                  placeholder="State the measurable target and the period for evaluating it"
+                  className="w-full px-3 py-2 rounded-lg border border-border-dim bg-bg-base text-xs font-mono text-text-primary focus:outline-none focus:border-accent"
+                  rows={2}
+                  required
+                />
+              </div>
+              {experimentFormError && (
+                <p role="alert" className="text-xs text-red-400">{experimentFormError}</p>
+              )}
               <div className="flex justify-end gap-2 pt-2">
                 <button
                   type="button"

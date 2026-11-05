@@ -26,6 +26,7 @@ import {
 import { ClientProject, ClientMilestone, ClientAsset, Lead } from '../types';
 import { useBusinessContext } from '../context/BusinessContext';
 import { readApiResponse } from '../lib/apiResponse';
+import InvoiceLedgerPanel from './InvoiceLedgerPanel';
 
 interface DeliveryHubProps {
   token: string;
@@ -48,7 +49,7 @@ export default function DeliveryHub({ token, leads = [] }: DeliveryHubProps) {
   const [newProjectCity, setNewProjectCity] = useState('');
   const [newProjectServiceType, setNewProjectServiceType] = useState('');
   const [newProjectPackage, setNewProjectPackage] = useState<'Growth' | 'Dominance' | 'Enterprise'>('Dominance');
-  const [newProjectRetainer, setNewProjectRetainer] = useState(2400);
+  const [newProjectRetainer, setNewProjectRetainer] = useState(0);
 
   const fetchProjects = async (retry = 1) => {
     let retryScheduled = false;
@@ -131,6 +132,7 @@ export default function DeliveryHub({ token, leads = [] }: DeliveryHubProps) {
       setNewProjectCity('');
       setNewProjectServiceType('');
       setNewProjectLeadId('');
+      setNewProjectRetainer(0);
       setProjectError(null);
     } catch (err) {
       console.error('Error creating project:', err);
@@ -149,7 +151,9 @@ export default function DeliveryHub({ token, leads = [] }: DeliveryHubProps) {
     const updatedProject = {
       ...selectedProject,
       milestones: updatedMilestones,
-      status: allMilestonesComplete ? ('completed' as const) : ('active_delivery' as const)
+      status: ['cancelled', 'canceled', 'churned', 'archived'].includes(String(selectedProject.status || '').toLowerCase())
+        ? selectedProject.status
+        : allMilestonesComplete ? ('completed' as const) : ('active_delivery' as const)
     };
 
     try {
@@ -250,7 +254,7 @@ export default function DeliveryHub({ token, leads = [] }: DeliveryHubProps) {
                 Client Projects ({projects.length})
               </span>
               <span className="text-[9px] font-mono text-brand font-bold uppercase">
-                ${projects.filter(project => project.status !== 'completed' && typeof project.monthlyRetainerUsd === 'number' && Number.isFinite(project.monthlyRetainerUsd)).reduce((sum, project) => sum + project.monthlyRetainerUsd, 0).toLocaleString()}/mo MRR
+                ${projects.filter(project => ['active', 'active_delivery', 'in_progress'].includes(String(project.status || '').toLowerCase()) && typeof project.monthlyRetainerUsd === 'number' && Number.isFinite(project.monthlyRetainerUsd)).reduce((sum, project) => sum + project.monthlyRetainerUsd, 0).toLocaleString()}/mo contract MRR
               </span>
             </div>
 
@@ -319,7 +323,13 @@ export default function DeliveryHub({ token, leads = [] }: DeliveryHubProps) {
         <div className="lg:col-span-8 space-y-6">
           {selectedProject ? (
             <div className="space-y-6">
-              
+              <InvoiceLedgerPanel
+                token={token}
+                projectId={selectedProject.id}
+                leadId={selectedProject.leadId}
+                businessName={selectedProject.businessName}
+              />
+
               {/* PROJECT HERO METRICS CARD */}
               <div className="bg-bg-raised border border-border-dim rounded-sm p-5 space-y-4">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border-dim/60 pb-4">
@@ -515,9 +525,9 @@ export default function DeliveryHub({ token, leads = [] }: DeliveryHubProps) {
             </div>
 
             <form onSubmit={handleCreateProject} className="space-y-3 font-mono text-xs">
-              {leads.length > 0 && (
+              {leads.some(l => ['closed_won', 'won', 'converted', 'customer'].includes(String(l.status).toLowerCase())) && (
                 <div className="space-y-1">
-                  <label className="text-[10px] text-text-secondary uppercase font-bold">Select Existing Lead (Optional)</label>
+                  <label className="text-[10px] text-text-secondary uppercase font-bold">Link a closed-won lead (Optional)</label>
                   <select
                     value={newProjectLeadId}
                     onChange={(e) => {
@@ -534,7 +544,7 @@ export default function DeliveryHub({ token, leads = [] }: DeliveryHubProps) {
                     className="w-full bg-bg-dark border border-border-dim rounded-sm p-2 text-text-primary outline-none focus:border-brand"
                   >
                     <option value="">-- Manual Entry / No Linked Lead --</option>
-                    {leads.map(l => (
+                    {leads.filter(l => ['closed_won', 'won', 'converted', 'customer'].includes(String(l.status).toLowerCase())).map(l => (
                       <option key={l.id} value={l.id}>{l.businessName} ({l.city} - {l.serviceType})</option>
                     ))}
                   </select>

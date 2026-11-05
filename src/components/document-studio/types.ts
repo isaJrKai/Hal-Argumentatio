@@ -59,9 +59,9 @@ export interface DocumentRecipient {
   email: string;
   tradeNiche: string;
   website: string;
-  missingSsl: boolean;
+  sslStatus: 'secured' | 'missing' | 'unknown';
   lcpSpeed: string;
-  recommendedSlaUsd: number;
+  recommendedSlaUsd: number | null;
 }
 
 export interface DocumentComment {
