@@ -11,6 +11,11 @@ import { seoSchemaGeneratorSkill } from '../../src/skills/seo-schema-generator';
 import { complianceScreenerSkill } from '../../src/skills/compliance-screener';
 import { dueDiligenceUnderwritingSkill } from '../../src/skills/due-diligence-underwriting';
 import { maTargetIntelSkill } from '../../src/skills/ma-target-intel';
+import { verifiedLeadListsSkill } from '../../src/skills/verified-lead-lists';
+import { patentLandscapeSkill } from '../../src/skills/patent-landscape';
+import { pricingMarginCalculatorSkill } from '../../src/skills/pricing-margin-calculator';
+import { listSubscriptionPricingSkill } from '../../src/skills/list-subscription-pricing';
+import { automationOpsProductSkill } from '../../src/skills/automation-ops-product';
 
 describe('existing HAL skills evidence boundaries', () => {
   beforeEach(() => generateResponse.mockReset());
@@ -73,6 +78,92 @@ describe('existing HAL skills evidence boundaries', () => {
     expect(result.schema.url).toBeUndefined();
     expect(result.schema.image).toBeUndefined();
     expect(result.report).not.toContain('35%');
+  });
+
+  it('does not fabricate records in the lead-list packager', async () => {
+    const result = await verifiedLeadListsSkill.execute({
+      niche: 'Roofing',
+      geography: 'Kampala',
+      verificationSources: 'Official business websites',
+      enrichmentSignals: 'Phone, website',
+      pricingStrategy: 'Not decided'
+    }, 'tenant-a');
+
+    expect(result.records).toEqual([]);
+    expect(result.retrievedRecordsCount).toBe(0);
+    expect(result.verifiedRecordsCount).toBe(0);
+    expect(result.liveSourcesQueried).toBe(false);
+    expect(result.report).toContain('EMPTY TEMPLATE — NOT REAL PROSPECT DATA');
+  });
+
+  it('does not issue trademark or patent clearance without registry searches', async () => {
+    const result = await patentLandscapeSkill.execute({
+      proposedBrand: 'Example Product',
+      industrySector: 'SaaS',
+      jurisdiction: 'Uganda'
+    }, 'tenant-a');
+
+    expect(result.searchPerformed).toBe(false);
+    expect(result.clearanceStatus).toBe('NOT_ASSESSED');
+    expect(result.trademarkMatches).toBeNull();
+    expect(result.patentFindings).toBeNull();
+    expect(result.report).toContain('No USPTO, WIPO, patent-office, or regulator database was queried');
+  });
+
+  it('calculates pricing spreads from explicit assumptions and labels them as scenarios', async () => {
+    const result = await pricingMarginCalculatorSkill.execute({
+      modelType: 'arbitrage',
+      workerPay: '10',
+      markupPercentOrRetainer: '50',
+      weeklyHoursOrAdminHours: '20',
+      adminHourlyCost: ''
+    }, 'tenant-a');
+
+    expect(result.scenarioOnly).toBe(true);
+    expect(result.calculations.clientHourlyRateUsd).toBe(15);
+    expect(result.calculations.weeklySpreadUsd).toBe(100);
+    expect(result.report).toContain('before other costs');
+    await expect(pricingMarginCalculatorSkill.execute({
+      modelType: 'ops',
+      workerPay: '50',
+      markupPercentOrRetainer: '199',
+      weeklyHoursOrAdminHours: '5',
+      adminHourlyCost: ''
+    }, 'tenant-a')).rejects.toThrow('admin hourly cost');
+  });
+
+  it('calculates lead-list pricing as a user-input scenario, not measured profitability', async () => {
+    const result = await listSubscriptionPricingSkill.execute({
+      listHours: '6',
+      hourlyRate: '40',
+      toolCosts: '20',
+      modelType: 'subscription',
+      unitPrice: '99',
+      volume: '10'
+    }, 'tenant-a');
+
+    expect(result.scenarioOnly).toBe(true);
+    expect(result.calculations.buildCostUsd).toBe(260);
+    expect(result.calculations.revenueScenarioUsd).toBe(11880);
+    expect(result.evidenceStatus).toContain('no_lead_data_retrieved');
+    expect(result.report).toContain('ongoing list refresh and verification labor');
+  });
+
+  it('does not recommend review gating or claim an automation offer is already implemented', async () => {
+    generateResponse.mockResolvedValue('');
+    const result = await automationOpsProductSkill.execute({
+      prospectType: 'Roofing contractors',
+      coreAutomationOffer: 'Missed-call text-back and appointment reminders',
+      initialHook: 'Paid pilot',
+      monthlyRetainer: '199',
+      infrastructureStack: 'Twilio and existing CRM'
+    }, 'tenant-a');
+
+    expect(result.integrationsExecuted).toBe(false);
+    expect(result.evidenceStatus).toBe('proposal_only_no_integrations_executed');
+    expect(result.report).toContain('Do not filter recipients by expected sentiment');
+    expect(result.report).not.toContain('prevent negative reviews from reaching public profiles');
+    expect(result.report).not.toContain('pays for itself instantly');
   });
 
   it('does not issue fake sanctions clearance or a low-risk AML rating', async () => {
