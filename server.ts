@@ -8,6 +8,7 @@ import { isIP } from 'node:net';
 import { execSync } from 'child_process';
 import { sendResendEmail, EmailProviderConfigurationError, EmailProviderRequestError } from './src/services/communications/resendEmail';
 import { verifySvixWebhookSignature } from './src/lib/resendWebhook';
+import { runCommunicationsOutboxWorker } from './src/services/communications/outboxWorker';
 import { 
   db, 
   encrypt, 
@@ -6193,6 +6194,41 @@ app.post('/api/outreach/draft-ai', authenticate, async (req, res) => {
   }
 });
 
+// Internal durable communications worker. Configure HAL_COMMUNICATIONS_WORKER_SECRET (32+ chars)
+// and invoke this endpoint from a trusted scheduler; never expose the secret to browsers.
+app.post('/api/internal/communications/outbox/run', async (req, res) => {
+  const secret = process.env.HAL_COMMUNICATIONS_WORKER_SECRET || '';
+  const supplied = String(req.header('authorization') || '').replace(/^Bearer\s+/i, '');
+  if (secret.length < 32 || supplied.length !== secret.length ||
+      !crypto.timingSafeEqual(Buffer.from(supplied), Buffer.from(secret))) {
+    return res.status(401).json({ success: false, error: 'Unauthorized worker request.' });
+  }
+  try {
+    const pool = getApplicationPostgresPool();
+    const result = await runCommunicationsOutboxWorker(pool, async (record) => {
+      const bridge = await getBridgesForContractor(record.contractor_id);
+      if (record.provider !== 'resend' || record.channel !== 'email' ||
+          !bridge.email.apiKey || !bridge.email.senderEmail) {
+        throw new EmailProviderConfigurationError('Tenant Resend sender configuration is unavailable.');
+      }
+      const sent = await sendResendEmail({
+        to: decrypt(record.recipient_encrypted),
+        subject: record.subject_encrypted ? decrypt(record.subject_encrypted) : 'Message from HAL',
+        text: decrypt(record.body_encrypted),
+        idempotencyKey: record.idempotency_key
+      }, { apiKey: bridge.email.apiKey, from: bridge.email.senderEmail });
+      return { providerMessageId: sent.providerMessageId };
+    }, {
+      batchSize: Number(process.env.HAL_COMMUNICATIONS_WORKER_BATCH_SIZE) || 10,
+      maxAttempts: 5
+    });
+    return res.json({ success: true, ...result });
+  } catch (error: any) {
+    console.error('[Communications Outbox Worker] Batch failed:', error?.message || error);
+    return res.status(503).json({ success: false, error: 'Communications outbox batch could not be processed.' });
+  }
+});
+
 app.post('/api/outreach/dispatch', authenticate, async (req, res) => {
   const contractorId = (req as any).contractorId;
   const {
@@ -6353,7 +6389,8 @@ app.post('/api/outreach/dispatch', authenticate, async (req, res) => {
       const result = await sendResendEmail({
         to: String(recipient),
         subject: customizedSubject,
-        text: customizedMessage
+        text: customizedMessage,
+        idempotencyKey
       }, {
         apiKey: emailBridge.email.apiKey,
         from: emailBridge.email.senderEmail
@@ -6425,9 +6462,14 @@ app.post('/api/outreach/dispatch', authenticate, async (req, res) => {
         block: auditBlock
       });
     } catch (err: any) {
+      const providerStatus = Number(String(err?.message || '').match(/HTTP (\d{3})/i)?.[1] || 0);
+      const retryableFailure = !(err instanceof EmailProviderConfigurationError) &&
+        (!providerStatus || providerStatus === 408 || providerStatus === 409 || providerStatus === 425 || providerStatus === 429 || providerStatus >= 500);
+      const nextStatus = retryableFailure ? 'retrying' : 'failed';
       await pgDb.update(communicationsOutbox).set({
-        status: 'failed',
+        status: nextStatus,
         attempts: 1,
+        nextAttemptAt: retryableFailure ? new Date(Date.now() + 30000) : null,
         lastAttemptAt: new Date(),
         updatedAt: new Date(),
         errorCode: err instanceof EmailProviderConfigurationError ? 'PROVIDER_NOT_CONFIGURED' : err instanceof EmailProviderRequestError ? 'PROVIDER_REQUEST_FAILED' : 'PROVIDER_UNKNOWN_FAILURE',
