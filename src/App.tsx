@@ -292,12 +292,15 @@ export default function App() {
     const drawer = mobileDrawerRef.current;
     if (!drawer) return;
 
-    const getFocusable = () =>
+    const getFocusable = (): HTMLElement[] =>
       Array.from(
-        drawer.querySelectorAll<HTMLElement>(
+        drawer.querySelectorAll(
           'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
         )
-      ).filter((element) => element.getAttribute('aria-hidden') !== 'true');
+      ).filter(
+        (element): element is HTMLElement =>
+          element instanceof HTMLElement && element.getAttribute('aria-hidden') !== 'true'
+      );
 
     getFocusable()[0]?.focus();
 
