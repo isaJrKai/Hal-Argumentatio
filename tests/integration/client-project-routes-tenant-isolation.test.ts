@@ -76,6 +76,7 @@ describe('client project HTTP route tenant isolation', () => {
       await pool.query('DELETE FROM work_events WHERE contractor_id = ANY($1::text[])', [[tenantA, tenantB]]);
       await pool.query('DELETE FROM invoice_payments WHERE contractor_id = ANY($1::text[])', [[tenantA, tenantB]]);
       await pool.query('DELETE FROM invoices WHERE contractor_id = ANY($1::text[])', [[tenantA, tenantB]]);
+      await pool.query('DELETE FROM proposal_signing_links WHERE contractor_id = ANY($1::text[])', [[tenantA, tenantB]]);
       await pool.query('DELETE FROM proposals WHERE contractor_id = ANY($1::text[])', [[tenantA, tenantB]]);
       await pool.query('DELETE FROM revenue_records WHERE contractor_id = ANY($1::text[])', [[tenantA, tenantB]]);
       await pool.query('DELETE FROM client_projects WHERE contractor_id = ANY($1::text[])', [[tenantA, tenantB]]);
@@ -184,6 +185,90 @@ describe('client project HTTP route tenant isolation', () => {
     expect(lead.status).toBe('closed_won');
     expect(revenue.amount_usd).toBe(900);
     expect(persistedProject).toMatchObject({ status: 'active_delivery', monthly_retainer_usd: 1450 });
+  });
+
+  it('records one-time client proposal acceptance with immutable content evidence', async (ctx) => {
+    if (!dbAvailable) return ctx.skip();
+
+    const generated = await request(app)
+      .post('/api/proposals/generate')
+      .set('Authorization', `Bearer ${tokenA}`)
+      .send({ leadId: leadA, packageTier: 'Growth', monthlyRetainerUsd: 1200, setupFeeUsd: 500 });
+    expect(generated.status).toBe(201);
+
+    const approved = await request(app)
+      .patch(`/api/proposals/${generated.body.id}/status`)
+      .set('Authorization', `Bearer ${tokenA}`)
+      .send({ status: 'approved' });
+    expect(approved.status).toBe(200);
+
+    const link = await request(app)
+      .post(`/api/proposals/${generated.body.id}/signing-link`)
+      .set('Authorization', `Bearer ${tokenA}`);
+    expect(link.status).toBe(201);
+    expect(link.body.acceptanceMode).toBe('first_party_typed_name_and_consent');
+    expect(link.body.externalESignProviderVerified).toBe(false);
+
+    const token = String(link.body.signingUrl).split('/').pop();
+    expect(token).toMatch(/^[A-Za-z0-9_-]{40,}$/);
+    const page = await request(app).get(link.body.signingUrl);
+    expect(page.status).toBe(200);
+    expect(page.text).toContain('Accept proposal');
+    expect(page.headers['cache-control']).toContain('no-store');
+
+    const publicRead = await request(app).get(`/api/public/proposals/${token}`);
+    expect(publicRead.status).toBe(200);
+    expect(publicRead.body.status).toBe('approved');
+    expect(publicRead.body.content.id).toBe(generated.body.id);
+
+    const noConsent = await request(app)
+      .post(`/api/public/proposals/${token}`)
+      .send({ signerName: 'Client Representative', signerEmail: 'client@example.test', consent: false });
+    expect(noConsent.status).toBe(400);
+
+    const accepted = await request(app)
+      .post(`/api/public/proposals/${token}`)
+      .set('user-agent', 'HAL acceptance integration test')
+      .send({ signerName: 'Client Representative', signerEmail: 'client@example.test', consent: true });
+    expect(accepted.status).toBe(200);
+    expect(accepted.body.success).toBe(true);
+    expect(accepted.body.identityVerifiedByExternalProvider).toBe(false);
+    expect(accepted.body.signedContentHash).toMatch(/^[a-f0-9]{64}$/);
+
+    const replay = await request(app)
+      .post(`/api/public/proposals/${token}`)
+      .send({ signerName: 'Second Attempt', signerEmail: 'second@example.test', consent: true });
+    expect(replay.status).toBe(404);
+
+    const [stored] = (await pool.query(
+      'SELECT status, signer_name, signer_email, signature_consent, signed_content_hash FROM proposals WHERE id = $1 AND contractor_id = $2',
+      [generated.body.id, tenantA]
+    )).rows;
+    expect(stored).toMatchObject({
+      status: 'signed',
+      signer_name: 'Client Representative',
+      signer_email: 'client@example.test',
+      signature_consent: true
+    });
+    expect(stored.signed_content_hash).toBe(accepted.body.signedContentHash);
+
+    const [linkRow] = (await pool.query(
+      'SELECT token_hash, used_at FROM proposal_signing_links WHERE proposal_id = $1 AND contractor_id = $2',
+      [generated.body.id, tenantA]
+    )).rows;
+    expect(linkRow.used_at).toBeTruthy();
+    expect(linkRow.token_hash).not.toBe(token);
+
+    const events = await pool.query(
+      "SELECT event_type FROM work_events WHERE contractor_id = $1 AND entity_type = 'proposal' AND entity_id = $2 ORDER BY occurred_at",
+      [tenantA, generated.body.id]
+    );
+    expect(events.rows.map(row => row.event_type)).toEqual([
+      'proposal.generated',
+      'proposal.approved',
+      'proposal.signing_link_created',
+      'proposal.client_accepted'
+    ]);
   });
 
   it('isolates invoices and serializes concurrent receipts without allowing overpayment', async (ctx) => {
