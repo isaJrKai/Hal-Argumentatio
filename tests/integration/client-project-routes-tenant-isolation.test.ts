@@ -175,6 +175,25 @@ describe('client project HTTP route tenant isolation', () => {
     expect(tenantBFinancials.body.currentMrrUsd).toBe(0);
     expect(tenantBFinancials.body.arrUsd).toBe(0);
     expect(tenantBFinancials.body.activeClientCount).toBe(0);
+
+    const cancelled = await request(app)
+      .put(`/api/projects/${created.body.id}`)
+      .set('Authorization', `Bearer ${tokenA}`)
+      .send({ status: 'cancelled' });
+    expect(cancelled.status).toBe(200);
+    expect(cancelled.body.status).toBe('cancelled');
+
+    const reactivation = await request(app)
+      .put(`/api/projects/${created.body.id}`)
+      .set('Authorization', `Bearer ${tokenA}`)
+      .send({ status: 'active_delivery', monthlyRetainerUsd: 1500 });
+    expect(reactivation.status).toBe(409);
+
+    const [terminalProject] = (await pool.query(
+      'SELECT status, monthly_retainer_usd FROM client_projects WHERE id = $1 AND contractor_id = $2',
+      [created.body.id, tenantA]
+    )).rows;
+    expect(terminalProject).toMatchObject({ status: 'cancelled', monthly_retainer_usd: 1500 });
   });
 
   it('prevents tenant B from updating tenant A\'s project by identifier', async (ctx) => {
