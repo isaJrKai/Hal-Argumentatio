@@ -4274,9 +4274,9 @@ app.get('/api/recommendations', authenticate, async (req, res) => {
     const contractorRecommendations = await pgDb.select().from(recommendations).where(inArray(recommendations.contractorId, targetIds)).orderBy(desc(recommendations.createdAt));
     res.json(contractorRecommendations);
   } catch (err: any) {
-    console.error('[HAL Recommendations] PostgreSQL read failed; using tenant-local fallback.', err);
-    res.set('X-HAL-Degraded', 'true').set('X-HAL-Data-Source', 'tenant-local-json-fallback');
-    return res.status(200).json(db.getRecommendations(contractorId));
+    console.error('[HAL Recommendations] PostgreSQL read failed.', err);
+    res.set('X-HAL-Degraded', 'true').set('X-HAL-Data-Source', 'postgres-unavailable');
+    return res.status(503).json({ error: 'Recommendations are temporarily unavailable. Please retry.' });
   }
 });
 
