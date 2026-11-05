@@ -42,7 +42,7 @@ A regression test asserts these fail-closed invariants.
 - Recommendation execution no longer manufactures a random “Manual Ref” identifier. The recommendation state update and immutable lifecycle event now commit in one transaction with a current-status predicate to prevent concurrent overwrites.
 - Client-project creation now requires explicit business, city, service, package, and positive whole-dollar retainer values. When linked to a lead, that lead must belong to the tenant and already be closed-won; an existing linked project is rejected. Missing audit scores and target scores remain unavailable instead of being seeded with defaults.
 - The project form no longer pre-fills a $2,400 retainer, and its lead picker offers only closed-won leads.
-- Project updates accept explicit non-negative whole-dollar retainer changes and terminal cancellation states. The work event records prior/current retainer values.
+- Project updates accept explicit non-negative whole-dollar retainer changes and terminal cancellation states. The project write and work event commit atomically, recording prior/current status and retainer values.
 - Financial MRR now counts only explicit active-delivery statuses (active, active_delivery, in_progress); onboarding and review projects are excluded until delivery is active.
 - The recommendations endpoint now returns an empty tenant-scoped list instead of inserting a fabricated sample campaign recommendation.
 - The automated decision engine now compares only campaigns with recorded spend and unambiguous lead-linked closed-won revenue. It no longer assigns unattributed revenue to an unknown campaign or invents geo attribution, confidence, impact scores, or uplift amounts; geographic recommendations remain explicitly unsupported.
