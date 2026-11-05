@@ -424,7 +424,7 @@ function checkRateLimit(req: express.Request, res: express.Response, email: stri
 }
 
 function recordAuthFailure(req: express.Request, email: string) {
-  const ip = req.ip || req.headers['x-forwarded-for'] as string || 'unknown-ip';
+  const ip = getClientIp(req);
   const limitKey = `${ip}:${email.toLowerCase().trim()}`;
   const now = Date.now();
   pruneLoginFailures(now);
@@ -444,7 +444,7 @@ function recordAuthFailure(req: express.Request, email: string) {
 }
 
 function recordAuthSuccess(req: express.Request, email: string) {
-  const ip = req.ip || req.headers['x-forwarded-for'] as string || 'unknown-ip';
+  const ip = getClientIp(req);
   const limitKey = `${ip}:${email.toLowerCase().trim()}`;
   pruneLoginFailures(Date.now());
   loginFailures.delete(limitKey);
