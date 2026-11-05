@@ -1,8 +1,8 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { Pool } from 'pg';
 import { drizzle } from 'drizzle-orm/node-postgres';
-import { pgTable, text, timestamp, integer, boolean } from 'drizzle-orm/pg-core';
-import { claimHermesWorkTask } from '../../src/lib/hermesTaskClaim';
+import { pgTable, text, timestamp, integer, boolean, jsonb } from 'drizzle-orm/pg-core';
+import { claimHermesWorkTask, heartbeatHermesWorkTask, failExpiredHermesWorkTask } from '../../src/lib/hermesTaskClaim';
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL || 'postgres://postgres:postgres@127.0.0.1:5432/hal_test'
@@ -19,7 +19,9 @@ const testTasks = pgTable('hermes_task_claim_test', {
   errorMessage: text('error_message'),
   requiresApproval: boolean('requires_approval').notNull(),
   approvedAt: timestamp('approved_at'),
-  updatedAt: timestamp('updated_at').notNull()
+  updatedAt: timestamp('updated_at').notNull(),
+  completedAt: timestamp('completed_at'),
+  output: jsonb('output')
 });
 
 let dbAvailable = false;
@@ -41,7 +43,9 @@ beforeAll(async () => {
         error_message text,
         requires_approval boolean NOT NULL DEFAULT false,
         approved_at timestamp,
-        updated_at timestamp NOT NULL DEFAULT NOW()
+        updated_at timestamp NOT NULL DEFAULT NOW(),
+        completed_at timestamp,
+        output jsonb
       )
     `);
   } catch {
@@ -123,4 +127,31 @@ describe('Hermes PostgreSQL task claim', () => {
     const claimed = await claimHermesWorkTask(db, 'task-hermes-1', 'tenant-a', testTasks);
     expect(claimed).toMatchObject({ status: 'running', attemptCount: 1, contractorId: 'tenant-a' });
   });
+
+  it('refreshes only the current tenant-owned attempt heartbeat', async () => {
+    if (!dbAvailable) return;
+    await insertTask();
+    const first = await pool.query('SELECT updated_at FROM hermes_task_claim_test WHERE id = $1', ['task-hermes-1']);
+    const alive = await heartbeatHermesWorkTask(db, 'task-hermes-1', 'tenant-a', 1, testTasks);
+    expect(alive).toBe(true);
+    const after = await pool.query('SELECT updated_at FROM hermes_task_claim_test WHERE id = $1', ['task-hermes-1']);
+    expect(new Date(after.rows[0].updated_at).getTime()).toBeGreaterThanOrEqual(new Date(first.rows[0].updated_at).getTime());
+
+    await pool.query('UPDATE hermes_task_claim_test SET status = $1, attempt_count = $2 WHERE id = $3', ['running', 2, 'task-hermes-1']);
+    await expect(heartbeatHermesWorkTask(db, 'task-hermes-1', 'tenant-a', 1, testTasks)).resolves.toBe(false);
+  });
+
+  it('turns an expired running lease into a persisted failure receipt, without crossing tenants', async () => {
+    if (!dbAvailable) return;
+    await insertTask({ status: 'running', attempt_count: 1 });
+    await pool.query("UPDATE hermes_task_claim_test SET updated_at = NOW() - INTERVAL '5 minutes' WHERE id = $1", ['task-hermes-1']);
+    const wrongTenant = await failExpiredHermesWorkTask(db, 'task-hermes-1', 'tenant-b', new Date(), 120_000, testTasks);
+    expect(wrongTenant).toBeNull();
+
+    const recovered = await failExpiredHermesWorkTask(db, 'task-hermes-1', 'tenant-a', new Date(), 120_000, testTasks);
+    expect(recovered).toMatchObject({ status: 'failed', attemptCount: 1 });
+    expect(recovered.output).toMatchObject({ outcome: 'lease_expired', success: false, worker: 'hermes', taskId: 'task-hermes-1' });
+    expect(recovered.errorMessage).toContain('lease expired');
+  });
+
 });
