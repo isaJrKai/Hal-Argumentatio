@@ -943,11 +943,9 @@ app.patch('/api/work-tasks/:id', authenticate, async (req, res) => {
   }
 });
 
-// Helper to resolve workspace contractor IDs (allows admins to view full primary workspace)
-function getTargetContractorIds(contractorId: string, role?: string): string[] {
-  if (role === 'admin') {
-    return ['con_admin_seed', contractorId];
-  }
+// Workspace APIs are always tenant-local, including for platform administrators.
+// Cross-tenant account administration belongs exclusively to dedicated admin endpoints.
+function getTargetContractorIds(contractorId: string, _role?: string): string[] {
   return [contractorId];
 }
 
