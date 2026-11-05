@@ -24,7 +24,7 @@ import {
   Recommendation
 } from './src/db/db';
 import { db as pgDb, createPool as getApplicationPostgresPool } from './src/db/index.ts';
-import { contractors, auditLogs, leads, leadEvents, revenueRecords, campaigns, winLossRecords, performanceSnapshots, recommendations, forecasts, predictionOutcomes, learningInsights, chatMessages, chatProjects, chatConversations, missions, clientProjects, outreachSequences, apiKeys, connectorCredentials, notifications, schedulerJobs, passwordResetTokens, leadAttribution, conversionOutbox, googleAdsDailyPerformance, revenueExperiments, revenueRecommendations, revenueRecommendationEvents, revenueSimulations, revenueOutcomes, communicationsOutbox, communicationsDeliveryEvents, communicationsConsents, twilioPhoneNumberMappings, twilioInboundEvents, whatsappPhoneNumberMappings, whatsappInboundEvents, halLoops, halLoopEvents, hermesLabArtifacts, hermesDiagnosticIncidents, hermesLabMessages, staffMembers, workEvents, workTasks, revokedTokens } from './src/db/schema.ts';
+import { contractors, auditLogs, leads, leadEvents, revenueRecords, campaigns, winLossRecords, performanceSnapshots, recommendations, forecasts, predictionOutcomes, learningInsights, chatMessages, chatProjects, chatConversations, missions, clientProjects, outreachSequences, apiKeys, connectorCredentials, notifications, schedulerJobs, passwordResetTokens, leadAttribution, conversionOutbox, googleAdsDailyPerformance, revenueExperiments, revenueRecommendations, revenueRecommendationEvents, revenueSimulations, revenueOutcomes, communicationsOutbox, communicationsDeliveryEvents, communicationsOptOuts, communicationsConsents, twilioPhoneNumberMappings, twilioInboundEvents, whatsappPhoneNumberMappings, whatsappInboundEvents, halLoops, halLoopEvents, hermesLabArtifacts, hermesDiagnosticIncidents, hermesLabMessages, staffMembers, workEvents, workTasks, revokedTokens } from './src/db/schema.ts';
 import { eq, inArray, desc, and, or, like, sql, gte, lte, gt, isNull } from 'drizzle-orm';
 import { 
   generateLearningFromOutcome, 
@@ -6287,6 +6287,13 @@ app.post('/api/outreach/dispatch', authenticate, async (req, res) => {
         if (gateError instanceof FailClosedOutreachError) return res.status(409).json({ success: false, code: 'OUTREACH_GROUNDING_BLOCKED', error: gateError.message });
         throw gateError;
       }
+      const phoneHash = crypto.createHash('sha256').update(normalizedRecipient).digest('hex');
+      const [suppression] = await pgDb.select().from(communicationsOptOuts).where(and(
+        eq(communicationsOptOuts.contractorId, contractorId),
+        eq(communicationsOptOuts.channel, 'sms'),
+        eq(communicationsOptOuts.phoneHash, phoneHash)
+      )).limit(1);
+      if (suppression) return res.status(409).json({ success: false, code: 'SMS_RECIPIENT_OPTED_OUT', error: 'This phone number has opted out of SMS. A new explicit opt-in is required before sending.' });
       const [consent] = await pgDb.select().from(communicationsConsents).where(and(
         eq(communicationsConsents.contractorId, contractorId),
         eq(communicationsConsents.leadId, storedLead.id),
@@ -6757,6 +6764,24 @@ app.post('/api/outreach/sms/consent', authenticate, async (req, res) => {
   const [lead] = await pgDb.select({ id: leads.id }).from(leads)
     .where(and(eq(leads.id, leadId), eq(leads.contractorId, contractorId))).limit(1);
   if (!lead) return res.status(404).json({ success: false, error: 'Lead not found in this workspace.' });
+  const [consentLead] = await pgDb.select().from(leads).where(and(eq(leads.id, leadId), eq(leads.contractorId, contractorId))).limit(1);
+  const consentPhone = consentLead?.phoneEncrypted ? decrypt(consentLead.phoneEncrypted) : (consentLead?.phone || '');
+  const normalizedConsentPhone = consentPhone.replace(/[^+\d]/g, '');
+  const consentPhoneHash = normalizedConsentPhone ? crypto.createHash('sha256').update(normalizedConsentPhone).digest('hex') : '';
+  if (status === 'opted_in' && consentPhoneHash) {
+    await pgDb.delete(communicationsOptOuts).where(and(
+      eq(communicationsOptOuts.contractorId, contractorId), eq(communicationsOptOuts.channel, 'sms'),
+      eq(communicationsOptOuts.phoneHash, consentPhoneHash)
+    ));
+  }
+  if (status === 'opted_out' && consentPhoneHash) {
+    await pgDb.insert(communicationsOptOuts).values({
+      id: 'smsout_' + crypto.createHash('sha256').update(`${contractorId}:sms:${consentPhoneHash}`).digest('hex'),
+      contractorId, channel: 'sms', phoneHash: consentPhoneHash,
+      phoneEncrypted: encrypt(normalizedConsentPhone), source: 'operator_opt_out',
+      optedOutAt: new Date(), createdAt: new Date()
+    }).onConflictDoNothing();
+  }
   const id = 'smsconsent_' + crypto.createHash('sha256').update(`${contractorId}:${leadId}:sms`).digest('hex');
   const now = new Date();
   try {
@@ -6810,6 +6835,16 @@ app.post('/api/webhooks/twilio/inbound', async (req, res) => {
       receivedAt: new Date()
     }).onConflictDoNothing();
     if (/^(STOP|STOPALL|UNSUBSCRIBE|CANCEL|END|QUIT)$/i.test(bodyText.trim())) {
+      const normalizedFrom = from.replace(/[^+\d]/g, '');
+      if (/^\+[1-9]\d{7,14}$/.test(normalizedFrom)) {
+        const phoneHash = crypto.createHash('sha256').update(normalizedFrom).digest('hex');
+        await pgDb.insert(communicationsOptOuts).values({
+          id: 'smsout_' + crypto.createHash('sha256').update(`${mapping.contractorId}:sms:${phoneHash}`).digest('hex'),
+          contractorId: mapping.contractorId, channel: 'sms', phoneHash,
+          phoneEncrypted: encrypt(normalizedFrom), source: 'twilio_stop',
+          optedOutAt: new Date(), createdAt: new Date()
+        }).onConflictDoNothing();
+      }
       const tenantLeads = await pgDb.select().from(leads).where(eq(leads.contractorId, mapping.contractorId));
       const matching = tenantLeads.filter(lead => {
         const phone = lead.phoneEncrypted ? decrypt(lead.phoneEncrypted) : (lead.phone && !lead.phone.includes('[ENCRYPTED]') ? lead.phone : '');
