@@ -313,28 +313,72 @@ export async function bootstrapPostgresTables(poolInstance?: Pool): Promise<void
         closed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
       );
 
-      CREATE TABLE IF NOT EXISTS client_projects (
+      CREATE TABLE IF NOT EXISTS proposals (
         id TEXT PRIMARY KEY,
         contractor_id TEXT NOT NULL,
         lead_id TEXT NOT NULL,
-        client_name TEXT NOT NULL,
-        business_name TEXT NOT NULL,
-        city TEXT NOT NULL,
-        service_type TEXT NOT NULL,
-        package_tier TEXT NOT NULL,
-        monthly_retainer_usd INTEGER NOT NULL,
-        start_date TIMESTAMP NOT NULL,
-        status TEXT NOT NULL,
-        initial_audit_score INTEGER DEFAULT 0,
-        current_score INTEGER DEFAULT 0,
-        target_score INTEGER DEFAULT 0,
-        milestones JSONB NOT NULL,
-        assets JSONB NOT NULL,
-        notes TEXT,
-        portal_access_token TEXT NOT NULL,
+        status TEXT DEFAULT 'draft' NOT NULL CHECK (status IN ('draft', 'approved', 'void', 'signed')),
+        content JSONB NOT NULL,
+        approved_at TIMESTAMP,
+        approved_by TEXT,
+        voided_at TIMESTAMP,
+        voided_by TEXT,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
       );
+      CREATE INDEX IF NOT EXISTS proposals_tenant_lead_created_idx
+        ON proposals (contractor_id, lead_id, created_at DESC);
+      ALTER TABLE proposals DROP CONSTRAINT IF EXISTS proposals_status_check;
+      ALTER TABLE proposals ADD CONSTRAINT proposals_status_check CHECK (status IN ('draft', 'approved', 'void', 'signed'));
+      ALTER TABLE proposals ADD COLUMN IF NOT EXISTS signed_at TIMESTAMP;
+      ALTER TABLE proposals ADD COLUMN IF NOT EXISTS signer_name TEXT;
+      ALTER TABLE proposals ADD COLUMN IF NOT EXISTS signer_email TEXT;
+      ALTER TABLE proposals ADD COLUMN IF NOT EXISTS signer_ip TEXT;
+      ALTER TABLE proposals ADD COLUMN IF NOT EXISTS signer_user_agent TEXT;
+      ALTER TABLE proposals ADD COLUMN IF NOT EXISTS signed_content_hash TEXT;
+      ALTER TABLE proposals ADD COLUMN IF NOT EXISTS signature_consent BOOLEAN DEFAULT false NOT NULL;
+
+      CREATE TABLE IF NOT EXISTS proposal_signing_links (
+        id TEXT PRIMARY KEY, contractor_id TEXT NOT NULL, proposal_id TEXT NOT NULL,
+        token_hash TEXT NOT NULL UNIQUE, expires_at TIMESTAMP NOT NULL, used_at TIMESTAMP,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS proposal_signing_links_tenant_proposal_idx
+        ON proposal_signing_links (contractor_id, proposal_id, created_at DESC);
+
+      CREATE TABLE IF NOT EXISTS client_projects (
+        id TEXT PRIMARY KEY, contractor_id TEXT NOT NULL, lead_id TEXT NOT NULL,
+        client_name TEXT NOT NULL, business_name TEXT NOT NULL, city TEXT NOT NULL,
+        service_type TEXT NOT NULL, package_tier TEXT NOT NULL, monthly_retainer_usd INTEGER NOT NULL,
+        start_date TIMESTAMP NOT NULL, status TEXT NOT NULL, initial_audit_score INTEGER DEFAULT 0,
+        current_score INTEGER DEFAULT 0, target_score INTEGER DEFAULT 0, milestones JSONB NOT NULL,
+        assets JSONB NOT NULL, notes TEXT, portal_access_token TEXT NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
+      );
+
+      CREATE TABLE IF NOT EXISTS invoices (
+        id TEXT PRIMARY KEY, contractor_id TEXT NOT NULL, invoice_number TEXT NOT NULL,
+        lead_id TEXT, project_id TEXT, description TEXT NOT NULL,
+        currency TEXT DEFAULT 'USD' NOT NULL CHECK (currency ~ '^[A-Z]{3}$'),
+        amount_due_minor INTEGER NOT NULL CHECK (amount_due_minor > 0),
+        status TEXT DEFAULT 'issued' NOT NULL CHECK (status IN ('issued', 'partially_paid', 'paid', 'void')),
+        issued_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL, due_at TIMESTAMP,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+        UNIQUE (contractor_id, invoice_number)
+      );
+      CREATE INDEX IF NOT EXISTS invoices_tenant_created_idx ON invoices (contractor_id, created_at DESC);
+      CREATE INDEX IF NOT EXISTS invoices_tenant_project_idx ON invoices (contractor_id, project_id);
+
+      CREATE TABLE IF NOT EXISTS invoice_payments (
+        id TEXT PRIMARY KEY, contractor_id TEXT NOT NULL, invoice_id TEXT NOT NULL,
+        amount_minor INTEGER NOT NULL CHECK (amount_minor > 0),
+        currency TEXT NOT NULL CHECK (currency ~ '^[A-Z]{3}$'),
+        method TEXT NOT NULL CHECK (method IN ('cash', 'bank_transfer', 'card_terminal', 'cheque', 'other')),
+        reference TEXT, notes TEXT, received_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+        recorded_by TEXT NOT NULL, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS invoice_payments_tenant_invoice_idx
+        ON invoice_payments (contractor_id, invoice_id, received_at DESC);
 
       CREATE TABLE IF NOT EXISTS outreach_sequences (
         id TEXT PRIMARY KEY,
