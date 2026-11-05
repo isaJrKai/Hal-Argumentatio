@@ -24,7 +24,7 @@ export const securityAuditorSkill: Skill = {
 
     let parsedUrl: URL;
     try {
-      parsedUrl = new URL(/^https?:\/\//i.test(rawWebsiteUrl) ? rawWebsiteUrl : `https://${rawWebsiteUrl}`);
+      parsedUrl = new URL(/^https?:\\/\\//i.test(rawWebsiteUrl) ? rawWebsiteUrl : `https://${rawWebsiteUrl}`);
     } catch {
       throw new Error('Enter a valid website URL.');
     }
@@ -43,10 +43,15 @@ export const securityAuditorSkill: Skill = {
     // pins the selected public IP for the request, and does not follow redirects.
     // Keep this capability passive: no port scans, exploit attempts, form submits,
     // authentication tests, or arbitrary path crawling.
-    const evidence = await validateDomainAndDns(parsedUrl.toString(), {
+    const rawEvidence = await validateDomainAndDns(parsedUrl.toString(), {
       probeHttp: true,
       timeoutMs: 5000
     });
+
+    // Never disclose private/reserved IPs from rejected DNS resolutions.
+    const evidence = rawEvidence.dnsResolved
+      ? rawEvidence
+      : { ...rawEvidence, ipAddresses: undefined };
 
     const lines = [
       '## Passive website security connectivity report',
@@ -74,7 +79,7 @@ export const securityAuditorSkill: Skill = {
         : '- Only the measurements listed above are verified. Missing security headers and application vulnerabilities remain unknown.',
       '',
       '### Safe next step',
-      'Obtain the website owner\'s written authorization before any intrusive security testing. A deeper passive header and page audit must separately validate redirects, DNS changes and every outbound destination.'
+      'Obtain the website owner\\'s written authorization before any intrusive security testing. A deeper passive header and page audit must separately validate redirects, DNS changes and every outbound destination.'
     ];
 
     return {
@@ -89,7 +94,7 @@ export const securityAuditorSkill: Skill = {
         pageContent: 'not_measured'
       },
       evidence,
-      report: lines.join('\n'),
+      report: lines.join('\\n'),
       executedAt: new Date().toISOString()
     };
   }
