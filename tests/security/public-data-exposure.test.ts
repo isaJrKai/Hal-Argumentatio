@@ -17,7 +17,7 @@ describe('Public data exposure security', () => {
     expect(route).not.toContain('outreachStrategy');
   });
 
-  it('only serves deployed landing-page artifacts through public endpoints', () => {
+  it('only serves published landing-page artifacts through public endpoints', () => {
     const jsonStart = source.indexOf("app.get('/api/public/landing/:id'");
     const htmlStart = source.indexOf("app.get('/landing/:id'");
     const htmlEnd = source.indexOf('// ─── CONTRACTOR LANDING PAGE STUDIO ENGINE', htmlStart);
