@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { encrypt, decrypt } from '../../src/db/db';
+import { encrypt, decrypt } from '../../src/db/encryption';
 import { validateCrmTransition } from '../../src/lib/crmStateMachine';
 
 /**
