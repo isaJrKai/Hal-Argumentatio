@@ -132,6 +132,7 @@ describe('Hermes PostgreSQL task claim', () => {
     if (!dbAvailable) return;
     await insertTask();
     const first = await pool.query('SELECT updated_at FROM hermes_task_claim_test WHERE id = $1', ['task-hermes-1']);
+    await expect(heartbeatHermesWorkTask(db, 'task-hermes-1', 'tenant-b', 1, testTasks)).resolves.toBe(false);
     const alive = await heartbeatHermesWorkTask(db, 'task-hermes-1', 'tenant-a', 1, testTasks);
     expect(alive).toBe(true);
     const after = await pool.query('SELECT updated_at FROM hermes_task_claim_test WHERE id = $1', ['task-hermes-1']);
@@ -150,7 +151,7 @@ describe('Hermes PostgreSQL task claim', () => {
 
     const recovered = await failExpiredHermesWorkTask(db, 'task-hermes-1', 'tenant-a', new Date(), 120_000, testTasks);
     expect(recovered).toMatchObject({ status: 'failed', attemptCount: 1 });
-    expect(recovered.output).toMatchObject({ outcome: 'lease_expired', success: false, worker: 'hermes', taskId: 'task-hermes-1' });
+    expect(recovered.output).toMatchObject({ outcome: 'lease_expired', success: false, worker: 'hermes', taskId: 'task-hermes-1', attempt: 1 });
     expect(recovered.errorMessage).toContain('lease expired');
   });
 
