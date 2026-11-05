@@ -188,7 +188,10 @@ export default function LeadsPanel({ leads, token, onRefresh }: LeadsPanelProps)
   // Fail-Closed & Network Grounding Verification State
   const [probingGroundingId, setProbingGroundingId] = useState<string | null>(null);
   const [verifyingAllGrounding, setVerifyingAllGrounding] = useState(false);
-  const [groundingFeedback, setGroundingFeedback] = useState<string | null>(null);\n  const [identitySourceUrl, setIdentitySourceUrl] = useState('');\n  const [identityConfirmationNotes, setIdentityConfirmationNotes] = useState('');\n  const [confirmingIdentity, setConfirmingIdentity] = useState(false);
+  const [groundingFeedback, setGroundingFeedback] = useState<string | null>(null);
+  const [identitySourceUrl, setIdentitySourceUrl] = useState('');
+  const [identityConfirmationNotes, setIdentityConfirmationNotes] = useState('');
+  const [confirmingIdentity, setConfirmingIdentity] = useState(false);
 
   const handleProbeGrounding = async (leadId: string) => {
     setProbingGroundingId(leadId);
