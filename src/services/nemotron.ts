@@ -79,7 +79,7 @@ export async function callNemotronWithTools(
     'nvidia/nemotron-3.5-lightning-30b-a3b',
     'nvidia/nemotron-3-nano-omni-30b-a3b-reasoning',
     'nvidia/nemotron-3-super-120b-a12b',
-    'openai/gpt-oss-20b'
+    
   ];
   let lastError: any = null;
 
@@ -159,7 +159,7 @@ export async function callNemotronWithTools(
 }
 
 /**
- * Query the NVIDIA Nemotron API (and Meta Llama NIM fallbacks) using OpenAI compatible protocol
+ * Query NVIDIA Nemotron models through the OpenAI-compatible NIM protocol
  */
 export async function callNemotron(
   messages: Array<{ role: string; content: string }>,
@@ -176,8 +176,6 @@ export async function callNemotron(
     "nvidia/nemotron-3.5-lightning-30b-a3b",         // Active flagship 30B Nemotron structured model
     "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning",  // Fast reasoning-specialized Nemotron
     "nvidia/nemotron-3-super-120b-a12b",              // High-capacity Nemotron fallback
-    "openai/gpt-oss-20b",                             // Fast open architecture NIM fallback
-    "meta/llama-3.2-11b-vision-instruct"              // Active Llama 3.2 NIM fallback
   ];
 
   let lastError: any = null;
