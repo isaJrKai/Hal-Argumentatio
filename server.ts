@@ -4806,12 +4806,16 @@ app.post('/api/intelligence/chat', authenticate, async (req, res) => {
     const chatStartedAt = Date.now();
     let preparationMs = 0;
     let providerMs = 0;
+    let providerUsed: string | null = null;
+    let modelUsed: string | null = null;
     res.on('finish', () => {
       console.info('[HAL performance] chat_request', JSON.stringify({
         status: res.statusCode,
         totalMs: Date.now() - chatStartedAt,
         preparationMs,
-        providerMs
+        providerMs,
+        provider: providerUsed,
+        model: modelUsed
       }));
     });
 
@@ -4951,6 +4955,8 @@ app.post('/api/intelligence/chat', authenticate, async (req, res) => {
         return toolResult;
       }
     }, { gemini: tenantAiCredentials.gemini, anthropic: tenantAiCredentials.anthropic, hermesTenantId: contractorId, hermesConversationId: conversationId });
+    providerUsed = result.provider || activeAi || 'unknown';
+    modelUsed = result.model || null;
 
     providerMs = Date.now() - providerStartedAt;
 
