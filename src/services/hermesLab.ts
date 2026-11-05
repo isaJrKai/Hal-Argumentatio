@@ -418,7 +418,7 @@ Generate the complete, unshortened asset now in valid JSON format.`;
   // Priority 3: Gemini Flash structured generation with fallback
   const gemini = getGeminiClient();
   if (!parsedResponse && gemini) {
-    for (const model of ['gemini-3.8-flash', 'gemini-flash-latest', 'gemini-3.1-flash-lite']) {
+    for (const model of ['gemini-3.8-flash']) {
       try {
         const resp = await gemini.models.generateContent({
           model,
