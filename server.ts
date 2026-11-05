@@ -1500,48 +1500,50 @@ app.post('/api/notifications/read-all', authenticate, async (req, res) => {
 // ─── SSE REALTIME EVENTS ─────────────────────────────────────────────────────
 
 app.get('/api/events', (req, res) => {
-  // Extract token from Bearer authorization header or ?token= query param
+  // Native EventSource cannot set Authorization headers, so legacy clients may
+  // supply ?token=. Route both forms through the same persisted-account and
+  // revocation checks as every other authenticated API endpoint.
   const authHeader = req.headers.authorization;
-  let token: string | null = null;
-  if (authHeader && authHeader.startsWith('Bearer ')) {
-    token = authHeader.substring(7);
-  } else if (typeof req.query.token === 'string' && req.query.token.trim() !== '') {
-    token = req.query.token.trim();
-  }
+  const queryToken = typeof req.query.token === 'string' ? req.query.token.trim() : '';
+  const token = authHeader?.startsWith('Bearer ')
+    ? authHeader.slice('Bearer '.length).trim()
+    : queryToken;
 
   if (!token) {
     return res.status(401).json({ error: 'Authentication required for SSE stream. Missing token.' });
   }
 
-  const session = verifyToken(token);
-  if (!session || !session.contractorId) {
-    return res.status(401).json({ error: 'Invalid, expired, or untrusted authentication token.' });
-  }
+  // authenticate() validates the JWT, checks durable revocation, and resolves
+  // the current account from PostgreSQL. Never trust JWT tenant claims alone.
+  req.headers.authorization = `Bearer ${token}`;
+  void authenticate(req, res, () => {
+    const contractorId = (req as any).contractorId as string;
 
-  const contractorId = session.contractorId;
+    // Query-string bearer tokens can be recorded by intermediaries. Prevent
+    // caching and discourage downstream referrer propagation of this URL.
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
+    res.setHeader('Referrer-Policy', 'no-referrer');
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Connection', 'keep-alive');
+    res.flushHeaders();
 
-  res.setHeader('Content-Type', 'text/event-stream');
-  res.setHeader('Cache-Control', 'no-cache');
-  res.setHeader('Connection', 'keep-alive');
-  res.flushHeaders();
+    const pingInterval = setInterval(() => {
+      try {
+        res.write(':\n\n');
+        const heartbeatEvent = { type: 'heartbeat', timestamp: new Date().toISOString() };
+        res.write(`data: ${JSON.stringify(heartbeatEvent)}\n\n`);
+      } catch {
+        clearInterval(pingInterval);
+      }
+    }, 15000);
 
-  // Keep alive heartbeat ping with real payload
-  const pingInterval = setInterval(() => {
-    try {
-      res.write(':\n\n'); // standard SSE comment ping
-      const heartbeatEvent = { type: 'heartbeat', timestamp: new Date().toISOString() };
-      res.write(`data: ${JSON.stringify(heartbeatEvent)}\n\n`);
-    } catch (err) {
+    const client: SseClient = { contractorId, res, pingInterval };
+    sseClients.push(client);
+
+    req.on('close', () => {
       clearInterval(pingInterval);
-    }
-  }, 15000);
-
-  const client: SseClient = { contractorId, res, pingInterval };
-  sseClients.push(client);
-
-  req.on('close', () => {
-    clearInterval(pingInterval);
-    sseClients = sseClients.filter(c => c !== client);
+      sseClients = sseClients.filter(c => c !== client);
+    });
   });
 });
 
@@ -1598,10 +1600,8 @@ app.get('/api/public/audit/:id', async (req, res) => {
       googleRating: null,
       reviewCount: lead.reviewCount ?? null,
       sentimentScore: null,
-      notes: lead.notes || '',
-      outreachStrategy: '',
-      urgencyScore: lead.urgencyScore ?? null,
-      predictedLtvUsd: lead.predictedLtv ?? null,
+      // Deliberately exclude internal notes, sales strategy, urgency and
+      // predicted deal value from the unauthenticated prospect-facing report.
       createdAt: lead.createdAt
     });
   } catch (err: any) {
@@ -1720,25 +1720,73 @@ app.post('/api/public/webhooks/delivery', async (req, res) => {
   }
 });
 
+// Public pages must be saved through the server-owned config renderer. Arbitrary
+// Hermes/provider HTML is never eligible for same-origin public publication.
+function hasOwnedLandingPageConfig(artifact: any): boolean {
+  const config = artifact?.content?.pageConfig;
+  return Boolean(
+    artifact &&
+    config &&
+    typeof config === 'object' &&
+    !Array.isArray(config) &&
+    config.id === artifact.id &&
+    config.contractorId === artifact.contractorId
+  );
+}
+
 // ─── PUBLIC LANDING PAGE SERVING (Direct Client & External Auditor Access) ───
 
 app.get('/api/public/landing/:id', async (req, res) => {
   const { id } = req.params;
   try {
-    const [artifact] = await pgDb.select().from(hermesLabArtifacts).where(eq(hermesLabArtifacts.id, id));
-    if (!artifact) {
-      return res.status(404).json({ error: 'Landing page artifact not found.' });
+    const [artifact] = await pgDb.select({
+      id: hermesLabArtifacts.id,
+      contractorId: hermesLabArtifacts.contractorId,
+      toolId: hermesLabArtifacts.toolId,
+      title: hermesLabArtifacts.title,
+      category: hermesLabArtifacts.category,
+      content: hermesLabArtifacts.content,
+      status: hermesLabArtifacts.status,
+      updatedAt: hermesLabArtifacts.updatedAt
+    }).from(hermesLabArtifacts).where(and(
+      eq(hermesLabArtifacts.id, id),
+      inArray(hermesLabArtifacts.status, ['ready', 'deployed']),
+      eq(hermesLabArtifacts.toolId, 'landing_page')
+    ));
+    if (!artifact || !hasOwnedLandingPageConfig(artifact)) {
+      return res.status(404).json({ error: 'Published landing page not found.' });
     }
-    res.json({ success: true, artifact });
-  } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    res.setHeader('Cache-Control', 'no-store');
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('Referrer-Policy', 'no-referrer');
+    return res.json({
+      success: true,
+      artifact: {
+        id: artifact.id,
+        toolId: artifact.toolId,
+        title: artifact.title,
+        category: artifact.category,
+        content: { renderedOutput: (artifact.content as any).renderedOutput },
+        status: artifact.status,
+        updatedAt: artifact.updatedAt
+      }
+    });
+  } catch {
+    return res.status(503).json({ error: 'Published landing page is temporarily unavailable.' });
   }
 });
 
 app.get('/landing/:id', async (req, res) => {
   const { id } = req.params;
   try {
-    const [artifact] = await pgDb.select().from(hermesLabArtifacts).where(eq(hermesLabArtifacts.id, id));
+    const [artifact] = await pgDb.select().from(hermesLabArtifacts).where(and(
+      eq(hermesLabArtifacts.id, id),
+      inArray(hermesLabArtifacts.status, ['ready', 'deployed']),
+      eq(hermesLabArtifacts.toolId, 'landing_page')
+    ));
+    if (artifact && !hasOwnedLandingPageConfig(artifact)) {
+      return res.status(404).send('<h1>Landing page not found or not safely published.</h1>');
+    }
     if (!artifact) {
       try {
         const { TRADE_TEMPLATES } = await import('./src/components/landing/templates');
@@ -1777,11 +1825,14 @@ app.get('/landing/:id', async (req, res) => {
     const html = (artifact.content as any)?.renderedOutput;
     if (html && typeof html === 'string') {
       res.setHeader('Content-Type', 'text/html; charset=utf-8');
+      res.setHeader('X-Content-Type-Options', 'nosniff');
+      res.setHeader('Referrer-Policy', 'no-referrer');
+      res.setHeader('Cache-Control', 'no-store');
       return res.send(html);
     }
     return res.status(400).send('<h1>No rendered HTML available for this artifact.</h1>');
-  } catch (err: any) {
-    res.status(500).send('Error rendering landing page: ' + err.message);
+  } catch {
+    res.status(503).send('Landing page is temporarily unavailable.');
   }
 });
 
@@ -1863,18 +1914,21 @@ app.post('/api/landing-pages/regenerate-section', authenticate, async (req, res)
 
 app.post('/api/landing-pages/save', authenticate, async (req, res) => {
   const contractorId = (req as any).contractorId;
-  const { id, title, pageConfig, renderedHtml } = req.body;
+  const { id, title, pageConfig } = req.body || {};
 
-  if (!title || !renderedHtml) {
-    return res.status(400).json({ success: false, error: 'Title and renderedHtml are required' });
+  if (typeof title !== 'string' || !title.trim() || title.length > 160 ||
+      !pageConfig || typeof pageConfig !== 'object' || Array.isArray(pageConfig) ||
+      JSON.stringify(pageConfig).length > 80_000 ||
+      (id !== undefined && (typeof id !== 'string' || id.length > 128))) {
+    return res.status(400).json({ success: false, error: 'A valid title and landing-page configuration are required.' });
   }
 
   try {
-    const artifactId = id && id.length > 5 ? id : ('lp_' + crypto.randomUUID().slice(0, 8));
-    const ownedPageConfig = pageConfig && typeof pageConfig === 'object'
-      ? { ...pageConfig, id: artifactId, contractorId }
-      : null;
-    const ownedRenderedHtml = ownedPageConfig ? generateLandingPageHtml(ownedPageConfig) : renderedHtml;
+    const artifactId = typeof id === 'string' && id.length > 5 ? id : ('lp_' + crypto.randomUUID().slice(0, 8));
+    const ownedPageConfig = { ...pageConfig, id: artifactId, contractorId };
+    // Never trust client-supplied rendered HTML. Render from the validated,
+    // tenant-owned configuration using the escaping server-side generator.
+    const ownedRenderedHtml = generateLandingPageHtml(ownedPageConfig);
 
     const [existing] = await pgDb
       .select()
@@ -1900,7 +1954,7 @@ app.post('/api/landing-pages/save', authenticate, async (req, res) => {
           status: 'ready',
           updatedAt: new Date()
         })
-        .where(eq(hermesLabArtifacts.id, artifactId));
+        .where(and(eq(hermesLabArtifacts.id, artifactId), eq(hermesLabArtifacts.contractorId, contractorId)));
     } else {
       await pgDb.insert(hermesLabArtifacts).values({
         id: artifactId,
@@ -6599,7 +6653,7 @@ app.post('/api/outreach/whatsapp/webhook', (req, res) => {
 });
 
 // ─── GITHUB REPOSITORY PUSH ENGINE ───────────────────────────────────────────
-app.get('/api/admin/git/status', authenticate, (req, res) => {
+app.get('/api/admin/git/status', authenticate, requireRole('admin'), (req, res) => {
   try {
     const isRepo = fs.existsSync(path.join(process.cwd(), '.git'));
     if (!isRepo) {
@@ -6652,89 +6706,15 @@ app.get('/api/admin/git/status', authenticate, (req, res) => {
   }
 });
 
-app.post('/api/admin/git/push', authenticate, async (req, res) => {
-  const contractorId = (req as any).contractorId;
-  const { repoUrl, token, branch, commitMessage } = req.body;
-
-  if (!repoUrl) {
-    return res.status(400).json({ success: false, error: 'Repository URL is required (e.g. https://github.com/username/repo)' });
-  }
-
-  const cleanRepoUrl = repoUrl.trim();
-  const targetBranch = (branch || 'main').trim();
-  const msg = commitMessage?.trim() || `Release: HAL Operating Intelligence System v1.0 (${new Date().toISOString().slice(0, 10)})`;
-
-  try {
-    const gitDir = path.join(process.cwd(), '.git');
-    if (!fs.existsSync(gitDir)) {
-      execSync('git init -b main', { stdio: 'pipe' });
-    }
-
-    execSync('git config user.name "HAL Operator"', { stdio: 'pipe' });
-    execSync('git config user.email "operator@halbiz.ai"', { stdio: 'pipe' });
-
-    execSync('git add -A', { stdio: 'pipe' });
-    try {
-      execSync(`git commit -m "${msg.replace(/"/g, '\\"')}"`, { stdio: 'pipe' });
-    } catch (_) {
-      // Nothing to commit is fine
-    }
-
-    let authUrl = cleanRepoUrl;
-    if (token) {
-      const cleanToken = token.trim();
-      if (cleanRepoUrl.startsWith('https://')) {
-        authUrl = `https://${cleanToken}@${cleanRepoUrl.replace('https://', '')}`;
-      } else if (cleanRepoUrl.startsWith('http://')) {
-        authUrl = `http://${cleanToken}@${cleanRepoUrl.replace('http://', '')}`;
-      }
-    }
-
-    try {
-      execSync('git remote remove origin 2>/dev/null || true', { stdio: 'pipe' });
-    } catch (_) {}
-
-    execSync(`git remote add origin "${authUrl}"`, { stdio: 'pipe' });
-
-    try {
-      execSync(`git branch -M ${targetBranch}`, { stdio: 'pipe' });
-    } catch (_) {}
-
-    execSync(`git push -u origin ${targetBranch} --force`, { stdio: 'pipe' });
-
-    // Scrub token immediately from local remote configuration
-    execSync(`git remote set-url origin "${cleanRepoUrl}"`, { stdio: 'pipe' });
-
-    const latestCommitHash = execSync('git rev-parse --short HEAD', { encoding: 'utf-8' }).trim();
-
-    db.addAuditLog({
-      contractorId,
-      action: 'GIT_PUSH_SUCCESSFUL',
-      details: `Pushed code to ${cleanRepoUrl} on branch ${targetBranch} (commit: ${latestCommitHash})`
-    });
-
-    broadcastNotification(
-      contractorId,
-      'success',
-      '🚀 GitHub Push Complete',
-      `Repository synchronized to ${cleanRepoUrl} [${latestCommitHash}]`
-    );
-
-    res.json({
-      success: true,
-      repoUrl: cleanRepoUrl,
-      branch: targetBranch,
-      commitHash: latestCommitHash,
-      message: 'Codebase committed and pushed successfully to GitHub.'
-    });
-  } catch (err: any) {
-    console.error('[Git Push Error]:', err.message);
-    let safeError = err.message || 'Git push failed';
-    if (token) {
-      safeError = safeError.replace(new RegExp(token, 'g'), '••••••••');
-    }
-    res.status(500).json({ success: false, error: safeError });
-  }
+app.post('/api/admin/git/push', authenticate, requireRole('admin'), (_req, res) => {
+  // This legacy endpoint executed shell commands using request-controlled Git
+  // arguments and performed force pushes from the application server. Disable
+  // it until a dedicated, non-shell deployment workflow replaces it.
+  return res.status(410).json({
+    success: false,
+    code: 'GIT_PUSH_DISABLED',
+    error: 'Server-side Git deployment is disabled. Use the reviewed CI/CD deployment workflow.'
+  });
 });
 
 // ─── WHITE-LABEL CLIENT PROPOSAL GENERATOR ───────────────────────────────────

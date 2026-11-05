@@ -930,7 +930,10 @@ Respond in the required JSON format.`;
           },
           updatedAt: new Date()
         })
-        .where(eq(hermesLabArtifacts.id, currentArtifact.id));
+        .where(and(
+          eq(hermesLabArtifacts.id, currentArtifact.id),
+          eq(hermesLabArtifacts.contractorId, contractorId)
+        ));
 
       updatedArtifactRecord = {
         id: currentArtifact.id,
