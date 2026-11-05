@@ -7878,6 +7878,7 @@ app.post('/api/projects', authenticate, async (req, res) => {
         summary: `Created client delivery project for ${businessName.trim()}.`,
         payload: {
           leadId: normalizedLeadId,
+          workflowId: normalizedLeadId || created.id,
           status: created.status,
           packageTier: created.packageTier,
           monthlyRetainerUsd: created.monthlyRetainerUsd
