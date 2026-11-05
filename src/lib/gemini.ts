@@ -768,7 +768,7 @@ RESPONSE STANDARD
           systemInstruction,
           temperature: 0.3,
           // Bound all Gemini rounds (including tool follow-ups) to one deadline.
-          abortSignal: AbortSignal.timeout(45_000),
+          abortSignal: AbortSignal.timeout(30_000),
           automaticContinuation: false
         };
 
