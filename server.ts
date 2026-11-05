@@ -21,8 +21,8 @@ import {
   Recommendation
 } from './src/db/db';
 import { db as pgDb, createPool as getApplicationPostgresPool } from './src/db/index.ts';
-import { contractors, auditLogs, leads, leadEvents, revenueRecords, campaigns, winLossRecords, performanceSnapshots, recommendations, forecasts, predictionOutcomes, learningInsights, chatMessages, chatProjects, chatConversations, missions, clientProjects, outreachSequences, apiKeys, connectorCredentials, notifications, schedulerJobs, leadAttribution, conversionOutbox, googleAdsDailyPerformance, revenueExperiments, revenueRecommendations, revenueRecommendationEvents, revenueSimulations, revenueOutcomes, communicationsOutbox, communicationsDeliveryEvents, halLoops, halLoopEvents, hermesLabArtifacts, hermesDiagnosticIncidents, hermesLabMessages, staffMembers, workEvents, workTasks, revokedTokens } from './src/db/schema.ts';
-import { eq, inArray, desc, and, or, like, sql, gte, lte, gt } from 'drizzle-orm';
+import { contractors, auditLogs, leads, leadEvents, revenueRecords, campaigns, winLossRecords, performanceSnapshots, recommendations, forecasts, predictionOutcomes, learningInsights, chatMessages, chatProjects, chatConversations, missions, clientProjects, outreachSequences, apiKeys, connectorCredentials, notifications, schedulerJobs, passwordResetTokens, leadAttribution, conversionOutbox, googleAdsDailyPerformance, revenueExperiments, revenueRecommendations, revenueRecommendationEvents, revenueSimulations, revenueOutcomes, communicationsOutbox, communicationsDeliveryEvents, halLoops, halLoopEvents, hermesLabArtifacts, hermesDiagnosticIncidents, hermesLabMessages, staffMembers, workEvents, workTasks, revokedTokens } from './src/db/schema.ts';
+import { eq, inArray, desc, and, or, like, sql, gte, lte, gt, isNull } from 'drizzle-orm';
 import { 
   generateLearningFromOutcome, 
   generateForecastNarrative,
@@ -1283,14 +1283,24 @@ app.post('/api/auth/forgot-password', async (req, res) => {
     // Keep account-existence responses indistinguishable.
     if (result.length > 0) {
       const rawToken = crypto.randomBytes(32).toString('hex');
-      db.createPasswordReset(cleanEmail, rawToken, 3600 * 1000); // 1 hour validity
+      const tokenHash = crypto.createHash('sha256').update(rawToken).digest('hex');
+      const contractorId = result[0].id;
+      await pgDb.update(passwordResetTokens)
+        .set({ usedAt: new Date() })
+        .where(and(eq(passwordResetTokens.contractorId, contractorId), isNull(passwordResetTokens.usedAt)));
+      await pgDb.insert(passwordResetTokens).values({
+        id: crypto.randomUUID(),
+        contractorId,
+        tokenHash,
+        expiresAt: new Date(Date.now() + 60 * 60 * 1000),
+      });
 
       try {
         await pgDb.insert(auditLogs).values({
           id: crypto.randomUUID(),
-          contractorId: 'system',
+          contractorId,
           action: 'PASSWORD_RESET_REQUESTED',
-          details: `Password reset requested for email: ${cleanEmail} from IP: ${req.ip}`
+          details: `Password reset requested from IP: ${req.ip}`
         });
       } catch (_) {}
 
@@ -1360,47 +1370,43 @@ app.post('/api/auth/reset-password', async (req, res) => {
       return res.status(400).json({ error: 'New password must be at least 12 characters long.' });
     }
 
-    // Verify and consume the single-use token
-    const verification = db.verifyAndConsumePasswordReset(token.trim());
-    if (!verification.valid || !verification.email) {
-      return res.status(400).json({ error: verification.error || 'Invalid or expired password reset token.' });
-    }
-
-    const cleanEmail = verification.email;
+    // Consume the token and update the account in one PostgreSQL transaction.
+    // A database failure rolls back both operations, preserving the valid token.
+    const tokenHash = crypto.createHash('sha256').update(token.trim()).digest('hex');
     const newPasswordHash = hashPassword(password);
-
-    // The PostgreSQL account is the source of truth for login. A reset is
-    // successful only when that exact account row is updated.
-    let updatedAccounts: Array<{ id: string }>;
+    let updatedAccount: { id: string } | null;
     try {
-      updatedAccounts = await pgDb.update(contractors)
-        .set({ passwordHash: newPasswordHash })
-        .where(eq(contractors.email, cleanEmail))
-        .returning({ id: contractors.id });
+      updatedAccount = await pgDb.transaction(async (tx) => {
+        const consumed = await tx.update(passwordResetTokens)
+          .set({ usedAt: new Date() })
+          .where(and(
+            eq(passwordResetTokens.tokenHash, tokenHash),
+            isNull(passwordResetTokens.usedAt),
+            gt(passwordResetTokens.expiresAt, new Date())
+          ))
+          .returning({ contractorId: passwordResetTokens.contractorId });
+        if (consumed.length !== 1) return null;
+
+        const updated = await tx.update(contractors)
+          .set({ passwordHash: newPasswordHash })
+          .where(eq(contractors.id, consumed[0].contractorId))
+          .returning({ id: contractors.id });
+        if (updated.length !== 1) throw new Error('Password reset account no longer exists.');
+        return updated[0];
+      });
     } catch (databaseError: any) {
-      // The token was claimed above. Restore it so a transient database outage
-      // does not permanently invalidate a legitimate reset link.
-      db.restorePasswordReset(token.trim());
-      console.error('[HAL Auth] Password reset database update failed:', databaseError?.message || databaseError);
+      console.error('[HAL Auth] Password reset transaction failed:', databaseError?.message || databaseError);
       return res.status(503).json({ error: 'Password reset service temporarily unavailable. Please try again later.' });
     }
 
-    if (updatedAccounts.length !== 1) {
-      return res.status(400).json({ error: 'This password reset link is invalid or no longer available.' });
-    }
-
-    // Local state is only a compatibility cache; it must never determine whether
-    // the PostgreSQL password update succeeded.
-    try {
-      db.updateContractorPassword(cleanEmail, newPasswordHash);
-    } catch (localUpdateError: any) {
-      console.warn('[HAL Auth] Local session cleanup was incomplete:', localUpdateError?.message || localUpdateError);
+    if (!updatedAccount) {
+      return res.status(400).json({ error: 'Invalid, expired, or already used password reset token.' });
     }
 
     try {
       await pgDb.insert(auditLogs).values({
         id: crypto.randomUUID(),
-        contractorId: updatedAccounts[0].id,
+        contractorId: updatedAccount.id,
         action: 'PASSWORD_RESET_SUCCESS',
         details: `Password successfully updated from IP: ${req.ip}`
       });
