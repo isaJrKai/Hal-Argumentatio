@@ -454,7 +454,7 @@ export default function RevenueIntelligenceView({ token }: RevenueIntelligenceVi
       {/* New Experiment Modal */}
       {showNewExpModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4">
-          <div className="bg-bg-raised border border-border-dim rounded-2xl w-full max-w-md p-6 space-y-4 shadow-2xl">
+          <div className="bg-bg-raised border border-border-dim rounded-2xl w-full max-w-md max-h-[90vh] overflow-y-auto p-6 space-y-4 shadow-2xl">
             <h3 className="text-base font-bold font-mono text-text-primary">Create Revenue Experiment</h3>
             <form onSubmit={handleCreateExperiment} className="space-y-4">
               <div>
