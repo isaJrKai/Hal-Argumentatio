@@ -1500,48 +1500,50 @@ app.post('/api/notifications/read-all', authenticate, async (req, res) => {
 // ─── SSE REALTIME EVENTS ─────────────────────────────────────────────────────
 
 app.get('/api/events', (req, res) => {
-  // Extract token from Bearer authorization header or ?token= query param
+  // Native EventSource cannot set Authorization headers, so legacy clients may
+  // supply ?token=. Route both forms through the same persisted-account and
+  // revocation checks as every other authenticated API endpoint.
   const authHeader = req.headers.authorization;
-  let token: string | null = null;
-  if (authHeader && authHeader.startsWith('Bearer ')) {
-    token = authHeader.substring(7);
-  } else if (typeof req.query.token === 'string' && req.query.token.trim() !== '') {
-    token = req.query.token.trim();
-  }
+  const queryToken = typeof req.query.token === 'string' ? req.query.token.trim() : '';
+  const token = authHeader?.startsWith('Bearer ')
+    ? authHeader.slice('Bearer '.length).trim()
+    : queryToken;
 
   if (!token) {
     return res.status(401).json({ error: 'Authentication required for SSE stream. Missing token.' });
   }
 
-  const session = verifyToken(token);
-  if (!session || !session.contractorId) {
-    return res.status(401).json({ error: 'Invalid, expired, or untrusted authentication token.' });
-  }
+  // authenticate() validates the JWT, checks durable revocation, and resolves
+  // the current account from PostgreSQL. Never trust JWT tenant claims alone.
+  req.headers.authorization = `Bearer ${token}`;
+  void authenticate(req, res, () => {
+    const contractorId = (req as any).contractorId as string;
 
-  const contractorId = session.contractorId;
+    // Query-string bearer tokens can be recorded by intermediaries. Prevent
+    // caching and discourage downstream referrer propagation of this URL.
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
+    res.setHeader('Referrer-Policy', 'no-referrer');
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Connection', 'keep-alive');
+    res.flushHeaders();
 
-  res.setHeader('Content-Type', 'text/event-stream');
-  res.setHeader('Cache-Control', 'no-cache');
-  res.setHeader('Connection', 'keep-alive');
-  res.flushHeaders();
+    const pingInterval = setInterval(() => {
+      try {
+        res.write(':\\n\\n');
+        const heartbeatEvent = { type: 'heartbeat', timestamp: new Date().toISOString() };
+        res.write(`data: ${JSON.stringify(heartbeatEvent)}\\n\\n`);
+      } catch {
+        clearInterval(pingInterval);
+      }
+    }, 15000);
 
-  // Keep alive heartbeat ping with real payload
-  const pingInterval = setInterval(() => {
-    try {
-      res.write(':\n\n'); // standard SSE comment ping
-      const heartbeatEvent = { type: 'heartbeat', timestamp: new Date().toISOString() };
-      res.write(`data: ${JSON.stringify(heartbeatEvent)}\n\n`);
-    } catch (err) {
+    const client: SseClient = { contractorId, res, pingInterval };
+    sseClients.push(client);
+
+    req.on('close', () => {
       clearInterval(pingInterval);
-    }
-  }, 15000);
-
-  const client: SseClient = { contractorId, res, pingInterval };
-  sseClients.push(client);
-
-  req.on('close', () => {
-    clearInterval(pingInterval);
-    sseClients = sseClients.filter(c => c !== client);
+      sseClients = sseClients.filter(c => c !== client);
+    });
   });
 });
 
