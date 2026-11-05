@@ -951,7 +951,7 @@ export async function bootstrapPostgresTables(poolInstance?: Pool): Promise<void
         RAISE EXCEPTION 'structured_ledger_entries is append-only; % is prohibited', TG_OP
           USING ERRCODE = '55000';
       END;
-      $ LANGUAGE plpgsql;
+      $ledger$ LANGUAGE plpgsql;
 
       DROP TRIGGER IF EXISTS structured_ledger_no_mutation ON structured_ledger_entries;
       CREATE TRIGGER structured_ledger_no_mutation
