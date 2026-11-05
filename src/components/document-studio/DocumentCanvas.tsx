@@ -169,7 +169,7 @@ export const DocumentCanvas: React.FC<DocumentCanvasProps> = ({
       .replace(/\{\{city\}\}/g, activeRecipient.city)
       .replace(/\{\{phone\}\}/g, activeRecipient.phone)
       .replace(/\{\{trade_niche\}\}/g, activeRecipient.tradeNiche)
-      .replace(/\{\{ssl_status\}\}/g, !activeRecipient.website ? 'Not measured' : activeRecipient.missingSsl ? 'MISSING (Unsecured HTTP)' : 'HTTPS observed; certificate not independently verified')
+      .replace(/\{\{ssl_status\}\}/g, activeRecipient.sslStatus === 'secured' ? 'Secured (recorded)' : activeRecipient.sslStatus === 'missing' ? 'Missing (recorded)' : 'Not measured')
       .replace(/\{\{lcp_speed\}\}/g, activeRecipient.lcpSpeed)
       .replace(/\{\{monthly_sla\}\}/g, activeRecipient.recommendedSlaUsd === null ? 'Not priced' : activeRecipient.recommendedSlaUsd.toLocaleString())
       .replace(/\{\{date_today\}\}/g, new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }));
