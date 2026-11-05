@@ -4796,6 +4796,7 @@ app.delete('/api/intelligence/chat/history', authenticate, async (req, res) => {
 });
 
 app.post('/api/intelligence/chat', authenticate, async (req, res) => {
+  const requestStartedAt = performance.now();
   const contractorId = resolveChatContractorId(req);
   const { message, enableGrounding, activeAi, conversationId } = req.body;
   if (typeof message !== 'string' || !message.trim()) return res.status(400).json({ error: 'A message is required.' });
@@ -4864,6 +4865,8 @@ app.post('/api/intelligence/chat', authenticate, async (req, res) => {
       'If the requested information is absent from this snapshot, state that it is not available in the loaded context; do not invent it.'
     ].join('\\n');
     formattedHistory.unshift({ role: 'model', parts: [{ text: sharedOperationalContext }] });
+    const contextReadyAt = performance.now();
+    const contextCharacterCount = sharedOperationalContext.length + formattedHistory.reduce((sum, turn) => sum + turn.parts.reduce((partSum, part) => partSum + part.text.length, 0), 0);
 
     // 2. Add the User's message to the persistent database
     const timestampDate = new Date();
@@ -4883,6 +4886,7 @@ app.post('/api/intelligence/chat', authenticate, async (req, res) => {
     // 3. Resolve this tenant's encrypted AI provider settings without exposing secrets to the browser.
     const tenantAiCredentials = await getTenantConnectorCredentials(contractorId);
     // 4. Ask HAL
+    const aiStartedAt = performance.now();
     const result = await askHalBot(message, formattedHistory, !!enableGrounding, activeAi, {
       // Only the authenticated server supplies this runtime. Tool calls inherit
       // the contractor ID from the verified session, never from model arguments.
@@ -4921,6 +4925,8 @@ app.post('/api/intelligence/chat', authenticate, async (req, res) => {
       }
     }, { gemini: tenantAiCredentials.gemini, anthropic: tenantAiCredentials.anthropic, hermesTenantId: contractorId, hermesConversationId: conversationId });
 
+    const aiFinishedAt = performance.now();
+
     // 5. Save HAL's reply to the database
     const replyDate = new Date();
     try {
@@ -4955,6 +4961,27 @@ app.post('/api/intelligence/chat', authenticate, async (req, res) => {
       await pgDb.update(chatConversations).set({ updatedAt: replyDate }).where(and(eq(chatConversations.id, conversationId), eq(chatConversations.contractorId, contractorId)));
     }
 
+    const persistenceFinishedAt = performance.now();
+    const chatTiming = {
+      contextMs: Math.round(contextReadyAt - requestStartedAt),
+      providerMs: Math.round(aiFinishedAt - aiStartedAt),
+      persistenceMs: Math.round(persistenceFinishedAt - aiFinishedAt),
+      totalMs: Math.round(persistenceFinishedAt - requestStartedAt),
+      historyMessages: contextRows.length,
+      contextCharacters: contextCharacterCount,
+      toolCalls: result.toolCalls?.length || 0,
+      provider: result.provider || activeAi || 'automatic',
+      model: result.model || null
+    };
+    res.setHeader('Server-Timing', [
+      `context;dur=${chatTiming.contextMs}`,
+      `provider;dur=${chatTiming.providerMs}`,
+      `persistence;dur=${chatTiming.persistenceMs}`,
+      `total;dur=${chatTiming.totalMs}`
+    ].join(', '));
+    // Never log prompts, responses, credentials, tenant IDs, or customer records.
+    console.info('[HAL performance] chat', JSON.stringify(chatTiming));
+
     res.json({ 
       reply: result.text, 
       sources: result.sources,
@@ -4965,6 +4992,7 @@ app.post('/api/intelligence/chat', authenticate, async (req, res) => {
       modelMessage: modelMsg
     });
   } catch (err: any) {
+    console.error('[HAL performance] chat_failed', JSON.stringify({ totalMs: Math.round(performance.now() - requestStartedAt) }));
     res.status(500).json({ error: err.message });
   }
 });
