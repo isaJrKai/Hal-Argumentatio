@@ -8914,22 +8914,30 @@ app.get('/api/revenue/experiments', authenticate, async (req, res) => {
 
 app.post('/api/revenue/experiments', authenticate, async (req, res) => {
   const contractorId = (req as any).contractorId;
-  const { hypothesis, variable, baseline, expectedOutcome, startDate } = req.body;
+  const { hypothesis, variable, baseline, expectedOutcome, startDate } = req.body || {};
+  if (typeof hypothesis !== 'string' || !hypothesis.trim() ||
+      typeof variable !== 'string' || !variable.trim() ||
+      typeof baseline !== 'string' || !baseline.trim() ||
+      typeof expectedOutcome !== 'string' || !expectedOutcome.trim()) {
+    return res.status(400).json({ error: 'Hypothesis, variable, measured baseline, and expected outcome are required.' });
+  }
+  const parsedStartDate = startDate === undefined ? new Date() : new Date(startDate);
+  if (!Number.isFinite(parsedStartDate.getTime())) {
+    return res.status(400).json({ error: 'Experiment start date must be a valid date.' });
+  }
+
   try {
-    if (!hypothesis || !variable) {
-      return res.status(400).json({ error: 'Hypothesis and variable are required' });
-    }
     const [record] = await pgDb.insert(revenueExperiments).values({
       id: crypto.randomUUID(),
       contractorId,
-      hypothesis,
-      variable,
-      baseline: baseline || 'Current baseline',
-      expectedOutcome: expectedOutcome || 'Positive revenue lift',
-      startDate: startDate ? new Date(startDate) : new Date(),
+      hypothesis: hypothesis.trim(),
+      variable: variable.trim(),
+      baseline: baseline.trim(),
+      expectedOutcome: expectedOutcome.trim(),
+      startDate: parsedStartDate,
       status: 'active'
     }).returning();
-    res.json(record);
+    res.status(201).json(record);
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
@@ -8938,16 +8946,30 @@ app.post('/api/revenue/experiments', authenticate, async (req, res) => {
 app.post('/api/revenue/experiments/:id/status', authenticate, async (req, res) => {
   const contractorId = (req as any).contractorId;
   const { id } = req.params;
-  const { status, actualOutcome, pipelineImpact, revenueImpact, decision } = req.body;
+  const { status, actualOutcome, pipelineImpact, revenueImpact, decision } = req.body || {};
+  const allowedStatuses = ['active', 'completed', 'cancelled'];
+  if (typeof status !== 'string' || !allowedStatuses.includes(status)) {
+    return res.status(400).json({ error: 'A valid experiment status is required.' });
+  }
+  if (status === 'completed' && (typeof actualOutcome !== 'string' || !actualOutcome.trim())) {
+    return res.status(400).json({ error: 'A completed experiment requires a recorded actual outcome.' });
+  }
+  for (const [field, value] of [['pipelineImpact', pipelineImpact], ['revenueImpact', revenueImpact]] as const) {
+    if (value !== undefined && (!Number.isFinite(Number(value)) || Number(value) < 0)) {
+      return res.status(400).json({ error: `${field} must be a finite non-negative measured value.` });
+    }
+  }
+
   try {
-    const [updated] = await pgDb.update(revenueExperiments).set({
-      status: status || 'completed',
-      actualOutcome,
-      pipelineImpact: pipelineImpact !== undefined ? pipelineImpact : undefined,
-      revenueImpact: revenueImpact !== undefined ? revenueImpact : undefined,
-      decision,
-      updatedAt: new Date()
-    }).where(and(eq(revenueExperiments.id, id), eq(revenueExperiments.contractorId, contractorId))).returning();
+    const updateValues: any = { status, updatedAt: new Date() };
+    if (typeof actualOutcome === 'string') updateValues.actualOutcome = actualOutcome.trim();
+    if (pipelineImpact !== undefined) updateValues.pipelineImpact = Number(pipelineImpact);
+    if (revenueImpact !== undefined) updateValues.revenueImpact = Number(revenueImpact);
+    if (typeof decision === 'string') updateValues.decision = decision.trim();
+
+    const [updated] = await pgDb.update(revenueExperiments).set(updateValues)
+      .where(and(eq(revenueExperiments.id, id), eq(revenueExperiments.contractorId, contractorId)))
+      .returning();
 
     if (!updated) return res.status(404).json({ error: 'Experiment not found' });
     res.json({ success: true, updated });
