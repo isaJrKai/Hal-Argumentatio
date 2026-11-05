@@ -95,24 +95,16 @@ suite('PostgreSQL global structured ledger', () => {
       metadata: { immutable: true },
     }, writerA);
 
+    // The isolated test schema intentionally omits the production immutability
+    // trigger so the verifier is tested against a privileged/manual tamper.
     await writerA.query(
       'UPDATE structured_ledger_entries SET payload_json = $1 WHERE contractor_id = $2',
       [JSON.stringify({ contractorId: 'tenant-tamper', eventType: 'security_event' }), 'tenant-tamper'],
-    ).catch((error) => {
-      // Production bootstrap installs an append-only trigger. A trigger rejection
-      // is itself proof that ordinary UPDATE is blocked; integrity is checked
-      // below only when the isolated test schema intentionally has no trigger.
-      if (error?.code !== '55000') throw error;
-    });
+    );
 
     const integrity = await verifyStructuredLedgerIntegrity(undefined, writerB);
-    if (integrity.valid) {
-      // This test schema intentionally omits the production immutability trigger;
-      // the verifier must catch changed payload bytes even if an operator bypasses it.
-      expect(integrity.valid).toBe(false);
-      expect(integrity.auditMessage).toContain('Payload hash mismatch');
-    } else {
-      expect(integrity.auditMessage).toMatch(/Payload hash mismatch|Hash chain break|Entry hash mismatch/);
-    }
+    expect(integrity.valid).toBe(false);
+    expect(integrity.brokenAtSequence).toBe(26);
+    expect(integrity.auditMessage).toContain('Payload hash mismatch');
   }, 20000);
 });
