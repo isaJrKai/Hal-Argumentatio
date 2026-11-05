@@ -2905,31 +2905,40 @@ app.all(['/api/webhooks/twilio', '/api/webhooks/whatsapp'], async (req, res) => 
 
     console.log(`[Inbound Webhook Received] Channel: ${isWhatsApp ? 'WhatsApp' : 'SMS'} | From: ${cleanFrom} | Body: "${rawBody}"`);
 
-    // Only update a lead when the sender can be matched unambiguously.
-    // Never assign an unmatched sender to the first contractor or invent business data.
-    const allLeads = db.getLeads() || [];
-    const matchedCandidates = allLeads.filter(l => {
-      const p = (l.phone || '').replace(/\D/g, '');
-      return p.length >= 7 && fromDigits.length >= 7 && (p === fromDigits);
+    // Match against encrypted PostgreSQL phone values; the JSON mirror stores only
+    // a display placeholder and must never be used for routing inbound messages.
+    if (fromDigits.length < 7) {
+      return res.status(400).type('text/xml').send('<?xml version="1.0" encoding="UTF-8"?><Response></Response>');
+    }
+    const phoneRows = await pgDb.select({
+      id: leads.id,
+      contractorId: leads.contractorId,
+      businessName: leads.businessName,
+      phoneEncrypted: leads.phoneEncrypted,
+      status: leads.status,
+      notes: leads.notes
+    }).from(leads).where(sql`${leads.phoneEncrypted} IS NOT NULL`);
+    const matchedCandidates = phoneRows.filter(row => {
+      const decryptedPhone = row.phoneEncrypted ? decrypt(row.phoneEncrypted) : '';
+      const candidateDigits = decryptedPhone.replace(/\D/g, '');
+      return candidateDigits.length >= 7 && candidateDigits === fromDigits;
     });
 
     if (matchedCandidates.length !== 1) {
       return res.status(404).type('text/xml').send('<?xml version="1.0" encoding="UTF-8"?><Response></Response>');
     }
 
-    let matchedLead = matchedCandidates[0];
+    const matchedLead = matchedCandidates[0];
     const targetContractorId = matchedLead.contractorId;
-    const now = new Date().toISOString();
+    const now = new Date();
+    const newStatus = (matchedLead.status === 'new' ? 'contacted' : matchedLead.status) as 'new' | 'contacted' | 'converted' | 'dead';
+    const updatedNotes = `${matchedLead.notes || ''}\n[Inbound ${isWhatsApp ? 'WhatsApp' : 'SMS'} - ${now.toISOString().slice(0, 16)}]: ${rawBody}`.trim();
 
-    // Advance lead status to 'contacted' if it was new
-      const newStatus = (matchedLead.status === 'new' ? 'contacted' : matchedLead.status) as 'new' | 'contacted' | 'converted' | 'dead';
-      const updatedNotes = `${matchedLead.notes || ''}\n[Inbound ${isWhatsApp ? 'WhatsApp' : 'SMS'} - ${now.slice(0, 16)}]: ${rawBody}`.trim();
-      
-      db.updateLead(matchedLead.id, matchedLead.contractorId, {
-        status: newStatus,
-        notes: updatedNotes
-      });
-      matchedLead.status = newStatus;
+    await pgDb.update(leads).set({
+      status: newStatus,
+      notes: updatedNotes,
+      updatedAt: now
+    }).where(and(eq(leads.id, matchedLead.id), eq(leads.contractorId, targetContractorId)));
 
     // Commit cryptographic ledger audit entry
     try {
