@@ -11445,6 +11445,108 @@ async function startServer() {
 
   // ─── PHASE 6D: OUTCOME TRACKING & LEARNING LOOP ENDPOINTS ───────────────────
 
+  app.get('/api/intelligence/prospect-funnel', authenticate, async (req, res) => {
+    const contractorId = (req as any).contractorId;
+    try {
+      const [leadRows, pageRows, proposalRows] = await Promise.all([
+        pgDb.select({
+          id: leads.id,
+          verificationStatus: leads.verificationStatus,
+          groundingEvidence: leads.groundingEvidence,
+          isSynthetic: leads.isSynthetic
+        }).from(leads).where(eq(leads.contractorId, contractorId)),
+        pgDb.select({
+          id: hermesLabArtifacts.id,
+          status: hermesLabArtifacts.status,
+          content: hermesLabArtifacts.content
+        }).from(hermesLabArtifacts).where(and(
+          eq(hermesLabArtifacts.contractorId, contractorId),
+          eq(hermesLabArtifacts.toolId, 'landing_page')
+        )),
+        pgDb.select({
+          id: proposals.id,
+          leadId: proposals.leadId,
+          status: proposals.status
+        }).from(proposals).where(eq(proposals.contractorId, contractorId))
+      ]);
+
+      const realLeads = leadRows.filter(lead => !lead.isSynthetic);
+      const measuredAuditLeadIds = new Set<string>();
+      const staleAuditLeadIds = new Set<string>();
+      for (const lead of realLeads) {
+        const evidence = lead.groundingEvidence && typeof lead.groundingEvidence === 'object'
+          ? lead.groundingEvidence as Record<string, any>
+          : {};
+        const audit = evidence.websiteAudit && typeof evidence.websiteAudit === 'object'
+          ? evidence.websiteAudit
+          : null;
+        if (audit?.status === 'measured') measuredAuditLeadIds.add(lead.id);
+        if (audit?.status === 'stale') staleAuditLeadIds.add(lead.id);
+      }
+
+      const linkedPageLeadIds = new Set<string>();
+      const publishedPageLeadIds = new Set<string>();
+      let draftPageCount = 0;
+      for (const page of pageRows) {
+        const content = page.content && typeof page.content === 'object'
+          ? page.content as Record<string, any>
+          : {};
+        const pageConfig = content.pageConfig && typeof content.pageConfig === 'object'
+          ? content.pageConfig as Record<string, any>
+          : {};
+        const sourceLeadId = typeof content.sourceLeadId === 'string'
+          ? content.sourceLeadId
+          : (typeof pageConfig.sourceLeadId === 'string' ? pageConfig.sourceLeadId : '');
+        if (sourceLeadId && realLeads.some(lead => lead.id === sourceLeadId)) {
+          linkedPageLeadIds.add(sourceLeadId);
+          if (page.status === 'ready' || page.status === 'deployed') publishedPageLeadIds.add(sourceLeadId);
+        }
+        if (page.status === 'draft') draftPageCount += 1;
+      }
+
+      const proposalStatusCounts: Record<string, number> = {};
+      let acceptedProposalCount = 0;
+      for (const proposal of proposalRows) {
+        const status = String(proposal.status || 'unknown').toLowerCase();
+        proposalStatusCounts[status] = (proposalStatusCounts[status] || 0) + 1;
+        if (status.includes('accept') || status.includes('approved')) acceptedProposalCount += 1;
+      }
+
+      const totalProspects = realLeads.length;
+      return res.json({
+        scope: 'authenticated tenant records only',
+        generatedAt: new Date().toISOString(),
+        counts: {
+          totalProspects,
+          verifiedProspects: realLeads.filter(lead => lead.verificationStatus === 'VERIFIED').length,
+          unverifiedProspects: realLeads.filter(lead => lead.verificationStatus !== 'VERIFIED').length,
+          measuredWebsiteAudits: measuredAuditLeadIds.size,
+          staleWebsiteAudits: staleAuditLeadIds.size,
+          prospectsWithLinkedLandingPages: linkedPageLeadIds.size,
+          prospectsWithPublishedLandingPages: publishedPageLeadIds.size,
+          privateLandingPageDrafts: draftPageCount,
+          proposals: proposalRows.length,
+          acceptedProposals: acceptedProposalCount
+        },
+        proposalStatusCounts,
+        rates: {
+          measuredAuditPerProspect: totalProspects ? measuredAuditLeadIds.size / totalProspects : null,
+          linkedPagePerProspect: totalProspects ? linkedPageLeadIds.size / totalProspects : null,
+          proposalPerProspect: totalProspects ? proposalRows.length / totalProspects : null
+        },
+        limitations: [
+          'Counts are based on saved tenant records, not market-wide activity.',
+          'A proposal count is not evidence of client acceptance or revenue.',
+          'Landing-page drafts are private until explicitly published.',
+          'Revenue is intentionally excluded; use recorded paid invoices and attributable outcome records for financial reporting.'
+        ]
+      });
+    } catch (err: any) {
+      console.error('[HAL prospect funnel intelligence] Failed:', err);
+      return res.status(503).json({ error: 'Prospect funnel metrics are temporarily unavailable.' });
+    }
+  });
+
   app.get('/api/revenue/outcomes', authenticate, async (req, res) => {
     const contractorId = (req as any).contractorId;
     try {
