@@ -173,3 +173,30 @@ describe('proposal integrity', () => {
     expect(proposalHandler).not.toContain("'Secured'");
   });
 });
+
+const decisionEngineStart = server.indexOf("app.post('/api/revenue/decision-engine/run'");
+const decisionEngineEnd = server.indexOf("app.get('/api/revenue/simulations'", decisionEngineStart);
+const decisionEngineHandler = server.slice(decisionEngineStart, decisionEngineEnd);
+
+describe('decision-engine attribution integrity', () => {
+  it('excludes ambiguous or unattributed revenue from campaign comparisons', () => {
+    expect(decisionEngineHandler).toContain('if (names.size !== 1) continue');
+    expect(decisionEngineHandler).toContain('data.spend > 0 && data.revenue > 0 && data.closedWon.size > 0');
+    expect(decisionEngineHandler).not.toContain("'Unknown Campaign'");
+    expect(decisionEngineHandler).not.toContain("attr?.landingPage ? 'Targeted Geo'");
+    expect(decisionEngineHandler).toContain('geoRecommendationsSupported: false');
+  });
+
+  it('does not invent recommendation confidence, impact scores, or revenue uplift', () => {
+    expect(decisionEngineHandler).toContain('impactScore: 0');
+    expect(decisionEngineHandler).toContain('confidenceScore: null');
+    expect(decisionEngineHandler).not.toContain('70 + (topCamp.closedWon * 2)');
+    expect(decisionEngineHandler).not.toContain('topCamp.spend * 0.2');
+    expect(decisionEngineHandler).toContain('no revenue uplift forecast');
+  });
+
+  it('commits each recommendation and its lifecycle event in one transaction', () => {
+    expect(decisionEngineHandler).toContain('await pgDb.transaction(async tx =>');
+    expect(decisionEngineHandler).toContain('tx.insert(revenueRecommendationEvents)');
+  });
+});
