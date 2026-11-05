@@ -38,6 +38,8 @@ export default function AdminConsolePanel({ token }: { token: string }) {
   useEffect(() => { void load(); }, [load]);
 
   const updateAccount = async (account: Account, change: { role?: 'admin' | 'user'; accountStatus?: 'active' | 'suspended' }) => {
+    const action = change.role ? (change.role === 'admin' ? 'grant administrator access to' : 'remove administrator access from') : (change.accountStatus === 'suspended' ? 'suspend' : 'reactivate');
+    if (!window.confirm(`Are you sure you want to ${action} ${account.companyName} (${account.email})?`)) return;
     setBusyId(account.id); setError('');
     try {
       const response = await fetch(`/api/admin/contractors/${encodeURIComponent(account.id)}`, {
