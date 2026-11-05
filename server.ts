@@ -2640,17 +2640,21 @@ app.post('/api/leads/:id/verify-grounding', authenticate, async (req, res) => {
     }
 
     const rawPhone = lead.phoneEncrypted ? (decrypt(lead.phoneEncrypted) || lead.phone) : lead.phone;
+    const existingGroundingEvidence = lead.groundingEvidence && typeof lead.groundingEvidence === 'object'
+      ? lead.groundingEvidence as Record<string, any>
+      : {};
     const verification = await verifyLeadGrounding({
       businessName: lead.businessName,
       websiteUrl: lead.websiteUrl || undefined,
       phone: rawPhone || undefined,
-      isSynthetic: Boolean(lead.isSynthetic)
+      isSynthetic: Boolean(lead.isSynthetic),
+      businessIdentityConfirmed: existingGroundingEvidence.businessIdentityConfirmed === true
     });
 
     const [updatedLead] = await pgDb.update(leads).set({
       verificationStatus: verification.status,
       dnsVerified: verification.evidence.dnsResolved,
-      groundingEvidence: verification.evidence,
+      groundingEvidence: { ...existingGroundingEvidence, ...verification.evidence, network: verification.evidence },
       updatedAt: new Date()
     }).where(and(eq(leads.id, leadId), eq(leads.contractorId, contractorId))).returning();
 
@@ -2689,17 +2693,21 @@ app.post('/api/leads/verify-all', authenticate, async (req, res) => {
 
     for (const lead of allLeads) {
       const rawPhone = lead.phoneEncrypted ? (decrypt(lead.phoneEncrypted) || lead.phone) : lead.phone;
+      const existingGroundingEvidence = lead.groundingEvidence && typeof lead.groundingEvidence === 'object'
+        ? lead.groundingEvidence as Record<string, any>
+        : {};
       const verification = await verifyLeadGrounding({
         businessName: lead.businessName,
         websiteUrl: lead.websiteUrl || undefined,
         phone: rawPhone || undefined,
-        isSynthetic: Boolean(lead.isSynthetic)
+        isSynthetic: Boolean(lead.isSynthetic),
+        businessIdentityConfirmed: existingGroundingEvidence.businessIdentityConfirmed === true
       });
 
       await pgDb.update(leads).set({
         verificationStatus: verification.status,
         dnsVerified: verification.evidence.dnsResolved,
-        groundingEvidence: verification.evidence,
+        groundingEvidence: { ...existingGroundingEvidence, ...verification.evidence, network: verification.evidence },
         updatedAt: new Date()
       }).where(and(eq(leads.id, lead.id), eq(leads.contractorId, contractorId)));
 
