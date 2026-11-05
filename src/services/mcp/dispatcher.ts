@@ -197,7 +197,7 @@ export const HAL_MCP_TOOLS: McpToolDefinition[] = [
       },
       required: ['toolId']
     }
-  }
+  },
   {
     name: 'hal_audit_website_connectivity',
     description: 'Runs a safe, bounded public DNS and pinned HTTP/TLS connectivity audit for a website. Reports only measured connectivity evidence; it does not claim Lighthouse, PageSpeed, SEO, mobile, content, or conversion analysis. Optionally links the result to a lead owned by the authenticated tenant.',
@@ -799,7 +799,8 @@ export async function executeMcpTool(
 
       let parsedUrl: URL;
       try {
-        parsedUrl = new URL(/^https?:\\/\\//i.test(rawUrl) ? rawUrl : 'https://' + rawUrl);
+        const candidateUrl = rawUrl.startsWith('http://') || rawUrl.startsWith('https://') ? rawUrl : 'https://' + rawUrl;
+        parsedUrl = new URL(candidateUrl);
       } catch {
         throw new Error('Target website URL is invalid.');
       }
