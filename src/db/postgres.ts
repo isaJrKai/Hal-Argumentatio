@@ -1049,7 +1049,8 @@ export async function bootstrapPostgresTables(poolInstance?: Pool): Promise<void
             to_regclass('public.work_tasks') IS NOT NULL AS has_work_tasks,
             to_regclass('public.work_events') IS NOT NULL AS has_work_events,
             to_regclass('public.structured_ledger_entries') IS NOT NULL AS has_structured_ledger,
-            EXISTS (SELECT 1 FROM pg_trigger WHERE tgrelid = to_regclass('public.structured_ledger_entries') AND tgname = 'structured_ledger_no_mutation' AND NOT tgisinternal)\n              AND EXISTS (SELECT 1 FROM pg_trigger WHERE tgrelid = to_regclass('public.structured_ledger_entries') AND tgname = 'structured_ledger_no_truncate' AND NOT tgisinternal) AS has_structured_ledger_guard
+            EXISTS (SELECT 1 FROM pg_trigger WHERE tgrelid = to_regclass('public.structured_ledger_entries') AND tgname = 'structured_ledger_no_mutation' AND NOT tgisinternal)
+              AND EXISTS (SELECT 1 FROM pg_trigger WHERE tgrelid = to_regclass('public.structured_ledger_entries') AND tgname = 'structured_ledger_no_truncate' AND NOT tgisinternal) AS has_structured_ledger_guard
           FROM information_schema.tables
           WHERE table_schema = 'public';
         `);
@@ -1113,7 +1114,8 @@ export async function testPostgresConnection(customUrl?: string): Promise<{
         to_regclass('public.work_tasks') IS NOT NULL AS has_work_tasks,
         to_regclass('public.work_events') IS NOT NULL AS has_work_events,
         to_regclass('public.structured_ledger_entries') IS NOT NULL AS has_structured_ledger,
-        EXISTS (SELECT 1 FROM pg_trigger WHERE tgrelid = to_regclass('public.structured_ledger_entries') AND tgname = 'structured_ledger_no_mutation' AND NOT tgisinternal)\n          AND EXISTS (SELECT 1 FROM pg_trigger WHERE tgrelid = to_regclass('public.structured_ledger_entries') AND tgname = 'structured_ledger_no_truncate' AND NOT tgisinternal) AS has_structured_ledger_guard
+        EXISTS (SELECT 1 FROM pg_trigger WHERE tgrelid = to_regclass('public.structured_ledger_entries') AND tgname = 'structured_ledger_no_mutation' AND NOT tgisinternal)
+          AND EXISTS (SELECT 1 FROM pg_trigger WHERE tgrelid = to_regclass('public.structured_ledger_entries') AND tgname = 'structured_ledger_no_truncate' AND NOT tgisinternal) AS has_structured_ledger_guard
       FROM information_schema.tables
       WHERE table_schema = 'public';
     `);
