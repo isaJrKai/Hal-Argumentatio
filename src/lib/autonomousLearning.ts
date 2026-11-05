@@ -441,6 +441,11 @@ export class AutonomousLearningEngine {
         ))
         .returning({ updatedAt: neuralState.updatedAt });
       if (updated.length !== 1) {
+        // Force the next authenticated request to reload the current tenant row.
+        // Keeping the stale revision marked initialized would make every later
+        // compare-and-swap fail until this process restarted.
+        this.initialized = false;
+        this.persistedAt = null;
         throw new Error('Learning state changed in another application instance; reload before retrying this update.');
       }
       this.persistedAt = updated[0].updatedAt;
@@ -450,6 +455,8 @@ export class AutonomousLearningEngine {
         .onConflictDoNothing()
         .returning({ updatedAt: neuralState.updatedAt });
       if (inserted.length !== 1) {
+        this.initialized = false;
+        this.persistedAt = null;
         throw new Error('Learning state was initialized by another application instance; reload before retrying this update.');
       }
       this.persistedAt = inserted[0].updatedAt;
