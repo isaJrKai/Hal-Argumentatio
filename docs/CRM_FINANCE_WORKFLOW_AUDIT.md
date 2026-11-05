@@ -38,6 +38,7 @@ A regression test asserts these fail-closed invariants.
 ## Additional defects corrected on this branch
 
 - The manual outcome-evaluation endpoint no longer substitutes default revenue/ROAS values. It now rejects evaluation unless the outcome is explicitly in the measured state and contains comparable finite numeric expected/actual metrics.
+- Outcome dashboard summaries now keep measured observations separate from evaluated outcomes, so an unevaluated measurement cannot inflate the evaluated count or prediction-accuracy average.
 - Recommendation execution no longer manufactures a random “Manual Ref” identifier. The recommendation state update and immutable lifecycle event now commit in one transaction with a current-status predicate to prevent concurrent overwrites.
 - Client-project creation now requires explicit business, city, service, package, and positive whole-dollar retainer values. When linked to a lead, that lead must belong to the tenant and already be closed-won; an existing linked project is rejected. Missing audit scores and target scores remain unavailable instead of being seeded with defaults.
 - The project form no longer pre-fills a $2,400 retainer, and its lead picker offers only closed-won leads.
