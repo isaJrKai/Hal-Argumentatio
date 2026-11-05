@@ -1735,7 +1735,7 @@ app.get('/api/public/landing/:id', async (req, res) => {
       updatedAt: hermesLabArtifacts.updatedAt
     }).from(hermesLabArtifacts).where(and(
       eq(hermesLabArtifacts.id, id),
-      eq(hermesLabArtifacts.status, 'deployed'),
+      inArray(hermesLabArtifacts.status, ['ready', 'deployed']),
       eq(hermesLabArtifacts.toolId, 'landing_page')
     ));
     if (!artifact) {
@@ -1755,7 +1755,7 @@ app.get('/landing/:id', async (req, res) => {
   try {
     const [artifact] = await pgDb.select().from(hermesLabArtifacts).where(and(
       eq(hermesLabArtifacts.id, id),
-      eq(hermesLabArtifacts.status, 'deployed'),
+      inArray(hermesLabArtifacts.status, ['ready', 'deployed']),
       eq(hermesLabArtifacts.toolId, 'landing_page')
     ));
     if (!artifact) {
