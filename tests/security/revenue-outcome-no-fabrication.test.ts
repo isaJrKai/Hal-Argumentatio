@@ -89,6 +89,8 @@ describe('client project financial integrity', () => {
     expect(projectHandler).toContain('pg_advisory_xact_lock');
     expect(projectHandler).toContain('tx.insert(workEvents)');
     expect(projectHandler).toContain('pgDb.transaction(async tx =>');
+    expect(projectHandler).toContain('PROJECT_LEAD_IDENTITY_MISMATCH');
+    expect(projectHandler).toContain('businessName.trim() !== linkedLead.businessName');
   });
 });
 
