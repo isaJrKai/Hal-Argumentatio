@@ -7658,6 +7658,15 @@ app.post('/api/proposals/generate', authenticate, async (req, res) => {
     const websiteAudit = leadEvidence.websiteAudit && typeof leadEvidence.websiteAudit === 'object'
       ? leadEvidence.websiteAudit
       : null;
+    const landingArtifacts = await pgDb.select().from(hermesLabArtifacts).where(and(
+      eq(hermesLabArtifacts.contractorId, contractorId),
+      eq(hermesLabArtifacts.toolId, 'landing_page')
+    )).orderBy(desc(hermesLabArtifacts.updatedAt));
+    const landingPageArtifact = landingArtifacts.find((artifact: any) => {
+      const content = artifact.content && typeof artifact.content === 'object' ? artifact.content as Record<string, any> : {};
+      const pageConfig = content.pageConfig && typeof content.pageConfig === 'object' ? content.pageConfig as Record<string, any> : {};
+      return content.sourceLeadId === lead.id || pageConfig.sourceLeadId === lead.id;
+    }) || null;
     const highlights: string[] = [];
     if (websiteAudit?.status === 'measured') {
       const measurements = websiteAudit.measurements || {};
@@ -7677,6 +7686,12 @@ app.post('/api/proposals/generate', authenticate, async (req, res) => {
       highlights.push('A website audit was attempted but stopped at a redirect. Review the destination before drawing conclusions.');
     } else {
       highlights.push('No measured website audit is currently saved to this lead. This proposal contains no website-specific findings.');
+    }
+
+    if (landingPageArtifact) {
+      highlights.push(`Saved Landing Page Studio artifact: ${landingPageArtifact.title} (status: ${landingPageArtifact.status}).`);
+    } else {
+      highlights.push('No Landing Page Studio artifact is linked to this prospect yet.');
     }
 
     const proposal = {
@@ -7701,6 +7716,8 @@ app.post('/api/proposals/generate', authenticate, async (req, res) => {
       auditEvidenceStatus: websiteAudit?.status || 'not_available',
       sourceAuditId: websiteAudit?.auditId || null,
       sourceAuditAt: websiteAudit?.auditedAt || null,
+      landingPageArtifactId: landingPageArtifact?.id || null,
+      landingPageStatus: landingPageArtifact?.status || null,
       validUntil: new Date(Date.now() + 14 * 24 * 3600 * 1000).toISOString(),
       persistenceStatus: 'persisted_draft'
     };
@@ -7731,6 +7748,8 @@ app.post('/api/proposals/generate', authenticate, async (req, res) => {
         packageTier,
         monthlyRetainerUsd: retainer,
         setupFeeUsd: setup,
+        sourceAuditId: websiteAudit?.auditId || null,
+        landingPageArtifactId: landingPageArtifact?.id || null,
         persistenceStatus: 'persisted_draft'
       }
       });
