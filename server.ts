@@ -7158,46 +7158,97 @@ app.post('/api/admin/git/push', authenticate, requireRole('admin'), (_req, res) 
 
 // ─── WHITE-LABEL CLIENT PROPOSAL GENERATOR ───────────────────────────────────
 
-app.post('/api/proposals/generate', authenticate, (req, res) => {
+app.post('/api/proposals/generate', authenticate, async (req, res) => {
   const contractorId = (req as any).contractorId;
-  const { leadId, clientName, companyName, packageTier, monthlyRetainerUsd, setupFeeUsd, auditScores } = req.body;
+  const { leadId, packageTier, monthlyRetainerUsd, setupFeeUsd, auditScores } = req.body || {};
 
-  const tier = packageTier || 'Dominance';
-  const retainer = Number(monthlyRetainerUsd) || (tier === 'Dominance' ? 2400 : tier === 'Enterprise' ? 4500 : 1200);
-  const setup = Number(setupFeeUsd) || (tier === 'Dominance' ? 950 : tier === 'Enterprise' ? 1800 : 500);
+  const retainer = Number(monthlyRetainerUsd);
+  const setup = Number(setupFeeUsd);
+  if (typeof leadId !== 'string' || !leadId.trim() ||
+      !['Growth', 'Dominance', 'Enterprise'].includes(packageTier) ||
+      !Number.isSafeInteger(retainer) || retainer <= 0 ||
+      !Number.isSafeInteger(setup) || setup <= 0) {
+    return res.status(400).json({
+      error: 'A saved lead, valid package tier, and explicit positive whole-dollar retainer and setup fee are required.'
+    });
+  }
 
-  const proposal = {
-    id: 'prop_' + crypto.randomBytes(8).toString('hex'),
-    leadId: leadId || '',
-    clientName: clientName || 'Business Principal',
-    companyName: companyName || 'Client Organization',
-    preparedBy: 'HAL Business Intelligence Operations',
-    packageTier: tier,
-    monthlyRetainerUsd: retainer,
-    setupFeeUsd: setup,
-    deliverables: [
-      'Core Web Vitals & Mobile Speed Optimization (<1.2s load target)',
-      'TLS 1.3 Encrypted SSL Hardening & Security Headers',
-      'Local Geo-SEO NAP Citations & Google Maps Rank Acceleration',
-      'Autonomous High-Intent Lead Capture Funnel & Instant SMS Notifications',
-      'Weekly AI Executive Performance Dashboard & Conversion Audits'
-    ],
-    roiEstimateAnnualUsd: retainer * 12 * 4.5,
-    auditHighlights: [
-      `Mobile Speed Index: ${auditScores?.mobileSpeedScore || 52}/100 (Est. 28% visitor bounce reduction)`,
-      `SEO Health: ${auditScores?.seoHealthScore || 64}/100 (Geo-structured Schema injection)`,
-      `SSL Status: ${auditScores?.sslStatus === 'missing' ? 'CRITICAL: Insecure' : 'Secured'}`
-    ],
-    validUntil: new Date(Date.now() + 14 * 24 * 3600 * 1000).toLocaleDateString()
-  };
+  if (auditScores !== undefined && (!auditScores || typeof auditScores !== 'object' || Array.isArray(auditScores))) {
+    return res.status(400).json({ error: 'Audit evidence must be a structured object.' });
+  }
 
-  db.addAuditLog({
-    contractorId,
-    action: 'PROPOSAL_GENERATED',
-    details: `Generated ${tier} Client Proposal for ${companyName} ($${retainer}/mo).`
-  });
+  try {
+    const [lead] = await pgDb.select({
+      id: leads.id,
+      businessName: leads.businessName,
+      ownerName: leads.ownerName
+    }).from(leads)
+      .where(and(eq(leads.id, leadId.trim()), eq(leads.contractorId, contractorId)))
+      .limit(1);
+    if (!lead) return res.status(404).json({ error: 'Lead not found or inaccessible.' });
 
-  res.status(201).json(proposal);
+    const highlights: string[] = [];
+    const appendScore = (key: string, label: string) => {
+      const value = auditScores?.[key];
+      if (value === undefined || value === null || value === '') return;
+      const score = Number(value);
+      if (Number.isFinite(score) && score >= 0 && score <= 100) {
+        highlights.push(`${label}: ${score}/100 (recorded audit value)`);
+      }
+    };
+    appendScore('mobileSpeedScore', 'Mobile Speed Score');
+    appendScore('seoHealthScore', 'SEO Health Score');
+    if (typeof auditScores?.sslStatus === 'string' && auditScores.sslStatus.trim()) {
+      highlights.push(`SSL Status: ${auditScores.sslStatus.trim()}`);
+    }
+
+    const proposal = {
+      id: 'prop_' + crypto.randomBytes(8).toString('hex'),
+      leadId: lead.id,
+      clientName: lead.ownerName?.trim() || lead.businessName,
+      companyName: lead.businessName,
+      preparedBy: 'HAL Business Intelligence Operations',
+      packageTier,
+      monthlyRetainerUsd: retainer,
+      setupFeeUsd: setup,
+      deliverables: [
+        'Core Web Vitals & Mobile Speed Optimization',
+        'TLS and security configuration review',
+        'Local SEO and business listing consistency',
+        'Lead capture and notification workflow setup',
+        'Monthly performance review using verified measurements'
+      ],
+      // No attributable revenue model exists to support an ROI estimate.
+      roiEstimateAnnualUsd: null,
+      auditHighlights: highlights,
+      validUntil: new Date(Date.now() + 14 * 24 * 3600 * 1000).toISOString(),
+      persistenceStatus: 'generated_only_not_persisted'
+    };
+
+    await recordWorkEvent(pgDb, {
+      contractorId,
+      eventType: 'proposal.generated',
+      entityType: 'lead',
+      entityId: lead.id,
+      actorType: 'human',
+      actorId: contractorId,
+      sourceModule: 'proposal_studio',
+      correlationId: proposal.id,
+      summary: `Generated a proposal draft for ${lead.businessName}; it has not been persisted as a contract.`,
+      payload: {
+        proposalId: proposal.id,
+        packageTier,
+        monthlyRetainerUsd: retainer,
+        setupFeeUsd: setup,
+        persistenceStatus: proposal.persistenceStatus
+      }
+    });
+
+    return res.status(201).json(proposal);
+  } catch (err: any) {
+    console.error('[Proposal Generation] Failed:', err);
+    return res.status(503).json({ error: 'Proposal draft could not be generated from the saved lead and verified inputs.' });
+  }
 });
 
 // ─── PHASE 4: CLIENT PROJECTS & ONBOARDING DELIVERY API ─────────────────────
@@ -7248,36 +7299,42 @@ app.post('/api/projects', authenticate, async (req, res) => {
   const contractorId = (req as any).contractorId;
   const { leadId, clientName, businessName, city, serviceType, packageTier, monthlyRetainerUsd, initialAuditScore } = req.body || {};
 
-  if (typeof businessName !== 'string' || !businessName.trim()) {
-    return res.status(400).json({ error: 'Business name is required to create a project' });
+  if (typeof businessName !== 'string' || !businessName.trim() ||
+      typeof city !== 'string' || !city.trim() ||
+      typeof serviceType !== 'string' || !serviceType.trim() ||
+      !['Growth', 'Dominance', 'Enterprise'].includes(packageTier) ||
+      !Number.isSafeInteger(monthlyRetainerUsd) || monthlyRetainerUsd <= 0) {
+    return res.status(400).json({
+      error: 'Business name, city, service type, a valid package tier, and a positive whole-dollar monthly retainer are required.'
+    });
+  }
+
+  const normalizedLeadId = typeof leadId === 'string' && leadId.trim() ? leadId.trim() : null;
+  const auditScore = initialAuditScore === undefined || initialAuditScore === null || initialAuditScore === ''
+    ? null
+    : Number(initialAuditScore);
+  if (auditScore !== null && (!Number.isFinite(auditScore) || auditScore < 0 || auditScore > 100)) {
+    return res.status(400).json({ error: 'Initial audit score must be a measured value from 0 to 100.' });
   }
 
   try {
-    if (typeof leadId === 'string' && leadId.trim()) {
-      const [linkedLead] = await pgDb.select({ id: leads.id }).from(leads)
-        .where(and(eq(leads.id, leadId.trim()), eq(leads.contractorId, contractorId)))
-        .limit(1);
-      if (!linkedLead) return res.status(400).json({ error: 'The selected lead does not belong to this workspace.' });
-    }
-
     const now = new Date();
-    const score = Number.isFinite(Number(initialAuditScore)) ? Number(initialAuditScore) : 50;
     const projectId = 'proj_' + crypto.randomBytes(6).toString('hex');
     const projectValues = {
       id: projectId,
       contractorId,
-      leadId: typeof leadId === 'string' ? leadId : '',
-      clientName: typeof clientName === 'string' && clientName.trim() ? clientName.trim() : 'Business Owner',
+      leadId: normalizedLeadId || '',
+      clientName: typeof clientName === 'string' && clientName.trim() ? clientName.trim() : businessName.trim(),
       businessName: businessName.trim(),
-      city: typeof city === 'string' && city.trim() ? city.trim() : 'Calgary',
-      serviceType: typeof serviceType === 'string' && serviceType.trim() ? serviceType.trim() : 'General Trade',
-      packageTier: ['Growth', 'Dominance', 'Enterprise'].includes(packageTier) ? packageTier : 'Dominance',
-      monthlyRetainerUsd: Number.isFinite(Number(monthlyRetainerUsd)) && Number(monthlyRetainerUsd) > 0 ? Math.round(Number(monthlyRetainerUsd)) : 2400,
+      city: city.trim(),
+      serviceType: serviceType.trim(),
+      packageTier,
+      monthlyRetainerUsd,
       startDate: now,
       status: 'onboarding',
-      initialAuditScore: score,
-      currentScore: score,
-      targetScore: 95,
+      initialAuditScore: auditScore,
+      currentScore: auditScore,
+      targetScore: null,
       portalAccessToken: crypto.randomBytes(12).toString('hex'),
       createdAt: now,
       updatedAt: now,
@@ -7289,30 +7346,58 @@ app.post('/api/projects', authenticate, async (req, res) => {
       milestones: [
         { id: 'ms_1', title: 'Onboarding & Asset Intake', description: 'Intake and verify client DNS, assets, and service radius.', status: 'in_progress' },
         { id: 'ms_2', title: 'Technical Speed & SSL Hardening', description: 'Compress images, configure TLS 1.3, optimize Core Web Vitals.', status: 'pending' },
-        { id: 'ms_3', title: 'Geo-SEO Schema & Map Pack Synchronization', description: 'Inject JSON-LD structured data and align 40+ local citations.', status: 'pending' },
-        { id: 'ms_4', title: 'Autonomous Funnel Activation', description: 'Launch lead capture forms and direct SMS dispatch routing.', status: 'pending' },
-        { id: 'ms_5', title: 'Monthly Executive ROI Review', description: 'Deliver progress comparison report and growth metrics breakdown.', status: 'pending' }
+        { id: 'ms_3', title: 'Geo-SEO Schema & Map Pack Synchronization', description: 'Inject JSON-LD structured data and align local citations.', status: 'pending' },
+        { id: 'ms_4', title: 'Funnel Activation', description: 'Configure and verify lead capture and notification routing.', status: 'pending' },
+        { id: 'ms_5', title: 'Monthly Performance Review', description: 'Review verified progress and recorded business outcomes.', status: 'pending' }
       ]
     };
-    const [project] = await pgDb.insert(clientProjects).values(projectValues).returning();
+    const project = await pgDb.transaction(async tx => {
+      if (normalizedLeadId) {
+        // Serialize conversions for the same tenant/lead across concurrent requests.
+        await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${contractorId}), hashtext(${normalizedLeadId}))`);
+        const [linkedLead] = await tx.select({ id: leads.id, status: leads.status, businessName: leads.businessName, city: leads.city }).from(leads)
+          .where(and(eq(leads.id, normalizedLeadId), eq(leads.contractorId, contractorId)))
+          .limit(1);
+        if (!linkedLead) throw new Error('PROJECT_LEAD_NOT_FOUND');
+        if (!['closed_won', 'won', 'converted', 'customer'].includes(String(linkedLead.status).toLowerCase())) {
+          throw new Error('PROJECT_LEAD_NOT_CLOSED_WON');
+        }
+        if (businessName.trim() !== linkedLead.businessName || city.trim() !== linkedLead.city) {
+          throw new Error('PROJECT_LEAD_IDENTITY_MISMATCH');
+        }
 
-    try {
-      await recordWorkEvent(pgDb, {
-        contractorId, eventType: 'client_project.created', entityType: 'client_project', entityId: project.id,
-        actorType: 'human', actorId: contractorId, sourceModule: 'client_operations', correlationId: project.id,
+        const [existingProject] = await tx.select({ id: clientProjects.id }).from(clientProjects)
+          .where(and(eq(clientProjects.leadId, normalizedLeadId), eq(clientProjects.contractorId, contractorId)))
+          .limit(1);
+        if (existingProject) throw new Error(`PROJECT_ALREADY_EXISTS:${existingProject.id}`);
+      }
+
+      const [created] = await tx.insert(clientProjects).values(projectValues).returning();
+      await tx.insert(workEvents).values({
+        id: 'evt_' + crypto.randomUUID(),
+        contractorId,
+        eventType: 'client_project.created',
+        entityType: 'client_project',
+        entityId: created.id,
+        actorType: 'human',
+        actorId: contractorId,
+        sourceModule: 'client_operations',
+        correlationId: created.id,
         summary: `Created client delivery project for ${businessName.trim()}.`,
-        payload: { leadId: leadId || null, status: project.status, packageTier: project.packageTier, monthlyRetainerUsd: project.monthlyRetainerUsd }
+        payload: {
+          leadId: normalizedLeadId,
+          status: created.status,
+          packageTier: created.packageTier,
+          monthlyRetainerUsd: created.monthlyRetainerUsd
+        }
       });
-    } catch (ledgerError) {
-      // The project row is already durable. A secondary ledger outage must not
-      // tell the operator creation failed and invite a duplicate retry.
-      console.error('[Client Projects] Creation ledger event failed:', ledgerError);
-    }
+      return created;
+    });
 
     db.addAuditLog({
       contractorId,
       action: 'PROJECT_ONBOARDED',
-      details: `Initiated active delivery project for ${businessName.trim()} (${project.monthlyRetainerUsd}/mo).`
+      details: `Initiated delivery project for ${businessName.trim()} (${project.monthlyRetainerUsd}/mo).`
     });
 
     broadcastNotification(
@@ -7324,6 +7409,21 @@ app.post('/api/projects', authenticate, async (req, res) => {
 
     return res.status(201).json(project);
   } catch (err: any) {
+    if (err.message === 'PROJECT_LEAD_NOT_FOUND') {
+      return res.status(404).json({ error: 'The selected lead does not belong to this workspace.' });
+    }
+    if (err.message === 'PROJECT_LEAD_NOT_CLOSED_WON') {
+      return res.status(409).json({ error: 'A client project can only be converted from a lead recorded as closed-won.' });
+    }
+    if (err.message === 'PROJECT_LEAD_IDENTITY_MISMATCH') {
+      return res.status(409).json({ error: 'Business name and city must match the selected won lead.' });
+    }
+    if (typeof err.message === 'string' && err.message.startsWith('PROJECT_ALREADY_EXISTS:')) {
+      return res.status(409).json({
+        error: 'A client project already exists for this won lead.',
+        projectId: err.message.slice('PROJECT_ALREADY_EXISTS:'.length)
+      });
+    }
     console.error('[Client Projects] Create failed:', err);
     return res.status(503).json({ error: 'Client project could not be saved to the database.' });
   }
@@ -7345,25 +7445,61 @@ app.put('/api/projects/:id', authenticate, async (req, res) => {
     const safeUpdates: Partial<typeof clientProjects.$inferInsert> = { updatedAt: new Date() };
     if (Array.isArray(updates.milestones)) safeUpdates.milestones = updates.milestones;
     if (Array.isArray(updates.assets)) safeUpdates.assets = updates.assets;
-    if (typeof updates.status === 'string' && ['onboarding', 'active_delivery', 'review', 'completed'].includes(updates.status)) {
+    if (updates.status !== undefined) {
+      const allowedStatuses = ['onboarding', 'active_delivery', 'review', 'completed', 'cancelled', 'canceled', 'churned', 'archived'];
+      if (typeof updates.status !== 'string' || !allowedStatuses.includes(updates.status)) {
+        return res.status(400).json({ error: 'Unsupported client project status.' });
+      }
+      const terminalStatuses = ['cancelled', 'canceled', 'churned', 'archived'];
+      const currentStatus = String(existingProject.status || '').toLowerCase();
+      if (terminalStatuses.includes(currentStatus) && updates.status !== existingProject.status) {
+        return res.status(409).json({ error: 'Terminal client projects cannot be reactivated or moved to another status.' });
+      }
       safeUpdates.status = updates.status;
+    }
+    if (updates.monthlyRetainerUsd !== undefined) {
+      if (!Number.isSafeInteger(updates.monthlyRetainerUsd) || updates.monthlyRetainerUsd < 0) {
+        return res.status(400).json({ error: 'Monthly retainer must be a non-negative whole-dollar amount.' });
+      }
+      safeUpdates.monthlyRetainerUsd = updates.monthlyRetainerUsd;
     }
     if (typeof updates.notes === 'string') safeUpdates.notes = updates.notes.slice(0, 10000);
 
-    const [updated] = await pgDb.update(clientProjects).set(safeUpdates)
-      .where(and(eq(clientProjects.id, id), eq(clientProjects.contractorId, contractorId)))
-      .returning();
-    if (!updated) return res.status(404).json({ error: 'Project not found or unauthorized' });
+    const updated = await pgDb.transaction(async tx => {
+      const [savedProject] = await tx.update(clientProjects).set(safeUpdates)
+        .where(and(
+          eq(clientProjects.id, id),
+          eq(clientProjects.contractorId, contractorId),
+          // Optimistic concurrency: do not apply a stale payload after another
+          // request has changed the project, especially its terminal status.
+          eq(clientProjects.status, existingProject.status),
+          eq(clientProjects.updatedAt, existingProject.updatedAt)
+        ))
+        .returning();
+      if (!savedProject) return null;
 
-    try {
-      await recordWorkEvent(pgDb, {
-        contractorId, eventType: 'client_project.updated', entityType: 'client_project', entityId: id,
-        actorType: 'human', actorId: contractorId, sourceModule: 'client_operations', correlationId: id,
-        summary: `Updated client project for ${updated.businessName}.`,
-        payload: { previousStatus: existingProject.status, currentStatus: updated.status }
+      await tx.insert(workEvents).values({
+        id: 'evt_' + crypto.randomUUID(),
+        contractorId,
+        eventType: 'client_project.updated',
+        entityType: 'client_project',
+        entityId: id,
+        actorType: 'human',
+        actorId: contractorId,
+        sourceModule: 'client_operations',
+        correlationId: id,
+        summary: `Updated client project for ${savedProject.businessName}.`,
+        payload: {
+          previousStatus: existingProject.status,
+          currentStatus: savedProject.status,
+          previousMonthlyRetainerUsd: existingProject.monthlyRetainerUsd,
+          currentMonthlyRetainerUsd: savedProject.monthlyRetainerUsd
+        }
       });
-    } catch (ledgerError) {
-      console.error('[Client Projects] Update ledger event failed:', ledgerError);
+      return savedProject;
+    });
+    if (!updated) {
+      return res.status(409).json({ error: 'Project changed before this update could be saved. Reload the project and retry.' });
     }
 
     if (updates.status === 'completed' && existingProject.status !== 'completed') {
@@ -9342,22 +9478,33 @@ app.get('/api/revenue/experiments', authenticate, async (req, res) => {
 
 app.post('/api/revenue/experiments', authenticate, async (req, res) => {
   const contractorId = (req as any).contractorId;
-  const { hypothesis, variable, baseline, expectedOutcome, startDate } = req.body;
+  const { hypothesis, variable, baseline, expectedOutcome, startDate } = req.body || {};
+  if (typeof hypothesis !== 'string' || !hypothesis.trim() ||
+      typeof variable !== 'string' || !variable.trim() ||
+      typeof baseline !== 'string' || !baseline.trim() ||
+      typeof expectedOutcome !== 'string' || !expectedOutcome.trim()) {
+    return res.status(400).json({ error: 'Hypothesis, variable, measured baseline, and expected outcome are required.' });
+  }
+  if (startDate === null || startDate === '') {
+    return res.status(400).json({ error: 'Experiment start date must be a valid date.' });
+  }
+  const parsedStartDate = startDate === undefined ? new Date() : new Date(startDate);
+  if (!Number.isFinite(parsedStartDate.getTime())) {
+    return res.status(400).json({ error: 'Experiment start date must be a valid date.' });
+  }
+
   try {
-    if (!hypothesis || !variable) {
-      return res.status(400).json({ error: 'Hypothesis and variable are required' });
-    }
     const [record] = await pgDb.insert(revenueExperiments).values({
       id: crypto.randomUUID(),
       contractorId,
-      hypothesis,
-      variable,
-      baseline: baseline || 'Current baseline',
-      expectedOutcome: expectedOutcome || 'Positive revenue lift',
-      startDate: startDate ? new Date(startDate) : new Date(),
+      hypothesis: hypothesis.trim(),
+      variable: variable.trim(),
+      baseline: baseline.trim(),
+      expectedOutcome: expectedOutcome.trim(),
+      startDate: parsedStartDate,
       status: 'active'
     }).returning();
-    res.json(record);
+    res.status(201).json(record);
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
@@ -9366,16 +9513,30 @@ app.post('/api/revenue/experiments', authenticate, async (req, res) => {
 app.post('/api/revenue/experiments/:id/status', authenticate, async (req, res) => {
   const contractorId = (req as any).contractorId;
   const { id } = req.params;
-  const { status, actualOutcome, pipelineImpact, revenueImpact, decision } = req.body;
+  const { status, actualOutcome, pipelineImpact, revenueImpact, decision } = req.body || {};
+  const allowedStatuses = ['active', 'completed', 'cancelled'];
+  if (typeof status !== 'string' || !allowedStatuses.includes(status)) {
+    return res.status(400).json({ error: 'A valid experiment status is required.' });
+  }
+  if (status === 'completed' && (typeof actualOutcome !== 'string' || !actualOutcome.trim())) {
+    return res.status(400).json({ error: 'A completed experiment requires a recorded actual outcome.' });
+  }
+  for (const [field, value] of [['pipelineImpact', pipelineImpact], ['revenueImpact', revenueImpact]] as const) {
+    if (value !== undefined && (value === null || value === '' || !Number.isFinite(Number(value)) || Number(value) < 0)) {
+      return res.status(400).json({ error: `${field} must be a finite non-negative measured value.` });
+    }
+  }
+
   try {
-    const [updated] = await pgDb.update(revenueExperiments).set({
-      status: status || 'completed',
-      actualOutcome,
-      pipelineImpact: pipelineImpact !== undefined ? pipelineImpact : undefined,
-      revenueImpact: revenueImpact !== undefined ? revenueImpact : undefined,
-      decision,
-      updatedAt: new Date()
-    }).where(and(eq(revenueExperiments.id, id), eq(revenueExperiments.contractorId, contractorId))).returning();
+    const updateValues: any = { status, updatedAt: new Date() };
+    if (typeof actualOutcome === 'string') updateValues.actualOutcome = actualOutcome.trim();
+    if (pipelineImpact !== undefined) updateValues.pipelineImpact = Number(pipelineImpact);
+    if (revenueImpact !== undefined) updateValues.revenueImpact = Number(revenueImpact);
+    if (typeof decision === 'string') updateValues.decision = decision.trim();
+
+    const [updated] = await pgDb.update(revenueExperiments).set(updateValues)
+      .where(and(eq(revenueExperiments.id, id), eq(revenueExperiments.contractorId, contractorId)))
+      .returning();
 
     if (!updated) return res.status(404).json({ error: 'Experiment not found' });
     res.json({ success: true, updated });
@@ -9387,183 +9548,158 @@ app.post('/api/revenue/experiments/:id/status', authenticate, async (req, res) =
 app.post('/api/revenue/decision-engine/run', authenticate, async (req, res) => {
   const contractorId = (req as any).contractorId;
   try {
-    // 1. Retrieve tenant-scoped performance and lead attribution data
-    const adRecords = await pgDb.select().from(googleAdsDailyPerformance).where(eq(googleAdsDailyPerformance.contractorId, contractorId));
-    const tenantLeads = await pgDb.select().from(leads).where(eq(leads.contractorId, contractorId));
-    const leadIds = tenantLeads.map(l => l.id);
+    const adRecords = await pgDb.select().from(googleAdsDailyPerformance)
+      .where(eq(googleAdsDailyPerformance.contractorId, contractorId));
+    const tenantLeads = await pgDb.select().from(leads)
+      .where(eq(leads.contractorId, contractorId));
+    const leadIds = tenantLeads.map(lead => lead.id);
 
-    let attributions: any[] = [];
-    let events: any[] = [];
-    let revenues: any[] = [];
-
-    if (leadIds.length > 0) {
-      attributions = await pgDb.select().from(leadAttribution).where(inArray(leadAttribution.leadId, leadIds));
-      events = await pgDb.select().from(leadEvents).where(inArray(leadEvents.leadId, leadIds));
-      revenues = await pgDb.select().from(revenueRecords).where(inArray(revenueRecords.leadId, leadIds));
-    }
-
-    // 2. Check for insufficient data
-    const insufficientData = adRecords.length === 0 && tenantLeads.length === 0;
-    if (insufficientData) {
+    if (adRecords.length === 0 || leadIds.length === 0) {
       return res.json({
         success: true,
         recommendationsGenerated: 0,
         recommendationsSkipped: 0,
         insufficientData: true,
-        message: 'Insufficient performance and lead data to run decision engine analysis.'
+        analyzedCampaigns: 0,
+        analyzedGeos: 0,
+        geoRecommendationsSupported: false,
+        message: 'Recorded campaign spend and tenant leads are required before decision analysis.'
       });
     }
 
-    // 3. Aggregate Campaign Economics
-    const campaignMap: { [key: string]: { spend: number; clicks: number; leads: number; closedWon: number; revenue: number } } = {};
+    const attributions = await pgDb.select().from(leadAttribution)
+      .where(inArray(leadAttribution.leadId, leadIds));
+    const revenues = await pgDb.select().from(revenueRecords)
+      .where(inArray(revenueRecords.leadId, leadIds));
+
+    const campaignMap: Record<string, {
+      spend: number;
+      clicks: number;
+      leads: Set<string>;
+      closedWon: Set<string>;
+      revenue: number;
+    }> = {};
+    const ensureCampaign = (name: string) => {
+      if (!campaignMap[name]) {
+        campaignMap[name] = { spend: 0, clicks: 0, leads: new Set<string>(), closedWon: new Set<string>(), revenue: 0 };
+      }
+      return campaignMap[name];
+    };
+
     for (const ad of adRecords) {
-      const camp = ad.campaignName || 'Unknown Campaign';
-      if (!campaignMap[camp]) {
-        campaignMap[camp] = { spend: 0, clicks: 0, leads: 0, closedWon: 0, revenue: 0 };
-      }
-      campaignMap[camp].spend += Number(ad.cost || 0);
-      campaignMap[camp].clicks += Number(ad.clicks || 0);
-      campaignMap[camp].leads += Number(ad.conversions || 0);
+      const campaign = typeof ad.campaignName === 'string' ? ad.campaignName.trim() : '';
+      if (!campaign) continue;
+      const data = ensureCampaign(campaign);
+      const spend = Number(ad.cost);
+      const clicks = Number(ad.clicks);
+      if (Number.isFinite(spend) && spend >= 0) data.spend += spend;
+      if (Number.isFinite(clicks) && clicks >= 0) data.clicks += clicks;
     }
 
-    // Map attribution and revenue to campaigns
-    for (const attr of attributions) {
-      const camp = attr.utmCampaign || 'Unknown Campaign';
-      if (!campaignMap[camp]) {
-        campaignMap[camp] = { spend: 0, clicks: 0, leads: 0, closedWon: 0, revenue: 0 };
-      }
-      campaignMap[camp].leads += 1;
+    const attributionNamesByLead = new Map<string, Set<string>>();
+    for (const attribution of attributions) {
+      const leadId = String(attribution.leadId || '');
+      const campaign = typeof attribution.utmCampaign === 'string' ? attribution.utmCampaign.trim() : '';
+      if (!leadId || !campaign) continue;
+      const names = attributionNamesByLead.get(leadId) || new Set<string>();
+      names.add(campaign);
+      attributionNamesByLead.set(leadId, names);
     }
 
-    for (const rev of revenues) {
-      // Find matching attribution or lead
-      const lead = tenantLeads.find(l => l.id === rev.leadId);
-      const attr = attributions.find(a => a.leadId === rev.leadId);
-      const camp = attr?.utmCampaign || 'Unknown Campaign';
-      if (!campaignMap[camp]) {
-        campaignMap[camp] = { spend: 0, clicks: 0, leads: 0, closedWon: 0, revenue: 0 };
-      }
-      campaignMap[camp].closedWon += 1;
-      campaignMap[camp].revenue += getRevenueAmountUsd(rev);
+    const campaignByLead = new Map<string, string>();
+    for (const [leadId, names] of attributionNamesByLead) {
+      // Ambiguous multi-touch attribution is excluded until an explicit attribution
+      // policy exists; never assign a deal to an arbitrary/first campaign.
+      if (names.size !== 1) continue;
+      const campaign = Array.from(names)[0];
+      campaignByLead.set(leadId, campaign);
+      ensureCampaign(campaign).leads.add(leadId);
     }
 
-    // Calculate ROAS, CPL, CAC for each campaign
-    const campaignList = Object.keys(campaignMap).map(camp => {
-      const d = campaignMap[camp];
-      const roas = d.spend > 0 ? Number((d.revenue / d.spend).toFixed(2)) : 0;
-      const cpl = d.leads > 0 ? Number((d.spend / d.leads).toFixed(2)) : d.spend > 0 ? d.spend : 0;
-      const cac = d.closedWon > 0 ? Number((d.spend / d.closedWon).toFixed(2)) : 0;
-      return { camp, ...d, roas, cpl, cac };
-    });
+    for (const revenue of revenues) {
+      const leadId = String(revenue.leadId || '');
+      const campaign = campaignByLead.get(leadId);
+      if (!campaign) continue;
+      const amount = getRevenueAmountUsd(revenue);
+      if (!Number.isFinite(amount) || amount <= 0) continue;
+      const data = ensureCampaign(campaign);
+      data.closedWon.add(leadId);
+      data.revenue += amount;
+    }
 
+    const campaignList = Object.entries(campaignMap)
+      .filter(([, data]) => data.spend > 0 && data.revenue > 0 && data.closedWon.size > 0)
+      .map(([camp, data]) => ({
+        camp,
+        spend: Number(data.spend.toFixed(2)),
+        clicks: data.clicks,
+        leads: data.leads.size,
+        closedWon: data.closedWon.size,
+        revenue: Number(data.revenue.toFixed(2)),
+        roas: Number((data.revenue / data.spend).toFixed(4)),
+        cpl: data.leads.size > 0 ? Number((data.spend / data.leads.size).toFixed(2)) : null,
+        cac: Number((data.spend / data.closedWon.size).toFixed(2))
+      }));
+
+    if (campaignList.length < 2) {
+      return res.json({
+        success: true,
+        recommendationsGenerated: 0,
+        recommendationsSkipped: 0,
+        insufficientData: true,
+        analyzedCampaigns: campaignList.length,
+        analyzedGeos: 0,
+        geoRecommendationsSupported: false,
+        message: 'At least two campaigns with recorded spend and unambiguous lead-linked closed-won revenue are required for a comparative recommendation.'
+      });
+    }
+
+    campaignList.sort((a, b) => b.roas - a.roas);
+    const topCamp = campaignList[0];
+    const bottomCamp = campaignList[campaignList.length - 1];
     let generatedCount = 0;
     let skippedCount = 0;
-    const existingRecs = await pgDb.select().from(revenueRecommendations).where(eq(revenueRecommendations.contractorId, contractorId));
 
-    // 4. Opportunity Detection & Recommendation Generation
-    // A) Campaign Budget Reallocation Opportunity
-    if (campaignList.length >= 2) {
-      campaignList.sort((a, b) => b.roas - a.roas);
-      const topCamp = campaignList[0];
-      const bottomCamp = campaignList[campaignList.length - 1];
+    if (topCamp.roas > 2.0 && bottomCamp.roas < topCamp.roas * 0.5 && topCamp.revenue > 1000) {
+      const title = `Review budget allocation from ${bottomCamp.camp} to ${topCamp.camp}`;
+      const rationale = `${topCamp.camp} has recorded ${topCamp.roas}x attributed ROAS across ${topCamp.closedWon} closed-won lead(s) ($${topCamp.revenue} attributed revenue); ${bottomCamp.camp} has ${bottomCamp.roas}x attributed ROAS. This is a comparative review signal, not a quantified uplift forecast.`;
+      const existingRecs = await pgDb.select().from(revenueRecommendations)
+        .where(eq(revenueRecommendations.contractorId, contractorId));
+      const alreadyExists = existingRecs.some(rec => rec.title === title && rec.status === 'proposed');
 
-      if (topCamp.roas > 2.0 && bottomCamp.roas < topCamp.roas * 0.5 && topCamp.revenue > 1000) {
-        const title = `Reallocate Budget from ${bottomCamp.camp} to ${topCamp.camp}`;
-        const rationale = `${topCamp.camp} demonstrates strong economic efficiency with a ${topCamp.roas}x ROAS and $${topCamp.revenue} attributed revenue, whereas ${bottomCamp.camp} underperforms at ${bottomCamp.roas}x ROAS.`;
-        
-        // Deduplication check
-        const alreadyExists = existingRecs.some(r => r.title === title && r.status === 'proposed');
-        if (!alreadyExists) {
-          const confidenceScore = Math.min(95, Math.max(60, 70 + (topCamp.closedWon * 2)));
-          const [newRec] = await pgDb.insert(revenueRecommendations).values({
+      if (alreadyExists) {
+        skippedCount++;
+      } else {
+        await pgDb.transaction(async tx => {
+          const [newRec] = await tx.insert(revenueRecommendations).values({
             id: crypto.randomUUID(),
             contractorId,
             category: 'budget',
             title,
             rationale,
-            citationData: { topCampaign: topCamp, bottomCampaign: bottomCamp, analysisBasis: 'Comparative ROAS and Attribution Revenue' },
-            impactScore: Number((topCamp.roas * 15).toFixed(1)),
-            confidenceScore,
-            expectedImpact: `Estimated efficiency lift of +$${Math.round(topCamp.spend * 0.2)} quarterly pipeline value`,
+            citationData: {
+              topCampaign: topCamp,
+              bottomCampaign: bottomCamp,
+              analysisBasis: 'Recorded spend and unambiguous lead-linked closed-won revenue'
+            },
+            impactScore: 0,
+            confidenceScore: null,
+            expectedImpact: 'Potential efficiency opportunity; no revenue uplift forecast or calibrated confidence is claimed.',
             status: 'proposed'
           }).returning();
 
-          await pgDb.insert(revenueRecommendationEvents).values({
+          const [event] = await tx.insert(revenueRecommendationEvents).values({
             id: crypto.randomUUID(),
             contractorId,
             recommendationId: newRec.id,
             previousStatus: null,
             newStatus: 'proposed',
             actor: 'HAL Automated Decision Engine',
-            metadata: { rationale }
-          });
-          generatedCount++;
-        } else {
-          skippedCount++;
-        }
-      }
-    }
-
-    // B) Geo Performance Optimization
-    const geoMap: { [key: string]: { spend: number; leads: number; closedWon: number; revenue: number } } = {};
-    for (const ad of adRecords) {
-      const geo = ad.geo || 'Primary Territory';
-      if (!geoMap[geo]) {
-        geoMap[geo] = { spend: 0, leads: 0, closedWon: 0, revenue: 0 };
-      }
-      geoMap[geo].spend += Number(ad.cost || 0);
-      geoMap[geo].leads += Number(ad.conversions || 0);
-    }
-
-    for (const rev of revenues) {
-      const attr = attributions.find(a => a.leadId === rev.leadId);
-      const geo = attr?.landingPage ? 'Targeted Geo' : 'Primary Territory';
-      if (!geoMap[geo]) {
-        geoMap[geo] = { spend: 0, leads: 0, closedWon: 0, revenue: 0 };
-      }
-      geoMap[geo].closedWon += 1;
-      geoMap[geo].revenue += getRevenueAmountUsd(rev);
-    }
-
-    const geoList = Object.keys(geoMap).map(geo => {
-      const d = geoMap[geo];
-      const roas = d.spend > 0 ? Number((d.revenue / d.spend).toFixed(2)) : 0;
-      return { geo, ...d, roas };
-    });
-
-    if (geoList.length > 0) {
-      const topGeo = geoList.sort((a, b) => b.roas - a.roas)[0];
-      if (topGeo && topGeo.roas >= 3.0) {
-        const title = `Expand Territory Ad Allocation in ${topGeo.geo}`;
-        const rationale = `Territory ${topGeo.geo} produces exceptionally strong revenue efficiency (${topGeo.roas}x ROAS). Recommend scaling targeted presence.`;
-        const alreadyExists = existingRecs.some(r => r.title === title && r.status === 'proposed');
-        if (!alreadyExists) {
-          const [newRec] = await pgDb.insert(revenueRecommendations).values({
-            id: crypto.randomUUID(),
-            contractorId,
-            category: 'geo',
-            title,
-            rationale,
-            citationData: { territory: topGeo, sampleSize: topGeo.closedWon },
-            impactScore: 88.0,
-            confidenceScore: 84.0,
-            expectedImpact: 'Territory market share expansion',
-            status: 'proposed'
+            metadata: { rationale, analysisBasis: 'Recorded campaign economics' }
           }).returning();
-
-          await pgDb.insert(revenueRecommendationEvents).values({
-            id: crypto.randomUUID(),
-            contractorId,
-            recommendationId: newRec.id,
-            previousStatus: null,
-            newStatus: 'proposed',
-            actor: 'HAL Automated Decision Engine',
-            metadata: { rationale }
-          });
-          generatedCount++;
-        } else {
-          skippedCount++;
-        }
+          return { newRec, event };
+        });
+        generatedCount++;
       }
     }
 
@@ -9573,9 +9709,10 @@ app.post('/api/revenue/decision-engine/run', authenticate, async (req, res) => {
       recommendationsSkipped: skippedCount,
       insufficientData: false,
       analyzedCampaigns: campaignList.length,
-      analyzedGeos: geoList.length
+      analyzedGeos: 0,
+      geoRecommendationsSupported: false,
+      message: 'Campaign comparisons use only unambiguous lead-linked revenue. Geographic recommendations remain unavailable until revenue-to-geo attribution is recorded.'
     });
-
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
@@ -9595,145 +9732,173 @@ app.get('/api/revenue/simulations', authenticate, async (req, res) => {
 
 app.post('/api/revenue/simulations', authenticate, async (req, res) => {
   const contractorId = (req as any).contractorId;
-  const { scenarioType, parameters } = req.body; 
-  // scenarioType: 'budget_reallocation' | 'geo_allocation' | 'campaign_comparison' | 'budget_shift'
-  // parameters: { fromCampaign, toCampaign, shiftAmount, percentChange, targetGeo }
+  const { scenarioType, parameters } = req.body || {};
+
+  if (!['budget_reallocation', 'budget_shift'].includes(scenarioType)) {
+    return res.status(501).json({
+      success: false,
+      code: 'SCENARIO_NOT_SUPPORTED_WITH_VERIFIED_DATA',
+      error: 'Only budget reallocation between two campaigns with recorded spend and attributed revenue is currently supported.'
+    });
+  }
+  if (!parameters || typeof parameters !== 'object' || Array.isArray(parameters)) {
+    return res.status(400).json({ error: 'Scenario parameters are required.' });
+  }
+
+  const fromCampaign = typeof parameters.fromCampaign === 'string' ? parameters.fromCampaign.trim() : '';
+  const toCampaign = typeof parameters.toCampaign === 'string' ? parameters.toCampaign.trim() : '';
+  const shiftAmount = Number(parameters.shiftAmount);
+  if (!fromCampaign || !toCampaign || fromCampaign === toCampaign ||
+      !Number.isFinite(shiftAmount) || shiftAmount <= 0) {
+    return res.status(400).json({ error: 'Select two different campaigns and provide a positive shift amount.' });
+  }
 
   try {
-    // 1. Fetch tenant performance data
-    const adRecords = await pgDb.select().from(googleAdsDailyPerformance).where(eq(googleAdsDailyPerformance.contractorId, contractorId));
-    const tenantLeads = await pgDb.select().from(leads).where(eq(leads.contractorId, contractorId));
-    const leadIds = tenantLeads.map(l => l.id);
-
-    let attributions: any[] = [];
-    let revenues: any[] = [];
-    if (leadIds.length > 0) {
-      attributions = await pgDb.select().from(leadAttribution).where(inArray(leadAttribution.leadId, leadIds));
-      revenues = await pgDb.select().from(revenueRecords).where(inArray(revenueRecords.leadId, leadIds));
+    const adRecords = await pgDb.select().from(googleAdsDailyPerformance)
+      .where(eq(googleAdsDailyPerformance.contractorId, contractorId));
+    const tenantLeads = await pgDb.select().from(leads)
+      .where(eq(leads.contractorId, contractorId));
+    const leadIds = tenantLeads.map(lead => lead.id);
+    if (adRecords.length === 0 || leadIds.length === 0) {
+      return res.status(409).json({
+        success: false,
+        code: 'INSUFFICIENT_ATTRIBUTED_DATA',
+        error: 'Campaign spend, tenant leads, and linked revenue observations are required before a revenue simulation can run.'
+      });
     }
 
-    // 2. Compute Baseline Metrics
-    let totalSpend = 0;
-    let totalRevenue = 0;
-    let totalLeads = tenantLeads.length;
-    let totalClosedWon = 0;
+    const attributions = await pgDb.select().from(leadAttribution)
+      .where(inArray(leadAttribution.leadId, leadIds));
+    const revenues = await pgDb.select().from(revenueRecords)
+      .where(inArray(revenueRecords.leadId, leadIds));
 
-    const campaignMap: { [key: string]: { spend: number; revenue: number; leads: number; closedWon: number } } = {};
-    for (const ad of adRecords) {
-      const camp = ad.campaignName || 'Unknown Campaign';
-      if (!campaignMap[camp]) campaignMap[camp] = { spend: 0, revenue: 0, leads: 0, closedWon: 0 };
-      campaignMap[camp].spend += Number(ad.cost || 0);
-      campaignMap[camp].leads += Number(ad.conversions || 0);
-      totalSpend += Number(ad.cost || 0);
-    }
+    const campaignMap: Record<string, {
+      spend: number;
+      attributedLeadIds: Set<string>;
+      closedWonLeadIds: Set<string>;
+      attributedRevenue: number;
+    }> = {};
 
-    for (const rev of revenues) {
-      const attr = attributions.find(a => a.leadId === rev.leadId);
-      const camp = attr?.utmCampaign || Object.keys(campaignMap)[0] || 'Unknown Campaign';
-      if (!campaignMap[camp]) campaignMap[camp] = { spend: 0, revenue: 0, leads: 0, closedWon: 0 };
-      campaignMap[camp].closedWon += 1;
-      campaignMap[camp].revenue += getRevenueAmountUsd(rev);
-      totalRevenue += getRevenueAmountUsd(rev);
-      totalClosedWon += 1;
-    }
-
-    const baselineRoas = totalSpend > 0 ? Number((totalRevenue / totalSpend).toFixed(2)) : 0;
-    const baselineCpl = totalLeads > 0 ? Number((totalSpend / totalLeads).toFixed(2)) : 0;
-    const baselineCac = totalClosedWon > 0 ? Number((totalSpend / totalClosedWon).toFixed(2)) : 0;
-
-    const baselineData = {
-      totalSpend,
-      totalRevenue,
-      roas: baselineRoas,
-      cpl: baselineCpl,
-      cac: baselineCac,
-      campaigns: campaignMap
-    };
-
-    // 3. Run Scenario Projection Calculation
-    let projectedSpend = totalSpend;
-    let projectedRevenue = totalRevenue;
-    let assumptions = 'Projected using historical ROAS and conversion efficiency over the available observation window.';
-    let confidenceScore = 78.0;
-
-    const sType = scenarioType || 'budget_reallocation';
-    const params = parameters || {};
-
-    if (sType === 'budget_reallocation' || sType === 'budget_shift') {
-      const fromCamp = params.fromCampaign;
-      const toCamp = params.toCampaign;
-      const shiftAmount = Number(params.shiftAmount || 500);
-
-      if (fromCamp && toCamp && campaignMap[fromCamp] && campaignMap[toCamp]) {
-        const fromData = campaignMap[fromCamp];
-        const toData = campaignMap[toCamp];
-
-        const fromRoas = fromData.spend > 0 ? fromData.revenue / fromData.spend : 1.0;
-        const toRoas = toData.spend > 0 ? toData.revenue / toData.spend : 2.5;
-
-        // Simulate shifting spend
-        const lostRevenue = shiftAmount * fromRoas;
-        const gainedRevenue = shiftAmount * toRoas;
-        const netRevenueDelta = gainedRevenue - lostRevenue;
-
-        projectedRevenue = totalRevenue + netRevenueDelta;
-        assumptions = `Shifted $${shiftAmount} from ${fromCamp} (Historical ROAS: ${fromRoas.toFixed(2)}x) to ${toCamp} (Historical ROAS: ${toRoas.toFixed(2)}x).`;
-        confidenceScore = Math.min(92.0, Math.max(65.0, 70 + (toData.closedWon * 1.5)));
-      } else {
-        // Generic percentage shift simulation
-        const pct = Number(params.percentChange || 10) / 100;
-        projectedRevenue = totalRevenue * (1 + pct * 0.6);
-        assumptions = `Simulated general budget reallocation resulting in a ${(pct * 100)}% scale across high-performing segments.`;
+    const ensureCampaign = (name: string) => {
+      if (!campaignMap[name]) {
+        campaignMap[name] = {
+          spend: 0,
+          attributedLeadIds: new Set<string>(),
+          closedWonLeadIds: new Set<string>(),
+          attributedRevenue: 0
+        };
       }
-    } else if (sType === 'geo_allocation') {
-      const targetGeo = params.targetGeo || 'Primary Territory';
-      const pctScale = Number(params.percentChange || 20) / 100;
-      projectedRevenue = totalRevenue * (1 + pctScale * 0.4);
-      assumptions = `Expanded advertising allocation in ${targetGeo} by ${(pctScale * 100)}% based on local conversion efficiency.`;
-      confidenceScore = 74.0;
-    } else {
-      projectedRevenue = totalRevenue * 1.15;
-      assumptions = 'Standard growth projection scenario based on historical acquisition trends.';
+      return campaignMap[name];
+    };
+
+    for (const ad of adRecords) {
+      const campaign = typeof ad.campaignName === 'string' ? ad.campaignName.trim() : '';
+      if (!campaign) continue;
+      const spend = Number(ad.cost);
+      if (Number.isFinite(spend) && spend >= 0) ensureCampaign(campaign).spend += spend;
     }
 
-    const projectedRoas = projectedSpend > 0 ? Number((projectedRevenue / projectedSpend).toFixed(2)) : 0;
-    const revenueDelta = Number((projectedRevenue - totalRevenue).toFixed(2));
-    const percentageChange = totalRevenue > 0 ? Number(((revenueDelta / totalRevenue) * 100).toFixed(2)) : 15.0;
+    const campaignByLead = new Map<string, string>();
+    const attributionsByLead = new Map<string, Set<string>>();
+    for (const attribution of attributions) {
+      const leadId = String(attribution.leadId || '');
+      const campaign = typeof attribution.utmCampaign === 'string' ? attribution.utmCampaign.trim() : '';
+      if (!leadId || !campaign) continue;
+      const names = attributionsByLead.get(leadId) || new Set<string>();
+      names.add(campaign);
+      attributionsByLead.set(leadId, names);
+    }
+    for (const [leadId, names] of attributionsByLead) {
+      // Ambiguous multi-touch attribution is excluded until a documented attribution
+      // model is implemented; never silently assign the revenue to the first campaign.
+      if (names.size !== 1) continue;
+      const campaign = Array.from(names)[0];
+      campaignByLead.set(leadId, campaign);
+      ensureCampaign(campaign).attributedLeadIds.add(leadId);
+    }
 
+    for (const revenue of revenues) {
+      const leadId = String(revenue.leadId || '');
+      const campaign = campaignByLead.get(leadId);
+      if (!campaign) continue;
+      const amount = getRevenueAmountUsd(revenue);
+      if (!Number.isFinite(amount) || amount <= 0) continue;
+      const campaignData = ensureCampaign(campaign);
+      campaignData.attributedRevenue += amount;
+      campaignData.closedWonLeadIds.add(leadId);
+    }
+
+    const fromData = campaignMap[fromCampaign];
+    const toData = campaignMap[toCampaign];
+    if (!fromData || !toData || fromData.spend <= 0 || toData.spend <= 0 ||
+        fromData.attributedRevenue <= 0 || toData.attributedRevenue <= 0) {
+      return res.status(409).json({
+        success: false,
+        code: 'INSUFFICIENT_ATTRIBUTED_DATA',
+        error: 'Both selected campaigns need recorded spend and unambiguous lead-linked revenue before they can be compared.'
+      });
+    }
+    if (shiftAmount > fromData.spend) {
+      return res.status(400).json({ error: 'The shift amount cannot exceed the recorded spend of the source campaign.' });
+    }
+
+    const campaigns = Object.fromEntries(Object.entries(campaignMap).map(([name, data]) => [name, {
+      spend: Number(data.spend.toFixed(2)),
+      attributedLeads: data.attributedLeadIds.size,
+      closedWon: data.closedWonLeadIds.size,
+      attributedRevenue: Number(data.attributedRevenue.toFixed(2)),
+      roas: data.spend > 0 ? Number((data.attributedRevenue / data.spend).toFixed(4)) : null
+    }]));
+    const measuredCampaigns = Object.values(campaignMap).filter(data =>
+      data.spend > 0 && data.attributedRevenue > 0 && data.closedWonLeadIds.size > 0
+    );
+    const totalSpend = measuredCampaigns.reduce((sum, data) => sum + data.spend, 0);
+    const totalRevenue = measuredCampaigns.reduce((sum, data) => sum + data.attributedRevenue, 0);
+    const totalAttributedLeads = new Set(measuredCampaigns.flatMap(data => Array.from(data.attributedLeadIds))).size;
+    const totalClosedWon = new Set(measuredCampaigns.flatMap(data => Array.from(data.closedWonLeadIds))).size;
+    const baselineRoas = Number((totalRevenue / totalSpend).toFixed(4));
+    const fromRoas = fromData.attributedRevenue / fromData.spend;
+    const toRoas = toData.attributedRevenue / toData.spend;
+
+    // This is an illustrative linear-response scenario, not a calibrated forecast.
+    const projectedRevenue = Math.max(0, totalRevenue - shiftAmount * fromRoas + shiftAmount * toRoas);
+    const revenueDelta = projectedRevenue - totalRevenue;
+    const baselineData = {
+      totalSpend: Number(totalSpend.toFixed(2)),
+      attributedRevenue: Number(totalRevenue.toFixed(2)),
+      roas: baselineRoas,
+      attributedLeads: totalAttributedLeads,
+      closedWon: totalClosedWon,
+      campaigns
+    };
     const projectedResult = {
-      projectedSpend,
-      projectedRevenue,
-      roas: projectedRoas,
-      cpl: baselineCpl,
-      cac: baselineCac
+      projectedSpend: Number(totalSpend.toFixed(2)),
+      projectedAttributedRevenue: Number(projectedRevenue.toFixed(2)),
+      roas: Number((projectedRevenue / totalSpend).toFixed(4)),
+      cpl: totalAttributedLeads > 0 ? Number((totalSpend / totalAttributedLeads).toFixed(2)) : null,
+      cac: totalClosedWon > 0 ? Number((totalSpend / totalClosedWon).toFixed(2)) : null
     };
-
     const delta = {
-      revenueDelta,
-      roasDelta: Number((projectedRoas - baselineRoas).toFixed(2)),
-      percentageChange
+      attributedRevenueDelta: Number(revenueDelta.toFixed(2)),
+      roasDelta: Number((projectedRevenue / totalSpend - baselineRoas).toFixed(4)),
+      percentageChange: totalRevenue > 0 ? Number((revenueDelta / totalRevenue * 100).toFixed(2)) : null
     };
-
-    // 4. Store Simulation Record in database
-    const simulationId = crypto.randomUUID();
+    const assumptions = 'Illustrative linear-response scenario using recorded historical campaign ROAS and unambiguous lead attribution. Marginal returns are unvalidated; this is not a forecast or guaranteed revenue.';
+    const params = { fromCampaign, toCampaign, shiftAmount };
     const [savedSim] = await pgDb.insert(revenueSimulations).values({
-      id: simulationId,
+      id: crypto.randomUUID(),
       contractorId,
-      scenarioType: sType,
+      scenarioType: scenarioType,
       baselineData,
       scenarioParameters: params,
       projectedResult,
       delta,
-      confidenceScore,
+      confidenceScore: 0,
       assumptions,
       createdBy: (req as any).user?.email || 'Operator'
     }).returning();
 
-    res.json({
-      success: true,
-      simulation: savedSim
-    });
-
+    res.json({ success: true, simulation: savedSim });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
@@ -9742,34 +9907,11 @@ app.post('/api/revenue/simulations', authenticate, async (req, res) => {
 app.get('/api/revenue/recommendations', authenticate, async (req, res) => {
   const contractorId = (req as any).contractorId;
   try {
-    const recs = await pgDb.select().from(revenueRecommendations).where(eq(revenueRecommendations.contractorId, contractorId));
-    if (recs.length === 0) {
-      const [seeded] = await pgDb.insert(revenueRecommendations).values({
-        id: crypto.randomUUID(),
-        contractorId,
-        category: 'campaign',
-        title: 'Reallocate Spend from Low-Pipeline to Revenue-Proven Campaigns',
-        rationale: 'Analysis of lead attribution shows Campaign B produces 3.4x higher closed-won revenue per dollar spent than Campaign A despite higher CPL.',
-        citationData: { campaignA: { cpl: 44, closedWonRevenue: 4000 }, campaignB: { cpl: 63, closedWonRevenue: 38700 } },
-        impactScore: 94.5,
-        confidenceScore: 91.0,
-        expectedImpact: 'Estimated +$24,500 quarterly attributed pipeline lift',
-        status: 'proposed'
-      }).returning();
-      
-      // Seed initial proposal event
-      await pgDb.insert(revenueRecommendationEvents).values({
-        id: crypto.randomUUID(),
-        contractorId,
-        recommendationId: seeded.id,
-        previousStatus: null,
-        newStatus: 'proposed',
-        actor: 'HAL Decision Engine',
-        metadata: { rationale: seeded.rationale }
-      });
-
-      return res.json([seeded]);
-    }
+    // An empty recommendation table is an honest empty state. Never seed
+    // example campaign economics into a tenant's live decision workspace.
+    const recs = await pgDb.select().from(revenueRecommendations)
+      .where(eq(revenueRecommendations.contractorId, contractorId))
+      .orderBy(desc(revenueRecommendations.createdAt));
     res.json(recs);
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -9833,7 +9975,9 @@ app.post('/api/revenue/recommendations/:id/transition', authenticate, async (req
       updateValues.status = newStatus;
       updateValues.executedAt = now;
       updateValues.executedBy = userEmail;
-      updateValues.executionReference = executionReference || `Manual Ref #${Math.floor(Math.random() * 90000 + 10000)}`;
+      updateValues.executionReference = typeof executionReference === 'string' && executionReference.trim()
+        ? executionReference.trim()
+        : null;
       eventMetadata.executionReference = updateValues.executionReference;
     } else if (action === 'expire') {
       if (currentStatus !== 'proposed' && currentStatus !== 'approved') {
@@ -9851,32 +9995,48 @@ app.post('/api/revenue/recommendations/:id/transition', authenticate, async (req
       return res.json({ success: true, message: `Recommendation is already in '${newStatus}' state.`, recommendation: rec });
     }
 
-    // Perform update
-    const [updated] = await pgDb.update(revenueRecommendations)
-      .set(updateValues)
-      .where(and(eq(revenueRecommendations.id, id), eq(revenueRecommendations.contractorId, contractorId)))
-      .returning();
+    // Persist the state transition and its immutable event atomically. The
+    // current-status predicate prevents concurrent requests from overwriting a
+    // transition that another request has already committed.
+    const committed = await pgDb.transaction(async tx => {
+      const [updated] = await tx.update(revenueRecommendations)
+        .set(updateValues)
+        .where(and(
+          eq(revenueRecommendations.id, id),
+          eq(revenueRecommendations.contractorId, contractorId),
+          eq(revenueRecommendations.status, currentStatus)
+        ))
+        .returning();
 
-    // Append immutable lifecycle event
-    const [eventRecord] = await pgDb.insert(revenueRecommendationEvents).values({
-      id: crypto.randomUUID(),
-      contractorId,
-      recommendationId: id,
-      previousStatus: currentStatus,
-      newStatus,
-      actor: userEmail,
-      metadata: eventMetadata
-    }).returning();
+      if (!updated) {
+        throw new Error('Recommendation changed before the transition could be committed.');
+      }
+
+      const [eventRecord] = await tx.insert(revenueRecommendationEvents).values({
+        id: crypto.randomUUID(),
+        contractorId,
+        recommendationId: id,
+        previousStatus: currentStatus,
+        newStatus,
+        actor: userEmail,
+        metadata: eventMetadata
+      }).returning();
+
+      return { updated, eventRecord };
+    });
 
     res.json({
       success: true,
       previousStatus: currentStatus,
       newStatus,
-      recommendation: updated,
-      event: eventRecord
+      recommendation: committed.updated,
+      event: committed.eventRecord
     });
 
   } catch (err: any) {
+    if (err.message === 'Recommendation changed before the transition could be committed.') {
+      return res.status(409).json({ error: err.message });
+    }
     res.status(500).json({ error: err.message });
   }
 });
@@ -10041,6 +10201,7 @@ async function startServer() {
 
       // Compute Learning Dashboard Summary Statistics
       let totalEvaluated = 0;
+      let measuredCount = 0;
       let successfulCount = 0;
       let partiallySuccessfulCount = 0;
       let neutralCount = 0;
@@ -10053,7 +10214,7 @@ async function startServer() {
       let actualRoasTotal = 0;
 
       for (const o of outcomes) {
-        if (o.outcomeStatus === 'evaluated' || o.outcomeStatus === 'measured') {
+        if (o.outcomeStatus === 'evaluated') {
           totalEvaluated++;
           totalAccuracy += Number(o.predictionAccuracy || 0);
           
@@ -10069,6 +10230,8 @@ async function startServer() {
           actualRevenueTotal += Number(actual.revenue || 0);
           expectedRoasTotal += Number(expected.roas || 0);
           actualRoasTotal += Number(actual.roas || 0);
+        } else if (o.outcomeStatus === 'measured') {
+          measuredCount++;
         } else if (o.outcomeStatus === 'insufficient_data') {
           insufficientDataCount++;
         }
@@ -10079,6 +10242,7 @@ async function startServer() {
       const summary = {
         totalOutcomes: outcomes.length,
         totalEvaluated,
+        measuredCount,
         successfulCount,
         partiallySuccessfulCount,
         neutralCount,
@@ -10113,86 +10277,28 @@ async function startServer() {
       let measuredCount = 0;
       const now = new Date();
 
-      const calcAcc = (exp: number, act: number) => {
-        if (exp === 0 && act === 0) return 1.0;
-        if (exp === 0) return 0.0;
-        const acc = 1 - Math.abs(exp - act) / Math.abs(exp);
-        return Math.max(0, Math.min(1, acc));
-      };
-
       for (const rec of executedRecs) {
         const existing = existingOutcomes.find(o => o.recommendationId === rec.id);
         const obsStart = rec.executedAt || rec.updatedAt || rec.createdAt;
-        const obsEnd = new Date(new Date(obsStart).getTime() + 7 * 24 * 60 * 1000);
+        const obsEnd = new Date(new Date(obsStart).getTime() + 7 * 24 * 60 * 60 * 1000);
 
-        let status = 'observing';
-        if (now < obsEnd) {
-          status = 'pending_observation';
-        } else {
-          status = 'evaluated';
-        }
-
-        const baselineMetrics = { revenue: 5000, roas: 2.5, cpl: 45, cac: 350 };
-        const expectedMetrics = { revenue: 5000 * (1 + (rec.impactScore || 10) / 100), roas: 3.2, cpl: 40, cac: 320 };
-        
-        let actualMetrics = { revenue: 5200, roas: 3.0, cpl: 42, cac: 330 };
-        if (status === 'evaluated') {
-          const obsStartDate = new Date(obsStart);
-          const measuredRevs = await pgDb.select().from(revenueRecords)
-            .where(and(
-              eq(revenueRecords.contractorId, contractorId),
-              gte(revenueRecords.createdAt, obsStartDate),
-              lte(revenueRecords.createdAt, obsEnd)
-            ));
-          const totalMeasuredRev = measuredRevs.reduce((sum, r) => sum + (Number(r.amountUsd) || 0), 0);
-
-          if (totalMeasuredRev > 0) {
-            actualMetrics = {
-              revenue: Number(totalMeasuredRev.toFixed(2)),
-              roas: Number((totalMeasuredRev / 1500).toFixed(2)),
-              cpl: 40,
-              cac: 320
-            };
-          } else {
-            const impactFactor = 1 + ((rec.impactScore || 10) * 0.08);
-            actualMetrics = {
-              revenue: Number((baselineMetrics.revenue * impactFactor).toFixed(2)),
-              roas: Number((baselineMetrics.roas * (1 + (rec.impactScore || 10) * 0.02)).toFixed(2)),
-              cpl: Math.max(20, Number((baselineMetrics.cpl * (1 - (rec.impactScore || 10) * 0.01)).toFixed(2))),
-              cac: Math.max(150, Number((baselineMetrics.cac * (1 - (rec.impactScore || 10) * 0.015)).toFixed(2)))
-            };
-          }
-        }
-
-        const variance = {
-          revenueDelta: Number((actualMetrics.revenue - expectedMetrics.revenue).toFixed(2)),
-          roasDelta: Number((actualMetrics.roas - expectedMetrics.roas).toFixed(2)),
-          cplDelta: Number((actualMetrics.cpl - expectedMetrics.cpl).toFixed(2))
-        };
-
-        const revAcc = calcAcc(expectedMetrics.revenue, actualMetrics.revenue);
-        const roasAcc = calcAcc(expectedMetrics.roas, actualMetrics.roas);
-        const predictionAccuracy = Number(((revAcc + roasAcc) / 2).toFixed(4));
-
-        let classification = 'insufficient_data';
-        if (status === 'evaluated') {
-          if (predictionAccuracy >= 0.85 && actualMetrics.revenue >= expectedMetrics.revenue * 0.9) {
-            classification = 'successful';
-          } else if (predictionAccuracy >= 0.60) {
-            classification = 'partially_successful';
-          } else if (predictionAccuracy >= 0.40) {
-            classification = 'neutral';
-          } else {
-            classification = 'failed';
-          }
-        }
-
+        // A recommendation currently has no canonical link to the business outcome
+        // it is intended to influence. Contractor-wide revenue in the same date window
+        // is not causal attribution, and synthetic fallback metrics must never train HAL.
+        // Keep the observation pending until its window closes, then explicitly mark it
+        // insufficient rather than inventing baseline, expected, or actual values.
+        const status = now < obsEnd ? 'pending_observation' : 'insufficient_data';
+        const baselineMetrics = {};
+        const expectedMetrics = {};
+        const actualMetrics = {};
+        const variance = {};
+        const predictionAccuracy = 0;
+        const classification = 'insufficient_data';
         const learningSignals = {
           category: rec.category,
-          predictionAccuracy,
           outcomeStatus: status,
-          variance,
-          insight: `Recommendation category '${rec.category}' achieved ${(predictionAccuracy * 100).toFixed(1)}% prediction accuracy with status '${classification}'.`
+          outcomeClassification: classification,
+          reason: 'No verified recommendation-to-outcome attribution record exists. No learning signal was emitted.'
         };
 
         if (existing) {
@@ -10214,7 +10320,7 @@ async function startServer() {
             id: crypto.randomUUID(),
             contractorId,
             recommendationId: rec.id,
-            executionReference: rec.executionReference || 'Exec-Ref-Auto',
+            executionReference: rec.executionReference || null,
             observationStart: obsStart,
             observationEnd: obsEnd,
             baselineMetrics,
@@ -10223,8 +10329,8 @@ async function startServer() {
             variance,
             predictionAccuracy,
             outcomeStatus: status,
-            confidenceScore: rec.confidenceScore || 85.0,
-            assumptions: 'Evaluated against pre-execution baseline over 7-day observation window.',
+            confidenceScore: rec.confidenceScore ?? 0,
+            assumptions: 'No verified recommendation-to-outcome attribution exists; outcome remains insufficient_data.',
             outcomeClassification: classification,
             learningSignals
           });
@@ -10257,34 +10363,71 @@ async function startServer() {
         return res.status(404).json({ success: false, error: 'Outcome record not found or unauthorized' });
       }
 
-      const updatedActual = { ...(outcome.actualMetrics as any) };
-      const expected = (outcome.expectedMetrics as any) || { revenue: 5000, roas: 3.0 };
-      const actualRev = Number(updatedActual.revenue || expected.revenue);
-      const actualRoas = Number(updatedActual.roas || expected.roas);
+      // Evaluation is only valid after a trusted measurement process has written
+      // comparable numeric expected/actual metrics. Never substitute defaults.
+      if (outcome.outcomeStatus !== 'measured') {
+        return res.status(409).json({
+          success: false,
+          error: 'Outcome cannot be evaluated until verified measurements are recorded.',
+          outcomeStatus: outcome.outcomeStatus
+        });
+      }
 
-      const expRev = Number(expected.revenue || 5000);
-      const expRoas = Number(expected.roas || 3.0);
+      const expected = outcome.expectedMetrics && typeof outcome.expectedMetrics === 'object'
+        ? outcome.expectedMetrics as Record<string, unknown>
+        : {};
+      const actual = outcome.actualMetrics && typeof outcome.actualMetrics === 'object'
+        ? outcome.actualMetrics as Record<string, unknown>
+        : {};
+      const metricKeys = Object.keys(expected).filter((key) =>
+        typeof expected[key] === 'number' &&
+        Number.isFinite(expected[key]) &&
+        typeof actual[key] === 'number' &&
+        Number.isFinite(actual[key])
+      );
 
-      const calcAcc = (exp: number, act: number) => {
-        if (exp === 0 && act === 0) return 1.0;
-        if (exp === 0) return 0.0;
-        const acc = 1 - Math.abs(exp - act) / Math.abs(exp);
-        return Math.max(0, Math.min(1, acc));
+      if (metricKeys.length === 0) {
+        return res.status(409).json({
+          success: false,
+          error: 'Outcome cannot be evaluated without comparable verified numeric metrics.'
+        });
+      }
+
+      const metricAccuracy = (key: string) => {
+        const expectedValue = expected[key] as number;
+        const actualValue = actual[key] as number;
+        if (expectedValue === 0) return actualValue === 0 ? 1 : 0;
+        return Math.max(0, Math.min(1, 1 - Math.abs(expectedValue - actualValue) / Math.abs(expectedValue)));
       };
-
-      const revAcc = calcAcc(expRev, actualRev);
-      const roasAcc = calcAcc(expRoas, actualRoas);
-      const predictionAccuracy = Number(((revAcc + roasAcc) / 2).toFixed(4));
+      const predictionAccuracy = Number((
+        metricKeys.reduce((sum, key) => sum + metricAccuracy(key), 0) / metricKeys.length
+      ).toFixed(4));
+      const variance = Object.fromEntries(metricKeys.map((key) => [
+        key,
+        Number(((actual[key] as number) - (expected[key] as number)).toFixed(4))
+      ]));
 
       let classification = 'successful';
       if (predictionAccuracy < 0.40) classification = 'failed';
       else if (predictionAccuracy < 0.60) classification = 'neutral';
       else if (predictionAccuracy < 0.85) classification = 'partially_successful';
 
+      const previousLearningSignals = outcome.learningSignals && typeof outcome.learningSignals === 'object'
+        ? outcome.learningSignals as Record<string, unknown>
+        : {};
       const [updated] = await pgDb.update(revenueOutcomes).set({
         outcomeStatus: 'evaluated',
         outcomeClassification: classification,
         predictionAccuracy,
+        variance,
+        learningSignals: {
+          ...previousLearningSignals,
+          outcomeStatus: 'evaluated',
+          outcomeClassification: classification,
+          predictionAccuracy,
+          evaluatedMetrics: metricKeys,
+          evaluatedAt: new Date().toISOString()
+        },
         updatedAt: new Date()
       }).where(and(eq(revenueOutcomes.id, id), eq(revenueOutcomes.contractorId, contractorId))).returning();
 
