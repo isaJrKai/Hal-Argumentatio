@@ -559,6 +559,7 @@ export function buildHalMcpServer(): McpServer {
     annotations: READ_ONLY_ANNOTATIONS
   }, async ({ limit = 25, offset = 0 }) => {
     try {
+      const contractorId = await getEffectiveContractorId();
       let records: any[] = [];
       try {
         records = await pgDb
@@ -649,6 +650,7 @@ export function buildHalMcpServer(): McpServer {
     annotations: READ_ONLY_ANNOTATIONS
   }, async ({ limit = 25, offset = 0 }) => {
     try {
+      const contractorId = await getEffectiveContractorId();
       let records: any[] = [];
       try {
         records = await pgDb
