@@ -15,10 +15,10 @@ function sourceFiles(directory: string): string[] {
 }
 
 function importsLegacyJsonStore(filePath: string, source: string): boolean {
-  const importPattern = /(?:from\\s*|import\\s*\\()\\s*['"]([^'"]+)['"]/g;
+  const importPattern = /(?:from\s*|import\s*\\()\s*['"]([^'"]+)['"]/g;
   for (const match of source.matchAll(importPattern)) {
     const specifier = match[1];
-    if (specifier === '@/db/db' || specifier.endsWith('/db/db')) return true;
+    if (specifier === '@/db/db' || (specifier.endsWith('/db/db') || specifier.endsWith('/db/db.ts'))) return true;
     if (!specifier.startsWith('.')) continue;
     const target = resolve(dirname(filePath), specifier);
     if (target === resolve(sourceRoot, 'db', 'db') ||
