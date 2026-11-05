@@ -18,6 +18,8 @@ export interface ResendEmailInput {
   text: string;
   /** Optional trusted HTML body for system emails such as password resets. */
   html?: string;
+  /** Stable provider idempotency key for safe outbox retries. */
+  idempotencyKey?: string;
 }
 
 export interface ResendEmailResult {
@@ -77,6 +79,7 @@ export async function sendResendEmail(
       headers: {
         Authorization: `Bearer ${apiKey}`,
         'Content-Type': 'application/json',
+        ...(input.idempotencyKey ? { 'Idempotency-Key': input.idempotencyKey } : {}),
       },
       body: JSON.stringify({
         from,
