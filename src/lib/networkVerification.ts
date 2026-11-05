@@ -557,3 +557,161 @@ export async function verifyAndGateLeadOutreach(lead: {
 
   enforceFailClosedOutreachGate(lead);
 }
+
+
+export interface PublicWebsiteFetchResult {
+  requestedUrl: string;
+  finalUrl: string;
+  statusCode: number;
+  contentType: string;
+  headers: Record<string, string>;
+  body: string;
+  fetchedAt: string;
+  resolvedHostname: string;
+  resolvedIps: string[];
+}
+
+/**
+ * Fetches one public HTML page for passive analysis. DNS is resolved and every
+ * answer must be globally routable; the connection is pinned to a validated IP.
+ * Redirects are returned, never followed. No scripts, forms, cookies or assets
+ * are executed or fetched. The body is strictly size- and time-bounded.
+ */
+export async function fetchPublicWebsitePage(
+  rawUrl: string,
+  options: { timeoutMs?: number; maxBytes?: number } = {}
+): Promise<PublicWebsiteFetchResult> {
+  const timeoutMs = Math.min(Math.max(options.timeoutMs ?? 7000, 1000), 10000);
+  const maxBytes = Math.min(Math.max(options.maxBytes ?? 512 * 1024, 16 * 1024), 1024 * 1024);
+  let url: URL;
+  try {
+    url = new URL(/^https?:\\/\\//i.test(rawUrl.trim()) ? rawUrl.trim() : `https://${rawUrl.trim()}`);
+  } catch {
+    throw new Error('Enter a valid website URL.');
+  }
+  if (
+    !['http:', 'https:'].includes(url.protocol) ||
+    url.username || url.password || url.port ||
+    !url.hostname || isIP(url.hostname) ||
+    url.hostname === 'localhost' || url.hostname.endsWith('.localhost') ||
+    url.hostname.endsWith('.local')
+  ) {
+    throw new Error('Only public HTTP(S) websites on standard ports can be inspected.');
+  }
+
+  const dnsResult = await resolveDnsWithTimeout(url.hostname, timeoutMs);
+  if (!dnsResult.resolved || !dnsResult.ips?.length) {
+    throw new Error('Website DNS lookup failed: ' + (dnsResult.error || 'No public DNS records returned'));
+  }
+  if (dnsResult.ips.some(address => !isPubliclyRoutableIp(address))) {
+    throw new Error('Website resolves to a private, reserved, or non-public network address; request blocked.');
+  }
+
+  const hostname = dnsResult.resolvedHostname || url.hostname;
+  const address = dnsResult.ips[0];
+  const transport = url.protocol === 'https:' ? https : http;
+  const requestPath = `${url.pathname || '/'}${url.search}`;
+
+  return await new Promise<PublicWebsiteFetchResult>((resolve, reject) => {
+    let settled = false;
+    const finishError = (error: Error) => {
+      if (settled) return;
+      settled = true;
+      reject(error);
+    };
+    const request = transport.request({
+      protocol: url.protocol,
+      hostname,
+      path: requestPath,
+      method: 'GET',
+      agent: false,
+      servername: url.protocol === 'https:' ? hostname : undefined,
+      headers: {
+        Host: hostname,
+        'User-Agent': 'HAL-Public-Website-Audit/1.0',
+        Accept: 'text/html,application/xhtml+xml;q=0.9'
+      },
+      lookup: (_host: string, _options: any, callback: (error: NodeJS.ErrnoException | null, address: string, family: number) => void) => {
+        callback(null, address, isIP(address));
+      }
+    } as any, response => {
+      const statusCode = response.statusCode || 0;
+      const contentType = String(response.headers['content-type'] || '').toLowerCase();
+      const headers: Record<string, string> = {};
+      for (const name of [
+        'strict-transport-security',
+        'content-security-policy',
+        'x-frame-options',
+        'x-content-type-options',
+        'referrer-policy',
+        'permissions-policy',
+        'location',
+        'cache-control',
+        'content-type'
+      ]) {
+        const value = response.headers[name];
+        if (typeof value === 'string') headers[name] = value.slice(0, 2000);
+      }
+
+      if (statusCode >= 300 && statusCode < 400) {
+        response.resume();
+        settled = true;
+        resolve({
+          requestedUrl: url.toString(),
+          finalUrl: url.toString(),
+          statusCode,
+          contentType,
+          headers,
+          body: '',
+          fetchedAt: new Date().toISOString(),
+          resolvedHostname: hostname,
+          resolvedIps: dnsResult.ips || []
+        });
+        return;
+      }
+      if (!contentType.includes('text/html') && !contentType.includes('application/xhtml+xml')) {
+        response.resume();
+        finishError(new Error(`Website returned non-HTML content (${contentType || 'unknown content type'}).`));
+        return;
+      }
+      const declaredLength = Number(response.headers['content-length'] || 0);
+      if (declaredLength > maxBytes) {
+        response.destroy();
+        finishError(new Error(`Website page exceeds the ${maxBytes}-byte inspection limit.`));
+        return;
+      }
+
+      const chunks: Buffer[] = [];
+      let totalBytes = 0;
+      response.on('data', (chunk: Buffer | string) => {
+        const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+        totalBytes += buffer.length;
+        if (totalBytes > maxBytes) {
+          response.destroy(new Error(`Website page exceeds the ${maxBytes}-byte inspection limit.`));
+          return;
+        }
+        chunks.push(buffer);
+      });
+      response.on('end', () => {
+        if (settled) return;
+        settled = true;
+        resolve({
+          requestedUrl: url.toString(),
+          finalUrl: url.toString(),
+          statusCode,
+          contentType,
+          headers,
+          body: Buffer.concat(chunks).toString('utf8'),
+          fetchedAt: new Date().toISOString(),
+          resolvedHostname: hostname,
+          resolvedIps: dnsResult.ips || []
+        });
+      });
+      response.on('error', error => finishError(error));
+    });
+
+    request.setTimeout(timeoutMs, () => request.destroy(new Error('Website page fetch timed out.')));
+    request.on('error', error => finishError(error));
+    request.end();
+  });
+}
