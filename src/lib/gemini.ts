@@ -875,7 +875,7 @@ RESPONSE STANDARD
             text: 'HAL processed tool calls before the Gemini response failed. Check each recorded success or failure in Work Queue and Work History; no tool was retried automatically.',
             toolCalls,
             provider: 'gemini',
-            model: selectedModel
+            model: 'gemini-3.8-flash'
           };
         }
         console.error("Gemini chatbot error, trying Nemotron fallback:", err);
