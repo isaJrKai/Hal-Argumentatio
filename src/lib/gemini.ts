@@ -72,7 +72,7 @@ Return your response strictly as a raw JSON object matching this structure:
   };
 
   if (activeAI === 'gemini') {
-    // 1. Try Gemini first (Strictly 3.5)
+    // 1. Try Gemini first (Gemini 3.8 Flash)
     const ai = getAIClient();
     if (ai) {
       try {
@@ -117,7 +117,7 @@ Return your response strictly as a raw JSON object matching this structure:
           insight,
           confidence,
           category,
-          source: 'nvidia-nemotron-70b'
+          source: 'nvidia-nemotron'
         };
       } catch (err) {
         console.error("NVIDIA Nemotron learning fallback failed:", err);
@@ -140,14 +140,14 @@ Return your response strictly as a raw JSON object matching this structure:
           insight,
           confidence,
           category,
-          source: 'nvidia-nemotron-70b'
+          source: 'nvidia-nemotron'
         };
       } catch (err) {
         console.error("NVIDIA Nemotron learning call failed, trying Gemini fallback:", err);
       }
     }
 
-    // Fallback to Gemini (Strictly 3.5)
+    // Fallback to Gemini (Gemini 3.8 Flash)
     const ai = getAIClient();
     if (ai) {
       try {
@@ -240,7 +240,7 @@ Return your response in a raw JSON object format (no markdown blocks, no code bl
   };
 
   if (activeAI === 'gemini') {
-    // 1. Try Gemini first (Strictly 3.5)
+    // 1. Try Gemini first (Gemini 3.8 Flash)
     const ai = getAIClient();
     if (ai) {
       try {
@@ -269,7 +269,7 @@ Return your response in a raw JSON object format (no markdown blocks, no code bl
         ], 0.2, true);
         const cleaned = cleanJSONResponse(text);
         const result = JSON.parse(cleaned);
-        return { ...parseForecastResponse(result), source: 'nvidia-nemotron-70b' };
+        return { ...parseForecastResponse(result), source: 'nvidia-nemotron' };
       } catch (err) {
         console.error("NVIDIA Nemotron forecast fallback failed:", err);
       }
@@ -283,13 +283,13 @@ Return your response in a raw JSON object format (no markdown blocks, no code bl
         ], 0.2, true);
         const cleaned = cleanJSONResponse(text);
         const result = JSON.parse(cleaned);
-        return { ...parseForecastResponse(result), source: 'nvidia-nemotron-70b' };
+        return { ...parseForecastResponse(result), source: 'nvidia-nemotron' };
       } catch (err) {
         console.error("NVIDIA Nemotron forecast generation failed, trying Gemini fallback:", err);
       }
     }
 
-    // Fallback to Gemini (Strictly 3.5)
+    // Fallback to Gemini (Gemini 3.8 Flash)
     const ai = getAIClient();
     if (ai) {
       try {
@@ -677,7 +677,7 @@ RESPONSE STANDARD
     }));
 
   if (activeAI === 'gemini' || activeAI === 'dual') {
-    // 1. Try Gemini first (Strictly 3.5)
+    // 1. Try Gemini first (Gemini 3.8 Flash)
     const ai = getAIClient(providerApiKeys?.gemini);
     if (ai) {
       const toolCalls: Array<{ name: string; result: any }> = [];
@@ -866,7 +866,7 @@ RESPONSE STANDARD
       }
     }
 
-    // Fallback to Gemini (Strictly 3.5)
+    // Fallback to Gemini (Gemini 3.8 Flash)
     const ai = getAIClient(providerApiKeys?.gemini);
     if (ai) {
       try {
