@@ -53,7 +53,7 @@ A regression test asserts these fail-closed invariants.
 
 A real HTTP integration suite imports the Express application and uses Supertest against PostgreSQL. It creates two isolated test tenants and verifies:
 - Cross-tenant won-lead conversion is rejected without creating a project.
-- Project creation persists both the tenant-owned project and its work-ledger event; duplicate conversion is rejected.
+- Project creation persists both the tenant-owned project and its work-ledger event; duplicate conversion is rejected. Two simultaneous HTTP conversions of the same won lead are also tested: exactly one request succeeds, one receives HTTP 409, and only one project plus one creation event persist.
 - Project listing and updates are tenant-scoped.
 - Tenant B cannot read, update, or delete Tenant A's lead through the HTTP routes.
 - Tenant B cannot record revenue against Tenant A's lead; Tenant A can close a qualified proposal-stage lead and atomically persist the revenue record, lead-stage events, and work-ledger event.
@@ -72,11 +72,11 @@ These items remain unverified and must not be represented as complete:
 2. Exact frontend-to-backend route coverage for every proposal, contract, client-project and communications action.
 3. Extend PostgreSQL-backed Tenant A/B HTTP tests to the remaining CRM/finance routes and add rollback-after-partial-failure coverage. Concurrent revenue close-out is now covered by the new HTTP test and must pass CI on the final branch head.
 4. Contract/proposal persistence and signature/execution semantics, including proof that draft/approved/signed are distinct states. The current proposal generator returns a generated response but no canonical proposal/contract table or durable signature workflow has been verified.
-5. Add route-level concurrency coverage for won-lead project conversion, retainer changes, and cancellation. The current HTTP suite verifies tenant ownership, duplicate conversion, persistence, and event creation; separate isolated PostgreSQL tests cover same-lead advisory-lock serialization and the optimistic status/timestamp predicate. The stale-update test mirrors the production predicate on an isolated test table and is not a full route-level concurrency test.
+5. Route-level concurrency coverage now includes simultaneous won-lead project conversion and simultaneous revenue close-out. Retainer-change/cancellation stale-write concurrency still needs a deterministic HTTP-level test; the existing stale-update test mirrors the production optimistic status/timestamp predicate on an isolated PostgreSQL table and is not a full route-level concurrency test.
 6. Revenue recognition versus cash collection/payment recording. The current `/api/revenues` close-out endpoint records a positive whole-dollar amount against a lead; it is not a payment processor or a complete invoice/receivables ledger.
 7. End-to-end event correlation and ordering across audit, landing-page, outreach, deal, project, revenue, and forecast records.
 8. Forecast evaluation against correctly attributed observations and evidence that only actual outcomes feed learning.
-9. GitHub Actions CI run #1275 passed on final branch head `de524ed2330969ae9b3e1fd2f8ed4ec884543d94`: 85 test files and 418 tests passed; TypeScript checks, PostgreSQL-backed integration tests, TimesFM Python checks, production build, and production dependency audit all succeeded. Non-blocking runner/toolchain warnings remain (Node.js 20 action deprecation, `punycode` deprecation, bundle-size warning, and local PostgreSQL trust-auth warning). CI provisions PostgreSQL 16 as a healthy service and supplies `DATABASE_URL`. The final branch head must remain green at merge time.
+9. GitHub Actions CI run #1276 passed on branch head `e71c45a8b89215e040495b13558937947a3775b7`: 85 test files and 418 tests passed; TypeScript checks, PostgreSQL-backed integration tests, TimesFM Python checks, production build, and production dependency audit all succeeded. A subsequent route-level concurrency test was added; its new head must pass CI before merge. Non-blocking runner/toolchain warnings remain (Node.js 20 action deprecation, `punycode` deprecation, bundle-size warning, and local PostgreSQL trust-auth warning). CI provisions PostgreSQL 16 as a healthy service and supplies `DATABASE_URL`.
 
 ## Safety and release
 
