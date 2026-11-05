@@ -66,14 +66,14 @@ The landing-page HTML generator interpolated contractor/AI-provided business det
 
 The helper returns both `con_admin_seed` and the authenticated administrator's contractor ID whenever the persisted role is `admin`. This means those ordinary workspace endpoints intentionally combine records from a second tenant into the administrator's workspace. It is not a general all-tenant query, but it is still an implicit cross-tenant exception and makes tenant boundaries depend on a magic account ID.
 
-**Required remediation:** make ordinary workspace APIs strictly tenant-local for every role. Put platform-wide account administration behind separate admin-only endpoints that expose account metadata and aggregate platform metrics, not tenant business records. Any exceptional support access should require an explicit, time-limited, reason-recorded support session.
+**Implementation in PR #90:** ordinary workspace APIs now resolve only the authenticated contractor ID for every role; the `con_admin_seed` exception is removed. Platform account administration is separated into admin-only metadata and aggregate endpoints. No tenant business records are exposed by the new admin APIs. Any future exceptional support access must use an explicit, time-limited, reason-recorded support session. CI and production verification remain pending.
 
 ### HIGH — No dedicated platform administrator console or account suspension state exists in the current schema
 **Area:** `src/App.tsx`, `src/db/schema.ts`, and `contractors` bootstrap DDL.
 
 The UI has no dedicated admin console. The contractor schema has a persisted `role` but no persisted account status, so there is no durable account suspension control that shared authentication can enforce. Existing admin-only system controls do not constitute a platform account-management console.
 
-**Required remediation:** add a server-enforced persisted account status with a safe additive migration; provide an admin-only contractor directory and account status/role actions; audit every change; prevent self-demotion and removal/suspension of the final active administrator. Do not bootstrap an administrator by email pattern, fixed seed ID, default password, or unauthenticated endpoint.
+**Implementation in PR #90:** added a persisted account status with an additive PostgreSQL migration, server-side suspension enforcement, an admin-only contractor directory, role/status actions, and audit logging. Self-demotion/suspension and removal of the final active administrator are blocked. No administrator is auto-provisioned; an existing persisted admin role is required. CI and production verification remain pending.
 
 ## Prioritized review observations
 
