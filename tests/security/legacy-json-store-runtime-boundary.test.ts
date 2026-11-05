@@ -30,7 +30,7 @@ function importsLegacyJsonStore(filePath: string, source: string): boolean {
 describe('runtime persistence boundary', () => {
   it('does not write audit, recommendation outcome, or lesson records through the legacy JSON aggregate', () => {
     const serverSource = readFileSync(resolve(process.cwd(), 'server.ts'), 'utf8');
-    expect(serverSource).not.toMatch(/\\bdb\\.(addAuditLog|addOutcomeRecord|addLesson)\\s*\\(/);
+    expect(serverSource).not.toMatch(/\bdb\.(addAuditLog|addOutcomeRecord|addLesson)\s*\(/);
   });
 
   it('does not mirror active harvested leads into the legacy JSON aggregate', () => {
@@ -40,7 +40,7 @@ describe('runtime persistence boundary', () => {
     expect(harvestStart).toBeGreaterThanOrEqual(0);
     expect(harvestEnd).toBeGreaterThan(harvestStart);
     const harvestRoutes = serverSource.slice(harvestStart, harvestEnd);
-    expect(harvestRoutes).not.toMatch(/\\bdb\\.addLead\\s*\\(/);
+    expect(harvestRoutes).not.toMatch(/\bdb\.addLead\s*\(/);
     expect(harvestRoutes).not.toMatch(/legacyMirrors/);
   });
 
@@ -58,7 +58,7 @@ describe('runtime persistence boundary', () => {
     expect(productionGuard).toBeGreaterThanOrEqual(0);
     expect(firstLegacyMutation).toBeGreaterThan(productionGuard);
     const outsideSimulator = serverSource.slice(0, simulatorStart) + serverSource.slice(simulatorEnd);
-    expect(outsideSimulator).not.toMatch(/\\bdb\\.(addLead|updateLead)\\s*\\(/);
+    expect(outsideSimulator).not.toMatch(/\bdb\.(addLead|updateLead)\s*\(/);
   });
 
   it('does not import the legacy JSON aggregate store from application source', () => {
