@@ -71,6 +71,7 @@ describe('client project HTTP route tenant isolation', () => {
   afterAll(async () => {
     if (dbAvailable) {
       await pool.query('DELETE FROM work_events WHERE contractor_id = ANY($1::text[])', [[tenantA, tenantB]]);
+      await pool.query('DELETE FROM proposals WHERE contractor_id = ANY($1::text[])', [[tenantA, tenantB]]);
       await pool.query('DELETE FROM revenue_records WHERE contractor_id = ANY($1::text[])', [[tenantA, tenantB]]);
       await pool.query('DELETE FROM client_projects WHERE contractor_id = ANY($1::text[])', [[tenantA, tenantB]]);
       await pool.query('DELETE FROM lead_events WHERE lead_id = ANY($1::text[])', [[leadA, leadRevenueA, leadB, leadConcurrentA]]);
@@ -370,7 +371,7 @@ describe('client project HTTP route tenant isolation', () => {
       .set('Authorization', `Bearer ${tokenA}`)
       .send(payload);
     expect(generated.status).toBe(201);
-    expect(generated.body.persistenceStatus).toBe('generated_only_not_persisted');
+    expect(generated.body.persistenceStatus).toBe('persisted_draft');
     expect(generated.body.roiEstimateAnnualUsd).toBeNull();
 
     const events = await pool.query(
@@ -381,7 +382,46 @@ describe('client project HTTP route tenant isolation', () => {
     );
     expect(events.rows).toHaveLength(1);
     expect(events.rows[0].correlation_id).toBe(generated.body.id);
-    expect(events.rows[0].payload.persistenceStatus).toBe('generated_only_not_persisted');
+    expect(events.rows[0].payload.persistenceStatus).toBe('persisted_draft');
+
+    const foreignRead = await request(app)
+      .get(`/api/proposals/${generated.body.id}`)
+      .set('Authorization', `Bearer ${tokenB}`);
+    expect(foreignRead.status).toBe(404);
+
+    const persisted = await request(app)
+      .get(`/api/proposals/${generated.body.id}`)
+      .set('Authorization', `Bearer ${tokenA}`);
+    expect(persisted.status).toBe(200);
+    expect(persisted.body.status).toBe('draft');
+    expect(persisted.body.content.id).toBe(generated.body.id);
+
+    const approved = await request(app)
+      .patch(`/api/proposals/${generated.body.id}/status`)
+      .set('Authorization', `Bearer ${tokenA}`)
+      .send({ status: 'approved' });
+    expect(approved.status).toBe(200);
+    expect(approved.body.status).toBe('approved');
+    expect(approved.body.approvedBy).toBe(tenantA);
+
+    const duplicateTransition = await request(app)
+      .patch(`/api/proposals/${generated.body.id}/status`)
+      .set('Authorization', `Bearer ${tokenA}`)
+      .send({ status: 'void' });
+    expect(duplicateTransition.status).toBe(409);
+
+    const [proposalRow] = (await pool.query(
+      'SELECT status, approved_by FROM proposals WHERE id = $1 AND contractor_id = $2',
+      [generated.body.id, tenantA]
+    )).rows;
+    expect(proposalRow).toMatchObject({ status: 'approved', approved_by: tenantA });
+
+    const proposalEvents = await pool.query(
+      `SELECT event_type FROM work_events WHERE contractor_id = $1
+       AND entity_type = 'proposal' AND entity_id = $2 ORDER BY occurred_at`,
+      [tenantA, generated.body.id]
+    );
+    expect(proposalEvents.rows.map(row => row.event_type)).toEqual(['proposal.approved']);
   });
 
   it('enforces lead read, update, and delete ownership through HTTP routes', async (ctx) => {
