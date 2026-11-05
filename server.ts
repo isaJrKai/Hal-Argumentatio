@@ -9317,10 +9317,13 @@ app.post('/api/revenue/simulations', authenticate, async (req, res) => {
       attributedRevenue: Number(data.attributedRevenue.toFixed(2)),
       roas: data.spend > 0 ? Number((data.attributedRevenue / data.spend).toFixed(4)) : null
     }]));
-    const totalSpend = Object.values(campaignMap).reduce((sum, data) => sum + data.spend, 0);
-    const totalRevenue = Object.values(campaignMap).reduce((sum, data) => sum + data.attributedRevenue, 0);
-    const totalAttributedLeads = new Set(Array.from(campaignByLead.keys())).size;
-    const totalClosedWon = new Set(Object.values(campaignMap).flatMap(data => Array.from(data.closedWonLeadIds))).size;
+    const measuredCampaigns = Object.values(campaignMap).filter(data =>
+      data.spend > 0 && data.attributedRevenue > 0 && data.closedWonLeadIds.size > 0
+    );
+    const totalSpend = measuredCampaigns.reduce((sum, data) => sum + data.spend, 0);
+    const totalRevenue = measuredCampaigns.reduce((sum, data) => sum + data.attributedRevenue, 0);
+    const totalAttributedLeads = new Set(measuredCampaigns.flatMap(data => Array.from(data.attributedLeadIds))).size;
+    const totalClosedWon = new Set(measuredCampaigns.flatMap(data => Array.from(data.closedWonLeadIds))).size;
     const baselineRoas = Number((totalRevenue / totalSpend).toFixed(4));
     const fromRoas = fromData.attributedRevenue / fromData.spend;
     const toRoas = toData.attributedRevenue / toData.spend;
