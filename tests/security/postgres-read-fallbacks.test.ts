@@ -29,4 +29,9 @@ describe('PostgreSQL-authoritative read failure behavior', () => {
       expect(route).not.toContain('return res.status(200).json(db.');
     }
   });
+
+  it('includes password-reset storage in application readiness checks', () => {
+    const readinessRoute = routeBetween("app.get('/api/ready'", '// Public Link & Community Sandbox Status & Controls');
+    expect(readinessRoute).toContain("to_regclass('public.password_reset_tokens')");
+  });
 });
