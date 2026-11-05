@@ -52,7 +52,7 @@ export const competitorAnalyzerSkill: Skill = {
       '4. Provide ethical local SEO steps without promising a top-three Maps position.',
       '5. Do not invent statistics, ratings, review counts, market share, backlinks, or ranking positions.',
       'Return concise Markdown.'
-    ].join('\\n');
+    ].join('\n');
 
     let reportText = '';
 
