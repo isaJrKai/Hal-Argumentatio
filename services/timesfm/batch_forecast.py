@@ -66,7 +66,7 @@ def main() -> None:
     if not 1 <= HORIZON <= 52 or not 8 <= MAX_CONTEXT <= 16384:
         raise ValueError("Invalid TimesFM batch horizon/context configuration")
 
-    model = make_model()
+    model = None
     generated = 0
     skipped = 0
     now = datetime.now(timezone.utc)
@@ -132,6 +132,8 @@ def main() -> None:
                 skipped += 1
                 continue
 
+            if model is None:
+                model = make_model()
             point, quantiles = model.forecast(
                 horizon=HORIZON,
                 inputs=[values],
