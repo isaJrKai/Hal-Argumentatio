@@ -280,9 +280,10 @@ export interface ProposalDeck {
   monthlyRetainerUsd: number;
   setupFeeUsd: number;
   deliverables: string[];
-  roiEstimateAnnualUsd: number;
+  roiEstimateAnnualUsd: number | null;
   auditHighlights: string[];
   validUntil: string;
+  persistenceStatus?: 'generated_only_not_persisted';
 }
 
 export interface ClientMilestone {
