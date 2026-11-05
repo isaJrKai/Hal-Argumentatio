@@ -9631,6 +9631,7 @@ async function startServer() {
 
       // Compute Learning Dashboard Summary Statistics
       let totalEvaluated = 0;
+      let measuredCount = 0;
       let successfulCount = 0;
       let partiallySuccessfulCount = 0;
       let neutralCount = 0;
@@ -9643,7 +9644,7 @@ async function startServer() {
       let actualRoasTotal = 0;
 
       for (const o of outcomes) {
-        if (o.outcomeStatus === 'evaluated' || o.outcomeStatus === 'measured') {
+        if (o.outcomeStatus === 'evaluated') {
           totalEvaluated++;
           totalAccuracy += Number(o.predictionAccuracy || 0);
           
@@ -9659,6 +9660,8 @@ async function startServer() {
           actualRevenueTotal += Number(actual.revenue || 0);
           expectedRoasTotal += Number(expected.roas || 0);
           actualRoasTotal += Number(actual.roas || 0);
+        } else if (o.outcomeStatus === 'measured') {
+          measuredCount++;
         } else if (o.outcomeStatus === 'insufficient_data') {
           insufficientDataCount++;
         }
@@ -9669,6 +9672,7 @@ async function startServer() {
       const summary = {
         totalOutcomes: outcomes.length,
         totalEvaluated,
+        measuredCount,
         successfulCount,
         partiallySuccessfulCount,
         neutralCount,
