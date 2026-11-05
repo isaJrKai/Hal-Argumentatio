@@ -6346,7 +6346,7 @@ app.post('/api/outreach/dispatch', authenticate, async (req, res) => {
         await pgDb.update(communicationsOutbox).set({
           status: 'submitted', providerMessageId: sent.providerMessageId, attempts: 1,
           submittedAt, lastAttemptAt: submittedAt, updatedAt: submittedAt, errorCode: null, errorMessage: null
-        }).where(and(eq(communicationsOutbox.id, outboxId), eq(communicationsOutbox.contractorId, contractorId)));
+        }).where(and(eq(communicationsOutbox.id, outboxId), eq(communicationsOutbox.contractorId, contractorId), eq(communicationsOutbox.status, 'processing')));
         return res.json({
           success: true, dispatchId: outboxId, idempotencyKey, provider: 'twilio',
           providerMessageId: sent.providerMessageId, status: 'submitted', mode: 'live',
@@ -6358,7 +6358,7 @@ app.post('/api/outreach/dispatch', authenticate, async (req, res) => {
           status: uncertain ? 'unknown' : 'failed', attempts: 1, lastAttemptAt: new Date(), updatedAt: new Date(),
           errorCode: error instanceof TwilioConfigurationError ? 'PROVIDER_NOT_CONFIGURED' : 'PROVIDER_REQUEST_FAILED',
           errorMessage: String(error?.message || 'Twilio request failed').slice(0, 500)
-        }).where(and(eq(communicationsOutbox.id, outboxId), eq(communicationsOutbox.contractorId, contractorId))).catch(() => undefined);
+        }).where(and(eq(communicationsOutbox.id, outboxId), eq(communicationsOutbox.contractorId, contractorId), eq(communicationsOutbox.status, 'processing'))).catch(() => undefined);
         return res.status(502).json({
           success: false, code: 'SMS_PROVIDER_REQUEST_FAILED',
           error: 'Twilio did not confirm submission. Automatic retry is disabled to avoid duplicate texts.'
