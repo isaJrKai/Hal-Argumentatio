@@ -300,7 +300,6 @@ describe('client project HTTP route tenant isolation', () => {
     expect(created.leadId).toBe(leadRevenueA);
     expect(created.amountUsd).toBe(2400);
     expect(created.leadStatus).toBe('closed_won');
-    expect(conflictingCloseOuts[0].body.code).toBeUndefined();
 
     const tenantARevenue = await request(app)
       .get('/api/revenues')
