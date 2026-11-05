@@ -2,7 +2,15 @@
 
 **Workstream branch:** `workstream/database-persistence-neon`  
 **Audit baseline:** `main` at the repository revision inspected on 2026-11-05  
-**Status:** Audit findings documented; runtime migration and restart/failure tests are not yet implemented. This document is not a completion claim.
+**Status:** Audit findings documented; one legacy-store data-loss defect has been fixed on this branch. The Neon runtime migration and restart/failure tests are not yet complete. This document is not a completion claim.
+
+## Implementation progress (2026-11-05)
+
+- `src/db/db.ts` now fails startup when `data/db.json` cannot be parsed or is not a JSON object. It no longer replaces an unreadable file with empty defaults.
+- `tests/security/legacy-database-corruption.test.ts` covers malformed JSON and non-object JSON inputs.
+- The workstream branch was synchronized with current `main` before further migration work; latest-main changes are retained.
+- CI for the latest synchronized commit is queued. Earlier commits passed CI, but that does not validate the latest merge commit.
+- No production database was queried or modified.
 
 ## Executive finding
 
@@ -17,7 +25,7 @@ A configured Neon connection therefore does not prove that all application write
 
 | Location | Operation | Meaning | Production assessment |
 |---|---|---|---|
-| `src/db/db.ts` | `existsSync`, `readFileSync`, `mkdirSync`, `writeFileSync` against `data/db.json` | Loads, mutates and serializes the legacy aggregate store | **Critical**: not durable on ephemeral Render filesystem; malformed JSON currently enters a reset-and-save path |
+| `src/db/db.ts` | `existsSync`, `readFileSync`, `mkdirSync`, `writeFileSync` against `data/db.json` | Loads, mutates and serializes the legacy aggregate store | **Critical**: not durable on ephemeral Render filesystem. At the audit baseline, malformed JSON entered a reset-and-save path; the branch now fails startup instead of overwriting the unreadable file. |
 | `tests/security/connector-credential-vault.test.ts` | Reads `data/db.json` | Test asserts credential persistence in the JSON store | Test encodes the legacy implementation, not Neon durability |
 | `sync-*.ts` | Reads an operator-provided JSON export | One-off import/synchronization utilities | Not a request-time runtime store; must be reviewed before use against production because scripts may not be uniformly idempotent |
 | `src/db/postgres.ts` | Filesystem checks for configured Unix socket paths | Resolves a database socket | Not application data persistence |
@@ -44,7 +52,7 @@ The legacy `DBStructure` includes contractors, sessions, password resets, leads,
 ## Migration and failure-mode risks
 
 1. **No safe runtime source selection:** the legacy singleton initializes unconditionally and continues to save to local JSON. Production can therefore appear to accept writes that disappear on restart.
-2. **Malformed-file data loss:** `src/db/db.ts` catches JSON parse errors, calls `save()`, and can replace the unreadable file with an empty/default state. This must become fail-closed; never reset a store automatically.
+2. **Malformed-file data loss — fixed on this branch:** the legacy store now rejects malformed/non-object JSON and aborts startup without calling `save()`. A regression test covers malformed and non-object content. This protects the file but does not make the JSON store durable on Render.
 3. **No complete migration ledger:** schema creation and upgrades are embedded in a large `bootstrapPostgresTables()` SQL batch. There is no evidence in the inspected files of a versioned migration journal tracking every deployed schema revision.
 4. **Potentially unsafe API-key constraint migration:** bootstrap adds nullable hash/prefix columns and then immediately sets them NOT NULL. This is safe only if the target table has no legacy rows (a code comment asserts zero rows, but this audit has not queried production).
 5. **Silent in-memory fallback:** `AutonomousLearningEngine.initializeFromDb()` catches database errors and keeps defaults; `saveState()` catches write failures and logs a warning. Callers can continue with state that was not durably saved.
@@ -57,7 +65,7 @@ The legacy `DBStructure` includes contractors, sessions, password resets, leads,
 2. Move connector credential CRUD to `connector_credentials`, retaining the existing encryption envelope and tenant/service uniqueness. Keep secrets out of logs and migration reports.
 3. Complete PostgreSQL repositories and route wiring for scheduler jobs, notifications, missions, outreach sequences, client projects and system audit logs. Remove the corresponding legacy store methods only after consumer coverage is proven.
 4. Build an operator-run JSON-to-Neon importer that defaults to dry-run, inserts without overwriting existing IDs, reports duplicates/conflicts, and verifies per-domain counts/checksums. Do not automatically import at application startup.
-5. Replace legacy JSON parse-reset behavior with fail-closed handling. Production writes must never report success unless the PostgreSQL transaction commits.
+5. Fail closed on unreadable legacy JSON — implemented on this branch. The broader requirement remains: production writes must never report success unless the PostgreSQL transaction commits.
 6. Add integration tests using a real PostgreSQL-compatible test database (PGlite or an isolated PostgreSQL service): write, dispose/recreate the application/repository, read back; simulate connection loss and assert writes fail without memory-only success; test migration idempotency and conflict preservation.
 
 ## Evidence and scope limits
