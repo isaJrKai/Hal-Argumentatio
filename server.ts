@@ -9598,13 +9598,6 @@ async function startServer() {
       let measuredCount = 0;
       const now = new Date();
 
-      const calcAcc = (exp: number, act: number) => {
-        if (exp === 0 && act === 0) return 1.0;
-        if (exp === 0) return 0.0;
-        const acc = 1 - Math.abs(exp - act) / Math.abs(exp);
-        return Math.max(0, Math.min(1, acc));
-      };
-
       for (const rec of executedRecs) {
         const existing = existingOutcomes.find(o => o.recommendationId === rec.id);
         const obsStart = rec.executedAt || rec.updatedAt || rec.createdAt;
