@@ -115,7 +115,7 @@ export default function IntelligencePanel({
   };
 
   // Grounding state
-  const [enableGrounding, setEnableGrounding] = useState(true);
+  const [enableGrounding, setEnableGrounding] = useState(false);
   const [lastInferenceLabel, setLastInferenceLabel] = useState('');
   const [activeAi, setActiveAi] = useState<'gemini' | 'nemotron' | 'anthropic'>(() => {
     const saved = localStorage.getItem('hal_active_ai');
@@ -537,7 +537,7 @@ export default function IntelligencePanel({
                         ? 'bg-accent/10 border-accent/45 text-accent font-bold' 
                         : 'bg-transparent border-border-dim text-text-tertiary hover:text-text-secondary hover:border-border-dark'
                     }`}
-                    title="Enable web search grounding for supported requests."
+                    title="Optional live web search can add response time. Enable it when you need current external sources."
                   >
                     <Globe className={`w-3.5 h-3.5 ${enableGrounding ? 'text-accent' : 'text-text-tertiary'}`} />
                     <span>Web search: {enableGrounding ? 'Enabled' : 'Disabled'}</span>
