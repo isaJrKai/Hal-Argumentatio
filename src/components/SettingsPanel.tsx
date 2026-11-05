@@ -342,6 +342,20 @@ export default function SettingsPanel({
   const [connectorKeySuccess, setConnectorKeySuccess] = useState<string | null>(null);
   const [connectorConfigured, setConnectorConfigured] = useState<Record<string, boolean>>({});
   const [connectorSaving, setConnectorSaving] = useState<Record<string, boolean>>({});
+  const [googleAdsSyncing, setGoogleAdsSyncing] = useState(false);
+  const [googleAdsSyncResult, setGoogleAdsSyncResult] = useState<string | null>(null);
+  const handleGoogleAdsHistorySync = async () => {
+    setGoogleAdsSyncing(true); setGoogleAdsSyncResult(null);
+    try {
+      const authToken=token||localStorage.getItem('halbiz_auth_token')||localStorage.getItem('token')||'';
+      const response=await fetch('/api/forecasting/google-ads/sync',{method:'POST',headers:{Authorization:`Bearer ${authToken}`}});
+      const result=await response.json();
+      if(!response.ok||!result.success)throw new Error(result.error||'Google Ads history sync failed.');
+      setGoogleAdsSyncResult(result.message||`Imported ${result.imported||0} records.`);
+    } catch(error:any) { setGoogleAdsSyncResult(error.message||'Google Ads history sync failed.'); }
+    finally { setGoogleAdsSyncing(false); }
+  };
+
 
   useEffect(() => {
     // Remove any legacy browser-stored database URI; production credentials belong in server env.
@@ -1176,7 +1190,7 @@ export default function SettingsPanel({
                 type="password"
                 value={connectorKeys.googleAds}
                 onChange={(e) => setConnectorKeys(prev => ({ ...prev, googleAds: e.target.value }))}
-                placeholder="Developer Token / Client ID"
+                placeholder="JSON: clientId, clientSecret, refreshToken, customerId, developerToken"
                 className={`w-full border rounded p-2 focus:outline-none focus:border-accent text-inherit font-mono text-xs ${innerBg} ${borderCol}`}
               />
               <div className="flex justify-end">
@@ -1184,7 +1198,9 @@ export default function SettingsPanel({
                   {connectorSaving.googleAds ? 'Saving…' : 'Save credential'}
                 </button>
               </div>
-              <span className="text-[11px] text-inherit opacity-60 block">Key: GOOGLE_ADS_DEVELOPER_TOKEN</span>
+              <p className="text-[11px] text-inherit opacity-70 leading-relaxed">Save a JSON OAuth connection object including developerToken. The refresh token must include the Google Ads API scope (https://www.googleapis.com/auth/adwords) and offline access. Credentials are encrypted in this workspace vault; saving does not verify connectivity.</p>
+              <div className="flex justify-end"><button type="button" onClick={handleGoogleAdsHistorySync} disabled={!connectorConfigured.googleAds || googleAdsSyncing} className="px-3 py-2 rounded-md border border-accent/50 text-accent text-xs font-semibold disabled:opacity-40 disabled:cursor-not-allowed">{googleAdsSyncing ? 'Syncing history…' : 'Verify & import last 365 days'}</button></div>
+              {googleAdsSyncResult && <p role="status" className="text-xs text-text-secondary">{googleAdsSyncResult}</p>}
             </div>
 
             {/* Meta Ads */}

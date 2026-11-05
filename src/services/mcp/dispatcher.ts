@@ -34,7 +34,7 @@ import { getRecentWorkEvents, recordWorkEvent } from '../../lib/workLedger';
 import { listWorkTasks, getWorkTask, requiresWorkTaskApproval, canExecutorClaimWorkTask } from '../../lib/workTasks';
 import { analyzeCampaignPerformance } from '../../lib/campaignAnomaly';
 import { classifyHermesToolResult } from '../../lib/hermesExecution';
-import { claimHermesWorkTask } from '../../lib/hermesTaskClaim';
+import { claimHermesWorkTask, heartbeatHermesWorkTask, failExpiredHermesWorkTask } from '../../lib/hermesTaskClaim';
 
 export const HAL_MCP_TOOLS: McpToolDefinition[] = [
   {
@@ -326,6 +326,20 @@ export async function executeMcpTool(
     case 'hal_execute_hermes_work_task': {
       const taskId = typeof rawParams?.taskId === 'string' ? rawParams.taskId.trim() : '';
       if (!taskId || taskId.length > 160) throw new Error('A valid taskId is required.');
+      const expired = await failExpiredHermesWorkTask(pgDb, taskId, contractorId);
+      if (expired) {
+        try {
+          await recordWorkEvent(pgDb, {
+            contractorId, eventType: 'task.execution_lease_expired', entityType: 'work_task', entityId: taskId,
+            actorType: 'system', actorId: 'hermes_lease_recovery', sourceModule: 'hermes_work_executor',
+            correlationId: expired.correlationId || taskId,
+            summary: 'Hermes stopped heartbeating before recording a terminal receipt; the task was marked failed for operator review.',
+            payload: { attempt: expired.attemptCount, outcome: 'lease_expired' }
+          });
+        } catch (ledgerError) {
+          console.error('[Hermes Work History] Lease-expiry receipt persisted but event append failed:', ledgerError);
+        }
+      }
       const task = await getWorkTask(pgDb, contractorId, taskId);
       if (!task) throw new Error('Work task not found in this workspace.');
       if (task.assignedWorker !== 'hermes') throw new Error('This task is not assigned to Hermes.');
@@ -368,6 +382,24 @@ export async function executeMcpTool(
         return running;
       });
       if (!claimed) throw new Error('Task was claimed or changed by another worker. Refresh the queue.');
+
+      const executionStartedAt = new Date();
+      let heartbeatLost = false;
+      let heartbeatInFlight = false;
+      const heartbeatTimer = setInterval(async () => {
+        if (heartbeatInFlight || heartbeatLost) return;
+        heartbeatInFlight = true;
+        try {
+          const alive = await heartbeatHermesWorkTask(pgDb, taskId, contractorId, claimed.attemptCount);
+          if (!alive) heartbeatLost = true;
+        } catch (heartbeatError) {
+          heartbeatLost = true;
+          console.error('[Hermes] Task heartbeat failed; refusing to record completion:', heartbeatError);
+        } finally {
+          heartbeatInFlight = false;
+        }
+      }, 15_000);
+      heartbeatTimer.unref?.();
 
       try {
         const result = task.taskType === 'hermes_lab_asset'
@@ -432,7 +464,10 @@ export async function executeMcpTool(
         if (task.taskType === 'hermes_agent_task' && (result as any).executionStatus === 'provider_unavailable') {
           throw new Error('Hermes providers are unavailable. No analysis or artifact update was completed.');
         }
-        const receipt = task.taskType === 'hermes_lab_asset'
+        if (heartbeatLost) throw new Error('Hermes lost ownership of this task attempt before completion; no success receipt was written.');
+        clearInterval(heartbeatTimer);
+        const completedAt = new Date();
+        const resultReceipt = task.taskType === 'hermes_lab_asset'
           ? {
               artifactId: (result as any).artifactId, title: (result as any).title, category: (result as any).category,
               status: (result as any).status, executionSummary: (result as any).executionSummary
@@ -448,11 +483,20 @@ export async function executeMcpTool(
                 resultStatus: typeof call.result?.status === 'string' ? call.result.status : null
               }))
             };
+        const receipt = {
+          schemaVersion: 1, outcome: 'completed', success: true, worker: 'hermes',
+          taskId, taskType: task.taskType, attempt: claimed.attemptCount,
+          startedAt: executionStartedAt.toISOString(), completedAt: completedAt.toISOString(),
+          durationMs: Math.max(0, completedAt.getTime() - executionStartedAt.getTime()),
+          ...resultReceipt,
+          result: resultReceipt
+        };
         const [completed] = await pgDb.update(workTasks).set({
-          status: 'completed', output: receipt, completedAt: new Date(), updatedAt: new Date()
+          status: 'completed', output: receipt, completedAt, updatedAt: completedAt
         }).where(and(
           eq(workTasks.id, taskId), eq(workTasks.contractorId, contractorId),
-          eq(workTasks.status, 'running'), eq(workTasks.assignedWorker, 'hermes')
+          eq(workTasks.status, 'running'), eq(workTasks.assignedWorker, 'hermes'),
+          eq(workTasks.attemptCount, claimed.attemptCount)
         )).returning();
         if (!completed) throw new Error('Task state changed before Hermes could record its execution receipt.');
         // The task receipt is the authoritative completion record. A secondary
@@ -473,9 +517,22 @@ export async function executeMcpTool(
         }
         return { success: true, task: completed, receipt, executionStarted: true };
       } catch (executionError: any) {
+        clearInterval(heartbeatTimer);
+        const failedAt = new Date();
         const message = String(executionError?.message || 'Hermes execution failed.').slice(0, 1000);
-        await pgDb.update(workTasks).set({ status: 'failed', errorMessage: message, updatedAt: new Date() })
-          .where(and(eq(workTasks.id, taskId), eq(workTasks.contractorId, contractorId), eq(workTasks.status, 'running')));
+        const failureReceipt = {
+          schemaVersion: 1, outcome: 'failed', success: false, worker: 'hermes',
+          taskId, taskType: task.taskType, attempt: claimed.attemptCount,
+          startedAt: executionStartedAt.toISOString(), completedAt: failedAt.toISOString(),
+          durationMs: Math.max(0, failedAt.getTime() - executionStartedAt.getTime()),
+          error: message
+        };
+        await pgDb.update(workTasks).set({
+          status: 'failed', errorMessage: message, output: failureReceipt, completedAt: failedAt, updatedAt: failedAt
+        }).where(and(
+          eq(workTasks.id, taskId), eq(workTasks.contractorId, contractorId),
+          eq(workTasks.status, 'running'), eq(workTasks.attemptCount, claimed.attemptCount)
+        ));
         try {
           await pgDb.insert(workEvents).values({
             id: 'evt_' + crypto.randomUUID(), contractorId,

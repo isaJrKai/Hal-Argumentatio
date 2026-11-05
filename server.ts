@@ -8,6 +8,9 @@ import { isIP } from 'node:net';
 import { execSync } from 'child_process';
 import { sendResendEmail, EmailProviderConfigurationError, EmailProviderRequestError } from './src/services/communications/resendEmail';
 import { verifySvixWebhookSignature } from './src/lib/resendWebhook';
+import { runCommunicationsOutboxWorker } from './src/services/communications/outboxWorker';
+import { verifyMetaWebhookSignature, isMetaPhoneNumberId } from './src/lib/whatsappWebhook';
+import { sendTwilioSms, verifyTwilioRequestSignature, TwilioConfigurationError, TwilioRequestError } from './src/services/communications/twilioSms';
 import { 
   db, 
   encrypt, 
@@ -21,7 +24,7 @@ import {
   Recommendation
 } from './src/db/db';
 import { db as pgDb, createPool as getApplicationPostgresPool } from './src/db/index.ts';
-import { contractors, auditLogs, leads, leadEvents, revenueRecords, campaigns, winLossRecords, performanceSnapshots, recommendations, forecasts, predictionOutcomes, learningInsights, chatMessages, chatProjects, chatConversations, missions, clientProjects, outreachSequences, apiKeys, connectorCredentials, notifications, schedulerJobs, passwordResetTokens, leadAttribution, conversionOutbox, googleAdsDailyPerformance, revenueExperiments, revenueRecommendations, revenueRecommendationEvents, revenueSimulations, revenueOutcomes, communicationsOutbox, communicationsDeliveryEvents, halLoops, halLoopEvents, hermesLabArtifacts, hermesDiagnosticIncidents, hermesLabMessages, staffMembers, workEvents, workTasks, revokedTokens } from './src/db/schema.ts';
+import { contractors, auditLogs, leads, leadEvents, revenueRecords, campaigns, winLossRecords, performanceSnapshots, recommendations, forecasts, predictionOutcomes, learningInsights, chatMessages, chatProjects, chatConversations, missions, clientProjects, outreachSequences, apiKeys, connectorCredentials, notifications, schedulerJobs, passwordResetTokens, leadAttribution, conversionOutbox, googleAdsDailyPerformance, revenueExperiments, revenueRecommendations, revenueRecommendationEvents, revenueSimulations, revenueOutcomes, communicationsOutbox, communicationsDeliveryEvents, communicationsOptOuts, communicationsConsents, twilioPhoneNumberMappings, twilioInboundEvents, whatsappPhoneNumberMappings, whatsappInboundEvents, halLoops, halLoopEvents, hermesLabArtifacts, hermesDiagnosticIncidents, hermesLabMessages, staffMembers, workEvents, workTasks, revokedTokens } from './src/db/schema.ts';
 import { eq, inArray, desc, and, or, like, sql, gte, lte, gt, isNull } from 'drizzle-orm';
 import { 
   generateLearningFromOutcome, 
@@ -32,6 +35,7 @@ import {
   draftOutreachMessage
 } from './src/lib/gemini';
 import { callNemotron } from './src/services/nemotron.ts';
+import { runProviderProbe } from './src/services/aiProviderDiagnostics.ts';
 import { autonomousLearning } from './src/lib/autonomousLearning';
 import { getAllSkills, executeSkill, registerCustomSkill, unregisterCustomSkill } from './src/skills/registry';
 import { HAL_MCP_TOOLS, executeMcpTool } from './src/services/mcp/dispatcher';
@@ -54,6 +58,7 @@ import { validateStaffInput, getEffectiveStaffAvailability } from './src/lib/sta
 import { getWorkerCapabilities } from './src/lib/workerCapabilities';
 import { resolvePublishedLandingPageOwner } from './src/lib/landingPageOwnership';
 import { validateLoopGate } from './src/lib/loopGating';
+import { parseGoogleAdsConnection, buildGoogleAdsCityPerformanceQuery, buildGoogleAdsGeoConstantQuery, extractGoogleAdsStreamRows, GOOGLE_ADS_API_VERSION } from './src/lib/googleAdsIngestion';
 import { 
   auditCompetitorFootprint, 
   calculateSpatialQuadrants, 
@@ -84,6 +89,7 @@ import {
   verifyPhase5Pillars
 } from './src/lib/phase5-enterprise';
 import { executeBrainSynchronizedForecast } from './src/lib/brainForecastBridge';
+import { getTimesFmBatchEvaluationWindow, evaluateTimesFmBatchActual } from './src/lib/forecastEvaluation';
 import {
   verifyLeadGrounding,
   enforceFailClosedOutreachGate,
@@ -1331,48 +1337,55 @@ app.post('/api/auth/forgot-password', async (req, res) => {
         });
       } catch (_) {}
 
-      // Construct standard clickable reset link
-      const host = req.get('x-forwarded-host') || req.get('host') || 'localhost:3000';
-      const proto = req.headers['x-forwarded-proto'] || (req.secure ? 'https' : 'http');
-      const origin = req.headers.origin || `${proto}://${host}`;
-      const resetUrl = `${origin}/?reset_token=${rawToken}`;
-
-      let emailDispatched = false;
-      const resendApiKey = process.env.RESEND_API_KEY || (db as any).getConnectorCredentials?.('con_admin_seed')?.resend;
-
-      // If an external email provider like Resend is configured, send the real email with link
-      if (resendApiKey) {
-        try {
-          const emailRes = await fetch('https://api.resend.com/emails', {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${resendApiKey}`,
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-              from: process.env.HAL_SENDER_EMAIL || 'HAL Operating System <support@hal-intelligence.ai>',
-              to: cleanEmail,
-              subject: 'Reset Your HAL Password',
-              html: `
-                <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 560px; margin: 0 auto; padding: 32px 24px; background: #0b0f17; color: #f3f4f6; border-radius: 12px; border: 1px solid #1f2937;">
-                  <div style="font-size: 18px; font-weight: bold; color: #3b82f6; margin-bottom: 20px; letter-spacing: 0.05em;">HAL OPERATING SYSTEM</div>
-                  <h2 style="font-size: 20px; font-weight: 600; margin: 0 0 12px 0; color: #ffffff;">Reset Your Account Password</h2>
-                  <p style="font-size: 14px; line-height: 1.6; color: #9ca3af; margin: 0 0 24px 0;">We received a password reset request for your HAL workspace account (${cleanEmail}). Click the button below to choose your new password:</p>
-                  <div style="margin: 28px 0; text-align: left;">
-                    <a href="${resetUrl}" style="background-color: #2563eb; color: #ffffff; padding: 12px 28px; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 14px; display: inline-block;">Reset Password</a>
-                  </div>
-                  <p style="font-size: 12px; color: #6b7280; line-height: 1.5; margin: 24px 0 0 0;">If the button does not work, copy and paste this link into your browser:<br/><a href="${resetUrl}" style="color: #60a5fa; word-break: break-all;">${resetUrl}</a></p>
-                  <p style="font-size: 11px; color: #4b5563; margin-top: 24px; border-top: 1px solid #1f2937; padding-top: 16px;">This link will expire in 60 minutes and can only be used once. If you did not request this change, you can ignore this email.</p>
-                </div>
-              `
-            })
-          });
-          if (emailRes.ok) {
-            emailDispatched = true;
-          }
-        } catch (emailErr) {
-          console.error('[HAL Auth] Failed to dispatch reset email via Resend:', emailErr);
+      // Reset links must use the operator-configured canonical origin. Never
+      // trust Host, X-Forwarded-Host, or Origin headers for credential links.
+      let appOrigin = '';
+      try {
+        const configuredUrl = new URL(process.env.APP_URL || '');
+        const isLocalDevelopment = process.env.NODE_ENV !== 'production' &&
+          (configuredUrl.hostname === 'localhost' || configuredUrl.hostname === '127.0.0.1');
+        if ((configuredUrl.protocol === 'https:' || isLocalDevelopment) &&
+            !configuredUrl.username && !configuredUrl.password) {
+          appOrigin = configuredUrl.origin;
         }
+      } catch {
+        appOrigin = '';
+      }
+
+      const resendApiKey = process.env.RESEND_API_KEY;
+      const senderEmail = process.env.HAL_SENDER_EMAIL;
+      if (resendApiKey && senderEmail && appOrigin) {
+        const resetUrl = `${appOrigin}/?reset_token=${rawToken}`;
+        const textBody = `We received a password reset request for your HAL account. Open this link within 60 minutes to choose a new password: ${resetUrl}\\n\\nIf you did not request this change, ignore this email.`;
+        const htmlBody = `
+          <div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;padding:32px 24px">
+            <h2>Reset your HAL password</h2>
+            <p>We received a password reset request for your HAL account.</p>
+            <p><a href="${resetUrl}">Reset password</a></p>
+            <p>If the button does not work, copy this link: <a href="${resetUrl}">${resetUrl}</a></p>
+            <p>This link expires in 60 minutes and can only be used once. If you did not request this change, ignore this email.</p>
+          </div>
+        `;
+        try {
+          // Resend's accepted response is recorded as submission only. A
+          // verified webhook is required before claiming recipient delivery.
+          await sendResendEmail({
+            to: cleanEmail,
+            subject: 'Reset Your HAL Password',
+            text: textBody,
+            html: htmlBody
+          }, { apiKey: resendApiKey, from: senderEmail });
+        } catch (emailError: any) {
+          console.error('[HAL Auth] Password reset email submission failed:', emailError?.name || 'provider_error');
+          await pgDb.update(passwordResetTokens)
+            .set({ usedAt: new Date() })
+            .where(and(eq(passwordResetTokens.tokenHash, tokenHash), isNull(passwordResetTokens.usedAt)));
+        }
+      } else {
+        // Do not leave an active reset token that cannot be delivered.
+        await pgDb.update(passwordResetTokens)
+          .set({ usedAt: new Date() })
+          .where(and(eq(passwordResetTokens.tokenHash, tokenHash), isNull(passwordResetTokens.usedAt)));
       }
 
       return res.json(buildPasswordResetResponse());
@@ -1500,48 +1513,50 @@ app.post('/api/notifications/read-all', authenticate, async (req, res) => {
 // ─── SSE REALTIME EVENTS ─────────────────────────────────────────────────────
 
 app.get('/api/events', (req, res) => {
-  // Extract token from Bearer authorization header or ?token= query param
+  // Native EventSource cannot set Authorization headers, so legacy clients may
+  // supply ?token=. Route both forms through the same persisted-account and
+  // revocation checks as every other authenticated API endpoint.
   const authHeader = req.headers.authorization;
-  let token: string | null = null;
-  if (authHeader && authHeader.startsWith('Bearer ')) {
-    token = authHeader.substring(7);
-  } else if (typeof req.query.token === 'string' && req.query.token.trim() !== '') {
-    token = req.query.token.trim();
-  }
+  const queryToken = typeof req.query.token === 'string' ? req.query.token.trim() : '';
+  const token = authHeader?.startsWith('Bearer ')
+    ? authHeader.slice('Bearer '.length).trim()
+    : queryToken;
 
   if (!token) {
     return res.status(401).json({ error: 'Authentication required for SSE stream. Missing token.' });
   }
 
-  const session = verifyToken(token);
-  if (!session || !session.contractorId) {
-    return res.status(401).json({ error: 'Invalid, expired, or untrusted authentication token.' });
-  }
+  // authenticate() validates the JWT, checks durable revocation, and resolves
+  // the current account from PostgreSQL. Never trust JWT tenant claims alone.
+  req.headers.authorization = `Bearer ${token}`;
+  void authenticate(req, res, () => {
+    const contractorId = (req as any).contractorId as string;
 
-  const contractorId = session.contractorId;
+    // Query-string bearer tokens can be recorded by intermediaries. Prevent
+    // caching and discourage downstream referrer propagation of this URL.
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
+    res.setHeader('Referrer-Policy', 'no-referrer');
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Connection', 'keep-alive');
+    res.flushHeaders();
 
-  res.setHeader('Content-Type', 'text/event-stream');
-  res.setHeader('Cache-Control', 'no-cache');
-  res.setHeader('Connection', 'keep-alive');
-  res.flushHeaders();
+    const pingInterval = setInterval(() => {
+      try {
+        res.write(':\n\n');
+        const heartbeatEvent = { type: 'heartbeat', timestamp: new Date().toISOString() };
+        res.write(`data: ${JSON.stringify(heartbeatEvent)}\n\n`);
+      } catch {
+        clearInterval(pingInterval);
+      }
+    }, 15000);
 
-  // Keep alive heartbeat ping with real payload
-  const pingInterval = setInterval(() => {
-    try {
-      res.write(':\n\n'); // standard SSE comment ping
-      const heartbeatEvent = { type: 'heartbeat', timestamp: new Date().toISOString() };
-      res.write(`data: ${JSON.stringify(heartbeatEvent)}\n\n`);
-    } catch (err) {
+    const client: SseClient = { contractorId, res, pingInterval };
+    sseClients.push(client);
+
+    req.on('close', () => {
       clearInterval(pingInterval);
-    }
-  }, 15000);
-
-  const client: SseClient = { contractorId, res, pingInterval };
-  sseClients.push(client);
-
-  req.on('close', () => {
-    clearInterval(pingInterval);
-    sseClients = sseClients.filter(c => c !== client);
+      sseClients = sseClients.filter(c => c !== client);
+    });
   });
 });
 
@@ -1598,10 +1613,8 @@ app.get('/api/public/audit/:id', async (req, res) => {
       googleRating: null,
       reviewCount: lead.reviewCount ?? null,
       sentimentScore: null,
-      notes: lead.notes || '',
-      outreachStrategy: '',
-      urgencyScore: lead.urgencyScore ?? null,
-      predictedLtvUsd: lead.predictedLtv ?? null,
+      // Deliberately exclude internal notes, sales strategy, urgency and
+      // predicted deal value from the unauthenticated prospect-facing report.
       createdAt: lead.createdAt
     });
   } catch (err: any) {
@@ -1720,25 +1733,73 @@ app.post('/api/public/webhooks/delivery', async (req, res) => {
   }
 });
 
+// Public pages must be saved through the server-owned config renderer. Arbitrary
+// Hermes/provider HTML is never eligible for same-origin public publication.
+function hasOwnedLandingPageConfig(artifact: any): boolean {
+  const config = artifact?.content?.pageConfig;
+  return Boolean(
+    artifact &&
+    config &&
+    typeof config === 'object' &&
+    !Array.isArray(config) &&
+    config.id === artifact.id &&
+    config.contractorId === artifact.contractorId
+  );
+}
+
 // ─── PUBLIC LANDING PAGE SERVING (Direct Client & External Auditor Access) ───
 
 app.get('/api/public/landing/:id', async (req, res) => {
   const { id } = req.params;
   try {
-    const [artifact] = await pgDb.select().from(hermesLabArtifacts).where(eq(hermesLabArtifacts.id, id));
-    if (!artifact) {
-      return res.status(404).json({ error: 'Landing page artifact not found.' });
+    const [artifact] = await pgDb.select({
+      id: hermesLabArtifacts.id,
+      contractorId: hermesLabArtifacts.contractorId,
+      toolId: hermesLabArtifacts.toolId,
+      title: hermesLabArtifacts.title,
+      category: hermesLabArtifacts.category,
+      content: hermesLabArtifacts.content,
+      status: hermesLabArtifacts.status,
+      updatedAt: hermesLabArtifacts.updatedAt
+    }).from(hermesLabArtifacts).where(and(
+      eq(hermesLabArtifacts.id, id),
+      inArray(hermesLabArtifacts.status, ['ready', 'deployed']),
+      eq(hermesLabArtifacts.toolId, 'landing_page')
+    ));
+    if (!artifact || !hasOwnedLandingPageConfig(artifact)) {
+      return res.status(404).json({ error: 'Published landing page not found.' });
     }
-    res.json({ success: true, artifact });
-  } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    res.setHeader('Cache-Control', 'no-store');
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('Referrer-Policy', 'no-referrer');
+    return res.json({
+      success: true,
+      artifact: {
+        id: artifact.id,
+        toolId: artifact.toolId,
+        title: artifact.title,
+        category: artifact.category,
+        content: { renderedOutput: (artifact.content as any).renderedOutput },
+        status: artifact.status,
+        updatedAt: artifact.updatedAt
+      }
+    });
+  } catch {
+    return res.status(503).json({ error: 'Published landing page is temporarily unavailable.' });
   }
 });
 
 app.get('/landing/:id', async (req, res) => {
   const { id } = req.params;
   try {
-    const [artifact] = await pgDb.select().from(hermesLabArtifacts).where(eq(hermesLabArtifacts.id, id));
+    const [artifact] = await pgDb.select().from(hermesLabArtifacts).where(and(
+      eq(hermesLabArtifacts.id, id),
+      inArray(hermesLabArtifacts.status, ['ready', 'deployed']),
+      eq(hermesLabArtifacts.toolId, 'landing_page')
+    ));
+    if (artifact && !hasOwnedLandingPageConfig(artifact)) {
+      return res.status(404).send('<h1>Landing page not found or not safely published.</h1>');
+    }
     if (!artifact) {
       try {
         const { TRADE_TEMPLATES } = await import('./src/components/landing/templates');
@@ -1777,11 +1838,14 @@ app.get('/landing/:id', async (req, res) => {
     const html = (artifact.content as any)?.renderedOutput;
     if (html && typeof html === 'string') {
       res.setHeader('Content-Type', 'text/html; charset=utf-8');
+      res.setHeader('X-Content-Type-Options', 'nosniff');
+      res.setHeader('Referrer-Policy', 'no-referrer');
+      res.setHeader('Cache-Control', 'no-store');
       return res.send(html);
     }
     return res.status(400).send('<h1>No rendered HTML available for this artifact.</h1>');
-  } catch (err: any) {
-    res.status(500).send('Error rendering landing page: ' + err.message);
+  } catch {
+    res.status(503).send('Landing page is temporarily unavailable.');
   }
 });
 
@@ -1863,18 +1927,21 @@ app.post('/api/landing-pages/regenerate-section', authenticate, async (req, res)
 
 app.post('/api/landing-pages/save', authenticate, async (req, res) => {
   const contractorId = (req as any).contractorId;
-  const { id, title, pageConfig, renderedHtml } = req.body;
+  const { id, title, pageConfig } = req.body || {};
 
-  if (!title || !renderedHtml) {
-    return res.status(400).json({ success: false, error: 'Title and renderedHtml are required' });
+  if (typeof title !== 'string' || !title.trim() || title.length > 160 ||
+      !pageConfig || typeof pageConfig !== 'object' || Array.isArray(pageConfig) ||
+      JSON.stringify(pageConfig).length > 80_000 ||
+      (id !== undefined && (typeof id !== 'string' || id.length > 128))) {
+    return res.status(400).json({ success: false, error: 'A valid title and landing-page configuration are required.' });
   }
 
   try {
-    const artifactId = id && id.length > 5 ? id : ('lp_' + crypto.randomUUID().slice(0, 8));
-    const ownedPageConfig = pageConfig && typeof pageConfig === 'object'
-      ? { ...pageConfig, id: artifactId, contractorId }
-      : null;
-    const ownedRenderedHtml = ownedPageConfig ? generateLandingPageHtml(ownedPageConfig) : renderedHtml;
+    const artifactId = typeof id === 'string' && id.length > 5 ? id : ('lp_' + crypto.randomUUID().slice(0, 8));
+    const ownedPageConfig = { ...pageConfig, id: artifactId, contractorId };
+    // Never trust client-supplied rendered HTML. Render from the validated,
+    // tenant-owned configuration using the escaping server-side generator.
+    const ownedRenderedHtml = generateLandingPageHtml(ownedPageConfig);
 
     const [existing] = await pgDb
       .select()
@@ -1900,7 +1967,7 @@ app.post('/api/landing-pages/save', authenticate, async (req, res) => {
           status: 'ready',
           updatedAt: new Date()
         })
-        .where(eq(hermesLabArtifacts.id, artifactId));
+        .where(and(eq(hermesLabArtifacts.id, artifactId), eq(hermesLabArtifacts.contractorId, contractorId)));
     } else {
       await pgDb.insert(hermesLabArtifacts).values({
         id: artifactId,
@@ -5500,6 +5567,7 @@ interface DispatchLogEntry {
 }
 
 const liveEmailDispatchLimits = new Map<string, { count: number; resetAt: number }>();
+const liveSmsDispatchLimits = new Map<string, { count: number; resetAt: number }>();
 
 app.post('/api/webhooks/resend', async (req, res) => {
   const webhookSecret = process.env.RESEND_WEBHOOK_SECRET || '';
@@ -6186,6 +6254,41 @@ app.post('/api/outreach/draft-ai', authenticate, async (req, res) => {
   }
 });
 
+// Internal durable communications worker. Configure HAL_COMMUNICATIONS_WORKER_SECRET (32+ chars)
+// and invoke this endpoint from a trusted scheduler; never expose the secret to browsers.
+app.post('/api/internal/communications/outbox/run', async (req, res) => {
+  const secret = process.env.HAL_COMMUNICATIONS_WORKER_SECRET || '';
+  const supplied = String(req.header('authorization') || '').replace(/^Bearer\s+/i, '');
+  if (secret.length < 32 || supplied.length !== secret.length ||
+      !crypto.timingSafeEqual(Buffer.from(supplied), Buffer.from(secret))) {
+    return res.status(401).json({ success: false, error: 'Unauthorized worker request.' });
+  }
+  try {
+    const pool = getApplicationPostgresPool();
+    const result = await runCommunicationsOutboxWorker(pool, async (record) => {
+      const bridge = await getBridgesForContractor(record.contractor_id);
+      if (record.provider !== 'resend' || record.channel !== 'email' ||
+          !bridge.email.apiKey || !bridge.email.senderEmail) {
+        throw new EmailProviderConfigurationError('Tenant Resend sender configuration is unavailable.');
+      }
+      const sent = await sendResendEmail({
+        to: decrypt(record.recipient_encrypted),
+        subject: record.subject_encrypted ? decrypt(record.subject_encrypted) : 'Message from HAL',
+        text: decrypt(record.body_encrypted),
+        idempotencyKey: record.idempotency_key
+      }, { apiKey: bridge.email.apiKey, from: bridge.email.senderEmail });
+      return { providerMessageId: sent.providerMessageId };
+    }, {
+      batchSize: Number(process.env.HAL_COMMUNICATIONS_WORKER_BATCH_SIZE) || 10,
+      maxAttempts: 5
+    });
+    return res.json({ success: true, ...result });
+  } catch (error: any) {
+    console.error('[Communications Outbox Worker] Batch failed:', error?.message || error);
+    return res.status(503).json({ success: false, error: 'Communications outbox batch could not be processed.' });
+  }
+});
+
 app.post('/api/outreach/dispatch', authenticate, async (req, res) => {
   const contractorId = (req as any).contractorId;
   const {
@@ -6218,6 +6321,123 @@ app.post('/api/outreach/dispatch', authenticate, async (req, res) => {
   }
 
   if (mode === 'live') {
+    if (channel === 'sms') {
+      if (!leadId) return res.status(400).json({ success: false, code: 'LEAD_ID_REQUIRED', error: 'Live SMS requires a saved lead with recorded consent.' });
+      const [storedLead] = await pgDb.select().from(leads).where(
+        and(eq(leads.id, String(leadId)), eq(leads.contractorId, contractorId))
+      ).limit(1);
+      if (!storedLead) return res.status(404).json({ success: false, code: 'LEAD_NOT_FOUND', error: 'The selected lead was not found in this workspace.' });
+      const verifiedPhone = storedLead.phoneEncrypted
+        ? decrypt(storedLead.phoneEncrypted)
+        : (storedLead.phone && !storedLead.phone.includes('[ENCRYPTED]') ? storedLead.phone : '');
+      const normalizedRecipient = verifiedPhone.replace(/[^+\d]/g, '');
+      if (!normalizedRecipient || normalizedRecipient !== String(recipient).replace(/[^+\d]/g, '')) {
+        return res.status(409).json({ success: false, code: 'RECIPIENT_DOES_NOT_MATCH_LEAD', error: 'SMS recipient does not match the saved lead phone number.' });
+      }
+      try {
+        enforceFailClosedOutreachGate({
+          id: storedLead.id, businessName: storedLead.businessName, isSynthetic: storedLead.isSynthetic,
+          sourceType: storedLead.sourceType || undefined, verificationStatus: storedLead.verificationStatus || undefined,
+          dnsVerified: storedLead.dnsVerified, websiteUrl: storedLead.websiteUrl || undefined,
+          phone: verifiedPhone, channel: 'sms'
+        });
+      } catch (gateError: any) {
+        if (gateError instanceof FailClosedOutreachError) return res.status(409).json({ success: false, code: 'OUTREACH_GROUNDING_BLOCKED', error: gateError.message });
+        throw gateError;
+      }
+      const phoneHash = crypto.createHash('sha256').update(normalizedRecipient).digest('hex');
+      const [suppression] = await pgDb.select().from(communicationsOptOuts).where(and(
+        eq(communicationsOptOuts.contractorId, contractorId),
+        eq(communicationsOptOuts.channel, 'sms'),
+        eq(communicationsOptOuts.phoneHash, phoneHash)
+      )).limit(1);
+      if (suppression) return res.status(409).json({ success: false, code: 'SMS_RECIPIENT_OPTED_OUT', error: 'This phone number has opted out of SMS. A new explicit opt-in is required before sending.' });
+      const [consent] = await pgDb.select().from(communicationsConsents).where(and(
+        eq(communicationsConsents.contractorId, contractorId),
+        eq(communicationsConsents.leadId, storedLead.id),
+        eq(communicationsConsents.channel, 'sms'),
+        eq(communicationsConsents.status, 'opted_in'),
+        isNull(communicationsConsents.optedOutAt)
+      )).limit(1);
+      if (!consent) return res.status(409).json({ success: false, code: 'SMS_CONSENT_REQUIRED', error: 'No current recorded SMS opt-in exists for this lead.' });
+
+      const bridge = await getBridgesForContractor(contractorId);
+      const statusCallbackUrl = process.env.TWILIO_STATUS_CALLBACK_URL || '';
+      const inboundWebhookUrl = process.env.TWILIO_INBOUND_WEBHOOK_URL || '';
+      if (bridge.sms.provider !== 'twilio' || !bridge.sms.accountSid || !bridge.sms.authToken || !bridge.sms.virtualNumber ||
+          !statusCallbackUrl.startsWith('https://') || !inboundWebhookUrl.startsWith('https://')) {
+        return res.status(503).json({ success: false, code: 'SMS_PROVIDER_NOT_CONFIGURED', error: 'Twilio credentials, verified sender and HTTPS inbound/status callback URLs are required.' });
+      }
+      const [senderMapping] = await pgDb.select().from(twilioPhoneNumberMappings).where(and(
+        eq(twilioPhoneNumberMappings.phoneNumber, bridge.sms.virtualNumber),
+        eq(twilioPhoneNumberMappings.contractorId, contractorId),
+        eq(twilioPhoneNumberMappings.accountSid, bridge.sms.accountSid)
+      )).limit(1);
+      if (!senderMapping) return res.status(409).json({ success: false, code: 'TWILIO_SENDER_NOT_VERIFIED', error: 'Register and verify this workspace Twilio sender number before sending SMS.' });
+
+      const idempotencyKey = String(requestedIdempotencyKey || req.headers['idempotency-key'] || crypto.randomUUID()).trim();
+      if (!idempotencyKey || idempotencyKey.length > 200) return res.status(400).json({ success: false, code: 'INVALID_IDEMPOTENCY_KEY', error: 'Idempotency key must be 1-200 characters.' });
+      const [existingDispatch] = await pgDb.select().from(communicationsOutbox).where(and(
+        eq(communicationsOutbox.contractorId, contractorId), eq(communicationsOutbox.idempotencyKey, idempotencyKey)
+      )).limit(1);
+      if (existingDispatch) {
+        const completed = ['submitted', 'sent', 'delivered'].includes(existingDispatch.status);
+        return res.status(completed ? 200 : 409).json({
+          success: completed, duplicate: true, dispatchId: existingDispatch.id,
+          providerMessageId: existingDispatch.providerMessageId, status: existingDispatch.status,
+          deliveryConfirmed: existingDispatch.status === 'delivered',
+          error: existingDispatch.errorMessage || undefined
+        });
+      }
+      const rateNow = Date.now();
+      const smsLimit = liveSmsDispatchLimits.get(contractorId);
+      if (smsLimit && smsLimit.resetAt > rateNow && smsLimit.count >= 5) {
+        return res.status(429).json({
+          success: false, code: 'LIVE_SMS_RATE_LIMITED',
+          error: 'Live SMS limit reached. Try again after the current 10-minute window.',
+          retryAfterSeconds: Math.ceil((smsLimit.resetAt - rateNow) / 1000)
+        });
+      }
+      if (!smsLimit || smsLimit.resetAt <= rateNow) {
+        liveSmsDispatchLimits.set(contractorId, { count: 1, resetAt: rateNow + 10 * 60 * 1000 });
+      } else {
+        smsLimit.count += 1;
+      }
+      const outboxId = crypto.randomUUID();
+      await pgDb.insert(communicationsOutbox).values({
+        id: outboxId, contractorId, leadId: storedLead.id, channel: 'sms', provider: 'twilio',
+        recipientEncrypted: encrypt(verifiedPhone), subjectEncrypted: null, bodyEncrypted: encrypt(customizedMessage),
+        status: 'processing', idempotencyKey, attempts: 0, lastAttemptAt: new Date(), updatedAt: new Date()
+      });
+      try {
+        const sent = await sendTwilioSms({
+          to: normalizedRecipient, from: bridge.sms.virtualNumber, body: customizedMessage,
+          statusCallbackUrl
+        }, { accountSid: bridge.sms.accountSid, authToken: bridge.sms.authToken });
+        const submittedAt = new Date();
+        await pgDb.update(communicationsOutbox).set({
+          status: 'submitted', providerMessageId: sent.providerMessageId, attempts: 1,
+          submittedAt, lastAttemptAt: submittedAt, updatedAt: submittedAt, errorCode: null, errorMessage: null
+        }).where(and(eq(communicationsOutbox.id, outboxId), eq(communicationsOutbox.contractorId, contractorId), eq(communicationsOutbox.status, 'processing')));
+        return res.json({
+          success: true, dispatchId: outboxId, idempotencyKey, provider: 'twilio',
+          providerMessageId: sent.providerMessageId, status: 'submitted', mode: 'live',
+          providerContacted: true, deliveryConfirmed: false, timestamp: submittedAt.toISOString()
+        });
+      } catch (error: any) {
+        const uncertain = error instanceof TwilioRequestError;
+        await pgDb.update(communicationsOutbox).set({
+          status: uncertain ? 'unknown' : 'failed', attempts: 1, lastAttemptAt: new Date(), updatedAt: new Date(),
+          errorCode: error instanceof TwilioConfigurationError ? 'PROVIDER_NOT_CONFIGURED' : 'PROVIDER_REQUEST_FAILED',
+          errorMessage: String(error?.message || 'Twilio request failed').slice(0, 500)
+        }).where(and(eq(communicationsOutbox.id, outboxId), eq(communicationsOutbox.contractorId, contractorId), eq(communicationsOutbox.status, 'processing'))).catch(() => undefined);
+        return res.status(502).json({
+          success: false, code: 'SMS_PROVIDER_REQUEST_FAILED',
+          error: 'Twilio did not confirm submission. Automatic retry is disabled to avoid duplicate texts.'
+        });
+      }
+    }
+
     if (channel !== 'email') {
       return res.status(501).json({
         success: false,
@@ -6346,7 +6566,8 @@ app.post('/api/outreach/dispatch', authenticate, async (req, res) => {
       const result = await sendResendEmail({
         to: String(recipient),
         subject: customizedSubject,
-        text: customizedMessage
+        text: customizedMessage,
+        idempotencyKey
       }, {
         apiKey: emailBridge.email.apiKey,
         from: emailBridge.email.senderEmail
@@ -6418,9 +6639,14 @@ app.post('/api/outreach/dispatch', authenticate, async (req, res) => {
         block: auditBlock
       });
     } catch (err: any) {
+      const providerStatus = Number(String(err?.message || '').match(/HTTP (\d{3})/i)?.[1] || 0);
+      const retryableFailure = !(err instanceof EmailProviderConfigurationError) &&
+        (!providerStatus || providerStatus === 408 || providerStatus === 409 || providerStatus === 425 || providerStatus === 429 || providerStatus >= 500);
+      const nextStatus = retryableFailure ? 'retrying' : 'failed';
       await pgDb.update(communicationsOutbox).set({
-        status: 'failed',
+        status: nextStatus,
         attempts: 1,
+        nextAttemptAt: retryableFailure ? new Date(Date.now() + 30000) : null,
         lastAttemptAt: new Date(),
         updatedAt: new Date(),
         errorCode: err instanceof EmailProviderConfigurationError ? 'PROVIDER_NOT_CONFIGURED' : err instanceof EmailProviderRequestError ? 'PROVIDER_REQUEST_FAILED' : 'PROVIDER_UNKNOWN_FAILURE',
@@ -6557,49 +6783,316 @@ app.get('/api/outreach/whatsapp/webhook', (req, res) => {
 });
 
 // WhatsApp Inbound Message Listener
-app.post('/api/outreach/whatsapp/webhook', (req, res) => {
-  const appSecret = process.env.WHATSAPP_APP_SECRET;
-  const signature = req.header('x-hub-signature-256');
-  const rawBody = (req as any).rawBody as Buffer | undefined;
-
-  if (!appSecret) {
-    return res.status(503).json({ error: 'WhatsApp inbound signature verification is not configured.' });
-  }
-  if (!signature || !rawBody || !signature.startsWith('sha256=')) {
-    return res.status(401).json({ error: 'Missing or invalid webhook signature.' });
-  }
-
-  const expected = Buffer.from('sha256=' + crypto.createHmac('sha256', appSecret).update(rawBody).digest('hex'));
-  const received = Buffer.from(signature);
-  if (expected.length !== received.length || !crypto.timingSafeEqual(expected, received)) {
-    return res.status(401).json({ error: 'Invalid webhook signature.' });
-  }
-
-  const body = req.body;
+// Workspace-owned Twilio sender registration. The account API must confirm ownership.
+app.post('/api/outreach/sms/connect-number', authenticate, async (req, res) => {
+  const contractorId = (req as any).contractorId;
+  const phoneNumber = String(req.body?.phoneNumber || '').trim();
+  if (!/^\+[1-9]\d{7,14}$/.test(phoneNumber)) return res.status(400).json({ success: false, error: 'A valid E.164 Twilio phone number is required.' });
   try {
-    if (body?.object === 'whatsapp_business_account') {
-      const hasInboundMessages = (body.entry || []).some((entry: any) =>
-        (entry.changes || []).some((change: any) => Array.isArray(change.value?.messages) && change.value.messages.length > 0)
-      );
-      if (hasInboundMessages) {
-        // Never fan out an inbound message to every connected workspace. A
-        // verified signature authenticates Meta, not the tenant that owns the
-        // destination phone number. Tenant routing must be configured first.
-        console.warn('[WhatsApp Webhook] Signed inbound message received without a verified phone-number-to-tenant mapping.');
-        return res.status(503).json({
-          error: 'WhatsApp signature verified, but tenant routing is not configured. The message was not exposed to any workspace.'
+    const bridge = await getBridgesForContractor(contractorId);
+    const { accountSid, authToken } = bridge.sms;
+    if (!accountSid || !authToken || !/^AC[0-9a-f]{32}$/i.test(accountSid)) {
+      return res.status(503).json({ success: false, error: 'Save valid workspace Twilio credentials before registering a sender.' });
+    }
+    const existing = await pgDb.select().from(twilioPhoneNumberMappings)
+      .where(eq(twilioPhoneNumberMappings.phoneNumber, phoneNumber)).limit(1);
+    if (existing[0] && existing[0].contractorId !== contractorId) {
+      return res.status(409).json({ success: false, error: 'This Twilio number is already assigned to another workspace.' });
+    }
+    const auth = 'Basic ' + Buffer.from(accountSid + ':' + authToken).toString('base64');
+    const verifyResponse = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${accountSid}/IncomingPhoneNumbers.json?PhoneNumber=${encodeURIComponent(phoneNumber)}`, {
+      headers: { Authorization: auth }, signal: AbortSignal.timeout(10000)
+    });
+    if (!verifyResponse.ok) return res.status(502).json({ success: false, error: 'Twilio could not verify number ownership for this workspace.' });
+    const inventory = await verifyResponse.json() as { incoming_phone_numbers?: Array<{ phone_number?: string; account_sid?: string }> };
+    const owned = (inventory.incoming_phone_numbers || []).some(number => number.phone_number === phoneNumber && number.account_sid === accountSid);
+    if (!owned) return res.status(403).json({ success: false, error: 'The selected phone number is not owned by this Twilio account.' });
+    const now = new Date();
+    const id = 'twilio_' + crypto.createHash('sha256').update(phoneNumber).digest('hex');
+    await pgDb.insert(twilioPhoneNumberMappings).values({
+      id, contractorId, phoneNumber, accountSid, verifiedAt: now, createdAt: now, updatedAt: now
+    }).onConflictDoNothing();
+    const [saved] = await pgDb.select().from(twilioPhoneNumberMappings)
+      .where(eq(twilioPhoneNumberMappings.phoneNumber, phoneNumber)).limit(1);
+    if (!saved || saved.contractorId !== contractorId) return res.status(409).json({ success: false, error: 'Twilio sender ownership changed during registration.' });
+    return res.json({ success: true, phoneNumber, verified: true });
+  } catch (error: any) {
+    console.error('[Twilio Number Registration] Failed:', error?.message || error);
+    return res.status(503).json({ success: false, error: 'Twilio number ownership verification could not be completed.' });
+  }
+});
+
+// Record explicit, auditable SMS consent for a saved lead. Evidence is encrypted at rest.
+app.post('/api/outreach/sms/consent', authenticate, async (req, res) => {
+  const contractorId = (req as any).contractorId;
+  const leadId = String(req.body?.leadId || '');
+  const status = req.body?.status;
+  const source = req.body?.source;
+  const evidence = typeof req.body?.evidence === 'string' ? req.body.evidence.trim() : '';
+  if (!leadId || !['opted_in', 'opted_out'].includes(status) ||
+      !['written', 'verbal', 'web_form'].includes(source) || evidence.length < 8 || evidence.length > 2000) {
+    return res.status(400).json({ success: false, error: 'Provide a saved lead, opt-in/opt-out status, consent source and a short evidence note.' });
+  }
+  const [lead] = await pgDb.select({ id: leads.id }).from(leads)
+    .where(and(eq(leads.id, leadId), eq(leads.contractorId, contractorId))).limit(1);
+  if (!lead) return res.status(404).json({ success: false, error: 'Lead not found in this workspace.' });
+  const [consentLead] = await pgDb.select().from(leads).where(and(eq(leads.id, leadId), eq(leads.contractorId, contractorId))).limit(1);
+  const consentPhone = consentLead?.phoneEncrypted ? decrypt(consentLead.phoneEncrypted) : (consentLead?.phone || '');
+  const normalizedConsentPhone = consentPhone.replace(/[^+\d]/g, '');
+  const consentPhoneHash = normalizedConsentPhone ? crypto.createHash('sha256').update(normalizedConsentPhone).digest('hex') : '';
+  if (status === 'opted_out' && consentPhoneHash) {
+    await pgDb.insert(communicationsOptOuts).values({
+      id: 'smsout_' + crypto.createHash('sha256').update(`${contractorId}:sms:${consentPhoneHash}`).digest('hex'),
+      contractorId, channel: 'sms', phoneHash: consentPhoneHash,
+      phoneEncrypted: encrypt(normalizedConsentPhone), source: 'operator_opt_out',
+      optedOutAt: new Date(), createdAt: new Date()
+    }).onConflictDoNothing();
+  }
+  const id = 'smsconsent_' + crypto.createHash('sha256').update(`${contractorId}:${leadId}:sms`).digest('hex');
+  const now = new Date();
+  try {
+    await pgDb.insert(communicationsConsents).values({
+      id, contractorId, leadId, channel: 'sms', status, source,
+      evidenceEncrypted: encrypt(evidence),
+      consentedAt: status === 'opted_in' ? now : null,
+      optedOutAt: status === 'opted_out' ? now : null,
+      createdAt: now, updatedAt: now
+    }).onConflictDoUpdate({
+      target: communicationsConsents.id,
+      set: {
+        status, source, evidenceEncrypted: encrypt(evidence),
+        consentedAt: status === 'opted_in' ? now : null,
+        optedOutAt: status === 'opted_out' ? now : null,
+        updatedAt: now
+      }
+    });
+    if (status === 'opted_in' && consentPhoneHash) {
+      await pgDb.delete(communicationsOptOuts).where(and(
+        eq(communicationsOptOuts.contractorId, contractorId), eq(communicationsOptOuts.channel, 'sms'),
+        eq(communicationsOptOuts.phoneHash, consentPhoneHash)
+      ));
+    }
+    return res.json({ success: true, leadId, channel: 'sms', status, recordedAt: now.toISOString() });
+  } catch (error: any) {
+    console.error('[SMS Consent] Could not persist consent:', error?.message || error);
+    return res.status(503).json({ success: false, error: 'SMS consent could not be saved.' });
+  }
+});
+
+// Twilio inbound webhook: signature-verified, tenant-routed and STOP-aware.
+app.post('/api/webhooks/twilio/inbound', async (req, res) => {
+  const canonicalUrl = process.env.TWILIO_INBOUND_WEBHOOK_URL || '';
+  const from = String(req.body?.From || '');
+  const to = String(req.body?.To || '');
+  const messageSid = String(req.body?.MessageSid || '');
+  const bodyText = String(req.body?.Body || '');
+  if (!canonicalUrl.startsWith('https://') || !/^\+[1-9]\d{7,14}$/.test(to) || !messageSid) {
+    return res.status(503).send('Twilio inbound webhook is not configured.');
+  }
+  try {
+    const [mapping] = await pgDb.select().from(twilioPhoneNumberMappings)
+      .where(eq(twilioPhoneNumberMappings.phoneNumber, to)).limit(1);
+    if (!mapping) return res.status(404).send('Unknown Twilio destination.');
+    const bridge = await getBridgesForContractor(mapping.contractorId);
+    if (!bridge.sms.authToken || bridge.sms.accountSid !== mapping.accountSid ||
+        !verifyTwilioRequestSignature(canonicalUrl, req.body || {}, req.header('x-twilio-signature'), bridge.sms.authToken)) {
+      return res.status(401).send('Invalid Twilio signature.');
+    }
+    await pgDb.insert(twilioInboundEvents).values({
+      id: 'twin_' + crypto.createHash('sha256').update(messageSid).digest('hex'),
+      contractorId: mapping.contractorId,
+      providerMessageId: messageSid,
+      fromEncrypted: encrypt(from),
+      bodyEncrypted: encrypt(bodyText),
+      receivedAt: new Date()
+    }).onConflictDoNothing();
+    if (/^(STOP|STOPALL|UNSUBSCRIBE|CANCEL|END|QUIT)$/i.test(bodyText.trim())) {
+      const normalizedFrom = from.replace(/[^+\d]/g, '');
+      if (/^\+[1-9]\d{7,14}$/.test(normalizedFrom)) {
+        const phoneHash = crypto.createHash('sha256').update(normalizedFrom).digest('hex');
+        await pgDb.insert(communicationsOptOuts).values({
+          id: 'smsout_' + crypto.createHash('sha256').update(`${mapping.contractorId}:sms:${phoneHash}`).digest('hex'),
+          contractorId: mapping.contractorId, channel: 'sms', phoneHash,
+          phoneEncrypted: encrypt(normalizedFrom), source: 'twilio_stop',
+          optedOutAt: new Date(), createdAt: new Date()
+        }).onConflictDoNothing();
+      }
+      const tenantLeads = await pgDb.select().from(leads).where(eq(leads.contractorId, mapping.contractorId));
+      const matching = tenantLeads.filter(lead => {
+        const phone = lead.phoneEncrypted ? decrypt(lead.phoneEncrypted) : (lead.phone && !lead.phone.includes('[ENCRYPTED]') ? lead.phone : '');
+        return phone.replace(/[^+\d]/g, '') === from.replace(/[^+\d]/g, '');
+      });
+      for (const lead of matching) {
+        const id = 'smsconsent_' + crypto.createHash('sha256').update(`${mapping.contractorId}:${lead.id}:sms`).digest('hex');
+        const now = new Date();
+        await pgDb.insert(communicationsConsents).values({
+          id, contractorId: mapping.contractorId, leadId: lead.id, channel: 'sms',
+          status: 'opted_out', source: 'twilio_stop', evidenceEncrypted: encrypt('Recipient sent STOP via Twilio inbound webhook.'),
+          consentedAt: null, optedOutAt: now, createdAt: now, updatedAt: now
+        }).onConflictDoUpdate({
+          target: communicationsConsents.id,
+          set: { status: 'opted_out', source: 'twilio_stop', evidenceEncrypted: encrypt('Recipient sent STOP via Twilio inbound webhook.'), optedOutAt: now, updatedAt: now }
         });
       }
     }
-    return res.sendStatus(200);
-  } catch (err) {
-    console.error('[WhatsApp Webhook Error]', err);
+    return res.status(200).send('OK');
+  } catch (error: any) {
+    console.error('[Twilio Inbound] Processing failed:', error?.message || error);
+    return res.status(500).send('Webhook processing failed.');
+  }
+});
+
+// Twilio delivery callback: reconcile only a previously submitted tenant outbox record.
+app.post('/api/webhooks/twilio/status', async (req, res) => {
+  const canonicalUrl = process.env.TWILIO_STATUS_CALLBACK_URL || '';
+  const sid = String(req.body?.MessageSid || '');
+  const status = String(req.body?.MessageStatus || '').toLowerCase();
+  if (!canonicalUrl.startsWith('https://') || !sid || !status) return res.status(503).send('Twilio status callback is not configured.');
+  try {
+    const [outbox] = await pgDb.select().from(communicationsOutbox)
+      .where(and(eq(communicationsOutbox.providerMessageId, sid), eq(communicationsOutbox.provider, 'twilio'), eq(communicationsOutbox.channel, 'sms'))).limit(1);
+    if (!outbox) return res.status(404).send('Unknown Twilio message.');
+    const bridge = await getBridgesForContractor(outbox.contractorId);
+    if (!bridge.sms.authToken || !verifyTwilioRequestSignature(canonicalUrl, req.body || {}, req.header('x-twilio-signature'), bridge.sms.authToken)) {
+      return res.status(401).send('Invalid Twilio signature.');
+    }
+    const allowed = new Set(['queued', 'accepted', 'sending', 'sent', 'delivered', 'undelivered', 'failed', 'canceled']);
+    if (!allowed.has(status)) return res.status(400).send('Unknown Twilio status.');
+    const nextStatus = status === 'undelivered' ? 'bounced' : status === 'failed' || status === 'canceled' ? 'failed' : status;
+    await pgDb.insert(communicationsDeliveryEvents).values({
+      id: 'twilio_' + crypto.createHash('sha256').update(`${sid}:${status}:${String(req.body?.ErrorCode || '')}`).digest('hex'),
+      outboxId: outbox.id, provider: 'twilio', providerMessageId: sid,
+      eventType: `sms.${status}`,
+      payload: { status, errorCode: String(req.body?.ErrorCode || '') || null },
+      receivedAt: new Date()
+    }).onConflictDoNothing();
+    const statusRank: Record<string, number> = { queued: 0, accepted: 1, sending: 2, submitted: 2, sent: 3, delivered: 4, bounced: 4, failed: 5, canceled: 5 };
+    if ((statusRank[nextStatus] ?? 0) >= (statusRank[outbox.status] ?? 0)) {
+      await pgDb.update(communicationsOutbox).set({
+        status: nextStatus,
+        deliveredAt: status === 'delivered' ? new Date() : outbox.deliveredAt,
+        bouncedAt: status === 'undelivered' ? new Date() : outbox.bouncedAt,
+        errorCode: String(req.body?.ErrorCode || '') || null,
+        errorMessage: status === 'undelivered' || status === 'failed' ? 'Twilio reported message delivery failure.' : null,
+        updatedAt: new Date()
+      }).where(and(eq(communicationsOutbox.id, outbox.id), eq(communicationsOutbox.contractorId, outbox.contractorId)));
+    }
+    return res.status(200).send('OK');
+  } catch (error: any) {
+    console.error('[Twilio Status] Reconciliation failed:', error?.message || error);
+    return res.status(500).send('Status reconciliation failed.');
+  }
+});
+
+// A workspace may register only a phone number that its own Meta token can read.
+app.post('/api/outreach/whatsapp/connect-number', authenticate, async (req, res) => {
+  const contractorId = (req as any).contractorId;
+  const phoneNumberId = String(req.body?.phoneNumberId || '').trim();
+  if (!isMetaPhoneNumberId(phoneNumberId)) {
+    return res.status(400).json({ success: false, error: 'A valid Meta phone-number ID is required.' });
+  }
+  try {
+    const [existing] = await pgDb.select().from(whatsappPhoneNumberMappings)
+      .where(eq(whatsappPhoneNumberMappings.phoneNumberId, phoneNumberId)).limit(1);
+    if (existing && existing.contractorId !== contractorId) {
+      return res.status(409).json({ success: false, error: 'This WhatsApp number is already assigned to another workspace.' });
+    }
+    const credentials = await getTenantConnectorCredentials(contractorId);
+    let bridgeSettings: any = {};
+    try { bridgeSettings = credentials.bridgeSettings ? JSON.parse(credentials.bridgeSettings) : {}; } catch {}
+    const accessToken = bridgeSettings?.whatsapp?.accessToken || credentials.whatsappAccessToken;
+    if (!accessToken) {
+      return res.status(503).json({ success: false, error: 'Save a WhatsApp access token in this workspace connector before registering its number.' });
+    }
+    const graphVersion = process.env.WHATSAPP_GRAPH_API_VERSION || 'v22.0';
+    if (!/^v\d+\.\d+$/.test(graphVersion)) {
+      return res.status(503).json({ success: false, error: 'WhatsApp Graph API version is invalid.' });
+    }
+    const response = await fetch(`https://graph.facebook.com/${graphVersion}/${phoneNumberId}?fields=id,display_phone_number,verified_name`, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+      signal: AbortSignal.timeout(10000)
+    });
+    if (!response.ok) return res.status(502).json({ success: false, error: 'Meta could not verify this phone-number ID with the workspace token.' });
+    const provider = await response.json() as { id?: string; display_phone_number?: string; verified_name?: string };
+    if (provider.id !== phoneNumberId) return res.status(409).json({ success: false, error: 'Meta returned a different phone-number ID.' });
+    const now = new Date();
+    const mapping = {
+      id: existing?.id || 'wa_' + crypto.randomUUID(),
+      contractorId,
+      phoneNumberId,
+      displayPhoneNumber: provider.display_phone_number || null,
+      verifiedName: provider.verified_name || null,
+      verifiedAt: now,
+      updatedAt: now
+    };
+    await pgDb.insert(whatsappPhoneNumberMappings).values({ ...mapping, createdAt: existing?.createdAt || now })
+      .onConflictDoNothing();
+    const [saved] = await pgDb.select().from(whatsappPhoneNumberMappings)
+      .where(eq(whatsappPhoneNumberMappings.phoneNumberId, phoneNumberId)).limit(1);
+    if (!saved || saved.contractorId !== contractorId) {
+      return res.status(409).json({ success: false, error: 'Phone-number ownership changed during registration. No mapping was enabled.' });
+    }
+    return res.json({ success: true, phoneNumberId, displayPhoneNumber: saved.displayPhoneNumber, verifiedName: saved.verifiedName, verified: true });
+  } catch (error: any) {
+    console.error('[WhatsApp Number Registration] Failed:', error?.message || error);
+    return res.status(503).json({ success: false, error: 'WhatsApp number verification could not be completed.' });
+  }
+});
+
+// WhatsApp inbound events are signature-verified, mapped to exactly one tenant,
+// encrypted at rest, and deduplicated by Meta's message ID.
+app.post('/api/outreach/whatsapp/webhook', async (req, res) => {
+  const appSecret = process.env.WHATSAPP_APP_SECRET;
+  const signature = req.header('x-hub-signature-256');
+  const rawBody = (req as any).rawBody as Buffer | undefined;
+  if (!appSecret) return res.status(503).json({ error: 'WhatsApp inbound signature verification is not configured.' });
+  if (!signature || !rawBody || !signature.startsWith('sha256=')) return res.status(401).json({ error: 'Missing or invalid webhook signature.' });
+  if (!verifyMetaWebhookSignature(rawBody, signature, appSecret)) {
+    return res.status(401).json({ error: 'Invalid webhook signature.' });
+  }
+  try {
+    const body = req.body;
+    if (body?.object !== 'whatsapp_business_account') return res.sendStatus(200);
+    const messages: any[] = [];
+    for (const entry of Array.isArray(body.entry) ? body.entry : []) {
+      for (const change of Array.isArray(entry.changes) ? entry.changes : []) {
+        const value = change?.value || {};
+        for (const message of Array.isArray(value.messages) ? value.messages : []) {
+          messages.push({ phoneNumberId: String(value.metadata?.phone_number_id || ''), message });
+        }
+      }
+    }
+    if (messages.length > 50) return res.status(413).json({ error: 'Webhook message batch exceeds the supported limit.' });
+    for (const item of messages) {
+      if (!item.phoneNumberId || typeof item.message?.id !== 'string' || typeof item.message?.from !== 'string') {
+        return res.status(400).json({ error: 'Inbound message is missing its routing or provider identifier.' });
+      }
+      const [mapping] = await pgDb.select().from(whatsappPhoneNumberMappings)
+        .where(eq(whatsappPhoneNumberMappings.phoneNumberId, item.phoneNumberId)).limit(1);
+      if (!mapping) {
+        console.warn('[WhatsApp Webhook] Signed message arrived for an unregistered phone-number ID.');
+        return res.status(503).json({ error: 'No verified workspace mapping exists for this WhatsApp number.' });
+      }
+      await pgDb.insert(whatsappInboundEvents).values({
+        id: 'waevt_' + crypto.createHash('sha256').update(item.message.id).digest('hex'),
+        contractorId: mapping.contractorId,
+        phoneNumberId: item.phoneNumberId,
+        providerMessageId: item.message.id,
+        senderEncrypted: encrypt(item.message.from),
+        messageEncrypted: encrypt(JSON.stringify(item.message)),
+        messageType: String(item.message.type || 'unknown').slice(0, 40),
+        receivedAt: new Date()
+      }).onConflictDoNothing();
+    }
+    return res.status(200).json({ success: true, accepted: messages.length });
+  } catch (err: any) {
+    console.error('[WhatsApp Webhook Error]', err?.message || err);
     return res.sendStatus(500);
   }
 });
 
 // ─── GITHUB REPOSITORY PUSH ENGINE ───────────────────────────────────────────
-app.get('/api/admin/git/status', authenticate, (req, res) => {
+app.get('/api/admin/git/status', authenticate, requireRole('admin'), (req, res) => {
   try {
     const isRepo = fs.existsSync(path.join(process.cwd(), '.git'));
     if (!isRepo) {
@@ -6652,89 +7145,15 @@ app.get('/api/admin/git/status', authenticate, (req, res) => {
   }
 });
 
-app.post('/api/admin/git/push', authenticate, async (req, res) => {
-  const contractorId = (req as any).contractorId;
-  const { repoUrl, token, branch, commitMessage } = req.body;
-
-  if (!repoUrl) {
-    return res.status(400).json({ success: false, error: 'Repository URL is required (e.g. https://github.com/username/repo)' });
-  }
-
-  const cleanRepoUrl = repoUrl.trim();
-  const targetBranch = (branch || 'main').trim();
-  const msg = commitMessage?.trim() || `Release: HAL Operating Intelligence System v1.0 (${new Date().toISOString().slice(0, 10)})`;
-
-  try {
-    const gitDir = path.join(process.cwd(), '.git');
-    if (!fs.existsSync(gitDir)) {
-      execSync('git init -b main', { stdio: 'pipe' });
-    }
-
-    execSync('git config user.name "HAL Operator"', { stdio: 'pipe' });
-    execSync('git config user.email "operator@halbiz.ai"', { stdio: 'pipe' });
-
-    execSync('git add -A', { stdio: 'pipe' });
-    try {
-      execSync(`git commit -m "${msg.replace(/"/g, '\\"')}"`, { stdio: 'pipe' });
-    } catch (_) {
-      // Nothing to commit is fine
-    }
-
-    let authUrl = cleanRepoUrl;
-    if (token) {
-      const cleanToken = token.trim();
-      if (cleanRepoUrl.startsWith('https://')) {
-        authUrl = `https://${cleanToken}@${cleanRepoUrl.replace('https://', '')}`;
-      } else if (cleanRepoUrl.startsWith('http://')) {
-        authUrl = `http://${cleanToken}@${cleanRepoUrl.replace('http://', '')}`;
-      }
-    }
-
-    try {
-      execSync('git remote remove origin 2>/dev/null || true', { stdio: 'pipe' });
-    } catch (_) {}
-
-    execSync(`git remote add origin "${authUrl}"`, { stdio: 'pipe' });
-
-    try {
-      execSync(`git branch -M ${targetBranch}`, { stdio: 'pipe' });
-    } catch (_) {}
-
-    execSync(`git push -u origin ${targetBranch} --force`, { stdio: 'pipe' });
-
-    // Scrub token immediately from local remote configuration
-    execSync(`git remote set-url origin "${cleanRepoUrl}"`, { stdio: 'pipe' });
-
-    const latestCommitHash = execSync('git rev-parse --short HEAD', { encoding: 'utf-8' }).trim();
-
-    db.addAuditLog({
-      contractorId,
-      action: 'GIT_PUSH_SUCCESSFUL',
-      details: `Pushed code to ${cleanRepoUrl} on branch ${targetBranch} (commit: ${latestCommitHash})`
-    });
-
-    broadcastNotification(
-      contractorId,
-      'success',
-      '🚀 GitHub Push Complete',
-      `Repository synchronized to ${cleanRepoUrl} [${latestCommitHash}]`
-    );
-
-    res.json({
-      success: true,
-      repoUrl: cleanRepoUrl,
-      branch: targetBranch,
-      commitHash: latestCommitHash,
-      message: 'Codebase committed and pushed successfully to GitHub.'
-    });
-  } catch (err: any) {
-    console.error('[Git Push Error]:', err.message);
-    let safeError = err.message || 'Git push failed';
-    if (token) {
-      safeError = safeError.replace(new RegExp(token, 'g'), '••••••••');
-    }
-    res.status(500).json({ success: false, error: safeError });
-  }
+app.post('/api/admin/git/push', authenticate, requireRole('admin'), (_req, res) => {
+  // This legacy endpoint executed shell commands using request-controlled Git
+  // arguments and performed force pushes from the application server. Disable
+  // it until a dedicated, non-shell deployment workflow replaces it.
+  return res.status(410).json({
+    success: false,
+    code: 'GIT_PUSH_DISABLED',
+    error: 'Server-side Git deployment is disabled. Use the reviewed CI/CD deployment workflow.'
+  });
 });
 
 // ─── WHITE-LABEL CLIENT PROPOSAL GENERATOR ───────────────────────────────────
@@ -6969,6 +7388,95 @@ app.put('/api/projects/:id', authenticate, async (req, res) => {
 });
 
 // ─── CONNECTORS CREDENTIALS & HEALTH API ──────────────────────────────────────
+
+
+async function googleAdsAccessToken(credentials: ReturnType<typeof parseGoogleAdsConnection>): Promise<string> {
+  const response = await fetch('https://oauth2.googleapis.com/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({ grant_type: 'refresh_token', client_id: credentials.clientId, client_secret: credentials.clientSecret, refresh_token: credentials.refreshToken }),
+    signal: AbortSignal.timeout(20000)
+  });
+  if (!response.ok) throw new Error(`Google OAuth token exchange failed (HTTP ${response.status}).`);
+  const result = await response.json() as { access_token?: string; token_type?: string };
+  if (!result.access_token || result.token_type?.toLowerCase() !== 'bearer') throw new Error('Google OAuth did not return a bearer access token.');
+  return result.access_token;
+}
+async function googleAdsSearch(accessToken: string, credentials: ReturnType<typeof parseGoogleAdsConnection>, query: string): Promise<any[]> {
+  const headers: Record<string,string> = { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' };
+  headers['developer-token'] = credentials.developerToken;
+  if (credentials.loginCustomerId) headers['login-customer-id'] = credentials.loginCustomerId;
+  const response = await fetch(`https://googleads.googleapis.com/${GOOGLE_ADS_API_VERSION}/customers/${credentials.customerId}/googleAds:searchStream`, {
+    method: 'POST', headers, body: JSON.stringify({ query }), signal: AbortSignal.timeout(45000)
+  });
+  if (!response.ok) throw new Error(`Google Ads query failed (HTTP ${response.status}). Check the connected account's access and API project authorization.`);
+  return extractGoogleAdsStreamRows(await response.json());
+}
+
+app.post('/api/forecasting/google-ads/sync', authenticate, async (req, res) => {
+  const contractorId = (req as any).contractorId as string;
+  try {
+    const saved = await getTenantConnectorCredentials(contractorId);
+    if (!saved.googleAds) return res.status(409).json({ success: false, error: 'Google Ads OAuth connection is not configured for this workspace.' });
+    const credentials = parseGoogleAdsConnection(saved.googleAds);
+    const accessToken = await googleAdsAccessToken(credentials);
+    const records = await googleAdsSearch(accessToken, credentials, buildGoogleAdsCityPerformanceQuery());
+    const cityResources = [...new Set(records.map(row => row.segments?.geoTargetCity)
+      .filter((value): value is string => typeof value === 'string' && /^geoTargetConstants\/\d+$/.test(value)))];
+    const cityNames = new Map<string,string>();
+    for (let offset=0; offset<cityResources.length; offset+=100) {
+      const rows = await googleAdsSearch(accessToken, credentials, buildGoogleAdsGeoConstantQuery(cityResources.slice(offset,offset+100)));
+      for (const row of rows) {
+        const resource=row.geoTargetConstant?.resourceName, name=row.geoTargetConstant?.canonicalName;
+        if (typeof resource==='string' && typeof name==='string' && name.trim()) cityNames.set(resource,name.trim());
+      }
+    }
+    const now=new Date(), seen=new Set<string>(), values:any[]=[];
+    for (const row of records) {
+      const campaignId=String(row.campaign?.id||''), campaignName=String(row.campaign?.name||'').trim();
+      const resource=row.segments?.geoTargetCity, city=typeof resource==='string'?cityNames.get(resource):undefined;
+      const day=String(row.segments?.date||'');
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(day) || !/^\d+$/.test(campaignId) || !campaignName || !city) continue;
+      const unique=`${campaignId}|${day}|${city.toLowerCase()}`;
+      if(seen.has(unique)) continue; seen.add(unique);
+      const impressions=Number(row.metrics?.impressions||0), clicks=Number(row.metrics?.clicks||0);
+      const costMicros=Number(row.metrics?.costMicros||0), conversions=Number(row.metrics?.conversions||0);
+      const conversionValue=Number(row.metrics?.conversionsValue||0);
+      const currencyCode=String(row.customer?.currencyCode||'').trim().toUpperCase() || null;
+      if (![impressions,clicks,costMicros,conversions,conversionValue].every(Number.isFinite) ||
+          [impressions,clicks,costMicros,conversions,conversionValue].some(v=>v<0)) continue;
+      const id='gads_'+crypto.createHash('sha256').update(`${contractorId}|${credentials.customerId}|${unique}`).digest('hex');
+      values.push({id,contractorId,campaignId,campaignName,geo:city,device:'all',currencyCode,date:new Date(`${day}T00:00:00.000Z`),
+        impressions,clicks,cost:costMicros/1000000,conversions,conversionValue,createdAt:now});
+    }
+    for(let offset=0;offset<values.length;offset+=500) {
+      await pgDb.insert(googleAdsDailyPerformance).values(values.slice(offset,offset+500)).onConflictDoUpdate({
+        target:googleAdsDailyPerformance.id,
+        set:{
+          campaignName:sql`excluded.campaign_name`,geo:sql`excluded.geo`,device:sql`excluded.device`,currencyCode:sql`excluded.currency_code`,date:sql`excluded.date`,
+          impressions:sql`excluded.impressions`,clicks:sql`excluded.clicks`,cost:sql`excluded.cost`,
+          conversions:sql`excluded.conversions`,conversionValue:sql`excluded.conversion_value`
+        }
+      });
+    }
+    await pgDb.insert(workEvents).values({
+      id:'evt_'+crypto.randomUUID(),contractorId,eventType:'forecasting.google_ads_history_synced',
+      entityType:'google_ads_daily_performance',entityId:credentials.customerId,actorType:'human',
+      actorId:contractorId,sourceModule:'forecasting',correlationId:crypto.randomUUID(),
+      summary:`Imported ${values.length} Google Ads city-level daily performance records.`,
+      payload:{provider:'google_ads_api',imported:values.length,queriedRows:records.length,range:'last_365_days',cityDimensions:cityNames.size}
+    });
+    return res.json({success:true,source:'google_ads_api',imported:values.length,queriedRows:records.length,
+      cities:cityNames.size,range:'last_365_days',
+      message:values.length?`Imported or refreshed ${values.length} real Google Ads city/day/campaign observations.`:
+      'Google Ads authenticated, but no eligible city-level daily rows were imported.'});
+  } catch(error:any) {
+    const message=String(error?.message||'');
+    const safe=message.startsWith('Google ')||message.startsWith('Invalid Google Ads')?message:
+      'Google Ads history sync failed. Verify the OAuth connection, account access and API configuration.';
+    return res.status(502).json({success:false,error:safe});
+  }
+});
 
 async function getTenantConnectorCredentials(contractorId: string): Promise<Record<string, string>> {
   // Import existing encrypted JSON-store values once. PostgreSQL becomes the
@@ -7384,38 +7892,11 @@ app.post('/api/system/diagnostics/ai-providers', authenticate, async (req, res) 
   lastAiProviderDiagnosticAt = now;
 
   const probePrompt = 'Reply with exactly this text and nothing else: HAL_PROVIDER_HEALTH_OK';
-  const runProbe = async (
-    configured: boolean,
-    run: () => Promise<string>
-  ): Promise<{ configured: boolean; status: 'not_configured' | 'verified' | 'failed'; latencyMs: number | null; errorCode?: string }> => {
-    if (!configured) {
-      return { configured: false, status: 'not_configured', latencyMs: null };
-    }
-
-    const startedAt = Date.now();
-    try {
-      const output = await run();
-      const latencyMs = Date.now() - startedAt;
-      if (typeof output !== 'string' || !output.includes('HAL_PROVIDER_HEALTH_OK')) {
-        return { configured: true, status: 'failed', latencyMs, errorCode: 'INVALID_PROVIDER_RESPONSE' };
-      }
-      return { configured: true, status: 'verified', latencyMs };
-    } catch (error: any) {
-      const latencyMs = Date.now() - startedAt;
-      const statusCode = Number(error?.status || error?.statusCode);
-      const errorCode = Number.isFinite(statusCode) && statusCode > 0
-        ? `HTTP_${statusCode}`
-        : 'PROVIDER_REQUEST_FAILED';
-      console.warn('[HAL AI diagnostics] Provider probe failed:', errorCode);
-      return { configured: true, status: 'failed', latencyMs, errorCode };
-    }
-  };
-
   const [gemini, nemotron] = await Promise.all([
-    runProbe(Boolean(process.env.GEMINI_API_KEY), () =>
+    runProviderProbe(Boolean(process.env.GEMINI_API_KEY), () =>
       callGemini(probePrompt, 'You are performing a provider connectivity check. Follow the requested exact response.', 0)
     ),
-    runProbe(Boolean(process.env.NVIDIA_API_KEY), () =>
+    runProviderProbe(Boolean(process.env.NVIDIA_API_KEY), () =>
       callNemotron([{ role: 'user', content: probePrompt }], 0, false)
     )
   ]);
@@ -7464,7 +7945,7 @@ app.get('/api/ai/engine-status', authenticate, async (req, res) => {
       gemini: {
         tenantCredentialSaved: tenantGeminiCredentialSaved,
         name: 'Google Gemini',
-        model: 'gemini-3.8-flash (fallbacks: gemini-flash-latest, gemini-3.1-flash-lite)',
+        model: 'gemini-3.8-flash (fallback: gemini-flash-latest)',
         configured: geminiKeySet,
         status: geminiKeySet ? 'configured_unverified' : 'not_configured',
         role: 'Deep Multimodal Reasoning & Discovery',
@@ -8214,17 +8695,26 @@ app.post('/api/scheduler', authenticate, async (req, res) => {
 
     if (job === 'evaluate_forecasts') {
       const now = new Date();
-      const expiredUnevaluated = await pgDb.select().from(forecasts).where(and(
+      const expiredRows = await pgDb.select().from(forecasts).where(and(
         eq(forecasts.contractorId, contractorId),
         eq(forecasts.evaluated, false),
         lte(forecasts.targetDate, now)
       )).orderBy(desc(forecasts.targetDate));
+      // TimesFM batch rows represent a complete target week beginning at target_date.
+      // Do not evaluate them until the entire Monday-Sunday observation window has elapsed.
+      const expiredUnevaluated = expiredRows.filter(forecast =>
+        forecast.modelVersion !== 'timesfm-2.5-batch-v1'
+        || getTimesFmBatchEvaluationWindow(forecast.targetDate, now) !== null
+      );
 
       const [tenantLeads, tenantCampaigns, tenantRevenues] = await Promise.all([
         pgDb.select().from(leads).where(eq(leads.contractorId, contractorId)),
         pgDb.select({ id: campaigns.id }).from(campaigns).where(eq(campaigns.contractorId, contractorId)),
         pgDb.select().from(revenueRecords).where(eq(revenueRecords.contractorId, contractorId))
       ]);
+      const tenantGoogleAds = expiredUnevaluated.some(forecast => forecast.modelVersion === 'timesfm-2.5-batch-v1')
+        ? await pgDb.select().from(googleAdsDailyPerformance).where(eq(googleAdsDailyPerformance.contractorId, contractorId))
+        : [];
       const campaignIds = tenantCampaigns.map(row => row.id);
       const snapshots = campaignIds.length
         ? await pgDb.select().from(performanceSnapshots).where(inArray(performanceSnapshots.campaignId, campaignIds))
@@ -8239,15 +8729,22 @@ app.post('/api/scheduler', authenticate, async (req, res) => {
 
       let evaluatedCount = 0;
       for (const forecast of expiredUnevaluated) {
-        const targetEnd = new Date(forecast.targetDate);
-        const targetStart = new Date(forecast.createdAt);
+        const isTimesFmBatchForecast = forecast.modelVersion === 'timesfm-2.5-batch-v1';
+        const timesFmWindow = isTimesFmBatchForecast
+          ? getTimesFmBatchEvaluationWindow(forecast.targetDate, now)
+          : null;
+        if (isTimesFmBatchForecast && (!timesFmWindow || new Date(forecast.createdAt).getTime() >= timesFmWindow.start.getTime())) continue;
+        const targetEnd = timesFmWindow?.end ?? new Date(forecast.targetDate);
+        const targetStart = timesFmWindow?.start ?? new Date(forecast.createdAt);
         if (!Number.isFinite(targetStart.getTime()) || !Number.isFinite(targetEnd.getTime()) || targetStart >= targetEnd) continue;
         const inWindow = (value: any) => {
           const timestamp = new Date(value).getTime();
-          return Number.isFinite(timestamp) && timestamp >= targetStart.getTime() && timestamp <= targetEnd.getTime();
+          return Number.isFinite(timestamp) && timestamp >= targetStart.getTime()
+            && (timesFmWindow ? timestamp < targetEnd.getTime() : timestamp <= targetEnd.getTime());
         };
 
         let actualValue: number | null = null;
+        let actualSource = 'tenant_postgres_observations';
         if (forecast.metric === 'lead_volume') {
           actualValue = tenantLeads.length
             ? tenantLeads.filter(lead => inWindow(lead.createdAt)).length
@@ -8262,9 +8759,22 @@ app.post('/api/scheduler', authenticate, async (req, res) => {
             ? tenantRevenues.filter(revenue => inWindow(revenue.createdAt)).reduce((sum, revenue) => sum + Number(revenue.amountUsd || 0), 0)
             : null;
         } else if (forecast.metric === 'conversions') {
-          actualValue = closedWonEvents.length
-            ? closedWonEvents.filter(event => inWindow(event.createdAt)).length
-            : null;
+          if (isTimesFmBatchForecast) {
+            let provenance: any;
+            try {
+              provenance = typeof forecast.assumptions === 'string' ? JSON.parse(forecast.assumptions) : forecast.assumptions;
+            } catch { provenance = null; }
+            const city = String(provenance?.territory_city || '').trim();
+            const niche = String(provenance?.territory_trade || '').trim();
+            if (!city || !niche || !timesFmWindow) continue;
+            actualValue = evaluateTimesFmBatchActual(tenantGoogleAds, city, niche, timesFmWindow);
+            actualSource = 'google_ads_daily_performance';
+          } else {
+            actualValue = closedWonEvents.length
+              ? closedWonEvents.filter(event => inWindow(event.createdAt)).length
+              : null;
+            actualSource = 'crm_closed_won_events';
+          }
         }
 
         // A missing measurement is not a zero. Keep the forecast unevaluated.
@@ -8310,7 +8820,12 @@ app.post('/api/scheduler', authenticate, async (req, res) => {
             sourceModule: 'intelligence',
             correlationId: forecast.id,
             summary: `Evaluated ${forecast.metric} forecast against recorded observations.`,
-            payload: { predicted: forecast.predicted, actual: actualValue, deviation, learningInsight: learning.insight }
+            payload: {
+              predicted: forecast.predicted, actual: actualValue, deviation, actualSource,
+              targetWindowStart: targetStart.toISOString(),
+              targetWindowEndExclusive: timesFmWindow ? targetEnd.toISOString() : undefined,
+              learningInsight: learning.insight
+            }
           });
         });
 

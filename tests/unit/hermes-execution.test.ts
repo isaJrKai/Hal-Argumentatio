@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { classifyHermesToolResult, createHermesTaskMessageId } from '../../src/lib/hermesExecution';
+import { classifyHermesToolResult, createHermesTaskMessageId, createHermesTaskArtifactId } from '../../src/lib/hermesExecution';
 
 describe('Hermes MCP tool outcome classification', () => {
   it('marks evidence-bearing read results as successful', () => {
@@ -41,5 +41,15 @@ describe('Hermes task message idempotency', () => {
 
   it('isolates message IDs between work tasks', () => {
     expect(createHermesTaskMessageId('task_123', 'user')).not.toBe(createHermesTaskMessageId('task_456', 'user'));
+  });
+});
+
+describe('Hermes task artifact idempotency', () => {
+  it('derives stable artifact IDs from tenant, task and artifact kind', () => {
+    const first = createHermesTaskArtifactId('tenant-a', 'task-123', 'lab');
+    expect(first).toBe(createHermesTaskArtifactId('tenant-a', 'task-123', 'lab'));
+    expect(first).not.toBe(createHermesTaskArtifactId('tenant-b', 'task-123', 'lab'));
+    expect(first).not.toBe(createHermesTaskArtifactId('tenant-a', 'task-123', 'studio'));
+    expect(first).toMatch(/^hermes-lab-[a-f0-9]{64}$/);
   });
 });

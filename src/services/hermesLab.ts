@@ -25,7 +25,7 @@ import { callOpenRouterHermes } from './openrouter.ts';
 import { GoogleGenAI } from '@google/genai';
 import { getRecentWorkEvents, recordWorkEvent } from '../lib/workLedger';
 import { listWorkTasks } from '../lib/workTasks';
-import { createHermesTaskMessageId } from '../lib/hermesExecution';
+import { createHermesTaskMessageId, createHermesTaskArtifactId } from '../lib/hermesExecution';
 
 async function recordHermesEventSafely(event: Parameters<typeof recordWorkEvent>[1]) {
   try {
@@ -463,7 +463,9 @@ Generate the complete, unshortened asset now in valid JSON format.`;
 
   const artifactStatus = generationEngine === 'deterministic_fallback' ? 'draft' : 'ready';
 
-  const artifactId = crypto.randomUUID();
+  const artifactId = executionContext?.workTaskId
+    ? createHermesTaskArtifactId(contractorId, executionContext.workTaskId, 'lab')
+    : crypto.randomUUID();
   const title = parsedResponse.title || `${toolDef.name} - ${contractorName}`;
 
   await pgDb.insert(hermesLabArtifacts).values({
@@ -928,7 +930,10 @@ Respond in the required JSON format.`;
           },
           updatedAt: new Date()
         })
-        .where(eq(hermesLabArtifacts.id, currentArtifact.id));
+        .where(and(
+          eq(hermesLabArtifacts.id, currentArtifact.id),
+          eq(hermesLabArtifacts.contractorId, contractorId)
+        ));
 
       updatedArtifactRecord = {
         id: currentArtifact.id,
@@ -938,7 +943,9 @@ Respond in the required JSON format.`;
       };
     } else {
       // Create new artifact
-      const newArtId = crypto.randomUUID();
+      const newArtId = executionContext?.workTaskId
+        ? createHermesTaskArtifactId(contractorId, executionContext.workTaskId, 'studio')
+        : crypto.randomUUID();
       const newContent = {
         summary: parsed.artifactUpdate.summary || 'Created via Hermes Lab Chat',
         structuredData: parsed.artifactUpdate.structuredData || {},

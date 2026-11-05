@@ -488,8 +488,88 @@ export async function bootstrapPostgresTables(poolInstance?: Pool): Promise<void
       );
 
       ALTER TABLE communications_outbox ALTER COLUMN lead_id DROP NOT NULL;
+      ALTER TABLE communications_outbox ADD COLUMN IF NOT EXISTS next_attempt_at TIMESTAMP;
+      CREATE INDEX IF NOT EXISTS communications_outbox_due_idx ON communications_outbox (status, next_attempt_at, created_at);
       ALTER TABLE communications_outbox DROP CONSTRAINT IF EXISTS communications_outbox_idempotency_key_key;
       CREATE UNIQUE INDEX IF NOT EXISTS communications_outbox_tenant_idempotency_idx ON communications_outbox (contractor_id, idempotency_key);
+
+      CREATE TABLE IF NOT EXISTS communications_opt_outs (
+        id TEXT PRIMARY KEY,
+        contractor_id TEXT NOT NULL,
+        channel TEXT NOT NULL,
+        phone_hash TEXT NOT NULL,
+        phone_encrypted TEXT NOT NULL,
+        source TEXT NOT NULL,
+        opted_out_at TIMESTAMP NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
+      );
+      CREATE UNIQUE INDEX IF NOT EXISTS communications_opt_outs_tenant_channel_phone_idx
+        ON communications_opt_outs (contractor_id, channel, phone_hash);
+
+      CREATE TABLE IF NOT EXISTS communications_consents (
+        id TEXT PRIMARY KEY,
+        contractor_id TEXT NOT NULL,
+        lead_id TEXT NOT NULL,
+        channel TEXT NOT NULL,
+        status TEXT NOT NULL,
+        source TEXT NOT NULL,
+        evidence_encrypted TEXT,
+        consented_at TIMESTAMP,
+        opted_out_at TIMESTAMP,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
+      );
+      CREATE UNIQUE INDEX IF NOT EXISTS communications_consents_tenant_lead_channel_idx
+        ON communications_consents (contractor_id, lead_id, channel);
+      CREATE INDEX IF NOT EXISTS communications_consents_tenant_status_idx
+        ON communications_consents (contractor_id, channel, status);
+
+      CREATE TABLE IF NOT EXISTS twilio_phone_number_mappings (
+        id TEXT PRIMARY KEY,
+        contractor_id TEXT NOT NULL,
+        phone_number TEXT NOT NULL UNIQUE,
+        account_sid TEXT NOT NULL,
+        verified_at TIMESTAMP NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
+      );
+
+      CREATE TABLE IF NOT EXISTS twilio_inbound_events (
+        id TEXT PRIMARY KEY,
+        contractor_id TEXT NOT NULL,
+        provider_message_id TEXT NOT NULL UNIQUE,
+        from_encrypted TEXT NOT NULL,
+        body_encrypted TEXT NOT NULL,
+        received_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS twilio_inbound_tenant_received_idx
+        ON twilio_inbound_events (contractor_id, received_at DESC);
+
+      CREATE TABLE IF NOT EXISTS whatsapp_phone_number_mappings (
+        id TEXT PRIMARY KEY,
+        contractor_id TEXT NOT NULL,
+        phone_number_id TEXT NOT NULL UNIQUE,
+        display_phone_number TEXT,
+        verified_name TEXT,
+        verified_at TIMESTAMP NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS whatsapp_phone_mapping_tenant_idx
+        ON whatsapp_phone_number_mappings (contractor_id);
+
+      CREATE TABLE IF NOT EXISTS whatsapp_inbound_events (
+        id TEXT PRIMARY KEY,
+        contractor_id TEXT NOT NULL,
+        phone_number_id TEXT NOT NULL,
+        provider_message_id TEXT NOT NULL UNIQUE,
+        sender_encrypted TEXT NOT NULL,
+        message_encrypted TEXT NOT NULL,
+        message_type TEXT NOT NULL,
+        received_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS whatsapp_inbound_tenant_received_idx
+        ON whatsapp_inbound_events (contractor_id, received_at DESC);
 
       CREATE TABLE IF NOT EXISTS communications_delivery_events (
         id TEXT PRIMARY KEY,
@@ -562,6 +642,7 @@ export async function bootstrapPostgresTables(poolInstance?: Pool): Promise<void
         search_term TEXT,
         geo TEXT,
         device TEXT DEFAULT 'desktop' NOT NULL,
+        currency_code TEXT,
         date TIMESTAMP NOT NULL,
         impressions INTEGER DEFAULT 0 NOT NULL,
         clicks INTEGER DEFAULT 0 NOT NULL,
@@ -572,6 +653,8 @@ export async function bootstrapPostgresTables(poolInstance?: Pool): Promise<void
         asset_group TEXT,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
       );
+
+      ALTER TABLE google_ads_daily_performance ADD COLUMN IF NOT EXISTS currency_code TEXT;
 
       CREATE TABLE IF NOT EXISTS revenue_experiments (
         id TEXT PRIMARY KEY,

@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 const serverSource = readFileSync('server.ts', 'utf8');
 const panelSource = readFileSync('src/components/SystemHealthPanel.tsx', 'utf8');
 const geminiSource = readFileSync('src/lib/gemini.ts', 'utf8');
+const probeSource = readFileSync('src/services/aiProviderDiagnostics.ts', 'utf8');
 
 function routeBetween(startMarker: string, endMarker: string): string {
   const start = serverSource.indexOf(startMarker);
@@ -24,6 +25,7 @@ describe('live AI provider diagnostics', () => {
     expect(route).toContain('retryAfterSeconds');
     expect(route).toContain('Boolean(process.env.GEMINI_API_KEY)');
     expect(route).toContain('Boolean(process.env.NVIDIA_API_KEY)');
+    expect(route).toContain('runProviderProbe(');
     expect(route).toContain('callGemini(');
     expect(route).toContain('callNemotron(');
     expect(geminiSource).toContain('export async function callGemini(');
@@ -31,9 +33,10 @@ describe('live AI provider diagnostics', () => {
   });
 
   it('returns status and latency only, never provider credentials or raw model output', () => {
-    expect(route).toContain('latencyMs');
-    expect(route).toContain('errorCode');
     expect(route).toContain('overall:');
+    expect(route).toContain('providers: { gemini, nemotron }');
+    expect(probeSource).toContain('latencyMs');
+    expect(probeSource).toContain('errorCode');
     expect(route).not.toContain('apiKey:');
     expect(route).not.toContain('process.env.GEMINI_API_KEY,');
     expect(route).not.toContain('process.env.NVIDIA_API_KEY,');

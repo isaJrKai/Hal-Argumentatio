@@ -5,11 +5,12 @@ const nemotronSource = readFileSync('src/services/nemotron.ts', 'utf8');
 const geminiSource = readFileSync('src/lib/gemini.ts', 'utf8');
 
 describe('AI provider identity and attribution', () => {
-  it('does not silently fall back from NVIDIA Nemotron to unrelated model families', () => {
+  it('uses NVIDIA Nemotron model IDs only and avoids retired or unrelated model families', () => {
     expect(nemotronSource).not.toContain('openai/gpt-oss-20b');
     expect(nemotronSource).not.toContain('meta/llama-3.2-11b-vision-instruct');
     expect(nemotronSource).toContain('nvidia/nemotron-3.5-lightning-30b-a3b');
-    expect(nemotronSource).toContain('nvidia/nemotron-3-nano-omni-30b-a3b-reasoning');
+    expect(nemotronSource).toContain('nvidia/nemotron-3-nano-30b-a3b');
+    expect(nemotronSource).not.toContain('nvidia/nemotron-3-nano-omni-30b-a3b-reasoning');
   });
 
   it('labels Nemotron results as Nemotron and does not claim an incorrect 70B model', () => {

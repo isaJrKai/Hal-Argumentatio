@@ -20,6 +20,7 @@ export interface GoogleAdsBaseline {
   totalImpressions: number;
   totalConversions: number;
   empiricalCpl: number;
+  currencyCode: string | null;
   empiricalCtr: number;
   empiricalConversionRate: number;
   source: 'LIVE_POSTGRES_TABLE' | 'UNAVAILABLE';
@@ -61,7 +62,8 @@ export interface BrainForecastCurvePoint {
   weatherSurgeFactor: number;
   lowerBound: number;
   upperBound: number;
-  observedCplUsd: number;
+  observedCpl: number;
+  currencyCode: string | null;
   isBreachingCplLimit: boolean;
 }
 
@@ -118,6 +120,7 @@ export async function ingestAndCalibrateGoogleAds(
         totalImpressions: 0,
         totalConversions: 0,
         empiricalCpl: 0,
+        currencyCode: null,
         empiricalCtr: 0,
         empiricalConversionRate: 0,
         source: 'UNAVAILABLE',
@@ -140,6 +143,8 @@ export async function ingestAndCalibrateGoogleAds(
       totalImpressions,
       totalConversions,
       empiricalCpl: totalConversions > 0 ? parseFloat((totalCost / totalConversions).toFixed(2)) : 0,
+      currencyCode: [...new Set(records.map(r => String(r.currencyCode || '').trim().toUpperCase()).filter(Boolean))].length === 1
+        ? String(records.find(r => r.currencyCode)?.currencyCode).toUpperCase() : null,
       empiricalCtr: totalImpressions > 0 ? parseFloat((totalClicks / totalImpressions).toFixed(4)) : 0,
       empiricalConversionRate: totalClicks > 0 ? parseFloat((totalConversions / totalClicks).toFixed(4)) : 0,
       source: 'LIVE_POSTGRES_TABLE',
@@ -155,6 +160,7 @@ export async function ingestAndCalibrateGoogleAds(
       totalImpressions: 0,
       totalConversions: 0,
       empiricalCpl: 0,
+      currencyCode: null,
       empiricalCtr: 0,
       empiricalConversionRate: 0,
       source: 'UNAVAILABLE',
@@ -287,7 +293,7 @@ export async function evaluateAndEnforceBudgetGuardrails(
   const maxAllowableCpl = Math.round(targetCac * 0.35);
   
   const observedCpl = forecastCurve.length
-    ? Math.max(...forecastCurve.map(point => point.observedCplUsd))
+    ? Math.max(...forecastCurve.map(point => point.observedCpl))
     : 0;
   const breachDetected = observedCpl > maxAllowableCpl;
   const breachWeeks: string[] = breachDetected ? ['CURRENT_BASELINE'] : [];
@@ -385,6 +391,7 @@ interface ScheduledTimesFmForecast {
   totalCost: number;
   totalConversions: number;
   empiricalCpl: number;
+  currencyCode: string | null;
 }
 
 /**
@@ -473,7 +480,8 @@ async function loadScheduledTimesFmForecast(
     daysSampled: Number(firstMetadata.input_days) || 0,
     totalCost: Number(firstMetadata.input_total_cost) || 0,
     totalConversions: Number(firstMetadata.input_total_conversions) || 0,
-    empiricalCpl: Number(firstMetadata.observed_cpl_usd) || 0
+    empiricalCpl: Number(firstMetadata.observed_cpl_account_currency) || 0,
+    currencyCode: typeof firstMetadata.account_currency_code === 'string' ? firstMetadata.account_currency_code : null
   };
 }
 
@@ -562,6 +570,7 @@ export async function executeBrainSynchronizedForecast(
   const historicalMean = scheduledSnapshot?.historicalMean
     ?? adsBaseline.weeklyDemandSeries.reduce((sum, value) => sum + value, 0) / adsBaseline.weeklyDemandSeries.length;
   const observedCplBaseline = scheduledSnapshot?.empiricalCpl ?? adsBaseline.empiricalCpl;
+  const cplCurrencyCode = scheduledSnapshot?.currencyCode ?? adsBaseline.currencyCode;
   if (!Number.isFinite(historicalMean) || historicalMean <= 0) {
     throw new Error('Forecast unavailable: historical demand baseline is invalid.');
   }
@@ -579,16 +588,21 @@ export async function executeBrainSynchronizedForecast(
       lowerBound: toIndex(point.lower),
       upperBound: Math.max(toIndex(point.point), toIndex(point.upper)),
       // CPL is the observed trailing CPL, not a TimesFM prediction.
-      observedCplUsd: observedCplBaseline,
+      observedCpl: observedCplBaseline,
+      currencyCode: cplCurrencyCode,
       isBreachingCplLimit: false
     };
   });
 
   // Step 4: Evaluate guardrails only when a real target CAC has been configured.
   const observedCpl = forecastCurve.length
-    ? Math.max(...forecastCurve.map(point => point.observedCplUsd))
+    ? Math.max(...forecastCurve.map(point => point.observedCpl))
     : 0;
-  const guardrails: GuardrailEvaluationResult = targetCac
+  const guardrailCurrencySupported = cplCurrencyCode === 'USD';
+  if (applyGuardrails && targetCac && !guardrailCurrencySupported) {
+    throw new Error(`Budget guardrails unavailable: the Google Ads account currency is ${cplCurrencyCode || 'unknown'}, while HAL's target CAC is stored in USD.`);
+  }
+  const guardrails: GuardrailEvaluationResult = targetCac && guardrailCurrencySupported
     ? await evaluateAndEnforceBudgetGuardrails(contractorId, forecastCurve, targetCac, applyGuardrails)
     : {
         targetCac: null,
@@ -615,14 +629,18 @@ export async function executeBrainSynchronizedForecast(
     success: true,
     engine: `Google TimesFM ${modelResult.version} (${modelResult.model}, ${modelResult.backend})${inferenceMode === 'scheduled_batch' ? ' — scheduled batch' : ''}`,
     brainLayerAlignments: {
-      layer2Goals: `Contractor-configured target CAC: ${targetCac} (Max allowable CPL: ${guardrails.maxAllowableCpl}).`,
-      layer5Knowledge: `TimesFM input: ${adsBaseline.weeklyDemandSeries.length} observed weekly conversion totals from ${adsBaseline.recordsCount} tenant-scoped Google Ads records. Trailing observed CPL: ${adsBaseline.empiricalCpl}.`,
+      layer2Goals: !guardrailCurrencySupported
+        ? `CPL guardrails are unavailable because the Google Ads account currency is ${cplCurrencyCode || 'unknown'} and HAL target CAC is stored in USD.`
+        : `Contractor-configured target CAC: ${targetCac} (Max allowable CPL: ${guardrails.maxAllowableCpl}).`,
+      layer5Knowledge: `TimesFM input: ${adsBaseline.weeklyDemandSeries.length} observed weekly conversion totals from ${adsBaseline.recordsCount} tenant-scoped Google Ads records. Trailing observed CPL: ${adsBaseline.empiricalCpl} ${cplCurrencyCode || '(currency unknown)'}.`,
       layer6WorldModel: `${weatherTrigger.conditionTitle}. Weather is contextual only; no demand multiplier is applied.`,
       layer8Skills: `${inferenceMode === 'scheduled_batch' ? 'Using the last successful scheduled' : 'Executed'} Google TimesFM ${modelResult.version} inference for a ${horizonWeeks}-week horizon${inferenceMode === 'scheduled_batch' ? ` (generated ${forecastTimestamp})` : ''}. Demand bands use the model's q10/q50/q90 output. CPL remains the trailing observed baseline, not a model forecast.`,
       layer10Execution: !targetCac
         ? 'Budget guardrails were skipped because no target CAC is configured. No ad budget was changed.'
         : guardrails.breachDetected
           ? `A budget guardrail recommendation is indicated: ${guardrails.suggestedAction}. It is based on trailing observed CPL; no ad budget was changed.`
+          : !guardrailCurrencySupported
+          ? 'Budget guardrails were skipped because CPL is not denominated in USD. No ad budget was changed.'
           : 'No trailing-CPL guardrail breach was found. This is not a profitability certification.',
       layer11Learning: `Model input is grounded in ${modelResult.input_points} weekly observations. No new learning or model fine-tuning is claimed by this inference.`
     },
@@ -636,6 +654,7 @@ export async function executeBrainSynchronizedForecast(
         totalCost: Math.round(scheduledSnapshot.totalCost),
         totalConversions: scheduledSnapshot.totalConversions,
         empiricalCpl: scheduledSnapshot.empiricalCpl,
+        currencyCode: scheduledSnapshot.currencyCode,
         daysSampled: scheduledSnapshot.daysSampled
       } : {}),
       weeklyDemandSeries: [],

@@ -1,16 +1,27 @@
+const GENERIC_TRADE_WORDS = new Set(['contractor', 'contractors', 'service', 'services', 'company', 'companies', 'business', 'businesses', 'llc', 'inc', 'the', 'and', 'of']);
+
+export function matchesTradeContext(recordNiche: unknown, targetNiche: string): boolean {
+  const haystack = String(recordNiche || '').trim().toLocaleLowerCase();
+  const requested = targetNiche.trim().toLocaleLowerCase();
+  if (!haystack || !requested) return false;
+  if (haystack.includes(requested)) return true;
+  const tokens = requested.split(/[^a-z0-9]+/).filter(token => token.length >= 3 && !GENERIC_TRADE_WORDS.has(token));
+  return tokens.length ? tokens.some(token => haystack.includes(token)) : haystack.includes(requested);
+}
+
 export function matchesTerritoryContext(
   recordCity: unknown,
   recordNiche: unknown,
   targetCity: string,
   targetNiche: string
 ): boolean {
-  const cityNeedle = targetCity.trim().toLocaleLowerCase();
+  const cityNeedle = targetCity.split(',')[0].trim().toLocaleLowerCase();
   const nicheNeedle = targetNiche.trim().toLocaleLowerCase();
   const cityValue = String(recordCity || '').trim().toLocaleLowerCase();
   const nicheValue = String(recordNiche || '').trim().toLocaleLowerCase();
   return Boolean(cityNeedle && nicheNeedle && cityValue && nicheValue)
     && cityValue.includes(cityNeedle)
-    && nicheValue.includes(nicheNeedle);
+    && matchesTradeContext(nicheValue, targetNiche);
 }
 
 export function filterGoogleAdsTerritoryRecords<T extends {

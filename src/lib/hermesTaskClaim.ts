@@ -1,13 +1,11 @@
 import { and, eq, isNotNull, lt, or, sql } from 'drizzle-orm';
 import { workTasks } from '../db/schema';
 
+export const HERMES_TASK_LEASE_MS = 120_000;
+
 /**
- * Atomically claims one queued Hermes task.
- *
- * The conditional UPDATE is the concurrency boundary: two workers may both
- * read a queued task, but PostgreSQL can return the row to only one claimant.
- * Tenant, worker, approval and retry-limit checks are repeated in the UPDATE
- * so stale preflight reads cannot bypass them.
+ * Atomically claims one queued Hermes task. attemptCount is also the fencing
+ * token: every heartbeat and terminal write must match the claimed attempt.
  */
 export async function claimHermesWorkTask(db: any, taskId: string, contractorId: string, taskTable: any = workTasks) {
   const [claimed] = await db.update(taskTable).set({
@@ -25,4 +23,68 @@ export async function claimHermesWorkTask(db: any, taskId: string, contractorId:
     or(eq(taskTable.requiresApproval, false), isNotNull(taskTable.approvedAt))
   )).returning();
   return claimed || null;
+}
+
+/**
+ * Refreshes the task lease only while this exact attempt still owns the task.
+ * A late heartbeat from an expired attempt cannot refresh a newer attempt.
+ */
+export async function heartbeatHermesWorkTask(
+  db: any,
+  taskId: string,
+  contractorId: string,
+  attempt: number,
+  taskTable: any = workTasks
+) {
+  const [updated] = await db.update(taskTable).set({ updatedAt: new Date() }).where(and(
+    eq(taskTable.id, taskId),
+    eq(taskTable.contractorId, contractorId),
+    eq(taskTable.assignedWorker, 'hermes'),
+    eq(taskTable.status, 'running'),
+    eq(taskTable.attemptCount, attempt)
+  )).returning({ id: taskTable.id });
+  return Boolean(updated);
+}
+
+/**
+ * Converts an abandoned running attempt into a truthful failed receipt. It
+ * never requeues automatically: an operator must explicitly request a retry,
+ * and the existing attempt limit remains authoritative.
+ */
+export async function failExpiredHermesWorkTask(
+  db: any,
+  taskId: string,
+  contractorId: string,
+  now = new Date(),
+  leaseMs = HERMES_TASK_LEASE_MS,
+  taskTable: any = workTasks
+) {
+  const expiredBefore = new Date(now.getTime() - leaseMs);
+  const [failed] = await db.update(taskTable).set({
+    status: 'failed',
+    errorMessage: 'Hermes execution lease expired before a terminal receipt was recorded.',
+    output: sql`jsonb_build_object(
+      'schemaVersion', 1,
+      'outcome', 'lease_expired',
+      'success', false,
+      'worker', 'hermes',
+      'taskId', ${taskId}::text,
+      'taskType', ${taskTable.taskType},
+      'attempt', ${taskTable.attemptCount},
+      'startedAt', COALESCE(${taskTable.startedAt}, ${taskTable.updatedAt})::text,
+      'completedAt', ${now.toISOString()}::timestamp::text,
+      'durationMs', GREATEST(0, FLOOR(EXTRACT(EPOCH FROM (${now.toISOString()}::timestamp - COALESCE(${taskTable.startedAt}, ${taskTable.updatedAt}))) * 1000)),
+      'recordedAt', ${now.toISOString()}::text,
+      'message', 'The executor stopped heartbeating. No successful completion was recorded; operator review is required before retry.'
+    )`,
+    completedAt: now,
+    updatedAt: now
+  }).where(and(
+    eq(taskTable.id, taskId),
+    eq(taskTable.contractorId, contractorId),
+    eq(taskTable.assignedWorker, 'hermes'),
+    eq(taskTable.status, 'running'),
+    lt(taskTable.updatedAt, expiredBefore)
+  )).returning();
+  return failed || null;
 }

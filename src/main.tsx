@@ -5,7 +5,6 @@ import './index.css';
 import './ui-quality-pass.css';
 import { BusinessProvider } from './context/BusinessContext.tsx';
 import { ToastProvider } from './context/ToastContext.tsx';
-import { APIProvider } from '@vis.gl/react-google-maps';
 
 // Propagate active AI model to all backend requests safely
 if (typeof window !== 'undefined') {
@@ -48,31 +47,11 @@ if (typeof window !== 'undefined') {
   }
 }
 
-const API_KEY =
-  process.env.GOOGLE_MAPS_PLATFORM_KEY ||
-  (import.meta as any).env?.VITE_GOOGLE_MAPS_PLATFORM_KEY ||
-  (globalThis as any).GOOGLE_MAPS_PLATFORM_KEY ||
-  '';
-
-const isValidGoogleMapsKey = (key: string): boolean => {
-  if (!key) return false;
-  // Standard Google Maps API keys are 39 characters long and start with AIzaSy
-  return /^AIzaSy[A-Za-z0-9_\-]{33}$/.test(key);
-};
-
-const hasValidKey = isValidGoogleMapsKey(API_KEY);
-
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <BusinessProvider>
       <ToastProvider>
-        {hasValidKey ? (
-          <APIProvider apiKey={API_KEY} version="weekly">
-            <App />
-          </APIProvider>
-        ) : (
-          <App />
-        )}
+        <App />
       </ToastProvider>
     </BusinessProvider>
   </StrictMode>,

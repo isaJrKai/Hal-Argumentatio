@@ -41,3 +41,14 @@ export function createHermesTaskMessageId(workTaskId: string, role: 'user' | 'as
   const digest = crypto.createHash('sha256').update(workTaskId).digest('hex');
   return `hermes-task-${digest}-${role}`;
 }
+
+/**
+ * Deterministic artifact identity for a work task. Concurrent or retried
+ * attempts cannot create a second artifact for the same tenant/task/kind.
+ */
+export function createHermesTaskArtifactId(contractorId: string, workTaskId: string, kind: 'lab' | 'studio'): string {
+  const digest = crypto.createHash('sha256')
+    .update(`${contractorId}:${workTaskId}:${kind}`)
+    .digest('hex');
+  return `hermes-${kind}-${digest}`;
+}
