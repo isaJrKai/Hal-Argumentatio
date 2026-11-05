@@ -1661,7 +1661,7 @@ Next-Gen Waterproofing	Calgary	Waterproofing	Jane Smith	jane@nextgen.ca	403-555-
                     <span className="text-text-secondary">Fail-Closed Outreach Gate:</span>
                     {selectedLead.verificationStatus === 'VERIFIED' ? (
                       <span className="text-emerald-400 font-bold text-[10px]">
-                        AUTHORIZED FOR AUTONOMOUS DISPATCH
+                        IDENTITY VERIFIED; CHANNEL GATES APPLY
                       </span>
                     ) : (
                       <span className="text-rose-400 font-bold text-[10px]">
