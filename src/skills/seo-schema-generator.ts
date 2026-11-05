@@ -1,119 +1,97 @@
 import { Skill } from './types';
-import { generateResponse } from '../services/nemotron';
 
 export const seoSchemaGeneratorSkill: Skill = {
   id: 'seo_schema_generator',
   name: 'Local SEO Schema Generator',
-  description: "Generates structured JSON-LD LocalBusiness Schema markup to enhance local Google Maps and search rankings using NEMOTRON.",
+  description: 'Builds JSON-LD LocalBusiness structured data only from supplied business details. It does not claim ranking improvements or invent missing contact, location, image, or website data.',
   category: 'seo',
   icon: 'Search',
   inputs: [
-    {
-      name: 'businessName',
-      label: 'Business Name',
-      type: 'string',
-      required: true,
-      defaultValue: '',
-    },
-    {
-      name: 'serviceType',
-      label: 'Business Category / Niche',
-      type: 'string',
-      required: true,
-      defaultValue: 'Plumbing',
-    },
-    {
-      name: 'city',
-      label: 'Target Location (City, State)',
-      type: 'string',
-      required: true,
-      defaultValue: '',
-    },
-    {
-      name: 'phone',
-      label: 'Business Telephone',
-      type: 'string',
-      required: false,
-      defaultValue: '',
-    }
+    { name: 'businessName', label: 'Business Name', type: 'string', required: true, defaultValue: '' },
+    { name: 'serviceType', label: 'Business Category / Niche', type: 'string', required: true, defaultValue: '' },
+    { name: 'city', label: 'City / Locality', type: 'string', required: true, defaultValue: '' },
+    { name: 'phone', label: 'Business Telephone', type: 'string', required: false, defaultValue: '' },
+    { name: 'websiteUrl', label: 'Official Website URL', type: 'string', required: false, defaultValue: '' },
+    { name: 'country', label: 'Country', type: 'string', required: false, defaultValue: '' },
+    { name: 'streetAddress', label: 'Street Address', type: 'string', required: false, defaultValue: '' },
+    { name: 'postalCode', label: 'Postal Code', type: 'string', required: false, defaultValue: '' }
   ],
-  execute: async (inputs, contractorId) => {
-    const { businessName, serviceType, city, phone } = inputs;
+  execute: async (inputs) => {
+    const businessName = String(inputs.businessName || '').trim();
+    const serviceType = String(inputs.serviceType || '').trim();
+    const city = String(inputs.city || '').trim();
+    const phone = String(inputs.phone || '').trim();
+    const websiteUrl = String(inputs.websiteUrl || '').trim();
+    const country = String(inputs.country || '').trim();
+    const streetAddress = String(inputs.streetAddress || '').trim();
+    const postalCode = String(inputs.postalCode || '').trim();
+
     if (!businessName || !serviceType || !city) {
-      throw new Error('Business Name, Category, and Target Location are required');
+      throw new Error('Business Name, Category, and City are required.');
     }
 
-
-
-    const systemPrompt = `You are HAL, the expert Search Engine Optimization Architect. 
-Your goal is to output valid JSON-LD LocalBusiness schema, followed by precise, Swiss-style directives on how and where to inject it.`;
-
-    const userPrompt = `Compile a fully functional, schema-validated LocalBusiness JSON-LD block and optimization directives for:
-- Business Name: ${businessName}
-- Category: ${serviceType}
-- Target City: ${city}
-- Telephone: ${phone || 'N/A'}
-
-Your report must follow this strict structure:
-1. SCHEMA.ORG MARKUP: A code block containing the exact JSON-LD markup.
-2. RELEVANCY REASONING: Explain how adding this structured data improves their local Google Maps "bento-box" ranking position.
-3. INJECTION DIRECTIVES: Step-by-step instructions for placing this code in their website header (CMS platforms like WordPress, Wix, or custom HTML).`;
-
-    let reportText = '';
-
-    try {
-      reportText = await generateResponse(
-        userPrompt,
-        systemPrompt,
-        0.1
-      );
-    } catch (err) {
-      console.error('NEMOTRON call failed during SEO Schema execution. Using fallback.', err);
+    let normalizedWebsite: string | undefined;
+    if (websiteUrl) {
+      let parsed: URL;
+      try {
+        parsed = new URL(websiteUrl);
+      } catch {
+        throw new Error('Enter a valid official website URL or leave the field blank.');
+      }
+      if (!['http:', 'https:'].includes(parsed.protocol) || parsed.username || parsed.password) {
+        throw new Error('The official website must be a public HTTP(S) URL without embedded credentials.');
+      }
+      normalizedWebsite = parsed.toString();
     }
 
-    if (!reportText) {
-      const generatedSchema = {
-        "@context": "https://schema.org",
-        "@type": serviceType.includes("Plumb") ? "Plumber" : serviceType.includes("HVAC") || serviceType.includes("Air") ? "HVACBusiness" : "LocalBusiness",
-        "name": businessName,
-        "image": "https://images.unsplash.com/photo-1581094288338-2314dddb7eed?q=80&w=300",
-        "telephone": phone || "None Sourced",
-        "address": {
-          "@type": "PostalAddress",
-          "addressLocality": city,
-          "addressCountry": "US"
-        },
-        "geo": {
-          "@type": "GeoCoordinates",
-          "latitude": "49.8951",
-          "longitude": "-97.1384"
-        },
-        "url": `https://www.example.com`,
-        "priceRange": "$$"
-      };
+    const normalizedCategory = serviceType.toLowerCase();
+    const schemaType = normalizedCategory.includes('plumb')
+      ? 'Plumber'
+      : normalizedCategory.includes('hvac') || normalizedCategory.includes('air conditioning')
+        ? 'HVACBusiness'
+        : 'LocalBusiness';
 
-      reportText = `### SCHEMA.ORG MARKUP
-\`\`\`json
-${JSON.stringify(generatedSchema, null, 2)}
-\`\`\`
+    const address: Record<string, string> = {
+      '@type': 'PostalAddress',
+      addressLocality: city
+    };
+    if (streetAddress) address.streetAddress = streetAddress;
+    if (postalCode) address.postalCode = postalCode;
+    if (country) address.addressCountry = country;
 
-### RELEVANCY REASONING
-- **Structured Data Core**: Standard search indexers require structured data to map entities directly to localized knowledge graphs. Adding this schema removes ambiguities in search intent.
-- **Local Map Pack Positioning**: Supplying coordinate data (\`geo\`), telephone listings, and localized postal addresses boosts trust factor weights in local algorithms. This lifts organic exposure in geographic search grids by up to 35%.
+    const schema: Record<string, any> = {
+      '@context': 'https://schema.org',
+      '@type': schemaType,
+      name: businessName,
+      address
+    };
+    if (phone) schema.telephone = phone;
+    if (normalizedWebsite) schema.url = normalizedWebsite;
 
-### INJECTION DIRECTIVES
-1. **Header Placement**: Copy the JSON-LD script block above.
-2. **HTML Deployment**: Open your website's primary layout template and paste the script directly within the \`<head>\` and \`</head>\` tags.
-3. **Wix / Squarespace**: Navigate to Settings ➔ Custom Code ➔ Paste inside Header Section ➔ Click Deploy.
-4. **WordPress Integration**: Install a lightweight plugin like "Header and Footer Code Manager", create a new snippet, set the location to "Header", paste the markup, and save.`;
-    }
+    const report = [
+      '### JSON-LD LocalBusiness schema',
+      '',
+      '```json',
+      JSON.stringify(schema, null, 2),
+      '```',
+      '',
+      '### Deployment notes',
+      '- Confirm every supplied business detail against the official business source before publishing.',
+      '- Add a real logo/image only when the business owns or is authorized to use that image.',
+      '- Do not add coordinates, opening hours, prices, ratings, reviews, or service areas unless those values are verified.',
+      '- Validate the final page and structured data with an appropriate schema validator after deployment.',
+      '',
+      '**Evidence boundary:** This markup contains only the information supplied to HAL. Structured data does not guarantee Google Maps placement, search ranking, traffic, or a ranking uplift.'
+    ].join('\n');
 
     return {
       success: true,
       businessName,
       serviceType,
       city,
-      report: reportText,
+      schema,
+      evidenceStatus: 'user_supplied_business_details',
+      report,
       executedAt: new Date().toISOString()
     };
   }
