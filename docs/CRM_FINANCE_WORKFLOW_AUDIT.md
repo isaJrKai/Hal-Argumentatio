@@ -76,7 +76,7 @@ These items remain unverified and must not be represented as complete:
 6. Revenue recognition versus cash collection/payment recording. The current `/api/revenues` close-out endpoint records a positive whole-dollar amount against a lead; it is not a payment processor or a complete invoice/receivables ledger.
 7. End-to-end event correlation and ordering across audit, landing-page, outreach, deal, project, revenue, and forecast records.
 8. Forecast evaluation against correctly attributed observations and evidence that only actual outcomes feed learning.
-9. GitHub Actions CI must pass on the final branch head after the route-level concurrency, persisted proposal lifecycle, and CRM lifecycle changes. Earlier green runs do not validate these later commits. Non-blocking runner/toolchain warnings remain (Node.js 20 action deprecation, `punycode` deprecation, bundle-size warning, and local PostgreSQL trust-auth warning). CI provisions PostgreSQL 16 as a healthy service and supplies `DATABASE_URL`.
+9. GitHub Actions CI must pass on the final branch head after the route-level concurrency, persisted proposal lifecycle, and CRM lifecycle changes. CI #1317 passed on the latest test-code commit; this audit-only update is also subject to a final-head CI rerun. Earlier green runs do not validate later commits. Non-blocking runner/toolchain warnings remain (Node.js 20 action deprecation, `punycode` deprecation, bundle-size warning, and local PostgreSQL trust-auth warning). CI provisions PostgreSQL 16 as a healthy service and supplies `DATABASE_URL`.
 
 ## Safety and release
 
