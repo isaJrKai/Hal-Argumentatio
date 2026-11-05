@@ -8230,22 +8230,32 @@ app.post('/api/geocode', authenticate, async (req, res) => {
   }
 });
 
-app.post('/api/ai/engine-select', authenticate, (req, res) => {
+app.post('/api/ai/engine-select', authenticate, async (req, res) => {
   const { preferredEngine, offlineSimulation } = req.body;
-  
-  if (preferredEngine === 'gemini' || preferredEngine === 'nemotron' || preferredEngine === 'dual') {
-    process.env.HAL_ACTIVE_AI = preferredEngine;
-  }
-  
-  if (typeof offlineSimulation === 'boolean') {
-    autonomousLearning.setOfflineMode(offlineSimulation);
-  }
 
-  res.json({
-    success: true,
-    activeEngine: process.env.HAL_ACTIVE_AI || 'dual',
-    isOfflineModeActive: autonomousLearning.getState().isOfflineModeActive
-  });
+  try {
+    // Persist learning mode before reporting success or changing the active provider.
+    if (typeof offlineSimulation === 'boolean') {
+      await autonomousLearning.setOfflineMode(offlineSimulation);
+    }
+
+    if (preferredEngine === 'gemini' || preferredEngine === 'nemotron' || preferredEngine === 'dual') {
+      process.env.HAL_ACTIVE_AI = preferredEngine;
+    }
+
+    return res.json({
+      success: true,
+      activeEngine: process.env.HAL_ACTIVE_AI || 'dual',
+      isOfflineModeActive: autonomousLearning.getState().isOfflineModeActive
+    });
+  } catch (error) {
+    console.error('[AI Engine Select] Learning-state persistence failed.', error);
+    return res.status(503).json({
+      success: false,
+      code: 'LEARNING_STATE_PERSISTENCE_FAILED',
+      error: 'The learning-mode change was not saved. PostgreSQL must be available before this setting can be changed.'
+    });
+  }
 });
 
 app.post('/api/ai/dual-drive-synthesis', authenticate, async (req, res) => {
@@ -8294,33 +8304,44 @@ app.get('/api/autonomous/weights', authenticate, (req, res) => {
   res.json(state);
 });
 
-app.post('/api/autonomous/learn-step', authenticate, (req, res) => {
+app.post('/api/autonomous/learn-step', authenticate, async (req, res) => {
   const contractorId = (req as any).contractorId;
   const { niche, city, outcome, closedValueUsd, channelUsed, objectionText, auditFindings } = req.body;
 
-  const result = autonomousLearning.digestBusinessOutcome({
-    niche,
-    city,
-    outcome: outcome || 'won',
-    closedValueUsd: Number(closedValueUsd) || 0,
-    channelUsed,
-    objectionText,
-    auditFindings
-  });
+  try {
+    const result = await autonomousLearning.digestBusinessOutcome({
+      niche,
+      city,
+      outcome: outcome || 'won',
+      closedValueUsd: Number(closedValueUsd) || 0,
+      channelUsed,
+      objectionText,
+      auditFindings
+    });
 
-  db.addAuditLog({
-    contractorId,
-    action: 'AUTONOMOUS_LEARNING_CALIBRATED',
-    details: `Epoch ${result.newEpoch}: ${result.logMessage}`
-  });
+    await pgDb.insert(auditLogs).values({
+      id: crypto.randomUUID(),
+      contractorId,
+      action: 'AUTONOMOUS_LEARNING_CALIBRATED',
+      details: `Epoch ${result.newEpoch}: ${result.logMessage}`,
+      timestamp: new Date()
+    });
 
-  res.json({
-    success: true,
-    epoch: result.newEpoch,
-    updatedNiche: result.updatedNiche,
-    message: result.logMessage,
-    fullState: autonomousLearning.getState()
-  });
+    return res.json({
+      success: true,
+      epoch: result.newEpoch,
+      updatedNiche: result.updatedNiche,
+      message: result.logMessage,
+      fullState: autonomousLearning.getState()
+    });
+  } catch (error) {
+    console.error('[Autonomous Learning] Outcome persistence failed.', error);
+    return res.status(503).json({
+      success: false,
+      code: 'LEARNING_PERSISTENCE_FAILED',
+      error: 'The learning outcome could not be durably saved. No successful learning update is being reported.'
+    });
+  }
 });
 
 app.post('/api/autonomous/offline-pitch', authenticate, (req, res) => {
