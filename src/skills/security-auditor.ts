@@ -1,10 +1,10 @@
 import { Skill } from './types';
-import { generateResponse } from '../services/nemotron';
+import { validateDomainAndDns } from '../lib/networkVerification';
 
 export const securityAuditorSkill: Skill = {
   id: 'security_auditor',
-  name: 'SSL & Header Security Auditor',
-  description: "Audits SSL/TLS certificates, response headers, and domain trust parameters to ensure client compliance and browser trust using NEMOTRON.",
+  name: 'DNS & HTTPS Reachability Check',
+  description: 'Performs a bounded passive DNS and HTTPS reachability check only. The separate Website Auditor measures selected HTTP response headers; neither capability performs exploit testing or confirms application vulnerabilities.',
   category: 'research',
   icon: 'Globe',
   inputs: [
@@ -16,64 +16,85 @@ export const securityAuditorSkill: Skill = {
       defaultValue: '',
     }
   ],
-  execute: async (inputs, contractorId) => {
-    const { websiteUrl } = inputs;
-    if (!websiteUrl) {
+  execute: async (inputs) => {
+    const rawWebsiteUrl = String(inputs.websiteUrl || '').trim();
+    if (!rawWebsiteUrl) {
       throw new Error('Website URL is required for security audit');
     }
 
-    const systemPrompt = `You are HAL, the Lead Security Systems Architect. 
-Your tone is Swiss-style: clinical, precise, and deeply technical. No filler or exclamation marks.`;
-
-    const userPrompt = `Generate a security and trust audit report for the web asset:
-- Target Domain: ${websiteUrl}
-
-Evaluate the following parameters and structure your report as:
-1. INFRASTRUCTURE & ENCRYPTION DEEP DIVE: Check if SSL TLS v1.3 is in place, certificate expiration indicators, and the vulnerability of non-secure submission forms.
-2. RESPONSE HEADERS INVENTORY: Detail critical missing HTTP headers (HSTS, Content-Security-Policy, X-Frame-Options, X-Content-Type-Options) and the specific exploit risks (Clickjacking, XSS injections).
-3. REMEDIATION WORKFLOW: 4 precise, developer-level commands or configuration directives to apply.`;
-
-    let reportText = '';
-
+    let parsedUrl: URL;
     try {
-      reportText = await generateResponse(
-        userPrompt,
-        systemPrompt,
-        0.1
-      );
-    } catch (err) {
-      console.error('NEMOTRON call failed during Security Audit execution. Using fallback.', err);
+      parsedUrl = new URL(/^https?:\/\//i.test(rawWebsiteUrl) ? rawWebsiteUrl : `https://${rawWebsiteUrl}`);
+    } catch {
+      throw new Error('Enter a valid website URL.');
     }
 
-    if (!reportText) {
-      reportText = `### INFRASTRUCTURE & ENCRYPTION DEEP DIVE
-- **Domain Tested**: ${websiteUrl}
-- **SSL Encryption State**: TLS v1.2 / TLS v1.3 Active (Sourced via port 443).
-- **Insecure Submissions**: Detected contact forms submitting across non-secure HTTP endpoints or lacking input sanitization. This allows malicious actors to execute cross-site scripting (XSS) or intercept lead submissions.
-
-### RESPONSE HEADERS INVENTORY
-Our crawler analyzed the HTTP responses from the tested domain. The following security posture was mapped:
-| Header | Status | Risk Level | Mitigation Benefit |
-| :--- | :--- | :--- | :--- |
-| **HSTS (Strict-Transport-Security)** | Missing | High | Enforces encrypted connections globally |
-| **Content-Security-Policy (CSP)** | Missing | Critical | Inhibits cross-site scripting & unauthorized resources |
-| **X-Frame-Options** | Missing | Medium | Extinguishes Clickjacking overlays |
-| **X-Content-Type-Options** | Missing | Low | Blocks MIME sniffing attacks |
-
-### REMEDIATION WORKFLOW
-1. **Enforce Global HTTPS Redirect**: Configure server settings (Nginx, Apache, or Cloudflare Page Rules) to redirect all port 80 traffic to 443 immediately.
-2. **Inject Strict-Transport-Security Header**: Add the following directive to your virtual host configuration:
-   \`Strict-Transport-Security: max-age=63072000; includeSubDomains; preload\`
-3. **Establish Baseline Content-Security-Policy**: Limit scripts, styles, and image loads strictly to reliable origins:
-   \`Content-Security-Policy: default-src 'self'; script-src 'self' https://apis.google.com; style-src 'self' 'unsafe-inline';\`
-4. **Deploy X-Frame-Options Directive**: Prevent unauthorized third-party frames from embedding your customer forms:
-   \`X-Frame-Options: SAMEORIGIN\``;
+    if (
+      !['http:', 'https:'].includes(parsedUrl.protocol) ||
+      parsedUrl.username ||
+      parsedUrl.password ||
+      !parsedUrl.hostname ||
+      parsedUrl.port
+    ) {
+      throw new Error('Enter a public HTTP or HTTPS website URL without credentials or a custom port.');
     }
+
+    // The shared verifier resolves DNS, rejects non-public/reserved destinations,
+    // pins the selected public IP for the request, and does not follow redirects.
+    // Keep this capability passive: no port scans, exploit attempts, form submits,
+    // authentication tests, or arbitrary path crawling.
+    const rawEvidence = await validateDomainAndDns(parsedUrl.toString(), {
+      probeHttp: true,
+      timeoutMs: 5000
+    });
+
+    // Never disclose private/reserved IPs from rejected DNS resolutions.
+    const evidence = rawEvidence.dnsResolved
+      ? rawEvidence
+      : { ...rawEvidence, ipAddresses: undefined };
+
+    const lines = [
+      '## Passive website security connectivity report',
+      '',
+      '**Scope:** DNS resolution and a pinned HTTP/TLS reachability probe only.',
+      '**Evidence rule:** A successful connectivity check is not a full security audit. No vulnerability or exploitability claim is made.',
+      '',
+      `- **Submitted URL:** ${parsedUrl.origin}`,
+      `- **Resolved hostname:** ${evidence.hostname || 'Not resolved'}`,
+      `- **Public DNS resolution:** ${evidence.dnsResolved ? 'Passed' : 'Failed / unavailable'}`,
+      `- **HTTP reachability:** ${evidence.httpReachable ? 'Reachable' : 'Not confirmed'}`,
+      `- **Observed response status:** ${evidence.httpStatus ?? 'Not available'}`,
+      `- **HTTPS probe:** ${evidence.sslSecured ? 'Successful TLS connection' : 'Not confirmed'}`,
+      `- **Resolved IPs:** ${evidence.ipAddresses?.join(', ') || 'Not available'}`,
+      '',
+      '### Not measured in this run',
+      '- HTTP response security headers (HSTS, CSP, X-Frame-Options, X-Content-Type-Options)',
+      '- TLS protocol and cipher-suite inventory or certificate expiry details',
+      '- Page content, forms, authentication, application dependencies or known CVEs',
+      '- SEO, accessibility, mobile usability, performance or conversion metrics',
+      '',
+      '### Result interpretation',
+      evidence.rejectionReason
+        ? `- **Probe limitation:** ${evidence.rejectionReason}`
+        : '- Only the measurements listed above are verified. Missing security headers and application vulnerabilities remain unknown.',
+      '',
+      '### Safe next step',
+      'Obtain the website owner\'s written authorization before any intrusive security testing. A deeper passive header and page audit must separately validate redirects, DNS changes and every outbound destination.'
+    ];
 
     return {
       success: true,
-      websiteUrl,
-      report: reportText,
+      websiteUrl: parsedUrl.toString(),
+      coverage: {
+        dns: evidence.dnsResolved ? 'measured' : 'failed',
+        httpReachability: evidence.httpReachable ? 'measured' : 'not_confirmed',
+        https: evidence.sslSecured ? 'measured_success' : 'not_confirmed',
+        responseHeaders: 'not_measured',
+        applicationVulnerabilities: 'not_measured',
+        pageContent: 'not_measured'
+      },
+      evidence,
+      report: lines.join(String.fromCharCode(10)),
       executedAt: new Date().toISOString()
     };
   }

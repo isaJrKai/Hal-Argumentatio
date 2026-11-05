@@ -893,3 +893,88 @@ Object.assign(TRADE_TEMPLATES, {
     ]
   )
 });
+
+
+// Every template is a private draft scaffold, not a real contractor profile.
+// Strip seeded sample-business details and proof claims before exposing it in the UI.
+for (const template of Object.values(TRADE_TEMPLATES)) {
+  template.businessName = 'Your Business Name';
+  template.city = 'Your service area';
+  template.title = `Your Business Name — ${template.trade.replace(/_/g, ' ')} Services in Your Service Area`;
+  template.phone = '';
+  template.licenseNumber = 'Add verified licence details or remove this field before publishing';
+  template.emergencyService = false;
+  template.dispatchWindow = 'Set your actual availability before publishing';
+  if (template.branding) template.branding.logoText = 'YOUR BUSINESS';
+
+  const sections = template.sections as any;
+  const disableSection = (key: string) => {
+    const section = sections[key];
+    if (!section || typeof section !== 'object') return;
+    section.active = false;
+    if (Array.isArray(section.items)) section.items = [];
+    if (Array.isArray(section.badges)) section.badges = [];
+    if (Array.isArray(section.cities)) section.cities = [];
+  };
+
+  [
+    'announcement_bar', 'trust_bar', 'bento_features', 'pricing_packages',
+    'seasonal_alert', 'before_after', 'reviews', 'service_areas',
+    'guarantee', 'online_booking', 'faq', 'sticky_mobile_call'
+  ].forEach(disableSection);
+
+  if (sections.announcement_bar) {
+    sections.announcement_bar.text = '';
+    sections.announcement_bar.urgencyBadge = '';
+  }
+  if (sections.header) sections.header.ctaText = 'Contact the business';
+  if (sections.hero) {
+    const isSpecialistTemplate = ['sump_pump', 'waterproofing', 'flood_restoration', 'emergency_dispatch'].includes(template.trade);
+    if (!isSpecialistTemplate) {
+      sections.hero.headline = `Professional ${template.trade.replace(/_/g, ' ')} services in your area`;
+      sections.hero.subheadline = 'Describe the services your business provides, the areas you serve, and how customers can contact you.';
+    }
+    sections.hero.badgeText = 'Add verified credentials or remove this badge before publishing';
+  }
+  if (sections.services) {
+    sections.services.active = true;
+    sections.services.title = 'Suggested services — edit before publishing';
+    sections.services.subtitle = 'Keep only the services your business actually provides.';
+    if (Array.isArray(sections.services.items)) {
+      sections.services.items = sections.services.items.map((item: any) => {
+        const safeItem = { ...item };
+        if ('price' in safeItem) safeItem.price = '';
+        return safeItem;
+      });
+    }
+  }
+  if (sections.lead_form) {
+    sections.lead_form.active = true;
+    sections.lead_form.title = 'Request a service enquiry';
+    sections.lead_form.subtitle = 'Share your contact details and a short description of the work required.';
+    sections.lead_form.buttonText = 'Request a call back';
+    sections.lead_form.dispatchNote = 'Confirm service availability, response times, and any call-out fees directly with the business.';
+  }
+  if (sections.before_after) sections.before_after.subtitle = 'Add genuine project photos with customer permission.';
+  if (sections.reviews) {
+    sections.reviews.rating = 0;
+    sections.reviews.totalReviews = 0;
+    sections.reviews.subtitle = 'Add genuine customer reviews with permission.';
+  }
+  if (sections.service_areas) sections.service_areas.subtitle = 'List only locations the business currently serves.';
+  if (sections.guarantee) sections.guarantee.description = 'Add written service terms approved by the business.';
+  if (sections.sticky_mobile_call) {
+    sections.sticky_mobile_call.crewStatus = '';
+    sections.sticky_mobile_call.buttonText = 'Contact the business';
+  }
+  if (sections.footer) {
+    sections.footer.address = 'Add the business address or remove this field before publishing.';
+    sections.footer.copyright = '';
+  }
+
+  if (template.seo) {
+    template.seo.metaTitle = `Your Business Name — ${template.trade.replace(/_/g, ' ')}`;
+    template.seo.metaDescription = 'Learn about the services offered by Your Business Name. Contact the business for current service details.';
+    template.seo.schemaType = 'LocalBusiness';
+  }
+}

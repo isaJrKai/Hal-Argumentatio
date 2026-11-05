@@ -66,6 +66,8 @@ export const LandingPageStudioPanel: React.FC<{ token: string | null }> = ({ tok
 
   // State management
   const [artifacts, setArtifacts] = useState<any[]>([]);
+  const [leadOptions, setLeadOptions] = useState<any[]>([]);
+  const [selectedLeadId, setSelectedLeadId] = useState<string>('');
   const [selectedArtifactId, setSelectedArtifactId] = useState<string>('');
   const [activeTab, setActiveTab] = useState<'builder' | 'templates' | 'branding' | 'seo' | 'quality_gates' | 'code'>('builder');
   const [viewport, setViewport] = useState<'desktop' | 'tablet' | 'mobile'>('desktop');
@@ -76,6 +78,7 @@ export const LandingPageStudioPanel: React.FC<{ token: string | null }> = ({ tok
   const [mobileActiveView, setMobileActiveView] = useState<'editor' | 'preview'>('editor');
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isPublishing, setIsPublishing] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
   const [showAiModal, setShowAiModal] = useState(false);
   const [showHistoryModal, setShowHistoryModal] = useState(false);
@@ -115,6 +118,9 @@ export const LandingPageStudioPanel: React.FC<{ token: string | null }> = ({ tok
 
   // Live URL for current page
   const liveUrl = typeof window !== 'undefined' ? `${window.location.origin}/landing/${config.id}` : '';
+  const currentArtifact = artifacts.find(artifact => artifact.id === config.id);
+  const isPagePublished = currentArtifact?.status === 'ready' || currentArtifact?.status === 'deployed';
+  const isSavedDraft = currentArtifact?.status === 'draft';
 
   // Record a version snapshot
   const saveSnapshot = (label: string, snapshotConfig: LandingPageConfig) => {
@@ -143,6 +149,7 @@ export const LandingPageStudioPanel: React.FC<{ token: string | null }> = ({ tok
           setArtifacts(landers);
           const first = landers[0];
           setSelectedArtifactId(first.id);
+          setSelectedLeadId(first.content?.sourceLeadId || first.content?.pageConfig?.sourceLeadId || '');
 
           // If artifact has saved pageConfig, restore it
           if (first.content?.pageConfig) {
@@ -167,13 +174,51 @@ export const LandingPageStudioPanel: React.FC<{ token: string | null }> = ({ tok
 
   useEffect(() => {
     fetchArtifacts();
+    fetchLeadOptions();
   }, [token]);
+
+  const fetchLeadOptions = async () => {
+    if (!token) return;
+    try {
+      const res = await fetch('/api/leads', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (!res.ok) return;
+      const data = await res.json();
+      if (Array.isArray(data)) setLeadOptions(data);
+    } catch (err) {
+      console.warn('Could not load prospect records for Landing Page Studio:', err);
+    }
+  };
+
+  const handleSelectSourceLead = (leadId: string) => {
+    setSelectedLeadId(leadId);
+    const lead = leadOptions.find(item => item.id === leadId);
+    if (!lead) {
+      setConfig(prev => ({ ...prev, sourceLeadId: undefined }));
+      return;
+    }
+    setConfig(prev => ({
+      ...prev,
+      sourceLeadId: lead.id,
+      businessName: lead.businessName || prev.businessName,
+      city: lead.city || prev.city,
+      phone: lead.phone || prev.phone,
+      title: `${lead.businessName || prev.businessName} — ${String(prev.trade || 'business').toUpperCase()} PAGE`
+    }));
+    showToast({
+      title: 'Prospect Context Loaded',
+      message: `Using saved CRM details for ${lead.businessName}. The selected CRM details are copied into a private draft; verify the prospect before publishing.`,
+      type: 'info'
+    });
+  };
 
   // Handle switching artifacts
   const handleSelectArtifact = (id: string) => {
     const found = artifacts.find(a => a.id === id);
     if (found) {
       setSelectedArtifactId(found.id);
+      setSelectedLeadId(found.content?.sourceLeadId || found.content?.pageConfig?.sourceLeadId || '');
       if (found.content?.pageConfig) {
         setConfig({ ...found.content.pageConfig, contractorId: found.content.pageConfig.contractorId || found.contractorId });
       } else {
@@ -205,19 +250,19 @@ export const LandingPageStudioPanel: React.FC<{ token: string | null }> = ({ tok
         body: JSON.stringify({
           id: config.id,
           title: config.title,
-          pageConfig: config,
-          renderedHtml
+          leadId: selectedLeadId || config.sourceLeadId || null,
+          pageConfig: config
         })
       });
 
       const data = await res.json();
       if (res.ok && data.success) {
-        const savedConfig = { ...config, id: data.id || config.id, contractorId: data.contractorId || config.contractorId };
+        const savedConfig = { ...config, id: data.id || config.id, title: data.title || config.title, contractorId: data.contractorId || config.contractorId, sourceLeadId: data.sourceLeadId || selectedLeadId || config.sourceLeadId };
         setConfig(savedConfig);
         saveSnapshot(`Saved: ${config.title}`, savedConfig);
         showToast({
           title: 'Landing Page Saved',
-          message: `Changes published live to ${data.liveUrl}`,
+          message: data.sourceLeadId ? `Saved as a private draft linked to CRM prospect ${data.sourceLeadId}. Verify the prospect and publish when ready.` : 'Saved as a private draft. It is not public until you publish it.',
           type: 'success'
         });
         fetchArtifacts();
@@ -227,7 +272,7 @@ export const LandingPageStudioPanel: React.FC<{ token: string | null }> = ({ tok
     } catch (err: any) {
       showToast({
         title: 'Save Warning',
-        message: err.message || 'Stored in local memory',
+        message: err.message || 'The draft was not saved. Please retry.',
         type: 'warning'
       });
     } finally {
@@ -235,8 +280,42 @@ export const LandingPageStudioPanel: React.FC<{ token: string | null }> = ({ tok
     }
   };
 
+  const handlePublishPage = async () => {
+    const contentReviewed = window.confirm('Before publishing, confirm that you reviewed the business identity, service list, contact details, images, credentials, testimonials, pricing and all other page claims. Only publish information the business has authorized and can substantiate.');
+    if (!contentReviewed) return;
+    if (!config.id || !token) {
+      showToast({ title: 'Cannot Publish', message: 'Save the page and sign in before publishing.', type: 'warning' });
+      return;
+    }
+    setIsPublishing(true);
+    try {
+      const res = await fetch(`/api/landing-pages/${encodeURIComponent(config.id)}/publish`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ confirmPublish: true, contentReviewed: true })
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.success) throw new Error(data.error || `Publish failed (HTTP ${res.status}).`);
+      setArtifacts(prev => prev.map(artifact => artifact.id === config.id ? { ...artifact, status: 'deployed' } : artifact));
+      showToast({
+        title: 'Landing Page Published',
+        message: `The approved page is now public at ${data.liveUrl}`,
+        type: 'success'
+      });
+      fetchArtifacts();
+    } catch (err: any) {
+      showToast({ title: 'Publish Blocked', message: err?.message || 'The page could not be published.', type: 'error' });
+    } finally {
+      setIsPublishing(false);
+    }
+  };
+
   // Copy live link to clipboard
   const handleCopyLink = () => {
+    if (!isPagePublished) {
+      showToast({ title: 'Draft Is Private', message: 'Publish the page before sharing a public link.', type: 'warning' });
+      return;
+    }
     navigator.clipboard.writeText(liveUrl);
     setCopiedLink(true);
     showToast({
@@ -558,6 +637,22 @@ export const LandingPageStudioPanel: React.FC<{ token: string | null }> = ({ tok
 
         {/* Right: AI Synthesis, History, Save, Share & Live Actions */}
         <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1 bg-bg-raised border border-border-dim rounded-xl px-2 py-1 max-w-[220px]">
+            <span className="text-[9px] font-mono uppercase text-text-secondary whitespace-nowrap">CRM Prospect</span>
+            <select
+              aria-label="Use a saved CRM prospect"
+              value={selectedLeadId}
+              onChange={event => handleSelectSourceLead(event.target.value)}
+              className="min-w-0 bg-transparent text-[10px] font-semibold text-text-primary focus:outline-none cursor-pointer py-0.5"
+            >
+              <option value="" className="bg-bg-raised">Standalone page</option>
+              {leadOptions.map(lead => (
+                <option key={lead.id} value={lead.id} className="bg-bg-raised">
+                  {lead.businessName} · {lead.city}
+                </option>
+              ))}
+            </select>
+          </div>
           {/* Quick Theme Selector Dropdown */}
           <div className="flex items-center gap-1 bg-bg-raised border border-border-dim rounded-xl px-2 py-1">
             <Palette className="w-3.5 h-3.5 text-amber-400 shrink-0" />
@@ -612,7 +707,7 @@ export const LandingPageStudioPanel: React.FC<{ token: string | null }> = ({ tok
           {/* Simulate Inbound Lead Capture */}
           <button
             type="button"
-            disabled={isSimulatingLead}
+            disabled={isSimulatingLead || !isPagePublished}
             onClick={handleSimulateLead}
             title="Simulate inbound homeowner dispatch request (validates encryption, database persistence, and SSE alert)"
             className="px-2.5 py-1.5 rounded-xl border border-emerald-500/40 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 text-xs font-bold transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
@@ -664,11 +759,22 @@ export const LandingPageStudioPanel: React.FC<{ token: string | null }> = ({ tok
             <span>{isSaving ? 'Saving...' : 'Save'}</span>
           </button>
 
+          <button
+            type="button"
+            disabled={!isSavedDraft || isPublishing}
+            onClick={handlePublishPage}
+            title={isSavedDraft ? 'Publish after reviewing the page and verifying linked prospect identity' : 'Save a draft before publishing'}
+            className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs transition flex items-center gap-1.5 shadow disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            <span>{isPublishing ? 'Publishing...' : isPagePublished ? 'Published' : 'Publish'}</span>
+          </button>
+
           {/* Copy URL */}
           <button
             type="button"
             onClick={handleCopyLink}
-            title="Copy Public Landing Page Link"
+            disabled={!isPagePublished}
+            title={isPagePublished ? 'Copy Public Landing Page Link' : 'Publish the draft before copying a public link'}
             className="p-1.5 rounded-xl border border-border-dim bg-bg-raised hover:bg-bg-subtle text-text-secondary transition"
           >
             {copiedLink ? <Check className="w-4 h-4 text-emerald-400" /> : <Share2 className="w-4 h-4" />}
@@ -685,15 +791,19 @@ export const LandingPageStudioPanel: React.FC<{ token: string | null }> = ({ tok
           </button>
 
           {/* Open Live */}
-          <a
-            href={liveUrl}
-            target="_blank"
-            rel="noreferrer"
-            className="px-3 py-1.5 rounded-xl bg-bg-subtle hover:bg-slate-700 text-text-primary font-bold text-xs transition flex items-center gap-1.5 border border-border-dim"
-          >
-            <ExternalLink className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">Live</span>
-          </a>
+          {isPagePublished ? (
+            <a
+              href={liveUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="px-3 py-1.5 rounded-xl bg-bg-subtle hover:bg-slate-700 text-text-primary font-bold text-xs transition flex items-center gap-1.5 border border-border-dim"
+            >
+              <ExternalLink className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Live</span>
+            </a>
+          ) : (
+            <span className="px-3 py-1.5 rounded-xl bg-bg-subtle text-text-tertiary text-xs border border-border-dim" title="This draft is private until published">Draft</span>
+          )}
         </div>
 
         {/* Mobile View Toggle (Editor vs Preview) */}

@@ -13,53 +13,59 @@ export const adSpendBreakevenSkill: Skill = {
       label: 'Monthly Ad Spend Budget (USD)',
       type: 'string',
       required: true,
-      defaultValue: '1000'
+      defaultValue: ''
     },
     {
       name: 'cpl',
       label: 'Estimated Cost Per Lead (USD)',
       type: 'string',
       required: true,
-      defaultValue: '50'
+      defaultValue: ''
     },
     {
       name: 'meetingRate',
       label: 'Lead-to-Meeting Rate (%)',
       type: 'string',
       required: true,
-      defaultValue: '20'
+      defaultValue: ''
     },
     {
       name: 'dealRate',
       label: 'Meeting-to-Deal Close Rate (%)',
       type: 'string',
       required: true,
-      defaultValue: '25'
+      defaultValue: ''
     },
     {
       name: 'dealValue',
       label: 'Average Deal Value / Client LTV (USD)',
       type: 'string',
       required: true,
-      defaultValue: '2500'
+      defaultValue: ''
     },
     {
       name: 'serviceMargin',
       label: 'Service Gross Fulfillment Margin (%)',
       type: 'string',
       required: true,
-      defaultValue: '60'
+      defaultValue: ''
     }
   ],
   execute: async (inputs, contractorId) => {
     const { monthlyAdSpend, cpl, meetingRate, dealRate, dealValue, serviceMargin } = inputs;
 
-    const adSpend = parseFloat(monthlyAdSpend) || 1000;
-    const costPerLead = parseFloat(cpl) || 50;
-    const meetRate = parseFloat(meetingRate) || 20;
-    const dRate = parseFloat(dealRate) || 25;
-    const dValue = parseFloat(dealValue) || 2500;
-    const sMargin = parseFloat(serviceMargin) || 60;
+    const adSpend = Number(monthlyAdSpend);
+    const costPerLead = Number(cpl);
+    const meetRate = Number(meetingRate);
+    const dRate = Number(dealRate);
+    const dValue = Number(dealValue);
+    const sMargin = Number(serviceMargin);
+    if (![adSpend, costPerLead, meetRate, dRate, dValue, sMargin].every(Number.isFinite) ||
+        adSpend <= 0 || costPerLead <= 0 || dValue <= 0 ||
+        meetRate < 0 || meetRate > 100 || dRate < 0 || dRate > 100 ||
+        sMargin <= 0 || sMargin > 100) {
+      throw new Error('Enter positive spend, CPL and deal value, with meeting, close and gross-margin percentages between 0 and 100.');
+    }
 
     const leads = adSpend / costPerLead;
     const meetings = leads * (meetRate / 100);
@@ -75,15 +81,15 @@ export const adSpendBreakevenSkill: Skill = {
 
     const adEconomicsReport = `### AD CAMPAIGN ECONOMIC MODEL SUMMARY
 
-**Core Metrics Projection:**
+**Illustrative scenario from user-supplied assumptions (not measured campaign results):**
 - **Monthly Budget:** $${adSpend.toFixed(2)}
 - **Estimated Leads Generated:** ${leads.toFixed(1)} leads
 - **Estimated Scheduled Meetings:** ${meetings.toFixed(1)} opportunities
 - **Estimated Closed Deals:** ${closedDeals.toFixed(2)} contracts
-- **Projected Gross Revenue:** $${grossRevenue.toFixed(2)}
+- **Scenario Gross Revenue:** $${grossRevenue.toFixed(2)}
 - **Fulfillment Margin Share:** $${(grossRevenue * (sMargin / 100)).toFixed(2)}
 - **Return on Ad Spend (ROAS):** ${roas.toFixed(2)}x
-- **Projected Campaign Net Profit:** $${netCampaignProfit.toFixed(2)}
+- **Scenario Campaign Contribution After Ad Spend:** $${netCampaignProfit.toFixed(2)}
 
 **Critical Break-Even Analysis:**
 - **Revenue Needed to Cover Ad Spend & Fulfillment Costs:** $${breakEvenRevenueNeeded.toFixed(2)}
@@ -96,7 +102,7 @@ Analyze client ad campaigns with cold, objective, mathematical precision. Offer 
     const userPrompt = `A business prospect is evaluating an ad budget with these metrics:
 ${adEconomicsReport}
 
-Draft a highly persuasive, numbers-driven proposal brief proving why this budget makes absolute mathematical sense. Clearly address their risk threshold (break-even point) to secure their buy-in.`;
+Draft a neutral scenario explanation. Clearly state that the model is arithmetic based on user-entered assumptions, not a prediction or measured result. Do not guarantee ROI or say the budget is proven to make sense.`;
 
     let reportText = '';
 
@@ -115,12 +121,12 @@ Draft a highly persuasive, numbers-driven proposal brief proving why this budget
 
 Dear Executive,
 
-Based on your target parameters, committing to a **$${adSpend} monthly spend** carries a highly optimized risk profile. With an average cost per lead of **$${costPerLead}**, the campaign generates **${leads.toFixed(0)} top-funnel leads**. 
+Using the assumptions entered, a **${adSpend} monthly spend** produces the following illustrative scenario. This is not a measured campaign result or a guarantee. With an average cost per lead of **$${costPerLead}**, the campaign generates **${leads.toFixed(0)} top-funnel leads**. 
 
-Assuming a conservative **${meetRate}% lead-to-meeting rate** and a standard **${dRate}% closing rate**, we anticipate converting **${closedDeals.toFixed(1)} new closed deals** with an average contract value of **$${dValue}**. This generates a gross pipeline value of **$${grossRevenue.toLocaleString()}** and a solid **${roas.toFixed(1)}x Return on Ad Spend**.
+Using the assumed **${meetRate}% lead-to-meeting rate** and **${dRate}% closing rate**, the arithmetic scenario produces **${closedDeals.toFixed(1)} new closed deals** with an average contract value of **$${dValue}**. This generates a gross pipeline value of **$${grossRevenue.toLocaleString()}** and a solid **${roas.toFixed(1)}x Return on Ad Spend**.
 
 **Risk Mitigation Metrics:**
-To satisfy a absolute risk-neutral commitment, we have calculated your precise break-even threshold. Adjusting for your **${sMargin}% gross profit margin**, you only need to close **${breakEvenDealsNeeded.toFixed(1)} deals** out of the expected campaign leads to completely offset both your marketing budget and delivery fulfillment costs. This represents a minuscule **${(breakEvenDealsNeeded / leads * 100).toFixed(1)}% necessary conversion rate** of incoming leads to be entirely break-even. 
+For this scenario, the break-even threshold is calculated from the supplied gross-margin assumption. Adjusting for your **${sMargin}% gross profit margin**, you only need to close **${breakEvenDealsNeeded.toFixed(1)} deals** out of the expected campaign leads to completely offset both your marketing budget and delivery fulfillment costs. This represents a minuscule **${(breakEvenDealsNeeded / leads * 100).toFixed(1)}% necessary conversion rate** of incoming leads to be entirely break-even. 
 
 We recommend proceeding with this allocation.`;
     }

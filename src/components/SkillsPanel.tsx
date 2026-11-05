@@ -89,6 +89,7 @@ export default function SkillsPanel({ token }: SkillsPanelProps) {
   const { toast } = useToast();
   const { activeCity, activeNiche } = useBusinessContext();
   const [skills, setSkills] = useState<Skill[]>([]);
+  const [auditLeads, setAuditLeads] = useState<any[]>([]);
   const [selectedSkill, setSelectedSkill] = useState<Skill | null>(null);
   const [formInputs, setFormInputs] = useState<Record<string, any>>({});
   const [loading, setLoading] = useState(false);
@@ -117,6 +118,7 @@ export default function SkillsPanel({ token }: SkillsPanelProps) {
 
   useEffect(() => {
     fetchSkills();
+    fetchAuditLeads();
   }, []);
 
   // Update default form inputs when selected skill or global context shifts
@@ -155,6 +157,19 @@ export default function SkillsPanel({ token }: SkillsPanelProps) {
     }
   };
 
+  const fetchAuditLeads = async () => {
+    try {
+      const res = await fetch('/api/leads', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (!res.ok) return;
+      const data = await res.json();
+      if (Array.isArray(data)) setAuditLeads(data.filter(lead => typeof lead.websiteUrl === 'string' && lead.websiteUrl.trim()));
+    } catch (err) {
+      console.error('Failed to load leads for website audit:', err);
+    }
+  };
+
   const handleInputChange = (name: string, value: any) => {
     setFormInputs(prev => ({ ...prev, [name]: value }));
   };
@@ -163,26 +178,18 @@ export default function SkillsPanel({ token }: SkillsPanelProps) {
     e.preventDefault();
     if (!selectedSkill) return;
 
+    const startedAt = Date.now();
     setLoading(true);
     setExecutionResult(null);
     setError(null);
     setTerminalLogs([
-      `[SYS_INFO] Initialising executive capability: "${selectedSkill.id}"`,
-      `[SYS_INFO] Allocating secure processing node...`,
-      `[SYS_INFO] Loading input parameters: ${JSON.stringify(formInputs)}`,
+      `[SYS_INFO] Starting capability: "${selectedSkill.id}"`,
+      '[SYS_INFO] Sending request to authenticated HAL execution API...',
+      `[SYS_INFO] Input fields: ${Object.keys(formInputs).join(', ') || 'none'}`
     ]);
 
-    const addLogWithDelay = (text: string, delay: number) => {
-      setTimeout(() => {
-        setTerminalLogs(prev => [...prev, text]);
-      }, delay);
-    };
-
-    addLogWithDelay(`[AGENT_LOAD] Launching active subprocess...`, 400);
-    addLogWithDelay(`[API_QUERY] Dispersing web request payload...`, 800);
-
     try {
-      const res = await fetch(`/api/skills/${selectedSkill.id}/execute`, {
+      const res = await fetch(`/api/skills/${encodeURIComponent(selectedSkill.id)}/execute`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -191,32 +198,22 @@ export default function SkillsPanel({ token }: SkillsPanelProps) {
         body: JSON.stringify({ inputs: formInputs })
       });
 
-      const data = await res.json();
-      
+      const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        throw new Error(data.error || 'Execution pipeline aborted');
+        throw new Error(data.error || `Execution failed (HTTP ${res.status}).`);
       }
 
-      setTimeout(() => {
-        setTerminalLogs(prev => [
-          ...prev, 
-          `[SYS_SUCCESS] Processing finalized. Decoding results...`,
-          `[SYS_SUCCESS] Execution completed in 1.48s`
-        ]);
-        setExecutionResult(data);
-        setLoading(false);
-      }, 1500);
-
+      setExecutionResult(data);
+      setTerminalLogs(prev => [
+        ...prev,
+        `[SYS_SUCCESS] HAL returned an execution result in ${Date.now() - startedAt}ms.`
+      ]);
     } catch (err: any) {
-      setTimeout(() => {
-        setTerminalLogs(prev => [
-          ...prev, 
-          `[CRITICAL_ERR] Pipeline error: ${err.message}`,
-          `[CRITICAL_ERR] Decryption / Connection failed`
-        ]);
-        setError(err.message);
-        setLoading(false);
-      }, 1500);
+      const message = err?.message || 'The HAL execution request failed.';
+      setError(message);
+      setTerminalLogs(prev => [...prev, `[CRITICAL_ERR] ${message}`]);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -451,7 +448,27 @@ export default function SkillsPanel({ token }: SkillsPanelProps) {
                       <label className="text-[10px] font-mono text-text-secondary uppercase tracking-wider block">
                         {inp.label} {inp.required && <span className="text-accent">*</span>}
                       </label>
-                      {inp.type === 'select' ? (
+                      {inp.name === 'leadId' && selectedSkill.id === 'website_audit' ? (
+                        <select
+                          value={formInputs.leadId || ''}
+                          onChange={(e) => {
+                            const lead = auditLeads.find(item => item.id === e.target.value);
+                            setFormInputs(prev => ({
+                              ...prev,
+                              leadId: e.target.value,
+                              ...(lead ? { businessName: lead.businessName || '', websiteUrl: lead.websiteUrl || '' } : {})
+                            }));
+                          }}
+                          className="w-full bg-bg-base border border-border-dim rounded-sm px-3 py-2 text-xs text-text-primary focus:outline-none focus:border-accent transition-colors font-sans"
+                        >
+                          <option value="" className="bg-bg-raised text-text-primary">Audit a URL without linking a lead</option>
+                          {auditLeads.map(lead => (
+                            <option key={lead.id} value={lead.id} className="bg-bg-raised text-text-primary">
+                              {lead.businessName} — {lead.city}
+                            </option>
+                          ))}
+                        </select>
+                      ) : inp.type === 'select' ? (
                         <select
                           required={inp.required}
                           value={formInputs[inp.name] || ''}

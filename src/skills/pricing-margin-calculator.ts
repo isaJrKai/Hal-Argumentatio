@@ -1,146 +1,109 @@
 import { Skill } from './types';
-import { generateResponse } from '../services/nemotron';
 
 export const pricingMarginCalculatorSkill: Skill = {
   id: 'pricing_margin_calculator',
-  name: 'Pricing & Margin Calculator Scoper',
-  description: "Evaluates the unit economics, worker pay spreads, and markups of Talent Arbitrage and Automation-Ops agency offerings using NEMOTRON.",
+  name: 'Pricing & Margin Scenario Calculator',
+  description: 'Calculates illustrative unit economics from user-supplied pay, markup, hours, retainer, and cost assumptions. Results are scenarios, not measured profitability or market benchmarks.',
   category: 'general',
   icon: 'DollarSign',
   inputs: [
-    {
-      name: 'modelType',
-      label: 'Model Type (arbitrage or ops)',
-      type: 'select',
-      required: true,
-      defaultValue: 'arbitrage',
-      options: ['arbitrage', 'ops']
-    },
-    {
-      name: 'workerPay',
-      label: 'Worker Hourly Pay (USD) / SaaS Overhead',
-      type: 'string',
-      required: true,
-      defaultValue: '8',
-    },
-    {
-      name: 'markupPercentOrRetainer',
-      label: 'Markup % (for Arbitrage) or Client Monthly Retainer (for Ops)',
-      type: 'string',
-      required: true,
-      defaultValue: '50',
-    },
-    {
-      name: 'weeklyHoursOrAdminHours',
-      label: 'Weekly Work Hours (for Arbitrage) or Admin Maint. Hours/mo (for Ops)',
-      type: 'string',
-      required: true,
-      defaultValue: '30',
-    }
+    { name: 'modelType', label: 'Model Type', type: 'select', required: true, defaultValue: 'arbitrage', options: ['arbitrage', 'ops'] },
+    { name: 'workerPay', label: 'Worker Hourly Pay (arbitrage) or Monthly Software Cost (ops), USD', type: 'string', required: true, defaultValue: '' },
+    { name: 'markupPercentOrRetainer', label: 'Markup Percent (arbitrage) or Monthly Client Retainer (ops), USD', type: 'string', required: true, defaultValue: '' },
+    { name: 'weeklyHoursOrAdminHours', label: 'Billable Hours per Week (arbitrage) or Admin Hours per Month (ops)', type: 'string', required: true, defaultValue: '' },
+    { name: 'adminHourlyCost', label: 'Assumed Admin Hourly Cost (ops only), USD', type: 'string', required: false, defaultValue: '' }
   ],
-  execute: async (inputs, contractorId) => {
-    const { modelType, workerPay, markupPercentOrRetainer, weeklyHoursOrAdminHours } = inputs;
+  execute: async (inputs) => {
+    const modelType = String(inputs.modelType || 'arbitrage');
+    const pay = Number(inputs.workerPay);
+    const markupOrRetainer = Number(inputs.markupPercentOrRetainer);
+    const hours = Number(inputs.weeklyHoursOrAdminHours);
+    const adminHourlyCost = Number(inputs.adminHourlyCost);
 
-    const pay = parseFloat(workerPay) || 8;
-    const markupOrRetainer = parseFloat(markupPercentOrRetainer) || 50;
-    const hours = parseFloat(weeklyHoursOrAdminHours) || 30;
+    if (!['arbitrage', 'ops'].includes(modelType)) throw new Error('Choose arbitrage or ops.');
+    if (![pay, markupOrRetainer, hours].every(Number.isFinite) || pay <= 0 || markupOrRetainer <= 0 || hours <= 0) {
+      throw new Error('Enter positive pay/software cost, markup/retainer, and hours.');
+    }
 
-    let marginAnalysis = '';
-
+    let report: string;
+    let calculations: Record<string, number>;
     if (modelType === 'arbitrage') {
+      if (markupOrRetainer > 1000) throw new Error('Markup percentage must be no greater than 1000%.');
       const clientHourlyRate = pay * (1 + markupOrRetainer / 100);
-      const profitPerKeyHour = clientHourlyRate - pay;
+      const spreadPerHour = clientHourlyRate - pay;
       const weeklyCost = pay * hours;
       const weeklyRevenue = clientHourlyRate * hours;
-      const weeklyProfit = weeklyRevenue - weeklyCost;
-      const annualProfit = weeklyProfit * 52;
-      const margin = (profitPerKeyHour / clientHourlyRate) * 100;
+      const weeklySpread = weeklyRevenue - weeklyCost;
+      const annualSpread = weeklySpread * 52;
+      const grossSpreadMarginPercent = clientHourlyRate > 0 ? spreadPerHour / clientHourlyRate * 100 : 0;
 
-      marginAnalysis = `### TALENT ARBITRAGE FINANCIAL FEASIBILITY REPORT
-
-**Unit Economics Summary:**
-- **Talent Compensation:** $${pay.toFixed(2)}/hr
-- **Markup Applied:** ${markupOrRetainer}%
-- **Client End-Price:** $${clientHourlyRate.toFixed(2)}/hr
-- **Gross Profit Margin:** ${margin.toFixed(1)}%
-- **Your Net Spread:** $${profitPerKeyHour.toFixed(2)}/hr
-
-**Weekly Forecast (Single Placement):**
-- **Hours Committed:** ${hours} hours/week
-- **Revenue Generated:** $${weeklyRevenue.toFixed(2)}/week
-- **Fulfillment Cost:** $${weeklyCost.toFixed(2)}/week
-- **Net Spread Revenue:** $${weeklyProfit.toFixed(2)}/week
-
-**Scaling Model Projections (Annual Net Profit Run-rate):**
-- **1 Active Placement:** $${annualProfit.toLocaleString(undefined, { maximumFractionDigits: 0 })}/year
-- **5 Active Placements:** $${(annualProfit * 5).toLocaleString(undefined, { maximumFractionDigits: 0 })}/year
-- **10 Active Placements:** $${(annualProfit * 10).toLocaleString(undefined, { maximumFractionDigits: 0 })}/year`;
+      calculations = {
+        clientHourlyRateUsd: clientHourlyRate,
+        spreadPerHourUsd: spreadPerHour,
+        weeklyCostUsd: weeklyCost,
+        weeklyRevenueUsd: weeklyRevenue,
+        weeklySpreadUsd: weeklySpread,
+        annualizedSpreadBeforeOtherCostsUsd: annualSpread,
+        grossSpreadMarginPercent
+      };
+      report = [
+        '### ARBITRAGE PRICING SCENARIO',
+        '- Worker pay assumption: $' + pay.toFixed(2) + '/hour',
+        '- Markup assumption: ' + markupOrRetainer + '%',
+        '- Illustrative client rate: $' + clientHourlyRate.toFixed(2) + '/hour',
+        '- Gross spread: $' + spreadPerHour.toFixed(2) + '/hour',
+        '- Billable hours assumption: ' + hours + ' per week',
+        '- Weekly spread before other costs: $' + weeklySpread.toFixed(2),
+        '- Annualized spread before other costs: $' + annualSpread.toFixed(2),
+        '- Gross spread margin: ' + grossSpreadMarginPercent.toFixed(1) + '%',
+        '',
+        '**Excluded from this calculation:** taxes, payment fees, recruiting, management time, non-billable hours, leave, currency conversion, churn, bad debt, insurance, and overhead. Annualization assumes 52 weeks at the same billable hours and rate.'
+      ].join('\n');
     } else {
-      // Ops
-      const monthlySoftwareOverhead = pay; // Software cost (entered in workerPay)
-      const retainer = markupOrRetainer; // Retainer (entered in markupPercentOrRetainer)
-      const maintenanceHours = hours; // Maintenance hours (entered in weeklyHoursOrAdminHours)
-      const adminInternalHourlyRate = 15; // standard assumption
-      const maintenanceCost = maintenanceHours * adminInternalHourlyRate;
-      const totalCostPerClient = monthlySoftwareOverhead + maintenanceCost;
-      const netProfitPerClient = retainer - totalCostPerClient;
-      const margin = (netProfitPerClient / retainer) * 100;
-      const annualProfit = netProfitPerClient * 12;
+      if (!Number.isFinite(adminHourlyCost) || adminHourlyCost <= 0) {
+        throw new Error('Enter a positive assumed admin hourly cost for the ops model.');
+      }
+      const monthlySoftwareCost = pay;
+      const monthlyRetainer = markupOrRetainer;
+      const monthlyMaintenanceCost = hours * adminHourlyCost;
+      const monthlyTotalCost = monthlySoftwareCost + monthlyMaintenanceCost;
+      const monthlyContribution = monthlyRetainer - monthlyTotalCost;
+      const contributionMarginPercent = monthlyRetainer > 0 ? monthlyContribution / monthlyRetainer * 100 : 0;
 
-      marginAnalysis = `### AUTOMATION OPS PRODUCT ECONOMIC PROFILE
-
-**Unit Economics Summary:**
-- **Client Monthly Retainer:** $${retainer.toFixed(2)}/mo
-- **Software/API Infrastructure Overhead:** $${monthlySoftwareOverhead.toFixed(2)}/mo
-- **Admin Maintenance Costs (${maintenanceHours} hrs @ $${adminInternalHourlyRate}/hr):** $${maintenanceCost.toFixed(2)}/mo
-- **Total Operational Overhead per Client:** $${totalCostPerClient.toFixed(2)}/mo
-- **Net Monthly Profit Spread per Client:** $${netProfitPerClient.toFixed(2)}/mo
-- **Gross Retainer Margin:** ${margin.toFixed(1)}%
-
-**Scaling Model Projections (Annual Net Profit Run-rate):**
-- **1 Active Client Retainer:** $${annualProfit.toLocaleString(undefined, { maximumFractionDigits: 0 })}/year
-- **10 Active Client Retainers:** $${(annualProfit * 10).toLocaleString(undefined, { maximumFractionDigits: 0 })}/year
-- **25 Active Client Retainers:** $${(annualProfit * 25).toLocaleString(undefined, { maximumFractionDigits: 0 })}/year`;
-    }
-
-    const systemPrompt = `You are HAL, the premier AI Business Operating Intelligence system.
-Provide highly structured, Swiss-style corporate analysis regarding talent arbitrage and operational products. No conversational filler.`;
-
-    const userPrompt = `Review these unit economics inputs and compile a rigorous pricing/margin optimization strategy.
-OPERATIONAL METRIC FEEDBACK:
-${marginAnalysis}
-
-Please outline a 3-step action plan to maximize gross margins without compromising worker welfare or service delivery standards. Use highly professional corporate prose.`;
-
-    let reportText = '';
-
-    try {
-      reportText = await generateResponse(
-        userPrompt,
-        systemPrompt,
-        0.2
-      );
-    } catch (err) {
-      console.error('NEMOTRON calculation failed, using fallback report.', err);
-    }
-
-    if (!reportText) {
-      reportText = `### ACTION PLAN FOR MARGIN OPTIMIZATION
-
-1. **Implement Retainer-Based Billing with Built-In Hour Caps:**
-   - Transition overseas clients from fluid hourly billings to fixed-price monthly retainers with predefined hour caps (e.g. 30 hours per week). Any overage is charged at a premium rate. This stabilizes cash flow and guarantees profit spread.
-
-2. **Upsell High-Leverage Automation Add-ons:**
-   - Bundle low-maintenance software automations with raw talent placements. Incorporating workflow scripts can justify a higher markup while actually reducing the manual hours remote workers have to spend on repetitive chores, elevating client perceived value.
-
-3. **Recruit from High-Competency, Competitive Geographies:**
-   - Focus sourcing efforts specifically on regional hubs with top-tier technical universities and reliable infrastructure, ensuring high quality control, near-zero churn, and long client retention rates.`;
+      calculations = {
+        monthlySoftwareCostUsd: monthlySoftwareCost,
+        monthlyRetainerUsd: monthlyRetainer,
+        adminHoursPerMonth: hours,
+        adminHourlyCostUsd: adminHourlyCost,
+        monthlyMaintenanceCostUsd: monthlyMaintenanceCost,
+        monthlyTotalCostUsd: monthlyTotalCost,
+        monthlyContributionBeforeOtherCostsUsd: monthlyContribution,
+        contributionMarginPercent,
+        annualizedContributionBeforeOtherCostsUsd: monthlyContribution * 12
+      };
+      report = [
+        '### AUTOMATION OPS PRICING SCENARIO',
+        '- Client retainer assumption: $' + monthlyRetainer.toFixed(2) + '/month',
+        '- Software/API cost assumption: $' + monthlySoftwareCost.toFixed(2) + '/month',
+        '- Admin hours assumption: ' + hours + ' per month',
+        '- Admin hourly cost assumption: $' + adminHourlyCost.toFixed(2),
+        '- Calculated maintenance cost: $' + monthlyMaintenanceCost.toFixed(2) + '/month',
+        '- Total modeled cost: $' + monthlyTotalCost.toFixed(2) + '/month',
+        '- Contribution before other costs: $' + monthlyContribution.toFixed(2) + '/month',
+        '- Contribution margin: ' + contributionMarginPercent.toFixed(1) + '%',
+        '- Annualized contribution before other costs: $' + (monthlyContribution * 12).toFixed(2),
+        '',
+        '**Excluded from this calculation:** taxes, payment fees, customer support outside the entered hours, onboarding, churn, infrastructure overages, compliance, and other operating costs.'
+      ].join('\n');
     }
 
     return {
       success: true,
-      marginAnalysis,
-      strategyActionPlan: reportText,
+      modelType,
+      calculations,
+      scenarioOnly: true,
+      evidenceStatus: 'user_supplied_assumptions_only',
+      report,
       executedAt: new Date().toISOString()
     };
   }

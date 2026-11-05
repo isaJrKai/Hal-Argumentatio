@@ -1,60 +1,47 @@
 import { Skill } from './types';
-import { generateResponse } from '../services/nemotron';
 
 export const jupyterLiveKernelSkill: Skill = {
   id: 'jupyter_live_kernel',
-  name: 'Jupyter Live Kernel',
-  description: 'Executes and analyzes iterative Python code via a live Jupyter kernel state model using NEMOTRON.',
+  name: 'Python Code Review (No Execution)',
+  description: 'Reviews Python source and provides a static reasoning report. It does not execute code, maintain a live Jupyter kernel, import modules, or persist variables.',
   category: 'general',
   icon: 'Terminal',
   inputs: [
-    {
-      name: 'code',
-      label: 'Python Code',
-      type: 'string',
-      required: true,
-    },
-    {
-      name: 'notebookPath',
-      label: 'Notebook Path',
-      type: 'string',
-      required: false,
-      defaultValue: 'scratch.ipynb',
-    },
+    { name: 'code', label: 'Python Code', type: 'string', required: true, defaultValue: '' },
+    { name: 'notebookPath', label: 'Notebook Label (optional)', type: 'string', required: false, defaultValue: 'scratch.ipynb' }
   ],
-  execute: async (inputs, contractorId) => {
-    const { code, notebookPath } = inputs;
+  execute: async (inputs) => {
+    const code = String(inputs.code || '');
+    const notebookPath = String(inputs.notebookPath || 'scratch.ipynb');
+    if (!code.trim()) throw new Error('Python code is required.');
 
-    const systemPrompt = `You are HAL, operating a stateful Jupyter Live Kernel Python REPL interface.
-Your analysis is Swiss-style, objective, analytical, and highly precise. No conversational filler or exclamation marks.`;
-
-    const userPrompt = `Simulate and analyze the execution of the following Python code within the Jupyter kernel context.
-Notebook Path: ${notebookPath}
-Code to Execute:
-\`\`\`python
-${code}
-\`\`\`
-
-Provide an elegant, high-fidelity execution report:
-1. EXECUTION STATUS: (e.g., Success, Traceback, or Warning)
-2. STDOUT/STDERR OUTPUT: (Show the expected printed outputs, variable states, or evaluation results)
-3. STATE PERSISTENCE MATRIX: List the live variables, imported modules, and their current values in the kernel memory.
-4. ARCHITECTURAL FEEDBACK: A concise (1-2 sentences) diagnostic of the code's complexity, efficiency, or suggestions.`;
-
-    let reportText = '';
-    try {
-      reportText = await generateResponse(userPrompt, systemPrompt, 0.2);
-    } catch (err) {
-      console.error('NEMOTRON call failed during Jupyter execution analysis. Using fallback.', err);
-      reportText = `### Jupyter Live Kernel Execution Report\n\n**Status:** Simulated Success\n**Notebook:** ${notebookPath}\n\n**Executed Code:**\n\`\`\`python\n${code}\n\`\`\`\n\n**Output:**\nCode analyzed and validated. All variable assignments persisted to state.`;
-    }
+    const report = [
+      '### Python static review',
+      '- **Notebook label:** ' + notebookPath,
+      '- **Execution performed:** No',
+      '- **Kernel state created or persisted:** No',
+      '- **Runtime output:** Not available — HAL does not have a Python kernel connected to this skill.',
+      '',
+      '### Source supplied for review',
+      '```python',
+      code.slice(0, 12000),
+      '```',
+      '',
+      '### Review limitations',
+      '- Syntax, imports, file access, network access, runtime exceptions, and variable values have not been verified by execution.',
+      '- Any expected output must be treated as a hypothesis until run in a real isolated Python environment.',
+      '- Do not use this report as proof that the code is safe or correct.'
+    ].join('\n');
 
     return {
-      report: reportText,
-      metadata: {
-        notebookPath,
-        codeLength: code.length,
-      }
+      success: true,
+      notebookPath,
+      executionPerformed: false,
+      kernelStatePersisted: false,
+      evidenceStatus: 'static_source_review_only',
+      codeLength: code.length,
+      report,
+      executedAt: new Date().toISOString()
     };
   }
 };

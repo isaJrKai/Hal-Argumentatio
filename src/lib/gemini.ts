@@ -366,6 +366,7 @@ export async function harvestRealBusinesses(
   verificationStatus?: 'VERIFIED' | 'UNVERIFIED_STAGING' | 'FABRICATED_REJECTED';
   dnsVerified?: boolean;
   groundingEvidence?: any;
+  discoverySources?: Array<{ title: string; uri: string }>;
 }>> {
   const targetCount = Math.min(Math.max(Number(limit) || 10, 1), 25);
   const prompt = `You are HAL's verified territory intelligence discovery engine.
@@ -412,9 +413,14 @@ IMPORTANT: Output ONLY a valid JSON array of objects with the keys above inside 
           ...unmeasuredMetrics,
           isSynthetic: false,
           sourceType: provenance,
-          verificationStatus: provenance === 'live_harvest' ? grounding.status : 'UNVERIFIED_STAGING',
+          verificationStatus: 'UNVERIFIED_STAGING',
           dnsVerified: grounding.evidence.dnsResolved,
-          groundingEvidence: grounding.evidence
+          groundingEvidence: {
+            network: grounding.evidence,
+            discoverySources: Array.isArray(b.discoverySources) ? b.discoverySources : [],
+            businessIdentityConfirmed: false,
+            verificationNote: 'DNS and phone-format checks do not independently prove that these details belong to the named business. Human/source confirmation is required before outreach.'
+          }
         };
       } catch {
         return {
@@ -423,7 +429,12 @@ IMPORTANT: Output ONLY a valid JSON array of objects with the keys above inside 
           isSynthetic: false,
           sourceType: provenance,
           verificationStatus: 'UNVERIFIED_STAGING' as const,
-          dnsVerified: false
+          dnsVerified: false,
+          groundingEvidence: {
+            discoverySources: Array.isArray(b.discoverySources) ? b.discoverySources : [],
+            businessIdentityConfirmed: false,
+            verificationNote: 'Network verification could not complete. Human/source confirmation is required before outreach.'
+          }
         };
       }
     }));
@@ -449,14 +460,31 @@ IMPORTANT: Output ONLY a valid JSON array of objects with the keys above inside 
           const rawText = response.text || "";
           const cleaned = cleanJSONResponse(rawText);
           const parsed = JSON.parse(cleaned);
+          const groundingChunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks || [];
+          const discoverySources = groundingChunks
+            .filter((chunk: any) => typeof chunk?.web?.uri === 'string')
+            .map((chunk: any) => ({
+              title: String(chunk.web.title || chunk.web.uri).slice(0, 300),
+              uri: String(chunk.web.uri)
+            }))
+            .filter((source: { uri: string }) => {
+              try {
+                const sourceUrl = new URL(source.uri);
+                return ['http:', 'https:'].includes(sourceUrl.protocol) && !sourceUrl.username && !sourceUrl.password;
+              } catch {
+                return false;
+              }
+            });
 
           if (Array.isArray(parsed) && parsed.length > 0) {
+            const provenance = discoverySources.length > 0 ? 'live_harvest' as const : 'ai_discovery_unverified' as const;
             const mapped = parsed.map((b: any) => ({
               ...b,
               isSynthetic: false,
-              sourceType: 'live_harvest' as const
+              sourceType: provenance,
+              discoverySources
             }));
-            return await groundHarvestedBusinesses(mapped, 'live_harvest');
+            return await groundHarvestedBusinesses(mapped, provenance);
           }
         } catch (err: any) {
           const is503 = err?.status === 503 || err?.message?.includes('503') || err?.message?.includes('high demand');

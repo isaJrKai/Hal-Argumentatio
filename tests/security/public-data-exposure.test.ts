@@ -43,8 +43,22 @@ describe('Public data exposure security', () => {
     expect(saveEnd).toBeGreaterThan(saveStart);
     const saveRoute = source.slice(saveStart, saveEnd);
     expect(saveRoute).toContain('!pageConfig');
-    expect(saveRoute).toContain('const ownedPageConfig = { ...pageConfig, id: artifactId, contractorId }');
-    expect(saveRoute).toContain('generateLandingPageHtml(ownedPageConfig)');
-    expect(saveRoute).not.toContain('const ownedRenderedHtml = ownedPageConfig ? generateLandingPageHtml(ownedPageConfig) : renderedHtml');
+    expect(saveRoute).toContain('const ownedPageConfig: Record<string, any> = {');
+    expect(saveRoute).toContain('eq(leads.contractorId, contractorId)');
+    expect(saveRoute).toContain("status: 'draft'");
+    expect(saveRoute).toContain('sourceLeadId: sourceLead?.id || null');
+    expect(saveRoute).toContain('generateLandingPageHtml(ownedPageConfig as LandingPageConfig)');
+    expect(saveRoute).not.toContain('renderedHtml\n        });');
+
+    const publishStart = source.indexOf("app.post('/api/landing-pages/:id/publish'");
+    const publishEnd = source.indexOf("app.get('/api/public/form/dispatch'", publishStart);
+    expect(publishStart).toBeGreaterThanOrEqual(0);
+    expect(publishEnd).toBeGreaterThan(publishStart);
+    const publishRoute = source.slice(publishStart, publishEnd);
+    expect(publishRoute).toContain('req.body?.confirmPublish !== true');
+    expect(publishRoute).toContain('req.body?.contentReviewed !== true');
+    expect(publishRoute).toContain("sourceLead.verificationStatus !== 'VERIFIED'");
+    expect(publishRoute).toContain("identityEvidence.businessIdentityConfirmed !== true");
+    expect(publishRoute).toContain("status: 'deployed'");
   });
 });
