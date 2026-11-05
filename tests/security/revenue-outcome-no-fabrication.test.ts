@@ -44,3 +44,22 @@ describe('revenue outcome evaluation integrity', () => {
     expect(evaluateHandler).toContain('comparable verified numeric metrics');
   });
 });
+
+const transitionStart = server.indexOf("app.post('/api/revenue/recommendations/:id/transition'");
+const transitionEnd = server.indexOf("\n  });", transitionStart);
+const transitionHandler = server.slice(transitionStart, transitionEnd);
+
+describe('recommendation transition integrity', () => {
+  it('does not generate synthetic execution references', () => {
+    expect(transitionHandler).not.toContain('Math.random()');
+    expect(transitionHandler).not.toContain('Manual Ref #');
+    expect(transitionHandler).toContain('executionReference.trim()');
+    expect(transitionHandler).toContain('updateValues.executionReference =');
+  });
+
+  it('commits the recommendation state and lifecycle event atomically', () => {
+    expect(transitionHandler).toContain('pgDb.transaction(async tx =>');
+    expect(transitionHandler).toContain('eq(revenueRecommendations.status, currentStatus)');
+    expect(transitionHandler).toContain('tx.insert(revenueRecommendationEvents)');
+  });
+});
