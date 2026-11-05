@@ -33,9 +33,11 @@ export default function InvoiceLedgerPanel({ token, projectId, leadId, businessN
   const [paymentMethods, setPaymentMethods] = useState<Record<string, string>>({});
   const [busyId, setBusyId] = useState<string | null>(null);
 
-  const money = useCallback((minor: number, currency = 'USD') => new Intl.NumberFormat(undefined, {
-    style: 'currency', currency, maximumFractionDigits: 2
-  }).format(minor / 100), []);
+  const currencyScale = (currency: string) => 10 ** new Intl.NumberFormat(undefined, { style: 'currency', currency }).resolvedOptions().maximumFractionDigits;
+  const money = useCallback((minor: number, currency = 'USD') => {
+    const scale = currencyScale(currency);
+    return new Intl.NumberFormat(undefined, { style: 'currency', currency }).format(minor / scale);
+  }, []);
 
   const loadInvoices = useCallback(async () => {
     const response = await fetch('/api/invoices', { headers: { Authorization: `Bearer ${token}` } });
@@ -56,9 +58,10 @@ export default function InvoiceLedgerPanel({ token, projectId, leadId, businessN
     return () => { cancelled = true; };
   }, [loadInvoices]);
 
-  const totalOutstanding = useMemo(() => invoices
-    .filter(invoice => invoice.status !== 'void')
-    .reduce((sum, invoice) => sum + invoice.balanceDueMinor, 0), [invoices]);
+  const outstandingByCurrency = useMemo(() => invoices.reduce<Record<string, number>>((totals, invoice) => {
+    if (invoice.status !== 'void') totals[invoice.currency] = (totals[invoice.currency] || 0) + invoice.balanceDueMinor;
+    return totals;
+  }, {}), [invoices]);
 
   const handleCreateInvoice = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -92,7 +95,8 @@ export default function InvoiceLedgerPanel({ token, projectId, leadId, businessN
   };
 
   const handleRecordPayment = async (invoice: InvoiceRecord) => {
-    const amount = Number(paymentAmounts[invoice.id] || (invoice.balanceDueMinor / 100));
+    const scale = currencyScale(invoice.currency);
+    const amount = Number(paymentAmounts[invoice.id] || (invoice.balanceDueMinor / scale));
     if (!Number.isFinite(amount) || amount <= 0) {
       setError('Enter a positive receipt amount.');
       return;
@@ -103,7 +107,7 @@ export default function InvoiceLedgerPanel({ token, projectId, leadId, businessN
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({
-          amountMinor: Math.round(amount * 100),
+          amountMinor: Math.round(amount * scale),
           method: paymentMethods[invoice.id] || 'bank_transfer'
         })
       });
@@ -138,7 +142,7 @@ export default function InvoiceLedgerPanel({ token, projectId, leadId, businessN
           <h3 className="text-sm font-bold text-text-primary">Invoices & receipts</h3>
           <p className="text-[11px] text-text-secondary">{businessName} · Manual accounting ledger · Receipts do not imply provider settlement</p>
         </div>
-        <div className="text-xs font-mono text-text-secondary">Outstanding: <strong className="text-text-primary">{money(totalOutstanding)}</strong></div>
+        <div className="text-xs font-mono text-text-secondary">Outstanding: <strong className="text-text-primary">{Object.entries(outstandingByCurrency).length ? Object.entries(outstandingByCurrency).map(([currency, amount]) => money(amount, currency)).join(' · ') : money(0)}</strong></div>
       </div>
 
       {error && <div role="alert" className="rounded border border-warning/30 bg-warning/5 p-2 text-xs text-text-primary">{error}</div>}
@@ -178,7 +182,7 @@ export default function InvoiceLedgerPanel({ token, projectId, leadId, businessN
             </div>
             {invoice.status !== 'paid' && invoice.status !== 'void' && (
               <div className="flex flex-col sm:flex-row gap-2">
-                <input type="number" min="0.01" step="0.01" placeholder={String(invoice.balanceDueMinor / 100)} value={paymentAmounts[invoice.id] ?? ''} onChange={event => setPaymentAmounts(current => ({ ...current, [invoice.id]: event.target.value }))} className="rounded-sm border border-border-dim bg-bg-raised p-2 text-xs text-text-primary" aria-label="Receipt amount in USD" />
+                <input type="number" min="0.01" step="0.01" placeholder={String(invoice.balanceDueMinor / currencyScale(invoice.currency))} value={paymentAmounts[invoice.id] ?? ''} onChange={event => setPaymentAmounts(current => ({ ...current, [invoice.id]: event.target.value }))} className="rounded-sm border border-border-dim bg-bg-raised p-2 text-xs text-text-primary" aria-label={`Receipt amount in ${invoice.currency}`} />
                 <select value={paymentMethods[invoice.id] || 'bank_transfer'} onChange={event => setPaymentMethods(current => ({ ...current, [invoice.id]: event.target.value }))} className="rounded-sm border border-border-dim bg-bg-raised p-2 text-xs text-text-primary" aria-label="Receipt method">
                   <option value="bank_transfer">Bank transfer</option><option value="cash">Cash</option><option value="card_terminal">Card terminal</option><option value="cheque">Cheque</option><option value="other">Other</option>
                 </select>
