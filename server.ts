@@ -4370,7 +4370,7 @@ app.post('/api/recommendations/:id/approve', authenticate, async (req, res) => {
       return res.status(404).json({ error: 'Recommendation not found or inaccessible' });
     }
 
-    const [updated] = await pgDb.transaction(async tx => {
+    const approval = await pgDb.transaction(async tx => {
       const [current] = await tx.select().from(recommendations)
         .where(and(eq(recommendations.id, id), eq(recommendations.contractorId, contractorId)))
         .for('update');
@@ -4378,7 +4378,7 @@ app.post('/api/recommendations/:id/approve', authenticate, async (req, res) => {
         throw new Error('Recommendation changed before approval could be committed.');
       }
       if (current.status === 'approved') {
-        return [current];
+        return { recommendation: current, transitioned: false };
       }
       const [approved] = await tx.update(recommendations).set({
         status: 'approved',
@@ -4416,10 +4416,11 @@ app.post('/api/recommendations/:id/approve', authenticate, async (req, res) => {
         details: `Approved recommendation: ${approved.action}`,
         metadata: { previousStatus: current.status, newStatus: 'approved' }
       });
-      return [approved];
+      return { recommendation: approved, transitioned: true };
     });
+    const updated = approval.recommendation;
 
-    if (!postgresStructuredLedgerEnabled()) {
+    if (!postgresStructuredLedgerEnabled() && approval.transitioned) {
       await recordStructuredLedgerEntry({
         contractorId,
         eventType: 'recommendation_approved',
