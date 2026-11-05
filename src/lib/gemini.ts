@@ -2,6 +2,7 @@ import { GoogleGenAI } from "@google/genai";
 import { generateResponse, cleanJSONResponse, callNemotron, callNemotronWithTools, getActiveAI } from "../services/nemotron.ts";
 import { verifyLeadGrounding } from "./networkVerification.ts";
 import { calibrateForecastConfidence } from "./forecastConfidence";
+import { callAnthropicWithTools } from "../services/anthropic";
 
 let aiClient: GoogleGenAI | null = null;
 
@@ -59,7 +60,40 @@ Return your response strictly as a raw JSON object matching this structure:
   "confidence": number
 }`;
 
-  const activeAI = getActiveAI(preferredAI);
+  // Explicit Anthropic selection uses the authenticated tenant key and the same
+  // server-owned HAL tool runtime as Gemini/Nemotron. A provider failure falls
+  // through to the configured fallback instead of silently pretending success.
+  if (preferredAI === 'anthropic' && providerApiKeys?.anthropic) {
+    try {
+      const anthropicMessages = [
+        ...history.map(turn => ({
+          role: turn.role === 'model' ? 'assistant' as const : 'user' as const,
+          content: turn.parts.map(part => part.text).join('\\n')
+        })),
+        { role: 'user' as const, content: message }
+      ];
+      const result = await callAnthropicWithTools({
+        apiKey: providerApiKeys.anthropic,
+        system: systemInstruction,
+        messages: anthropicMessages,
+        tools: toolRuntime?.tools.filter(tool => tool.name !== 'hermes_synthesize_lab_asset'),
+        execute: toolRuntime?.execute
+      });
+      if (result.text || result.toolCalls.length) {
+        return {
+          text: result.text || 'Claude processed the available HAL tool calls. Review Work Queue and Work History for their recorded results.',
+          toolCalls: result.toolCalls.length ? result.toolCalls : undefined,
+          provider: 'anthropic',
+          model: result.model
+        };
+      }
+      throw new Error('Anthropic returned an empty response.');
+    } catch (error: any) {
+      console.error('[HAL Anthropic] Request failed; falling back to configured provider:', error?.message || error);
+    }
+  }
+
+  const activeAI = getActiveAI(preferredAI === 'anthropic' ? undefined : preferredAI);
 
   // Helper to calibrate confidence: clamp between 0.10 and 0.95 and account for extreme unexplained variance
   const calibrateConfidence = (rawScore: number): number => {
@@ -657,8 +691,8 @@ export async function askHalBot(
     tools: Array<{ name: string; description: string; inputSchema: { type: 'object'; properties: Record<string, any>; required?: string[] } }>;
     execute: (name: string, args: Record<string, any>) => Promise<any>;
   },
-  providerApiKeys?: { gemini?: string }
-): Promise<{ text: string; sources?: Array<{ title: string; uri: string }>; toolCalls?: Array<{ name: string; result: any }> }> {
+  providerApiKeys?: { gemini?: string; anthropic?: string }
+): Promise<{ text: string; sources?: Array<{ title: string; uri: string }>; toolCalls?: Array<{ name: string; result: any }>; provider?: string; model?: string }> {
   const systemInstruction = `You are HAL, the central business operating assistant inside HAL (Human Augmentation Layer).
 
 Your job is to understand the operator's business situation, connect related work across the application, explain the next useful step, and help the operator make sound decisions. Do not behave like a generic chatbot or pretend to be an autonomous employee when the required execution path is not connected.
