@@ -12139,7 +12139,7 @@ async function startServer() {
         subject: row.subjectEncrypted ? decrypt(row.subjectEncrypted) : undefined,
         preview: row.bodyEncrypted ? decrypt(row.bodyEncrypted).slice(0, 100) : ''
       }));
-      const ledgerHistory = await readStructuredLedger(contractorId, 20).filter(entry =>
+      const ledgerHistory = (await readStructuredLedger(contractorId, 20)).filter(entry =>
         entry.eventType === 'phase3_live_dispatch' ||
         entry.eventType === 'phase3_outbox_inspected' ||
         entry.entityType === 'conversion_outbox'
@@ -12373,7 +12373,7 @@ async function startServer() {
         totalLeadsCount,
         syntheticLeadsCount,
         verifiedLeadsCount,
-        cryptoVerified: await checkStructuredLedgerIntegrity(contractorId).valid,
+        cryptoVerified: (await checkStructuredLedgerIntegrity(contractorId)).valid,
         autonomyReadinessScore: learningState.autonomyReadinessScore,
         learningEpoch: learningState.calibrationEpoch
       };
@@ -12413,7 +12413,7 @@ async function startServer() {
         totalLeadsCount,
         syntheticLeadsCount,
         verifiedLeadsCount,
-        cryptoVerified: await checkStructuredLedgerIntegrity(contractorId).valid,
+        cryptoVerified: (await checkStructuredLedgerIntegrity(contractorId)).valid,
         autonomyReadinessScore: learningState.autonomyReadinessScore,
         learningEpoch: learningState.calibrationEpoch
       };
