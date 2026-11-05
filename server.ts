@@ -11743,65 +11743,64 @@ async function startServer() {
         const emailEncrypted = verifiedEmail ? encrypt(verifiedEmail) : null;
         const phoneEncrypted = verifiedPhone ? encrypt(verifiedPhone) : null;
 
-        const [addedLead] = await pgDb.insert(leads).values({
-          id,
-          contractorId,
-          businessName: hl.businessName,
-          ownerName: sourceVerified ? (hl.ownerName || null) : null,
-          email: verifiedEmail ? '[ENCRYPTED]' : null,
-          phone: verifiedPhone ? '[ENCRYPTED]' : null,
-          emailEncrypted,
-          phoneEncrypted,
-          isSynthetic: Boolean(hl.isSynthetic),
-          sourceType: hl.sourceType || 'live_harvest',
-          city: hl.city || city,
-          niche: hl.serviceType || niche,
-          source: 'harvested_intelligence',
-          status: 'new',
-          urgencyScore: null,
-          predictedLtv: null,
-          notes: hl.notes ? `AI-generated research note (not independently verified): ${hl.notes}` : 'AI-assisted discovery candidate; independently verified details are not available.',
-          websiteUrl: sourceVerified ? hl.websiteUrl : null,
-          performanceScore: null,
-          sslStatus: null,
-          reviewCount: null,
-          verificationStatus: (hl as any).verificationStatus || (hl.isSynthetic ? 'FABRICATED_REJECTED' : 'UNVERIFIED_STAGING'),
-          dnsVerified: (hl as any).dnsVerified !== undefined ? Boolean((hl as any).dnsVerified) : false,
-          groundingEvidence: (hl as any).groundingEvidence || null,
-        }).returning();
+        const persisted = await pgDb.transaction(async tx => {
+          const [addedLead] = await tx.insert(leads).values({
+            id,
+            contractorId,
+            businessName: hl.businessName,
+            ownerName: sourceVerified ? (hl.ownerName || null) : null,
+            email: verifiedEmail ? '[ENCRYPTED]' : null,
+            phone: verifiedPhone ? '[ENCRYPTED]' : null,
+            emailEncrypted,
+            phoneEncrypted,
+            isSynthetic: Boolean(hl.isSynthetic),
+            sourceType: hl.sourceType || 'live_harvest',
+            city: hl.city || city,
+            niche: hl.serviceType || niche,
+            source: 'harvested_intelligence',
+            status: 'new',
+            urgencyScore: null,
+            predictedLtv: null,
+            notes: hl.notes ? `AI-generated research note (not independently verified): ${hl.notes}` : 'AI-assisted discovery candidate; independently verified details are not available.',
+            websiteUrl: sourceVerified ? hl.websiteUrl : null,
+            performanceScore: null,
+            sslStatus: null,
+            reviewCount: null,
+            verificationStatus: (hl as any).verificationStatus || (hl.isSynthetic ? 'FABRICATED_REJECTED' : 'UNVERIFIED_STAGING'),
+            dnsVerified: (hl as any).dnsVerified !== undefined ? Boolean((hl as any).dnsVerified) : false,
+            groundingEvidence: (hl as any).groundingEvidence || null,
+          }).returning();
 
-        // Add lead creation event
-        await pgDb.insert(leadEvents).values({
-          id: crypto.randomUUID(),
-          leadId: addedLead.id,
-          eventType: 'LeadCreated',
-          newStage: 'new',
-          notes: `AI-assisted discovery candidate; verification status: ${(hl as any).verificationStatus || 'UNVERIFIED_STAGING'}.`
-        });
+          await tx.insert(leadEvents).values({
+            id: crypto.randomUUID(),
+            leadId: addedLead.id,
+            eventType: 'LeadCreated',
+            newStage: 'new',
+            notes: `AI-assisted discovery candidate; verification status: ${(hl as any).verificationStatus || 'UNVERIFIED_STAGING'}.`
+          });
 
-        // Record in cryptographic ledger
-        await recordStructuredLedgerEntry({
-          contractorId,
-          eventType: 'lead_harvested',
-          entityType: 'lead',
-          entityId: addedLead.id,
-          actor: 'HAL Territory Intelligence Harvester',
-          details: `Recorded discovery candidate: ${addedLead.businessName} (${addedLead.city}); verification status: ${addedLead.verificationStatus || 'UNVERIFIED_STAGING'}.`,
-          metadata: { city: addedLead.city, niche: addedLead.niche, source: 'harvested_intelligence' }
-        });
+          const ledgerInput: StructuredLedgerInput = {
+            contractorId,
+            eventType: 'lead_harvested',
+            entityType: 'lead',
+            entityId: addedLead.id,
+            actor: 'HAL Territory Intelligence Harvester',
+            details: `Recorded discovery candidate: ${addedLead.businessName} (${addedLead.city}); verification status: ${addedLead.verificationStatus || 'UNVERIFIED_STAGING'}.`,
+            metadata: { city: addedLead.city, niche: addedLead.niche, source: 'harvested_intelligence' }
+          };
+          await recordStructuredLedgerEntryInTransaction(tx, ledgerInput);
 
-        const [activeReviewTask] = await pgDb.select({ id: workTasks.id }).from(workTasks).where(and(
-          eq(workTasks.contractorId, contractorId),
-          eq(workTasks.taskType, 'lead_follow_up'),
-          eq(workTasks.entityType, 'lead'),
-          eq(workTasks.entityId, addedLead.id),
-          eq(workTasks.assignedWorker, 'human'),
-          inArray(workTasks.status, ['queued', 'running', 'awaiting_approval'])
-        )).limit(1);
-        if (!activeReviewTask) {
-          const taskId = 'task_' + crypto.randomUUID();
-          const correlationId = taskId;
-          await pgDb.transaction(async tx => {
+          const [activeReviewTask] = await tx.select({ id: workTasks.id }).from(workTasks).where(and(
+            eq(workTasks.contractorId, contractorId),
+            eq(workTasks.taskType, 'lead_follow_up'),
+            eq(workTasks.entityType, 'lead'),
+            eq(workTasks.entityId, addedLead.id),
+            eq(workTasks.assignedWorker, 'human'),
+            inArray(workTasks.status, ['queued', 'running', 'awaiting_approval'])
+          )).limit(1);
+          if (!activeReviewTask) {
+            const taskId = 'task_' + crypto.randomUUID();
+            const correlationId = taskId;
             await tx.insert(workTasks).values({
               id: taskId, contractorId, taskType: 'lead_follow_up',
               title: `Review and qualify: ${addedLead.businessName}`,
@@ -11825,9 +11824,15 @@ async function startServer() {
               correlationId, summary: `${addedLead.businessName} was added to the human review queue.`,
               payload: { taskId, verificationStatus: addedLead.verificationStatus || 'UNVERIFIED_STAGING' }
             });
-          });
-          queuedTasks++;
+          }
+          return { addedLead, queued: !activeReviewTask, ledgerInput };
+        });
+
+        if (!postgresStructuredLedgerEnabled()) {
+          await recordStructuredLedgerEntry(persisted.ledgerInput);
         }
+        if (persisted.queued) queuedTasks++;
+        const addedLead = persisted.addedLead;
         savedLeads.push(addedLead);
       }
 
