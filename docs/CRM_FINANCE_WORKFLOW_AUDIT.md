@@ -35,6 +35,14 @@ The branch now:
 
 A regression test asserts these fail-closed invariants.
 
+## Additional defects corrected on this branch
+
+- The manual outcome-evaluation endpoint no longer substitutes default revenue/ROAS values. It now rejects evaluation unless the outcome is explicitly in the measured state and contains comparable finite numeric expected/actual metrics.
+- Recommendation execution no longer manufactures a random “Manual Ref” identifier. The recommendation state update and immutable lifecycle event now commit in one transaction with a current-status predicate to prevent concurrent overwrites.
+- Client-project creation now requires explicit business, city, service, package, and positive whole-dollar retainer values. When linked to a lead, that lead must belong to the tenant and already be closed-won; an existing linked project is rejected. Missing audit scores and target scores remain unavailable instead of being seeded with defaults.
+- The project form no longer pre-fills a $2,400 retainer, and its lead picker offers only closed-won leads.
+- Project updates accept explicit non-negative whole-dollar retainer changes and terminal cancellation states. The work event records prior/current retainer values.
+- Financial MRR now counts only explicit active-delivery statuses (active, active_delivery, in_progress); onboarding and review projects are excluded until delivery is active.
 ## Remaining verification gates
 
 These items remain unverified and must not be represented as complete:
@@ -42,12 +50,12 @@ These items remain unverified and must not be represented as complete:
 1. Full browser-level discovery → lead → audit → landing-page artifact → proposal/contract → approved outreach → delivery/follow-up → deal outcome → client project → revenue flow.
 2. Exact frontend-to-backend route coverage for every proposal, contract, client-project and communications action.
 3. Tenant A/B integration tests against a disposable PostgreSQL test database for CRUD, foreign-record access, duplicate requests, concurrent close-out, and rollback after partial failure.
-4. Contract/proposal persistence and signature/execution semantics, including proof that draft/approved/signed are distinct states.
-5. Client-project creation from a won deal, duplicate prevention, lead linkage, and retainer changes/cancellation semantics.
+4. Contract/proposal persistence and signature/execution semantics, including proof that draft/approved/signed are distinct states. The current proposal generator returns a generated response but no canonical proposal/contract table or durable signature workflow has been verified.
+5. Integration coverage for won-lead project conversion, duplicate prevention under concurrent requests, lead linkage, and retainer changes/cancellation semantics. The current duplicate guard is an application-level pre-check, not a database uniqueness guarantee.
 6. Revenue recognition versus cash collection/payment recording. The current `/api/revenues` close-out endpoint records a positive whole-dollar amount against a lead; it is not a payment processor or a complete invoice/receivables ledger.
 7. End-to-end event correlation and ordering across audit, landing-page, outreach, deal, project, revenue, and forecast records.
 8. Forecast evaluation against correctly attributed observations and evidence that only actual outcomes feed learning.
-9. CI execution on this branch. GitHub Actions evidence must be attached after the branch test run; no local test runner was available through the repository connector during this pass.
+9. CI execution on the latest branch head. GitHub Actions must run the type-check, full Vitest suite, production build, and dependency audit; no local test runner is available through the repository connector.
 
 ## Safety and release
 
