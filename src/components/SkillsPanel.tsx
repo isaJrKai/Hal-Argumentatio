@@ -118,6 +118,7 @@ export default function SkillsPanel({ token }: SkillsPanelProps) {
 
   useEffect(() => {
     fetchSkills();
+    fetchAuditLeads();
   }, []);
 
   // Update default form inputs when selected skill or global context shifts
