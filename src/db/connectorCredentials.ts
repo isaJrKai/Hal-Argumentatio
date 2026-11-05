@@ -19,6 +19,9 @@ export async function getConnectorCredentials(contractorId: string, pool?: Pool)
 
   const credentials: Record<string, string> = {};
   for (const row of result.rows) {
+    if (Object.prototype.hasOwnProperty.call(credentials, row.service)) {
+      throw new Error('Duplicate connector credential records exist for this tenant and service; reconcile them before reading.');
+    }
     const value = decrypt(row.encrypted_value);
     if (value) credentials[row.service] = value;
   }
@@ -35,13 +38,15 @@ export async function saveConnectorCredential(contractorId: string, service: str
   if (!contractorId.trim() || !service.trim()) throw new Error('Contractor ID and service are required.');
   if (typeof secret !== 'string') throw new Error('Credential value must be a string.');
 
+  const tenantId = contractorId.trim();
+  const provider = service.trim();
   const client = await requirePool(pool).connect();
   try {
     await client.query('BEGIN');
-    await client.query('SELECT pg_advisory_xact_lock(hashtext($1), hashtext($2))', [contractorId, service]);
+    await client.query('SELECT pg_advisory_xact_lock(hashtext($1), hashtext($2))', [tenantId, provider]);
     const existing = await client.query<{ id: string }>(
       'SELECT id FROM connector_credentials WHERE contractor_id = $1 AND service = $2 FOR UPDATE',
-      [contractorId, service]
+      [tenantId, provider]
     );
     if (existing.rows.length > 1) {
       throw new Error('Duplicate connector credential records exist for this tenant and service; reconcile them before writing.');
@@ -61,7 +66,7 @@ export async function saveConnectorCredential(contractorId: string, service: str
       } else {
         await client.query(
           'INSERT INTO connector_credentials (id, contractor_id, service, encrypted_value, updated_at) VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP)',
-          [randomUUID(), contractorId, service, encryptedValue]
+          [randomUUID(), tenantId, provider, encryptedValue]
         );
       }
     }
