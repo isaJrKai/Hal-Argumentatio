@@ -12,7 +12,6 @@ export const contractors = pgTable('contractors', {
   targetMonthlyRevenueUsd: integer('target_monthly_revenue_usd').default(0),
   activeTerritories: text('active_territories').array(),
   role: text('role').default('user').notNull(),
-  accountStatus: text('account_status').default('active').notNull(),
   passwordHash: text('password_hash').notNull(),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   lastLoginAt: timestamp('last_login_at'),
