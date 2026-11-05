@@ -9684,34 +9684,71 @@ async function startServer() {
         return res.status(404).json({ success: false, error: 'Outcome record not found or unauthorized' });
       }
 
-      const updatedActual = { ...(outcome.actualMetrics as any) };
-      const expected = (outcome.expectedMetrics as any) || { revenue: 5000, roas: 3.0 };
-      const actualRev = Number(updatedActual.revenue || expected.revenue);
-      const actualRoas = Number(updatedActual.roas || expected.roas);
+      // Evaluation is only valid after a trusted measurement process has written
+      // comparable numeric expected/actual metrics. Never substitute defaults.
+      if (outcome.outcomeStatus !== 'measured') {
+        return res.status(409).json({
+          success: false,
+          error: 'Outcome cannot be evaluated until verified measurements are recorded.',
+          outcomeStatus: outcome.outcomeStatus
+        });
+      }
 
-      const expRev = Number(expected.revenue || 5000);
-      const expRoas = Number(expected.roas || 3.0);
+      const expected = outcome.expectedMetrics && typeof outcome.expectedMetrics === 'object'
+        ? outcome.expectedMetrics as Record<string, unknown>
+        : {};
+      const actual = outcome.actualMetrics && typeof outcome.actualMetrics === 'object'
+        ? outcome.actualMetrics as Record<string, unknown>
+        : {};
+      const metricKeys = Object.keys(expected).filter((key) =>
+        typeof expected[key] === 'number' &&
+        Number.isFinite(expected[key]) &&
+        typeof actual[key] === 'number' &&
+        Number.isFinite(actual[key])
+      );
 
-      const calcAcc = (exp: number, act: number) => {
-        if (exp === 0 && act === 0) return 1.0;
-        if (exp === 0) return 0.0;
-        const acc = 1 - Math.abs(exp - act) / Math.abs(exp);
-        return Math.max(0, Math.min(1, acc));
+      if (metricKeys.length === 0) {
+        return res.status(409).json({
+          success: false,
+          error: 'Outcome cannot be evaluated without comparable verified numeric metrics.'
+        });
+      }
+
+      const metricAccuracy = (key: string) => {
+        const expectedValue = expected[key] as number;
+        const actualValue = actual[key] as number;
+        if (expectedValue === 0) return actualValue === 0 ? 1 : 0;
+        return Math.max(0, Math.min(1, 1 - Math.abs(expectedValue - actualValue) / Math.abs(expectedValue)));
       };
-
-      const revAcc = calcAcc(expRev, actualRev);
-      const roasAcc = calcAcc(expRoas, actualRoas);
-      const predictionAccuracy = Number(((revAcc + roasAcc) / 2).toFixed(4));
+      const predictionAccuracy = Number((
+        metricKeys.reduce((sum, key) => sum + metricAccuracy(key), 0) / metricKeys.length
+      ).toFixed(4));
+      const variance = Object.fromEntries(metricKeys.map((key) => [
+        key,
+        Number(((actual[key] as number) - (expected[key] as number)).toFixed(4))
+      ]));
 
       let classification = 'successful';
       if (predictionAccuracy < 0.40) classification = 'failed';
       else if (predictionAccuracy < 0.60) classification = 'neutral';
       else if (predictionAccuracy < 0.85) classification = 'partially_successful';
 
+      const previousLearningSignals = outcome.learningSignals && typeof outcome.learningSignals === 'object'
+        ? outcome.learningSignals as Record<string, unknown>
+        : {};
       const [updated] = await pgDb.update(revenueOutcomes).set({
         outcomeStatus: 'evaluated',
         outcomeClassification: classification,
         predictionAccuracy,
+        variance,
+        learningSignals: {
+          ...previousLearningSignals,
+          outcomeStatus: 'evaluated',
+          outcomeClassification: classification,
+          predictionAccuracy,
+          evaluatedMetrics: metricKeys,
+          evaluatedAt: new Date().toISOString()
+        },
         updatedAt: new Date()
       }).where(and(eq(revenueOutcomes.id, id), eq(revenueOutcomes.contractorId, contractorId))).returning();
 
