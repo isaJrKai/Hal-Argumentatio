@@ -6626,7 +6626,7 @@ app.post('/api/outreach/dispatch', authenticate, async (req, res) => {
         from: emailBridge.email.senderEmail
       });
     } catch (err: any) {
-      const providerStatus = Number(String(err?.message || '').match(/HTTP (\\d{3})/i)?.[1] || 0);
+      const providerStatus = Number(String(err?.message || '').match(/HTTP (\d{3})/i)?.[1] || 0);
       const retryableFailure = !(err instanceof EmailProviderConfigurationError) &&
         (!providerStatus || providerStatus === 408 || providerStatus === 409 || providerStatus === 425 || providerStatus === 429 || providerStatus >= 500);
       const nextStatus = retryableFailure ? 'retrying' : 'failed';
