@@ -1,6 +1,36 @@
 import { LandingPageConfig } from './types';
 
+function escapeHtml(value: string): string {
+  return value.replace(/[&<>"']/g, char => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;'
+  }[char] || char));
+}
+
+function escapeConfigStrings<T>(value: T): T {
+  if (typeof value === 'string') return escapeHtml(value) as T;
+  if (Array.isArray(value)) return value.map(item => escapeConfigStrings(item)) as T;
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(
+      Object.entries(value as Record<string, unknown>)
+        .map(([key, item]) => [key, escapeConfigStrings(item)])
+    ) as T;
+  }
+  return value;
+}
+
 export function generateLandingPageHtml(config: LandingPageConfig): string {
+  // Escape dynamic strings before they reach HTML text/attribute contexts.
+  // Keep a separately JSON-serialized subset for the inline form handler.
+  const scriptData = JSON.stringify({
+    id: config.id,
+    city: config.city,
+    phone: config.phone || ''
+  }).replace(/</g, '\\u003c');
+  const safeConfig = escapeConfigStrings(config);
   const {
     id,
     businessName,
@@ -11,7 +41,7 @@ export function generateLandingPageHtml(config: LandingPageConfig): string {
     sectionOrder,
     sections,
     seo
-  } = config;
+  } = safeConfig;
 
   const cleanPhone = phone.replace(/[^0-9+]/g, '');
   const primaryColor = branding.primaryColor || '#0284c7';
@@ -19,9 +49,9 @@ export function generateLandingPageHtml(config: LandingPageConfig): string {
   const accentColor = branding.accentColor || '#f59e0b';
   const heroImageUrl = (() => {
     try {
-      const candidate = new URL(sections.hero?.heroImageUrl || '');
+      const candidate = new URL(config.sections.hero?.heroImageUrl || '');
       return candidate.protocol === 'https:' && candidate.hostname === 'images.unsplash.com'
-        ? candidate.toString()
+        ? escapeHtml(candidate.toString())
         : '';
     } catch {
       return '';
@@ -849,7 +879,7 @@ export function generateLandingPageHtml(config: LandingPageConfig): string {
     }
   </style>
   <script type="application/ld+json">
-    ${JSON.stringify(schemaJson, null, 2)}
+    ${JSON.stringify(schemaJson, null, 2).replace(/</g, '\\u003c')}
   </script>
 </head>
 <body class="${
@@ -864,6 +894,7 @@ export function generateLandingPageHtml(config: LandingPageConfig): string {
   ${renderedSections}
 
   <script>
+    const pageData = ${scriptData};
     async function handleFormSubmit(e) {
       e.preventDefault();
       const btn = document.getElementById('submit-btn');
@@ -881,12 +912,11 @@ export function generateLandingPageHtml(config: LandingPageConfig): string {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            contractorId: "${config.contractorId || ''}",
-            landingPageId: "${id}",
+            landingPageId: pageData.id,
             name: name,
             phone: phone,
             serviceDetails: details,
-            city: "${city}"
+            city: pageData.city
           })
         });
         
@@ -896,7 +926,7 @@ export function generateLandingPageHtml(config: LandingPageConfig): string {
       } catch (err) {
         btn.disabled = false;
         btn.innerText = 'Try Again';
-        alert('Sorry, your request did not go through. Please call us directly at ${config.phone || ''}.');
+        alert('Sorry, your request did not go through. Please call us directly at ' + pageData.phone + '.');
       }
     }
   </script>
