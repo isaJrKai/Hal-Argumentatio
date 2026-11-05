@@ -281,6 +281,47 @@ describe('client project HTTP route tenant isolation', () => {
     expect(events.rows[0].payload.currentMonthlyRetainerUsd).toBe(persisted.monthly_retainer_usd);
   });
 
+  it('prevents a stale retainer write from overwriting a concurrent cancellation', async (ctx) => {
+    if (!dbAvailable) return ctx.skip();
+
+    const [project] = (await pool.query(
+      'SELECT id, status FROM client_projects WHERE lead_id = $1 AND contractor_id = $2',
+      [leadConcurrentA, tenantA]
+    )).rows;
+    expect(project).toBeTruthy();
+
+    const attempts = await Promise.all([
+      request(app).put(`/api/projects/${project.id}`)
+        .set('Authorization', `Bearer ${tokenA}`)
+        .send({ status: 'cancelled' }),
+      request(app).put(`/api/projects/${project.id}`)
+        .set('Authorization', `Bearer ${tokenA}`)
+        .send({ monthlyRetainerUsd: 1750 })
+    ]);
+
+    expect(attempts.filter(response => response.status === 200)).toHaveLength(1);
+    expect(attempts.filter(response => response.status === 409)).toHaveLength(1);
+
+    const [persisted] = (await pool.query(
+      'SELECT status, monthly_retainer_usd FROM client_projects WHERE id = $1 AND contractor_id = $2',
+      [project.id, tenantA]
+    )).rows;
+    if (persisted.status === 'cancelled') {
+      expect(persisted.monthly_retainer_usd).toBeGreaterThan(0);
+    } else {
+      expect(persisted.status).toBe('onboarding');
+      expect(persisted.monthly_retainer_usd).toBe(1750);
+    }
+
+    const events = await pool.query(
+      `SELECT payload FROM work_events
+       WHERE contractor_id = $1 AND event_type = 'client_project.updated'
+         AND entity_id = $2`,
+      [tenantA, project.id]
+    );
+    expect(events.rows).toHaveLength(1);
+  });
+
   it('prevents tenant B from updating tenant A\'s project by identifier', async (ctx) => {
     if (!dbAvailable) return ctx.skip();
 
