@@ -446,7 +446,7 @@ export default function SystemHealthPanel({ token }: SystemHealthPanelProps) {
               </div>
               <div className="border-b border-border-dim/40 py-1 flex flex-col">
                 <span className="text-text-tertiary uppercase text-[8px] tracking-wider">Database Node</span>
-                <span className="text-text-primary font-bold">SQLite Node (Encrypted)</span>
+                <span className="text-text-primary font-bold">PostgreSQL (Neon)</span>
               </div>
               <div className="border-b border-border-dim/40 py-1 flex flex-col">
                 <span className="text-text-tertiary uppercase text-[8px] tracking-wider">Port Ingress Binding</span>
@@ -454,7 +454,7 @@ export default function SystemHealthPanel({ token }: SystemHealthPanelProps) {
               </div>
               <div className="border-b border-border-dim/40 py-1 flex flex-col">
                 <span className="text-text-tertiary uppercase text-[8px] tracking-wider">Security Vector</span>
-                <span className="text-positive font-bold">AES-256-CTR SECURE</span>
+                <span className="text-positive font-bold">{cryptoLabel}</span>
               </div>
             </div>
           </div>
@@ -464,10 +464,10 @@ export default function SystemHealthPanel({ token }: SystemHealthPanelProps) {
             <div className="flex justify-between items-center border-b border-border-dim pb-2">
               <div className="flex items-center gap-2">
                 <Terminal className="w-4 h-4 text-positive" />
-                <span className="text-xs font-mono font-bold text-text-primary uppercase tracking-wider">Live Audit Trail Console</span>
+                <span className="text-xs font-mono font-bold text-text-primary uppercase tracking-wider">Audit Trail Snapshot</span>
               </div>
               <span className="text-[8px] text-positive font-mono uppercase bg-positive/10 border border-positive/25 px-1.5 py-0.5 rounded">
-                Live Feed
+                Latest Records
               </span>
             </div>
 
