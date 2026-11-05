@@ -47,7 +47,7 @@ describe('runtime persistence boundary', () => {
   it('keeps legacy lead mutations confined to the production-disabled roadmap simulator', () => {
     const serverSource = readFileSync(resolve(process.cwd(), 'server.ts'), 'utf8');
     const simulatorStart = serverSource.indexOf("app.post('/api/roadmap/phase1/simulate-transaction'");
-    const simulatorEnd = serverSource.indexOf('// 5. Verify Cryptographic Ledger Integrity', simulatorStart);
+    const simulatorEnd = serverSource.indexOf("app.get('/api/roadmap/phase2/status'", simulatorStart);
     expect(simulatorStart).toBeGreaterThanOrEqual(0);
     expect(simulatorEnd).toBeGreaterThan(simulatorStart);
     const simulator = serverSource.slice(simulatorStart, simulatorEnd);
