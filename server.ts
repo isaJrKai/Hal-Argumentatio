@@ -7476,7 +7476,7 @@ app.post('/api/public/proposals/:token', async (req, res) => {
         eventType: 'proposal.client_accepted',
         entityType: 'proposal',
         entityId: saved.id,
-        actorType: 'external_client',
+        actorType: 'human',
         actorId: signerEmail,
         sourceModule: 'proposal_studio',
         correlationId: saved.id,
@@ -7597,7 +7597,7 @@ app.post('/api/invoices', authenticate, async (req, res) => {
       projectId: normalizedProjectId,
       description: description.trim(),
       currency: normalizedCurrency,
-      amountDueMinor,
+      amountDueMinor: amountMinor,
       status: 'issued',
       issuedAt: now,
       dueAt: dueDate,
@@ -7616,10 +7616,10 @@ app.post('/api/invoices', authenticate, async (req, res) => {
         sourceModule: 'finance_ledger',
         correlationId: invoice.id,
         summary: `Issued invoice ${invoice.invoiceNumber} for ${invoice.amountDueMinor} ${invoice.currency} minor units.`,
-        payload: { invoiceNumber: invoice.invoiceNumber, leadId: linkedLeadId, projectId: normalizedProjectId, amountDueMinor, currency: normalizedCurrency }
+        payload: { invoiceNumber: invoice.invoiceNumber, leadId: linkedLeadId, projectId: normalizedProjectId, amountDueMinor: amountMinor, currency: normalizedCurrency }
       });
     });
-    return res.status(201).json({ ...invoice, amountPaidMinor: 0, balanceDueMinor: amountDueMinor });
+    return res.status(201).json({ ...invoice, amountPaidMinor: 0, balanceDueMinor: amountMinor });
   } catch (err: any) {
     console.error('[Invoices] Create failed:', err);
     return res.status(503).json({ error: 'Invoice could not be saved to the ledger.' });
