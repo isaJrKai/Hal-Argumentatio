@@ -12,6 +12,7 @@ const db = drizzle(pool);
 const testTasks = pgTable('hermes_task_claim_test', {
   id: text('id').primaryKey(),
   contractorId: text('contractor_id').notNull(),
+  taskType: text('task_type').notNull(),
   assignedWorker: text('assigned_worker').notNull(),
   status: text('status').notNull(),
   startedAt: timestamp('started_at'),
@@ -36,6 +37,7 @@ beforeAll(async () => {
       CREATE TABLE IF NOT EXISTS hermes_task_claim_test (
         id text PRIMARY KEY,
         contractor_id text NOT NULL,
+        task_type text NOT NULL DEFAULT 'hermes_lab_asset',
         assigned_worker text NOT NULL DEFAULT 'human',
         status text NOT NULL DEFAULT 'queued',
         started_at timestamp,
@@ -154,7 +156,10 @@ describe('Hermes PostgreSQL task claim', () => {
 
     const recovered = await failExpiredHermesWorkTask(db, 'task-hermes-1', 'tenant-a', new Date(), 120_000, testTasks);
     expect(recovered).toMatchObject({ status: 'failed', attemptCount: 1 });
-    expect(recovered.output).toMatchObject({ outcome: 'lease_expired', success: false, worker: 'hermes', taskId: 'task-hermes-1', attempt: 1 });
+    expect(recovered.output).toMatchObject({ outcome: 'lease_expired', success: false, worker: 'hermes', taskId: 'task-hermes-1', taskType: 'hermes_lab_asset', attempt: 1 });
+    expect(recovered.output.startedAt).toBeTruthy();
+    expect(recovered.output.completedAt).toBeTruthy();
+    expect(recovered.output.durationMs).toBeGreaterThan(0);
     expect(recovered.errorMessage).toContain('lease expired');
   });
 
