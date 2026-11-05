@@ -7370,10 +7370,18 @@ app.get('/api/neural/network', authenticate, async (req, res) => {
 
 // ─── AI ENGINE DUAL-DRIVE & AUTONOMOUS ENGINE STATUS ─────────────────────────
 
+let lastAiProviderDiagnosticAt = 0;
 app.post('/api/system/diagnostics/ai-providers', authenticate, async (req, res) => {
   if ((req as any).contractorRole !== 'admin') {
     return res.status(403).json({ error: 'Administrator access is required to run live provider diagnostics.' });
   }
+
+  const now = Date.now();
+  const retryAfterMs = 30_000 - (now - lastAiProviderDiagnosticAt);
+  if (retryAfterMs > 0) {
+    return res.status(429).json({ error: 'Provider diagnostics are rate limited. Please wait before retrying.', retryAfterSeconds: Math.ceil(retryAfterMs / 1000) });
+  }
+  lastAiProviderDiagnosticAt = now;
 
   const probePrompt = 'Reply with exactly this text and nothing else: HAL_PROVIDER_HEALTH_OK';
   const runProbe = async (
