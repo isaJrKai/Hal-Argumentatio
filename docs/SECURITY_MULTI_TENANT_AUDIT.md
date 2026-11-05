@@ -11,6 +11,15 @@ The SSE route independently called `verifyToken` and trusted the JWT's `contract
 
 **Fix:** SSE now delegates both Authorization-header and EventSource query-string tokens to the shared `authenticate` middleware. It therefore applies signature/expiry verification, durable token revocation, and current account lookup before registering a stream. SSE responses also set no-store and no-referrer headers. A regression guard test ensures the route cannot silently revert to direct JWT-only validation.
 
+## Additional confirmed finding fixed in this branch
+
+### HIGH — Authenticated non-admins could invoke administrative Git operations
+**Area:** `GET /api/admin/git/status` and `POST /api/admin/git/push` in `server.ts`.
+
+Both routes previously required authentication but did not require the administrator role. The push handler ran shell commands against a server-side Git checkout, accepted request-controlled repository, branch, commit-message and token values, and force-pushed to a remote. In addition to being an authorization failure, interpolating untrusted values into shell command strings created command-injection exposure.
+
+**Fix:** The status endpoint now requires `requireRole('admin')`. The legacy push endpoint now requires the same role and returns HTTP 410 without executing Git commands. This removes the unsafe server-side force-push capability; reviewed CI/CD is the supported deployment path. A regression test checks both protections and ensures the endpoint contains no shell execution.
+
 ## Prioritized review observations
 
 | Priority | Area | Observation / remaining evidence |
