@@ -2685,6 +2685,109 @@ app.post('/api/leads/:id/verify-grounding', authenticate, async (req, res) => {
   }
 });
 
+app.post('/api/leads/:id/confirm-identity', authenticate, async (req, res) => {
+  const contractorId = (req as any).contractorId;
+  const leadId = req.params.id;
+  const { confirmed, sourceUrl, notes } = req.body || {};
+
+  if (confirmed !== true || typeof sourceUrl !== 'string' || typeof notes !== 'string' || notes.trim().length < 10) {
+    return res.status(400).json({
+      error: 'Explicit confirmation, a public source URL, and at least 10 characters describing the identity check are required.'
+    });
+  }
+
+  let parsedSource: URL;
+  try {
+    parsedSource = new URL(sourceUrl.trim());
+  } catch {
+    return res.status(400).json({ error: 'Enter a valid public source URL.' });
+  }
+  if (!['http:', 'https:'].includes(parsedSource.protocol) || parsedSource.username || parsedSource.password || parsedSource.port) {
+    return res.status(400).json({ error: 'The identity source must be a public HTTP(S) URL on a standard port.' });
+  }
+
+  try {
+    const [lead] = await pgDb.select().from(leads)
+      .where(and(eq(leads.id, leadId), eq(leads.contractorId, contractorId)));
+    if (!lead) return res.status(404).json({ error: 'Lead not found.' });
+    if (lead.isSynthetic) return res.status(409).json({ error: 'Synthetic leads cannot be identity-confirmed.' });
+
+    const existingEvidence = lead.groundingEvidence && typeof lead.groundingEvidence === 'object'
+      ? lead.groundingEvidence as Record<string, any>
+      : {};
+    const networkEvidence = existingEvidence.network && typeof existingEvidence.network === 'object'
+      ? existingEvidence.network
+      : existingEvidence;
+
+    if (networkEvidence.dnsResolved !== true || networkEvidence.httpReachable !== true || networkEvidence.phoneValid !== true) {
+      return res.status(409).json({
+        error: 'Run the live network/phone verification first. DNS, HTTP reachability, and phone-format checks must pass before human identity confirmation.',
+        verificationStatus: lead.verificationStatus
+      });
+    }
+
+    const now = new Date();
+    const identityConfirmation = {
+      method: 'human_review',
+      confirmed: true,
+      sourceUrl: parsedSource.toString(),
+      notes: notes.trim().slice(0, 1000),
+      confirmedBy: contractorId,
+      confirmedAt: now.toISOString()
+    };
+    const [updatedLead] = await pgDb.update(leads).set({
+      verificationStatus: 'VERIFIED',
+      dnsVerified: true,
+      groundingEvidence: {
+        ...existingEvidence,
+        ...networkEvidence,
+        network: networkEvidence,
+        businessIdentityConfirmed: true,
+        identityConfirmation
+      },
+      updatedAt: now
+    }).where(and(eq(leads.id, leadId), eq(leads.contractorId, contractorId))).returning();
+
+    await pgDb.insert(leadEvents).values({
+      id: crypto.randomUUID(),
+      leadId,
+      eventType: 'GroundingVerified',
+      newStage: lead.status,
+      notes: `Human confirmed the business identity using ${parsedSource.hostname}. Network and phone checks had already passed.`
+    });
+
+    await recordWorkEvent(pgDb, {
+      contractorId,
+      eventType: 'lead.identity_confirmed',
+      entityType: 'lead',
+      entityId: leadId,
+      actorType: 'human',
+      actorId: contractorId,
+      sourceModule: 'lead_verification',
+      correlationId: leadId,
+      summary: `Human-confirmed business identity for ${lead.businessName}.`,
+      payload: { sourceUrl: parsedSource.toString(), confirmedAt: now.toISOString() }
+    });
+
+    await persistAuditLog({
+      contractorId,
+      action: 'LEAD_IDENTITY_CONFIRMED',
+      details: `Human confirmed business identity for lead ${leadId} using ${parsedSource.hostname}.`
+    });
+
+    return res.json({
+      success: true,
+      leadId: updatedLead.id,
+      verificationStatus: updatedLead.verificationStatus,
+      businessIdentityConfirmed: true,
+      identityConfirmation
+    });
+  } catch (err: any) {
+    console.error('[HAL lead identity confirmation] Failed:', err);
+    return res.status(503).json({ error: 'Business identity confirmation could not be saved. Please retry.' });
+  }
+});
+
 app.post('/api/leads/verify-all', authenticate, async (req, res) => {
   const contractorId = (req as any).contractorId;
   try {
