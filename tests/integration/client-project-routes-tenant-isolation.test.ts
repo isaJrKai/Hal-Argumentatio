@@ -187,6 +187,25 @@ describe('client project HTTP route tenant isolation', () => {
     expect(proposal.body.landingPageStatus).toBe('deployed');
     expect(proposal.body.auditHighlights.join(' ')).toContain('Tenant A Contractor | Kampala');
     expect(proposal.body.auditHighlights.join(' ')).toContain('Images without non-empty alt text: 1 of 2');
+
+    const editedLead = await request(app)
+      .put(`/api/leads/${leadAuditFlowA}`)
+      .set('Authorization', `Bearer ${tokenA}`)
+      .send({ city: 'Entebbe' });
+    expect(editedLead.status).toBe(200);
+    const [afterIdentityEdit] = (await pool.query(
+      'SELECT verification_status, grounding_evidence FROM leads WHERE id = $1 AND contractor_id = $2',
+      [leadAuditFlowA, tenantA]
+    )).rows;
+    expect(afterIdentityEdit.verification_status).toBe('UNVERIFIED_STAGING');
+    expect(afterIdentityEdit.grounding_evidence.businessIdentityConfirmed).toBe(false);
+    expect(afterIdentityEdit.grounding_evidence.websiteAudit.status).toBe('stale');
+
+    const republishAfterEdit = await request(app)
+      .post(`/api/landing-pages/${landingAuditArtifactId}/publish`)
+      .set('Authorization', `Bearer ${tokenA}`)
+      .send({ confirmPublish: true });
+    expect(republishAfterEdit.status).toBe(409);
   });
 
   it('completes the persisted proposal-to-revenue-to-delivery CRM lifecycle over HTTP', async (ctx) => {
