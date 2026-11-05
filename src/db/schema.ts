@@ -395,6 +395,9 @@ export const communicationsOutbox = pgTable('communications_outbox', {
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });
 
+export const whatsappPhoneNumberMappings = pgTable('whatsapp_phone_number_mappings', { id: text('id').primaryKey(), contractorId: text('contractor_id').notNull(), phoneNumberId: text('phone_number_id').notNull().unique(), displayPhoneNumber: text('display_phone_number'), verifiedName: text('verified_name'), verifiedAt: timestamp('verified_at').notNull(), createdAt: timestamp('created_at').defaultNow().notNull(), updatedAt: timestamp('updated_at').defaultNow().notNull() });
+export const whatsappInboundEvents = pgTable('whatsapp_inbound_events', { id: text('id').primaryKey(), contractorId: text('contractor_id').notNull(), phoneNumberId: text('phone_number_id').notNull(), providerMessageId: text('provider_message_id').notNull().unique(), senderEncrypted: text('sender_encrypted').notNull(), messageEncrypted: text('message_encrypted').notNull(), messageType: text('message_type').notNull(), receivedAt: timestamp('received_at').defaultNow().notNull() });
+
 export const communicationsDeliveryEvents = pgTable('communications_delivery_events', {
   id: text('id').primaryKey(),
   outboxId: text('outbox_id'),
