@@ -1,0 +1,39 @@
+name: Communications Outbox Worker
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: communications-outbox-worker
+  cancel-in-progress: false
+
+jobs:
+  dispatch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Invoke the protected outbox worker
+        shell: bash
+        env:
+          HAL_APP_URL: ${{ vars.HAL_APP_URL }}
+          HAL_COMMUNICATIONS_WORKER_SECRET: ${{ secrets.HAL_COMMUNICATIONS_WORKER_SECRET }}
+        run: |
+          set -euo pipefail
+          if [[ -z "${HAL_APP_URL}" || -z "${HAL_COMMUNICATIONS_WORKER_SECRET}" ]]; then
+            echo "::notice::Set repository variable HAL_APP_URL and secret HAL_COMMUNICATIONS_WORKER_SECRET to enable scheduled dispatch."
+            exit 0
+          fi
+          case "${HAL_APP_URL}" in
+            https://*) ;;
+            *) echo "::error::HAL_APP_URL must be an HTTPS origin."; exit 1 ;;
+          esac
+          curl --fail-with-body --silent --show-error --max-time 60 \
+            -X POST "${HAL_APP_URL%/}/api/internal/communications/outbox/run" \
+            -H "Authorization: Bearer ${HAL_COMMUNICATIONS_WORKER_SECRET}" \
+            -H "Content-Type: application/json" \
+            --data '{}'
