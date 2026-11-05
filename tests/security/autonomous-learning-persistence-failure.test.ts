@@ -20,6 +20,7 @@ import { AutonomousLearningEngine, getTenantAutonomousLearning } from '../../src
 
 describe('autonomous learning persistence failure handling', () => {
   beforeEach(() => {
+    vi.clearAllMocks();
     mocks.databaseAvailable = true;
     mocks.insert.mockReturnValue({ values: mocks.values });
     mocks.values.mockReturnValue({ onConflictDoNothing: mocks.onConflictDoNothing });
@@ -60,10 +61,48 @@ describe('autonomous learning persistence failure handling', () => {
   it('does not change offline mode when PostgreSQL rejects the write', async () => {
     const engine = new AutonomousLearningEngine();
     const before = structuredClone(engine.getState());
-    mocks.onConflictDoUpdate.mockRejectedValueOnce(new Error('database unavailable'));
+    mocks.insertReturning.mockRejectedValueOnce(new Error('database unavailable'));
 
     await expect(engine.setOfflineMode(true)).rejects.toThrow('database unavailable');
 
+    expect(engine.getState()).toEqual(before);
+  });
+
+  it('keeps mutable calibration defaults isolated between tenant engines', () => {
+    const tenantA = getTenantAutonomousLearning('defaults-a');
+    const tenantB = getTenantAutonomousLearning('defaults-b');
+    const stateA = tenantA.getState();
+    const stateB = tenantB.getState();
+
+    stateA.nicheMap.roofing.sampleCount = 99;
+    stateA.objections[0].triggerKeywords.push('tenant-a-only');
+
+    expect(stateB.nicheMap.roofing.sampleCount).not.toBe(99);
+    expect(stateB.objections[0].triggerKeywords).not.toContain('tenant-a-only');
+  });
+
+  it('serializes concurrent outcome mutations for one tenant', async () => {
+    const engine = new AutonomousLearningEngine('tenant:serialized');
+    const [first, second] = await Promise.all([
+      engine.digestBusinessOutcome({ niche: 'roofing', outcome: 'won', closedValueUsd: 1000 }),
+      engine.digestBusinessOutcome({ niche: 'roofing', outcome: 'lost' })
+    ]);
+
+    expect(first.newEpoch).toBe(1);
+    expect(second.newEpoch).toBe(2);
+    expect(engine.getState().nicheMap.roofing.sampleCount).toBe(2);
+    expect(mocks.insert).toHaveBeenCalledTimes(1);
+    expect(mocks.update).toHaveBeenCalledTimes(1);
+  });
+
+  it('rejects a stale write from another application instance', async () => {
+    const engine = new AutonomousLearningEngine('tenant:stale');
+    await engine.saveState();
+    const before = structuredClone(engine.getState());
+    mocks.updateReturning.mockResolvedValueOnce([]);
+
+    await expect(engine.digestBusinessOutcome({ niche: 'roofing', outcome: 'won' }))
+      .rejects.toThrow('Learning state changed in another application instance');
     expect(engine.getState()).toEqual(before);
   });
 
