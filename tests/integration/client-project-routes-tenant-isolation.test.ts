@@ -186,6 +186,11 @@ describe('client project HTTP route tenant isolation', () => {
     )).rows;
     expect(row).toBeTruthy();
 
+    const [beforeAttempt] = (await pool.query(
+      'SELECT status, monthly_retainer_usd FROM client_projects WHERE id = $1 AND contractor_id = $2',
+      [row.id, tenantA]
+    )).rows;
+
     const response = await request(app)
       .put(`/api/projects/${row.id}`)
       .set('Authorization', `Bearer ${tokenB}`)
@@ -196,8 +201,7 @@ describe('client project HTTP route tenant isolation', () => {
       'SELECT status, monthly_retainer_usd FROM client_projects WHERE id = $1 AND contractor_id = $2',
       [row.id, tenantA]
     )).rows;
-    expect(current.status).toBe('onboarding');
-    expect(current.monthly_retainer_usd).toBe(1200);
+    expect(current).toEqual(beforeAttempt);
   });
 
   it('keeps proposal generation tenant-scoped and records a non-persisted draft event', async (ctx) => {
