@@ -2146,7 +2146,7 @@ app.post('/api/landing-pages/save', authenticate, async (req, res) => {
       await pgDb.update(hermesLabArtifacts).set({
         title,
         content,
-        status: 'ready',
+        status: 'draft',
         updatedAt: new Date()
       }).where(and(eq(hermesLabArtifacts.id, artifactId), eq(hermesLabArtifacts.contractorId, contractorId)));
     } else {
@@ -2156,7 +2156,7 @@ app.post('/api/landing-pages/save', authenticate, async (req, res) => {
         toolId: 'landing_page',
         category: 'web',
         title,
-        status: 'ready',
+        status: 'draft',
         content,
         createdAt: new Date(),
         updatedAt: new Date()
@@ -2169,11 +2169,102 @@ app.post('/api/landing-pages/save', authenticate, async (req, res) => {
       contractorId,
       sourceLeadId: sourceLead?.id || null,
       sourceAuditId: sourceAudit?.auditId || null,
-      liveUrl: `/landing/${artifactId}`
+      draftUrl: `/landing/${artifactId}`,\n      published: false
     });
   } catch (err: any) {
     console.error('[Save Landing Page Error]', err);
     return res.status(503).json({ success: false, error: err.message || 'Landing page could not be saved.' });
+  }
+});
+
+
+app.post('/api/landing-pages/:id/publish', authenticate, async (req, res) => {
+  const contractorId = (req as any).contractorId;
+  if (req.body?.confirmPublish !== true) {
+    return res.status(400).json({ success: false, error: 'Explicit publish confirmation is required.' });
+  }
+
+  try {
+    const [artifact] = await pgDb.select().from(hermesLabArtifacts).where(and(
+      eq(hermesLabArtifacts.id, req.params.id),
+      eq(hermesLabArtifacts.contractorId, contractorId),
+      eq(hermesLabArtifacts.toolId, 'landing_page')
+    )).limit(1);
+    if (!artifact) return res.status(404).json({ success: false, error: 'Landing page draft not found.' });
+
+    const content = artifact.content && typeof artifact.content === 'object'
+      ? artifact.content as Record<string, any>
+      : {};
+    const pageConfig = content.pageConfig && typeof content.pageConfig === 'object'
+      ? content.pageConfig as Record<string, any>
+      : {};
+    if (!String(pageConfig.businessName || '').trim() || !String(pageConfig.city || '').trim()) {
+      return res.status(409).json({ success: false, error: 'Business name and city must be present before publishing.' });
+    }
+
+    const sourceLeadId = typeof content.sourceLeadId === 'string'
+      ? content.sourceLeadId
+      : (typeof pageConfig.sourceLeadId === 'string' ? pageConfig.sourceLeadId : '');
+    if (sourceLeadId) {
+      const [sourceLead] = await pgDb.select({
+        id: leads.id,
+        businessName: leads.businessName,
+        city: leads.city,
+        verificationStatus: leads.verificationStatus,
+        groundingEvidence: leads.groundingEvidence,
+        isSynthetic: leads.isSynthetic
+      }).from(leads).where(and(
+        eq(leads.id, sourceLeadId),
+        eq(leads.contractorId, contractorId)
+      )).limit(1);
+      if (!sourceLead) return res.status(409).json({ success: false, error: 'Linked prospect is no longer available in this workspace.' });
+      const identityEvidence = sourceLead.groundingEvidence && typeof sourceLead.groundingEvidence === 'object'
+        ? sourceLead.groundingEvidence as Record<string, any>
+        : {};
+      if (sourceLead.isSynthetic || sourceLead.verificationStatus !== 'VERIFIED' || identityEvidence.businessIdentityConfirmed !== true) {
+        return res.status(409).json({
+          success: false,
+          code: 'SOURCE_LEAD_NOT_VERIFIED',
+          error: 'This page is linked to a prospect whose business identity has not been human-confirmed. Verify the prospect before publishing.'
+        });
+      }
+      if (pageConfig.businessName !== sourceLead.businessName || pageConfig.city !== sourceLead.city) {
+        return res.status(409).json({ success: false, error: 'The page business name or city no longer matches its verified CRM prospect. Reload the prospect context and save again.' });
+      }
+    }
+
+    const now = new Date();
+    await pgDb.update(hermesLabArtifacts).set({
+      status: 'deployed',
+      updatedAt: now
+    }).where(and(
+      eq(hermesLabArtifacts.id, artifact.id),
+      eq(hermesLabArtifacts.contractorId, contractorId)
+    ));
+
+    await recordWorkEvent(pgDb, {
+      contractorId,
+      eventType: 'landing_page.published',
+      entityType: 'landing_page',
+      entityId: artifact.id,
+      actorType: 'human',
+      actorId: contractorId,
+      sourceModule: 'landing_page_studio',
+      correlationId: artifact.id,
+      summary: `Published landing page: ${artifact.title}.`,
+      payload: { sourceLeadId: sourceLeadId || null, sourceAuditId: content.sourceAuditId || null, publishedAt: now.toISOString() }
+    });
+
+    return res.json({
+      success: true,
+      id: artifact.id,
+      status: 'deployed',
+      liveUrl: `/landing/${artifact.id}`,
+      publishedAt: now.toISOString()
+    });
+  } catch (err: any) {
+    console.error('[Publish Landing Page Error]', err);
+    return res.status(503).json({ success: false, error: 'Landing page could not be published. Please retry.' });
   }
 });
 
