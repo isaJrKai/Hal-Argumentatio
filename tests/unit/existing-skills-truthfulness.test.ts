@@ -8,6 +8,9 @@ import { competitorAnalyzerSkill } from '../../src/skills/competitor-analyzer';
 import { geoSkill } from '../../src/skills/geo';
 import { adSpendOptimizerSkill } from '../../src/skills/ad-spend-optimizer';
 import { seoSchemaGeneratorSkill } from '../../src/skills/seo-schema-generator';
+import { complianceScreenerSkill } from '../../src/skills/compliance-screener';
+import { dueDiligenceUnderwritingSkill } from '../../src/skills/due-diligence-underwriting';
+import { maTargetIntelSkill } from '../../src/skills/ma-target-intel';
 
 describe('existing HAL skills evidence boundaries', () => {
   beforeEach(() => generateResponse.mockReset());
@@ -70,6 +73,55 @@ describe('existing HAL skills evidence boundaries', () => {
     expect(result.schema.url).toBeUndefined();
     expect(result.schema.image).toBeUndefined();
     expect(result.report).not.toContain('35%');
+  });
+
+  it('does not issue fake sanctions clearance or a low-risk AML rating', async () => {
+    const result = await complianceScreenerSkill.execute({
+      subjectName: 'Example Holdings Ltd',
+      country: 'Uganda'
+    }, 'tenant-a');
+
+    expect(result.screeningPerformed).toBe(false);
+    expect(result.sanctionsMatches).toBeNull();
+    expect(result.pepMatches).toBeNull();
+    expect(result.riskRating).toBeNull();
+    expect(result.report).toContain('Sanctions result:** Unknown');
+    expect(result.report).not.toContain('NO MATCH');
+    expect(result.report).not.toContain('LOW RISK');
+  });
+
+  it('does not invent corporate registry, liquidity, litigation, or sanctions findings', async () => {
+    const result = await dueDiligenceUnderwritingSkill.execute({
+      entityName: 'Example Holdings Ltd',
+      jurisdiction: 'Uganda'
+    }, 'tenant-a');
+
+    expect(result.dueDiligencePerformed).toBe(false);
+    expect(result.underwritingDecision).toBe('REVIEW_REQUIRED');
+    expect(result.verifiedRegistryStatus).toBeNull();
+    expect(result.verifiedFinancials).toBeNull();
+    expect(result.report).toContain('External checks performed:** None');
+    expect(result.report).not.toContain('1.45x');
+    expect(result.report).not.toContain('APPROVE WITH CONDITIONS');
+  });
+
+  it('calculates M&A valuation only from explicit user assumptions', async () => {
+    const result = await maTargetIntelSkill.execute({
+      targetCompany: 'Example Holdings Ltd',
+      estimatedRevenue: 1000000,
+      industry: 'Home Services',
+      ebitdaMarginPercent: 12,
+      lowMultiple: 3,
+      highMultiple: 5
+    }, 'tenant-a');
+
+    expect(result.scenarioOnly).toBe(true);
+    expect(result.calculated.ebitdaUsd).toBe(120000);
+    expect(result.calculated.enterpriseValueLowUsd).toBe(360000);
+    expect(result.calculated.enterpriseValueHighUsd).toBe(600000);
+    expect(result.report).toContain('These are arithmetic scenarios');
+    expect(result.report).not.toContain('65,000 annually');
+    expect(result.report).not.toContain('4,000 active contacts');
   });
 
   it('labels ad spend calculations as user-supplied scenarios, not measured performance', async () => {
