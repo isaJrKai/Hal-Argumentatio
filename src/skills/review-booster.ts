@@ -20,7 +20,7 @@ export const reviewBoosterSkill: Skill = {
       label: 'Service Performed',
       type: 'string',
       required: true,
-      defaultValue: 'A/C Repair',
+      defaultValue: '',
     },
     {
       name: 'channel',
@@ -71,7 +71,7 @@ Structure the output as follows:
 - **Gratitude Framing**: Reminds them of the exact value delivered (${servicePerformed}) and uses personal accountability rather than automated system wording.
 
 ### OUTREACH TEMPLATE (SMS Medium)
-"Hi ${clientName}, this is our service team. Hope your ${servicePerformed} is running perfectly. If you have 20 seconds, would you mind leaving us an honest rating on Google? It helps local homeowners find us. Click here: [INSERT_GOOGLE_REVIEW_LINK] - Thank you!"
+"Hi ${clientName}, this is our service team. We would appreciate an honest review of your ${servicePerformed} experience. Please share what went well and what we could improve. It helps local homeowners find us. Click here: [INSERT_GOOGLE_REVIEW_LINK] - Thank you!"
 
 ### CONVERSION BEST PRACTICES
 1. **Timing Priority**: Dispatch the message within 2 hours of completing the job. Send the request after the service is complete, at a time consistent with the customer's communication preferences.
@@ -87,9 +87,9 @@ Structure the output as follows:
 
 "Dear ${clientName},
 
-Thank you for trusting us to handle your ${servicePerformed} yesterday. Our goal is always to deliver clean, professional, and reliable work.
+Thank you for choosing us for your ${servicePerformed}. Our goal is always to deliver clean, professional, and reliable work.
 
-If you are satisfied with our service, would you be open to writing a brief 1-2 sentence review of your experience? Your feedback helps our family-owned business grow and assists other families in our community in finding reliable technicians.
+Would you be open to writing an honest 1–2 sentence review of your experience, whether positive or negative? Your feedback helps us improve and helps other customers make informed decisions.
 
 You can leave your feedback in just one click here:
 [INSERT_GOOGLE_REVIEW_LINK]
