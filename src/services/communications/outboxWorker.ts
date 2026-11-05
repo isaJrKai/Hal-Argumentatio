@@ -9,6 +9,7 @@ export interface DueCommunication {
   subject_encrypted: string | null;
   body_encrypted: string;
   attempts: number;
+  idempotency_key: string;
 }
 
 export interface WorkerResult {
@@ -58,7 +59,7 @@ export async function runCommunicationsOutboxWorker(
           last_attempt_at = $1, updated_at = $1
       FROM due WHERE o.id = due.id
       RETURNING o.id, o.contractor_id, o.channel, o.provider,
-        o.recipient_encrypted, o.subject_encrypted, o.body_encrypted, o.attempts`,
+        o.recipient_encrypted, o.subject_encrypted, o.body_encrypted, o.attempts, o.idempotency_key`,
       [now, batchSize]
     );
     records = claimed.rows;
