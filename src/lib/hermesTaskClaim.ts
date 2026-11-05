@@ -68,9 +68,9 @@ export async function failExpiredHermesWorkTask(
       'outcome', 'lease_expired',
       'success', false,
       'worker', 'hermes',
-      'taskId', ${taskId},
+      'taskId', ${taskId}::text,
       'attempt', ${taskTable.attemptCount},
-      'recordedAt', ${now.toISOString()},
+      'recordedAt', ${now.toISOString()}::text,
       'message', 'The executor stopped heartbeating. No successful completion was recorded; operator review is required before retry.'
     )`,
     completedAt: now,
