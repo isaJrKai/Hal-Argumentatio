@@ -163,7 +163,7 @@ export function auditLandingPage(config: LandingPageConfig): QualityGateAuditRep
     ruleNumber: 3,
     title: 'Contrast & Accessibility (WCAG AA)',
     category: 'a11y',
-    status: 'pass',
+    status: 'warning',
     summary: 'Contrast has not been programmatically measured',
     details: 'This configuration-level gate does not compute foreground/background contrast ratios or verify keyboard focus in a rendered browser. Run an accessibility audit before claiming WCAG AA conformance.',
     remedyHint: 'Use a contrast checker and keyboard/screen-reader testing on the rendered page.',
