@@ -280,21 +280,27 @@ describe('client project HTTP route tenant isolation', () => {
       .send({ leadId: leadRevenueA, amountUsd: 2400, source: 'route_test' });
     expect(foreignAttempt.status).toBe(404);
 
-    const created = await request(app)
-      .post('/api/revenues')
-      .set('Authorization', `Bearer ${tokenA}`)
-      .send({ leadId: leadRevenueA, amountUsd: 2400, source: 'route_test' });
-    expect(created.status).toBe(201);
-    expect(created.body.contractorId).toBe(tenantA);
-    expect(created.body.leadId).toBe(leadRevenueA);
-    expect(created.body.amountUsd).toBe(2400);
-    expect(created.body.leadStatus).toBe('closed_won');
+    const closeOutAttempts = await Promise.all([
+      request(app)
+        .post('/api/revenues')
+        .set('Authorization', `Bearer ${tokenA}`)
+        .send({ leadId: leadRevenueA, amountUsd: 2400, source: 'route_test' }),
+      request(app)
+        .post('/api/revenues')
+        .set('Authorization', `Bearer ${tokenA}`)
+        .send({ leadId: leadRevenueA, amountUsd: 2400, source: 'route_test' })
+    ]);
+    const successfulCloseOuts = closeOutAttempts.filter(response => response.status === 201);
+    const conflictingCloseOuts = closeOutAttempts.filter(response => response.status === 409);
+    expect(successfulCloseOuts).toHaveLength(1);
+    expect(conflictingCloseOuts).toHaveLength(1);
 
-    const duplicate = await request(app)
-      .post('/api/revenues')
-      .set('Authorization', `Bearer ${tokenA}`)
-      .send({ leadId: leadRevenueA, amountUsd: 2400, source: 'route_test' });
-    expect(duplicate.status).toBe(409);
+    const created = successfulCloseOuts[0].body;
+    expect(created.contractorId).toBe(tenantA);
+    expect(created.leadId).toBe(leadRevenueA);
+    expect(created.amountUsd).toBe(2400);
+    expect(created.leadStatus).toBe('closed_won');
+    expect(conflictingCloseOuts[0].body.code).toBeUndefined();
 
     const tenantARevenue = await request(app)
       .get('/api/revenues')
