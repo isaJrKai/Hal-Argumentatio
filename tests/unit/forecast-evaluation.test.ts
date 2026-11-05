@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { evaluateTimesFmBatchActual, getTimesFmBatchEvaluationWindow } from '../../src/lib/forecastEvaluation';
+import { filterGoogleAdsTerritoryRecords } from '../../src/lib/forecastData';
 
 const targetMonday = new Date('2026-11-02T00:00:00.000Z');
 const completeWindow = { start: targetMonday, end: new Date('2026-11-09T00:00:00.000Z') };
@@ -22,6 +23,14 @@ describe('TimesFM batch forecast evaluation window', () => {
   it('sums actual Google Ads conversions only for the requested territory and niche', () => {
     const rows = [...adsRows(), ...adsRows('Austin, TX', 'Roofing Leads'), ...adsRows('Calgary, AB', 'Plumbing Leads')];
     expect(evaluateTimesFmBatchActual(rows, 'Calgary, AB', 'Roofing', completeWindow)).toBe(15);
+  });
+  it('matches city suffixes and specific trade terms without generic contractor wording', () => {
+    const rows = [
+      { ...adsRows()[0], campaignName: 'Roofing Leads' },
+      { ...adsRows()[0], campaignName: 'Plumbing Leads' },
+      { ...adsRows()[0], geo: 'Austin, TX', campaignName: 'Roofing Leads' }
+    ];
+    expect(filterGoogleAdsTerritoryRecords(rows, 'Roofing Contractor', 'Calgary, AB')).toHaveLength(1);
   });
   it('does not turn an incomplete target week into a zero actual', () => {
     expect(evaluateTimesFmBatchActual(adsRows().slice(0, 4), 'Calgary, AB', 'Roofing', completeWindow)).toBeNull();

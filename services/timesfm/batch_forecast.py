@@ -24,6 +24,21 @@ HORIZON = int(os.getenv("TIMESFM_BATCH_HORIZON", "12"))
 MAX_CONTEXT = int(os.getenv("TIMESFM_BATCH_MAX_CONTEXT", "256"))
 
 
+GENERIC_TRADE_WORDS = {"contractor", "contractors", "service", "services", "company", "companies", "business", "businesses", "llc", "inc", "the", "and", "of"}
+
+
+def matches_trade_context(campaign_text: str, niche: str) -> bool:
+    haystack = campaign_text.strip().lower()
+    requested = niche.strip().lower()
+    if not haystack or not requested:
+        return False
+    if requested in haystack:
+        return True
+    tokens = [token for token in __import__("re").split(r"[^a-z0-9]+", requested)
+              if len(token) >= 3 and token not in GENERIC_TRADE_WORDS]
+    return any(token in haystack for token in tokens) if tokens else requested in haystack
+
+
 def weekly_series(rows: list[dict]) -> list[tuple[date, float]]:
     buckets: dict[date, dict] = {}
     for row in rows:
@@ -116,7 +131,7 @@ def main() -> None:
                 trade_text = " ".join(
                     str(row[key] or "") for key in ("campaign_name", "keyword", "search_term")
                 ).strip().lower()
-                if city in geo and niche in trade_text:
+                if city in geo and matches_trade_context(trade_text, niche):
                     scoped.append(row)
 
             weeks = weekly_series(scoped)
