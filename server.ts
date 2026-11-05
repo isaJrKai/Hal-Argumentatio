@@ -324,6 +324,7 @@ app.get('/api/ready', async (_req, res) => {
         to_regclass('public.learning_insights') IS NOT NULL AS learning_insights,
         to_regclass('public.outreach_sequences') IS NOT NULL AS outreach_sequences,
         to_regclass('public.revoked_tokens') IS NOT NULL AS revoked_tokens,
+        to_regclass('public.password_reset_tokens') IS NOT NULL AS password_reset_tokens,
         to_regclass('public.hal_loops') IS NOT NULL AS hal_loops
     `);
     const checks = result.rows[0] || {};
