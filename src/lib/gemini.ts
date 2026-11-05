@@ -951,7 +951,7 @@ RESPONSE STANDARD
         }
 
         const text = await callNemotron(messages, 0.3);
-        return { text };
+        return { text, provider: 'nvidia' };
       } catch (err: any) {
         console.error("NVIDIA Nemotron chatbot error, trying Gemini fallback:", err);
       }
