@@ -92,7 +92,6 @@ be eligible. OAuth success with zero imported rows is not successful ingestion.
      ON TABLE public.contractors TO hal_timesfm_batch;
    GRANT SELECT (contractor_id, date, conversions, cost, geo, campaign_name, keyword, search_term)
      ON TABLE public.google_ads_daily_performance TO hal_timesfm_batch;
-   GRANT SELECT (id) ON TABLE public.forecasts TO hal_timesfm_batch;
    GRANT INSERT (id, contractor_id, metric, predicted, confidence_score, target_date,
                  model_version, assumptions, created_at, updated_at)
      ON TABLE public.forecasts TO hal_timesfm_batch;
