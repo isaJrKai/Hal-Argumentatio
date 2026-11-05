@@ -251,8 +251,7 @@ export const LandingPageStudioPanel: React.FC<{ token: string | null }> = ({ tok
           id: config.id,
           title: config.title,
           leadId: selectedLeadId || config.sourceLeadId || null,
-          pageConfig: config,
-          renderedHtml
+          pageConfig: config
         })
       });
 
@@ -273,7 +272,7 @@ export const LandingPageStudioPanel: React.FC<{ token: string | null }> = ({ tok
     } catch (err: any) {
       showToast({
         title: 'Save Warning',
-        message: err.message || 'Stored in local memory',
+        message: err.message || 'The draft was not saved. Please retry.',
         type: 'warning'
       });
     } finally {
