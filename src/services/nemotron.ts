@@ -79,7 +79,7 @@ export async function callNemotronWithTools(
     'nvidia/nemotron-3.5-lightning-30b-a3b',
     'nvidia/nemotron-3-nano-30b-a3b',
   ];
-  const overallDeadline = AbortSignal.timeout(45_000);
+  const overallDeadline = AbortSignal.timeout(30_000);
   let lastError: any = null;
 
   for (const model of candidates) {
