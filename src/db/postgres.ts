@@ -493,6 +493,45 @@ export async function bootstrapPostgresTables(poolInstance?: Pool): Promise<void
       ALTER TABLE communications_outbox DROP CONSTRAINT IF EXISTS communications_outbox_idempotency_key_key;
       CREATE UNIQUE INDEX IF NOT EXISTS communications_outbox_tenant_idempotency_idx ON communications_outbox (contractor_id, idempotency_key);
 
+      CREATE TABLE IF NOT EXISTS communications_consents (
+        id TEXT PRIMARY KEY,
+        contractor_id TEXT NOT NULL,
+        lead_id TEXT NOT NULL,
+        channel TEXT NOT NULL,
+        status TEXT NOT NULL,
+        source TEXT NOT NULL,
+        evidence_encrypted TEXT,
+        consented_at TIMESTAMP,
+        opted_out_at TIMESTAMP,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
+      );
+      CREATE UNIQUE INDEX IF NOT EXISTS communications_consents_tenant_lead_channel_idx
+        ON communications_consents (contractor_id, lead_id, channel);
+      CREATE INDEX IF NOT EXISTS communications_consents_tenant_status_idx
+        ON communications_consents (contractor_id, channel, status);
+
+      CREATE TABLE IF NOT EXISTS twilio_phone_number_mappings (
+        id TEXT PRIMARY KEY,
+        contractor_id TEXT NOT NULL,
+        phone_number TEXT NOT NULL UNIQUE,
+        account_sid TEXT NOT NULL,
+        verified_at TIMESTAMP NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
+      );
+
+      CREATE TABLE IF NOT EXISTS twilio_inbound_events (
+        id TEXT PRIMARY KEY,
+        contractor_id TEXT NOT NULL,
+        provider_message_id TEXT NOT NULL UNIQUE,
+        from_encrypted TEXT NOT NULL,
+        body_encrypted TEXT NOT NULL,
+        received_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS twilio_inbound_tenant_received_idx
+        ON twilio_inbound_events (contractor_id, received_at DESC);
+
       CREATE TABLE IF NOT EXISTS whatsapp_phone_number_mappings (
         id TEXT PRIMARY KEY,
         contractor_id TEXT NOT NULL,
