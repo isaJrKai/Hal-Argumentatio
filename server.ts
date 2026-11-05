@@ -2100,7 +2100,7 @@ app.post('/api/landing-pages/save', authenticate, async (req, res) => {
     const sourceAudit = sourceEvidence.websiteAudit && typeof sourceEvidence.websiteAudit === 'object'
       ? sourceEvidence.websiteAudit
       : null;
-    const ownedPageConfig = {
+    const ownedPageConfig: Record<string, any> = {
       ...pageConfig,
       ...(sourceLead ? {
         businessName: sourceLead.businessName,
@@ -2111,6 +2111,34 @@ app.post('/api/landing-pages/save', authenticate, async (req, res) => {
       contractorId,
       ...(sourceLead ? { sourceLeadId: sourceLead.id } : {})
     };
+    let savedTitle = title.trim();
+
+    if (sourceLead) {
+      const trade = String(sourceLead.niche || pageConfig.trade || 'services').replace(/_/g, ' ');
+      savedTitle = `${sourceLead.businessName} — ${trade} Services in ${sourceLead.city}`;
+      ownedPageConfig.title = savedTitle;
+
+      if (ownedPageConfig.seo && typeof ownedPageConfig.seo === 'object') {
+        if (/your business name|your service area/i.test(String(ownedPageConfig.seo.metaTitle || ''))) {
+          ownedPageConfig.seo.metaTitle = `${sourceLead.businessName} — ${trade} in ${sourceLead.city}`;
+        }
+        if (/your business name|your service area/i.test(String(ownedPageConfig.seo.metaDescription || ''))) {
+          ownedPageConfig.seo.metaDescription = `${sourceLead.businessName} provides ${trade} services in ${sourceLead.city}. Contact the business for current service details.`;
+        }
+      }
+
+      if (ownedPageConfig.sections?.hero) {
+        if (/in your area/i.test(String(ownedPageConfig.sections.hero.headline || ''))) {
+          ownedPageConfig.sections.hero.headline = `${trade} services in ${sourceLead.city}`;
+        }
+        if (/describe the services your business provides/i.test(String(ownedPageConfig.sections.hero.subheadline || ''))) {
+          ownedPageConfig.sections.hero.subheadline = `Contact ${sourceLead.businessName} to discuss ${trade} services in ${sourceLead.city}. Confirm availability and scope with the team.`;
+        }
+      }
+      if (/add the business address or remove/i.test(String(ownedPageConfig.sections?.footer?.address || ''))) {
+        ownedPageConfig.sections.footer.address = '';
+      }
+    }
 
     // Never trust client-supplied rendered HTML. Render from the validated,
     // tenant-owned configuration using the escaping server-side generator.
@@ -2138,13 +2166,13 @@ app.post('/api/landing-pages/save', authenticate, async (req, res) => {
       actorId: contractorId,
       sourceModule: 'landing_page_studio',
       correlationId: artifactId,
-      summary: `${existing ? 'Updated' : 'Saved'} landing page: ${title}.`,
+      summary: `${existing ? 'Updated' : 'Saved'} landing page: ${savedTitle}.`,
       payload: { title, sourceLeadId: sourceLead?.id || null, sourceAuditId: sourceAudit?.auditId || null }
     });
 
     if (existing) {
       await pgDb.update(hermesLabArtifacts).set({
-        title,
+        title: savedTitle,
         content,
         status: 'draft',
         updatedAt: new Date()
@@ -2167,6 +2195,7 @@ app.post('/api/landing-pages/save', authenticate, async (req, res) => {
       success: true,
       id: artifactId,
       contractorId,
+      title: savedTitle,
       sourceLeadId: sourceLead?.id || null,
       sourceAuditId: sourceAudit?.auditId || null,
       draftUrl: `/landing/${artifactId}`,
