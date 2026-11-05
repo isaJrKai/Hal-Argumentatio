@@ -7555,9 +7555,15 @@ app.post('/api/invoices', authenticate, async (req, res) => {
   const normalizedLeadId = typeof leadId === 'string' && leadId.trim() ? leadId.trim() : null;
   const normalizedProjectId = typeof projectId === 'string' && projectId.trim() ? projectId.trim() : null;
   const normalizedCurrency = typeof currency === 'string' ? currency.trim().toUpperCase() : 'USD';
+  let currencySupported = true;
+  try {
+    new Intl.NumberFormat('en-US', { style: 'currency', currency: normalizedCurrency }).format(0);
+  } catch {
+    currencySupported = false;
+  }
   if ((!normalizedLeadId && !normalizedProjectId) ||
       !Number.isSafeInteger(amountMinor) || amountMinor <= 0 ||
-      amountMinor > 2147483647 ||
+      amountMinor > 2147483647 || !currencySupported ||
       !/^[A-Z]{3}$/.test(normalizedCurrency) ||
       typeof description !== 'string' || !description.trim() || description.trim().length > 500) {
     return res.status(400).json({ error: 'A tenant-owned lead or project, description, positive amount in minor currency units, and valid ISO currency are required.' });
