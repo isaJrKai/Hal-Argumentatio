@@ -48,6 +48,7 @@ import { buildHalMcpServer } from './src/services/mcp/halMcpServer';
 import { HERMES_LAB_CATALOG, executeHermesLabTool, chatWithHermesAgent, LabToolType } from './src/services/hermesLab';
 import { generateContractorLandingPage, regenerateLandingSection } from './src/services/landingGenerator';
 import { generateLandingPageHtml } from './src/components/landing/htmlGenerator';
+import type { LandingPageConfig } from './src/components/landing/types';
 import { validateCrmTransition, isKnownCrmStage } from './src/lib/crmStateMachine';
 import { buildFinancialSnapshotCore } from './src/lib/financialSnapshot';
 import { getRevenueAmountUsd } from './src/lib/revenueAmounts';
@@ -2142,7 +2143,7 @@ app.post('/api/landing-pages/save', authenticate, async (req, res) => {
 
     // Never trust client-supplied rendered HTML. Render from the validated,
     // tenant-owned configuration using the escaping server-side generator.
-    const ownedRenderedHtml = generateLandingPageHtml(ownedPageConfig);
+    const ownedRenderedHtml = generateLandingPageHtml(ownedPageConfig as LandingPageConfig);
 
     const [existing] = await pgDb
       .select()
