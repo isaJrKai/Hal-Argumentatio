@@ -918,7 +918,7 @@ for (const template of Object.values(TRADE_TEMPLATES)) {
 
   [
     'announcement_bar', 'trust_bar', 'bento_features', 'pricing_packages',
-    'seasonal_alert', 'services', 'before_after', 'reviews', 'service_areas',
+    'seasonal_alert', 'before_after', 'reviews', 'service_areas',
     'guarantee', 'online_booking', 'faq', 'sticky_mobile_call'
   ].forEach(disableSection);
 
@@ -930,8 +930,19 @@ for (const template of Object.values(TRADE_TEMPLATES)) {
   if (sections.hero) {
     sections.hero.headline = `Professional ${template.trade.replace(/_/g, ' ')} services in your area`;
     sections.hero.subheadline = 'Describe the services your business provides, the areas you serve, and how customers can contact you.';
-    sections.hero.badgeText = '';
-    sections.hero.heroImageUrl = undefined;
+    sections.hero.badgeText = 'Add verified credentials or remove this badge before publishing';
+  }
+  if (sections.services) {
+    sections.services.active = true;
+    sections.services.title = 'Suggested services — edit before publishing';
+    sections.services.subtitle = 'Keep only the services your business actually provides.';
+    if (Array.isArray(sections.services.items)) {
+      sections.services.items = sections.services.items.map((item: any) => {
+        const safeItem = { ...item };
+        if ('price' in safeItem) safeItem.price = '';
+        return safeItem;
+      });
+    }
   }
   if (sections.lead_form) {
     sections.lead_form.active = true;
