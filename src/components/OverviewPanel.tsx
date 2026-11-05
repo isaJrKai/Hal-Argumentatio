@@ -536,7 +536,7 @@ export default function OverviewPanel({
                 <span className="text-text-tertiary block text-[9px] uppercase font-sans">Live Google Ads</span>
                 <span className="text-text-primary font-semibold truncate">
                   {forecastMetadata?.googleAdsBaseline 
-                    ? `${forecastMetadata.googleAdsBaseline.recordsCount} Logs · $${forecastMetadata.googleAdsBaseline.empiricalCpl} CPL` 
+                    ? `${forecastMetadata.googleAdsBaseline.recordsCount} Logs · ${forecastMetadata.googleAdsBaseline.empiricalCpl} ${forecastMetadata.googleAdsBaseline.currencyCode || 'currency unknown'} CPL` 
                     : 'No verified records'}
                 </span>
               </div>

@@ -122,7 +122,7 @@ export default function HalOpsPanel({
     {
       id: 'evaluate_forecasts',
       name: '3.5 Forecast Evaluator',
-      desc: 'Checks expired predictions against actual performance, records deviations, and triggers Gemini feedback insights to refine downstream strategy models.'
+      desc: 'Evaluates completed TimesFM target weeks against the same territory’s recorded Google Ads conversions; incomplete observation weeks are left unevaluated.'
     },
     {
       id: 'auto_forecaster',

@@ -15,6 +15,7 @@ import numpy as np
 import psycopg
 from psycopg.rows import dict_row
 import timesfm
+from forecast_contract import first_target_week, matches_trade_context, validate_batch_result
 
 DATABASE_URL = os.environ["DATABASE_URL"]
 MODEL_ID = "google/timesfm-2.5-200m-pytorch"
@@ -65,7 +66,7 @@ def main() -> None:
     if not 1 <= HORIZON <= 52 or not 8 <= MAX_CONTEXT <= 16384:
         raise ValueError("Invalid TimesFM batch horizon/context configuration")
 
-    model = make_model()
+    model = None
     generated = 0
     skipped = 0
     now = datetime.now(timezone.utc)
@@ -90,8 +91,11 @@ def main() -> None:
             """
         ).fetchall()
 
+        if not contractors:
+            validate_batch_result(0, 0)
+
         for contractor in contractors:
-            city = str(contractor["city"]).strip().lower()
+            city = str(contractor["city"]).split(",")[0].strip().lower()
             niche = str(contractor["service_type"]).strip().lower()
             if not city or not niche:
                 skipped += 1
@@ -99,7 +103,7 @@ def main() -> None:
 
             rows = conn.execute(
                 """
-                SELECT date, conversions, cost, geo, campaign_name, keyword, search_term
+                SELECT date, conversions, cost, geo, campaign_name, keyword, search_term, currency_code
                 FROM google_ads_daily_performance
                 WHERE contractor_id = %s
                 ORDER BY date ASC
@@ -115,7 +119,7 @@ def main() -> None:
                 trade_text = " ".join(
                     str(row[key] or "") for key in ("campaign_name", "keyword", "search_term")
                 ).strip().lower()
-                if city in geo and niche in trade_text:
+                if city in geo and matches_trade_context(trade_text, niche):
                     scoped.append(row)
 
             weeks = weekly_series(scoped)
@@ -128,6 +132,8 @@ def main() -> None:
                 skipped += 1
                 continue
 
+            if model is None:
+                model = make_model()
             point, quantiles = model.forecast(
                 horizon=HORIZON,
                 inputs=[values],
@@ -140,11 +146,12 @@ def main() -> None:
             batch_rows = []
             last_week = weeks[-1][0]
             today_utc = datetime.now(timezone.utc).date()
-            next_monday = today_utc - timedelta(days=today_utc.weekday()) + timedelta(days=7)
-            first_forecast_week = max(last_week + timedelta(days=7), next_monday)
+            first_forecast_week = first_target_week(last_week, today_utc)
             total_cost = sum(float(row["cost"] or 0) for row in scoped)
             total_conversions = sum(float(row["conversions"] or 0) for row in scoped)
-            observed_cpl = total_cost / total_conversions if total_conversions > 0 else 0.0
+            currency_codes = {str(row["currency_code"] or "").strip().upper() for row in scoped if row["currency_code"]}
+            account_currency_code = next(iter(currency_codes)) if len(currency_codes) == 1 else None
+            observed_cpl = total_cost / total_conversions if total_conversions > 0 and account_currency_code else None
             observed_days = {
                 row["date"].date() if isinstance(row["date"], datetime) else row["date"]
                 for row in scoped
@@ -160,7 +167,7 @@ def main() -> None:
                 lower = max(0.0, min(lower, median))
                 upper = max(median, upper)
                 target_date = datetime.combine(
-                    last_week + timedelta(days=7 * (index + 1)),
+                    first_forecast_week + timedelta(days=7 * index),
                     datetime.min.time(),
                     tzinfo=timezone.utc,
                 )
@@ -176,7 +183,8 @@ def main() -> None:
                     "input_days": len(observed_days),
                     "input_total_cost": total_cost,
                     "input_total_conversions": total_conversions,
-                    "observed_cpl_usd": observed_cpl,
+                    "account_currency_code": account_currency_code,
+                    "observed_cpl_account_currency": observed_cpl,
                     "historical_mean": historical_mean,
                     "input_start_week": weeks[0][0].isoformat(),
                     "input_end_week": last_week.isoformat(),
@@ -211,8 +219,7 @@ def main() -> None:
             generated += len(batch_rows)
 
     print(f"TimesFM batch complete: {generated} forecast points saved; {skipped} contractor-territories skipped.")
-    if generated == 0:
-        print("No contractor-territories had enough eligible history yet; no forecasts were changed.")
+    validate_batch_result(len(contractors), generated)
 
 
 if __name__ == "__main__":

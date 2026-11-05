@@ -58,21 +58,76 @@ the median forecast plus q10/q90 bounds into the existing `forecasts` table.
 Other niche selections require the optional HTTP inference mode. It is a
 scheduled batch job, not a live HTTP inference API.
 
+### Real Google Ads history ingestion
+
+The authenticated tenant endpoint `POST /api/forecasting/google-ads/sync` is
+available from Settings using **Verify & import last 365 days**. The credential
+object is stored in the existing contractor-scoped encrypted connector vault
+and is never returned to the browser.
+
+Required JSON fields: `clientId`, `clientSecret`, `refreshToken`, `developerToken`, and
+10-digit `customerId`. Optional: `loginCustomerId` for manager-account access. The refresh token must be authorized
+for `https://www.googleapis.com/auth/adwords` with offline access. Google's current user-auth flow requires passkey authentication when generating new refresh tokens, and the Ads scope is restricted, so production OAuth app verification is required. HAL refreshes
+the token server-side, queries Google Ads v26 city-level geographic performance
+for the last 365 days, resolves city names, and idempotently upserts daily
+campaign/city observations into the same tenant's
+`google_ads_daily_performance` table. Only physical-presence geography is
+imported. The TimesFM batch job subsequently filters campaign names against the
+tenant's service type; campaign names must identify the trade for forecasts to
+be eligible. OAuth success with zero imported rows is not successful ingestion.
+
 ### Required setup
 
 1. In the GitHub repository, open **Settings → Secrets and variables → Actions**.
 2. Add repository secret `HAL_FORECAST_DATABASE_URL` containing a PostgreSQL
    connection string for a dedicated least-privilege database role.
-3. Grant that role only the permissions needed to read `contractors` and
-   `google_ads_daily_performance`, and insert/update rows in `forecasts`.
-   Do not use a database owner or admin credential.
+3. Create a dedicated login role (run as a database administrator and replace
+   the role/database placeholders securely):
+
+   ```sql
+   CREATE ROLE hal_timesfm_batch LOGIN PASSWORD '<generate-a-unique-secret>';
+   GRANT CONNECT ON DATABASE <database_name> TO hal_timesfm_batch;
+   GRANT USAGE ON SCHEMA public TO hal_timesfm_batch;
+   GRANT SELECT (id, city, service_type, active_territories)
+     ON TABLE public.contractors TO hal_timesfm_batch;
+   GRANT SELECT (contractor_id, date, conversions, cost, geo, campaign_name, keyword, search_term, currency_code)
+     ON TABLE public.google_ads_daily_performance TO hal_timesfm_batch;
+   GRANT INSERT (id, contractor_id, metric, predicted, confidence_score, target_date,
+                 model_version, assumptions, created_at, updated_at)
+     ON TABLE public.forecasts TO hal_timesfm_batch;
+   GRANT UPDATE (predicted, confidence_score, assumptions, updated_at)
+     ON TABLE public.forecasts TO hal_timesfm_batch;
+   ```
+
+   Do not grant table ownership, `DELETE`, `TRUNCATE`, `CREATE`, or `BYPASSRLS`.
+   Store the URL only as the GitHub Actions secret `HAL_FORECAST_DATABASE_URL`;
+   never commit it or print it in logs.
 4. Run **Actions → HAL TimesFM scheduled forecasts → Run workflow** manually
-   to test. Scheduled runs execute from `main` every six hours after this
-   workflow is merged into the default branch.
+   after verifying grants and confirming genuine Google Ads history exists.
+   Scheduled runs execute from `main` every six hours after workflow merge.
 
 The workflow does not print connection strings, customer records, or model
 inputs. Do not enable verbose SQL logging or add personal/customer fields to
 workflow logs.
+
+### Historical data ingestion status
+
+A tenant-authenticated Google Ads API ingestion endpoint is now implemented at
+`POST /api/forecasting/google-ads/sync`. It uses the current encrypted
+workspace credential, queries city-level physical-presence daily performance,
+resolves canonical Google geo-target city names, and upserts tenant-owned records
+idempotently. It does not invent missing days or fabricate sample rows. The
+batch runner consumes only rows whose city and campaign text match the selected
+territory and service type.
+
+The code path and its input/query contracts are covered by CI tests. No
+production Google Ads OAuth consent, live account query, or non-zero Neon
+history has yet been verified. The ingestion feature is implemented but
+production-unverified until a workspace owner saves valid OAuth credentials and
+the UI reports a non-zero imported row count. The batch runner now fails rather
+than reporting a successful empty run when the configured database has no
+contractor territories or when no eligible history produces forecast points.
+The database table existing by itself is not proof of genuine historical ingestion.
 
 ### Resource and product limitations
 
@@ -83,9 +138,14 @@ workflow logs.
   time limits. A failed run does not delete or overwrite the last successful
   forecasts.
 - Forecasts are refreshed on the schedule, not immediately on dashboard
-  interaction. HAL reads only a fresh complete snapshot (up to 24 hours old)
-  and shows its generation timestamp. A later failed run does not delete or
-  overwrite the last successful forecasts.
+  interaction. The first target is the later of the week after the last complete
+  observed week and the next UTC week, keeping the full target week in the future and preventing expired targets from stale
+  history. HAL reads only a fresh complete snapshot (up to 24 hours old).
+- TimesFM conversion forecasts are evaluated only after their complete target
+  Monday-Sunday week has elapsed, against the same tenant's Google Ads daily
+  conversion observations filtered to the forecast city and service type. At
+  least five observed days spanning Monday-Friday are required; missing history
+  is not interpreted as zero. Outcomes and source-window provenance are persisted.
 - The `confidence_score` field is set to zero because a calibrated confidence
   score has not been established. q10/q90 values are stored separately in
   `assumptions`; they are model quantile bounds, not a guarantee.

@@ -54,6 +54,7 @@ import { validateStaffInput, getEffectiveStaffAvailability } from './src/lib/sta
 import { getWorkerCapabilities } from './src/lib/workerCapabilities';
 import { resolvePublishedLandingPageOwner } from './src/lib/landingPageOwnership';
 import { validateLoopGate } from './src/lib/loopGating';
+import { parseGoogleAdsConnection, buildGoogleAdsCityPerformanceQuery, buildGoogleAdsGeoConstantQuery, extractGoogleAdsStreamRows, GOOGLE_ADS_API_VERSION } from './src/lib/googleAdsIngestion';
 import { 
   auditCompetitorFootprint, 
   calculateSpatialQuadrants, 
@@ -84,6 +85,7 @@ import {
   verifyPhase5Pillars
 } from './src/lib/phase5-enterprise';
 import { executeBrainSynchronizedForecast } from './src/lib/brainForecastBridge';
+import { getTimesFmBatchEvaluationWindow, evaluateTimesFmBatchActual } from './src/lib/forecastEvaluation';
 import {
   verifyLeadGrounding,
   enforceFailClosedOutreachGate,
@@ -6950,6 +6952,95 @@ app.put('/api/projects/:id', authenticate, async (req, res) => {
 
 // ─── CONNECTORS CREDENTIALS & HEALTH API ──────────────────────────────────────
 
+
+async function googleAdsAccessToken(credentials: ReturnType<typeof parseGoogleAdsConnection>): Promise<string> {
+  const response = await fetch('https://oauth2.googleapis.com/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({ grant_type: 'refresh_token', client_id: credentials.clientId, client_secret: credentials.clientSecret, refresh_token: credentials.refreshToken }),
+    signal: AbortSignal.timeout(20000)
+  });
+  if (!response.ok) throw new Error(`Google OAuth token exchange failed (HTTP ${response.status}).`);
+  const result = await response.json() as { access_token?: string; token_type?: string };
+  if (!result.access_token || result.token_type?.toLowerCase() !== 'bearer') throw new Error('Google OAuth did not return a bearer access token.');
+  return result.access_token;
+}
+async function googleAdsSearch(accessToken: string, credentials: ReturnType<typeof parseGoogleAdsConnection>, query: string): Promise<any[]> {
+  const headers: Record<string,string> = { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' };
+  headers['developer-token'] = credentials.developerToken;
+  if (credentials.loginCustomerId) headers['login-customer-id'] = credentials.loginCustomerId;
+  const response = await fetch(`https://googleads.googleapis.com/${GOOGLE_ADS_API_VERSION}/customers/${credentials.customerId}/googleAds:searchStream`, {
+    method: 'POST', headers, body: JSON.stringify({ query }), signal: AbortSignal.timeout(45000)
+  });
+  if (!response.ok) throw new Error(`Google Ads query failed (HTTP ${response.status}). Check the connected account's access and API project authorization.`);
+  return extractGoogleAdsStreamRows(await response.json());
+}
+
+app.post('/api/forecasting/google-ads/sync', authenticate, async (req, res) => {
+  const contractorId = (req as any).contractorId as string;
+  try {
+    const saved = await getTenantConnectorCredentials(contractorId);
+    if (!saved.googleAds) return res.status(409).json({ success: false, error: 'Google Ads OAuth connection is not configured for this workspace.' });
+    const credentials = parseGoogleAdsConnection(saved.googleAds);
+    const accessToken = await googleAdsAccessToken(credentials);
+    const records = await googleAdsSearch(accessToken, credentials, buildGoogleAdsCityPerformanceQuery());
+    const cityResources = [...new Set(records.map(row => row.segments?.geoTargetCity)
+      .filter((value): value is string => typeof value === 'string' && /^geoTargetConstants\/\d+$/.test(value)))];
+    const cityNames = new Map<string,string>();
+    for (let offset=0; offset<cityResources.length; offset+=100) {
+      const rows = await googleAdsSearch(accessToken, credentials, buildGoogleAdsGeoConstantQuery(cityResources.slice(offset,offset+100)));
+      for (const row of rows) {
+        const resource=row.geoTargetConstant?.resourceName, name=row.geoTargetConstant?.canonicalName;
+        if (typeof resource==='string' && typeof name==='string' && name.trim()) cityNames.set(resource,name.trim());
+      }
+    }
+    const now=new Date(), seen=new Set<string>(), values:any[]=[];
+    for (const row of records) {
+      const campaignId=String(row.campaign?.id||''), campaignName=String(row.campaign?.name||'').trim();
+      const resource=row.segments?.geoTargetCity, city=typeof resource==='string'?cityNames.get(resource):undefined;
+      const day=String(row.segments?.date||'');
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(day) || !/^\d+$/.test(campaignId) || !campaignName || !city) continue;
+      const unique=`${campaignId}|${day}|${city.toLowerCase()}`;
+      if(seen.has(unique)) continue; seen.add(unique);
+      const impressions=Number(row.metrics?.impressions||0), clicks=Number(row.metrics?.clicks||0);
+      const costMicros=Number(row.metrics?.costMicros||0), conversions=Number(row.metrics?.conversions||0);
+      const conversionValue=Number(row.metrics?.conversionsValue||0);
+      const currencyCode=String(row.customer?.currencyCode||'').trim().toUpperCase() || null;
+      if (![impressions,clicks,costMicros,conversions,conversionValue].every(Number.isFinite) ||
+          [impressions,clicks,costMicros,conversions,conversionValue].some(v=>v<0)) continue;
+      const id='gads_'+crypto.createHash('sha256').update(`${contractorId}|${credentials.customerId}|${unique}`).digest('hex');
+      values.push({id,contractorId,campaignId,campaignName,geo:city,device:'all',currencyCode,date:new Date(`${day}T00:00:00.000Z`),
+        impressions,clicks,cost:costMicros/1000000,conversions,conversionValue,createdAt:now});
+    }
+    for(let offset=0;offset<values.length;offset+=500) {
+      await pgDb.insert(googleAdsDailyPerformance).values(values.slice(offset,offset+500)).onConflictDoUpdate({
+        target:googleAdsDailyPerformance.id,
+        set:{
+          campaignName:sql`excluded.campaign_name`,geo:sql`excluded.geo`,device:sql`excluded.device`,currencyCode:sql`excluded.currency_code`,date:sql`excluded.date`,
+          impressions:sql`excluded.impressions`,clicks:sql`excluded.clicks`,cost:sql`excluded.cost`,
+          conversions:sql`excluded.conversions`,conversionValue:sql`excluded.conversion_value`
+        }
+      });
+    }
+    await pgDb.insert(workEvents).values({
+      id:'evt_'+crypto.randomUUID(),contractorId,eventType:'forecasting.google_ads_history_synced',
+      entityType:'google_ads_daily_performance',entityId:credentials.customerId,actorType:'human',
+      actorId:contractorId,sourceModule:'forecasting',correlationId:crypto.randomUUID(),
+      summary:`Imported ${values.length} Google Ads city-level daily performance records.`,
+      payload:{provider:'google_ads_api',imported:values.length,queriedRows:records.length,range:'last_365_days',cityDimensions:cityNames.size}
+    });
+    return res.json({success:true,source:'google_ads_api',imported:values.length,queriedRows:records.length,
+      cities:cityNames.size,range:'last_365_days',
+      message:values.length?`Imported or refreshed ${values.length} real Google Ads city/day/campaign observations.`:
+      'Google Ads authenticated, but no eligible city-level daily rows were imported.'});
+  } catch(error:any) {
+    const message=String(error?.message||'');
+    const safe=message.startsWith('Google ')||message.startsWith('Invalid Google Ads')?message:
+      'Google Ads history sync failed. Verify the OAuth connection, account access and API configuration.';
+    return res.status(502).json({success:false,error:safe});
+  }
+});
+
 async function getTenantConnectorCredentials(contractorId: string): Promise<Record<string, string>> {
   // Import existing encrypted JSON-store values once. PostgreSQL becomes the
   // durable source after first read; conflicts never overwrite newer DB values.
@@ -8194,17 +8285,26 @@ app.post('/api/scheduler', authenticate, async (req, res) => {
 
     if (job === 'evaluate_forecasts') {
       const now = new Date();
-      const expiredUnevaluated = await pgDb.select().from(forecasts).where(and(
+      const expiredRows = await pgDb.select().from(forecasts).where(and(
         eq(forecasts.contractorId, contractorId),
         eq(forecasts.evaluated, false),
         lte(forecasts.targetDate, now)
       )).orderBy(desc(forecasts.targetDate));
+      // TimesFM batch rows represent a complete target week beginning at target_date.
+      // Do not evaluate them until the entire Monday-Sunday observation window has elapsed.
+      const expiredUnevaluated = expiredRows.filter(forecast =>
+        forecast.modelVersion !== 'timesfm-2.5-batch-v1'
+        || getTimesFmBatchEvaluationWindow(forecast.targetDate, now) !== null
+      );
 
       const [tenantLeads, tenantCampaigns, tenantRevenues] = await Promise.all([
         pgDb.select().from(leads).where(eq(leads.contractorId, contractorId)),
         pgDb.select({ id: campaigns.id }).from(campaigns).where(eq(campaigns.contractorId, contractorId)),
         pgDb.select().from(revenueRecords).where(eq(revenueRecords.contractorId, contractorId))
       ]);
+      const tenantGoogleAds = expiredUnevaluated.some(forecast => forecast.modelVersion === 'timesfm-2.5-batch-v1')
+        ? await pgDb.select().from(googleAdsDailyPerformance).where(eq(googleAdsDailyPerformance.contractorId, contractorId))
+        : [];
       const campaignIds = tenantCampaigns.map(row => row.id);
       const snapshots = campaignIds.length
         ? await pgDb.select().from(performanceSnapshots).where(inArray(performanceSnapshots.campaignId, campaignIds))
@@ -8219,15 +8319,22 @@ app.post('/api/scheduler', authenticate, async (req, res) => {
 
       let evaluatedCount = 0;
       for (const forecast of expiredUnevaluated) {
-        const targetEnd = new Date(forecast.targetDate);
-        const targetStart = new Date(forecast.createdAt);
+        const isTimesFmBatchForecast = forecast.modelVersion === 'timesfm-2.5-batch-v1';
+        const timesFmWindow = isTimesFmBatchForecast
+          ? getTimesFmBatchEvaluationWindow(forecast.targetDate, now)
+          : null;
+        if (isTimesFmBatchForecast && (!timesFmWindow || new Date(forecast.createdAt).getTime() >= timesFmWindow.start.getTime())) continue;
+        const targetEnd = timesFmWindow?.end ?? new Date(forecast.targetDate);
+        const targetStart = timesFmWindow?.start ?? new Date(forecast.createdAt);
         if (!Number.isFinite(targetStart.getTime()) || !Number.isFinite(targetEnd.getTime()) || targetStart >= targetEnd) continue;
         const inWindow = (value: any) => {
           const timestamp = new Date(value).getTime();
-          return Number.isFinite(timestamp) && timestamp >= targetStart.getTime() && timestamp <= targetEnd.getTime();
+          return Number.isFinite(timestamp) && timestamp >= targetStart.getTime()
+            && (timesFmWindow ? timestamp < targetEnd.getTime() : timestamp <= targetEnd.getTime());
         };
 
         let actualValue: number | null = null;
+        let actualSource = 'tenant_postgres_observations';
         if (forecast.metric === 'lead_volume') {
           actualValue = tenantLeads.length
             ? tenantLeads.filter(lead => inWindow(lead.createdAt)).length
@@ -8242,9 +8349,22 @@ app.post('/api/scheduler', authenticate, async (req, res) => {
             ? tenantRevenues.filter(revenue => inWindow(revenue.createdAt)).reduce((sum, revenue) => sum + Number(revenue.amountUsd || 0), 0)
             : null;
         } else if (forecast.metric === 'conversions') {
-          actualValue = closedWonEvents.length
-            ? closedWonEvents.filter(event => inWindow(event.createdAt)).length
-            : null;
+          if (isTimesFmBatchForecast) {
+            let provenance: any;
+            try {
+              provenance = typeof forecast.assumptions === 'string' ? JSON.parse(forecast.assumptions) : forecast.assumptions;
+            } catch { provenance = null; }
+            const city = String(provenance?.territory_city || '').trim();
+            const niche = String(provenance?.territory_trade || '').trim();
+            if (!city || !niche || !timesFmWindow) continue;
+            actualValue = evaluateTimesFmBatchActual(tenantGoogleAds, city, niche, timesFmWindow);
+            actualSource = 'google_ads_daily_performance';
+          } else {
+            actualValue = closedWonEvents.length
+              ? closedWonEvents.filter(event => inWindow(event.createdAt)).length
+              : null;
+            actualSource = 'crm_closed_won_events';
+          }
         }
 
         // A missing measurement is not a zero. Keep the forecast unevaluated.
@@ -8290,7 +8410,12 @@ app.post('/api/scheduler', authenticate, async (req, res) => {
             sourceModule: 'intelligence',
             correlationId: forecast.id,
             summary: `Evaluated ${forecast.metric} forecast against recorded observations.`,
-            payload: { predicted: forecast.predicted, actual: actualValue, deviation, learningInsight: learning.insight }
+            payload: {
+              predicted: forecast.predicted, actual: actualValue, deviation, actualSource,
+              targetWindowStart: targetStart.toISOString(),
+              targetWindowEndExclusive: timesFmWindow ? targetEnd.toISOString() : undefined,
+              learningInsight: learning.insight
+            }
           });
         });
 
