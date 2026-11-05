@@ -24,7 +24,7 @@ import {
   Recommendation
 } from './src/db/db';
 import { db as pgDb, createPool as getApplicationPostgresPool } from './src/db/index.ts';
-import { contractors, auditLogs, leads, leadEvents, revenueRecords, campaigns, winLossRecords, performanceSnapshots, recommendations, forecasts, predictionOutcomes, learningInsights, chatMessages, chatProjects, chatConversations, missions, clientProjects, outreachSequences, apiKeys, connectorCredentials, notifications, schedulerJobs, passwordResetTokens, leadAttribution, conversionOutbox, googleAdsDailyPerformance, revenueExperiments, proposals, invoices, invoicePayments, revenueRecommendations, revenueRecommendationEvents, revenueSimulations, revenueOutcomes, communicationsOutbox, communicationsDeliveryEvents, communicationsOptOuts, communicationsConsents, twilioPhoneNumberMappings, twilioInboundEvents, whatsappPhoneNumberMappings, whatsappInboundEvents, halLoops, halLoopEvents, hermesLabArtifacts, hermesDiagnosticIncidents, hermesLabMessages, staffMembers, workEvents, workTasks, revokedTokens } from './src/db/schema.ts';
+import { contractors, auditLogs, leads, leadEvents, revenueRecords, campaigns, winLossRecords, performanceSnapshots, recommendations, forecasts, predictionOutcomes, learningInsights, chatMessages, chatProjects, chatConversations, missions, clientProjects, outreachSequences, apiKeys, connectorCredentials, notifications, schedulerJobs, passwordResetTokens, leadAttribution, conversionOutbox, googleAdsDailyPerformance, revenueExperiments, proposals, proposalSigningLinks, invoices, invoicePayments, revenueRecommendations, revenueRecommendationEvents, revenueSimulations, revenueOutcomes, communicationsOutbox, communicationsDeliveryEvents, communicationsOptOuts, communicationsConsents, twilioPhoneNumberMappings, twilioInboundEvents, whatsappPhoneNumberMappings, whatsappInboundEvents, halLoops, halLoopEvents, hermesLabArtifacts, hermesDiagnosticIncidents, hermesLabMessages, staffMembers, workEvents, workTasks, revokedTokens } from './src/db/schema.ts';
 import { eq, inArray, desc, and, or, like, sql, gte, lte, gt, isNull } from 'drizzle-orm';
 import { 
   generateLearningFromOutcome, 
@@ -7353,6 +7353,173 @@ app.patch('/api/proposals/:id/status', authenticate, async (req, res) => {
   }
 });
 
+
+
+function proposalTokenHash(token: string): string {
+  return crypto.createHash('sha256').update(token).digest('hex');
+}
+
+function escapePublicProposalText(value: unknown): string {
+  return String(value ?? '').replace(/[&<>"']/g, character => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+  })[character] || character);
+}
+
+app.post('/api/proposals/:id/signing-link', authenticate, async (req, res) => {
+  const contractorId = (req as any).contractorId;
+  try {
+    const [proposal] = await pgDb.select().from(proposals)
+      .where(and(eq(proposals.id, req.params.id), eq(proposals.contractorId, contractorId))).limit(1);
+    if (!proposal) return res.status(404).json({ error: 'Proposal not found or inaccessible.' });
+    if (proposal.status !== 'approved') {
+      return res.status(409).json({ error: 'Only an internally approved proposal can be sent for client acceptance.' });
+    }
+    const token = crypto.randomBytes(32).toString('base64url');
+    const now = new Date();
+    const expiresAt = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+    await pgDb.transaction(async tx => {
+      await tx.update(proposalSigningLinks).set({ usedAt: now })
+        .where(and(
+          eq(proposalSigningLinks.contractorId, contractorId),
+          eq(proposalSigningLinks.proposalId, proposal.id),
+          isNull(proposalSigningLinks.usedAt)
+        ));
+      await tx.insert(proposalSigningLinks).values({
+        id: 'psl_' + crypto.randomBytes(12).toString('hex'),
+        contractorId,
+        proposalId: proposal.id,
+        tokenHash: proposalTokenHash(token),
+        expiresAt,
+        usedAt: null,
+        createdAt: now
+      });
+      await recordWorkEvent(tx, {
+        contractorId,
+        eventType: 'proposal.signing_link_created',
+        entityType: 'proposal',
+        entityId: proposal.id,
+        actorType: 'human',
+        actorId: contractorId,
+        sourceModule: 'proposal_studio',
+        correlationId: proposal.id,
+        summary: 'Created a seven-day one-time client proposal acceptance link.',
+        payload: { expiresAt: expiresAt.toISOString(), acceptanceMode: 'first_party_typed_name_and_consent', externalESignProviderVerified: false }
+      });
+    });
+    const signingUrl = `${req.protocol}://${req.get('host')}/sign/proposal/${token}`;
+    return res.status(201).json({ signingUrl, expiresAt: expiresAt.toISOString(), acceptanceMode: 'first_party_typed_name_and_consent', externalESignProviderVerified: false });
+  } catch (err) {
+    console.error('[Proposal Signing] Link creation failed:', err);
+    return res.status(503).json({ error: 'Client acceptance link could not be created.' });
+  }
+});
+
+app.get('/api/public/proposals/:token', async (req, res) => {
+  try {
+    const [link] = await pgDb.select().from(proposalSigningLinks)
+      .where(and(eq(proposalSigningLinks.tokenHash, proposalTokenHash(req.params.token)), isNull(proposalSigningLinks.usedAt), gt(proposalSigningLinks.expiresAt, new Date())))
+      .limit(1);
+    if (!link) return res.status(404).json({ error: 'This proposal acceptance link is invalid, expired, or already used.' });
+    const [proposal] = await pgDb.select().from(proposals)
+      .where(and(eq(proposals.id, link.proposalId), eq(proposals.contractorId, link.contractorId), eq(proposals.status, 'approved')))
+      .limit(1);
+    if (!proposal) return res.status(404).json({ error: 'This proposal is no longer available for acceptance.' });
+    return res.json({ id: proposal.id, content: proposal.content, status: proposal.status, expiresAt: link.expiresAt });
+  } catch (err) {
+    console.error('[Proposal Signing] Public read failed:', err);
+    return res.status(503).json({ error: 'Proposal acceptance details are temporarily unavailable.' });
+  }
+});
+
+app.post('/api/public/proposals/:token', async (req, res) => {
+  const signerName = typeof req.body?.signerName === 'string' ? req.body.signerName.trim() : '';
+  const signerEmail = typeof req.body?.signerEmail === 'string' ? req.body.signerEmail.trim().toLowerCase() : '';
+  const consent = req.body?.consent === true;
+  if (signerName.length < 2 || signerName.length > 120 ||
+      !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(signerEmail) || signerEmail.length > 254 || !consent) {
+    return res.status(400).json({ error: 'Enter your full name and valid email, then explicitly agree to accept this proposal electronically.' });
+  }
+  try {
+    const result = await pgDb.transaction(async tx => {
+      await tx.execute(sql`SELECT id FROM proposal_signing_links WHERE token_hash = ${proposalTokenHash(req.params.token)} FOR UPDATE`);
+      const [link] = await tx.select().from(proposalSigningLinks)
+        .where(and(eq(proposalSigningLinks.tokenHash, proposalTokenHash(req.params.token)), isNull(proposalSigningLinks.usedAt), gt(proposalSigningLinks.expiresAt, new Date())))
+        .limit(1);
+      if (!link) return { kind: 'invalid' as const };
+      const [proposal] = await tx.select().from(proposals)
+        .where(and(eq(proposals.id, link.proposalId), eq(proposals.contractorId, link.contractorId)))
+        .limit(1);
+      if (!proposal || proposal.status !== 'approved') return { kind: 'conflict' as const };
+      const now = new Date();
+      const contentHash = crypto.createHash('sha256').update(JSON.stringify(proposal.content)).digest('hex');
+      const [saved] = await tx.update(proposals).set({
+        status: 'signed',
+        signedAt: now,
+        signerName,
+        signerEmail,
+        signerIp: String(req.ip || '').slice(0, 64) || null,
+        signerUserAgent: String(req.get('user-agent') || '').slice(0, 512) || null,
+        signedContentHash: contentHash,
+        signatureConsent: true,
+        updatedAt: now
+      }).where(and(
+        eq(proposals.id, proposal.id),
+        eq(proposals.contractorId, link.contractorId),
+        eq(proposals.status, 'approved')
+      )).returning();
+      if (!saved) return { kind: 'conflict' as const };
+      await tx.update(proposalSigningLinks).set({ usedAt: now })
+        .where(and(eq(proposalSigningLinks.id, link.id), isNull(proposalSigningLinks.usedAt)));
+      await recordWorkEvent(tx, {
+        contractorId: link.contractorId,
+        eventType: 'proposal.client_accepted',
+        entityType: 'proposal',
+        entityId: saved.id,
+        actorType: 'external_client',
+        actorId: signerEmail,
+        sourceModule: 'proposal_studio',
+        correlationId: saved.id,
+        summary: 'Client recorded electronic acceptance of the approved proposal.',
+        payload: { signerName, signerEmail, signedAt: now.toISOString(), signedContentHash: contentHash, consentRecorded: true, captureMode: 'first_party_typed_name_and_consent', identityVerifiedByExternalProvider: false }
+      });
+      return { kind: 'saved' as const, signedAt: now.toISOString(), contentHash };
+    });
+    if (result.kind === 'invalid') return res.status(404).json({ error: 'This proposal acceptance link is invalid, expired, or already used.' });
+    if (result.kind === 'conflict') return res.status(409).json({ error: 'This proposal has already been signed or is no longer available.' });
+    return res.json({ success: true, signedAt: result.signedAt, signedContentHash: result.contentHash, identityVerifiedByExternalProvider: false });
+  } catch (err) {
+    console.error('[Proposal Signing] Acceptance failed:', err);
+    return res.status(503).json({ error: 'Proposal acceptance could not be recorded.' });
+  }
+});
+
+app.get('/sign/proposal/:token', async (req, res) => {
+  try {
+    const [link] = await pgDb.select().from(proposalSigningLinks)
+      .where(and(eq(proposalSigningLinks.tokenHash, proposalTokenHash(req.params.token)), isNull(proposalSigningLinks.usedAt), gt(proposalSigningLinks.expiresAt, new Date())))
+      .limit(1);
+    if (!link) return res.status(404).send('Proposal acceptance link is invalid, expired, or already used.');
+    const [proposal] = await pgDb.select().from(proposals)
+      .where(and(eq(proposals.id, link.proposalId), eq(proposals.contractorId, link.contractorId), eq(proposals.status, 'approved')))
+      .limit(1);
+    if (!proposal) return res.status(404).send('This proposal is no longer available for acceptance.');
+    const content = proposal.content as any;
+    const deliverables = Array.isArray(content?.deliverables) ? content.deliverables.map((item: unknown) => `<li>${escapePublicProposalText(item)}</li>`).join('') : '';
+    const highlights = Array.isArray(content?.auditHighlights) ? content.auditHighlights.map((item: unknown) => `<li>${escapePublicProposalText(item)}</li>`).join('') : '';
+    const token = escapePublicProposalText(req.params.token);
+    res.set({
+      'Cache-Control': 'no-store',
+      'Referrer-Policy': 'no-referrer',
+      'X-Content-Type-Options': 'nosniff',
+      'X-Frame-Options': 'DENY',
+      'Content-Security-Policy': "default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; connect-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'"
+    });
+    return res.type('html').send(`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Review proposal</title><style>body{font:16px system-ui,sans-serif;background:#f4f5f2;color:#17211b;margin:0;padding:32px 16px}.wrap{max-width:760px;margin:auto;background:#fff;padding:32px;border:1px solid #d9dfd9;border-radius:12px}h1{font-size:28px}h2{font-size:18px;margin-top:28px}.muted{color:#5c685f}li{margin:8px 0}label{display:block;margin:14px 0 6px}input{width:100%;box-sizing:border-box;padding:12px;border:1px solid #aab5aa;border-radius:6px}input[type=checkbox]{width:auto}button{padding:12px 18px;background:#173f2b;color:white;border:0;border-radius:6px;font-weight:700;cursor:pointer}button:disabled{opacity:.5}#message{margin-top:16px;color:#8b2b1d}</style></head><body><main class="wrap"><p class="muted">HAL · CLIENT PROPOSAL</p><h1>${escapePublicProposalText(content?.companyName || 'Service proposal')}</h1><p>Prepared for ${escapePublicProposalText(content?.clientName || 'Client')}</p><p class="muted">${escapePublicProposalText(content?.packageTier || 'Package')} · ${escapePublicProposalText(content?.currency || 'USD')} ${escapePublicProposalText(content?.monthlyRetainerUsd ?? '—')} per month · Setup fee ${escapePublicProposalText(content?.setupFeeUsd ?? '—')}</p><h2>Scope of work</h2><ul>${deliverables}</ul>${highlights ? '<h2>Recorded audit highlights</h2><ul>'+highlights+'</ul>' : ''}<p class="muted">Review the scope and commercial terms carefully. Submitting acceptance records your typed name, email, timestamp, request metadata, and a hash of this proposal version. This first-party acceptance record does not verify identity through an external e-signature provider.</p><form id="accept"><label for="name">Full name</label><input id="name" name="signerName" minlength="2" maxlength="120" required><label for="email">Email address</label><input id="email" name="signerEmail" type="email" maxlength="254" required><label><input type="checkbox" name="consent" value="yes" required> I confirm I am authorized to accept this proposal and agree to record my acceptance electronically.</label><button id="submit" type="submit">Accept proposal</button><p id="message" role="alert"></p></form></main><script>const form=document.getElementById('accept');form.addEventListener('submit',async event=>{event.preventDefault();const button=document.getElementById('submit');const message=document.getElementById('message');button.disabled=true;message.textContent='Recording acceptance…';const data=new FormData(form);try{const response=await fetch('/api/public/proposals/${token}',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({signerName:data.get('signerName'),signerEmail:data.get('signerEmail'),consent:data.get('consent')==='yes'})});const result=await response.json();if(!response.ok)throw new Error(result.error||'Acceptance failed.');form.innerHTML='<h2>Acceptance recorded</h2><p>Your proposal acceptance was recorded at '+new Date(result.signedAt).toLocaleString()+'. Reference: '+result.signedContentHash+'</p><p class="muted">The workspace operator can now view this acceptance record.</p>';}catch(error){message.textContent=error instanceof Error?error.message:'Acceptance could not be recorded.';button.disabled=false;}});</script></body></html>`);
+  } catch (err) {
+    console.error('[Proposal Signing] Page failed:', err);
+    return res.status(503).send('Proposal acceptance is temporarily unavailable.');
+  }
+});
 
 // ─── INVOICE AND CASH-RECEIPT LEDGER ─────────────────────────────────────────
 // This is a manual accounting ledger. It never claims a provider settlement
