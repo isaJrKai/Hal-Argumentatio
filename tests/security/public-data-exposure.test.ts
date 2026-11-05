@@ -47,7 +47,7 @@ describe('Public data exposure security', () => {
     expect(saveRoute).toContain('eq(leads.contractorId, contractorId)');
     expect(saveRoute).toContain("status: 'draft'");
     expect(saveRoute).toContain('sourceLeadId: sourceLead?.id || null');
-    expect(saveRoute).toContain('generateLandingPageHtml(ownedPageConfig)');
+    expect(saveRoute).toContain('generateLandingPageHtml(ownedPageConfig as LandingPageConfig)');
     expect(saveRoute).not.toContain('renderedHtml\n        });');
 
     const publishStart = source.indexOf("app.post('/api/landing-pages/:id/publish'");
