@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { encrypt, decrypt } from '../../src/db/db';
+import { encrypt, decrypt } from '../../src/db/encryption';
 
 // Deterministic test-only key. Never reuse this value outside tests.
 process.env.LEAD_ENCRYPTION_KEY_B64 = Buffer.from('0123456789abcdef0123456789abcdef').toString('base64');
