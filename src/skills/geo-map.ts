@@ -3,40 +3,23 @@ import { and, eq, ilike } from 'drizzle-orm';
 import { db as pgDb } from '../db/index.ts';
 import { leads as leadsTable } from '../db/schema.ts';
 
-const CITY_COORDS: Record<string, { lat: number; lng: number }> = {
-  winnipeg: { lat: 49.8951, lng: -97.1384 },
-  calgary: { lat: 51.0447, lng: -114.0719 },
-  fredericton: { lat: 45.9636, lng: -66.6431 },
-  brandon: { lat: 49.8485, lng: -99.9501 },
-  winkler: { lat: 49.1812, lng: -97.9392 },
-  landmark: { lat: 49.6583, lng: -96.8203 },
-  edmonton: { lat: 53.5461, lng: -113.4938 },
-  toronto: { lat: 43.6532, lng: -79.3832 },
-  vancouver: { lat: 49.2827, lng: -123.1207 }
-};
-
 export const geoMapSkill: Skill = {
   id: 'geo_map',
   name: 'Territory Map Visualizer',
-  description: 'Resolves precise geographic coordinates for active prospect lists and maps spatial clusters for targeted service areas.',
+  description: 'Maps tenant-owned prospects at verified city-centroid precision. It does not invent individual business coordinates or infer a street address from a city name.',
   category: 'geo',
   icon: 'Map',
   inputs: [
-    {
-      name: 'city',
-      label: 'Target City',
-      type: 'string',
-      required: true,
-      defaultValue: 'Winnipeg',
-    }
+    { name: 'city', label: 'Target City', type: 'string', required: true, defaultValue: '' }
   ],
   execute: async (inputs, contractorId) => {
-    const { city } = inputs;
-    // Always read from the tenant-scoped PostgreSQL store. Contact fields are
-    // intentionally omitted here: the canonical table stores them encrypted,
-    // and this visualization does not need to decrypt or expose them.
-    const filters = [eq(leadsTable.contractorId, contractorId)];
-    if (city) filters.push(ilike(leadsTable.city, city));
+    const city = String(inputs.city || '').trim();
+    if (!city) throw new Error('Target City is required for territory mapping.');
+
+    const filters = [
+      eq(leadsTable.contractorId, contractorId),
+      ilike(leadsTable.city, city)
+    ];
     const filteredLeads = await pgDb.select({
       id: leadsTable.id,
       businessName: leadsTable.businessName,
@@ -50,52 +33,59 @@ export const geoMapSkill: Skill = {
       sslStatus: leadsTable.sslStatus,
       urgencyScore: leadsTable.urgencyScore,
       predictedLtvUsd: leadsTable.predictedLtv,
-      status: leadsTable.status,
+      status: leadsTable.status
     }).from(leadsTable).where(and(...filters));
 
-    const mappedLeads = filteredLeads.map((lead) => {
-      const cityKey = lead.city.toLowerCase().trim();
-      const baseCoords = CITY_COORDS[cityKey] || { lat: 49.8951, lng: -97.1384 }; // default to Winnipeg
-      
-      let hash = 0;
-      for (let i = 0; i < lead.id.length; i++) {
-        hash = (hash << 5) - hash + lead.id.charCodeAt(i);
-        hash |= 0;
-      }
-      const positiveHash = Math.abs(hash);
-      const angle = (positiveHash % 360) * (Math.PI / 180);
-      const radius = 0.02 + ((positiveHash % 100) / 100) * 0.12;
+    const geocodeUrl = new URL('https://geocoding-api.open-meteo.com/v1/search');
+    geocodeUrl.searchParams.set('name', city);
+    geocodeUrl.searchParams.set('count', '1');
+    geocodeUrl.searchParams.set('language', 'en');
+    geocodeUrl.searchParams.set('format', 'json');
 
-      return {
-        id: lead.id,
-        businessName: lead.businessName,
-        ownerName: lead.ownerName,
-        // Phone and email remain encrypted in PostgreSQL and are not exposed by this map skill.
-        city: lead.city,
-        serviceType: lead.serviceType,
-        googleRating: lead.googleRating,
-        reviewCount: lead.reviewCount,
-        seoScore: lead.seoScore,
-        performanceScore: lead.performanceScore,
-        sslStatus: lead.sslStatus,
-        urgencyScore: lead.urgencyScore,
-        predictedLtvUsd: lead.predictedLtvUsd,
-        status: lead.status,
-        coords: {
-          lat: baseCoords.lat + Math.sin(angle) * radius * 0.6,
-          lng: baseCoords.lng + Math.cos(angle) * radius * 0.85
-        }
-      };
-    });
+    const response = await fetch(geocodeUrl.toString(), { signal: AbortSignal.timeout(7000) });
+    if (!response.ok) throw new Error(`City geocoding provider returned HTTP ${response.status}.`);
+    const geocode = await response.json();
+    const match = Array.isArray(geocode.results) ? geocode.results[0] : null;
+    if (!match || !Number.isFinite(match.latitude) || !Number.isFinite(match.longitude)) {
+      throw new Error(`No verified city-centroid coordinates were returned for "${city}". No fallback location was used.`);
+    }
 
-    const centerCoords = CITY_COORDS[city.toLowerCase().trim()] || { lat: 49.8951, lng: -97.1384 };
+    const center = {
+      lat: Number(match.latitude),
+      lng: Number(match.longitude),
+      city: String(match.name || city),
+      country: String(match.country || '')
+    };
+
+    // The only available location is the lead's saved city. Do not distribute
+    // leads around a fabricated radius or imply their exact business addresses.
+    const mappedLeads = filteredLeads.map(lead => ({
+      id: lead.id,
+      businessName: lead.businessName,
+      ownerName: lead.ownerName,
+      city: lead.city,
+      serviceType: lead.serviceType,
+      googleRating: lead.googleRating,
+      reviewCount: lead.reviewCount,
+      seoScore: lead.seoScore,
+      performanceScore: lead.performanceScore,
+      sslStatus: lead.sslStatus,
+      urgencyScore: lead.urgencyScore,
+      predictedLtvUsd: lead.predictedLtvUsd,
+      status: lead.status,
+      coords: { lat: center.lat, lng: center.lng },
+      locationPrecision: 'city_centroid'
+    }));
 
     return {
       success: true,
-      city,
-      center: centerCoords,
+      city: center.city,
+      country: center.country,
+      center,
       leads: mappedLeads,
-      message: `Resolved ${mappedLeads.length} leads in ${city} with spatial distribution offsets.`
+      locationPrecision: 'city_centroid',
+      businessAddressesGeocoded: false,
+      message: `Mapped ${mappedLeads.length} tenant-owned leads to the verified city centroid. Individual business coordinates and addresses were not available.`
     };
   }
 };
