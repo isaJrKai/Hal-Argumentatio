@@ -49,15 +49,26 @@ A regression test asserts these fail-closed invariants.
 - Revenue experiment creation now requires an explicit baseline and expected outcome; an experiment cannot be marked complete without an actual-outcome record, and optional numeric impacts are validated.
 - Proposal generation now requires a tenant-owned saved lead and explicit package/price inputs. It no longer estimates ROI from an arbitrary multiplier or invents audit scores; the response clearly identifies itself as a generated, non-persisted draft.
 - Revenue simulations now require two campaigns with recorded spend and unambiguous lead-linked revenue. Ambiguous multi-touch attribution is excluded; unverified geo/general-growth scenarios are explicitly unsupported rather than assigned invented ROAS, percentage lift, or confidence values.
+## Route-level PostgreSQL verification added
+
+A real HTTP integration suite now imports the Express application and uses Supertest against the PostgreSQL-backed routes. It creates two isolated test tenants and verifies:
+- Tenant B cannot convert Tenant A's closed-won lead (404; no project row created).
+- Tenant A can create the project, and the project plus its `client_project.created` work event persist.
+- A repeated conversion is rejected (409) and does not create a second project.
+- Tenant B's project list does not expose Tenant A's project.
+- Tenant B cannot update Tenant A's project by identifier (404; persisted status and retainer remain unchanged).
+
+The test harness exports the Express app but skips listener/background-worker startup under `NODE_ENV=test`. The test uses only CI/local test PostgreSQL records and removes its uniquely identified rows after completion. This verifies the client-project HTTP route boundary, not every CRM/finance route or the complete browser lifecycle.
+
 ## Remaining verification gates
 
 These items remain unverified and must not be represented as complete:
 
 1. Full browser-level discovery → lead → audit → landing-page artifact → proposal/contract → approved outreach → delivery/follow-up → deal outcome → client project → revenue flow.
 2. Exact frontend-to-backend route coverage for every proposal, contract, client-project and communications action.
-3. Tenant A/B integration tests against a disposable PostgreSQL test database for CRUD, foreign-record access, duplicate requests, concurrent close-out, and rollback after partial failure.
+3. Extend PostgreSQL-backed Tenant A/B HTTP tests beyond client projects to lead CRUD, revenue close-out, proposal generation, and other CRM/finance routes; add concurrent close-out and rollback-after-partial-failure coverage.
 4. Contract/proposal persistence and signature/execution semantics, including proof that draft/approved/signed are distinct states. The current proposal generator returns a generated response but no canonical proposal/contract table or durable signature workflow has been verified.
-5. Integration coverage for won-lead project conversion, duplicate prevention under concurrent requests, lead linkage, and retainer changes/cancellation semantics. The conversion now uses a transaction-scoped PostgreSQL advisory lock and rechecks the tenant-owned lead/project inside the transaction. Isolated PostgreSQL tests cover same-lead advisory-lock serialization, tenant-scoped lookup, and the optimistic status/timestamp predicate rejecting a stale update after a concurrent terminal-status change. The stale-update test mirrors the production predicate on an isolated test table; it is not a full route-level concurrency test. A full route-level lifecycle test remains outstanding.
+5. Add route-level concurrency coverage for won-lead project conversion, retainer changes, and cancellation. The current HTTP suite verifies tenant ownership, duplicate conversion, persistence, and event creation; separate isolated PostgreSQL tests cover same-lead advisory-lock serialization and the optimistic status/timestamp predicate. The stale-update test mirrors the production predicate on an isolated test table and is not a full route-level concurrency test.
 6. Revenue recognition versus cash collection/payment recording. The current `/api/revenues` close-out endpoint records a positive whole-dollar amount against a lead; it is not a payment processor or a complete invoice/receivables ledger.
 7. End-to-end event correlation and ordering across audit, landing-page, outreach, deal, project, revenue, and forecast records.
 8. Forecast evaluation against correctly attributed observations and evidence that only actual outcomes feed learning.
