@@ -104,6 +104,22 @@ describe('contractor landing page factual normalization', () => {
     expect(html).not.toContain('<img src="javascript:');
   });
 
+  it('escapes contractor-controlled HTML and safely serializes inline form data', () => {
+    const config = clonePlumbingTemplate();
+    config.businessName = 'Acme </script><script>alert("owned")</script>';
+    config.city = 'Toronto </script><script>alert(1)</script>';
+    config.sections.hero.headline = '<img src=x onerror=alert(1)>';
+    config.sections.services.items[0].description = 'Quote: "test" & <svg onload=alert(1)>';
+    config.id = 'page-</script><script>alert(2)</script>';
+    const html = generateLandingPageHtml(config);
+
+    expect(html).not.toContain('</script><script>alert');
+    expect(html).toContain('&lt;script&gt;alert');
+    expect(html).toContain('&lt;img src=x onerror=alert(1)&gt;');
+    expect(html).toContain('const pageData =');
+    expect(html).not.toContain('contractorId:');
+  });
+
   it('exports syntactically valid React TSX and does not report failed lead submissions as successful', () => {
     const config = JSON.parse(JSON.stringify(TRADE_TEMPLATES.roofing));
     config.businessName = 'North Ridge Roofing';
