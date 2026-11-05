@@ -3627,7 +3627,6 @@ app.post('/api/leads/ingest', authenticate, async (req, res) => {
     const now = new Date();
     const committed = await pgDb.transaction(async tx => {
       const addedItems: any[] = [];
-      const legacyMirrors: any[] = [];
 
       for (const item of accepted) {
         const id = crypto.randomUUID();
@@ -3726,29 +3725,7 @@ app.post('/api/leads/ingest', authenticate, async (req, res) => {
         });
 
         addedItems.push(addedLead);
-        legacyMirrors.push({
-          id,
-          contractorId,
-          businessName: item.businessName.trim(),
-          ownerName: item.ownerName || undefined,
-          email: rawEmail || '',
-          phone: rawPhone || '',
-          city: item.city.trim(),
-          serviceType: item.serviceType.trim(),
-          source: 'harvested_intelligence',
-          status: 'new',
-          urgencyScore: null,
-          predictedLtvUsd: null,
-          notes,
-          websiteUrl: item.websiteUrl,
-          sourceType: item.sourceType || 'unknown',
-          isSynthetic: Boolean(item.isSynthetic),
-          verificationStatus,
-          dnsVerified,
-          groundingEvidence: item.groundingEvidence || null,
-          createdAt: now.toISOString(),
-          updatedAt: now.toISOString()
-        });
+
       }
 
       await tx.insert(auditLogs).values({
@@ -3757,15 +3734,8 @@ app.post('/api/leads/ingest', authenticate, async (req, res) => {
         action: 'LEADS_INGESTED',
         details: `Imported ${addedItems.length} unique territory prospects and created ${addedItems.length} human qualification tasks. Verification remains required before outreach.`
       });
-      return { addedItems, legacyMirrors };
+      return { addedItems };
     });
-
-    // The JSON store is a temporary compatibility mirror only. A mirror failure
-    // must not undo or misreport the authoritative PostgreSQL transaction.
-    for (const legacyLead of committed.legacyMirrors) {
-      try { db.addLead(legacyLead); }
-      catch (mirrorError) { console.warn('[HAL Lead Ingest] Legacy mirror failed; PostgreSQL lead is committed.', mirrorError); }
-    }
 
     broadcastNotification(
       contractorId,
@@ -3825,7 +3795,6 @@ app.post('/api/leads/purge-and-replace', authenticate, async (req, res) => {
       const normalize = (value: any) => String(value || '').trim().toLowerCase().replace(/\s+/g, ' ');
       const seen = new Set(existingRows.map(row => [normalize(row.businessName), normalize(row.city), normalize(row.niche)].join('|')));
       const addedItems: any[] = [];
-      const legacyMirrors: any[] = [];
       let skippedCount = 0;
 
       for (const item of harvestedLeads) {
@@ -3938,29 +3907,7 @@ app.post('/api/leads/purge-and-replace', authenticate, async (req, res) => {
         });
 
         addedItems.push(addedLead);
-        legacyMirrors.push({
-          id,
-          contractorId,
-          businessName: item.businessName.trim(),
-          ownerName: item.ownerName || undefined,
-          email: rawEmail || '',
-          phone: rawPhone || '',
-          city: item.city.trim(),
-          serviceType: item.serviceType.trim(),
-          source: 'harvested_intelligence',
-          status: 'new',
-          urgencyScore: null,
-          predictedLtvUsd: null,
-          notes,
-          websiteUrl: item.websiteUrl,
-          sourceType: item.sourceType || 'unknown',
-          isSynthetic: Boolean(item.isSynthetic),
-          verificationStatus,
-          dnsVerified,
-          groundingEvidence: item.groundingEvidence || null,
-          createdAt: now.toISOString(),
-          updatedAt: now.toISOString()
-        });
+
       }
 
       await tx.insert(auditLogs).values({
@@ -3982,15 +3929,11 @@ app.post('/api/leads/purge-and-replace', authenticate, async (req, res) => {
         summary: `Replaced ${seedIds.length} mock seed leads with ${addedItems.length} unique imported prospects.`,
         payload: { removedSeedLeads: seedIds.length, importedLeads: addedItems.length, queuedTasks: addedItems.length, skippedCount }
       });
-      return { addedItems, legacyMirrors, removedSeedCount: seedIds.length, skippedCount };
+      return { addedItems, removedSeedCount: seedIds.length, skippedCount };
     });
 
     try { db.purgeMockLeads(contractorId); }
     catch (mirrorError) { console.warn('[HAL Lead Replace] Legacy seed purge mirror failed.', mirrorError); }
-    for (const legacyLead of committed.legacyMirrors) {
-      try { db.addLead(legacyLead); }
-      catch (mirrorError) { console.warn('[HAL Lead Replace] Legacy lead mirror failed; PostgreSQL lead is committed.', mirrorError); }
-    }
 
     broadcastNotification(
       contractorId,
