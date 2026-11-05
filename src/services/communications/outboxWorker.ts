@@ -30,7 +30,7 @@ function retryable(error: unknown): boolean {
 }
 
 export async function runCommunicationsOutboxWorker(
-  pool: Pick<Pool, 'connect'>,
+  pool: Pick<Pool, 'connect' | 'query'>,
   send: CommunicationSender,
   options: { batchSize?: number; maxAttempts?: number; now?: Date } = {}
 ): Promise<WorkerResult> {
