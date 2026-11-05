@@ -29,7 +29,7 @@ export function CommunicationsSetupPanel() {
     setBusy(key);
     try {
       await post(path, payload);
-      toast({ variant: 'success', title: success, description: 'The workspace configuration was saved and verified by the provider.' });
+      toast({ variant: 'success', title: success, description: 'The request completed successfully.' });
     } catch (error: any) {
       toast({ variant: 'danger', title: 'Configuration not completed', description: error?.message || 'Please try again.' });
     } finally {
