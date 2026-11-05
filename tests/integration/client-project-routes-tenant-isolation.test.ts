@@ -23,6 +23,7 @@ const leadRevenueA = `revenue_lead_${suffix}`;
 const leadB = `lead_b_${suffix}`;
 const leadConcurrentA = `lead_concurrent_${suffix}`;
 const leadFullFlowA = `lead_full_flow_${suffix}`;
+const leadAcceptanceA = `lead_acceptance_${suffix}`;
 
 let dbAvailable = false;
 let tokenA = '';
@@ -60,7 +61,8 @@ describe('client project HTTP route tenant isolation', () => {
           leadRevenueA, tenantA, 'Tenant A HVAC', 'Kampala', 'hvac',
           leadB, tenantB, 'Tenant B Electrical', 'London', 'electrical',
           leadConcurrentA, tenantA, 'Tenant A Concurrent Conversion', 'Kampala', 'roofing',
-          leadFullFlowA, tenantA, 'Tenant A End-to-End Plumbing', 'Kampala', 'plumbing']
+          leadFullFlowA, tenantA, 'Tenant A End-to-End Plumbing', 'Kampala', 'plumbing',
+          leadAcceptanceA, tenantA, 'Tenant A Acceptance Test', 'Kampala', 'consulting']
       );
 
       tokenA = await login(emailA);
@@ -80,7 +82,7 @@ describe('client project HTTP route tenant isolation', () => {
       await pool.query('DELETE FROM proposals WHERE contractor_id = ANY($1::text[])', [[tenantA, tenantB]]);
       await pool.query('DELETE FROM revenue_records WHERE contractor_id = ANY($1::text[])', [[tenantA, tenantB]]);
       await pool.query('DELETE FROM client_projects WHERE contractor_id = ANY($1::text[])', [[tenantA, tenantB]]);
-      await pool.query('DELETE FROM lead_events WHERE lead_id = ANY($1::text[])', [[leadA, leadRevenueA, leadB, leadConcurrentA, leadFullFlowA]]);
+      await pool.query('DELETE FROM lead_events WHERE lead_id = ANY($1::text[])', [[leadA, leadRevenueA, leadB, leadConcurrentA, leadFullFlowA, leadAcceptanceA]]);
       await pool.query('DELETE FROM leads WHERE contractor_id = ANY($1::text[])', [[tenantA, tenantB]]);
       await pool.query('DELETE FROM audit_logs WHERE contractor_id = ANY($1::text[])', [[tenantA, tenantB]]);
       await pool.query('DELETE FROM contractors WHERE id = ANY($1::text[])', [[tenantA, tenantB]]);
@@ -193,7 +195,7 @@ describe('client project HTTP route tenant isolation', () => {
     const generated = await request(app)
       .post('/api/proposals/generate')
       .set('Authorization', `Bearer ${tokenA}`)
-      .send({ leadId: leadA, packageTier: 'Growth', monthlyRetainerUsd: 1200, setupFeeUsd: 500 });
+      .send({ leadId: leadAcceptanceA, packageTier: 'Growth', monthlyRetainerUsd: 1200, setupFeeUsd: 500 });
     expect(generated.status).toBe(201);
 
     const approved = await request(app)
@@ -259,12 +261,20 @@ describe('client project HTTP route tenant isolation', () => {
     expect(linkRow.used_at).toBeTruthy();
     expect(linkRow.token_hash).not.toBe(token);
 
+    const generatedEvent = await pool.query(
+      `SELECT event_type, entity_id, correlation_id, payload
+       FROM work_events
+       WHERE contractor_id = $1 AND event_type = 'proposal.generated' AND entity_id = $2 AND correlation_id = $3`,
+      [tenantA, leadAcceptanceA, generated.body.id]
+    );
+    expect(generatedEvent.rows).toHaveLength(1);
+    expect(generatedEvent.rows[0].payload.persistenceStatus).toBe('persisted_draft');
+
     const events = await pool.query(
       "SELECT event_type FROM work_events WHERE contractor_id = $1 AND entity_type = 'proposal' AND entity_id = $2 ORDER BY occurred_at",
       [tenantA, generated.body.id]
     );
     expect(events.rows.map(row => row.event_type)).toEqual([
-      'proposal.generated',
       'proposal.approved',
       'proposal.signing_link_created',
       'proposal.client_accepted'
