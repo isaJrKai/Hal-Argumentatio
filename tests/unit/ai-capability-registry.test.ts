@@ -21,7 +21,7 @@ describe('HAL provider-agnostic capability registry', () => {
     }
   });
 
-  it('keeps website audit, redesign and publishing unavailable until real executors exist', () => {
+  it('distinguishes the limited connectivity audit from full audit, redesign and publishing', () => {
     expect(registry).toContain("id: 'websites.audit.connectivity'");
     expect(registry).toContain("id: 'websites.audit.full'");
     expect(dispatcher).toContain('validateDomainAndDns');
