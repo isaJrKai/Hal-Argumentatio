@@ -25,6 +25,16 @@ export const revokedTokens = pgTable('revoked_tokens', {
   createdAt: timestamp('created_at').defaultNow().notNull(),
 });
 
+/** Single-use, hashed password-reset tokens persisted in PostgreSQL. */
+export const passwordResetTokens = pgTable('password_reset_tokens', {
+  id: text('id').primaryKey(),
+  contractorId: text('contractor_id').notNull(),
+  tokenHash: text('token_hash').notNull().unique(),
+  expiresAt: timestamp('expires_at').notNull(),
+  usedAt: timestamp('used_at'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+});
+
 export const leads = pgTable('leads', {
   id: text('id').primaryKey(),
   contractorId: text('contractor_id').notNull(),
