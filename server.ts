@@ -7036,7 +7036,7 @@ app.post('/api/forecasting/google-ads/sync', authenticate, async (req, res) => {
       await pgDb.insert(googleAdsDailyPerformance).values(values.slice(offset,offset+500)).onConflictDoUpdate({
         target:googleAdsDailyPerformance.id,
         set:{
-          campaignName:sql`excluded.campaign_name`,geo:sql`excluded.geo`,currencyCode:sql`excluded.currency_code`,date:sql`excluded.date`,
+          campaignName:sql`excluded.campaign_name`,geo:sql`excluded.geo`,device:sql`excluded.device`,currencyCode:sql`excluded.currency_code`,date:sql`excluded.date`,
           impressions:sql`excluded.impressions`,clicks:sql`excluded.clicks`,cost:sql`excluded.cost`,
           conversions:sql`excluded.conversions`,conversionValue:sql`excluded.conversion_value`
         }
