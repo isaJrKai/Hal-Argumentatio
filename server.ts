@@ -462,8 +462,7 @@ async function recordAuthFailure(req: express.Request, email: string) {
     failure.lockoutUntil = now + 15 * 60 * 1000; // 15 minutes lockout
     await persistAuditLog({
       action: 'RATE_LIMIT_TRIGGERED',
-      ipAddress: ip,
-      details: `Lockout triggered for ${email} following 5 failed attempts.`
+      details: `Lockout triggered for ${email} from IP ${ip} following 5 failed attempts.`
     });
   }
   loginFailures.set(limitKey, failure);
