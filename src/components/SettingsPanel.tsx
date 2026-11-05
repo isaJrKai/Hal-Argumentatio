@@ -1047,7 +1047,7 @@ export default function SettingsPanel({
         <p className="text-xs text-inherit opacity-80 leading-relaxed font-sans">
           Add credentials only for integrations that your workspace is authorized to use. Saved secrets are encrypted server-side. A saved key is not proof of provider connectivity or an enabled feature.
         </p>
-        <p className="text-[11px] text-inherit opacity-70 leading-relaxed">Gemini is used by supported HAL AI workflows when a valid server or tenant credential is available. OpenAI and Anthropic credentials can be stored, but their runtime adapters are not active. Provider status must not be inferred from a saved-key indicator.</p>
+        <p className="text-[11px] text-inherit opacity-70 leading-relaxed">Gemini and Anthropic are supported by HAL chat when a valid server or tenant credential is available. Claude is selected in the Intelligence chat provider switcher. OpenAI credentials can be stored but are not yet connected to inference. A saved key is not proof of provider connectivity.</p>
 
           {connectorKeySuccess && (
             <div className="p-3 bg-accent/10 border border-accent/20 text-accent text-xs rounded-sm font-mono leading-relaxed font-bold uppercase tracking-wider flex items-center gap-2">
