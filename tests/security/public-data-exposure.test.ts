@@ -56,6 +56,7 @@ describe('Public data exposure security', () => {
     expect(publishEnd).toBeGreaterThan(publishStart);
     const publishRoute = source.slice(publishStart, publishEnd);
     expect(publishRoute).toContain('req.body?.confirmPublish !== true');
+    expect(publishRoute).toContain('req.body?.contentReviewed !== true');
     expect(publishRoute).toContain("sourceLead.verificationStatus !== 'VERIFIED'");
     expect(publishRoute).toContain("identityEvidence.businessIdentityConfirmed !== true");
     expect(publishRoute).toContain("status: 'deployed'");
