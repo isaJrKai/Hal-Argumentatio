@@ -283,6 +283,56 @@ export default function App() {
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
   const [isSidebarHovered, setIsSidebarHovered] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const mobileDrawerRef = useRef<HTMLElement | null>(null);
+
+  // Keep keyboard focus inside the mobile modal and return it to the trigger.
+  useEffect(() => {
+    if (!isMobileMenuOpen) return;
+
+    const drawer = mobileDrawerRef.current;
+    if (!drawer) return;
+
+    const getFocusable = () =>
+      Array.from(
+        drawer.querySelectorAll<HTMLElement>(
+          'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+        )
+      ).filter((element) => element.getAttribute('aria-hidden') !== 'true');
+
+    getFocusable()[0]?.focus();
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        setIsMobileMenuOpen(false);
+        return;
+      }
+
+      if (event.key !== 'Tab') return;
+      const focusable = getFocusable();
+      if (focusable.length === 0) {
+        event.preventDefault();
+        drawer.focus();
+        return;
+      }
+
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+      document.querySelector<HTMLElement>('[aria-controls="mobile-navigation"]')?.focus();
+    };
+  }, [isMobileMenuOpen]);
 
   // Device & Form Factor Detection
   const [deviceInfo, setDeviceInfo] = useState(() => {
@@ -1075,6 +1125,7 @@ export default function App() {
         )}
         {isMobileMenuOpen && (
           <motion.aside
+            ref={mobileDrawerRef}
             key="mobile-drawer"
             initial={{ x: '-100%' }}
             animate={{ x: 0 }}
@@ -1163,6 +1214,7 @@ export default function App() {
         onCloseNotifications={() => setShowNotificationDropdown(false)}
         onToggleTheme={toggleTheme}
         onOpenMobileMenu={() => setIsMobileMenuOpen(true)}
+        isMobileMenuOpen={isMobileMenuOpen}
         theme={theme}
         isAppInstalled={isAppInstalled || !deferredPrompt}
         onInstallClick={handleInstallClick}
