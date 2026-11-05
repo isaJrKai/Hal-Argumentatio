@@ -6299,7 +6299,7 @@ app.post('/api/outreach/dispatch', authenticate, async (req, res) => {
       const bridge = await getBridgesForContractor(contractorId);
       const statusCallbackUrl = process.env.TWILIO_STATUS_CALLBACK_URL || '';
       const inboundWebhookUrl = process.env.TWILIO_INBOUND_WEBHOOK_URL || '';
-      if (!bridge.sms.accountSid || !bridge.sms.authToken || !bridge.sms.virtualNumber ||
+      if (bridge.sms.provider !== 'twilio' || !bridge.sms.accountSid || !bridge.sms.authToken || !bridge.sms.virtualNumber ||
           !statusCallbackUrl.startsWith('https://') || !inboundWebhookUrl.startsWith('https://')) {
         return res.status(503).json({ success: false, code: 'SMS_PROVIDER_NOT_CONFIGURED', error: 'Twilio credentials, verified sender and HTTPS inbound/status callback URLs are required.' });
       }
@@ -6859,14 +6859,17 @@ app.post('/api/webhooks/twilio/status', async (req, res) => {
       payload: { status, errorCode: String(req.body?.ErrorCode || '') || null },
       receivedAt: new Date()
     }).onConflictDoNothing();
-    await pgDb.update(communicationsOutbox).set({
-      status: nextStatus,
-      deliveredAt: status === 'delivered' ? new Date() : outbox.deliveredAt,
-      bouncedAt: status === 'undelivered' ? new Date() : outbox.bouncedAt,
-      errorCode: String(req.body?.ErrorCode || '') || null,
-      errorMessage: status === 'undelivered' || status === 'failed' ? 'Twilio reported message delivery failure.' : null,
-      updatedAt: new Date()
-    }).where(and(eq(communicationsOutbox.id, outbox.id), eq(communicationsOutbox.contractorId, outbox.contractorId)));
+    const statusRank: Record<string, number> = { queued: 0, accepted: 1, sending: 2, submitted: 2, sent: 3, delivered: 4, bounced: 4, failed: 5, canceled: 5 };
+    if ((statusRank[nextStatus] ?? 0) >= (statusRank[outbox.status] ?? 0)) {
+      await pgDb.update(communicationsOutbox).set({
+        status: nextStatus,
+        deliveredAt: status === 'delivered' ? new Date() : outbox.deliveredAt,
+        bouncedAt: status === 'undelivered' ? new Date() : outbox.bouncedAt,
+        errorCode: String(req.body?.ErrorCode || '') || null,
+        errorMessage: status === 'undelivered' || status === 'failed' ? 'Twilio reported message delivery failure.' : null,
+        updatedAt: new Date()
+      }).where(and(eq(communicationsOutbox.id, outbox.id), eq(communicationsOutbox.contractorId, outbox.contractorId)));
+    }
     return res.status(200).send('OK');
   } catch (error: any) {
     console.error('[Twilio Status] Reconciliation failed:', error?.message || error);
