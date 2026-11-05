@@ -6936,12 +6936,15 @@ app.post('/api/projects', authenticate, async (req, res) => {
       if (normalizedLeadId) {
         // Serialize conversions for the same tenant/lead across concurrent requests.
         await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${contractorId}), hashtext(${normalizedLeadId}))`);
-        const [linkedLead] = await tx.select({ id: leads.id, status: leads.status }).from(leads)
+        const [linkedLead] = await tx.select({ id: leads.id, status: leads.status, businessName: leads.businessName, city: leads.city }).from(leads)
           .where(and(eq(leads.id, normalizedLeadId), eq(leads.contractorId, contractorId)))
           .limit(1);
         if (!linkedLead) throw new Error('PROJECT_LEAD_NOT_FOUND');
         if (!['closed_won', 'won', 'converted', 'customer'].includes(String(linkedLead.status).toLowerCase())) {
           throw new Error('PROJECT_LEAD_NOT_CLOSED_WON');
+        }
+        if (businessName.trim() !== linkedLead.businessName || city.trim() !== linkedLead.city) {
+          throw new Error('PROJECT_LEAD_IDENTITY_MISMATCH');
         }
 
         const [existingProject] = await tx.select({ id: clientProjects.id }).from(clientProjects)
@@ -6992,6 +6995,9 @@ app.post('/api/projects', authenticate, async (req, res) => {
     }
     if (err.message === 'PROJECT_LEAD_NOT_CLOSED_WON') {
       return res.status(409).json({ error: 'A client project can only be converted from a lead recorded as closed-won.' });
+    }
+    if (err.message === 'PROJECT_LEAD_IDENTITY_MISMATCH') {
+      return res.status(409).json({ error: 'Business name and city must match the selected won lead.' });
     }
     if (typeof err.message === 'string' && err.message.startsWith('PROJECT_ALREADY_EXISTS:')) {
       return res.status(409).json({
