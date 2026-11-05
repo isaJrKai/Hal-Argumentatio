@@ -2167,7 +2167,7 @@ app.post('/api/landing-pages/save', authenticate, async (req, res) => {
       sourceModule: 'landing_page_studio',
       correlationId: artifactId,
       summary: `${existing ? 'Updated' : 'Saved'} landing page: ${savedTitle}.`,
-      payload: { title, sourceLeadId: sourceLead?.id || null, sourceAuditId: sourceAudit?.auditId || null }
+      payload: { title: savedTitle, sourceLeadId: sourceLead?.id || null, sourceAuditId: sourceAudit?.auditId || null }
     });
 
     if (existing) {
@@ -2183,7 +2183,7 @@ app.post('/api/landing-pages/save', authenticate, async (req, res) => {
         contractorId,
         toolId: 'landing_page',
         category: 'web',
-        title,
+        title: savedTitle,
         status: 'draft',
         content,
         createdAt: new Date(),
