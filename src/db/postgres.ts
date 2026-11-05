@@ -120,6 +120,8 @@ export async function bootstrapPostgresTables(poolInstance?: Pool): Promise<void
     // Bootstrap DDL is one unit: a failed statement must not leave a partially
     // upgraded schema for the next application restart.
     await client.query('BEGIN');
+    // Serialize first-time schema creation across app startup and concurrent test workers.
+    await client.query('SELECT pg_advisory_xact_lock(2026, 1105)');
     await client.query(`
       CREATE TABLE IF NOT EXISTS contractors (
         id TEXT PRIMARY KEY,

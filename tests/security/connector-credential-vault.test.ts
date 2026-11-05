@@ -15,18 +15,31 @@ let pool: Pool;
 suite('Neon connector credential vault', () => {
   beforeAll(async () => {
     pool = new Pool({ connectionString: databaseUrl });
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS connector_credentials (
-        id TEXT PRIMARY KEY,
-        contractor_id TEXT NOT NULL,
-        service TEXT NOT NULL,
-        encrypted_value TEXT NOT NULL,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
-      )
-    `);
-    await pool.query(
-      'CREATE INDEX IF NOT EXISTS connector_credentials_tenant_idx ON connector_credentials (contractor_id, service)'
-    );
+    const schemaClient = await pool.connect();
+    try {
+      await schemaClient.query('BEGIN');
+      // Use the same schema lock as application bootstrap to avoid concurrent
+      // CREATE TABLE IF NOT EXISTS races in parallel CI workers.
+      await schemaClient.query('SELECT pg_advisory_xact_lock(2026, 1105)');
+      await schemaClient.query(`
+        CREATE TABLE IF NOT EXISTS connector_credentials (
+          id TEXT PRIMARY KEY,
+          contractor_id TEXT NOT NULL,
+          service TEXT NOT NULL,
+          encrypted_value TEXT NOT NULL,
+          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
+        )
+      `);
+      await schemaClient.query(
+        'CREATE INDEX IF NOT EXISTS connector_credentials_tenant_idx ON connector_credentials (contractor_id, service)'
+      );
+      await schemaClient.query('COMMIT');
+    } catch (error) {
+      await schemaClient.query('ROLLBACK').catch(() => undefined);
+      throw error;
+    } finally {
+      schemaClient.release();
+    }
   });
 
   afterEach(async () => {
