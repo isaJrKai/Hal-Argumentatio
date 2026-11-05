@@ -28,5 +28,9 @@ describe('frontend loading and accessibility architecture', () => {
   it('exposes the mobile navigation as a labelled dialog', () => {
     expect(app).toContain('aria-modal="true"');
     expect(app).toContain('aria-label="Main navigation"');
+    expect(app).toContain('mobileDrawerRef');
+    expect(app).toContain("event.key === 'Escape'");
+    expect(app).toContain("event.key !== 'Tab'");
+    expect(app).toContain('[aria-label="Open navigation menu"]');
   });
 });
