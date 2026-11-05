@@ -9263,34 +9263,11 @@ app.post('/api/revenue/simulations', authenticate, async (req, res) => {
 app.get('/api/revenue/recommendations', authenticate, async (req, res) => {
   const contractorId = (req as any).contractorId;
   try {
-    const recs = await pgDb.select().from(revenueRecommendations).where(eq(revenueRecommendations.contractorId, contractorId));
-    if (recs.length === 0) {
-      const [seeded] = await pgDb.insert(revenueRecommendations).values({
-        id: crypto.randomUUID(),
-        contractorId,
-        category: 'campaign',
-        title: 'Reallocate Spend from Low-Pipeline to Revenue-Proven Campaigns',
-        rationale: 'Analysis of lead attribution shows Campaign B produces 3.4x higher closed-won revenue per dollar spent than Campaign A despite higher CPL.',
-        citationData: { campaignA: { cpl: 44, closedWonRevenue: 4000 }, campaignB: { cpl: 63, closedWonRevenue: 38700 } },
-        impactScore: 94.5,
-        confidenceScore: 91.0,
-        expectedImpact: 'Estimated +$24,500 quarterly attributed pipeline lift',
-        status: 'proposed'
-      }).returning();
-      
-      // Seed initial proposal event
-      await pgDb.insert(revenueRecommendationEvents).values({
-        id: crypto.randomUUID(),
-        contractorId,
-        recommendationId: seeded.id,
-        previousStatus: null,
-        newStatus: 'proposed',
-        actor: 'HAL Decision Engine',
-        metadata: { rationale: seeded.rationale }
-      });
-
-      return res.json([seeded]);
-    }
+    // An empty recommendation table is an honest empty state. Never seed
+    // example campaign economics into a tenant's live decision workspace.
+    const recs = await pgDb.select().from(revenueRecommendations)
+      .where(eq(revenueRecommendations.contractorId, contractorId))
+      .orderBy(desc(revenueRecommendations.createdAt));
     res.json(recs);
   } catch (err: any) {
     res.status(500).json({ error: err.message });
