@@ -21,6 +21,7 @@ const leadA = `lead_${suffix}`;
 const projectA = `project_${suffix}`;
 const leadRevenueA = `revenue_lead_${suffix}`;
 const leadB = `lead_b_${suffix}`;
+const leadConcurrentA = `lead_concurrent_${suffix}`;
 
 let dbAvailable = false;
 let tokenA = '';
@@ -51,10 +52,12 @@ describe('client project HTTP route tenant isolation', () => {
         `INSERT INTO leads (id, contractor_id, business_name, city, niche, status)
          VALUES ($1, $2, $3, $4, $5, 'closed_won'),
                 ($6, $7, $8, $9, $10, 'proposal'),
-                ($11, $12, $13, $14, $15, 'qualified')`,
+                ($11, $12, $13, $14, $15, 'qualified'),
+                ($16, $17, $18, $19, $20, 'closed_won')`,
         [leadA, tenantA, 'Tenant A Roofing', 'Kampala', 'roofing',
           leadRevenueA, tenantA, 'Tenant A HVAC', 'Kampala', 'hvac',
-          leadB, tenantB, 'Tenant B Electrical', 'London', 'electrical']
+          leadB, tenantB, 'Tenant B Electrical', 'London', 'electrical',
+          leadConcurrentA, tenantA, 'Tenant A Concurrent Conversion', 'Kampala', 'roofing']
       );
 
       tokenA = await login(emailA);
@@ -70,7 +73,7 @@ describe('client project HTTP route tenant isolation', () => {
       await pool.query('DELETE FROM work_events WHERE contractor_id = ANY($1::text[])', [[tenantA, tenantB]]);
       await pool.query('DELETE FROM revenue_records WHERE contractor_id = ANY($1::text[])', [[tenantA, tenantB]]);
       await pool.query('DELETE FROM client_projects WHERE contractor_id = ANY($1::text[])', [[tenantA, tenantB]]);
-      await pool.query('DELETE FROM lead_events WHERE lead_id = ANY($1::text[])', [[leadA, leadRevenueA, leadB]]);
+      await pool.query('DELETE FROM lead_events WHERE lead_id = ANY($1::text[])', [[leadA, leadRevenueA, leadB, leadConcurrentA]]);
       await pool.query('DELETE FROM leads WHERE contractor_id = ANY($1::text[])', [[tenantA, tenantB]]);
       await pool.query('DELETE FROM audit_logs WHERE contractor_id = ANY($1::text[])', [[tenantA, tenantB]]);
       await pool.query('DELETE FROM contractors WHERE id = ANY($1::text[])', [[tenantA, tenantB]]);
@@ -194,6 +197,49 @@ describe('client project HTTP route tenant isolation', () => {
       [created.body.id, tenantA]
     )).rows;
     expect(terminalProject).toMatchObject({ status: 'cancelled', monthly_retainer_usd: 1500 });
+  });
+
+  it('serializes simultaneous HTTP conversions of the same won lead', async (ctx) => {
+    if (!dbAvailable) return ctx.skip();
+
+    const payload = {
+      leadId: leadConcurrentA,
+      businessName: 'Tenant A Concurrent Conversion',
+      city: 'Kampala',
+      serviceType: 'Website and local SEO',
+      packageTier: 'Growth',
+      monthlyRetainerUsd: 1250
+    };
+
+    const attempts = await Promise.all([
+      request(app).post('/api/projects').set('Authorization', `Bearer ${tokenA}`).send(payload),
+      request(app).post('/api/projects').set('Authorization', `Bearer ${tokenA}`).send(payload)
+    ]);
+
+    const created = attempts.filter(response => response.status === 201);
+    const conflicts = attempts.filter(response => response.status === 409);
+    expect(created).toHaveLength(1);
+    expect(conflicts).toHaveLength(1);
+    expect(conflicts[0].body.projectId).toBe(created[0].body.id);
+
+    const persisted = await pool.query(
+      'SELECT id, contractor_id, lead_id FROM client_projects WHERE lead_id = $1 AND contractor_id = $2',
+      [leadConcurrentA, tenantA]
+    );
+    expect(persisted.rows).toHaveLength(1);
+    expect(persisted.rows[0]).toMatchObject({
+      id: created[0].body.id,
+      contractor_id: tenantA,
+      lead_id: leadConcurrentA
+    });
+
+    const events = await pool.query(
+      `SELECT id FROM work_events
+       WHERE contractor_id = $1 AND event_type = 'client_project.created'
+         AND entity_id = $2 AND correlation_id = $2`,
+      [tenantA, created[0].body.id]
+    );
+    expect(events.rows).toHaveLength(1);
   });
 
   it('prevents tenant B from updating tenant A\'s project by identifier', async (ctx) => {
