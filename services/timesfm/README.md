@@ -93,6 +93,18 @@ The workflow does not print connection strings, customer records, or model
 inputs. Do not enable verbose SQL logging or add personal/customer fields to
 workflow logs.
 
+### Historical data ingestion status
+
+The TimesFM batch runner is a consumer of `google_ads_daily_performance`; it is
+not itself an ingestion connector. The repository currently contains the table
+schema and read paths, but this audit did not find a supported Google Ads import
+writer or verify any production rows. Table existence and a successful SQL
+connection are not proof of genuine historical ingestion. Before enabling the
+batch secret, verify a real provider/export ingestion path, tenant ownership,
+source timestamps, city/trade metadata, deduplication, and daily coverage in the
+actual database. If no trusted ingestion path exists, forecasting must remain
+unavailable rather than using sample or synthetic rows.
+
 ### Resource and product limitations
 
 - The GitHub-hosted runner has finite memory. The initial batch configuration
