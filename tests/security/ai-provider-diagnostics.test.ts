@@ -19,6 +19,8 @@ describe('live AI provider diagnostics', () => {
 
   it('requires administrator access and probes configured Gemini and Nemotron providers', () => {
     expect(route).toContain("contractorRole !== 'admin'");
+    expect(route).toContain('lastAiProviderDiagnosticAt');
+    expect(route).toContain('retryAfterSeconds');
     expect(route).toContain('Boolean(process.env.GEMINI_API_KEY)');
     expect(route).toContain('Boolean(process.env.NVIDIA_API_KEY)');
     expect(route).toContain('callGemini(');
