@@ -38,7 +38,7 @@ import { callNemotron } from './src/services/nemotron.ts';
 import { runProviderProbe } from './src/services/aiProviderDiagnostics.ts';
 import { autonomousLearning, getTenantAutonomousLearning } from './src/lib/autonomousLearning';
 import { getConnectorCredentials, importConnectorCredentialIfAbsent, saveConnectorCredential } from './src/db/connectorCredentials';
-import { appendStructuredLedgerEntry, getStructuredLedgerEntries, importLegacyStructuredLedgerEntries, verifyStructuredLedgerIntegrity } from './src/db/structuredLedger';
+import { appendStructuredLedgerEntry, appendStructuredLedgerEntryInTransaction, getStructuredLedgerEntries, importLegacyStructuredLedgerEntries, verifyStructuredLedgerIntegrity } from './src/db/structuredLedger';
 import { getAllSkills, executeSkill, registerCustomSkill, unregisterCustomSkill } from './src/skills/registry';
 import { HAL_MCP_TOOLS, executeMcpTool } from './src/services/mcp/dispatcher';
 import { McpJsonRpcRequest, McpJsonRpcResponse } from './src/services/mcp/types';
@@ -113,6 +113,12 @@ const postgresStructuredLedgerEnabled = () => process.env.HAL_STRUCTURED_LEDGER_
 async function recordStructuredLedgerEntry(input: StructuredLedgerInput) {
   return postgresStructuredLedgerEnabled()
     ? appendStructuredLedgerEntry(input)
+    : db.recordLedgerEntry(input);
+}
+
+async function recordStructuredLedgerEntryInTransaction(tx: { execute: (query: any) => Promise<any> }, input: StructuredLedgerInput) {
+  return postgresStructuredLedgerEnabled()
+    ? appendStructuredLedgerEntryInTransaction(tx, input)
     : db.recordLedgerEntry(input);
 }
 
@@ -2195,24 +2201,22 @@ app.post('/api/public/landing-leads', async (req, res) => {
         summary: `Inbound inquiry from ${normalizedName} was added to the human review queue.`,
         payload: { taskId, landingPageId: landingPageId.trim() }
       });
+      await recordStructuredLedgerEntryInTransaction(tx, {
+        contractorId: targetContractorId,
+        eventType: 'lead_captured',
+        entityType: 'lead',
+        entityId: leadId,
+        actor: 'LandingPageLeadIngest',
+        details: `A visitor submitted an inquiry through landing page ${landingPageId.trim()}.`,
+        metadata: {
+          landingPageId: landingPageId.trim(),
+          serviceDetails: normalizedDetails,
+          city: pageCity
+        }
+      });
     });
 
-    // The lead and its review events were committed in the PostgreSQL transaction above.
-    // Do not mirror this write into the legacy JSON aggregate.
-    
-    await recordStructuredLedgerEntry({
-      contractorId: targetContractorId,
-      eventType: 'lead_captured',
-      entityType: 'lead',
-      entityId: leadId,
-      actor: 'LandingPageLeadIngest',
-      details: `A visitor submitted an inquiry through landing page ${landingPageId.trim()}.`,
-      metadata: {
-        landingPageId: landingPageId.trim(),
-        serviceDetails: normalizedDetails,
-        city: pageCity
-      }
-    });
+    // Lead, review task, work events, and cryptographic ledger entry committed atomically.
 
     try {
       broadcastNotification(
@@ -2955,26 +2959,27 @@ app.all(['/api/webhooks/twilio', '/api/webhooks/whatsapp'], async (req, res) => 
     const newStatus = (matchedLead.status === 'new' ? 'contacted' : matchedLead.status) as 'new' | 'contacted' | 'converted' | 'dead';
     const updatedNotes = `${matchedLead.notes || ''}\n[Inbound ${isWhatsApp ? 'WhatsApp' : 'SMS'} - ${now.toISOString().slice(0, 16)}]: ${rawBody}`.trim();
 
-    await pgDb.update(leads).set({
-      status: newStatus,
-      notes: updatedNotes,
-      updatedAt: now
-    }).where(and(eq(leads.id, matchedLead.id), eq(leads.contractorId, targetContractorId)));
+    await pgDb.transaction(async tx => {
+      await tx.update(leads).set({
+        status: newStatus,
+        notes: updatedNotes,
+        updatedAt: now
+      }).where(and(eq(leads.id, matchedLead.id), eq(leads.contractorId, targetContractorId)));
 
-    // Commit cryptographic ledger audit entry
-    await recordStructuredLedgerEntry({
-      contractorId: targetContractorId,
-      eventType: 'lead_captured',
-      entityType: 'lead',
-      entityId: matchedLead.id,
-      actor: 'carrier_webhook',
-      metadata: {
-        from: cleanFrom,
-        channel: isWhatsApp ? 'whatsapp' : 'sms',
-        messageSid,
-        leadId: matchedLead.id,
-        bodySnippet: rawBody.slice(0, 140)
-      }
+      await recordStructuredLedgerEntryInTransaction(tx, {
+        contractorId: targetContractorId,
+        eventType: 'lead_captured',
+        entityType: 'lead',
+        entityId: matchedLead.id,
+        actor: 'carrier_webhook',
+        metadata: {
+          from: cleanFrom,
+          channel: isWhatsApp ? 'whatsapp' : 'sms',
+          messageSid,
+          leadId: matchedLead.id,
+          bodySnippet: rawBody.slice(0, 140)
+        }
+      });
     });
 
     // Broadcast instant real-time notification alert via SSE to the dashboard
