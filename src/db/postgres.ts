@@ -3,6 +3,7 @@ import path from 'node:path';
 import { Pool, PoolClient } from 'pg';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import * as schema from './schema.ts';
+import { normalizePostgresConnectionString } from './connectionString';
 
 export function resolveValidSqlHost(): string | undefined {
   const host = process.env.SQL_HOST;
@@ -33,14 +34,15 @@ let activeConnectionString: string | null = null;
 
 export function getPostgresPool(customUrl?: string): Pool | null {
   if (customUrl) {
-    if (!pool || customUrl !== activeConnectionString) {
+    const normalizedUrl = normalizePostgresConnectionString(customUrl);
+    if (!pool || normalizedUrl !== activeConnectionString) {
       if (pool) {
         pool.end().catch(() => {});
       }
-      activeConnectionString = customUrl;
+      activeConnectionString = normalizedUrl;
       pool = new Pool({
-        connectionString: customUrl,
-        ssl: customUrl.includes('sslmode=require') || customUrl.includes('neon.tech') || customUrl.includes('supabase')
+        connectionString: normalizedUrl,
+        ssl: normalizedUrl.includes('sslmode=verify-full') || customUrl.includes('neon.tech') || customUrl.includes('supabase')
           ? { rejectUnauthorized: true }
           : undefined,
         max: 10,
@@ -69,16 +71,17 @@ export function getPostgresPool(customUrl?: string): Pool | null {
     return pool;
   }
 
-  const connectionString = activeConnectionString || process.env.NEON_DATABASE_URL || process.env.DATABASE_URL;
-  if (!connectionString) {
+  const rawConnectionString = activeConnectionString || process.env.NEON_DATABASE_URL || process.env.DATABASE_URL;
+  if (!rawConnectionString) {
     return null;
   }
   
+  const connectionString = normalizePostgresConnectionString(rawConnectionString);
   if (!pool) {
     activeConnectionString = connectionString;
     pool = new Pool({
       connectionString,
-      ssl: connectionString.includes('sslmode=require') || connectionString.includes('neon.tech') || connectionString.includes('supabase')
+      ssl: connectionString.includes('sslmode=verify-full') || connectionString.includes('neon.tech') || connectionString.includes('supabase')
         ? { rejectUnauthorized: true }
         : undefined,
       max: 10,
@@ -91,13 +94,13 @@ export function getPostgresPool(customUrl?: string): Pool | null {
 }
 
 export function setCustomDatabaseUrl(url: string) {
-  activeConnectionString = url;
+  activeConnectionString = normalizePostgresConnectionString(url);
   if (pool) {
     pool.end().catch(() => {});
     pool = null;
     pgDb = null;
   }
-  return getPostgresPool(url);
+  return getPostgresPool(activeConnectionString);
 }
 
 export function getDrizzleDb() {
@@ -951,8 +954,8 @@ export async function testPostgresConnection(customUrl?: string): Promise<{
   // by application queries and never run DDL just because an admin tested a URL.
   const temporaryPool = customUrl
     ? new Pool({
-        connectionString: customUrl,
-        ssl: customUrl.includes('sslmode=require') || customUrl.includes('neon.tech') || customUrl.includes('supabase')
+        connectionString: normalizedUrl,
+        ssl: normalizedUrl.includes('sslmode=verify-full') || customUrl.includes('neon.tech') || customUrl.includes('supabase')
           ? { rejectUnauthorized: true }
           : undefined,
         max: 1,
