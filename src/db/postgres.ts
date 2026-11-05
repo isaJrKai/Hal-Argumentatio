@@ -140,6 +140,17 @@ export async function bootstrapPostgresTables(poolInstance?: Pool): Promise<void
       );
       CREATE INDEX IF NOT EXISTS revoked_tokens_expiry_idx ON revoked_tokens (expires_at);
 
+      CREATE TABLE IF NOT EXISTS password_reset_tokens (
+        id TEXT PRIMARY KEY,
+        contractor_id TEXT NOT NULL,
+        token_hash TEXT NOT NULL UNIQUE,
+        expires_at TIMESTAMP NOT NULL,
+        used_at TIMESTAMP,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS password_reset_tokens_expiry_idx ON password_reset_tokens (expires_at);
+      CREATE INDEX IF NOT EXISTS password_reset_tokens_contractor_idx ON password_reset_tokens (contractor_id, used_at);
+
       CREATE TABLE IF NOT EXISTS leads (
         id TEXT PRIMARY KEY,
         contractor_id TEXT NOT NULL,
