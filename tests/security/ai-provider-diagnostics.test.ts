@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 
 const serverSource = readFileSync('server.ts', 'utf8');
 const panelSource = readFileSync('src/components/SystemHealthPanel.tsx', 'utf8');
+const geminiSource = readFileSync('src/lib/gemini.ts', 'utf8');
 
 function routeBetween(startMarker: string, endMarker: string): string {
   const start = serverSource.indexOf(startMarker);
@@ -25,6 +26,8 @@ describe('live AI provider diagnostics', () => {
     expect(route).toContain('Boolean(process.env.NVIDIA_API_KEY)');
     expect(route).toContain('callGemini(');
     expect(route).toContain('callNemotron(');
+    expect(geminiSource).toContain('export async function callGemini(');
+    expect(geminiSource).toContain('maxOutputTokens: 24');
   });
 
   it('returns status and latency only, never provider credentials or raw model output', () => {
