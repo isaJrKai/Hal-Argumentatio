@@ -57,7 +57,7 @@ An MCP client connected for one configured contractor could therefore read anoth
 
 The landing-page HTML generator interpolated contractor/AI-provided business details and section content directly into HTML text and attribute contexts. It also embedded page identifiers and business details directly into JavaScript string literals. A crafted value containing HTML/script delimiters could break out of its intended context and execute script when a published page was viewed on the HAL origin.
 
-**Fix:** The generator now recursively HTML-escapes dynamic string values before HTML interpolation, serializes the small set of inline form data with `JSON.stringify` and escapes script-closing delimiters, and no longer embeds the contractor ID in the public form request. A regression test exercises malicious business name, city, section text and page ID values.
+**Fix:** The generator now recursively HTML-escapes dynamic string values before HTML interpolation, serializes the small set of inline form data with `JSON.stringify` and escapes script-closing delimiters, and no longer embeds the contractor ID in the public form request. The save API now requires a page configuration and always renders it server-side; client-supplied HTML is ignored. Public serving additionally requires a matching server-owned `pageConfig.id` and `pageConfig.contractorId`, so raw AI/provider HTML artifacts without that trusted config are not published. A regression test exercises malicious business name, city, section text and page ID values.
 
 ## Prioritized review observations
 
