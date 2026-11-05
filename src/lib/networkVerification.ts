@@ -43,6 +43,7 @@ export interface GroundingVerificationResult {
     phoneValid: boolean;
     isDummyPhone: boolean;
     reasons: string[];
+    businessIdentityConfirmed: boolean;
     verifiedAt: string;
   };
 }
@@ -381,33 +382,45 @@ export async function verifyLeadGrounding(lead: {
   websiteUrl?: string;
   phone?: string;
   isSynthetic?: boolean;
+  businessIdentityConfirmed?: boolean;
 }): Promise<GroundingVerificationResult> {
   const reasons: string[] = [];
 
-  // Flag if explicitly marked synthetic
   if (lead.isSynthetic) {
     reasons.push('Lead is explicitly marked as synthetic/simulated');
   }
 
-  // 1. Validate Phone
   const phoneValidation = validatePhoneNumber(lead.phone || '');
   if (!phoneValidation.isValid) {
     reasons.push(`Phone validation failed: ${phoneValidation.rejectionReason}`);
   }
 
-  // 2. Validate Domain
   const domainValidation = await validateDomainAndDns(lead.websiteUrl || '');
   if (!domainValidation.dnsResolved) {
-    reasons.push(`Domain validation failed: ${domainValidation.rejectionReason}`);
+    reasons.push(`Domain validation failed: ${domainValidation.rejectionReason || 'No verified public DNS result'}`);
+  }
+  if (!domainValidation.httpReachable) {
+    reasons.push('The submitted website did not return a confirmed reachable HTTP response.');
   }
 
-  const isGroundTruth = phoneValidation.isValid && domainValidation.dnsResolved && !lead.isSynthetic;
+  const businessIdentityConfirmed = lead.businessIdentityConfirmed === true;
+  if (!businessIdentityConfirmed) {
+    reasons.push('DNS resolution and phone-number format do not prove these contact details belong to the named business; human/source confirmation is required.');
+  }
 
-  let status: GroundingVerificationResult['status'] = 'VERIFIED';
-  if (lead.isSynthetic || phoneValidation.isDummyFictional || !domainValidation.dnsResolved) {
+  const isGroundTruth = Boolean(
+    !lead.isSynthetic &&
+    phoneValidation.isValid &&
+    domainValidation.dnsResolved &&
+    domainValidation.httpReachable &&
+    businessIdentityConfirmed
+  );
+
+  let status: GroundingVerificationResult['status'] = 'UNVERIFIED_STAGING';
+  if (lead.isSynthetic || phoneValidation.isDummyFictional) {
     status = 'FABRICATED_REJECTED';
-  } else if (!phoneValidation.isValid || !domainValidation.httpReachable) {
-    status = 'UNVERIFIED_STAGING';
+  } else if (isGroundTruth) {
+    status = 'VERIFIED';
   }
 
   return {
@@ -422,6 +435,7 @@ export async function verifyLeadGrounding(lead: {
       phoneValid: phoneValidation.isValid,
       isDummyPhone: phoneValidation.isDummyFictional,
       reasons,
+      businessIdentityConfirmed,
       verifiedAt: new Date().toISOString()
     }
   };
