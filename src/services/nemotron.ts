@@ -78,8 +78,6 @@ export async function callNemotronWithTools(
   const candidates = [
     'nvidia/nemotron-3.5-lightning-30b-a3b',
     'nvidia/nemotron-3-nano-30b-a3b',
-    'nvidia/nemotron-3-super-120b-a12b',
-    
   ];
   let lastError: any = null;
 
@@ -91,7 +89,7 @@ export async function callNemotronWithTools(
         const response = await fetch('https://integrate.api.nvidia.com/v1/chat/completions', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
-          signal: AbortSignal.timeout(15_000),
+          signal: AbortSignal.timeout(10_000),
           body: JSON.stringify({
             model,
             messages: conversation,
@@ -176,7 +174,6 @@ export async function callNemotron(
   const candidateModels = [
     "nvidia/nemotron-3.5-lightning-30b-a3b",         // Active flagship 30B Nemotron structured model
     "nvidia/nemotron-3-nano-30b-a3b",  // Fast reasoning-specialized Nemotron
-    "nvidia/nemotron-3-super-120b-a12b",              // High-capacity Nemotron fallback
   ];
 
   let lastError: any = null;
@@ -199,7 +196,7 @@ export async function callNemotron(
           "Content-Type": "application/json",
           "Authorization": `Bearer ${apiKey}`,
         },
-        signal: AbortSignal.timeout(15_000),
+        signal: AbortSignal.timeout(10_000),
         body: JSON.stringify(payload),
       });
 
