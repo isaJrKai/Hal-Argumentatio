@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { Pool } from 'pg';
 import {
   getConnectorCredentials,
+  importConnectorCredentialIfAbsent,
   saveConnectorCredential,
 } from '../../src/db/connectorCredentials';
 
@@ -62,6 +63,23 @@ suite('Neon connector credential vault', () => {
 
     await expect(getConnectorCredentials(contractorId, pool)).resolves.toEqual({ stripe: secret });
     await expect(getConnectorCredentials(otherContractorId, pool)).resolves.toEqual({});
+  });
+
+  it('imports a legacy credential only when no newer PostgreSQL value exists', async () => {
+    const contractorId = newTenant();
+
+    await expect(importConnectorCredentialIfAbsent(contractorId, 'stripe', 'legacy-secret', pool))
+      .resolves.toBe(true);
+    await expect(importConnectorCredentialIfAbsent(contractorId, 'stripe', 'stale-legacy-secret', pool))
+      .resolves.toBe(false);
+    await expect(getConnectorCredentials(contractorId, pool))
+      .resolves.toEqual({ stripe: 'legacy-secret' });
+
+    await saveConnectorCredential(contractorId, 'stripe', 'new-postgres-secret', pool);
+    await expect(importConnectorCredentialIfAbsent(contractorId, 'stripe', 'older-json-secret', pool))
+      .resolves.toBe(false);
+    await expect(getConnectorCredentials(contractorId, pool))
+      .resolves.toEqual({ stripe: 'new-postgres-secret' });
   });
 
   it('updates an existing tenant/service record without creating duplicates', async () => {
