@@ -6614,8 +6614,9 @@ app.post('/api/outreach/dispatch', authenticate, async (req, res) => {
       return res.status(503).json({ success: false, code: 'OUTBOX_UNAVAILABLE', error: 'Durable communications outbox is unavailable. No email was sent.' });
     }
 
+    let result: any;
     try {
-      const result = await sendResendEmail({
+      result = await sendResendEmail({
         to: String(recipient),
         subject: customizedSubject,
         text: customizedMessage,
@@ -6624,74 +6625,8 @@ app.post('/api/outreach/dispatch', authenticate, async (req, res) => {
         apiKey: emailBridge.email.apiKey,
         from: emailBridge.email.senderEmail
       });
-      const submittedAt = new Date().toISOString();
-      await pgDb.update(communicationsOutbox).set({
-        status: 'submitted',
-        providerMessageId: result.providerMessageId,
-        attempts: 1,
-        submittedAt: new Date(submittedAt),
-        lastAttemptAt: new Date(submittedAt),
-        updatedAt: new Date(submittedAt),
-        errorCode: null,
-        errorMessage: null
-      }).where(and(eq(communicationsOutbox.id, outboxId), eq(communicationsOutbox.contractorId, contractorId)));
-      const entry: DispatchLogEntry = {
-        id: outboxId,
-        contractorId,
-        channel,
-        recipient: String(recipient),
-        leadId,
-        leadBusinessName: leadBusinessName || 'Direct Recipient',
-        status: 'submitted',
-        mode: 'live',
-        providerId: result.providerMessageId,
-        timestamp: submittedAt,
-        subject: customizedSubject,
-        preview: customizedMessage.slice(0, 100)
-      };
-      await recordWorkEvent(pgDb, {
-        contractorId, eventType: 'outreach.email.submitted', entityType: leadId ? 'lead' : 'outreach_dispatch', entityId: leadId || entry.id,
-        actorType: 'human', actorId: contractorId, sourceModule: 'outreach_dispatch', correlationId: entry.id,
-        summary: `Email accepted by Resend for ${leadBusinessName || 'a direct recipient'}; delivery is not confirmed.`,
-        payload: { channel: 'email', provider: result.provider, providerMessageId: result.providerMessageId, status: result.status, deliveryConfirmed: false }
-      });
-      const auditBlock = await recordStructuredLedgerEntry({
-        contractorId,
-        eventType: 'phase3_live_dispatch',
-        entityType: 'outreach_email',
-        entityId: entry.id,
-        actor: 'HAL Resend Adapter',
-        details: 'Email accepted by Resend API. This is provider submission, not recipient delivery confirmation.',
-        metadata: {
-          channel: 'email',
-          provider: result.provider,
-          providerMessageId: result.providerMessageId,
-          leadId: leadId || null,
-          status: result.status,
-          deliveryConfirmed: false
-        }
-      });
-      broadcastNotification(
-        contractorId,
-        'info',
-        'Email submitted to Resend',
-        `Resend accepted an email request for ${String(recipient)}. Delivery is not yet confirmed.`
-      );
-      return res.json({
-        success: true,
-        dispatchId: entry.id,
-        idempotencyKey,
-        provider: result.provider,
-        providerMessageId: result.providerMessageId,
-        status: result.status,
-        mode: 'live',
-        providerContacted: true,
-        deliveryConfirmed: false,
-        timestamp: submittedAt,
-        block: auditBlock
-      });
     } catch (err: any) {
-      const providerStatus = Number(String(err?.message || '').match(/HTTP (\d{3})/i)?.[1] || 0);
+      const providerStatus = Number(String(err?.message || '').match(/HTTP (\\d{3})/i)?.[1] || 0);
       const retryableFailure = !(err instanceof EmailProviderConfigurationError) &&
         (!providerStatus || providerStatus === 408 || providerStatus === 409 || providerStatus === 425 || providerStatus === 429 || providerStatus >= 500);
       const nextStatus = retryableFailure ? 'retrying' : 'failed';
@@ -6725,6 +6660,125 @@ app.post('/api/outreach/dispatch', authenticate, async (req, res) => {
         error: 'Email provider request failed. Delivery status is unknown.'
       });
     }
+
+    // From this point Resend has accepted the message. Persistence or audit
+    // failures must never relabel an accepted external send as retryable/failed.
+    const submittedAt = new Date().toISOString();
+    const entry: DispatchLogEntry = {
+      id: outboxId,
+      contractorId,
+      channel,
+      recipient: String(recipient),
+      leadId,
+      leadBusinessName: leadBusinessName || 'Direct Recipient',
+      status: 'submitted',
+      mode: 'live',
+      providerId: result.providerMessageId,
+      timestamp: submittedAt,
+      subject: customizedSubject,
+      preview: customizedMessage.slice(0, 100)
+    };
+    const ledgerInput: StructuredLedgerInput = {
+      contractorId,
+      eventType: 'phase3_live_dispatch',
+      entityType: 'outreach_email',
+      entityId: entry.id,
+      actor: 'HAL Resend Adapter',
+      details: 'Email accepted by Resend API. This is provider submission, not recipient delivery confirmation.',
+      metadata: {
+        channel: 'email',
+        provider: result.provider,
+        providerMessageId: result.providerMessageId,
+        leadId: leadId || null,
+        status: result.status,
+        deliveryConfirmed: false
+      }
+    };
+
+    let auditBlock: any = null;
+    let auditRecorded = true;
+    let persistencePending = false;
+    try {
+      await pgDb.transaction(async tx => {
+        await tx.update(communicationsOutbox).set({
+          status: 'submitted',
+          providerMessageId: result.providerMessageId,
+          attempts: 1,
+          submittedAt: new Date(submittedAt),
+          lastAttemptAt: new Date(submittedAt),
+          updatedAt: new Date(submittedAt),
+          errorCode: null,
+          errorMessage: null
+        }).where(and(eq(communicationsOutbox.id, outboxId), eq(communicationsOutbox.contractorId, contractorId)));
+        await recordWorkEvent(tx, {
+          contractorId, eventType: 'outreach.email.submitted', entityType: leadId ? 'lead' : 'outreach_dispatch', entityId: leadId || entry.id,
+          actorType: 'human', actorId: contractorId, sourceModule: 'outreach_dispatch', correlationId: entry.id,
+          summary: `Email accepted by Resend for ${leadBusinessName || 'a direct recipient'}; delivery is not confirmed.`,
+          payload: { channel: 'email', provider: result.provider, providerMessageId: result.providerMessageId, status: result.status, deliveryConfirmed: false }
+        });
+        auditBlock = await recordStructuredLedgerEntryInTransaction(tx, ledgerInput);
+      });
+    } catch (persistenceError) {
+      // A ledger failure must not cause a provider-accepted email to be retried.
+      // Retry the authoritative submitted state without the optional ledger append.
+      auditRecorded = false;
+      console.error('[HAL Email Dispatch] Resend accepted the email, but atomic audit persistence failed:', persistenceError);
+      try {
+        await pgDb.transaction(async tx => {
+          await tx.update(communicationsOutbox).set({
+            status: 'submitted',
+            providerMessageId: result.providerMessageId,
+            attempts: 1,
+            submittedAt: new Date(submittedAt),
+            lastAttemptAt: new Date(submittedAt),
+            updatedAt: new Date(submittedAt),
+            errorCode: null,
+            errorMessage: null
+          }).where(and(eq(communicationsOutbox.id, outboxId), eq(communicationsOutbox.contractorId, contractorId)));
+          await recordWorkEvent(tx, {
+            contractorId, eventType: 'outreach.email.submitted', entityType: leadId ? 'lead' : 'outreach_dispatch', entityId: leadId || entry.id,
+            actorType: 'human', actorId: contractorId, sourceModule: 'outreach_dispatch', correlationId: entry.id,
+            summary: `Email accepted by Resend for ${leadBusinessName || 'a direct recipient'}; delivery is not confirmed.`,
+            payload: { channel: 'email', provider: result.provider, providerMessageId: result.providerMessageId, status: result.status, deliveryConfirmed: false, ledgerPersistenceFailed: true }
+          });
+        });
+        persistencePending = false;
+      } catch (reconciliationError) {
+        persistencePending = true;
+        console.error('[HAL Email Dispatch] Provider accepted the email, but the submitted state could not be persisted:', reconciliationError);
+      }
+    }
+
+    if (!postgresStructuredLedgerEnabled()) {
+      try {
+        auditBlock = await recordStructuredLedgerEntry(ledgerInput);
+      } catch (ledgerError) {
+        auditRecorded = false;
+        console.error('[HAL Email Dispatch] Provider accepted the email, but legacy ledger append failed:', ledgerError);
+      }
+    }
+
+    broadcastNotification(
+      contractorId,
+      'info',
+      'Email submitted to Resend',
+      `Resend accepted an email request for ${String(recipient)}. Delivery is not yet confirmed.`
+    );
+    return res.json({
+      success: true,
+      dispatchId: entry.id,
+      idempotencyKey,
+      provider: result.provider,
+      providerMessageId: result.providerMessageId,
+      status: 'submitted',
+      mode: 'live',
+      providerContacted: true,
+      deliveryConfirmed: false,
+      auditRecorded,
+      persistencePending,
+      timestamp: submittedAt,
+      block: auditBlock
+    });
   }
 
   if (mode !== 'simulation') {
