@@ -460,7 +460,7 @@ IMPORTANT: Output ONLY a valid JSON array of objects with the keys above inside 
     }
 
     // 2. Secondary Path: Gemini with structured JSON mode (no search tool needed if grounding was blocked)
-    const structuredModels = ["gemini-3.8-flash", "gemini-flash-latest", "gemini-3.1-flash-lite"];
+    const structuredModels = ["gemini-3.8-flash", "gemini-flash-latest"];
     for (const model of structuredModels) {
       try {
         const fallbackResponse = await ai.models.generateContent({
@@ -526,7 +526,7 @@ export async function callGemini(
   const ai = getAIClient();
   if (!ai) throw new Error('Gemini provider is not configured.');
 
-  const models = ['gemini-3.8-flash', 'gemini-flash-latest', 'gemini-3.1-flash-lite'];
+  const models = ['gemini-3.8-flash', 'gemini-flash-latest'];
   let lastError: unknown;
 
   for (const model of models) {
@@ -588,7 +588,7 @@ export async function callGeminiWithTools(
   const contents: any[] = [{ role: 'user', parts: [{ text: prompt }] }];
   let lastError: any = null;
 
-  for (const model of ['gemini-3.8-flash', 'gemini-flash-latest', 'gemini-3.1-flash-lite']) {
+  for (const model of ['gemini-3.8-flash', 'gemini-flash-latest']) {
     try {
       const config: any = {
         systemInstruction,
@@ -747,7 +747,7 @@ RESPONSE STANDARD
           ];
         }
 
-        const candidateModels = ["gemini-3.8-flash", "gemini-flash-latest", "gemini-3.1-flash-lite"];
+        const candidateModels = ["gemini-3.8-flash", "gemini-flash-latest"];
         let response: any = null;
         let lastError: any = null;
         let selectedModel = candidateModels[0];
@@ -928,7 +928,7 @@ RESPONSE STANDARD
           { role: 'user', parts: [{ text: message }] }
         ];
 
-        const candidateModels = ["gemini-3.8-flash", "gemini-flash-latest", "gemini-3.1-flash-lite"];
+        const candidateModels = ["gemini-3.8-flash", "gemini-flash-latest"];
         let response: any = null;
         let lastError: any = null;
 

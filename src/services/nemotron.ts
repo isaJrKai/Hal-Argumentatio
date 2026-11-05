@@ -77,7 +77,7 @@ export async function callNemotronWithTools(
   }));
   const candidates = [
     'nvidia/nemotron-3.5-lightning-30b-a3b',
-    'nvidia/nemotron-3-nano-omni-30b-a3b-reasoning',
+    'nvidia/nemotron-3-nano-30b-a3b',
     'nvidia/nemotron-3-super-120b-a12b',
     
   ];
@@ -91,6 +91,7 @@ export async function callNemotronWithTools(
         const response = await fetch('https://integrate.api.nvidia.com/v1/chat/completions', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
+          signal: AbortSignal.timeout(30_000),
           body: JSON.stringify({
             model,
             messages: conversation,
@@ -174,7 +175,7 @@ export async function callNemotron(
   // Active models verified on NVIDIA NIM API catalog
   const candidateModels = [
     "nvidia/nemotron-3.5-lightning-30b-a3b",         // Active flagship 30B Nemotron structured model
-    "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning",  // Fast reasoning-specialized Nemotron
+    "nvidia/nemotron-3-nano-30b-a3b",  // Fast reasoning-specialized Nemotron
     "nvidia/nemotron-3-super-120b-a12b",              // High-capacity Nemotron fallback
   ];
 
@@ -198,6 +199,7 @@ export async function callNemotron(
           "Content-Type": "application/json",
           "Authorization": `Bearer ${apiKey}`,
         },
+        signal: AbortSignal.timeout(30_000),
         body: JSON.stringify(payload),
       });
 
@@ -207,11 +209,11 @@ export async function callNemotron(
         return choice?.content || choice?.reasoning_content || "";
       } else {
         const errText = await response.text();
-        console.warn(`NVIDIA API model ${model} failed with status ${response.status}: ${errText}`);
+        console.warn(`NVIDIA API model ${model} failed with status ${response.status}: ${errText.slice(0, 300)}`);
         lastError = new Error(`NVIDIA model ${model} call failed with status ${response.status}: ${errText}`);
       }
     } catch (err: any) {
-      console.warn(`NVIDIA API network error for model ${model}:`, err.message);
+      console.warn(`NVIDIA API network error for model ${model}:`, err?.name === 'AbortError' || err?.name === 'TimeoutError' ? 'request timed out' : 'request failed');
       lastError = err;
     }
   }
