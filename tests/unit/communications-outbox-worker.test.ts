@@ -21,7 +21,8 @@ describe('communications outbox worker', () => {
     expect(result).toEqual({ claimed: 1, submitted: 1, retrying: 0, deadLettered: 0, failed: 0 });
     expect(client.query.mock.calls[1][0]).toContain('FOR UPDATE SKIP LOCKED');
     expect(client.query.mock.calls[1][0]).toContain("status IN ('queued','retrying')");
-    expect(client.query.mock.calls[1][0]).not.toContain("status = 'processing'");
+    expect(client.query.mock.calls[1][0]).not.toContain("OR (status = 'processing'");
+    expect(client.query.mock.calls[1][0]).not.toContain('updated_at < $1 - INTERVAL');
     expect(send).toHaveBeenCalledWith(expect.objectContaining({ contractor_id: 'tenant-a' }));
     expect(pool.query).toHaveBeenCalledWith(expect.stringContaining("status='submitted'"), ['outbox-1', 're_123']);
     expect(client.release).toHaveBeenCalled();
