@@ -46,7 +46,7 @@ suite('PostgreSQL global structured ledger', () => {
       BEGIN
         RAISE EXCEPTION 'structured_ledger_entries is append-only' USING ERRCODE = '55000';
       END;
-      $ LANGUAGE plpgsql;
+      $ledger$ LANGUAGE plpgsql;
       CREATE TRIGGER structured_ledger_no_mutation
         BEFORE UPDATE OR DELETE ON structured_ledger_entries
         FOR EACH ROW EXECUTE FUNCTION prevent_structured_ledger_mutation();
