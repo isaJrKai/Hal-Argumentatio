@@ -20,6 +20,13 @@ describe('Legacy MCP tenant isolation', () => {
     expect(route).toContain('.where(eq(leads.contractorId, contractorId))');
   });
 
+  it('retains contractor ownership in Hermes artifact update writes', () => {
+    const hermes = readFileSync(path.resolve(process.cwd(), 'src/services/hermesLab.ts'), 'utf8');
+    expect(hermes).toContain('eq(hermesLabArtifacts.id, currentArtifact.id)');
+    expect(hermes).toContain('eq(hermesLabArtifacts.contractorId, contractorId)');
+    expect(hermes).toContain('.where(and(');
+  });
+
   it('filters scheduled jobs by contractor before pagination', () => {
     const start = source.indexOf("server.registerTool('hal_list_tasks'");
     const end = source.indexOf("server.registerTool('hal_list_recommendations'", start);
