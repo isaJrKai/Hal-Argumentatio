@@ -69,7 +69,7 @@ describe('HAL passive website security auditor', () => {
     expect(result.coverage.https).toBe('not_confirmed');
     expect(result.evidence.rejectionReason).toContain('NXDOMAIN');
     expect(result.report).toContain('Not confirmed');
-    expect(result.report).toContain('not measured');
+    expect(result.report).toContain('Not measured in this run');
     expect(result.report).not.toContain('Detected contact forms');
   });
 });
