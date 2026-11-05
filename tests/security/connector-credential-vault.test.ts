@@ -1,51 +1,106 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { db } from '../../src/db/db';
+import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
+import { randomUUID } from 'node:crypto';
+import { Pool } from 'pg';
+import {
+  getConnectorCredentials,
+  saveConnectorCredential,
+} from '../../src/db/connectorCredentials';
 
-const testContractorId = 'credential-vault-regression-test';
-let saveSpy: ReturnType<typeof vi.spyOn>;
+const databaseUrl = process.env.DATABASE_URL;
+const suite = databaseUrl ? describe : describe.skip;
+const contractorIds: string[] = [];
+let pool: Pool;
 
-beforeEach(() => {
-  (db as any).data.connectorCredentials[testContractorId] = {};
-  saveSpy = vi.spyOn(db, 'save').mockImplementation(() => undefined);
-});
+suite('Neon connector credential vault', () => {
+  beforeAll(async () => {
+    pool = new Pool({ connectionString: databaseUrl });
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS connector_credentials (
+        id TEXT PRIMARY KEY,
+        contractor_id TEXT NOT NULL,
+        service TEXT NOT NULL,
+        encrypted_value TEXT NOT NULL,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
+      )
+    `);
+    await pool.query(
+      'CREATE INDEX IF NOT EXISTS connector_credentials_tenant_idx ON connector_credentials (contractor_id, service)'
+    );
+  });
 
-afterEach(() => {
-  (db as any).data.connectorCredentials[testContractorId] = {};
-  vi.restoreAllMocks();
-});
+  afterEach(async () => {
+    if (contractorIds.length) {
+      await pool.query('DELETE FROM connector_credentials WHERE contractor_id = ANY($1::text[])', [contractorIds]);
+      contractorIds.length = 0;
+    }
+  });
 
-describe('connector credential vault', () => {
-  it('encrypts credentials before persisting them and decrypts only server-side reads', () => {
+  afterAll(async () => {
+    await pool?.end();
+  });
+
+  function newTenant(): string {
+    const id = `credential-vault-test-${randomUUID()}`;
+    contractorIds.push(id);
+    return id;
+  }
+
+  it('encrypts at rest and decrypts only for the owning tenant', async () => {
+    const contractorId = newTenant();
+    const otherContractorId = newTenant();
     const secret = 'test-secret-do-not-store-in-plaintext';
-    db.saveConnectorCredential(testContractorId, 'stripe', secret);
 
-    const storedValue = (db as any).data.connectorCredentials[testContractorId].stripe;
-    expect(saveSpy).toHaveBeenCalled();
-    expect(storedValue).not.toBe(secret);
-    expect(storedValue).toMatch(/^[a-f0-9]{24}:[a-f0-9]+:[a-f0-9]{32}$/i);
-    expect(db.getConnectorCredentials(testContractorId).stripe).toBe(secret);
+    await saveConnectorCredential(contractorId, 'stripe', secret, pool);
+
+    const persisted = await pool.query(
+      'SELECT encrypted_value FROM connector_credentials WHERE contractor_id = $1 AND service = $2',
+      [contractorId, 'stripe']
+    );
+    expect(persisted.rows).toHaveLength(1);
+    expect(persisted.rows[0].encrypted_value).not.toBe(secret);
+    expect(persisted.rows[0].encrypted_value).toMatch(/^[a-f0-9]{24}:[a-f0-9]+:[a-f0-9]{32}$/i);
+
+    await expect(getConnectorCredentials(contractorId, pool)).resolves.toEqual({ stripe: secret });
+    await expect(getConnectorCredentials(otherContractorId, pool)).resolves.toEqual({});
   });
 
-  it('migrates legacy plaintext credentials to encrypted storage on server-side read', () => {
-    (db as any).data.connectorCredentials[testContractorId] = {
-      legacyProvider: 'legacy-plaintext-secret'
-    };
+  it('updates an existing tenant/service record without creating duplicates', async () => {
+    const contractorId = newTenant();
+    await saveConnectorCredential(contractorId, 'stripe', 'first-secret', pool);
+    await saveConnectorCredential(contractorId, 'stripe', 'rotated-secret', pool);
 
-    const credentials = db.getConnectorCredentials(testContractorId);
-    const storedValue = (db as any).data.connectorCredentials[testContractorId].legacyProvider;
-
-    expect(credentials.legacyProvider).toBe('legacy-plaintext-secret');
-    expect(saveSpy).toHaveBeenCalled();
-    expect(storedValue).not.toBe('legacy-plaintext-secret');
-    expect(storedValue).toMatch(/^[a-f0-9]{24}:[a-f0-9]+:[a-f0-9]{32}$/i);
+    const rows = await pool.query(
+      'SELECT id FROM connector_credentials WHERE contractor_id = $1 AND service = $2',
+      [contractorId, 'stripe']
+    );
+    expect(rows.rows).toHaveLength(1);
+    await expect(getConnectorCredentials(contractorId, pool)).resolves.toEqual({ stripe: 'rotated-secret' });
   });
 
-  it('fails closed when stored ciphertext cannot be decrypted', () => {
-    (db as any).data.connectorCredentials[testContractorId] = {
-      stripe: `${'a'.repeat(24)}:${'b'.repeat(64)}:${'c'.repeat(32)}`
-    };
+  it('deletes a credential when an empty value is saved', async () => {
+    const contractorId = newTenant();
+    await saveConnectorCredential(contractorId, 'stripe', 'temporary-secret', pool);
+    await saveConnectorCredential(contractorId, 'stripe', '', pool);
+    await expect(getConnectorCredentials(contractorId, pool)).resolves.toEqual({});
+  });
 
-    const credentials = db.getConnectorCredentials(testContractorId);
-    expect(credentials.stripe).toBeUndefined();
+  it('fails closed on corrupt ciphertext', async () => {
+    const contractorId = newTenant();
+    await pool.query(
+      'INSERT INTO connector_credentials (id, contractor_id, service, encrypted_value) VALUES ($1, $2, $3, $4)',
+      [randomUUID(), contractorId, 'stripe', 'not-valid-ciphertext']
+    );
+    await expect(getConnectorCredentials(contractorId, pool)).resolves.toEqual({});
+  });
+
+  it('refuses to overwrite ambiguous duplicate legacy rows', async () => {
+    const contractorId = newTenant();
+    await pool.query(
+      'INSERT INTO connector_credentials (id, contractor_id, service, encrypted_value) VALUES ($1, $2, $3, $4), ($5, $2, $3, $6)',
+      [randomUUID(), contractorId, 'stripe', 'ciphertext-one', randomUUID(), 'ciphertext-two']
+    );
+
+    await expect(saveConnectorCredential(contractorId, 'stripe', 'replacement-secret', pool))
+      .rejects.toThrow(/Duplicate connector credential records/);
   });
 });
