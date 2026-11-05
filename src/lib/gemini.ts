@@ -421,7 +421,7 @@ IMPORTANT: Output ONLY a valid JSON array of objects with the keys above inside 
 
   if (ai) {
     // 1. Primary Path: Gemini with live Google Search Grounding & retry
-    const searchModels = ["gemini-3.8-flash", "gemini-flash-latest"];
+    const searchModels = ["gemini-3.8-flash"];
     for (const model of searchModels) {
       for (let attempt = 0; attempt < 2; attempt++) {
         try {
@@ -460,7 +460,7 @@ IMPORTANT: Output ONLY a valid JSON array of objects with the keys above inside 
     }
 
     // 2. Secondary Path: Gemini with structured JSON mode (no search tool needed if grounding was blocked)
-    const structuredModels = ["gemini-3.8-flash", "gemini-flash-latest"];
+    const structuredModels = ["gemini-3.8-flash"];
     for (const model of structuredModels) {
       try {
         const fallbackResponse = await ai.models.generateContent({
@@ -747,7 +747,7 @@ RESPONSE STANDARD
           ];
         }
 
-        const candidateModels = ["gemini-3.8-flash", "gemini-flash-latest"];
+        const candidateModels = ["gemini-3.8-flash"];
         let response: any = null;
         let lastError: any = null;
         let selectedModel = candidateModels[0];
@@ -928,7 +928,7 @@ RESPONSE STANDARD
           { role: 'user', parts: [{ text: message }] }
         ];
 
-        const candidateModels = ["gemini-3.8-flash", "gemini-flash-latest"];
+        const candidateModels = ["gemini-3.8-flash"];
         let response: any = null;
         let lastError: any = null;
 
