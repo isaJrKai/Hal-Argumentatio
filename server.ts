@@ -22,7 +22,7 @@ import {
   Recommendation
 } from './src/db/db';
 import { db as pgDb, createPool as getApplicationPostgresPool } from './src/db/index.ts';
-import { contractors, auditLogs, leads, leadEvents, revenueRecords, campaigns, winLossRecords, performanceSnapshots, recommendations, forecasts, predictionOutcomes, learningInsights, chatMessages, chatProjects, chatConversations, missions, clientProjects, outreachSequences, apiKeys, connectorCredentials, notifications, schedulerJobs, passwordResetTokens, leadAttribution, conversionOutbox, googleAdsDailyPerformance, revenueExperiments, revenueRecommendations, revenueRecommendationEvents, revenueSimulations, revenueOutcomes, communicationsOutbox, communicationsDeliveryEvents, halLoops, halLoopEvents, hermesLabArtifacts, hermesDiagnosticIncidents, hermesLabMessages, staffMembers, workEvents, workTasks, revokedTokens } from './src/db/schema.ts';
+import { contractors, auditLogs, leads, leadEvents, revenueRecords, campaigns, winLossRecords, performanceSnapshots, recommendations, forecasts, predictionOutcomes, learningInsights, chatMessages, chatProjects, chatConversations, missions, clientProjects, outreachSequences, apiKeys, connectorCredentials, notifications, schedulerJobs, passwordResetTokens, leadAttribution, conversionOutbox, googleAdsDailyPerformance, revenueExperiments, revenueRecommendations, revenueRecommendationEvents, revenueSimulations, revenueOutcomes, communicationsOutbox, communicationsDeliveryEvents, whatsappPhoneNumberMappings, whatsappInboundEvents, halLoops, halLoopEvents, hermesLabArtifacts, hermesDiagnosticIncidents, hermesLabMessages, staffMembers, workEvents, workTasks, revokedTokens } from './src/db/schema.ts';
 import { eq, inArray, desc, and, or, like, sql, gte, lte, gt, isNull } from 'drizzle-orm';
 import { 
   generateLearningFromOutcome, 
@@ -6606,43 +6606,111 @@ app.get('/api/outreach/whatsapp/webhook', (req, res) => {
 });
 
 // WhatsApp Inbound Message Listener
-app.post('/api/outreach/whatsapp/webhook', (req, res) => {
+// A workspace may register only a phone number that its own Meta token can read.
+app.post('/api/outreach/whatsapp/connect-number', authenticate, async (req, res) => {
+  const contractorId = (req as any).contractorId;
+  const phoneNumberId = String(req.body?.phoneNumberId || '').trim();
+  if (!/^\d{5,30}$/.test(phoneNumberId)) {
+    return res.status(400).json({ success: false, error: 'A valid Meta phone-number ID is required.' });
+  }
+  try {
+    const [existing] = await pgDb.select().from(whatsappPhoneNumberMappings)
+      .where(eq(whatsappPhoneNumberMappings.phoneNumberId, phoneNumberId)).limit(1);
+    if (existing && existing.contractorId !== contractorId) {
+      return res.status(409).json({ success: false, error: 'This WhatsApp number is already assigned to another workspace.' });
+    }
+    const credentials = await getTenantConnectorCredentials(contractorId);
+    let bridgeSettings: any = {};
+    try { bridgeSettings = credentials.bridgeSettings ? JSON.parse(credentials.bridgeSettings) : {}; } catch {}
+    const accessToken = bridgeSettings?.whatsapp?.accessToken || credentials.whatsappAccessToken;
+    if (!accessToken) {
+      return res.status(503).json({ success: false, error: 'Save a WhatsApp access token in this workspace connector before registering its number.' });
+    }
+    const graphVersion = process.env.WHATSAPP_GRAPH_API_VERSION || 'v22.0';
+    if (!/^v\d+\.\d+$/.test(graphVersion)) {
+      return res.status(503).json({ success: false, error: 'WhatsApp Graph API version is invalid.' });
+    }
+    const response = await fetch(`https://graph.facebook.com/${graphVersion}/${phoneNumberId}?fields=id,display_phone_number,verified_name`, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+      signal: AbortSignal.timeout(10000)
+    });
+    if (!response.ok) return res.status(502).json({ success: false, error: 'Meta could not verify this phone-number ID with the workspace token.' });
+    const provider = await response.json() as { id?: string; display_phone_number?: string; verified_name?: string };
+    if (provider.id !== phoneNumberId) return res.status(409).json({ success: false, error: 'Meta returned a different phone-number ID.' });
+    const now = new Date();
+    const mapping = {
+      id: existing?.id || 'wa_' + crypto.randomUUID(),
+      contractorId,
+      phoneNumberId,
+      displayPhoneNumber: provider.display_phone_number || null,
+      verifiedName: provider.verified_name || null,
+      verifiedAt: now,
+      updatedAt: now
+    };
+    await pgDb.insert(whatsappPhoneNumberMappings).values({ ...mapping, createdAt: existing?.createdAt || now })
+      .onConflictDoNothing();
+    const [saved] = await pgDb.select().from(whatsappPhoneNumberMappings)
+      .where(eq(whatsappPhoneNumberMappings.phoneNumberId, phoneNumberId)).limit(1);
+    if (!saved || saved.contractorId !== contractorId) {
+      return res.status(409).json({ success: false, error: 'Phone-number ownership changed during registration. No mapping was enabled.' });
+    }
+    return res.json({ success: true, phoneNumberId, displayPhoneNumber: saved.displayPhoneNumber, verifiedName: saved.verifiedName, verified: true });
+  } catch (error: any) {
+    console.error('[WhatsApp Number Registration] Failed:', error?.message || error);
+    return res.status(503).json({ success: false, error: 'WhatsApp number verification could not be completed.' });
+  }
+});
+
+// WhatsApp inbound events are signature-verified, mapped to exactly one tenant,
+// encrypted at rest, and deduplicated by Meta's message ID.
+app.post('/api/outreach/whatsapp/webhook', async (req, res) => {
   const appSecret = process.env.WHATSAPP_APP_SECRET;
   const signature = req.header('x-hub-signature-256');
   const rawBody = (req as any).rawBody as Buffer | undefined;
-
-  if (!appSecret) {
-    return res.status(503).json({ error: 'WhatsApp inbound signature verification is not configured.' });
-  }
-  if (!signature || !rawBody || !signature.startsWith('sha256=')) {
-    return res.status(401).json({ error: 'Missing or invalid webhook signature.' });
-  }
-
+  if (!appSecret) return res.status(503).json({ error: 'WhatsApp inbound signature verification is not configured.' });
+  if (!signature || !rawBody || !signature.startsWith('sha256=')) return res.status(401).json({ error: 'Missing or invalid webhook signature.' });
   const expected = Buffer.from('sha256=' + crypto.createHmac('sha256', appSecret).update(rawBody).digest('hex'));
   const received = Buffer.from(signature);
   if (expected.length !== received.length || !crypto.timingSafeEqual(expected, received)) {
     return res.status(401).json({ error: 'Invalid webhook signature.' });
   }
-
-  const body = req.body;
   try {
-    if (body?.object === 'whatsapp_business_account') {
-      const hasInboundMessages = (body.entry || []).some((entry: any) =>
-        (entry.changes || []).some((change: any) => Array.isArray(change.value?.messages) && change.value.messages.length > 0)
-      );
-      if (hasInboundMessages) {
-        // Never fan out an inbound message to every connected workspace. A
-        // verified signature authenticates Meta, not the tenant that owns the
-        // destination phone number. Tenant routing must be configured first.
-        console.warn('[WhatsApp Webhook] Signed inbound message received without a verified phone-number-to-tenant mapping.');
-        return res.status(503).json({
-          error: 'WhatsApp signature verified, but tenant routing is not configured. The message was not exposed to any workspace.'
-        });
+    const body = req.body;
+    if (body?.object !== 'whatsapp_business_account') return res.sendStatus(200);
+    const messages: any[] = [];
+    for (const entry of Array.isArray(body.entry) ? body.entry : []) {
+      for (const change of Array.isArray(entry.changes) ? entry.changes : []) {
+        const value = change?.value || {};
+        for (const message of Array.isArray(value.messages) ? value.messages : []) {
+          messages.push({ phoneNumberId: String(value.metadata?.phone_number_id || ''), message });
+        }
       }
     }
-    return res.sendStatus(200);
-  } catch (err) {
-    console.error('[WhatsApp Webhook Error]', err);
+    if (messages.length > 50) return res.status(413).json({ error: 'Webhook message batch exceeds the supported limit.' });
+    for (const item of messages) {
+      if (!item.phoneNumberId || typeof item.message?.id !== 'string' || typeof item.message?.from !== 'string') {
+        return res.status(400).json({ error: 'Inbound message is missing its routing or provider identifier.' });
+      }
+      const [mapping] = await pgDb.select().from(whatsappPhoneNumberMappings)
+        .where(eq(whatsappPhoneNumberMappings.phoneNumberId, item.phoneNumberId)).limit(1);
+      if (!mapping) {
+        console.warn('[WhatsApp Webhook] Signed message arrived for an unregistered phone-number ID.');
+        return res.status(503).json({ error: 'No verified workspace mapping exists for this WhatsApp number.' });
+      }
+      await pgDb.insert(whatsappInboundEvents).values({
+        id: 'waevt_' + crypto.createHash('sha256').update(item.message.id).digest('hex'),
+        contractorId: mapping.contractorId,
+        phoneNumberId: item.phoneNumberId,
+        providerMessageId: item.message.id,
+        senderEncrypted: encrypt(item.message.from),
+        messageEncrypted: encrypt(JSON.stringify(item.message)),
+        messageType: String(item.message.type || 'unknown').slice(0, 40),
+        receivedAt: new Date()
+      }).onConflictDoNothing();
+    }
+    return res.status(200).json({ success: true, accepted: messages.length });
+  } catch (err: any) {
+    console.error('[WhatsApp Webhook Error]', err?.message || err);
     return res.sendStatus(500);
   }
 });
