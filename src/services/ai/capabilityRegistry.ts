@@ -123,7 +123,7 @@ export const HAL_CAPABILITY_REGISTRY: readonly HalCapability[] = [
     toolNames: [],
     approvalRequired: true
   }
-] as const;
+];
 
 const ACTIVE_TOOL_NAMES = new Set(
   HAL_CAPABILITY_REGISTRY
