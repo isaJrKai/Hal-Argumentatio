@@ -83,5 +83,5 @@ These items remain unverified and must not be represented as complete:
 - Dedicated branch only; no direct `main` writes.
 - No production data was read or modified through a privileged database connection.
 - No production migration or deployment was performed.
-- This integration branch was created directly from current `main`; it is currently 30 commits ahead and 0 behind. The original workstream branch remains untouched and is not the release candidate.
+- This integration branch was created directly from current `main`; it is currently 31 commits ahead and 0 behind. The original workstream branch remains untouched and is not the release candidate.
 - Do not merge until the branch CI is green and the remaining end-to-end/tenant-isolation gates have been addressed or explicitly accepted as limitations.
