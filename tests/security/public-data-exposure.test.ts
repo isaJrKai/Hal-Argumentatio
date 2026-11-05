@@ -43,7 +43,7 @@ describe('Public data exposure security', () => {
     expect(saveEnd).toBeGreaterThan(saveStart);
     const saveRoute = source.slice(saveStart, saveEnd);
     expect(saveRoute).toContain('!pageConfig');
-    expect(saveRoute).toContain('const ownedPageConfig = {');
+    expect(saveRoute).toContain('const ownedPageConfig: Record<string, any> = {');
     expect(saveRoute).toContain('eq(leads.contractorId, contractorId)');
     expect(saveRoute).toContain("status: 'draft'");
     expect(saveRoute).toContain('sourceLeadId: sourceLead?.id || null');
