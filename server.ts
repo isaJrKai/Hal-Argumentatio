@@ -1,4 +1,5 @@
 import { testPostgresConnection, bootstrapPostgresTables } from './src/db/postgres';
+import { migrateExistingLeadPii } from './src/db/leadPiiMigration';
 import express from 'express';
 import path from 'path';
 import fs from 'fs';
@@ -9290,6 +9291,10 @@ async function startServer() {
     try {
       const pool = getApplicationPostgresPool();
       await bootstrapPostgresTables(pool);
+      const migratedLeadPii = await migrateExistingLeadPii(pool);
+      if (migratedLeadPii > 0) {
+        console.info(`[HAL PostgreSQL] Encrypted PII for ${migratedLeadPii} existing lead records.`);
+      }
       await pool.query('SELECT 1');
       applicationDatabaseState = 'ready';
       console.log('[HAL PostgreSQL] Application database schema is ready.');
