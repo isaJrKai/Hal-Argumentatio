@@ -6739,46 +6739,97 @@ app.post('/api/admin/git/push', authenticate, async (req, res) => {
 
 // ─── WHITE-LABEL CLIENT PROPOSAL GENERATOR ───────────────────────────────────
 
-app.post('/api/proposals/generate', authenticate, (req, res) => {
+app.post('/api/proposals/generate', authenticate, async (req, res) => {
   const contractorId = (req as any).contractorId;
-  const { leadId, clientName, companyName, packageTier, monthlyRetainerUsd, setupFeeUsd, auditScores } = req.body;
+  const { leadId, packageTier, monthlyRetainerUsd, setupFeeUsd, auditScores } = req.body || {};
 
-  const tier = packageTier || 'Dominance';
-  const retainer = Number(monthlyRetainerUsd) || (tier === 'Dominance' ? 2400 : tier === 'Enterprise' ? 4500 : 1200);
-  const setup = Number(setupFeeUsd) || (tier === 'Dominance' ? 950 : tier === 'Enterprise' ? 1800 : 500);
+  const retainer = Number(monthlyRetainerUsd);
+  const setup = Number(setupFeeUsd);
+  if (typeof leadId !== 'string' || !leadId.trim() ||
+      !['Growth', 'Dominance', 'Enterprise'].includes(packageTier) ||
+      !Number.isSafeInteger(retainer) || retainer <= 0 ||
+      !Number.isSafeInteger(setup) || setup <= 0) {
+    return res.status(400).json({
+      error: 'A saved lead, valid package tier, and explicit positive whole-dollar retainer and setup fee are required.'
+    });
+  }
 
-  const proposal = {
-    id: 'prop_' + crypto.randomBytes(8).toString('hex'),
-    leadId: leadId || '',
-    clientName: clientName || 'Business Principal',
-    companyName: companyName || 'Client Organization',
-    preparedBy: 'HAL Business Intelligence Operations',
-    packageTier: tier,
-    monthlyRetainerUsd: retainer,
-    setupFeeUsd: setup,
-    deliverables: [
-      'Core Web Vitals & Mobile Speed Optimization (<1.2s load target)',
-      'TLS 1.3 Encrypted SSL Hardening & Security Headers',
-      'Local Geo-SEO NAP Citations & Google Maps Rank Acceleration',
-      'Autonomous High-Intent Lead Capture Funnel & Instant SMS Notifications',
-      'Weekly AI Executive Performance Dashboard & Conversion Audits'
-    ],
-    roiEstimateAnnualUsd: retainer * 12 * 4.5,
-    auditHighlights: [
-      `Mobile Speed Index: ${auditScores?.mobileSpeedScore || 52}/100 (Est. 28% visitor bounce reduction)`,
-      `SEO Health: ${auditScores?.seoHealthScore || 64}/100 (Geo-structured Schema injection)`,
-      `SSL Status: ${auditScores?.sslStatus === 'missing' ? 'CRITICAL: Insecure' : 'Secured'}`
-    ],
-    validUntil: new Date(Date.now() + 14 * 24 * 3600 * 1000).toLocaleDateString()
-  };
+  if (auditScores !== undefined && (!auditScores || typeof auditScores !== 'object' || Array.isArray(auditScores))) {
+    return res.status(400).json({ error: 'Audit evidence must be a structured object.' });
+  }
 
-  db.addAuditLog({
-    contractorId,
-    action: 'PROPOSAL_GENERATED',
-    details: `Generated ${tier} Client Proposal for ${companyName} ($${retainer}/mo).`
-  });
+  try {
+    const [lead] = await pgDb.select({
+      id: leads.id,
+      businessName: leads.businessName,
+      ownerName: leads.ownerName
+    }).from(leads)
+      .where(and(eq(leads.id, leadId.trim()), eq(leads.contractorId, contractorId)))
+      .limit(1);
+    if (!lead) return res.status(404).json({ error: 'Lead not found or inaccessible.' });
 
-  res.status(201).json(proposal);
+    const highlights: string[] = [];
+    const appendScore = (key: string, label: string) => {
+      const value = auditScores?.[key];
+      if (value === undefined || value === null || value === '') return;
+      const score = Number(value);
+      if (Number.isFinite(score) && score >= 0 && score <= 100) {
+        highlights.push(`${label}: ${score}/100 (recorded audit value)`);
+      }
+    };
+    appendScore('mobileSpeedScore', 'Mobile Speed Score');
+    appendScore('seoHealthScore', 'SEO Health Score');
+    if (typeof auditScores?.sslStatus === 'string' && auditScores.sslStatus.trim()) {
+      highlights.push(`SSL Status: ${auditScores.sslStatus.trim()}`);
+    }
+
+    const proposal = {
+      id: 'prop_' + crypto.randomBytes(8).toString('hex'),
+      leadId: lead.id,
+      clientName: lead.ownerName?.trim() || lead.businessName,
+      companyName: lead.businessName,
+      preparedBy: 'HAL Business Intelligence Operations',
+      packageTier,
+      monthlyRetainerUsd: retainer,
+      setupFeeUsd: setup,
+      deliverables: [
+        'Core Web Vitals & Mobile Speed Optimization',
+        'TLS and security configuration review',
+        'Local SEO and business listing consistency',
+        'Lead capture and notification workflow setup',
+        'Monthly performance review using verified measurements'
+      ],
+      // No attributable revenue model exists to support an ROI estimate.
+      roiEstimateAnnualUsd: null,
+      auditHighlights: highlights,
+      validUntil: new Date(Date.now() + 14 * 24 * 3600 * 1000).toISOString(),
+      persistenceStatus: 'generated_only_not_persisted'
+    };
+
+    await recordWorkEvent(pgDb, {
+      contractorId,
+      eventType: 'proposal.generated',
+      entityType: 'lead',
+      entityId: lead.id,
+      actorType: 'human',
+      actorId: contractorId,
+      sourceModule: 'proposal_studio',
+      correlationId: proposal.id,
+      summary: `Generated a proposal draft for ${lead.businessName}; it has not been persisted as a contract.`,
+      payload: {
+        proposalId: proposal.id,
+        packageTier,
+        monthlyRetainerUsd: retainer,
+        setupFeeUsd: setup,
+        persistenceStatus: proposal.persistenceStatus
+      }
+    });
+
+    return res.status(201).json(proposal);
+  } catch (err: any) {
+    console.error('[Proposal Generation] Failed:', err);
+    return res.status(503).json({ error: 'Proposal draft could not be generated from the saved lead and verified inputs.' });
+  }
 });
 
 // ─── PHASE 4: CLIENT PROJECTS & ONBOARDING DELIVERY API ─────────────────────
