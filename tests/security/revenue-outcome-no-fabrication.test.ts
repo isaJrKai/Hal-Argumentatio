@@ -103,6 +103,8 @@ describe('client project retainer lifecycle', () => {
     expect(projectUpdateHandler).toContain('safeUpdates.monthlyRetainerUsd = updates.monthlyRetainerUsd');
     expect(projectUpdateHandler).toContain('previousMonthlyRetainerUsd');
     expect(projectUpdateHandler).toContain('currentMonthlyRetainerUsd');
+    expect(projectUpdateHandler).toContain('pgDb.transaction(async tx =>');
+    expect(projectUpdateHandler).toContain('tx.insert(workEvents)');
   });
 
   it('does not prefill a new client project with an assumed retainer', () => {
