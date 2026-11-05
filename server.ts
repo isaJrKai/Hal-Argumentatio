@@ -1784,7 +1784,10 @@ app.get('/landing/:id', async (req, res) => {
       inArray(hermesLabArtifacts.status, ['ready', 'deployed']),
       eq(hermesLabArtifacts.toolId, 'landing_page')
     ));
-    if (!artifact || !hasOwnedLandingPageConfig(artifact)) {
+    if (artifact && !hasOwnedLandingPageConfig(artifact)) {
+      return res.status(404).send('<h1>Landing page not found or not safely published.</h1>');
+    }
+    if (!artifact) {
       try {
         const { TRADE_TEMPLATES } = await import('./src/components/landing/templates');
         const { generateLandingPageHtml } = await import('./src/components/landing/htmlGenerator');
