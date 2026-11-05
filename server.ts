@@ -8253,7 +8253,7 @@ app.post('/api/scheduler', authenticate, async (req, res) => {
         const timesFmWindow = isTimesFmBatchForecast
           ? getTimesFmBatchEvaluationWindow(forecast.targetDate, now)
           : null;
-        if (isTimesFmBatchForecast && !timesFmWindow) continue;
+        if (isTimesFmBatchForecast && (!timesFmWindow || new Date(forecast.createdAt).getTime() >= timesFmWindow.start.getTime())) continue;
         const targetEnd = timesFmWindow?.end ?? new Date(forecast.targetDate);
         const targetStart = timesFmWindow?.start ?? new Date(forecast.createdAt);
         if (!Number.isFinite(targetStart.getTime()) || !Number.isFinite(targetEnd.getTime()) || targetStart >= targetEnd) continue;

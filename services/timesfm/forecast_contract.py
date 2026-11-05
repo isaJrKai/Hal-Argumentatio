@@ -7,4 +7,5 @@ def first_target_week(last_observed_week: date, today: date) -> date:
     """Return the first forecast Monday without emitting stale target weeks."""
     last_monday = last_observed_week - timedelta(days=last_observed_week.weekday())
     current_monday = today - timedelta(days=today.weekday())
-    return max(last_monday + timedelta(days=7), current_monday)
+    next_monday = current_monday + timedelta(days=7)
+    return max(last_monday + timedelta(days=7), next_monday)

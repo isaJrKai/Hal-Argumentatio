@@ -103,7 +103,7 @@ workflow logs.
   forecasts.
 - Forecasts are refreshed on the schedule, not immediately on dashboard
   interaction. The first target is the later of the week after the last complete
-  observed week and the current UTC week, preventing expired targets from stale
+  observed week and the next UTC week, keeping the full target week in the future and preventing expired targets from stale
   history. HAL reads only a fresh complete snapshot (up to 24 hours old).
 - TimesFM conversion forecasts are evaluated only after their complete target
   Monday-Sunday week has elapsed, against the same tenant's Google Ads daily
