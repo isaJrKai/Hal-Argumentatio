@@ -33,7 +33,7 @@ Set the following in the Render service's protected Environment settings. Never 
 - `HAL_ACTIVE_AI`: optional preference (`gemini`, `nemotron`, or `dual`). A preference does not establish provider health. Runtime selection still requires the corresponding deployment-level key.
 
 ### Not currently consumed by inference
-- OpenAI `OPENAI_API_KEY` and Anthropic `ANTHROPIC_API_KEY` are not active adapter configuration in this repository. Do not add them to Render expecting HAL to call those providers. The Settings UI can store tenant values for these services, but no request-scoped inference adapter consumes them.
+- OpenAI `OPENAI_API_KEY` and Anthropic `ANTHROPIC_API_KEY` are not active adapter configuration in this repository. Do not add them to Render expecting HAL to call those providers. The Settings UI stores tenant credentials encrypted. Anthropic is consumed by the HAL chat adapter; OpenAI remains credential-only and is not an active inference adapter.
 
 ## Credential ownership and encryption findings
 
