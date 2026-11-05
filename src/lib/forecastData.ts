@@ -21,7 +21,7 @@ export function matchesTerritoryContext(
   const nicheValue = String(recordNiche || '').trim().toLocaleLowerCase();
   return Boolean(cityNeedle && nicheNeedle && cityValue && nicheValue)
     && cityValue.includes(cityNeedle)
-    && nicheValue.includes(nicheNeedle);
+    && matchesTradeContext(nicheValue, targetNiche);
 }
 
 export function filterGoogleAdsTerritoryRecords<T extends {
@@ -43,7 +43,7 @@ export function filterGoogleAdsTerritoryRecords<T extends {
       .filter(Boolean)
       .join(' ')
       .toLocaleLowerCase();
-    return matchesTerritoryContext(geo, tradeText, targetCity, targetNiche) && matchesTradeContext(tradeText, targetNiche);
+    return matchesTerritoryContext(geo, tradeText, targetCity, targetNiche);
   });
 }
 
