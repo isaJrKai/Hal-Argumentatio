@@ -325,7 +325,7 @@ describe('client project HTTP route tenant isolation', () => {
       .set('Authorization', `Bearer ${tokenA}`);
     expect(tenantARevenue.status).toBe(200);
     expect(tenantARevenue.body).toEqual(expect.arrayContaining([
-      expect.objectContaining({ id: created.body.id, contractorId: tenantA, amountUsd: 2400 })
+      expect.objectContaining({ id: created.id, contractorId: tenantA, amountUsd: 2400 })
     ]));
 
     const tenantBRevenue = await request(app)
