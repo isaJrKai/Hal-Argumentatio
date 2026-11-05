@@ -3760,6 +3760,40 @@ app.put('/api/leads/:id', authenticate, async (req, res) => {
     if (updates.websiteUrl !== undefined) safeUpdates.websiteUrl = String(updates.websiteUrl);
     if (updates.gmbListingUrl !== undefined) safeUpdates.gmbListingUrl = String(updates.gmbListingUrl);
 
+    const identityFieldsChanged = [
+      'businessName', 'ownerName', 'city', 'websiteUrl', 'phone', 'email'
+    ].some(field => updates[field] !== undefined && String(updates[field] ?? '') !== String(
+      field === 'businessName' ? currentLead.businessName || '' :
+      field === 'ownerName' ? currentLead.ownerName || '' :
+      field === 'city' ? currentLead.city || '' :
+      field === 'websiteUrl' ? currentLead.websiteUrl || '' :
+      field === 'phone' ? (currentLead.phoneEncrypted ? (decrypt(currentLead.phoneEncrypted) || '') : currentLead.phone || '') :
+      field === 'email' ? (currentLead.emailEncrypted ? (decrypt(currentLead.emailEncrypted) || '') : currentLead.email || '') : ''
+    ));
+    if (identityFieldsChanged) {
+      const previousEvidence = currentLead.groundingEvidence && typeof currentLead.groundingEvidence === 'object'
+        ? currentLead.groundingEvidence as Record<string, any>
+        : {};
+      const previousAudit = previousEvidence.websiteAudit && typeof previousEvidence.websiteAudit === 'object'
+        ? previousEvidence.websiteAudit
+        : null;
+      safeUpdates.verificationStatus = 'UNVERIFIED_STAGING';
+      safeUpdates.dnsVerified = false;
+      safeUpdates.groundingEvidence = {
+        ...previousEvidence,
+        businessIdentityConfirmed: false,
+        identityConfirmation: null,
+        ...(previousAudit ? {
+          websiteAudit: {
+            ...previousAudit,
+            status: 'stale',
+            staleAt: new Date().toISOString(),
+            staleReason: 'A core business identity field changed; rerun the website audit and reconfirm the prospect identity.'
+          }
+        } : {})
+      };
+    }
+
     // Cryptographic PII handling remains inside the existing field whitelist.
     if (updates.email !== undefined) {
       safeUpdates.emailEncrypted = updates.email ? encrypt(String(updates.email)) : null;
