@@ -104,6 +104,10 @@ interface EngineStatus {
   provider: string;
   activeEngine: string;
   activeModel: string;
+  status?: string;
+  runtime?: string;
+  officialNousRuntimeConnected?: boolean;
+  modelAttribution?: string;
   providers: {
     openrouter: boolean;
     huggingface: boolean;
@@ -599,7 +603,7 @@ export default function HermesLabPanel({ token }: { token: string | null }) {
             <div className="flex items-center gap-2 flex-wrap">
               <h2 className="text-xl font-bold tracking-tight text-text-primary">Business assistant & tools</h2>
               <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-accent-dim text-accent border border-accent/20">
-                {engineStatus?.activeEngine || 'NOUS HERMES 3.7'}
+                {engineStatus?.activeEngine || 'HAL CUSTOM RUNTIME'}
               </span>
               <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center gap-1">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 " />
@@ -607,7 +611,7 @@ export default function HermesLabPanel({ token }: { token: string | null }) {
               </span>
             </div>
             <p className="text-xs text-text-secondary mt-0.5">
-              Create landing pages and ad assets, manage SEO details, and review operational diagnostics.
+              HAL's current custom agent runtime. The official Nous Hermes runtime is not connected yet.
             </p>
           </div>
         </div>
@@ -1021,11 +1025,11 @@ export default function HermesLabPanel({ token }: { token: string | null }) {
                 <span className="text-xs font-bold text-text-primary">Hermes Lab Dialogue</span>
                 <span className="px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[10px] font-mono font-bold flex items-center gap-1">
                   <Sparkles className="w-3 h-3" />
-                  {engineStatus?.activeEngine || 'Nous Hermes 3 (70B / 405B) Live'}
+                  {engineStatus?.activeEngine || 'HAL custom Hermes runtime'}
                 </span>
               </div>
               <span className="text-[10px] font-mono text-text-tertiary">
-                {engineStatus?.activeModel || 'Direct Nous Research Engine'}
+                {engineStatus?.activeModel || 'Exact model not yet attributed'}
               </span>
             </div>
 
