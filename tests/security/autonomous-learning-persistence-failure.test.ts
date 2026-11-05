@@ -141,11 +141,11 @@ describe('autonomous learning persistence failure handling', () => {
     // cache. It must reload after entering the same mutation queue.
     const requestB = engineB.digestBusinessOutcome({ niche: 'roofing', outcome: 'lost' });
     mocks.selectRecord.updatedAt = revisionTwo;
+    mocks.updateReturning.mockResolvedValueOnce([{ updatedAt: revisionThree }]);
+    mocks.updateReturning.mockResolvedValueOnce([{ updatedAt: revisionFour }]);
     resolveConflict([]);
 
     await expect(requestA).rejects.toThrow('Learning state changed in another application instance');
-    mocks.updateReturning.mockResolvedValueOnce([{ updatedAt: revisionThree }]);
-    mocks.updateReturning.mockResolvedValueOnce([{ updatedAt: revisionFour }]);
     const recovered = await requestB;
 
     expect(recovered.newEpoch).toBe(1);
