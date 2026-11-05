@@ -1,6 +1,7 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { Pool } from 'pg';
 import { drizzle } from 'drizzle-orm/node-postgres';
+import { and, eq } from 'drizzle-orm';
 import { pgTable, text, timestamp, integer, boolean, jsonb } from 'drizzle-orm/pg-core';
 import { claimHermesWorkTask, heartbeatHermesWorkTask, failExpiredHermesWorkTask } from '../../src/lib/hermesTaskClaim';
 
@@ -153,6 +154,37 @@ describe('Hermes PostgreSQL task claim', () => {
     expect(recovered).toMatchObject({ status: 'failed', attemptCount: 1 });
     expect(recovered.output).toMatchObject({ outcome: 'lease_expired', success: false, worker: 'hermes', taskId: 'task-hermes-1', attempt: 1 });
     expect(recovered.errorMessage).toContain('lease expired');
+  });
+
+
+  it('persists a completion receipt only for the attempt that claimed the task', async () => {
+    if (!dbAvailable) return;
+    await insertTask();
+    const claimed = await claimHermesWorkTask(db, 'task-hermes-1', 'tenant-a', testTasks);
+    expect(claimed).toMatchObject({ status: 'running', attemptCount: 1 });
+
+    const receipt = {
+      schemaVersion: 1, outcome: 'completed', success: true, worker: 'hermes',
+      taskId: 'task-hermes-1', attempt: claimed.attemptCount, result: { artifactId: 'artifact_test' }
+    };
+    const [completed] = await db.update(testTasks).set({
+      status: 'completed', output: receipt, completedAt: new Date(), updatedAt: new Date()
+    }).where(and(
+      eq(testTasks.id, 'task-hermes-1'),
+      eq(testTasks.contractorId, 'tenant-a'),
+      eq(testTasks.assignedWorker, 'hermes'),
+      eq(testTasks.status, 'running'),
+      eq(testTasks.attemptCount, claimed.attemptCount)
+    )).returning();
+
+    expect(completed).toMatchObject({ status: 'completed', output: receipt, attemptCount: 1 });
+    const [staleCompletion] = await db.update(testTasks).set({ status: 'completed' }).where(and(
+      eq(testTasks.id, 'task-hermes-1'),
+      eq(testTasks.contractorId, 'tenant-a'),
+      eq(testTasks.status, 'running'),
+      eq(testTasks.attemptCount, 0)
+    )).returning();
+    expect(staleCompletion).toBeUndefined();
   });
 
 });
