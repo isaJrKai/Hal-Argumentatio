@@ -7048,7 +7048,14 @@ app.put('/api/projects/:id', authenticate, async (req, res) => {
 
     const updated = await pgDb.transaction(async tx => {
       const [savedProject] = await tx.update(clientProjects).set(safeUpdates)
-        .where(and(eq(clientProjects.id, id), eq(clientProjects.contractorId, contractorId)))
+        .where(and(
+          eq(clientProjects.id, id),
+          eq(clientProjects.contractorId, contractorId),
+          // Optimistic concurrency: do not apply a stale payload after another
+          // request has changed the project, especially its terminal status.
+          eq(clientProjects.status, existingProject.status),
+          eq(clientProjects.updatedAt, existingProject.updatedAt)
+        ))
         .returning();
       if (!savedProject) return null;
 
@@ -7072,7 +7079,9 @@ app.put('/api/projects/:id', authenticate, async (req, res) => {
       });
       return savedProject;
     });
-    if (!updated) return res.status(404).json({ error: 'Project not found or unauthorized' });
+    if (!updated) {
+      return res.status(409).json({ error: 'Project changed before this update could be saved. Reload the project and retry.' });
+    }
 
     if (updates.status === 'completed' && existingProject.status !== 'completed') {
       db.addAuditLog({
