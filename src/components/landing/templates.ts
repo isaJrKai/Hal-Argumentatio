@@ -901,7 +901,7 @@ for (const template of Object.values(TRADE_TEMPLATES)) {
   template.businessName = 'Your Business Name';
   template.city = 'Your service area';
   template.phone = '';
-  template.licenseNumber = '';
+  template.licenseNumber = 'Add verified licence details or remove this field before publishing';
   template.emergencyService = false;
   template.dispatchWindow = 'Set your actual availability before publishing';
   if (template.branding) template.branding.logoText = 'YOUR BUSINESS';
