@@ -76,12 +76,12 @@ These items remain unverified and must not be represented as complete:
 6. Revenue recognition versus cash collection/payment recording. The current `/api/revenues` close-out endpoint records a positive whole-dollar amount against a lead; it is not a payment processor or a complete invoice/receivables ledger.
 7. End-to-end event correlation and ordering across audit, landing-page, outreach, deal, project, revenue, and forecast records.
 8. Forecast evaluation against correctly attributed observations and evidence that only actual outcomes feed learning.
-9. Earlier integrated-branch CI run #1264 passed with 85 test files and 418 tests before the financial-overview assertions and concurrent revenue-close-out coverage were added. Subsequent runs exposed an order-dependent test assertion (the project had correctly been activated by another test); that assertion has been changed to compare persisted state before and after the foreign-tenant attempt. A fresh green run on the final branch head is required before merge. CI provisions PostgreSQL 16 as a healthy service and supplies `DATABASE_URL`.
+9. GitHub Actions CI run #1272 passed on code commit `46c289e47310cbcb6862b1aaa35bca425b36fab4`: 85 test files and 418 tests passed; TypeScript checks, PostgreSQL-backed integration tests, TimesFM Python checks, production build, and production dependency audit all succeeded. Non-blocking runner/toolchain warnings remain (Node.js 20 action deprecation, `punycode` deprecation, bundle-size warning, and local PostgreSQL trust-auth warning). CI provisions PostgreSQL 16 as a healthy service and supplies `DATABASE_URL`. Re-run CI after this audit-document update before merging.
 
 ## Safety and release
 
 - Dedicated branch only; no direct `main` writes.
 - No production data was read or modified through a privileged database connection.
 - No production migration or deployment was performed.
-- This integration branch was created directly from current `main`; it is currently 26 commits ahead and 0 behind. The original workstream branch remains untouched and is not the release candidate.
+- This integration branch was created directly from current `main`; it is currently 30 commits ahead and 0 behind. The original workstream branch remains untouched and is not the release candidate.
 - Do not merge until the branch CI is green and the remaining end-to-end/tenant-isolation gates have been addressed or explicitly accepted as limitations.
