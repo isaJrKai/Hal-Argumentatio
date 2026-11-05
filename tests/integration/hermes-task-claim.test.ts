@@ -132,6 +132,8 @@ describe('Hermes PostgreSQL task claim', () => {
   it('refreshes only the current tenant-owned attempt heartbeat', async () => {
     if (!dbAvailable) return;
     await insertTask();
+    const claimed = await claimHermesWorkTask(db, 'task-hermes-1', 'tenant-a', testTasks);
+    expect(claimed).toMatchObject({ status: 'running', attemptCount: 1 });
     const first = await pool.query('SELECT updated_at FROM hermes_task_claim_test WHERE id = $1', ['task-hermes-1']);
     await expect(heartbeatHermesWorkTask(db, 'task-hermes-1', 'tenant-b', 1, testTasks)).resolves.toBe(false);
     const alive = await heartbeatHermesWorkTask(db, 'task-hermes-1', 'tenant-a', 1, testTasks);
