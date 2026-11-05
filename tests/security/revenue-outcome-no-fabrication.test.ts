@@ -200,3 +200,26 @@ describe('decision-engine attribution integrity', () => {
     expect(decisionEngineHandler).toContain('tx.insert(revenueRecommendationEvents)');
   });
 });
+
+const experimentStart = server.indexOf("app.post('/api/revenue/experiments',");
+const experimentEnd = server.indexOf("app.post('/api/revenue/experiments/:id/status'", experimentStart);
+const experimentHandler = server.slice(experimentStart, experimentEnd);
+const experimentStatusStart = server.indexOf("app.post('/api/revenue/experiments/:id/status'");
+const experimentStatusEnd = server.indexOf("app.post('/api/revenue/decision-engine/run'", experimentStatusStart);
+const experimentStatusHandler = server.slice(experimentStatusStart, experimentStatusEnd);
+
+describe('revenue experiment integrity', () => {
+  it('requires an explicit baseline and expected outcome', () => {
+    expect(experimentHandler).toContain("typeof baseline !== 'string'");
+    expect(experimentHandler).toContain("typeof expectedOutcome !== 'string'");
+    expect(experimentHandler).not.toContain("'Current baseline'");
+    expect(experimentHandler).not.toContain("'Positive revenue lift'");
+  });
+
+  it('requires actual outcome evidence before completing an experiment', () => {
+    expect(experimentStatusHandler).toContain("status === 'completed'");
+    expect(experimentStatusHandler).toContain("typeof actualOutcome !== 'string'");
+    expect(experimentStatusHandler).not.toContain("status || 'completed'");
+    expect(experimentStatusHandler).toContain('Number.isFinite(Number(value))');
+  });
+});
