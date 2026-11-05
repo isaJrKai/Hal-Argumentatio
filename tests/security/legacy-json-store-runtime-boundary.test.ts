@@ -36,7 +36,7 @@ describe('runtime persistence boundary', () => {
   it('does not mirror active harvested leads into the legacy JSON aggregate', () => {
     const serverSource = readFileSync(resolve(process.cwd(), 'server.ts'), 'utf8');
     const harvestStart = serverSource.indexOf("app.post('/api/leads/ingest'");
-    const harvestEnd = serverSource.indexOf('// ─── LEADS ENDPOINTS', harvestStart);
+    const harvestEnd = serverSource.indexOf("app.get('/api/leads'", harvestStart);
     expect(harvestStart).toBeGreaterThanOrEqual(0);
     expect(harvestEnd).toBeGreaterThan(harvestStart);
     const harvestRoutes = serverSource.slice(harvestStart, harvestEnd);
