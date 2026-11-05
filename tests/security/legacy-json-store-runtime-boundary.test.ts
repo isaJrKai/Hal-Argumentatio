@@ -61,6 +61,21 @@ describe('runtime persistence boundary', () => {
     expect(outsideSimulator).not.toMatch(/\bdb\.(addLead|updateLead)\s*\(/);
   });
 
+  it('does not create a new local JSON genesis store in PostgreSQL-ledger mode', () => {
+    const databaseSource = readFileSync(resolve(process.cwd(), 'src/db/db.ts'), 'utf8');
+    expect(databaseSource).toContain("const postgresLedgerMode = process.env.HAL_STRUCTURED_LEDGER_POSTGRES_ENABLED === 'true'");
+    expect(databaseSource).toContain("} else if (!postgresLedgerMode) {");
+    expect(databaseSource).toContain("&& (!postgresLedgerMode || this.legacyStorePresent)");
+    expect(databaseSource).toContain('public hasLegacyStore(): boolean');
+  });
+
+  it('verifies PostgreSQL ledger history without requiring a frozen count or local JSON file', () => {
+    const serverSource = readFileSync(resolve(process.cwd(), 'server.ts'), 'utf8');
+    expect(serverSource).toContain('db.hasLegacyStore()');
+    expect(serverSource).toContain('postgresIntegrity.totalEntries < reconciliation.total');
+    expect(serverSource).not.toContain('postgresIntegrity.totalEntries !== reconciliation.total');
+  });
+
   it('does not import the legacy JSON aggregate store from application source', () => {
     const offenders = sourceFiles(sourceRoot).filter((filePath) =>
       importsLegacyJsonStore(filePath, readFileSync(filePath, 'utf8'))
