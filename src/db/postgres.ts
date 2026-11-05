@@ -310,6 +310,22 @@ export async function bootstrapPostgresTables(poolInstance?: Pool): Promise<void
         closed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
       );
 
+      CREATE TABLE IF NOT EXISTS proposals (
+        id TEXT PRIMARY KEY,
+        contractor_id TEXT NOT NULL,
+        lead_id TEXT NOT NULL,
+        status TEXT DEFAULT 'draft' NOT NULL CHECK (status IN ('draft', 'approved', 'void')),
+        content JSONB NOT NULL,
+        approved_at TIMESTAMP,
+        approved_by TEXT,
+        voided_at TIMESTAMP,
+        voided_by TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS proposals_tenant_lead_created_idx
+        ON proposals (contractor_id, lead_id, created_at DESC);
+
       CREATE TABLE IF NOT EXISTS client_projects (
         id TEXT PRIMARY KEY,
         contractor_id TEXT NOT NULL,
