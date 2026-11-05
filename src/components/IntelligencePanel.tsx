@@ -104,8 +104,8 @@ export default function IntelligencePanel({
           setOutcomesData(data.outcomes || []);
           toast({
             variant: 'success',
-            title: 'Outcomes Measured Successfully',
-            description: `Measured ${data.measuredCount || 0} executed recommendations against observation windows.`
+            title: 'Outcome observations updated',
+            description: `Created ${data.measuredCount || 0} observation records. Outcomes remain pending or insufficient until verified attribution data is recorded.`
           });
         }
       }
