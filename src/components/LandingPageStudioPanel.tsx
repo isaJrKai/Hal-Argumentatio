@@ -258,7 +258,7 @@ export const LandingPageStudioPanel: React.FC<{ token: string | null }> = ({ tok
 
       const data = await res.json();
       if (res.ok && data.success) {
-        const savedConfig = { ...config, id: data.id || config.id, contractorId: data.contractorId || config.contractorId, sourceLeadId: data.sourceLeadId || selectedLeadId || config.sourceLeadId };
+        const savedConfig = { ...config, id: data.id || config.id, title: data.title || config.title, contractorId: data.contractorId || config.contractorId, sourceLeadId: data.sourceLeadId || selectedLeadId || config.sourceLeadId };
         setConfig(savedConfig);
         saveSnapshot(`Saved: ${config.title}`, savedConfig);
         showToast({
