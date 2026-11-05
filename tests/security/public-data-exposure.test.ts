@@ -1,0 +1,36 @@
+import { describe, expect, it } from 'vitest';
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
+
+describe('Public data exposure security', () => {
+  const source = readFileSync(path.resolve(process.cwd(), 'server.ts'), 'utf8');
+
+  it('does not expose internal lead notes, sales strategy, urgency or predicted LTV in public audit reports', () => {
+    const start = source.indexOf("app.get('/api/public/audit/:id'");
+    const end = source.indexOf("app.post('/api/public/audit/:id/book'", start);
+    expect(start).toBeGreaterThanOrEqual(0);
+    expect(end).toBeGreaterThan(start);
+    const route = source.slice(start, end);
+    expect(route).not.toContain('lead.notes');
+    expect(route).not.toContain('lead.predictedLtv');
+    expect(route).not.toContain('lead.urgencyScore');
+    expect(route).not.toContain('outreachStrategy');
+  });
+
+  it('only serves deployed landing-page artifacts through public endpoints', () => {
+    const jsonStart = source.indexOf("app.get('/api/public/landing/:id'");
+    const htmlStart = source.indexOf("app.get('/landing/:id'");
+    const htmlEnd = source.indexOf('// ─── CONTRACTOR LANDING PAGE STUDIO ENGINE', htmlStart);
+    expect(jsonStart).toBeGreaterThanOrEqual(0);
+    expect(htmlStart).toBeGreaterThan(jsonStart);
+    const jsonRoute = source.slice(jsonStart, htmlStart);
+    const htmlRoute = source.slice(htmlStart, htmlEnd);
+    for (const route of [jsonRoute, htmlRoute]) {
+      expect(route).toContain("eq(hermesLabArtifacts.status, 'deployed')");
+      expect(route).toContain("eq(hermesLabArtifacts.toolId, 'landing_page')");
+    }
+    expect(jsonRoute).not.toContain('res.json({ success: true, artifact })');
+    expect(jsonRoute).toContain('id: hermesLabArtifacts.id');
+    expect(jsonRoute).not.toContain('contractorId: hermesLabArtifacts.contractorId');
+  });
+});
