@@ -314,7 +314,7 @@ export async function bootstrapPostgresTables(poolInstance?: Pool): Promise<void
         id TEXT PRIMARY KEY,
         contractor_id TEXT NOT NULL,
         lead_id TEXT NOT NULL,
-        status TEXT DEFAULT 'draft' NOT NULL CHECK (status IN ('draft', 'approved', 'void')),
+        status TEXT DEFAULT 'draft' NOT NULL CHECK (status IN ('draft', 'approved', 'void', 'signed')),
         content JSONB NOT NULL,
         approved_at TIMESTAMP,
         approved_by TEXT,
@@ -325,6 +325,28 @@ export async function bootstrapPostgresTables(poolInstance?: Pool): Promise<void
       );
       CREATE INDEX IF NOT EXISTS proposals_tenant_lead_created_idx
         ON proposals (contractor_id, lead_id, created_at DESC);
+      ALTER TABLE proposals DROP CONSTRAINT IF EXISTS proposals_status_check;
+      ALTER TABLE proposals ADD CONSTRAINT proposals_status_check
+        CHECK (status IN ('draft', 'approved', 'void', 'signed'));
+      ALTER TABLE proposals ADD COLUMN IF NOT EXISTS signed_at TIMESTAMP;
+      ALTER TABLE proposals ADD COLUMN IF NOT EXISTS signer_name TEXT;
+      ALTER TABLE proposals ADD COLUMN IF NOT EXISTS signer_email TEXT;
+      ALTER TABLE proposals ADD COLUMN IF NOT EXISTS signer_ip TEXT;
+      ALTER TABLE proposals ADD COLUMN IF NOT EXISTS signer_user_agent TEXT;
+      ALTER TABLE proposals ADD COLUMN IF NOT EXISTS signed_content_hash TEXT;
+      ALTER TABLE proposals ADD COLUMN IF NOT EXISTS signature_consent BOOLEAN DEFAULT false NOT NULL;
+
+      CREATE TABLE IF NOT EXISTS proposal_signing_links (
+        id TEXT PRIMARY KEY,
+        contractor_id TEXT NOT NULL,
+        proposal_id TEXT NOT NULL,
+        token_hash TEXT NOT NULL UNIQUE,
+        expires_at TIMESTAMP NOT NULL,
+        used_at TIMESTAMP,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS proposal_signing_links_tenant_proposal_idx
+        ON proposal_signing_links (contractor_id, proposal_id, created_at DESC);
 
       CREATE TABLE IF NOT EXISTS invoices (
         id TEXT PRIMARY KEY,
