@@ -46,10 +46,11 @@ export async function runCommunicationsOutboxWorker(
       `WITH due AS (
         SELECT id FROM communications_outbox
         WHERE provider = 'resend' AND channel = 'email'
-          AND (
-            (status IN ('queued','retrying') AND (next_attempt_at IS NULL OR next_attempt_at <= $1))
-            OR (status = 'processing' AND updated_at < $1 - INTERVAL '5 minutes')
-          )
+          -- A stale processing row may already have been accepted by the provider
+          -- before the process lost its database connection. Never resend it
+          -- automatically; reconcile it against provider records first.
+          AND status IN ('queued','retrying')
+          AND (next_attempt_at IS NULL OR next_attempt_at <= $1)
         ORDER BY COALESCE(next_attempt_at, created_at), created_at
         FOR UPDATE SKIP LOCKED
         LIMIT $2
