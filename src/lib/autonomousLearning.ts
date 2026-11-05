@@ -414,7 +414,9 @@ export class AutonomousLearningEngine {
       throw new Error('PostgreSQL is not configured; learning state was not persisted.');
     }
 
-    const updatedAt = new Date();
+    const updatedAt = this.persistedAt
+      ? new Date(Math.max(new Date().getTime(), this.persistedAt.getTime() + 1))
+      : new Date();
     const values = {
       version: this.state.version,
       calibrationEpoch: this.state.calibrationEpoch,
