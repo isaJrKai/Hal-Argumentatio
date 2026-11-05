@@ -67,7 +67,8 @@ This report separates code implementation from provider configuration and live v
 - The PostgreSQL communications outbox stores encrypted recipient/subject/body values, tenant ID, idempotency key, attempts, provider message ID, submission/delivery timestamps and terminal/provider status fields.
 - The initial dispatch path remains synchronous, with a separate durable worker now able to reclaim retryable and stale-processing records.
 - **Implemented in this branch:** due-time scheduling, atomic concurrent claims, stale-processing recovery, bounded exponential backoff, maximum attempts, terminal failure/dead-letter statuses, and provider-side idempotency for Resend.
-- **Remaining:** operator replay UI, operational alerting, and a trusted scheduler invocation. Configure `HAL_COMMUNICATIONS_WORKER_SECRET` (32+ characters) and call `POST /api/internal/communications/outbox/run` from a private scheduler. The endpoint itself is not a continuously running worker.
+- Added `.github/workflows/communications-outbox-worker.yml`, scheduled every five minutes. After merge, set the GitHub repository variable `HAL_APP_URL` to the canonical HTTPS production origin and the GitHub Actions secret `HAL_COMMUNICATIONS_WORKER_SECRET` to the same 32+ character value configured in Render. The workflow invokes the protected worker endpoint. No Render Cron Job was created.
+- **Remaining:** operator replay UI and operational alerting. The endpoint itself is not a continuously running worker.
 
 ## Configuration required outside this PR
 
