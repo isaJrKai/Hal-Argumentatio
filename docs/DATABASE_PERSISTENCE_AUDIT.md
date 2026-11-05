@@ -25,7 +25,7 @@ This substantially reduces the risk that normal server requests are writing to e
 | Location | Operation | Current assessment |
 |---|---|---|
 | `src/db/db.ts` | Synchronous load/save of `data/db.json` | Legacy compatibility/test store. Direct app-source consumer identified in geo-map has been migrated. Retain only until all legacy test/migration dependencies are deliberately removed. |
-| `tests/security/connector-credential-vault.test.ts` | Reads `data/db.json` | Tests the legacy credential-store behavior, not Neon persistence. Must be replaced with PostgreSQL-backed tests before deleting the compatibility store. |
+| `tests/security/connector-credential-vault.test.ts` | Uses an isolated PostgreSQL test database | Verifies encryption-at-rest, tenant isolation, update/delete behavior, corrupt ciphertext handling and duplicate-row rejection. |
 | `sync-*.ts` | Reads operator-provided JSON exports | One-off utilities, not request-time persistence. Review each before any production use. |
 | `src/db/postgres.ts` | Filesystem checks for Unix socket paths | Connection resolution only, not application data persistence. |
 | `scripts/patches/*.ts` | Reads/writes source files | Repository maintenance scripts, not runtime application storage. |
@@ -41,7 +41,7 @@ This substantially reduces the risk that normal server requests are writing to e
 | Notifications | `notifications` | Confirm all producers and read/mark-read paths use PostgreSQL. |
 | Outreach sequences | `outreach_sequences`, with `steps JSONB` | Verify all CRUD paths and ownership checks. |
 | Client projects | `client_projects`, with `milestones JSONB` and `assets JSONB` | Verify tenant-scoped CRUD and uniqueness/handling of portal access tokens. |
-| Connector credentials | `connector_credentials`, with `encrypted_value` | Table exists, but the legacy credential-vault tests still exercise JSON storage. Replace them with PostgreSQL tests; preserve the AES envelope and tenant/service uniqueness. |
+| Connector credentials | `connector_credentials`, with `encrypted_value` | Transactional repository and PostgreSQL tests now exist. Wire it to any future/current connector integration consumers; preserve the AES envelope and reconcile historical duplicate rows before adding a unique constraint. |
 | API keys | `api_keys`, with `key_hash` and `prefix` | Bootstrap's NOT NULL transition still requires row-state verification before any production constraint/backfill change. |
 | Password reset tokens | `password_reset_tokens` | Table existence alone does not establish a complete reset flow; token persistence, single-use semantics and delivery must be verified together. |
 | Chat messages | `chat_messages` | Confirm every active UI/API path uses the same tenant-scoped PostgreSQL records. |
@@ -53,14 +53,14 @@ This substantially reduces the risk that normal server requests are writing to e
 2. **API-key constraint transition:** bootstrap adds nullable hash/prefix columns and then sets them NOT NULL. Existing rows without values can make startup DDL fail. Do not run production changes without inspecting row state and preparing a safe backfill.
 3. **Silent learning-state fallback:** `AutonomousLearningEngine` catches initialization/save errors and can continue with defaults or memory-only state. Critical writes must surface persistence failure to callers.
 4. **Structured ledger gap:** hash-chain entries remain in the legacy JSON store; PostgreSQL needs a transactionally serialized append path before the legacy implementation can be retired.
-5. **Legacy credential tests:** current tests assert JSON-file storage, so they do not validate the existing `connector_credentials` table.
+5. **Connector integration wiring:** the new repository is tested against PostgreSQL but is not yet connected to an active production integration consumer. The legacy credential test has been replaced; historical duplicate rows remain an explicit conflict.
 6. **Production data state unknown:** no production row counts, JSON exports, or database contents were inspected. No production SQL was executed and no production data was changed.
 
 ## Next implementation sequence
 
 1. Finish a route/service-level persistence trace for every active domain and confirm database failures are returned as failures, not swallowed.
 2. Add the structured-ledger table and an atomic append/verify repository using a transaction-level lock, immutable rows, global sequence ordering matching the current chain, and unique sequence/hash constraints.
-3. Replace connector credential JSON tests with Neon/PostgreSQL tests for tenant isolation, encryption-at-rest, rotation/migration and failure behavior.
+3. Wire the PostgreSQL connector credential repository into the actual connector integration paths, then add end-to-end secret rotation and failure behavior tests.
 4. Add integration coverage that writes, disposes/recreates the repository, and reads data back; simulate connection loss and prove no write is reported successful without a committed transaction.
 5. Review and version the bootstrap DDL. Resolve API-key constraints and audit-log nullability with forward-only migrations.
 6. Determine whether any operator-held JSON export actually needs importing. If so, provide a dry-run-first, insert-only importer with duplicate/conflict reports, per-domain counts/checksums and no startup auto-import.
