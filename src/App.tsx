@@ -84,8 +84,8 @@ import { readApiResponse } from './lib/apiResponse';
 
 // 4-Zone Workstation Shell & Tools
 import { InspectorProvider } from './context/InspectorContext';
-import { TopTelemetryBar } from './components/TopTelemetryBar';
-import { RightInspector } from './components/RightInspector';
+const TopTelemetryBar = lazy(() => import('./components/TopTelemetryBar').then(module => ({ default: module.TopTelemetryBar })));
+const RightInspector = lazy(() => import('./components/RightInspector').then(module => ({ default: module.RightInspector })));
 const EmailDesignerPanel = lazy(() => import('./components/EmailDesignerPanel').then(module => ({ default: module.EmailDesignerPanel })));
 const LandingPageStudioPanel = lazy(() => import('./components/LandingPageStudioPanel').then(module => ({ default: module.LandingPageStudioPanel })));
 const FormBuilderPanel = lazy(() => import('./components/FormBuilderPanel').then(module => ({ default: module.FormBuilderPanel })));
@@ -1202,6 +1202,7 @@ export default function App() {
       </AnimatePresence>
 
       {/* ZONE 1: TOP NAVIGATION & TELEMETRY RIBBON */}
+      <Suspense fallback={<div className="h-13 border-b border-border-dim bg-bg-raised" aria-hidden="true" />}>
       <TopTelemetryBar
         activeTab={activeTab}
         setActiveTab={setActiveTab}
@@ -1223,6 +1224,7 @@ export default function App() {
         onInstallClick={handleInstallClick}
         onLogout={handleLogout}
       />
+      </Suspense>
 
       {/* MAIN CONTAINER (SIDEBAR NAV + HEADER + WORKSPACE + RIGHT INSPECTOR) */}
       <div className="flex-1 flex flex-row overflow-hidden w-full h-full min-w-0">
@@ -1522,7 +1524,9 @@ export default function App() {
         </div>
 
         {/* ZONE 4: CONTEXTUAL RIGHT INSPECTOR */}
-        <RightInspector />
+        <Suspense fallback={null}>
+          <RightInspector />
+        </Suspense>
       </div>
 
       {/* METICULOUS BOTTOM STATUS BAR */}
