@@ -206,6 +206,71 @@ export const clientProjects = pgTable('client_projects', {
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });
 
+/** Tenant-owned proposal drafts. Approval is an internal workflow state, not a client signature. */
+export const proposals = pgTable('proposals', {
+  id: text('id').primaryKey(),
+  contractorId: text('contractor_id').notNull(),
+  leadId: text('lead_id').notNull(),
+  status: text('status').default('draft').notNull(), // draft | approved | void
+  content: jsonb('content').notNull(),
+  approvedAt: timestamp('approved_at'),
+  approvedBy: text('approved_by'),
+  voidedAt: timestamp('voided_at'),
+  voidedBy: text('voided_by'),
+  signedAt: timestamp('signed_at'),
+  signerName: text('signer_name'),
+  signerEmail: text('signer_email'),
+  signerIp: text('signer_ip'),
+  signerUserAgent: text('signer_user_agent'),
+  signedContentHash: text('signed_content_hash'),
+  signatureConsent: boolean('signature_consent').default(false).notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+});
+
+/** Tenant-owned invoices and manual payment ledger. Amounts are stored in minor currency units. */
+/** One-time bearer links for client proposal acceptance; only token hashes are stored. */
+export const proposalSigningLinks = pgTable('proposal_signing_links', {
+  id: text('id').primaryKey(),
+  contractorId: text('contractor_id').notNull(),
+  proposalId: text('proposal_id').notNull(),
+  tokenHash: text('token_hash').notNull().unique(),
+  expiresAt: timestamp('expires_at').notNull(),
+  usedAt: timestamp('used_at'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+});
+
+export const invoices = pgTable('invoices', {
+  id: text('id').primaryKey(),
+  contractorId: text('contractor_id').notNull(),
+  invoiceNumber: text('invoice_number').notNull(),
+  leadId: text('lead_id'),
+  projectId: text('project_id'),
+  description: text('description').notNull(),
+  currency: text('currency').default('USD').notNull(),
+  amountDueMinor: integer('amount_due_minor').notNull(),
+  status: text('status').default('issued').notNull(), // issued | partially_paid | paid | void
+  issuedAt: timestamp('issued_at').defaultNow().notNull(),
+  dueAt: timestamp('due_at'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+});
+
+/** Manually recorded receipts; a ledger entry is not proof of a card/bank provider settlement. */
+export const invoicePayments = pgTable('invoice_payments', {
+  id: text('id').primaryKey(),
+  contractorId: text('contractor_id').notNull(),
+  invoiceId: text('invoice_id').notNull(),
+  amountMinor: integer('amount_minor').notNull(),
+  currency: text('currency').notNull(),
+  method: text('method').notNull(), // cash | bank_transfer | card_terminal | cheque | other
+  reference: text('reference'),
+  notes: text('notes'),
+  receivedAt: timestamp('received_at').defaultNow().notNull(),
+  recordedBy: text('recorded_by').notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+});
+
 export const outreachSequences = pgTable('outreach_sequences', {
   id: text('id').primaryKey(),
   contractorId: text('contractor_id').notNull(),
