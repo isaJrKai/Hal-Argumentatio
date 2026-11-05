@@ -53,10 +53,11 @@ describe('client project HTTP route tenant isolation', () => {
       await pool.query(
         `INSERT INTO leads (id, contractor_id, business_name, city, niche, status)
          VALUES ($1, $2, $3, $4, $5, 'closed_won'),
-                ($6, $7, $8, $9, $10, 'proposal'),
-                ($11, $12, $13, $14, $15, 'qualified'),
-                ($16, $17, $18, $19, $20, 'closed_won'),
-                ($21, $22, $23, $24, $25, 'proposal')`,
+                 ($6, $7, $8, $9, $10, 'proposal'),
+                 ($11, $12, $13, $14, $15, 'qualified'),
+                 ($16, $17, $18, $19, $20, 'closed_won'),
+                 ($21, $22, $23, $24, $25, 'proposal'),
+                 ($26, $27, $28, $29, $30, 'closed_won')`,
         [leadA, tenantA, 'Tenant A Roofing', 'Kampala', 'roofing',
           leadRevenueA, tenantA, 'Tenant A HVAC', 'Kampala', 'hvac',
           leadB, tenantB, 'Tenant B Electrical', 'London', 'electrical',
