@@ -7230,7 +7230,7 @@ app.post('/api/proposals/generate', authenticate, async (req, res) => {
       roiEstimateAnnualUsd: null,
       auditHighlights: highlights,
       validUntil: new Date(Date.now() + 14 * 24 * 3600 * 1000).toISOString(),
-      persistenceStatus: 'generated_only_not_persisted'
+      persistenceStatus: 'persisted_draft'
     };
 
     await pgDb.transaction(async tx => {
