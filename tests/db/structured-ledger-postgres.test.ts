@@ -8,7 +8,7 @@ import {
   importLegacyStructuredLedgerEntries,
 } from '../../src/db/structuredLedger';
 
-const databaseUrl = process.env.HAL_LEDGER_TEST_DATABASE_URL;
+const databaseUrl = process.env.HAL_LEDGER_TEST_DATABASE_URL || (process.env.CI === 'true' ? process.env.DATABASE_URL : undefined);
 const suite = databaseUrl ? describe : describe.skip;
 
 suite('PostgreSQL global structured ledger', () => {
