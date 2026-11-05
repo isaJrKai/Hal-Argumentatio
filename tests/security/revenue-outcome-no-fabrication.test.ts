@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 
 const server = readFileSync(new URL('../../server.ts', import.meta.url), 'utf8');
+const revenueView = readFileSync(new URL('../../src/components/RevenueIntelligenceView.tsx', import.meta.url), 'utf8');
 const deliveryHub = readFileSync(new URL('../../src/components/DeliveryHub.tsx', import.meta.url), 'utf8');
 const start = server.indexOf("app.post('/api/revenue/outcomes/measure'");
 const end = server.indexOf("\n  });", start);
@@ -243,5 +244,22 @@ describe('outcome reporting status integrity', () => {
     expect(outcomesSummaryHandler).toContain("} else if (o.outcomeStatus === 'measured')");
     expect(outcomesSummaryHandler).toContain('measuredCount,');
     expect(outcomesSummaryHandler).not.toContain("o.outcomeStatus === 'evaluated' || o.outcomeStatus === 'measured'");
+  });
+});
+
+describe('revenue experiment form and API contract', () => {
+  it('submits the explicit baseline and expected outcome required by the API', () => {
+    expect(revenueView).toContain("const [newBaseline, setNewBaseline] = useState('')");
+    expect(revenueView).toContain("const [newExpectedOutcome, setNewExpectedOutcome] = useState('')");
+    expect(revenueView).toContain('baseline: newBaseline.trim()');
+    expect(revenueView).toContain('expectedOutcome: newExpectedOutcome.trim()');
+    expect(revenueView).toContain('Measured Baseline');
+    expect(revenueView).toContain('Expected Outcome');
+  });
+
+  it('surfaces API validation errors instead of silently closing the form', () => {
+    expect(revenueView).toContain('setExperimentFormError(responseData.error');
+    expect(revenueView).toContain('role="alert"');
+    expect(revenueView).toContain("if (!res.ok)");
   });
 });
