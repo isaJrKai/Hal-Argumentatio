@@ -22,7 +22,7 @@ export interface FinancialSnapshotCore {
   tierDistribution: { tier: string; count: number; totalRevenue: number }[];
 }
 
-const TERMINAL_PROJECT_STATUSES = new Set(['completed', 'cancelled', 'canceled', 'churned', 'archived']);
+const ACTIVE_PROJECT_STATUSES = new Set(['active', 'active_delivery', 'in_progress']);
 
 function finiteNonNegativeAmount(value: number | string | null | undefined): number {
   const parsed = typeof value === 'number' ? value : Number(value);
@@ -35,10 +35,11 @@ function finiteNonNegativeAmount(value: number | string | null | undefined): num
  * churn cohorts, or cash/burn records remain null until those data sources exist.
  */
 export function buildFinancialSnapshotCore(projects: readonly FinancialProjectLike[]): FinancialSnapshotCore {
-  const activeProjects = projects.filter(project => {
-    const status = String(project.status || '').trim().toLowerCase();
-    return !TERMINAL_PROJECT_STATUSES.has(status);
-  });
+  // Count only statuses that explicitly represent live delivery. Draft/onboarding,
+  // review, completed, and cancelled projects are not contract MRR evidence.
+  const activeProjects = projects.filter(project =>
+    ACTIVE_PROJECT_STATUSES.has(String(project.status || '').trim().toLowerCase())
+  );
 
   const currentMrrUsd = activeProjects.reduce(
     (total, project) => total + finiteNonNegativeAmount(project.monthlyRetainerUsd),
