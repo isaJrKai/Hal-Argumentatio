@@ -67,8 +67,12 @@ async function createProjectUnderLeadLock(contractorId: string, leadId: string, 
 }
 
 describe('client project conversion advisory lock', () => {
-  it('serializes concurrent conversion attempts for the same tenant lead', async () => {
-    if (!dbAvailable) return;
+  it('serializes concurrent conversion attempts for the same tenant lead', async (ctx) => {
+    if (!dbAvailable) {
+      if (process.env.CI) throw new Error('PostgreSQL is required for this integration test in CI.');
+      ctx.skip();
+      return;
+    }
 
     const results = await Promise.all([
       createProjectUnderLeadLock('tenant-a', 'lead-won-1', 'project-a'),
@@ -83,8 +87,12 @@ describe('client project conversion advisory lock', () => {
     expect(rows.rows).toHaveLength(1);
   });
 
-  it('keeps project lookup tenant-scoped', async () => {
-    if (!dbAvailable) return;
+  it('keeps project lookup tenant-scoped', async (ctx) => {
+    if (!dbAvailable) {
+      if (process.env.CI) throw new Error('PostgreSQL is required for this integration test in CI.');
+      ctx.skip();
+      return;
+    }
 
     await createProjectUnderLeadLock('tenant-a', 'lead-a', 'project-a');
     await createProjectUnderLeadLock('tenant-b', 'lead-b', 'project-b');
