@@ -188,7 +188,7 @@ export default function LeadsPanel({ leads, token, onRefresh }: LeadsPanelProps)
   // Fail-Closed & Network Grounding Verification State
   const [probingGroundingId, setProbingGroundingId] = useState<string | null>(null);
   const [verifyingAllGrounding, setVerifyingAllGrounding] = useState(false);
-  const [groundingFeedback, setGroundingFeedback] = useState<string | null>(null);
+  const [groundingFeedback, setGroundingFeedback] = useState<string | null>(null);\n  const [identitySourceUrl, setIdentitySourceUrl] = useState('');\n  const [identityConfirmationNotes, setIdentityConfirmationNotes] = useState('');\n  const [confirmingIdentity, setConfirmingIdentity] = useState(false);
 
   const handleProbeGrounding = async (leadId: string) => {
     setProbingGroundingId(leadId);
@@ -218,6 +218,42 @@ export default function LeadsPanel({ leads, token, onRefresh }: LeadsPanelProps)
       setGroundingFeedback(err.message || 'Error probing network grounding');
     } finally {
       setProbingGroundingId(null);
+    }
+  };
+
+  const handleConfirmBusinessIdentity = async (leadId: string) => {
+    if (!identitySourceUrl.trim() || identityConfirmationNotes.trim().length < 10) {
+      setGroundingFeedback('Add the public source URL and describe what you checked (at least 10 characters).');
+      return;
+    }
+    setConfirmingIdentity(true);
+    setGroundingFeedback(null);
+    try {
+      const res = await fetch(`/api/leads/${encodeURIComponent(leadId)}/confirm-identity`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          confirmed: true,
+          sourceUrl: identitySourceUrl.trim(),
+          notes: identityConfirmationNotes.trim()
+        })
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.success) throw new Error(data.error || `Identity confirmation failed (HTTP ${res.status}).`);
+      setGroundingFeedback('Business identity confirmed and saved. Outreach gate is now eligible, subject to the channel-specific consent and delivery checks.');
+      setSelectedLead(prev => prev && prev.id === leadId
+        ? { ...prev, verificationStatus: 'VERIFIED', groundingEvidence: { ...(prev as any).groundingEvidence, businessIdentityConfirmed: true, identityConfirmation: data.identityConfirmation } }
+        : prev);
+      setIdentitySourceUrl('');
+      setIdentityConfirmationNotes('');
+      onRefresh();
+    } catch (err: any) {
+      setGroundingFeedback(err?.message || 'Could not confirm business identity.');
+    } finally {
+      setConfirmingIdentity(false);
     }
   };
 
@@ -1632,6 +1668,35 @@ Next-Gen Waterproofing	Calgary	Waterproofing	Jane Smith	jane@nextgen.ca	403-555-
                   </div>
                 </div>
               </div>
+
+              {selectedLead.verificationStatus !== 'VERIFIED' && !isSelectedSynthetic && (
+                <div className="border-t border-border-dark/60 pt-4 space-y-3">
+                  <div className="space-y-1">
+                    <span className="text-[10px] font-mono uppercase tracking-widest text-text-dim block font-bold">Human identity confirmation</span>
+                    <p className="text-[10px] text-text-secondary leading-relaxed">A DNS and phone-format check does not prove this contact belongs to the named business. After checking an official website or trusted public listing, record the source and what you verified.</p>
+                  </div>
+                  <input
+                    value={identitySourceUrl}
+                    onChange={e => setIdentitySourceUrl(e.target.value)}
+                    placeholder="Public source URL (official site or business listing)"
+                    className="w-full bg-bg-base border border-border-dark rounded-sm px-3 py-2 text-[11px] text-text-primary"
+                  />
+                  <textarea
+                    value={identityConfirmationNotes}
+                    onChange={e => setIdentityConfirmationNotes(e.target.value)}
+                    placeholder="What did you verify? e.g. business name and listed phone match the official contact page."
+                    rows={3}
+                    className="w-full bg-bg-base border border-border-dark rounded-sm px-3 py-2 text-[11px] text-text-primary resize-y"
+                  />
+                  <button
+                    onClick={() => handleConfirmBusinessIdentity(selectedLead.id)}
+                    disabled={confirmingIdentity || selectedLead.verificationStatus === 'FABRICATED_REJECTED'}
+                    className="text-[10px] font-mono font-bold px-3 py-2 rounded-sm bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 disabled:opacity-50"
+                  >
+                    {confirmingIdentity ? 'Saving confirmation...' : 'Confirm business identity'}
+                  </button>
+                </div>
+              )}
 
             {/* Phase 2: Sourced Intelligence Audit Metrics */}
             {selectedLead.websiteUrl && (
