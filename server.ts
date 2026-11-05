@@ -36,7 +36,7 @@ import {
 } from './src/lib/gemini';
 import { callNemotron } from './src/services/nemotron.ts';
 import { runProviderProbe } from './src/services/aiProviderDiagnostics.ts';
-import { autonomousLearning } from './src/lib/autonomousLearning';
+import { autonomousLearning, getTenantAutonomousLearning } from './src/lib/autonomousLearning';
 import { getConnectorCredentials, importConnectorCredentialIfAbsent, saveConnectorCredential } from './src/db/connectorCredentials';
 import { getAllSkills, executeSkill, registerCustomSkill, unregisterCustomSkill } from './src/skills/registry';
 import { HAL_MCP_TOOLS, executeMcpTool } from './src/services/mcp/dispatcher';
@@ -7922,7 +7922,9 @@ app.get('/api/ai/engine-status', authenticate, async (req, res) => {
     requestedPreference === 'nemotron' && nvidiaKeySet ? 'nemotron' :
     geminiKeySet ? 'gemini' :
     nvidiaKeySet ? 'nemotron' : 'unavailable';
-  const learningState = autonomousLearning.getState();
+  const tenantLearning = getTenantAutonomousLearning(String((req as any).contractorId || ''));
+  await tenantLearning.initializeFromDb();
+  const learningState = tenantLearning.getState();
 
   res.json({
     activeEngine: activeAiPreference,
@@ -8225,11 +8227,13 @@ app.post('/api/geocode', authenticate, async (req, res) => {
 
 app.post('/api/ai/engine-select', authenticate, async (req, res) => {
   const { preferredEngine, offlineSimulation } = req.body;
+  const tenantLearning = getTenantAutonomousLearning(String((req as any).contractorId || ''));
 
   try {
+    await tenantLearning.initializeFromDb();
     // Persist learning mode before reporting success or changing the active provider.
     if (typeof offlineSimulation === 'boolean') {
-      await autonomousLearning.setOfflineMode(offlineSimulation);
+      await tenantLearning.setOfflineMode(offlineSimulation);
     }
 
     if (preferredEngine === 'gemini' || preferredEngine === 'nemotron' || preferredEngine === 'dual') {
@@ -8239,7 +8243,7 @@ app.post('/api/ai/engine-select', authenticate, async (req, res) => {
     return res.json({
       success: true,
       activeEngine: process.env.HAL_ACTIVE_AI || 'dual',
-      isOfflineModeActive: autonomousLearning.getState().isOfflineModeActive
+      isOfflineModeActive: tenantLearning.getState().isOfflineModeActive
     });
   } catch (error) {
     console.error('[AI Engine Select] Learning-state persistence failed.', error);
@@ -8253,8 +8257,10 @@ app.post('/api/ai/engine-select', authenticate, async (req, res) => {
 
 app.post('/api/ai/dual-drive-synthesis', authenticate, async (req, res) => {
   const { prompt, systemInstruction, leadContext } = req.body;
+  const tenantLearning = getTenantAutonomousLearning(String((req as any).contractorId || ''));
 
   try {
+    await tenantLearning.initializeFromDb();
     const { generateDualDriveResponse } = await import('./src/services/nemotron');
     const result = await generateDualDriveResponse(
       prompt || `Generate a high-converting contractor growth strategy and discovery audit for ${leadContext?.businessName || 'the prospect'}.`,
@@ -8268,7 +8274,7 @@ app.post('/api/ai/dual-drive-synthesis', authenticate, async (req, res) => {
     });
   } catch (err: any) {
     // If cloud calls fail, gracefully fall back to local autonomous engine
-    const pitch = autonomousLearning.generateOfflinePitch(leadContext || {
+    const pitch = tenantLearning.generateOfflinePitch(leadContext || {
       businessName: 'Target Contractor',
       city: 'Calgary',
       niche: 'roofing',
@@ -8292,17 +8298,25 @@ app.post('/api/ai/dual-drive-synthesis', authenticate, async (req, res) => {
 
 // ─── AUTONOMOUS SELF-TEACHING SYSTEM ENDPOINTS ───────────────────────────────
 
-app.get('/api/autonomous/weights', authenticate, (req, res) => {
-  const state = autonomousLearning.getState();
-  res.json(state);
+app.get('/api/autonomous/weights', authenticate, async (req, res) => {
+  try {
+    const tenantLearning = getTenantAutonomousLearning(String((req as any).contractorId || ''));
+    await tenantLearning.initializeFromDb();
+    return res.json(tenantLearning.getState());
+  } catch (error) {
+    console.error('[Autonomous Learning] Tenant state read failed.', error);
+    return res.status(503).json({ error: 'Tenant learning state is temporarily unavailable.' });
+  }
 });
 
 app.post('/api/autonomous/learn-step', authenticate, async (req, res) => {
   const contractorId = (req as any).contractorId;
   const { niche, city, outcome, closedValueUsd, channelUsed, objectionText, auditFindings } = req.body;
+  const tenantLearning = getTenantAutonomousLearning(String(contractorId || ''));
 
   try {
-    const result = await autonomousLearning.digestBusinessOutcome({
+    await tenantLearning.initializeFromDb();
+    const result = await tenantLearning.digestBusinessOutcome({
       niche,
       city,
       outcome: outcome || 'won',
@@ -8337,7 +8351,7 @@ app.post('/api/autonomous/learn-step', authenticate, async (req, res) => {
       epoch: result.newEpoch,
       updatedNiche: result.updatedNiche,
       message: result.logMessage,
-      fullState: autonomousLearning.getState()
+      fullState: tenantLearning.getState()
     });
   } catch (error) {
     console.error('[Autonomous Learning] Outcome persistence failed.', error);
@@ -8349,24 +8363,36 @@ app.post('/api/autonomous/learn-step', authenticate, async (req, res) => {
   }
 });
 
-app.post('/api/autonomous/offline-pitch', authenticate, (req, res) => {
+app.post('/api/autonomous/offline-pitch', authenticate, async (req, res) => {
   const { lead, channel } = req.body;
   if (!lead || !lead.businessName) {
     return res.status(400).json({ error: 'Lead data with businessName is required' });
   }
 
-  const pitch = autonomousLearning.generateOfflinePitch(lead, channel || 'phone');
-  res.json(pitch);
+  try {
+    const tenantLearning = getTenantAutonomousLearning(String((req as any).contractorId || ''));
+    await tenantLearning.initializeFromDb();
+    return res.json(tenantLearning.generateOfflinePitch(lead, channel || 'phone'));
+  } catch (error) {
+    console.error('[Autonomous Learning] Tenant pitch state unavailable.', error);
+    return res.status(503).json({ error: 'Tenant learning state is temporarily unavailable.' });
+  }
 });
 
-app.post('/api/autonomous/offline-objection', authenticate, (req, res) => {
+app.post('/api/autonomous/offline-objection', authenticate, async (req, res) => {
   const { objectionText, niche } = req.body;
   if (!objectionText) {
     return res.status(400).json({ error: 'objectionText is required' });
   }
 
-  const solution = autonomousLearning.solveOfflineObjection(objectionText, niche || 'general');
-  res.json(solution);
+  try {
+    const tenantLearning = getTenantAutonomousLearning(String((req as any).contractorId || ''));
+    await tenantLearning.initializeFromDb();
+    return res.json(tenantLearning.solveOfflineObjection(objectionText, niche || 'general'));
+  } catch (error) {
+    console.error('[Autonomous Learning] Tenant objection state unavailable.', error);
+    return res.status(503).json({ error: 'Tenant learning state is temporarily unavailable.' });
+  }
 });
 
 // ─── NEON POSTGRESQL CONNECTION & DATA SYNC ENDPOINTS ────────────────────────
