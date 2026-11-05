@@ -61,40 +61,8 @@ Return your response strictly as a raw JSON object matching this structure:
   "confidence": number
 }`;
 
-  // Explicit Anthropic selection uses the authenticated tenant key and the same
-  // server-owned HAL tool runtime as Gemini/Nemotron. A provider failure falls
-  // through to the configured fallback instead of silently pretending success.
-  if (preferredAI === 'anthropic' && providerApiKeys?.anthropic) {
-    try {
-      const anthropicMessages = [
-        ...history.map(turn => ({
-          role: turn.role === 'model' ? 'assistant' as const : 'user' as const,
-          content: turn.parts.map(part => part.text).join('\\n')
-        })),
-        { role: 'user' as const, content: message }
-      ];
-      const result = await callAnthropicWithTools({
-        apiKey: providerApiKeys.anthropic,
-        system: systemInstruction,
-        messages: anthropicMessages,
-        tools: toolRuntime?.tools.filter(tool => tool.name !== 'hermes_synthesize_lab_asset'),
-        execute: toolRuntime?.execute
-      });
-      if (result.text || result.toolCalls.length) {
-        return {
-          text: result.text || 'Claude processed the available HAL tool calls. Review Work Queue and Work History for their recorded results.',
-          toolCalls: result.toolCalls.length ? result.toolCalls : undefined,
-          provider: 'anthropic',
-          model: result.model
-        };
-      }
-      throw new Error('Anthropic returned an empty response.');
-    } catch (error: any) {
-      console.error('[HAL Anthropic] Request failed; falling back to configured provider:', error?.message || error);
-    }
-  }
+  const activeAI = getActiveAI(preferredAI);
 
-  const activeAI = getActiveAI(preferredAI === 'anthropic' ? undefined : preferredAI);
 
   // Helper to calibrate confidence: clamp between 0.10 and 0.95 and account for extreme unexplained variance
   const calibrateConfidence = (rawScore: number): number => {
@@ -724,7 +692,37 @@ RESPONSE STANDARD
 - Avoid hype, generic filler, unsupported certainty, and unnecessary technical detail.
 - Never expose private chain-of-thought. Provide brief conclusions and user-facing rationale only.`;
 
-  const activeAI = getActiveAI(preferredAI);
+  if (preferredAI === 'anthropic' && providerApiKeys?.anthropic) {
+    try {
+      const anthropicMessages = [
+        ...history.map(turn => ({
+          role: turn.role === 'model' ? 'assistant' as const : 'user' as const,
+          content: turn.parts.map(part => part.text).join('\\n')
+        })),
+        { role: 'user' as const, content: message }
+      ];
+      const result = await callAnthropicWithTools({
+        apiKey: providerApiKeys.anthropic,
+        system: systemInstruction,
+        messages: anthropicMessages,
+        tools: toolRuntime?.tools.filter(tool => tool.name !== 'hermes_synthesize_lab_asset'),
+        execute: toolRuntime?.execute
+      });
+      if (result.text || result.toolCalls.length) {
+        return {
+          text: result.text || 'Claude processed the available HAL tool calls. Review Work Queue and Work History for their recorded results.',
+          toolCalls: result.toolCalls.length ? result.toolCalls : undefined,
+          provider: 'anthropic',
+          model: result.model
+        };
+      }
+      throw new Error('Anthropic returned an empty response.');
+    } catch (error: any) {
+      console.error('[HAL Anthropic] Request failed; falling back to configured provider:', error?.message || error);
+    }
+  }
+
+  const activeAI = getActiveAI(preferredAI === 'anthropic' ? undefined : preferredAI);
 
   // When the authenticated server supplies its MCP runtime, HAL can call the
   // same tenant-scoped tools exposed to connected agents. Only the server may
