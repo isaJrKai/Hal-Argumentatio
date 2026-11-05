@@ -69,7 +69,7 @@ const ConnectorsPanel = lazy(() => import('./components/ConnectorsPanel'));
 const NeuralPanel = lazy(() => import('./components/NeuralPanel'));
 const DebriefModule = lazy(() => import('./components/DebriefModule'));
 const SystemHealthPanel = lazy(() => import('./components/SystemHealthPanel'));
-const MapPanel = lazy(() => import('./components/MapPanel'));
+const MapPanel = lazy(() => import('./components/MapPanelWithProvider'));
 const PublicAuditPage = lazy(() => import('./components/PublicAuditPage'));
 const DeliveryHub = lazy(() => import('./components/DeliveryHub'));
 const PublicPortalPage = lazy(() => import('./components/PublicPortalPage'));
