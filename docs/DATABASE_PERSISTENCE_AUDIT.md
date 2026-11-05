@@ -2,15 +2,15 @@
 
 **Workstream branch:** `workstream/database-persistence-neon`  
 **Main baseline:** `080726d677823eeef69bc1cd882367fc8d12ebc1`  
-**Status:** Runtime JSON-store references identified and reduced; broader Neon durability verification and migration hardening remain incomplete. This is not a completion claim.
+**Status:** Partial migration. Structured-ledger PostgreSQL storage, guarded legacy reconciliation, and several domain migrations are implemented on this branch. The remaining root-server JSON paths, transaction coupling, migration journal, and production recovery evidence remain incomplete. This is not a completion claim.
 
 ## Executive finding
 
 HALBiz's server entrypoint uses PostgreSQL/Drizzle: `server.ts` imports the application pool and calls `bootstrapPostgresTables(pool)`; its lead-PII migration is transactional. Core services such as work-ledger, work-task, Hermes and forecasting code use the PostgreSQL schema.
 
-A separate legacy singleton remains in `src/db/db.ts`. It loads and saves a complete `data/db.json` aggregate synchronously. `server.ts` still imports this singleton and makes 77 calls across 17 legacy methods, including audit logs, leads, lessons, win/loss records, scheduler jobs, structured-ledger entries and integrity checks. This branch migrates the `src/skills/geo-map.ts` consumer, but does not retire the root server's legacy runtime paths. The PII migration helper was decoupled from the singleton by extracting encryption into `src/db/encryption.ts`. The static regression test currently scans `src/` only; it does not cover the root `server.ts` import.
+A separate legacy singleton remains in `src/db/db.ts`. It loads and saves a complete `data/db.json` aggregate synchronously. At the current branch head, `server.ts` still imports this singleton and has 22 direct `db.*()` call expressions, including compatibility fallbacks plus remaining reads/writes for contractor lookup, lead CRUD, win/loss, lessons, scheduler jobs, outreach sequences, client projects, connector credentials, audit history, and sync tooling. This count is a source scan, not a claim that every call is a live production request path. This branch migrates the `src/skills/geo-map.ts` consumer, but does not retire the root server's legacy runtime paths. The PII migration helper was decoupled from the singleton by extracting encryption into `src/db/encryption.ts`. The static regression test currently scans `src/` only; it does not cover the root `server.ts` import.
 
-The geo-map and credential paths now use PostgreSQL, but the root server still has many active JSON-backed request paths. This is a partial reduction only; it does not prove that the broader runtime persistence boundary is durable, tenant-safe, or failure-closed.
+The geo-map and connector credential paths use PostgreSQL. Audit-log writes and authenticated learning writes also persist to PostgreSQL. The root server still has active JSON-backed request paths. This is a partial reduction only; it does not prove that the broader runtime persistence boundary is durable, tenant-safe, or failure-closed.
 
 ## Implemented on this branch
 
@@ -57,16 +57,16 @@ The geo-map and credential paths now use PostgreSQL, but the root server still h
 2. **No versioned migration journal:** schema creation and upgrades remain embedded in `bootstrapPostgresTables()`. Bootstrap DDL is now transactional, so a failed run rolls back as a unit, but there is still no complete, versioned migration ledger for deployed schema revisions.
 3. **API-key constraint transition:** hash/prefix columns intentionally remain nullable during the legacy transition, so startup no longer forces a NOT NULL upgrade against unknown row state. A versioned migration must inspect existing rows, safely backfill hashes/prefixes where possible, and enforce constraints only after verification.
 4. **Learning-state tenant isolation:** Authenticated learning routes now use a tenant-keyed engine and `neural_state` row (`tenant:<contractorId>`), while the legacy `singleton` row is reserved for system defaults. Persistence failures remain fail-closed. Route-level tenant isolation tests, legacy singleton retirement semantics, and a bounded lifecycle for cached engines remain to be verified.
-5. **Structured ledger gap:** hash-chain entries remain in the legacy JSON store; PostgreSQL needs a transactionally serialized append path before the legacy implementation can be retired.
+5. **Structured ledger cutover:** PostgreSQL append/read/verify and insert-only historical reconciliation are implemented behind a feature flag. Most server call sites use an async adapter. However, some business writes commit before the subsequent ledger append (including public landing-page lead creation and the development inbound webhook), so a ledger outage can leave a committed business change without its matching cryptographic entry. These paths need a transaction-aware append or durable transactional outbox before the ledger is considered fully atomic. Do not enable the flag in production yet.
 6. **Connector integration wiring:** the credential read and save APIs now use the transactional PostgreSQL repository. Legacy JSON credentials are imported once per tenant/process with an advisory-lock-protected insert-if-absent operation, so an existing newer PostgreSQL secret is never overwritten. Connector health reads only tenant-scoped PostgreSQL records; provider connectivity remains unverified until a real provider probe succeeds.
 7. **Production data state unknown:** no production row counts, JSON exports, or database contents were inspected. No production SQL was executed and no production data was changed.
 
 ## Next implementation sequence
 
 1. Finish a route/service-level persistence trace for every active domain and confirm database failures are returned as failures, not swallowed.
-2. Add the structured-ledger table and an atomic append/verify repository using a transaction-level lock, immutable rows, global sequence ordering matching the current chain, and unique sequence/hash constraints.
-3. Add end-to-end connector route tests for concurrent legacy imports, tenant isolation, secret rotation and database failure behavior.
-4. Extend the fresh-pool and unavailable-database tests to the other active persistence domains; verify no write is reported successful without a committed transaction.
+2. Finish transaction-aware ledger writes or a durable outbox for business mutations, then test failure and retry semantics. The global append/verify repository, locking, immutability and legacy reconciliation are now implemented.
+3. Add end-to-end connector route tests for concurrent legacy imports, tenant isolation, secret rotation and database failure behavior; complete CRM, finance, lesson and scheduler route persistence traces.
+4. Extend fresh-pool, restart and unavailable-database tests to the other active persistence domains; verify no write is reported successful without a committed transaction.
 5. Introduce a versioned migration journal and forward-only migrations for the remaining schema transitions, including the API-key hash/prefix backfill.
 6. Determine whether any operator-held JSON export actually needs importing. If so, provide a dry-run-first, insert-only importer with duplicate/conflict reports, per-domain counts/checksums and no startup auto-import.
 7. Remove the legacy JSON singleton and its JSON-specific tests only after all references and recovery requirements are accounted for.
