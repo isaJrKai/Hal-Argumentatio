@@ -206,6 +206,21 @@ export const clientProjects = pgTable('client_projects', {
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });
 
+/** Tenant-owned proposal drafts. Approval is an internal workflow state, not a client signature. */
+export const proposals = pgTable('proposals', {
+  id: text('id').primaryKey(),
+  contractorId: text('contractor_id').notNull(),
+  leadId: text('lead_id').notNull(),
+  status: text('status').default('draft').notNull(), // draft | approved | void
+  content: jsonb('content').notNull(),
+  approvedAt: timestamp('approved_at'),
+  approvedBy: text('approved_by'),
+  voidedAt: timestamp('voided_at'),
+  voidedBy: text('voided_by'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+});
+
 export const outreachSequences = pgTable('outreach_sequences', {
   id: text('id').primaryKey(),
   contractorId: text('contractor_id').notNull(),
