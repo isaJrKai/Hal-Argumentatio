@@ -26,3 +26,21 @@ describe('revenue outcome measurement integrity', () => {
     expect(handler).toContain('rec.confidenceScore ?? 0');
   });
 });
+
+const evaluateStart = server.indexOf("app.post('/api/revenue/outcomes/:id/evaluate'");
+const evaluateEnd = server.indexOf("\\n  });", evaluateStart);
+const evaluateHandler = server.slice(evaluateStart, evaluateEnd);
+
+describe('revenue outcome evaluation integrity', () => {
+  it('requires a measured outcome before evaluation', () => {
+    expect(evaluateHandler).toContain("outcome.outcomeStatus !== 'measured'");
+    expect(evaluateHandler).toContain("return res.status(409)");
+  });
+
+  it('requires comparable finite numeric evidence and has no synthetic defaults', () => {
+    expect(evaluateHandler).toContain('Number.isFinite(expected[key])');
+    expect(evaluateHandler).toContain('Number.isFinite(actual[key])');
+    expect(evaluateHandler).not.toMatch(/revenue:\\s*5000|roas:\\s*3\\.0|expected\\.revenue \\|\\| 5000/);
+    expect(evaluateHandler).toContain('comparable verified numeric metrics');
+  });
+});
