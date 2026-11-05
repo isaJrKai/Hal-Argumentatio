@@ -48,12 +48,15 @@ export const geoSkill: Skill = {
       const current = weatherData.current_weather || {};
       const temp = current.temperature;
       const windspeed = current.windspeed;
-      if (!Number.isFinite(temp) || !Number.isFinite(windspeed)) {
-        throw new Error('Weather provider response did not include valid current temperature and wind speed.');
-      }
       const weathercode = current.weathercode;
+      if (!Number.isFinite(temp) || !Number.isFinite(windspeed) || !Number.isFinite(weathercode)) {
+        throw new Error('Weather provider response did not include valid current weather measurements.');
+      }
       const hourly = weatherData.hourly || {};
-      const precipArray = hourly.precipitation || [0];
+      const precipArray = hourly.precipitation;
+      if (!Array.isArray(precipArray) || precipArray.length < 12 || !precipArray.slice(0, 12).every((value: unknown) => Number.isFinite(value))) {
+        throw new Error('Weather provider response did not include a complete next-12-hour precipitation series.');
+      }
       const next12hPrecipitation = precipArray.slice(0, 12).reduce((sum: number, val: number) => sum + val, 0); // next 12 forecast hours
 
       // 3. Compute Home Services & Trade Demand Indices (HAL Heuristics)
