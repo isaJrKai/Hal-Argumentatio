@@ -2,6 +2,9 @@ import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
 import bcrypt from 'bcryptjs';
+import { tmpdir } from 'node:os';
+import { parseLegacyDatabase } from './legacyJsonStore';
+export { parseLegacyDatabase } from './legacyJsonStore';
 
 // Types for our Database models
 export interface Contractor {
@@ -420,19 +423,13 @@ interface DBStructure {
   connectorCredentials?: Record<string, Record<string, string>>;
 }
 
-const DATA_DIR = path.join(process.cwd(), 'data');
+const DATA_DIR = process.env.NODE_ENV === 'test' || process.env.VITEST
+  ? path.join(tmpdir(), 'hal-legacy-db-tests', String(process.pid))
+  : path.join(process.cwd(), 'data');
 const DB_FILE = path.join(DATA_DIR, 'db.json');
 
 export { encrypt, decrypt } from './encryption';
 import { encrypt, decrypt } from './encryption';
-
-export function parseLegacyDatabase(raw: string): Partial<DBStructure> {
-  const parsed: unknown = JSON.parse(raw);
-  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
-    throw new Error('Legacy database content must be a JSON object.');
-  }
-  return parsed as Partial<DBStructure>;
-}
 
 class Database {
   private data: DBStructure = {
@@ -472,7 +469,7 @@ class Database {
     if (fs.existsSync(DB_FILE)) {
       try {
         const raw = fs.readFileSync(DB_FILE, 'utf8');
-        const parsed = parseLegacyDatabase(raw);
+        const parsed = parseLegacyDatabase(raw) as Partial<DBStructure>;
         // Load with proper fallbacks
         this.data = { ...this.data, ...parsed };
         console.log('Database loaded successfully with', this.data.leads.length, 'leads.');
