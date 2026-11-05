@@ -3167,9 +3167,6 @@ app.post('/api/system/purge-fake-data', authenticate, async (req, res) => {
 
     // Best-effort cleanup of this workspace's legacy lead mirror only. Never
     // invoke the old global purge method from an authenticated tenant route.
-    try { db.purgeMockLeads(contractorId); }
-    catch (mirrorError) { console.warn('[HAL Purge] Legacy tenant lead mirror cleanup failed.', mirrorError); }
-
     const remaining = await pgDb.select({ id: leads.id }).from(leads).where(eq(leads.contractorId, contractorId));
     const remainingRealLeads = remaining.filter(row => !row.id.startsWith('lead_seed_')).length;
     return res.json({
@@ -3932,8 +3929,6 @@ app.post('/api/leads/purge-and-replace', authenticate, async (req, res) => {
       return { addedItems, removedSeedCount: seedIds.length, skippedCount };
     });
 
-    try { db.purgeMockLeads(contractorId); }
-    catch (mirrorError) { console.warn('[HAL Lead Replace] Legacy seed purge mirror failed.', mirrorError); }
 
     broadcastNotification(
       contractorId,
@@ -8464,7 +8459,8 @@ app.post('/api/system/postgres-sync', authenticate, requireRole('admin'), async 
     const client = await pool.connect();
 
     try {
-      const localLeads = db.getLeads(contractorId);
+      // Exclude retired mock seed rows: an old JSON export must never resurrect them.
+      const localLeads = db.getLeads(contractorId).filter(lead => !lead.id.startsWith('lead_seed_'));
       const localWinLoss = db.getWinLossRecords(contractorId);
       const tenantLearning = getTenantAutonomousLearning(String(contractorId || ''));
       await tenantLearning.initializeFromDb();
