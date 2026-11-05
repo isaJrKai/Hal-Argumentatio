@@ -141,6 +141,19 @@ suite('PostgreSQL global structured ledger', () => {
     expect(reconciliation.total).toBe(source.length);
   });
 
+  it('refuses a valid but divergent legacy history without changing PostgreSQL rows', async () => {
+    const source = (await getStructuredLedgerEntries(undefined, 100, writerA)).reverse();
+    const divergent = structuredClone(source);
+    divergent[0] = { ...divergent[0], id: `${divergent[0].id}_different_source` };
+
+    await expect(importLegacyStructuredLedgerEntries(divergent, writerB))
+      .rejects.toThrow(/diverges from the verified legacy chain/);
+
+    const integrity = await verifyStructuredLedgerIntegrity(undefined, writerA);
+    expect(integrity.valid).toBe(true);
+    expect(integrity.totalEntries).toBe(source.length);
+  });
+
   it('blocks destructive truncate operations', async () => {
     await expect(writerA.query('TRUNCATE TABLE structured_ledger_entries'))
       .rejects.toMatchObject({ code: '55000' });
