@@ -1,5 +1,7 @@
 import { Skill } from './types';
-import { db } from '../db/db';
+import { and, eq, ilike } from 'drizzle-orm';
+import { db as pgDb } from '../db/index.ts';
+import { leads as leadsTable } from '../db/schema.ts';
 
 const CITY_COORDS: Record<string, { lat: number; lng: number }> = {
   winnipeg: { lat: 49.8951, lng: -97.1384 },
@@ -30,12 +32,26 @@ export const geoMapSkill: Skill = {
   ],
   execute: async (inputs, contractorId) => {
     const { city } = inputs;
-    const leads = db.getLeads(contractorId);
-    
-    // Filter leads by city if specified
-    const filteredLeads = city 
-      ? leads.filter(l => l.city.toLowerCase() === city.toLowerCase())
-      : leads;
+    // Always read from the tenant-scoped PostgreSQL store. Contact fields are
+    // intentionally omitted here: the canonical table stores them encrypted,
+    // and this visualization does not need to decrypt or expose them.
+    const filters = [eq(leadsTable.contractorId, contractorId)];
+    if (city) filters.push(ilike(leadsTable.city, city));
+    const filteredLeads = await pgDb.select({
+      id: leadsTable.id,
+      businessName: leadsTable.businessName,
+      ownerName: leadsTable.ownerName,
+      city: leadsTable.city,
+      serviceType: leadsTable.niche,
+      googleRating: leadsTable.googleRating,
+      reviewCount: leadsTable.reviewCount,
+      seoScore: leadsTable.seoScore,
+      performanceScore: leadsTable.performanceScore,
+      sslStatus: leadsTable.sslStatus,
+      urgencyScore: leadsTable.urgencyScore,
+      predictedLtvUsd: leadsTable.predictedLtv,
+      status: leadsTable.status,
+    }).from(leadsTable).where(and(...filters));
 
     const mappedLeads = filteredLeads.map((lead) => {
       const cityKey = lead.city.toLowerCase().trim();
@@ -54,8 +70,7 @@ export const geoMapSkill: Skill = {
         id: lead.id,
         businessName: lead.businessName,
         ownerName: lead.ownerName,
-        phone: lead.phone,
-        email: lead.email,
+        // Phone and email remain encrypted in PostgreSQL and are not exposed by this map skill.
         city: lead.city,
         serviceType: lead.serviceType,
         googleRating: lead.googleRating,
