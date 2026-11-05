@@ -2381,7 +2381,7 @@ app.get('/api/leads', authenticate, async (req, res) => {
         : l.verificationStatus;
       return {
         ...l,
-        sourceType: l.externalSource || l.externalCrmId ? (l.externalSource || l.sourceType || 'unknown') : 'unknown',
+        sourceType: l.externalSource || l.externalCrmId ? (l.externalSource || l.sourceType || 'unknown') : (l.sourceType || 'unknown'),
         verificationStatus: safeVerificationStatus,
         dnsVerified: hasCurrentGroundingEvidence ? l.dnsVerified : false,
         // These columns historically had schema defaults without source evidence.
