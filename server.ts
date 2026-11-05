@@ -687,9 +687,11 @@ app.patch('/api/admin/contractors/:id', authenticate, requireRole('admin'), asyn
       const nextStatus = accountStatus ?? target.accountStatus;
       const removesActiveAdmin = target.role === 'admin' && target.accountStatus === 'active' && (nextRole !== 'admin' || nextStatus !== 'active');
       if (removesActiveAdmin) {
-        const [adminCount] = await tx.select({ count: sql<number>`count(*)::int` }).from(contractors)
-          .where(and(eq(contractors.role, 'admin'), eq(contractors.accountStatus, 'active')));
-        if ((adminCount?.count ?? 0) <= 1) return { kind: 'last_admin' as const };
+        // Lock the active administrator set so concurrent demotions cannot both pass the last-admin check.
+        const activeAdmins = await tx.select({ id: contractors.id }).from(contractors)
+          .where(and(eq(contractors.role, 'admin'), eq(contractors.accountStatus, 'active')))
+          .for('update');
+        if (activeAdmins.length <= 1) return { kind: 'last_admin' as const };
       }
       const [updated] = await tx.update(contractors).set({ role: nextRole, accountStatus: nextStatus })
         .where(eq(contractors.id, targetId)).returning({
