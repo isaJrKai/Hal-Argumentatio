@@ -163,26 +163,18 @@ export default function SkillsPanel({ token }: SkillsPanelProps) {
     e.preventDefault();
     if (!selectedSkill) return;
 
+    const startedAt = Date.now();
     setLoading(true);
     setExecutionResult(null);
     setError(null);
     setTerminalLogs([
-      `[SYS_INFO] Initialising executive capability: "${selectedSkill.id}"`,
-      `[SYS_INFO] Allocating secure processing node...`,
-      `[SYS_INFO] Loading input parameters: ${JSON.stringify(formInputs)}`,
+      `[SYS_INFO] Starting capability: "${selectedSkill.id}"`,
+      '[SYS_INFO] Sending request to authenticated HAL execution API...',
+      `[SYS_INFO] Input fields: ${Object.keys(formInputs).join(', ') || 'none'}`
     ]);
 
-    const addLogWithDelay = (text: string, delay: number) => {
-      setTimeout(() => {
-        setTerminalLogs(prev => [...prev, text]);
-      }, delay);
-    };
-
-    addLogWithDelay(`[AGENT_LOAD] Launching active subprocess...`, 400);
-    addLogWithDelay(`[API_QUERY] Dispersing web request payload...`, 800);
-
     try {
-      const res = await fetch(`/api/skills/${selectedSkill.id}/execute`, {
+      const res = await fetch(`/api/skills/${encodeURIComponent(selectedSkill.id)}/execute`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -191,32 +183,22 @@ export default function SkillsPanel({ token }: SkillsPanelProps) {
         body: JSON.stringify({ inputs: formInputs })
       });
 
-      const data = await res.json();
-      
+      const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        throw new Error(data.error || 'Execution pipeline aborted');
+        throw new Error(data.error || `Execution failed (HTTP ${res.status}).`);
       }
 
-      setTimeout(() => {
-        setTerminalLogs(prev => [
-          ...prev, 
-          `[SYS_SUCCESS] Processing finalized. Decoding results...`,
-          `[SYS_SUCCESS] Execution completed in 1.48s`
-        ]);
-        setExecutionResult(data);
-        setLoading(false);
-      }, 1500);
-
+      setExecutionResult(data);
+      setTerminalLogs(prev => [
+        ...prev,
+        `[SYS_SUCCESS] HAL returned an execution result in ${Date.now() - startedAt}ms.`
+      ]);
     } catch (err: any) {
-      setTimeout(() => {
-        setTerminalLogs(prev => [
-          ...prev, 
-          `[CRITICAL_ERR] Pipeline error: ${err.message}`,
-          `[CRITICAL_ERR] Decryption / Connection failed`
-        ]);
-        setError(err.message);
-        setLoading(false);
-      }, 1500);
+      const message = err?.message || 'The HAL execution request failed.';
+      setError(message);
+      setTerminalLogs(prev => [...prev, `[CRITICAL_ERR] ${message}`]);
+    } finally {
+      setLoading(false);
     }
   };
 
