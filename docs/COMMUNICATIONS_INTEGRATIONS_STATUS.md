@@ -44,7 +44,8 @@ This report separates code implementation from provider configuration and live v
 
 - Meta webhook verification challenge and HMAC-SHA256 signature checks are implemented.
 - Signed inbound messages are deliberately rejected with HTTP 503 until a verified phone-number-ID to tenant mapping is available. This is a security control, not a provider outage to work around.
-- **Remaining:** tenant-owned verified number registration/mapping, tenant-isolation tests for two workspaces, durable inbound event storage/replay handling, and live Meta verification. Live outbound dispatch is not implemented.
+- **Implemented in this branch:** an authenticated workspace can register a phone-number ID only after its own saved Meta access token successfully reads that exact ID from the Graph API. A unique phone-number mapping prevents cross-workspace reassignment. Signed inbound messages resolve to exactly one mapped tenant and are encrypted at rest and deduplicated by Meta message ID.
+- **Remaining:** real Meta account setup, token provisioning, webhook subscription, live two-workspace acceptance test, and a tenant-facing inbox/reply workflow. Live outbound dispatch is not implemented.
 
 ### 4. SMS
 
@@ -64,8 +65,8 @@ This report separates code implementation from provider configuration and live v
 
 - The PostgreSQL communications outbox stores encrypted recipient/subject/body values, tenant ID, idempotency key, attempts, provider message ID, submission/delivery timestamps and terminal/provider status fields.
 - Dispatch is currently synchronous after the outbox record is created. A process crash or transient provider failure does not yet have a durable worker that reclaims and retries queued records.
-- There is no complete retry schedule, lease/claim protocol, maximum-attempt policy, dead-letter queue, replay UI, or operational alerting for stuck messages.
-- **Status:** durable intent/history exists; durable automated delivery/retry execution is not implemented. Do not describe this as a complete transactional outbox worker.
+- **Implemented in this branch:** due-time scheduling, atomic concurrent claims, stale-processing recovery, bounded exponential backoff, maximum attempts, terminal failure/dead-letter statuses, and provider-side idempotency for Resend.
+- **Remaining:** operator replay UI, operational alerting, and a trusted scheduler invocation. Configure `HAL_COMMUNICATIONS_WORKER_SECRET` (32+ characters) and call `POST /api/internal/communications/outbox/run` from a private scheduler. The endpoint itself is not a continuously running worker.
 
 ## Configuration required outside this PR
 
@@ -75,7 +76,7 @@ No production secrets are copied into Git or exposed in this report. An operator
 - Resend: sender domain verified; webhook registered to `/api/webhooks/resend` for sent, delivered, delayed, bounced, complained, opened and clicked events; secret matches Render.
 - Firebase/Google Cloud: Firebase web app values configured as build-time variables; Google sign-in enabled; Drive API, Calendar API and Gmail API enabled; OAuth consent and requested scopes approved.
 - Meta: WhatsApp Business app, phone number, webhook subscription and app secret configured; tenant mapping must be explicitly provisioned and verified before enabling inbound routing.
-- Twilio: no live capability should be enabled until the provider adapter and callback flow are implemented.
+- Twilio: no live capability should be enabled until the provider adapter, signed callback flow, tenant opt-in evidence and live acceptance test are completed.
 
 ## Verification evidence
 
@@ -101,3 +102,15 @@ No production environment, deploy, secret, service setting, or database was modi
 ## Release decision
 
 **Do not treat this workstream as fully production-verified.** The password-reset submission path is hardened in code; Resend submission/webhook reconciliation and Google API call paths exist; SMS and WhatsApp outbound remain simulations/unavailable; WhatsApp inbound remains fail-closed; durable retries/dead-letter processing and real provider/browser acceptance tests remain outstanding.
+
+
+## Follow-up implementation (2026-11-05)
+
+- Added `communications_outbox.next_attempt_at` and an index for due work.
+- Added a scheduler-invoked, bearer-secret-protected worker route. It processes only Resend email rows, claims work atomically, decrypts tenant-scoped content only in process memory, uses each tenant's saved Resend configuration, reuses the original idempotency key, and records submitted/retrying/failed/dead-letter outcomes.
+- Initial synchronous email dispatch now records transient failures as retryable and permanent configuration errors as failed.
+- Added a Meta phone-number registration endpoint that verifies the number using the registering workspace's saved WhatsApp token before storing a unique tenant mapping.
+- Replaced WhatsApp inbound fail-closed placeholder with signature-verified, tenant-routed, encrypted and deduplicated inbound event persistence. Unknown phone-number IDs remain fail-closed.
+- Added unit coverage for outbox claims, retry/dead-letter decisions, and Resend idempotency headers.
+
+**Still not complete/live-verified:** Twilio SMS sending and signed delivery callbacks; provider account credentials, Meta webhook registration and real inbound acceptance; Google Workspace OAuth/browser/Drive/Calendar/Gmail acceptance. These require real provider setup and test accounts, which are not available through the repository connection. The worker also requires a trusted external scheduler; no Render service or cron job was created.
