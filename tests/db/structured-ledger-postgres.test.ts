@@ -5,6 +5,7 @@ import {
   appendStructuredLedgerEntry,
   getStructuredLedgerEntries,
   verifyStructuredLedgerIntegrity,
+  importLegacyStructuredLedgerEntries,
 } from '../../src/db/structuredLedger';
 
 const databaseUrl = process.env.HAL_LEDGER_TEST_DATABASE_URL;
@@ -39,6 +40,16 @@ suite('PostgreSQL global structured ledger', () => {
         metadata JSONB,
         created_at TIMESTAMPTZ NOT NULL
       )
+    `);
+    await writerA.query(`
+      CREATE FUNCTION prevent_structured_ledger_mutation() RETURNS trigger AS $
+      BEGIN
+        RAISE EXCEPTION 'structured_ledger_entries is append-only' USING ERRCODE = '55000';
+      END;
+      $ LANGUAGE plpgsql;
+      CREATE TRIGGER structured_ledger_no_mutation
+        BEFORE UPDATE OR DELETE ON structured_ledger_entries
+        FOR EACH ROW EXECUTE FUNCTION prevent_structured_ledger_mutation();
     `);
   }, 20000);
 
@@ -84,6 +95,14 @@ suite('PostgreSQL global structured ledger', () => {
     expect(tenantA).toHaveLength(13);
   }, 30000);
 
+  it('reconciles an already-imported legacy prefix idempotently', async () => {
+    const source = (await getStructuredLedgerEntries(undefined, 100, writerA)).reverse();
+    const reconciliation = await importLegacyStructuredLedgerEntries(source, writerB);
+    expect(reconciliation.imported).toBe(0);
+    expect(reconciliation.alreadyPresent).toBe(source.length);
+    expect(reconciliation.total).toBe(source.length);
+  });
+
   it('detects tampering with the exact serialized payload', async () => {
     await appendStructuredLedgerEntry({
       contractorId: 'tenant-tamper',
@@ -95,12 +114,20 @@ suite('PostgreSQL global structured ledger', () => {
       metadata: { immutable: true },
     }, writerA);
 
-    // The isolated test schema intentionally omits the production immutability
-    // trigger so the verifier is tested against a privileged/manual tamper.
+    const changedPayload = JSON.stringify({ contractorId: 'tenant-tamper', eventType: 'security_event' });
+    await expect(writerA.query(
+      'UPDATE structured_ledger_entries SET payload_json = $1 WHERE contractor_id = $2',
+      [changedPayload, 'tenant-tamper'],
+    )).rejects.toMatchObject({ code: '55000' });
+
+    // Simulate a privileged operator bypassing the append-only trigger. The
+    // cryptographic verifier must still identify the modified payload.
+    await writerA.query('ALTER TABLE structured_ledger_entries DISABLE TRIGGER structured_ledger_no_mutation');
     await writerA.query(
       'UPDATE structured_ledger_entries SET payload_json = $1 WHERE contractor_id = $2',
-      [JSON.stringify({ contractorId: 'tenant-tamper', eventType: 'security_event' }), 'tenant-tamper'],
+      [changedPayload, 'tenant-tamper'],
     );
+    await writerA.query('ALTER TABLE structured_ledger_entries ENABLE TRIGGER structured_ledger_no_mutation');
 
     const integrity = await verifyStructuredLedgerIntegrity(undefined, writerB);
     expect(integrity.valid).toBe(false);
