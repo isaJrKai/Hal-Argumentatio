@@ -42,6 +42,7 @@ describe('live AI provider diagnostics', () => {
   it('runs billable live inference only from a manual diagnostics scan', () => {
     expect(panelSource).toContain('const providerProbe = silent');
     expect(panelSource).toContain("requestJson('/api/system/diagnostics/ai-providers', true, 'POST')");
+    expect(panelSource).toContain("name: 'Live AI provider inference'");
     expect(panelSource).toContain('Live inference verified');
   });
 });
