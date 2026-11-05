@@ -6899,23 +6899,6 @@ app.post('/api/projects', authenticate, async (req, res) => {
   }
 
   try {
-    if (normalizedLeadId) {
-      const [linkedLead] = await pgDb.select({ id: leads.id, status: leads.status }).from(leads)
-        .where(and(eq(leads.id, normalizedLeadId), eq(leads.contractorId, contractorId)))
-        .limit(1);
-      if (!linkedLead) return res.status(404).json({ error: 'The selected lead does not belong to this workspace.' });
-      if (!['closed_won', 'won', 'converted', 'customer'].includes(String(linkedLead.status).toLowerCase())) {
-        return res.status(409).json({ error: 'A client project can only be converted from a lead recorded as closed-won.' });
-      }
-
-      const [existingProject] = await pgDb.select({ id: clientProjects.id }).from(clientProjects)
-        .where(and(eq(clientProjects.leadId, normalizedLeadId), eq(clientProjects.contractorId, contractorId)))
-        .limit(1);
-      if (existingProject) {
-        return res.status(409).json({ error: 'A client project already exists for this won lead.', projectId: existingProject.id });
-      }
-    }
-
     const now = new Date();
     const projectId = 'proj_' + crypto.randomBytes(6).toString('hex');
     const projectValues = {
@@ -6949,18 +6932,45 @@ app.post('/api/projects', authenticate, async (req, res) => {
         { id: 'ms_5', title: 'Monthly Performance Review', description: 'Review verified progress and recorded business outcomes.', status: 'pending' }
       ]
     };
-    const [project] = await pgDb.insert(clientProjects).values(projectValues).returning();
+    const project = await pgDb.transaction(async tx => {
+      if (normalizedLeadId) {
+        // Serialize conversions for the same tenant/lead across concurrent requests.
+        await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${contractorId}), hashtext(${normalizedLeadId}))`);
+        const [linkedLead] = await tx.select({ id: leads.id, status: leads.status }).from(leads)
+          .where(and(eq(leads.id, normalizedLeadId), eq(leads.contractorId, contractorId)))
+          .limit(1);
+        if (!linkedLead) throw new Error('PROJECT_LEAD_NOT_FOUND');
+        if (!['closed_won', 'won', 'converted', 'customer'].includes(String(linkedLead.status).toLowerCase())) {
+          throw new Error('PROJECT_LEAD_NOT_CLOSED_WON');
+        }
 
-    try {
-      await recordWorkEvent(pgDb, {
-        contractorId, eventType: 'client_project.created', entityType: 'client_project', entityId: project.id,
-        actorType: 'human', actorId: contractorId, sourceModule: 'client_operations', correlationId: project.id,
+        const [existingProject] = await tx.select({ id: clientProjects.id }).from(clientProjects)
+          .where(and(eq(clientProjects.leadId, normalizedLeadId), eq(clientProjects.contractorId, contractorId)))
+          .limit(1);
+        if (existingProject) throw new Error(`PROJECT_ALREADY_EXISTS:${existingProject.id}`);
+      }
+
+      const [created] = await tx.insert(clientProjects).values(projectValues).returning();
+      await tx.insert(workEvents).values({
+        id: 'evt_' + crypto.randomUUID(),
+        contractorId,
+        eventType: 'client_project.created',
+        entityType: 'client_project',
+        entityId: created.id,
+        actorType: 'human',
+        actorId: contractorId,
+        sourceModule: 'client_operations',
+        correlationId: created.id,
         summary: `Created client delivery project for ${businessName.trim()}.`,
-        payload: { leadId: normalizedLeadId, status: project.status, packageTier: project.packageTier, monthlyRetainerUsd: project.monthlyRetainerUsd }
+        payload: {
+          leadId: normalizedLeadId,
+          status: created.status,
+          packageTier: created.packageTier,
+          monthlyRetainerUsd: created.monthlyRetainerUsd
+        }
       });
-    } catch (ledgerError) {
-      console.error('[Client Projects] Creation ledger event failed:', ledgerError);
-    }
+      return created;
+    });
 
     db.addAuditLog({
       contractorId,
@@ -6977,6 +6987,18 @@ app.post('/api/projects', authenticate, async (req, res) => {
 
     return res.status(201).json(project);
   } catch (err: any) {
+    if (err.message === 'PROJECT_LEAD_NOT_FOUND') {
+      return res.status(404).json({ error: 'The selected lead does not belong to this workspace.' });
+    }
+    if (err.message === 'PROJECT_LEAD_NOT_CLOSED_WON') {
+      return res.status(409).json({ error: 'A client project can only be converted from a lead recorded as closed-won.' });
+    }
+    if (typeof err.message === 'string' && err.message.startsWith('PROJECT_ALREADY_EXISTS:')) {
+      return res.status(409).json({
+        error: 'A client project already exists for this won lead.',
+        projectId: err.message.slice('PROJECT_ALREADY_EXISTS:'.length)
+      });
+    }
     console.error('[Client Projects] Create failed:', err);
     return res.status(503).json({ error: 'Client project could not be saved to the database.' });
   }
