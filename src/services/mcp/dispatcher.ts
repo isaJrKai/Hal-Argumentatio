@@ -35,6 +35,7 @@ import { listWorkTasks, getWorkTask, requiresWorkTaskApproval, canExecutorClaimW
 import { analyzeCampaignPerformance } from '../../lib/campaignAnomaly';
 import { classifyHermesToolResult } from '../../lib/hermesExecution';
 import { claimHermesWorkTask, heartbeatHermesWorkTask, failExpiredHermesWorkTask } from '../../lib/hermesTaskClaim';
+import { validateDomainAndDns } from '../../lib/networkVerification';
 
 export const HAL_MCP_TOOLS: McpToolDefinition[] = [
   {
@@ -195,6 +196,21 @@ export const HAL_MCP_TOOLS: McpToolDefinition[] = [
         promptOverride: { type: 'string' }
       },
       required: ['toolId']
+    }
+  },
+  {
+    name: 'hal_audit_website_connectivity',
+    description: 'Runs a safe, bounded public DNS and pinned HTTP/TLS connectivity audit for a website. Reports only measured connectivity evidence; it does not claim Lighthouse, PageSpeed, SEO, mobile, content, or conversion analysis. Optionally links the result to a lead owned by the authenticated tenant.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        url: { type: 'string', description: 'Public website domain or HTTP/HTTPS URL.' },
+        leadId: { type: 'string', description: 'Optional lead ID from the authenticated workspace.' },
+        businessName: { type: 'string' },
+        city: { type: 'string' },
+        niche: { type: 'string' }
+      },
+      required: ['url']
     }
   }
 ];
@@ -772,6 +788,96 @@ export async function executeMcpTool(
         currentStage: loop.currentStage,
         intelligenceAttachedAt: new Date().toISOString()
       };
+    }
+
+    case 'hal_audit_website_connectivity': {
+      const rawUrl = typeof rawParams?.url === 'string' ? rawParams.url.trim() : '';
+      const leadId = typeof rawParams?.leadId === 'string' ? rawParams.leadId.trim() : '';
+      if (!rawUrl || rawUrl.length > 2048 || (leadId && leadId.length > 128)) {
+        throw new Error('A website URL up to 2048 characters and an optional valid lead ID are required.');
+      }
+
+      let parsedUrl: URL;
+      try {
+        const candidateUrl = rawUrl.startsWith('http://') || rawUrl.startsWith('https://') ? rawUrl : 'https://' + rawUrl;
+        parsedUrl = new URL(candidateUrl);
+      } catch {
+        throw new Error('Target website URL is invalid.');
+      }
+      if ((parsedUrl.protocol !== 'https:' && parsedUrl.protocol !== 'http:') || parsedUrl.username || parsedUrl.password) {
+        throw new Error('Only public HTTP/HTTPS domain names without embedded credentials are supported.');
+      }
+
+      const [linkedLead] = leadId
+        ? await pgDb.select().from(leads).where(and(eq(leads.id, leadId), eq(leads.contractorId, contractorId))).limit(1)
+        : [];
+      if (leadId && !linkedLead) throw new Error('Lead not found or inaccessible in this workspace.');
+
+      const targetUrl = parsedUrl.origin + parsedUrl.pathname;
+      const probe = await validateDomainAndDns(targetUrl, { probeHttp: true, timeoutMs: 5000 });
+      const vulnerabilities: string[] = [];
+      const recommendedFixes: string[] = [];
+      if (!probe.dnsResolved) {
+        vulnerabilities.push(probe.rejectionReason || 'Public DNS resolution could not be confirmed.');
+        recommendedFixes.push('Confirm the domain registration and public DNS records point to the intended web host.');
+      } else if (!probe.httpReachable) {
+        vulnerabilities.push('Public DNS resolved, but the pinned HTTP/TLS HEAD probe did not receive a usable response.');
+        recommendedFixes.push('Check web-server availability, firewall rules, and support for HEAD requests.');
+      }
+      if (probe.dnsResolved && probe.httpReachable && !probe.sslSecured) {
+        vulnerabilities.push('HTTPS/TLS could not be confirmed; an HTTP response was reachable.');
+        recommendedFixes.push('Install or repair a valid TLS certificate and redirect HTTP traffic to HTTPS.');
+      }
+      if (probe.httpReachable) recommendedFixes.push('Run a full Lighthouse or PageSpeed Insights audit before making performance or SEO claims.');
+
+      const report = {
+        targetUrl,
+        businessName: typeof rawParams?.businessName === 'string' ? rawParams.businessName.slice(0, 200) : linkedLead?.businessName || null,
+        city: typeof rawParams?.city === 'string' ? rawParams.city.slice(0, 120) : linkedLead?.city || null,
+        niche: typeof rawParams?.niche === 'string' ? rawParams.niche.slice(0, 120) : linkedLead?.niche || null,
+        sslStatus: probe.sslSecured ? 'secured' : probe.httpReachable ? 'missing' : 'unknown',
+        dnsResolved: probe.dnsResolved,
+        httpReachable: probe.httpReachable,
+        httpStatus: probe.httpStatus ?? null,
+        ipAddresses: probe.ipAddresses || [],
+        measurementStatus: probe.httpReachable ? 'partial' : 'unreachable',
+        pageSpeedStatus: 'not_configured',
+        measurementSource: 'HAL public DNS lookup and pinned, non-redirecting HTTP/TLS HEAD probe',
+        measurementLimitations: [
+          'No PageSpeed or Lighthouse measurement was run.',
+          'No SEO crawler or Google Business Profile lookup was run.',
+          'No lead-loss, conversion, or revenue estimate was calculated.',
+          'TLS certificate expiry was not measured.'
+        ],
+        identifiedVulnerabilities: vulnerabilities,
+        recommendedFixes,
+        generatedAt: new Date().toISOString()
+      };
+
+      if (linkedLead) {
+        await pgDb.update(leads).set({ sslStatus: report.sslStatus, updatedAt: new Date() })
+          .where(and(eq(leads.id, linkedLead.id), eq(leads.contractorId, contractorId)));
+        await pgDb.insert(leadEvents).values({
+          id: crypto.randomUUID(), leadId: linkedLead.id, eventType: 'WebsiteConnectivityAuditCompleted',
+          newStage: linkedLead.status,
+          notes: JSON.stringify({ targetUrl, measurementStatus: report.measurementStatus, dnsResolved: report.dnsResolved, httpReachable: report.httpReachable, sslStatus: report.sslStatus, pageSpeedStatus: report.pageSpeedStatus })
+        });
+      }
+
+      const auditId = crypto.randomUUID();
+      await recordWorkEvent(pgDb, {
+        contractorId,
+        eventType: 'website_audit.completed',
+        entityType: linkedLead ? 'lead' : 'website_audit',
+        entityId: linkedLead?.id || auditId,
+        actorType: actor.actorType,
+        actorId: actor.actorId,
+        sourceModule: actor.sourceModule || 'website_audit',
+        correlationId: linkedLead?.id || auditId,
+        summary: `Completed DNS/HTTP/TLS connectivity check for ${report.businessName || targetUrl}.`,
+        payload: { targetUrl, measurementStatus: report.measurementStatus, dnsResolved: report.dnsResolved, httpReachable: report.httpReachable, sslStatus: report.sslStatus, pageSpeedStatus: report.pageSpeedStatus }
+      });
+      return { success: true, report };
     }
 
     case 'hermes_synthesize_lab_asset': {
