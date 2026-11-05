@@ -11719,32 +11719,31 @@ async function startServer() {
     }
 
     try {
-      // 1. Optionally purge static mock seed files
-      let purgedCount = 0;
-      if (purgeMock) {
-        const deletedSeeds = await pgDb.delete(leads)
-          .where(and(eq(leads.contractorId, contractorId), like(leads.id, 'lead_seed_%')))
-          .returning({ id: leads.id });
-        purgedCount = deletedSeeds.length;
-      }
-
-      // 2. Harvest actual active businesses
+      // Harvest first: a provider failure must never delete existing seed records.
       const harvested = await harvestRealBusinesses(city, niche);
+      const committed = await pgDb.transaction(async tx => {
+        let purgedCount = 0;
+        if (purgeMock) {
+          const deletedSeeds = await tx.delete(leads)
+            .where(and(eq(leads.contractorId, contractorId), like(leads.id, 'lead_seed_%')))
+            .returning({ id: leads.id });
+          purgedCount = deletedSeeds.length;
+        }
 
-      // 3. Save each with AES-GCM-256 encrypted PII and create a human review assignment.
-      const savedLeads = [];
-      let queuedTasks = 0;
-      for (const hl of harvested) {
-        const id = crypto.randomUUID();
-        const rawEmail = hl.email ? String(hl.email) : null;
-        const rawPhone = hl.phone ? String(hl.phone) : null;
-        const sourceVerified = hl.verificationStatus === 'VERIFIED' && !hl.isSynthetic;
-        const verifiedEmail = sourceVerified ? rawEmail : null;
-        const verifiedPhone = sourceVerified ? rawPhone : null;
-        const emailEncrypted = verifiedEmail ? encrypt(verifiedEmail) : null;
-        const phoneEncrypted = verifiedPhone ? encrypt(verifiedPhone) : null;
+        const savedLeads: any[] = [];
+        const ledgerInputs: StructuredLedgerInput[] = [];
+        let queuedTasks = 0;
 
-        const persisted = await pgDb.transaction(async tx => {
+        for (const hl of harvested) {
+          const id = crypto.randomUUID();
+          const rawEmail = hl.email ? String(hl.email) : null;
+          const rawPhone = hl.phone ? String(hl.phone) : null;
+          const sourceVerified = hl.verificationStatus === 'VERIFIED' && !hl.isSynthetic;
+          const verifiedEmail = sourceVerified ? rawEmail : null;
+          const verifiedPhone = sourceVerified ? rawPhone : null;
+          const emailEncrypted = verifiedEmail ? encrypt(verifiedEmail) : null;
+          const phoneEncrypted = verifiedPhone ? encrypt(verifiedPhone) : null;
+
           const [addedLead] = await tx.insert(leads).values({
             id,
             contractorId,
@@ -11789,6 +11788,7 @@ async function startServer() {
             details: `Recorded discovery candidate: ${addedLead.businessName} (${addedLead.city}); verification status: ${addedLead.verificationStatus || 'UNVERIFIED_STAGING'}.`,
             metadata: { city: addedLead.city, niche: addedLead.niche, source: 'harvested_intelligence' }
           };
+          ledgerInputs.push(ledgerInput);
           await recordStructuredLedgerEntryInTransaction(tx, ledgerInput);
 
           const [activeReviewTask] = await tx.select({ id: workTasks.id }).from(workTasks).where(and(
@@ -11825,28 +11825,34 @@ async function startServer() {
               correlationId, summary: `${addedLead.businessName} was added to the human review queue.`,
               payload: { taskId, verificationStatus: addedLead.verificationStatus || 'UNVERIFIED_STAGING' }
             });
+            queuedTasks++;
           }
-          return { addedLead, queued: !activeReviewTask, ledgerInput };
-        });
-
-        if (!postgresStructuredLedgerEnabled()) {
-          await recordStructuredLedgerEntry(persisted.ledgerInput);
+          savedLeads.push(addedLead);
         }
-        if (persisted.queued) queuedTasks++;
-        const addedLead = persisted.addedLead;
-        savedLeads.push(addedLead);
-      }
 
-      // 4. Log overarching harvest block
-      const harvestBlock = await recordStructuredLedgerEntry({
-        contractorId,
-        eventType: 'territory_harvest_completed',
-        entityType: 'territory_intel',
-        entityId: 'harvest_' + Date.now(),
-        actor: 'HAL Territory Intelligence Harvester',
-        details: `Processed ${savedLeads.length} discovery candidates in ${city} (${niche}); verified: ${savedLeads.filter(lead => lead.verificationStatus === 'VERIFIED' && !lead.isSynthetic).length}; unverified: ${savedLeads.filter(lead => lead.verificationStatus !== 'VERIFIED' || lead.isSynthetic).length}.`,
-        metadata: { city, niche, harvestedCount: savedLeads.length, purgedMockSeeds: purgeMock }
+        const harvestLedgerInput: StructuredLedgerInput = {
+          contractorId,
+          eventType: 'territory_harvest_completed',
+          entityType: 'territory_intel',
+          entityId: 'harvest_' + Date.now(),
+          actor: 'HAL Territory Intelligence Harvester',
+          details: `Processed ${savedLeads.length} discovery candidates in ${city} (${niche}); verified: ${savedLeads.filter(lead => lead.verificationStatus === 'VERIFIED' && !lead.isSynthetic).length}; unverified: ${savedLeads.filter(lead => lead.verificationStatus !== 'VERIFIED' || lead.isSynthetic).length}.`,
+          metadata: { city, niche, harvestedCount: savedLeads.length, purgedMockSeeds: purgeMock }
+        };
+        await recordStructuredLedgerEntryInTransaction(tx, harvestLedgerInput);
+        return { savedLeads, queuedTasks, purgedCount, ledgerInputs, harvestLedgerInput };
       });
+
+      let harvestBlock: any = null;
+      if (!postgresStructuredLedgerEnabled()) {
+        for (const ledgerInput of committed.ledgerInputs) {
+          await recordStructuredLedgerEntry(ledgerInput);
+        }
+        harvestBlock = await recordStructuredLedgerEntry(committed.harvestLedgerInput);
+      } else {
+        harvestBlock = committed.harvestLedgerInput;
+      }
+      const { savedLeads, queuedTasks, purgedCount } = committed;
 
       res.json({
         success: true,
