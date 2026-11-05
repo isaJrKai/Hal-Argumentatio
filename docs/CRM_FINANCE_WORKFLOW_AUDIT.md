@@ -51,14 +51,17 @@ A regression test asserts these fail-closed invariants.
 - Revenue simulations now require two campaigns with recorded spend and unambiguous lead-linked revenue. Ambiguous multi-touch attribution is excluded; unverified geo/general-growth scenarios are explicitly unsupported rather than assigned invented ROAS, percentage lift, or confidence values.
 ## Route-level PostgreSQL verification added
 
-A real HTTP integration suite now imports the Express application and uses Supertest against the PostgreSQL-backed routes. It creates two isolated test tenants and verifies:
-- Tenant B cannot convert Tenant A's closed-won lead (404; no project row created).
-- Tenant A can create the project, and the project plus its `client_project.created` work event persist.
-- A repeated conversion is rejected (409) and does not create a second project.
-- Tenant B's project list does not expose Tenant A's project.
-- Tenant B cannot update Tenant A's project by identifier (404; persisted status and retainer remain unchanged).
+A real HTTP integration suite imports the Express application and uses Supertest against PostgreSQL. It creates two isolated test tenants and verifies:
+- Cross-tenant won-lead conversion is rejected without creating a project.
+- Project creation persists both the tenant-owned project and its work-ledger event; duplicate conversion is rejected.
+- Project listing and updates are tenant-scoped.
+- Tenant B cannot read, update, or delete Tenant A's lead through the HTTP routes.
+- Tenant B cannot record revenue against Tenant A's lead; Tenant A can close a qualified proposal-stage lead and atomically persist the revenue record, lead-stage events, and work-ledger event.
+- Duplicate revenue close-out is rejected, and revenue listing remains tenant-scoped.
+- An activated client project contributes to Tenant A's contract MRR/ARR, while Tenant B's financial overview remains zero for that project.
+- Proposal generation is tenant-scoped and explicitly reports a generated-only, non-persisted draft.
 
-The test harness exports the Express app but skips listener/background-worker startup under `NODE_ENV=test`. The test uses only CI/local test PostgreSQL records and removes its uniquely identified rows after completion. This verifies the client-project HTTP route boundary, not every CRM/finance route or the complete browser lifecycle.
+The test harness exports the Express app but skips listener/background-worker startup under `NODE_ENV=test`. Each test tenant and its records use unique identifiers and are cleaned from the CI/local PostgreSQL database. This is route-level integration coverage for the exercised CRM/finance endpoints, not the complete browser lifecycle or every route in the application.
 
 ## Remaining verification gates
 
@@ -66,7 +69,7 @@ These items remain unverified and must not be represented as complete:
 
 1. Full browser-level discovery → lead → audit → landing-page artifact → proposal/contract → approved outreach → delivery/follow-up → deal outcome → client project → revenue flow.
 2. Exact frontend-to-backend route coverage for every proposal, contract, client-project and communications action.
-3. Extend PostgreSQL-backed Tenant A/B HTTP tests beyond client projects to lead CRUD, revenue close-out, proposal generation, and other CRM/finance routes; add concurrent close-out and rollback-after-partial-failure coverage.
+3. Extend PostgreSQL-backed Tenant A/B HTTP tests to the remaining CRM/finance routes and add concurrent revenue close-out plus rollback-after-partial-failure coverage.
 4. Contract/proposal persistence and signature/execution semantics, including proof that draft/approved/signed are distinct states. The current proposal generator returns a generated response but no canonical proposal/contract table or durable signature workflow has been verified.
 5. Add route-level concurrency coverage for won-lead project conversion, retainer changes, and cancellation. The current HTTP suite verifies tenant ownership, duplicate conversion, persistence, and event creation; separate isolated PostgreSQL tests cover same-lead advisory-lock serialization and the optimistic status/timestamp predicate. The stale-update test mirrors the production predicate on an isolated test table and is not a full route-level concurrency test.
 6. Revenue recognition versus cash collection/payment recording. The current `/api/revenues` close-out endpoint records a positive whole-dollar amount against a lead; it is not a payment processor or a complete invoice/receivables ledger.
