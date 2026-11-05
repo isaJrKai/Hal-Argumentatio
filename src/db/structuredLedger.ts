@@ -1,4 +1,5 @@
 import crypto from 'node:crypto';
+import { isDeepStrictEqual } from 'node:util';
 import type { Pool, PoolClient } from 'pg';
 import { getPostgresPool } from './postgres';
 import type { StructuredLedgerEntry } from './db';
@@ -240,7 +241,9 @@ export async function verifyStructuredLedgerIntegrity(
       payload.contractorId !== row.contractor_id ||
       payload.eventType !== row.event_type ||
       payload.entityType !== row.entity_type ||
-      payload.entityId !== row.entity_id
+      payload.entityId !== row.entity_id ||
+      payload.details !== (row.details || '') ||
+      !isDeepStrictEqual(payload.metadata, row.metadata ?? {})
     ) {
       return {
         valid: false, totalEntries: result.rows.length, latestHash,
