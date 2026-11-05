@@ -91,7 +91,7 @@ test('Document Studio persists, approves, and captures client proposal acceptanc
     await page.getByLabel('Invoice description').fill('First month service');
     await page.getByLabel('Amount (USD)').fill('1200');
     await page.getByRole('button', { name: 'Issue invoice' }).click();
-    await expect(page.getByText(/HAL-/)).toBeVisible();
+    await expect(page.getByText(/HAL-/).first()).toBeVisible();
 
     await page.getByLabel('Receipt amount in USD').fill('1200');
     await page.getByRole('button', { name: 'Record receipt' }).click();
