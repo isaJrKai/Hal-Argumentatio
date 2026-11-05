@@ -22,6 +22,7 @@ const projectA = `project_${suffix}`;
 const leadRevenueA = `revenue_lead_${suffix}`;
 const leadB = `lead_b_${suffix}`;
 const leadConcurrentA = `lead_concurrent_${suffix}`;
+const leadFullFlowA = `lead_full_flow_${suffix}`;
 
 let dbAvailable = false;
 let tokenA = '';
@@ -53,11 +54,13 @@ describe('client project HTTP route tenant isolation', () => {
          VALUES ($1, $2, $3, $4, $5, 'closed_won'),
                 ($6, $7, $8, $9, $10, 'proposal'),
                 ($11, $12, $13, $14, $15, 'qualified'),
-                ($16, $17, $18, $19, $20, 'closed_won')`,
+                ($16, $17, $18, $19, $20, 'closed_won'),
+                ($21, $22, $23, $24, $25, 'proposal')`,
         [leadA, tenantA, 'Tenant A Roofing', 'Kampala', 'roofing',
           leadRevenueA, tenantA, 'Tenant A HVAC', 'Kampala', 'hvac',
           leadB, tenantB, 'Tenant B Electrical', 'London', 'electrical',
-          leadConcurrentA, tenantA, 'Tenant A Concurrent Conversion', 'Kampala', 'roofing']
+          leadConcurrentA, tenantA, 'Tenant A Concurrent Conversion', 'Kampala', 'roofing',
+          leadFullFlowA, tenantA, 'Tenant A End-to-End Plumbing', 'Kampala', 'plumbing']
       );
 
       tokenA = await login(emailA);
@@ -74,12 +77,79 @@ describe('client project HTTP route tenant isolation', () => {
       await pool.query('DELETE FROM proposals WHERE contractor_id = ANY($1::text[])', [[tenantA, tenantB]]);
       await pool.query('DELETE FROM revenue_records WHERE contractor_id = ANY($1::text[])', [[tenantA, tenantB]]);
       await pool.query('DELETE FROM client_projects WHERE contractor_id = ANY($1::text[])', [[tenantA, tenantB]]);
-      await pool.query('DELETE FROM lead_events WHERE lead_id = ANY($1::text[])', [[leadA, leadRevenueA, leadB, leadConcurrentA]]);
+      await pool.query('DELETE FROM lead_events WHERE lead_id = ANY($1::text[])', [[leadA, leadRevenueA, leadB, leadConcurrentA, leadFullFlowA]]);
       await pool.query('DELETE FROM leads WHERE contractor_id = ANY($1::text[])', [[tenantA, tenantB]]);
       await pool.query('DELETE FROM audit_logs WHERE contractor_id = ANY($1::text[])', [[tenantA, tenantB]]);
       await pool.query('DELETE FROM contractors WHERE id = ANY($1::text[])', [[tenantA, tenantB]]);
     }
     await pool.end().catch(() => {});
+  });
+
+  it('completes the persisted proposal-to-revenue-to-delivery CRM lifecycle over HTTP', async (ctx) => {
+    if (!dbAvailable) return ctx.skip();
+
+    const proposalResponse = await request(app)
+      .post('/api/proposals/generate')
+      .set('Authorization', `Bearer ${tokenA}`)
+      .send({ leadId: leadFullFlowA, packageTier: 'Growth', monthlyRetainerUsd: 1450, setupFeeUsd: 900 });
+    expect(proposalResponse.status).toBe(201);
+    expect(proposalResponse.body.persistenceStatus).toBe('persisted_draft');
+
+    const approval = await request(app)
+      .patch(`/api/proposals/${proposalResponse.body.id}/status`)
+      .set('Authorization', `Bearer ${tokenA}`)
+      .send({ status: 'approved' });
+    expect(approval.status).toBe(200);
+    expect(approval.body.status).toBe('approved');
+
+    const closeOut = await request(app)
+      .post('/api/revenues')
+      .set('Authorization', `Bearer ${tokenA}`)
+      .send({ leadId: leadFullFlowA, amountUsd: 900, source: 'approved_proposal_setup_fee' });
+    expect(closeOut.status).toBe(201);
+    expect(closeOut.body.leadStatus).toBe('closed_won');
+
+    const project = await request(app)
+      .post('/api/projects')
+      .set('Authorization', `Bearer ${tokenA}`)
+      .send({
+        leadId: leadFullFlowA,
+        businessName: 'Tenant A End-to-End Plumbing',
+        city: 'Kampala',
+        serviceType: 'Web and local SEO',
+        packageTier: 'Growth',
+        monthlyRetainerUsd: 1450
+      });
+    expect(project.status).toBe(201);
+    expect(project.body.leadId).toBe(leadFullFlowA);
+
+    const activation = await request(app)
+      .put(`/api/projects/${project.body.id}`)
+      .set('Authorization', `Bearer ${tokenA}`)
+      .send({ status: 'active_delivery' });
+    expect(activation.status).toBe(200);
+
+    const overview = await request(app)
+      .get('/api/financials/overview')
+      .set('Authorization', `Bearer ${tokenA}`);
+    expect(overview.status).toBe(200);
+    expect(overview.body.currentMrrUsd).toBe(1450);
+
+    const [lead] = (await pool.query(
+      'SELECT status FROM leads WHERE id = $1 AND contractor_id = $2',
+      [leadFullFlowA, tenantA]
+    )).rows;
+    const [revenue] = (await pool.query(
+      'SELECT amount_usd FROM revenue_records WHERE lead_id = $1 AND contractor_id = $2',
+      [leadFullFlowA, tenantA]
+    )).rows;
+    const [persistedProject] = (await pool.query(
+      'SELECT status, monthly_retainer_usd FROM client_projects WHERE lead_id = $1 AND contractor_id = $2',
+      [leadFullFlowA, tenantA]
+    )).rows;
+    expect(lead.status).toBe('closed_won');
+    expect(revenue.amount_usd).toBe(900);
+    expect(persistedProject).toMatchObject({ status: 'active_delivery', monthly_retainer_usd: 1450 });
   });
 
   it('rejects a tenant B attempt to convert tenant A\'s won lead without creating records', async (ctx) => {
