@@ -7844,7 +7844,7 @@ app.post('/api/proposals/generate', authenticate, async (req, res) => {
     const landingArtifacts = await pgDb.select().from(hermesLabArtifacts).where(and(
       eq(hermesLabArtifacts.contractorId, contractorId),
       eq(hermesLabArtifacts.toolId, 'landing_page')
-    )).orderBy(desc(hermesLabArtifacts.updatedAt));
+    )).orderBy(desc(hermesLabArtifacts.updatedAt)).limit(200);
     const landingPageArtifact = landingArtifacts.find((artifact: any) => {
       const content = artifact.content && typeof artifact.content === 'object' ? artifact.content as Record<string, any> : {};
       const pageConfig = content.pageConfig && typeof content.pageConfig === 'object' ? content.pageConfig as Record<string, any> : {};
