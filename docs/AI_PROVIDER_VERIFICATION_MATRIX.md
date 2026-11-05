@@ -8,10 +8,10 @@
 
 | Provider | Runtime adapter | Request protocol | Model IDs in this codebase | Production credential | Verification |
 |---|---|---|---|---|---|
-| Google Gemini | Implemented in `src/lib/gemini.ts` using `@google/genai` | Google GenAI SDK `models.generateContent`; API key auth | `gemini-3.8-flash`, then `gemini-flash-latest` | `GEMINI_API_KEY` | Manual authenticated System Health diagnostics; configured key alone is unverified |
+| Google Gemini | Implemented in `src/lib/gemini.ts` using `@google/genai` | Google GenAI SDK `models.generateContent`; API key auth | `gemini-3.8-flash` in primary HAL chat and Hermes Lab paths | `GEMINI_API_KEY` or supported tenant credential | Manual authenticated System Health diagnostics; configured key alone is unverified |
 | NVIDIA Nemotron | Implemented in `src/services/nemotron.ts` | OpenAI-compatible `POST https://integrate.api.nvidia.com/v1/chat/completions`; Bearer auth | `nvidia/nemotron-3.5-lightning-30b-a3b`, `nvidia/nemotron-3-nano-30b-a3b`, `nvidia/nemotron-3-super-120b-a12b` | `NVIDIA_API_KEY` | Manual authenticated System Health diagnostics; configured key alone is unverified |
 | OpenAI | No inference adapter found; credential can be saved only | No runtime request contract implemented | None | No production variable is consumed by the current runtime | Unsupported / not operational |
-| Anthropic | No inference adapter found; credential can be saved only | No runtime request contract implemented | None | No production variable is consumed by the current runtime | Unsupported / not operational |
+| Anthropic | Implemented in `src/services/anthropic.ts` for HAL chat | Native Messages API with bounded HAL MCP tool loop | `claude-haiku-5-5` default; `HAL_ANTHROPIC_MODEL` override | Encrypted tenant `anthropic` credential | Adapter implemented; live provider health and production latency remain unverified |
 
 Model identifiers are implementation defaults, not proof that a model is enabled for a particular account, region, project, or API key. NVIDIA's hosted NIM catalog and Google's Gemini model catalog are the authoritative sources for current availability.
 
@@ -32,8 +32,8 @@ Set the following in the Render service's protected Environment settings. Never 
 ### Optional selection
 - `HAL_ACTIVE_AI`: optional preference (`gemini`, `nemotron`, or `dual`). A preference does not establish provider health. Runtime selection still requires the corresponding deployment-level key.
 
-### Not currently consumed by inference
-- OpenAI `OPENAI_API_KEY` and Anthropic `ANTHROPIC_API_KEY` are not active adapter configuration in this repository. Do not add them to Render expecting HAL to call those providers. The Settings UI can store tenant values for these services, but no request-scoped inference adapter consumes them.
+### Provider availability boundaries
+- Anthropic is active in HAL chat when selected and a tenant credential is available. OpenAI remains credential-only; no OpenAI inference adapter is active. Do not add them to Render expecting HAL to call those providers. The Settings UI stores tenant credentials encrypted. Anthropic is consumed by the HAL chat adapter; OpenAI remains credential-only and is not an active inference adapter.
 
 ## Credential ownership and encryption findings
 

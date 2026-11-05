@@ -91,7 +91,7 @@ export async function callNemotronWithTools(
         const response = await fetch('https://integrate.api.nvidia.com/v1/chat/completions', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
-          signal: AbortSignal.timeout(30_000),
+          signal: AbortSignal.timeout(15_000),
           body: JSON.stringify({
             model,
             messages: conversation,
@@ -199,7 +199,7 @@ export async function callNemotron(
           "Content-Type": "application/json",
           "Authorization": `Bearer ${apiKey}`,
         },
-        signal: AbortSignal.timeout(30_000),
+        signal: AbortSignal.timeout(15_000),
         body: JSON.stringify(payload),
       });
 

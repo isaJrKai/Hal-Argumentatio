@@ -2,6 +2,8 @@ import { GoogleGenAI } from "@google/genai";
 import { generateResponse, cleanJSONResponse, callNemotron, callNemotronWithTools, getActiveAI } from "../services/nemotron.ts";
 import { verifyLeadGrounding } from "./networkVerification.ts";
 import { calibrateForecastConfidence } from "./forecastConfidence";
+import { callAnthropicWithTools } from "../services/anthropic";
+import { callNousHermes } from "../services/nousHermesGateway";
 
 let aiClient: GoogleGenAI | null = null;
 
@@ -60,6 +62,7 @@ Return your response strictly as a raw JSON object matching this structure:
 }`;
 
   const activeAI = getActiveAI(preferredAI);
+
 
   // Helper to calibrate confidence: clamp between 0.10 and 0.95 and account for extreme unexplained variance
   const calibrateConfidence = (rawScore: number): number => {
@@ -421,7 +424,7 @@ IMPORTANT: Output ONLY a valid JSON array of objects with the keys above inside 
 
   if (ai) {
     // 1. Primary Path: Gemini with live Google Search Grounding & retry
-    const searchModels = ["gemini-3.8-flash", "gemini-flash-latest"];
+    const searchModels = ["gemini-3.8-flash"];
     for (const model of searchModels) {
       for (let attempt = 0; attempt < 2; attempt++) {
         try {
@@ -460,7 +463,7 @@ IMPORTANT: Output ONLY a valid JSON array of objects with the keys above inside 
     }
 
     // 2. Secondary Path: Gemini with structured JSON mode (no search tool needed if grounding was blocked)
-    const structuredModels = ["gemini-3.8-flash", "gemini-flash-latest"];
+    const structuredModels = ["gemini-3.8-flash"];
     for (const model of structuredModels) {
       try {
         const fallbackResponse = await ai.models.generateContent({
@@ -657,8 +660,8 @@ export async function askHalBot(
     tools: Array<{ name: string; description: string; inputSchema: { type: 'object'; properties: Record<string, any>; required?: string[] } }>;
     execute: (name: string, args: Record<string, any>) => Promise<any>;
   },
-  providerApiKeys?: { gemini?: string }
-): Promise<{ text: string; sources?: Array<{ title: string; uri: string }>; toolCalls?: Array<{ name: string; result: any }> }> {
+  providerApiKeys?: { gemini?: string; anthropic?: string; hermesTenantId?: string; hermesConversationId?: string }
+): Promise<{ text: string; sources?: Array<{ title: string; uri: string }>; toolCalls?: Array<{ name: string; result: any }>; provider?: string; model?: string }> {
   const systemInstruction = `You are HAL, the central business operating assistant inside HAL (Human Augmentation Layer).
 
 Your job is to understand the operator's business situation, connect related work across the application, explain the next useful step, and help the operator make sound decisions. Do not behave like a generic chatbot or pretend to be an autonomous employee when the required execution path is not connected.
@@ -689,7 +692,37 @@ RESPONSE STANDARD
 - Avoid hype, generic filler, unsupported certainty, and unnecessary technical detail.
 - Never expose private chain-of-thought. Provide brief conclusions and user-facing rationale only.`;
 
-  const activeAI = getActiveAI(preferredAI);
+  if (preferredAI === 'anthropic' && providerApiKeys?.anthropic) {
+    try {
+      const anthropicMessages = [
+        ...history.map(turn => ({
+          role: turn.role === 'model' ? 'assistant' as const : 'user' as const,
+          content: turn.parts.map(part => part.text).join('\\n')
+        })),
+        { role: 'user' as const, content: message }
+      ];
+      const result = await callAnthropicWithTools({
+        apiKey: providerApiKeys.anthropic,
+        system: systemInstruction,
+        messages: anthropicMessages,
+        tools: toolRuntime?.tools.filter(tool => tool.name !== 'hermes_synthesize_lab_asset'),
+        execute: toolRuntime?.execute
+      });
+      if (result.text || result.toolCalls.length) {
+        return {
+          text: result.text || 'Claude processed the available HAL tool calls. Review Work Queue and Work History for their recorded results.',
+          toolCalls: result.toolCalls.length ? result.toolCalls : undefined,
+          provider: 'anthropic',
+          model: result.model
+        };
+      }
+      throw new Error('Anthropic returned an empty response.');
+    } catch (error: any) {
+      console.error('[HAL Anthropic] Request failed; falling back to configured provider:', error?.message || error);
+    }
+  }
+
+  const activeAI = getActiveAI(preferredAI === 'anthropic' ? undefined : preferredAI);
 
   // When the authenticated server supplies its MCP runtime, HAL can call the
   // same tenant-scoped tools exposed to connected agents. Only the server may
@@ -747,7 +780,7 @@ RESPONSE STANDARD
           ];
         }
 
-        const candidateModels = ["gemini-3.8-flash", "gemini-flash-latest"];
+        const candidateModels = ["gemini-3.8-flash"];
         let response: any = null;
         let lastError: any = null;
         let selectedModel = candidateModels[0];
@@ -928,7 +961,7 @@ RESPONSE STANDARD
           { role: 'user', parts: [{ text: message }] }
         ];
 
-        const candidateModels = ["gemini-3.8-flash", "gemini-flash-latest"];
+        const candidateModels = ["gemini-3.8-flash"];
         let response: any = null;
         let lastError: any = null;
 
@@ -985,6 +1018,20 @@ RESPONSE STANDARD
       } catch (err: any) {
         console.error("Gemini chatbot fallback error:", err);
       }
+    }
+  }
+
+  if (process.env.HERMES_AGENT_URL && process.env.HERMES_AGENT_API_KEY && providerApiKeys?.hermesTenantId && providerApiKeys?.hermesConversationId) {
+    try {
+      const messages = [
+        { role: 'system' as const, content: systemInstruction },
+        ...history.map(turn => ({ role: turn.role === 'model' ? 'assistant' as const : 'user' as const, content: turn.parts.map(part => part.text).join('\\n') })),
+        { role: 'user' as const, content: message }
+      ];
+      const result = await callNousHermes({ messages, tenantId: providerApiKeys.hermesTenantId, conversationId: providerApiKeys.hermesConversationId });
+      return { text: result.text, provider: 'nous-hermes-agent', model: result.model };
+    } catch (error: any) {
+      console.error('[HAL Hermes fallback] Agent runtime unavailable:', error?.message || error);
     }
   }
 

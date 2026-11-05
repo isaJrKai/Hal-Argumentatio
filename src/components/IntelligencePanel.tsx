@@ -116,9 +116,10 @@ export default function IntelligencePanel({
 
   // Grounding state
   const [enableGrounding, setEnableGrounding] = useState(true);
-  const [activeAi, setActiveAi] = useState<'gemini' | 'nemotron'>(() => {
+  const [lastInferenceLabel, setLastInferenceLabel] = useState('');
+  const [activeAi, setActiveAi] = useState<'gemini' | 'nemotron' | 'anthropic'>(() => {
     const saved = localStorage.getItem('hal_active_ai');
-    return (saved === 'gemini' || saved === 'nemotron') ? saved : 'gemini';
+    return (saved === 'gemini' || saved === 'nemotron' || saved === 'anthropic') ? saved : 'gemini';
   });
   
   // Chat state
@@ -218,6 +219,7 @@ export default function IntelligencePanel({
 
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to communicate with HAL.");
+      setLastInferenceLabel([data.provider || activeAi, data.model].filter(Boolean).join(' · '));
 
       // Replace temporary/optimistic query message with database-saved structures
       setMessages(prev => {
@@ -476,9 +478,29 @@ export default function IntelligencePanel({
                           ? 'bg-accent/15 text-accent border border-accent/20'
                           : 'text-text-tertiary hover:text-text-secondary border border-transparent'
                       }`}
-                      title="Google Gemini 3.5 is selected for supported requests; provider access is not verified here."
+                      title="Google Gemini is selected for supported requests; the exact model is reported by the inference adapter, not inferred from this selector."
                     >
                       Gemini
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setActiveAi('anthropic');
+                        localStorage.setItem('hal_active_ai', 'anthropic');
+                        toast({
+                          variant: 'success',
+                          title: 'Claude selected',
+                          description: 'Claude will be used when an Anthropic credential is saved. HAL falls back to another configured provider if Claude is unavailable.'
+                        });
+                      }}
+                      className={`px-2 py-1 rounded text-[9px] font-mono font-bold uppercase transition-all ${
+                        activeAi === 'anthropic'
+                          ? 'bg-positive/10 text-positive border border-positive/20'
+                          : 'text-text-tertiary hover:text-text-secondary border border-transparent'
+                      }`}
+                      title="Anthropic Claude is selected for HAL chat when a tenant credential is available."
+                    >
+                      Claude
                     </button>
                     <button
                       type="button"
@@ -502,6 +524,11 @@ export default function IntelligencePanel({
                     </button>
                   </div>
 
+                  {lastInferenceLabel && (
+                    <span className="hidden xl:inline text-[9px] font-mono text-text-tertiary" title="Provider and model returned by the server for the last completed reply">
+                      Last reply: {lastInferenceLabel}
+                    </span>
+                  )}
                   <button
                     type="button"
                     onClick={() => setEnableGrounding(!enableGrounding)}

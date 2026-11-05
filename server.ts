@@ -4918,7 +4918,7 @@ app.post('/api/intelligence/chat', authenticate, async (req, res) => {
         }
         return toolResult;
       }
-    }, { gemini: tenantAiCredentials.gemini });
+    }, { gemini: tenantAiCredentials.gemini, anthropic: tenantAiCredentials.anthropic, hermesTenantId: contractorId, hermesConversationId: conversationId });
 
     // 5. Save HAL's reply to the database
     const replyDate = new Date();
@@ -4927,7 +4927,7 @@ app.post('/api/intelligence/chat', authenticate, async (req, res) => {
         contractorId, eventType: 'assistant.responded', entityType: 'conversation', entityId: conversationId,
         actorType: 'agent', actorId: activeAi || 'hal_assistant', sourceModule: 'hal_assistant',
         correlationId: conversationId, summary: 'HAL generated a response using conversation and bounded workspace context.',
-        payload: { groundingEnabled: !!enableGrounding, projectId: conversation.projectId || null, sourcesCount: result.sources?.length || 0, toolNames: result.toolCalls?.map(call => call.name) || [] }
+        payload: { groundingEnabled: !!enableGrounding, projectId: conversation.projectId || null, sourcesCount: result.sources?.length || 0, toolNames: result.toolCalls?.map(call => call.name) || [], provider: result.provider || activeAi || 'automatic', model: result.model || null }
       });
     } catch (ledgerError) {
       // Work History is a secondary audit append; it must not suppress a valid Copilot reply.
@@ -4958,6 +4958,8 @@ app.post('/api/intelligence/chat', authenticate, async (req, res) => {
       reply: result.text, 
       sources: result.sources,
       toolCalls: result.toolCalls || [],
+      provider: result.provider || activeAi || 'automatic',
+      model: result.model || null,
       userMessage: userMsg,
       modelMessage: modelMsg
     });
