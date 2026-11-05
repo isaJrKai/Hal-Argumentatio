@@ -1,7 +1,7 @@
 from datetime import date
 import unittest
 from forecast_contract import first_target_week
-from batch_forecast import matches_trade_context
+from forecast_contract import matches_trade_context
 
 
 class FirstTargetWeekTests(unittest.TestCase):

@@ -15,28 +15,13 @@ import numpy as np
 import psycopg
 from psycopg.rows import dict_row
 import timesfm
-from forecast_contract import first_target_week
+from forecast_contract import first_target_week, matches_trade_context
 
 DATABASE_URL = os.environ["DATABASE_URL"]
 MODEL_ID = "google/timesfm-2.5-200m-pytorch"
 MODEL_VERSION = "timesfm-2.5-batch-v1"
 HORIZON = int(os.getenv("TIMESFM_BATCH_HORIZON", "12"))
 MAX_CONTEXT = int(os.getenv("TIMESFM_BATCH_MAX_CONTEXT", "256"))
-
-
-GENERIC_TRADE_WORDS = {"contractor", "contractors", "service", "services", "company", "companies", "business", "businesses", "llc", "inc", "the", "and", "of"}
-
-
-def matches_trade_context(campaign_text: str, niche: str) -> bool:
-    haystack = campaign_text.strip().lower()
-    requested = niche.strip().lower()
-    if not haystack or not requested:
-        return False
-    if requested in haystack:
-        return True
-    tokens = [token for token in __import__("re").split(r"[^a-z0-9]+", requested)
-              if len(token) >= 3 and token not in GENERIC_TRADE_WORDS]
-    return any(token in haystack for token in tokens) if tokens else requested in haystack
 
 
 def weekly_series(rows: list[dict]) -> list[tuple[date, float]]:
