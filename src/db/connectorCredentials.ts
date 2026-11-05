@@ -81,3 +81,50 @@ export async function saveConnectorCredential(contractorId: string, service: str
     client.release();
   }
 }
+
+
+/**
+ * Import a legacy credential only when no PostgreSQL value exists.
+ * The same advisory lock used by normal writes makes the check-and-insert safe
+ * across concurrent application instances without overwriting a newer secret.
+ */
+export async function importConnectorCredentialIfAbsent(
+  contractorId: string,
+  service: string,
+  secret: string,
+  pool?: Pool
+): Promise<boolean> {
+  const tenantId = contractorId.trim();
+  const provider = service.trim();
+  if (!tenantId || !provider) throw new Error('Contractor ID and service are required.');
+  if (typeof secret !== 'string' || secret.length === 0) return false;
+
+  const client = await requirePool(pool).connect();
+  try {
+    await client.query('BEGIN');
+    await client.query('SELECT pg_advisory_xact_lock(hashtext($1), hashtext($2))', [tenantId, provider]);
+    const existing = await client.query<{ id: string }>(
+      'SELECT id FROM connector_credentials WHERE contractor_id = $1 AND service = $2 FOR UPDATE',
+      [tenantId, provider]
+    );
+    if (existing.rows.length > 1) {
+      throw new Error('Duplicate connector credential records exist for this tenant and service; reconcile them before importing.');
+    }
+    if (existing.rows.length === 1) {
+      await client.query('COMMIT');
+      return false;
+    }
+
+    await client.query(
+      'INSERT INTO connector_credentials (id, contractor_id, service, encrypted_value, updated_at) VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP)',
+      [randomUUID(), tenantId, provider, encrypt(secret)]
+    );
+    await client.query('COMMIT');
+    return true;
+  } catch (error) {
+    await client.query('ROLLBACK').catch(() => undefined);
+    throw error;
+  } finally {
+    client.release();
+  }
+}
