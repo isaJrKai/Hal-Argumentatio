@@ -59,7 +59,7 @@ export default function SystemHealthPanel({ token }: SystemHealthPanelProps) {
   
   const [checks, setChecks] = useState<HealthCheck[]>([
     { name: 'Application database readiness', category: 'database', status: 'warning', details: 'Not yet checked.', metric: 'PENDING' },
-    { name: 'AI provider configuration', category: 'ai', status: 'warning', details: 'Not yet checked.', metric: 'PENDING' },
+    { name: 'Live AI provider inference', category: 'ai', status: 'warning', details: 'Not yet checked.', metric: 'PENDING' },
     { name: 'Hermes provider configuration', category: 'ai', status: 'warning', details: 'Not yet checked.', metric: 'PENDING' },
     { name: 'Google Maps connector', category: 'core', status: 'warning', details: 'Not yet checked.', metric: 'PENDING' },
     { name: 'AES-256-GCM round-trip', category: 'security', status: 'warning', details: 'Not yet checked.', metric: 'PENDING' },
@@ -100,14 +100,21 @@ export default function SystemHealthPanel({ token }: SystemHealthPanelProps) {
       toast({
         variant: 'info',
         title: 'Diagnosing HAL Services',
-        description: 'Checking database readiness, provider configuration, encryption and scheduler records...'
+        description: 'Checking database readiness, live AI provider inference, encryption and scheduler records...'
       });
     }
 
     const activeToken = token || localStorage.getItem('halbiz_auth_token') || localStorage.getItem('token') || '';
     const headers = activeToken ? { Authorization: `Bearer ${activeToken}` } : {};
-    const requestJson = async (url: string, authenticated = true) => {
-      const response = await fetch(url, { headers: authenticated ? headers : {} });
+    const requestJson = async (url: string, authenticated = true, method: 'GET' | 'POST' = 'GET') => {
+      const requestHeaders = authenticated
+        ? { ...headers, ...(method === 'POST' ? { 'Content-Type': 'application/json' } : {}) }
+        : {};
+      const response = await fetch(url, {
+        method,
+        headers: requestHeaders,
+        ...(method === 'POST' ? { body: '{}' } : {})
+      });
       const payload = await response.json().catch(() => null);
       if (!response.ok) throw new Error(payload?.error || `${url} returned HTTP ${response.status}`);
       return payload;
@@ -118,9 +125,13 @@ export default function SystemHealthPanel({ token }: SystemHealthPanelProps) {
       result => { setDbLatency(Math.round(performance.now() - dbStarted)); return result; },
       error => { setDbLatency(Math.round(performance.now() - dbStarted)); throw error; }
     );
-    const [readyResult, aiResult, hermesResult, connectorResult, cryptoResult, schedulerResult, leadsResult, healthResult] = await Promise.allSettled([
+    const providerProbe = silent
+      ? Promise.resolve(null)
+      : requestJson('/api/system/diagnostics/ai-providers', true, 'POST');
+    const [readyResult, aiResult, providerProbeResult, hermesResult, connectorResult, cryptoResult, schedulerResult, leadsResult, healthResult] = await Promise.allSettled([
       readinessProbe,
       requestJson('/api/ai/engine-status'),
+      providerProbe,
       requestJson('/api/hermes/status'),
       requestJson('/api/connectors/health'),
       requestJson('/api/system/diagnostics/crypto'),
@@ -135,6 +146,7 @@ export default function SystemHealthPanel({ token }: SystemHealthPanelProps) {
       : '';
     const ready = value(readyResult);
     const ai = value(aiResult);
+    const providerProbeData = value(providerProbeResult);
     const hermes = value(hermesResult);
     const connectorData = value(connectorResult);
     const cryptoData = value(cryptoResult);
@@ -152,11 +164,19 @@ export default function SystemHealthPanel({ token }: SystemHealthPanelProps) {
     
     const activeEngine = typeof ai?.activeEngine === 'string' ? ai.activeEngine : 'unavailable';
     const configuredProviders = ['gemini', 'nemotron'].filter(key => ai?.engines?.[key]?.configured);
+    const verifiedProviders = ['gemini', 'nemotron'].filter(key => providerProbeData?.providers?.[key]?.status === 'verified');
+    const failedProviders = ['gemini', 'nemotron'].filter(key => providerProbeData?.providers?.[key]?.status === 'failed');
+    const liveProbeUnavailable = !silent && providerProbeResult.status === 'rejected';
+    const aiVerified = configuredProviders.length > 0 && verifiedProviders.length === configuredProviders.length;
     const aiDetails = configuredProviders.length
-      ? `Configured: ${configuredProviders.join(', ')}. Provider keys are configured, but live inference has not been verified by this scan.`
+      ? silent
+        ? `Configured: ${configuredProviders.join(', ')}. Live inference has not been tested during this background refresh.`
+        : liveProbeUnavailable
+          ? failure(providerProbeResult) || 'Live provider diagnostics could not run.'
+          : `Live inference verified: ${verifiedProviders.join(', ') || 'none'}.${failedProviders.length ? ` Failed: ${failedProviders.join(', ')}.` : ''}`
       : failure(aiResult) || 'No AI provider is configured.';
     setAiEngineLabel(activeEngine === 'unavailable' ? 'Unavailable' : activeEngine);
-    setAiEngineDetail(configuredProviders.length ? 'Configured · inference unverified' : 'No configured provider');
+    setAiEngineDetail(aiVerified ? 'Live inference verified' : configuredProviders.length ? 'Configured · inference unverified' : 'No configured provider');
 
     const hermesProvider = typeof hermes?.provider === 'string' ? hermes.provider : 'unknown';
     const hermesDetails = hermesProvider === 'fallback'
@@ -194,9 +214,9 @@ export default function SystemHealthPanel({ token }: SystemHealthPanelProps) {
       {
         name: 'AI provider configuration',
         category: 'ai',
-        status: configuredProviders.length ? 'warning' : 'critical',
+        status: !configuredProviders.length ? 'critical' : aiVerified ? 'healthy' : 'warning',
         details: aiDetails,
-        metric: configuredProviders.length ? 'CONFIGURED' : 'UNAVAILABLE'
+        metric: !configuredProviders.length ? 'UNAVAILABLE' : aiVerified ? 'VERIFIED' : 'UNVERIFIED'
       },
       {
         name: 'Hermes provider configuration',

@@ -26,10 +26,12 @@ import { eq, inArray, desc, and, or, like, sql, gte, lte, gt, isNull } from 'dri
 import { 
   generateLearningFromOutcome, 
   generateForecastNarrative,
+  callGemini,
   harvestRealBusinesses,
   askHalBot,
   draftOutreachMessage
 } from './src/lib/gemini';
+import { callNemotron } from './src/services/nemotron.ts';
 import { autonomousLearning } from './src/lib/autonomousLearning';
 import { getAllSkills, executeSkill, registerCustomSkill, unregisterCustomSkill } from './src/skills/registry';
 import { HAL_MCP_TOOLS, executeMcpTool } from './src/services/mcp/dispatcher';
@@ -7367,6 +7369,65 @@ app.get('/api/neural/network', authenticate, async (req, res) => {
 });
 
 // ─── AI ENGINE DUAL-DRIVE & AUTONOMOUS ENGINE STATUS ─────────────────────────
+
+let lastAiProviderDiagnosticAt = 0;
+app.post('/api/system/diagnostics/ai-providers', authenticate, async (req, res) => {
+  if ((req as any).contractorRole !== 'admin') {
+    return res.status(403).json({ error: 'Administrator access is required to run live provider diagnostics.' });
+  }
+
+  const now = Date.now();
+  const retryAfterMs = 30_000 - (now - lastAiProviderDiagnosticAt);
+  if (retryAfterMs > 0) {
+    return res.status(429).json({ error: 'Provider diagnostics are rate limited. Please wait before retrying.', retryAfterSeconds: Math.ceil(retryAfterMs / 1000) });
+  }
+  lastAiProviderDiagnosticAt = now;
+
+  const probePrompt = 'Reply with exactly this text and nothing else: HAL_PROVIDER_HEALTH_OK';
+  const runProbe = async (
+    configured: boolean,
+    run: () => Promise<string>
+  ): Promise<{ configured: boolean; status: 'not_configured' | 'verified' | 'failed'; latencyMs: number | null; errorCode?: string }> => {
+    if (!configured) {
+      return { configured: false, status: 'not_configured', latencyMs: null };
+    }
+
+    const startedAt = Date.now();
+    try {
+      const output = await run();
+      const latencyMs = Date.now() - startedAt;
+      if (typeof output !== 'string' || !output.includes('HAL_PROVIDER_HEALTH_OK')) {
+        return { configured: true, status: 'failed', latencyMs, errorCode: 'INVALID_PROVIDER_RESPONSE' };
+      }
+      return { configured: true, status: 'verified', latencyMs };
+    } catch (error: any) {
+      const latencyMs = Date.now() - startedAt;
+      const statusCode = Number(error?.status || error?.statusCode);
+      const errorCode = Number.isFinite(statusCode) && statusCode > 0
+        ? `HTTP_${statusCode}`
+        : 'PROVIDER_REQUEST_FAILED';
+      console.warn('[HAL AI diagnostics] Provider probe failed:', errorCode);
+      return { configured: true, status: 'failed', latencyMs, errorCode };
+    }
+  };
+
+  const [gemini, nemotron] = await Promise.all([
+    runProbe(Boolean(process.env.GEMINI_API_KEY), () =>
+      callGemini(probePrompt, 'You are performing a provider connectivity check. Follow the requested exact response.', 0)
+    ),
+    runProbe(Boolean(process.env.NVIDIA_API_KEY), () =>
+      callNemotron([{ role: 'user', content: probePrompt }], 0, false)
+    )
+  ]);
+
+  const configuredCount = Number(gemini.configured) + Number(nemotron.configured);
+  const verifiedCount = Number(gemini.status === 'verified') + Number(nemotron.status === 'verified');
+  return res.json({
+    testedAt: new Date().toISOString(),
+    overall: configuredCount === 0 ? 'not_configured' : verifiedCount === configuredCount ? 'verified' : 'degraded',
+    providers: { gemini, nemotron }
+  });
+});
 
 app.get('/api/ai/engine-status', authenticate, async (req, res) => {
   let tenantCredentials: Record<string, string> = {};

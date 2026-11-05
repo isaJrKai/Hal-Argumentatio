@@ -514,6 +514,46 @@ IMPORTANT: Output ONLY a valid JSON array of objects with the keys above inside 
 }
 
 /**
+ * Perform a direct, provider-specific Gemini text request. This deliberately
+ * does not fall back to Nemotron or heuristic output so diagnostics can prove
+ * the Google credential and endpoint work independently.
+ */
+export async function callGemini(
+  prompt: string,
+  systemInstruction: string,
+  temperature = 0.2
+): Promise<string> {
+  const ai = getAIClient();
+  if (!ai) throw new Error('Gemini provider is not configured.');
+
+  const models = ['gemini-3.8-flash', 'gemini-flash-latest', 'gemini-3.1-flash-lite'];
+  let lastError: unknown;
+
+  for (const model of models) {
+    try {
+      const response = await ai.models.generateContent({
+        model,
+        contents: prompt,
+        config: {
+          systemInstruction,
+          temperature,
+          maxOutputTokens: 24
+        }
+      });
+      const output = response.text?.trim() || '';
+      if (!output) throw new Error(`Gemini model ${model} returned an empty response.`);
+      return output;
+    } catch (error) {
+      lastError = error;
+      const status = Number((error as any)?.status || (error as any)?.statusCode);
+      if (status === 401 || status === 403) break;
+    }
+  }
+
+  throw lastError instanceof Error ? lastError : new Error('Gemini provider request failed.');
+}
+
+/**
  * Ask HAL Chatbot - A-Z Knowledge Base Responder
  */
 export async function callGeminiWithTools(
