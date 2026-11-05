@@ -600,11 +600,19 @@ export async function fetchPublicWebsitePage(
   }
 
   let resolvedIps: string[];
+  let dnsTimer: ReturnType<typeof setTimeout> | undefined;
   try {
-    const records = await dns.promises.lookup(url.hostname, { all: true, verbatim: true });
+    const records = await Promise.race([
+      dns.promises.lookup(url.hostname, { all: true, verbatim: true }),
+      new Promise<never>((_resolve, reject) => {
+        dnsTimer = setTimeout(() => reject(new Error('DNS resolution timed out.')), timeoutMs);
+      })
+    ]);
     resolvedIps = records.map(record => record.address);
   } catch (error: any) {
     throw new Error('Website DNS lookup failed: ' + (error?.message || 'No DNS records returned'));
+  } finally {
+    if (dnsTimer) clearTimeout(dnsTimer);
   }
   if (!resolvedIps.length) {
     throw new Error('Website DNS lookup failed: no DNS records returned');
