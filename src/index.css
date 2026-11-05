@@ -418,3 +418,22 @@ body {
 .text-white:not(.btn-primary):not(.btn-primary *):not(.bg-accent *):not(.bg-positive *):not(.bg-negative *):not(.bg-warning *):not(button):not(button *) {
   color: var(--text-primary) !important;
 }
+
+
+/* Consistent keyboard focus without changing the visual hierarchy. */
+:where(a, button, input, select, textarea, [role="button"], [tabindex]):focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
+/* Respect the operating system's reduced-motion preference. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

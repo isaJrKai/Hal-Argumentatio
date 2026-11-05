@@ -88,6 +88,7 @@ export const TopTelemetryBar: React.FC<TopTelemetryBarProps> = ({
               onClick={onOpenMobileMenu}
               className="md:hidden p-2 rounded-lg text-text-tertiary hover:text-text-primary hover:bg-bg-subtle transition-colors cursor-pointer"
               title="Open Navigation Menu"
+              aria-label="Open navigation menu"
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16" />
@@ -95,8 +96,17 @@ export const TopTelemetryBar: React.FC<TopTelemetryBarProps> = ({
             </button>
           )}
 
-          <div 
+          <div
+            role="button"
+            tabIndex={0}
+            aria-label="Go to HALBiz overview"
             onClick={() => setActiveTab('overview')}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault();
+                setActiveTab('overview');
+              }
+            }}
             className="flex items-center gap-2.5 cursor-pointer group"
           >
             <div className="flex items-center gap-2.5">

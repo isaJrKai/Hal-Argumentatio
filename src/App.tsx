@@ -69,7 +69,7 @@ const ConnectorsPanel = lazy(() => import('./components/ConnectorsPanel'));
 const NeuralPanel = lazy(() => import('./components/NeuralPanel'));
 const DebriefModule = lazy(() => import('./components/DebriefModule'));
 const SystemHealthPanel = lazy(() => import('./components/SystemHealthPanel'));
-const MapPanel = lazy(() => import('./components/MapPanel'));
+const MapPanel = lazy(() => import('./components/MapPanelWithProvider'));
 const PublicAuditPage = lazy(() => import('./components/PublicAuditPage'));
 const DeliveryHub = lazy(() => import('./components/DeliveryHub'));
 const PublicPortalPage = lazy(() => import('./components/PublicPortalPage'));
@@ -283,6 +283,59 @@ export default function App() {
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
   const [isSidebarHovered, setIsSidebarHovered] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const mobileDrawerRef = useRef<HTMLElement | null>(null);
+
+  // Keep keyboard focus inside the mobile modal and return it to the trigger.
+  useEffect(() => {
+    if (!isMobileMenuOpen) return;
+
+    const drawer = mobileDrawerRef.current;
+    if (!drawer) return;
+
+    const getFocusable = (): HTMLElement[] =>
+      Array.from(
+        drawer.querySelectorAll(
+          'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+        )
+      ).filter(
+        (element): element is HTMLElement =>
+          element instanceof HTMLElement && element.getAttribute('aria-hidden') !== 'true'
+      );
+
+    getFocusable()[0]?.focus();
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        setIsMobileMenuOpen(false);
+        return;
+      }
+
+      if (event.key !== 'Tab') return;
+      const focusable = getFocusable();
+      if (focusable.length === 0) {
+        event.preventDefault();
+        drawer.focus();
+        return;
+      }
+
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+      document.querySelector<HTMLElement>('[aria-label="Open navigation menu"]')?.focus();
+    };
+  }, [isMobileMenuOpen]);
 
   // Device & Form Factor Detection
   const [deviceInfo, setDeviceInfo] = useState(() => {
@@ -1075,11 +1128,16 @@ export default function App() {
         )}
         {isMobileMenuOpen && (
           <motion.aside
+            ref={mobileDrawerRef}
             key="mobile-drawer"
             initial={{ x: '-100%' }}
             animate={{ x: 0 }}
             exit={{ x: '-100%' }}
             transition={{ type: 'spring', damping: 25, stiffness: 220 }}
+            id="mobile-navigation"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Main navigation"
             className={`fixed top-0 bottom-0 left-0 w-72 max-w-[85vw] z-50 flex flex-col justify-between select-none border-r md:hidden shadow-2xl h-full ${sidebarBg}`}
           >
               <div className="flex flex-col flex-1 overflow-hidden">
@@ -1159,6 +1217,7 @@ export default function App() {
         onCloseNotifications={() => setShowNotificationDropdown(false)}
         onToggleTheme={toggleTheme}
         onOpenMobileMenu={() => setIsMobileMenuOpen(true)}
+        isMobileMenuOpen={isMobileMenuOpen}
         theme={theme}
         isAppInstalled={isAppInstalled || !deferredPrompt}
         onInstallClick={handleInstallClick}
