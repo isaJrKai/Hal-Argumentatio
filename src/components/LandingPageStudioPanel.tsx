@@ -145,6 +145,7 @@ export const LandingPageStudioPanel: React.FC<{ token: string | null }> = ({ tok
           setArtifacts(landers);
           const first = landers[0];
           setSelectedArtifactId(first.id);
+          setSelectedLeadId(first.content?.sourceLeadId || first.content?.pageConfig?.sourceLeadId || '');
 
           // If artifact has saved pageConfig, restore it
           if (first.content?.pageConfig) {
@@ -599,6 +600,22 @@ export const LandingPageStudioPanel: React.FC<{ token: string | null }> = ({ tok
 
         {/* Right: AI Synthesis, History, Save, Share & Live Actions */}
         <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1 bg-bg-raised border border-border-dim rounded-xl px-2 py-1 max-w-[220px]">
+            <span className="text-[9px] font-mono uppercase text-text-secondary whitespace-nowrap">CRM Prospect</span>
+            <select
+              aria-label="Use a saved CRM prospect"
+              value={selectedLeadId}
+              onChange={event => handleSelectSourceLead(event.target.value)}
+              className="min-w-0 bg-transparent text-[10px] font-semibold text-text-primary focus:outline-none cursor-pointer py-0.5"
+            >
+              <option value="" className="bg-bg-raised">Standalone page</option>
+              {leadOptions.map(lead => (
+                <option key={lead.id} value={lead.id} className="bg-bg-raised">
+                  {lead.businessName} · {lead.city}
+                </option>
+              ))}
+            </select>
+          </div>
           {/* Quick Theme Selector Dropdown */}
           <div className="flex items-center gap-1 bg-bg-raised border border-border-dim rounded-xl px-2 py-1">
             <Palette className="w-3.5 h-3.5 text-amber-400 shrink-0" />
