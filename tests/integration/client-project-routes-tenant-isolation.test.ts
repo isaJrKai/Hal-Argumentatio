@@ -167,4 +167,39 @@ describe('client project HTTP route tenant isolation', () => {
     expect(current.status).toBe('onboarding');
     expect(current.monthly_retainer_usd).toBe(1200);
   });
+
+  it('keeps proposal generation tenant-scoped and records a non-persisted draft event', async (ctx) => {
+    if (!dbAvailable) return ctx.skip();
+
+    const payload = {
+      leadId: leadA,
+      packageTier: 'Growth',
+      monthlyRetainerUsd: 1200,
+      setupFeeUsd: 500
+    };
+
+    const foreign = await request(app)
+      .post('/api/proposals/generate')
+      .set('Authorization', `Bearer ${tokenB}`)
+      .send(payload);
+    expect(foreign.status).toBe(404);
+
+    const generated = await request(app)
+      .post('/api/proposals/generate')
+      .set('Authorization', `Bearer ${tokenA}`)
+      .send(payload);
+    expect(generated.status).toBe(201);
+    expect(generated.body.persistenceStatus).toBe('generated_only_not_persisted');
+    expect(generated.body.roiEstimateAnnualUsd).toBeNull();
+
+    const events = await pool.query(
+      `SELECT event_type, entity_id, correlation_id, payload
+       FROM work_events
+       WHERE contractor_id = $1 AND event_type = 'proposal.generated' AND entity_id = $2`,
+      [tenantA, leadA]
+    );
+    expect(events.rows).toHaveLength(1);
+    expect(events.rows[0].correlation_id).toBe(generated.body.id);
+    expect(events.rows[0].payload.persistenceStatus).toBe('generated_only_not_persisted');
+  });
 });
