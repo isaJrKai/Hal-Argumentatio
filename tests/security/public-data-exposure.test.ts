@@ -29,8 +29,22 @@ describe('Public data exposure security', () => {
       expect(route).toContain("inArray(hermesLabArtifacts.status, ['ready', 'deployed'])");
       expect(route).toContain("eq(hermesLabArtifacts.toolId, 'landing_page')");
     }
-    expect(jsonRoute).toContain('return res.json({ success: true, artifact });');
+    expect(jsonRoute).toContain('hasOwnedLandingPageConfig(artifact)');
     expect(jsonRoute).toContain('id: hermesLabArtifacts.id');
-    expect(jsonRoute).not.toContain('contractorId: hermesLabArtifacts.contractorId');
+    const publicProjection = jsonRoute.slice(jsonRoute.indexOf('return res.json({'));
+    expect(publicProjection).not.toContain('contractorId');
+    expect(htmlRoute).toContain('hasOwnedLandingPageConfig(artifact)');
+  });
+
+  it('never publishes arbitrary client-supplied HTML or unowned page configuration', () => {
+    const saveStart = source.indexOf("app.post('/api/landing-pages/save'");
+    const saveEnd = source.indexOf("app.get('/api/public/form/dispatch'", saveStart);
+    expect(saveStart).toBeGreaterThanOrEqual(0);
+    expect(saveEnd).toBeGreaterThan(saveStart);
+    const saveRoute = source.slice(saveStart, saveEnd);
+    expect(saveRoute).toContain('!pageConfig');
+    expect(saveRoute).toContain('const ownedPageConfig = { ...pageConfig, id: artifactId, contractorId }');
+    expect(saveRoute).toContain('generateLandingPageHtml(ownedPageConfig)');
+    expect(saveRoute).not.toContain('const ownedRenderedHtml = ownedPageConfig ? generateLandingPageHtml(ownedPageConfig) : renderedHtml');
   });
 });
