@@ -858,7 +858,7 @@ export const DocumentRibbon: React.FC<DocumentRibbonProps> = ({
             {/* Active Recipient Details */}
             {currentRecipient && (
               <div className="text-[11px] text-slate-400 pl-2">
-                Active: <span className="text-slate-200 font-medium">{currentRecipient.businessName}</span> &bull; <span className="text-blue-400">\${currentRecipient.recommendedSlaUsd === null ? 'Not priced' : `${currentRecipient.recommendedSlaUsd}/mo`}</span>
+                Active: <span className="text-slate-200 font-medium">{currentRecipient.businessName}</span> &bull; <span className="text-blue-400">{currentRecipient.recommendedSlaUsd === null ? 'Not priced' : `$${currentRecipient.recommendedSlaUsd}/mo`}</span>
               </div>
             )}
           </div>
