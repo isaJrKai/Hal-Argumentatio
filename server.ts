@@ -4195,7 +4195,14 @@ app.post('/api/revenues', authenticate, async (req, res) => {
     return res.status(201).json({ ...updated.revenue, leadStatus: updated.lead.status });
   } catch (err: any) {
     console.error('[HAL Revenue Conversion] Transaction failed:', err);
-    return res.status(503).json({ error: err.message || 'Revenue conversion could not be committed.' });
+    const message = err?.message || 'Revenue conversion could not be committed.';
+    // A concurrent close-out that loses the conditional lead update is a
+    // business conflict, not a database outage. Return 409 so callers can
+    // refresh the lead instead of treating a duplicate close as retryable.
+    if (message === 'Lead changed before the close could be committed. Refresh and try again.') {
+      return res.status(409).json({ error: message, code: 'LEAD_CLOSE_CONFLICT' });
+    }
+    return res.status(503).json({ error: message });
   }
 });
 
