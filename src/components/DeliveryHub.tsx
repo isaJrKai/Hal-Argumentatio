@@ -48,7 +48,7 @@ export default function DeliveryHub({ token, leads = [] }: DeliveryHubProps) {
   const [newProjectCity, setNewProjectCity] = useState('');
   const [newProjectServiceType, setNewProjectServiceType] = useState('');
   const [newProjectPackage, setNewProjectPackage] = useState<'Growth' | 'Dominance' | 'Enterprise'>('Dominance');
-  const [newProjectRetainer, setNewProjectRetainer] = useState(2400);
+  const [newProjectRetainer, setNewProjectRetainer] = useState(0);
 
   const fetchProjects = async (retry = 1) => {
     let retryScheduled = false;
@@ -131,6 +131,7 @@ export default function DeliveryHub({ token, leads = [] }: DeliveryHubProps) {
       setNewProjectCity('');
       setNewProjectServiceType('');
       setNewProjectLeadId('');
+      setNewProjectRetainer(0);
       setProjectError(null);
     } catch (err) {
       console.error('Error creating project:', err);
@@ -515,9 +516,9 @@ export default function DeliveryHub({ token, leads = [] }: DeliveryHubProps) {
             </div>
 
             <form onSubmit={handleCreateProject} className="space-y-3 font-mono text-xs">
-              {leads.length > 0 && (
+              {leads.some(l => ['closed_won', 'won', 'converted', 'customer'].includes(String(l.status).toLowerCase())) && (
                 <div className="space-y-1">
-                  <label className="text-[10px] text-text-secondary uppercase font-bold">Select Existing Lead (Optional)</label>
+                  <label className="text-[10px] text-text-secondary uppercase font-bold">Link a closed-won lead (Optional)</label>
                   <select
                     value={newProjectLeadId}
                     onChange={(e) => {
@@ -534,7 +535,7 @@ export default function DeliveryHub({ token, leads = [] }: DeliveryHubProps) {
                     className="w-full bg-bg-dark border border-border-dim rounded-sm p-2 text-text-primary outline-none focus:border-brand"
                   >
                     <option value="">-- Manual Entry / No Linked Lead --</option>
-                    {leads.map(l => (
+                    {leads.filter(l => ['closed_won', 'won', 'converted', 'customer'].includes(String(l.status).toLowerCase())).map(l => (
                       <option key={l.id} value={l.id}>{l.businessName} ({l.city} - {l.serviceType})</option>
                     ))}
                   </select>
