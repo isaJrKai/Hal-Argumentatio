@@ -2,7 +2,7 @@
 
 ## Architecture contract
 
-HAL providers (Claude, Gemini, Nemotron and Nous Hermes) are interchangeable reasoning engines. They do not own business permissions, tenant identity, or execution state. HAL owns those concerns through a shared capability registry, authenticated server-side execution callbacks, durable Work Queue tasks, Work History receipts, and approval gates.
+HAL providers (Claude, Gemini and Nemotron) are interchangeable reasoning engines on the current shared tool surface. Nous Hermes remains a provider fallback only; it joins the shared capability surface after its authenticated MCP bridge is implemented. They do not own business permissions, tenant identity, or execution state. HAL owns those concerns through a shared capability registry, authenticated server-side execution callbacks, durable Work Queue tasks, Work History receipts, and approval gates.
 
 The registry in `src/services/ai/capabilityRegistry.ts` is the single catalogue for capabilities exposed to provider tool calling. Each capability records its stable ID, purpose, category, risk, status, and backing HAL dispatcher tools. Provider adapters receive the same active tool definitions; the server callback supplies the authenticated contractor ID. A model cannot select or override tenant scope.
 
@@ -24,7 +24,7 @@ The full website-review workflow remains planned. The active `websites.audit.con
 The following entries are deliberately marked `planned` and expose no provider tools yet:
 
 1. **Full website audit** — safely crawl and inspect a public website, report exactly which measurements ran, and distinguish measured facts from inferred recommendations.
-2. **Website redesign** — use business context and verified site evidence to produce a versioned draft in Landing Page Studio. Claude, Gemini, Nemotron, and Hermes should be selectable as reasoning providers through the same execution contract. Iteration must preserve the source evidence and draft history.
+2. **Website redesign** — use business context and verified site evidence to produce a versioned draft in Landing Page Studio. Claude, Gemini and Nemotron should be selectable as reasoning providers through the same execution contract. Hermes can join after its tenant-scoped MCP bridge is delivered. Iteration must preserve the source evidence and draft history.
 3. **Website publishing** — require an explicit human approval tied to the exact artifact/version hash. Publishing must be a separate executor, not a side effect of generation or saving a draft.
 
 ## Execution lifecycle
