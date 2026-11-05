@@ -16,6 +16,9 @@ import { patentLandscapeSkill } from '../../src/skills/patent-landscape';
 import { pricingMarginCalculatorSkill } from '../../src/skills/pricing-margin-calculator';
 import { listSubscriptionPricingSkill } from '../../src/skills/list-subscription-pricing';
 import { automationOpsProductSkill } from '../../src/skills/automation-ops-product';
+import { jupyterLiveKernelSkill } from '../../src/skills/jupyter-live-kernel';
+import { xurlSkill } from '../../src/skills/xurl';
+import { talentArbitrageBridgeSkill } from '../../src/skills/talent-arbitrage-bridge';
 
 describe('existing HAL skills evidence boundaries', () => {
   beforeEach(() => generateResponse.mockReset());
@@ -78,6 +81,55 @@ describe('existing HAL skills evidence boundaries', () => {
     expect(result.schema.url).toBeUndefined();
     expect(result.schema.image).toBeUndefined();
     expect(result.report).not.toContain('35%');
+  });
+
+  it('does not claim Python code was executed or kernel state persisted', async () => {
+    const result = await jupyterLiveKernelSkill.execute({
+      code: 'print(1 + 1)',
+      notebookPath: 'demo.ipynb'
+    }, 'tenant-a');
+
+    expect(result.executionPerformed).toBe(false);
+    expect(result.kernelStatePersisted).toBe(false);
+    expect(result.evidenceStatus).toBe('static_source_review_only');
+    expect(result.report).toContain('Execution performed:** No');
+    expect(result.report).not.toContain('Simulated Success');
+  });
+
+  it('does not claim X posts, searches, DMs, or profile lookups were executed', async () => {
+    const post = await xurlSkill.execute({
+      action: 'post',
+      content: 'Hello from HAL',
+      targetUser: ''
+    }, 'tenant-a');
+    expect(post.actionExecuted).toBe(false);
+    expect(post.apiQueried).toBe(false);
+    expect(post.report).toContain('Drafted only: not posted.');
+
+    const lookup = await xurlSkill.execute({
+      action: 'user_lookup',
+      content: 'Check this account',
+      targetUser: '@example'
+    }, 'tenant-a');
+    expect(lookup.apiQueried).toBe(false);
+    expect(lookup.report).toContain('Profile lookup performed: No');
+  });
+
+  it('does not invent talent rejection rates, wages, or overseas buyer demand', async () => {
+    const result = await talentArbitrageBridgeSkill.execute({
+      serviceCategory: 'Bookkeeping',
+      talentLocation: 'Uganda',
+      targetOverseasMarket: 'Canada',
+      pricingMarkupPercent: '50',
+      riskMitigationOffer: 'A paid pilot task'
+    }, 'tenant-a');
+
+    expect(result.candidateVettingPerformed).toBe(false);
+    expect(result.buyerResearchPerformed).toBe(false);
+    expect(result.evidenceStatus).toBe('planning_only_no_market_data_or_candidates_verified');
+    expect(result.report).not.toContain('reject 95%');
+    expect(result.report).not.toContain('mathematically superior');
+    expect(result.report).toContain('No wage survey');
   });
 
   it('does not fabricate records in the lead-list packager', async () => {
