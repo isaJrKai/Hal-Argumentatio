@@ -8448,7 +8448,9 @@ app.post('/api/system/postgres-sync', authenticate, requireRole('admin'), async 
     try {
       const localLeads = db.getLeads(contractorId);
       const localWinLoss = db.getWinLossRecords(contractorId);
-      const learningState = autonomousLearning.getState();
+      const tenantLearning = getTenantAutonomousLearning(String(contractorId || ''));
+      await tenantLearning.initializeFromDb();
+      const learningState = tenantLearning.getState();
 
       const existingLeadRows = localLeads.length
         ? await client.query('SELECT id FROM leads WHERE contractor_id = $1', [contractorId])
@@ -12280,7 +12282,9 @@ async function startServer() {
       const syntheticLeadsCount = allLeads.filter(l => l.isSynthetic).length;
       const verifiedLeadsCount = allLeads.filter(l => (l as any).verificationStatus === 'VERIFIED' && !l.isSynthetic).length;
       
-      const learningState = autonomousLearning.getState();
+      const tenantLearning = getTenantAutonomousLearning(String(contractorId || ''));
+      await tenantLearning.initializeFromDb();
+      const learningState = tenantLearning.getState();
 
       const orgNodes = getDefaultOrganizationNodes();
       const edgeRegions = getDefaultEdgeRegions();
@@ -12321,7 +12325,9 @@ async function startServer() {
       const totalLeadsCount = allLeads.length;
       const syntheticLeadsCount = allLeads.filter(l => l.isSynthetic).length;
       const verifiedLeadsCount = allLeads.filter(l => (l as any).verificationStatus === 'VERIFIED' && !l.isSynthetic).length;
-      const learningState = autonomousLearning.getState();
+      const tenantLearning = getTenantAutonomousLearning(String(contractorId || ''));
+      await tenantLearning.initializeFromDb();
+      const learningState = tenantLearning.getState();
 
       const activeDiagnostics = {
         hasGeminiKey: Boolean(process.env.GEMINI_API_KEY),
