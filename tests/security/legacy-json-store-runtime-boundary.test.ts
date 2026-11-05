@@ -44,6 +44,23 @@ describe('runtime persistence boundary', () => {
     expect(harvestRoutes).not.toMatch(/legacyMirrors/);
   });
 
+  it('keeps legacy lead mutations confined to the production-disabled roadmap simulator', () => {
+    const serverSource = readFileSync(resolve(process.cwd(), 'server.ts'), 'utf8');
+    const simulatorStart = serverSource.indexOf("app.post('/api/roadmap/phase1/simulate-transaction'");
+    const simulatorEnd = serverSource.indexOf('// 5. Verify Cryptographic Ledger Integrity', simulatorStart);
+    expect(simulatorStart).toBeGreaterThanOrEqual(0);
+    expect(simulatorEnd).toBeGreaterThan(simulatorStart);
+    const simulator = serverSource.slice(simulatorStart, simulatorEnd);
+    const productionGuard = simulator.indexOf("if (process.env.NODE_ENV === 'production')");
+    const firstLegacyMutation = Math.min(
+      ...['db.addLead(', 'db.updateLead('].map(value => simulator.indexOf(value)).filter(index => index >= 0)
+    );
+    expect(productionGuard).toBeGreaterThanOrEqual(0);
+    expect(firstLegacyMutation).toBeGreaterThan(productionGuard);
+    const outsideSimulator = serverSource.slice(0, simulatorStart) + serverSource.slice(simulatorEnd);
+    expect(outsideSimulator).not.toMatch(/\\bdb\\.(addLead|updateLead)\\s*\\(/);
+  });
+
   it('does not import the legacy JSON aggregate store from application source', () => {
     const offenders = sourceFiles(sourceRoot).filter((filePath) =>
       importsLegacyJsonStore(filePath, readFileSync(filePath, 'utf8'))
