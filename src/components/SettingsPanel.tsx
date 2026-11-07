@@ -549,7 +549,7 @@ export default function SettingsPanel({
       <div className={`border rounded-lg p-6 space-y-6 min-w-0 ${cardBg}`}>
         <div className="flex flex-wrap items-center gap-2 border-b pb-3 border-inherit">
           <Briefcase className="w-4 h-4 text-brand" />
-          <span className="text-xs font-mono uppercase tracking-wider font-bold">Workspace and company profile</span>
+          <span className="text-xs font-mono uppercase tracking-wider font-bold">Workspace and company</span>
           <span className="ml-auto text-[11px] px-2 py-0.5 bg-brand/10 text-brand font-mono border border-brand/20 rounded font-semibold uppercase flex items-center gap-1">
             <Sparkles className="w-3 h-3" /> Custom branding
           </span>
@@ -565,7 +565,7 @@ export default function SettingsPanel({
           <div className="space-y-3 font-mono">
             <div className="flex items-center justify-between">
               <label className="text-[11px] font-bold text-text-primary uppercase tracking-wider">
-                TARGET SUB-NICHE
+                Trade or service
               </label>
               <span className="text-[11px] text-brand">{activeNiche}</span>
             </div>
@@ -606,7 +606,7 @@ export default function SettingsPanel({
           <div className="space-y-3 font-mono">
             <div className="flex items-center justify-between">
               <label className="text-[11px] font-bold text-text-primary uppercase tracking-wider">
-                TARGET CITY / TERRITORY
+                City or region
               </label>
               <span className="text-[11px] text-text-dim flex items-center gap-1">
                 <Globe className="w-3 h-3" /> ACTIVE: {(activeCity || '').toUpperCase()}
@@ -649,17 +649,17 @@ export default function SettingsPanel({
           </div>
         </div>
 
-        {/* 3. WHITE-LABEL OPERATOR & AGENCY BRANDING SETTINGS */}
+        {/* 3. Company details and branding SETTINGS */}
         <div className="p-5 bg-bg-subtle border border-border-dim rounded-sm space-y-4 pt-4 border-t border-border-dim">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2 font-mono">
               <Paintbrush className="w-4 h-4 text-brand" />
               <span className="text-xs font-bold text-text-primary uppercase">
-                WHITE-LABEL OPERATOR & AGENCY BRANDING
+                Company details and branding
               </span>
             </div>
             <span className="text-[11px] font-mono text-text-dim">
-              Tailors pitch deck exports & audit headers
+              Used on reports and client materials
             </span>
           </div>
 
@@ -729,7 +729,7 @@ export default function SettingsPanel({
 
               {/* Quick Brand Accent Presets */}
               <div className="flex items-center gap-1.5 pt-1">
-                <span className="text-[11px] font-mono text-text-tertiary uppercase">Presets:</span>
+                <span className="text-[11px] font-mono text-text-tertiary uppercase">Brand colours:</span>
                 {[
                   { name: 'Volt Lime', color: '#c8f542' },
                   { name: 'Cyber Indigo', color: '#6366f1' },
@@ -835,7 +835,7 @@ export default function SettingsPanel({
             <div className="space-y-3">
               <div className="flex items-center gap-2">
                 <User className="w-4 h-4 text-accent" />
-                <span className="text-xs font-mono font-bold uppercase tracking-wide text-inherit">Executive Profile Image</span>
+                <span className="text-xs font-mono font-bold uppercase tracking-wide text-inherit">Profile photo</span>
               </div>
               <p className="text-[11px] text-inherit opacity-80 leading-normal">
                 Upload a professional avatar image to represent the agency principal on headers and meeting consoles.
@@ -883,7 +883,7 @@ export default function SettingsPanel({
             <div className="space-y-3">
               <div className="flex items-center gap-2">
                 <Building className="w-4 h-4 text-positive" />
-                <span className="text-xs font-mono font-bold uppercase tracking-wide text-inherit">Corporate Branding Logo</span>
+                <span className="text-xs font-mono font-bold uppercase tracking-wide text-inherit">Company logo</span>
               </div>
               <p className="text-[11px] text-inherit opacity-80 leading-normal">
                 Upload your custom agency or client logo to completely skin the system launcher sidebar.
