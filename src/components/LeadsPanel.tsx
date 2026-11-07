@@ -1,7 +1,7 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { Lead, LeadEvent } from '../types';
 import { motion } from 'motion/react';
-import LeadMap from './LeadMap';
+import LeadMap, { OsmTradeCandidate } from './LeadMap';
 import WhiteLabelReportModal from './WhiteLabelReportModal';
 import { useBusinessContext } from '../context/BusinessContext';
 import { getCityCoordinates, CITIES_CONFIG } from '../config/cities';
@@ -127,6 +127,46 @@ export default function LeadsPanel({ leads, token, onRefresh }: LeadsPanelProps)
       setHarvesting(false);
     }
   };
+
+  const handleImportOsmPlace = useCallback(async (candidate: OsmTradeCandidate) => {
+    const res = await fetch('/api/leads/ingest', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify({
+        leads: [{
+          businessName: candidate.name,
+          city: candidate.city,
+          serviceType: candidate.craft,
+          phone: candidate.phone,
+          email: candidate.email,
+          websiteUrl: candidate.websiteUrl,
+          sourceType: 'openstreetmap_poi',
+          verificationStatus: 'UNVERIFIED_STAGING',
+          dnsVerified: false,
+          isSynthetic: false,
+          notes: 'Imported from an OpenStreetMap community-mapped trade POI. This does not establish current operation or contact validity. Human review is required before outreach.',
+          groundingEvidence: {
+            source: 'openstreetmap',
+            osmType: candidate.osmType,
+            osmId: candidate.osmId,
+            latitude: candidate.latitude,
+            longitude: candidate.longitude,
+            attribution: '© OpenStreetMap contributors',
+            verificationNote: 'Community-mapped POI; business operation and contact details are not independently verified.'
+          }
+        }]
+      })
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) throw new Error(data.error || 'Could not add this mapped place to CRM review.');
+    setIngestFeedback(data.count
+      ? `Added ${candidate.name} to the CRM and created a human review task. Verify before outreach.`
+      : `${candidate.name} was already in the CRM or was skipped as a duplicate.`);
+    onRefresh();
+  }, [token, onRefresh]);
 
   const handleIngestSelected = async () => {
     const leadsToIngest = harvestedLeads.filter((_, i) => selectedIndices.has(i));
@@ -312,7 +352,9 @@ export default function LeadsPanel({ leads, token, onRefresh }: LeadsPanelProps)
       status: lead.status,
       coords: typeof lead.latitude === 'number' && typeof lead.longitude === 'number'
         ? { lat: lead.latitude, lng: lead.longitude }
-        : null
+        : typeof lead.groundingEvidence?.latitude === 'number' && typeof lead.groundingEvidence?.longitude === 'number'
+          ? { lat: lead.groundingEvidence.latitude, lng: lead.groundingEvidence.longitude }
+          : null
     }));
   }, [filteredLeads]);
 
@@ -1398,7 +1440,8 @@ Next-Gen Waterproofing	Calgary	Waterproofing	Jane Smith	jane@nextgen.ca	403-555-
             <LeadMap 
               leads={mappedLeadsForMap} 
               center={mapCenter} 
-              city={cityFilter === 'all' ? activeCity : cityFilter} 
+              city={cityFilter === 'all' ? activeCity : cityFilter}
+              onImportOsmPlace={handleImportOsmPlace}
               selectedLeadId={selectedLead?.id}
               onSelectLead={(leadId) => {
                 const found = leads.find(l => l.id === leadId);
