@@ -168,7 +168,7 @@ export default function LeadMap({
       // Surface style/network failures instead of leaving the map stuck on
       // "Loading OpenFreeMap…" forever when the style endpoint cannot load.
       map.on('error', (event: any) => {
-        if (disposed || mapReady) return;
+        if (disposed || map.isStyleLoaded()) return;
         const message = event?.error?.message || 'The map style or tiles could not be loaded.';
         setMapError(message);
       });
