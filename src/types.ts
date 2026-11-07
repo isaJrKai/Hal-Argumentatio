@@ -6,6 +6,8 @@ export interface Lead {
   email?: string;
   phone?: string;
   city: string;
+  latitude?: number | null;
+  longitude?: number | null;
   serviceType: string;
   source: string;
   status: 'new' | 'contacted' | 'qualified' | 'sal' | 'proposal' | 'closed_won' | 'closed_lost' | 'converted' | 'dead' | 'retained' | 'churned' | 'reactivated';
