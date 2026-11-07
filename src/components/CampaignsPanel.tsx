@@ -436,7 +436,7 @@ export default function CampaignsPanel({ campaigns, leads = [], token, onRefresh
         </div>
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div>
-            <h2 className="text-xl font-bold tracking-tight text-text-primary">Marketing & Campaigns</h2>
+            <h2 className="text-xl font-bold tracking-tight text-text-primary">Campaigns</h2>
             <p className="text-xs text-text-secondary max-w-2xl mt-0.5 leading-relaxed">
               Review recorded campaign spend and performance snapshots when available. Metrics remain blank until actual campaign events are recorded.
             </p>
