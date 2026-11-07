@@ -597,7 +597,7 @@ export default function HermesLabPanel({ token }: { token: string | null }) {
           </div>
           <div>
             <div className="flex items-center gap-2 flex-wrap">
-              <h2 className="text-xl font-bold tracking-tight text-text-primary">Business assistant & tools</h2>
+              <h2 className="text-xl font-bold tracking-tight text-text-primary">Creative studio</h2>
               <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-accent-dim text-accent border border-accent/20">
                 {engineStatus?.activeEngine || 'NOUS HERMES 3.7'}
               </span>
@@ -607,7 +607,7 @@ export default function HermesLabPanel({ token }: { token: string | null }) {
               </span>
             </div>
             <p className="text-xs text-text-secondary mt-0.5">
-              Create landing pages and ad assets, manage SEO details, and review operational diagnostics.
+              Create and manage landing pages, ads and other business materials.
             </p>
           </div>
         </div>
@@ -947,7 +947,7 @@ export default function HermesLabPanel({ token }: { token: string | null }) {
                   <Bot className="w-4 h-4" />
                 </div>
                 <div>
-                  <h3 className="text-xs font-bold text-text-primary">Hermes Creative Strategist</h3>
+                  <h3 className="text-xs font-bold text-text-primary">Creative assistant</h3>
                   <p className="text-[11px] text-text-secondary">Set the colors, typography and voice used in your assets.</p>
                 </div>
               </div>
@@ -1018,10 +1018,10 @@ export default function HermesLabPanel({ token }: { token: string | null }) {
             <div className="px-4 py-3 border-b border-border-dim flex items-center justify-between bg-bg-base/40">
               <div className="flex items-center gap-2">
                 <div className="w-2 h-2 rounded-full bg-emerald-400 " />
-                <span className="text-xs font-bold text-text-primary">Hermes Lab Dialogue</span>
+                <span className="text-xs font-bold text-text-primary">Assistant chat</span>
                 <span className="px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[10px] font-mono font-bold flex items-center gap-1">
                   <Sparkles className="w-3 h-3" />
-                  {engineStatus?.activeEngine || 'Nous Hermes 3 (70B / 405B) Live'}
+                  {engineStatus?.activeEngine || 'Not reported'}
                 </span>
               </div>
               <span className="text-[10px] font-mono text-text-tertiary">
@@ -1039,7 +1039,7 @@ export default function HermesLabPanel({ token }: { token: string | null }) {
                   <div className="max-w-md space-y-1">
                     <h4 className="text-sm font-bold text-text-primary">Personalize Assets to Your Taste</h4>
                     <p className="text-xs text-text-secondary leading-relaxed">
-                      Ask Hermes to alter color schemes, rewrite copy, add emergency warranty badges, or re-structure layout forms. Hermes updates the code in real-time.
+                      Describe the changes you want to make to the selected asset. Review the saved draft before using it.
                     </p>
                   </div>
                 </div>
