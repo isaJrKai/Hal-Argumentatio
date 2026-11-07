@@ -543,7 +543,7 @@ export default function MapPanel({ leads, token, onOpenWorkQueue }: MapPanelProp
 
       {/* SPATIAL ZONE DRAWING BAR */}
       <details className="bg-bg-raised border border-border-dim p-4 rounded-xl space-y-3">
-        <summary className="cursor-pointer text-sm font-semibold text-text-primary">Map tools · {${"serviceZones.length"}} service areas</summary>
+        <summary className="cursor-pointer text-sm font-semibold text-text-primary">Map tools · {serviceZones.length} service areas</summary>
         <div className="pt-3 space-y-3 font-mono">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-2">
