@@ -123,9 +123,6 @@ export default function LeadMap({
         setMapReady(true);
       });
       map.on('mousemove', (event: any) => setCursor({ lat: event.lngLat.lat, lng: event.lngLat.lng }));
-      map.on('click', (event: any) => {
-        if (isDrawingZone && onAddZonePoint) onAddZonePoint({ lat: event.lngLat.lat, lng: event.lngLat.lng });
-      });
       mapRef.current = map;
     }).catch(error => {
       if (!disposed) setMapError(error?.message || 'Could not load the free map.');
