@@ -435,7 +435,7 @@ export default function ConnectorsPanel() {
         <div>
           <div className="flex items-center gap-2">
             <h1 className="text-2xl font-bold tracking-tight text-zinc-900 dark:text-zinc-100">
-              Integrations & Verification
+              Integrations
             </h1>
             <Badge variant="neutral">
               Verification required
@@ -486,7 +486,7 @@ export default function ConnectorsPanel() {
           }`}
         >
           <MessageSquare className="w-4 h-4" />
-          <span>Two-Way Inbound (WhatsApp & SMS)</span>
+          <span>Messaging</span>
           <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
         </button>
 
@@ -499,7 +499,7 @@ export default function ConnectorsPanel() {
           }`}
         >
           <ProviderBrandIcon brand="meta" label="Meta" className="h-5 w-5" />
-          <span>Meta & Instagram Ads</span>
+          <span>Meta Ads</span>
           {metaStatus === 'configured' && (
             <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
           )}
@@ -514,7 +514,7 @@ export default function ConnectorsPanel() {
           }`}
         >
           <Database className="w-4 h-4" />
-          <span>Active Infrastructure</span>
+          <span>Infrastructure</span>
           <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
         </button>
       </div>
@@ -530,10 +530,10 @@ export default function ConnectorsPanel() {
                 </div>
                 <div>
                   <h3 className="text-base font-semibold text-zinc-900 dark:text-zinc-100">
-                    Unified Google Workspace Integration
+                    Google Workspace
                   </h3>
                   <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
-                    Combines Google Drive, Google Calendar, and Gmail into a single zero-friction OAuth token.
+                    Connect Google Drive, Calendar and Gmail for the tools your workspace uses.
                   </p>
                 </div>
               </div>
