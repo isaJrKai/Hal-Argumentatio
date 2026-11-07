@@ -294,36 +294,26 @@ export default function LeadsPanel({ leads, token, onRefresh }: LeadsPanelProps)
   }, [leads, searchQuery, cityFilter, statusFilter]);
 
   const mappedLeadsForMap = useMemo(() => {
-    return filteredLeads.map((lead, idx) => {
-      const baseCoords = getCityCoordinates(lead.city);
-      
-      const angle = (idx * 137.5) * (Math.PI / 180);
-      const r = 0.01 + (idx * 0.005);
-      const latOffset = Math.sin(angle) * r * 0.35;
-      const lngOffset = Math.cos(angle) * r * 0.45;
-
-      return {
-        id: lead.id,
-        businessName: lead.businessName,
-        ownerName: lead.ownerName,
-        phone: lead.phone,
-        email: lead.email,
-        city: lead.city,
-        serviceType: lead.serviceType,
-        googleRating: lead.googleRating,
-        reviewCount: lead.reviewCount,
-        seoScore: lead.seoScore,
-        performanceScore: lead.performanceScore,
-        sslStatus: lead.sslStatus,
-        urgencyScore: lead.urgencyScore,
-        predictedLtvUsd: lead.predictedLtvUsd,
-        status: lead.status,
-        coords: {
-          lat: baseCoords.lat + latOffset,
-          lng: baseCoords.lng + lngOffset
-        }
-      };
-    });
+    return filteredLeads.map(lead => ({
+      id: lead.id,
+      businessName: lead.businessName,
+      ownerName: lead.ownerName,
+      phone: lead.phone,
+      email: lead.email,
+      city: lead.city,
+      serviceType: lead.serviceType,
+      googleRating: lead.googleRating,
+      reviewCount: lead.reviewCount,
+      seoScore: lead.seoScore,
+      performanceScore: lead.performanceScore,
+      sslStatus: lead.sslStatus,
+      urgencyScore: lead.urgencyScore,
+      predictedLtvUsd: lead.predictedLtvUsd,
+      status: lead.status,
+      coords: typeof lead.latitude === 'number' && typeof lead.longitude === 'number'
+        ? { lat: lead.latitude, lng: lead.longitude }
+        : null
+    }));
   }, [filteredLeads]);
 
   const mapCenter = useMemo(() => {
@@ -333,8 +323,8 @@ export default function LeadsPanel({ leads, token, onRefresh }: LeadsPanelProps)
     if (filteredLeads.length > 0) {
       return getCityCoordinates(filteredLeads[0].city);
     }
-    return { lat: 49.8951, lng: -97.1384 };
-  }, [cityFilter, filteredLeads]);
+    return getCityCoordinates(activeCity);
+  }, [cityFilter, filteredLeads, activeCity]);
 
   const cities = Array.from(new Set(leads.map(l => l.city)));
 
@@ -910,6 +900,9 @@ export default function LeadsPanel({ leads, token, onRefresh }: LeadsPanelProps)
                       <option value={10}>10 Leads</option>
                       <option value={15}>15 Leads</option>
                       <option value={20}>20 Leads</option>
+                      <option value={30}>30 Leads</option>
+                      <option value={40}>40 Leads</option>
+                      <option value={50}>50 Leads</option>
                     </select>
                   </div>
                   <button
