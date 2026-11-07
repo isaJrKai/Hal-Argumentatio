@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import {
   Search,
   Bell,
@@ -12,10 +12,9 @@ import {
   Activity,
   ListTodo,
   Compass,
-  Bot,
-  ChevronDown,
-  ChevronUp
-} from 'lucide-react';import { useBusinessContext } from '../context/BusinessContext';
+  Bot
+} from 'lucide-react';
+import { useBusinessContext } from '../context/BusinessContext';
 
 interface TopTelemetryBarProps {
   activeTab: string;
@@ -58,8 +57,7 @@ export const TopTelemetryBar: React.FC<TopTelemetryBarProps> = ({
   onInstallClick,
   onLogout
 }) => {
-  const { workspaceConfig, activeCity, activeIndustry, supportedCities, setActiveCity, setCity } = useBusinessContext();
-  const [isRibbonExpanded, setIsRibbonExpanded] = useState(false);
+  const { workspaceConfig, activeCity, supportedCities, setActiveCity, setCity } = useBusinessContext();
 
   // Top Workspace Tabs (AutoCAD Master Panels)
   const topNavTabs = [
@@ -68,7 +66,7 @@ export const TopTelemetryBar: React.FC<TopTelemetryBarProps> = ({
     { id: 'work-queue', label: 'Tasks', icon: ListTodo },
     { id: 'leads', label: 'Prospects', icon: Compass },
     { id: 'board', label: 'Sales Pipeline', icon: Users },
-    { id: 'map', label: 'Map', icon: Map },
+    { id: 'map', label: 'Maps', icon: Map },
     { id: 'campaigns', label: 'Outreach & Messages', icon: Send },
     { id: 'revenue-intelligence', label: 'Financials', icon: TrendingUp },
     { id: 'hermes-lab', label: 'Business assistant', icon: Cpu },
@@ -239,7 +237,7 @@ export const TopTelemetryBar: React.FC<TopTelemetryBarProps> = ({
 
       {/* ─── ROW 2: PRIMARY WORKSPACE TABS (DOMAINS) ─── */}
       <div className="px-3 sm:px-5 flex items-center justify-between border-b border-border-dim bg-bg-base transition-colors duration-200">
-        <div id="hal-primary-workspace-tabs" className={`flex items-center gap-1 no-scrollbar py-0.5 min-w-0 ${isRibbonExpanded ? 'flex-wrap overflow-visible' : 'overflow-x-auto'}`}>
+        <div id="hal-primary-workspace-tabs" className="flex flex-wrap items-center gap-1 no-scrollbar py-0.5 min-w-0">
           {topNavTabs.map((tab) => {
             const isActive = activeTab === tab.id;
             const Icon = tab.icon;
@@ -260,23 +258,11 @@ export const TopTelemetryBar: React.FC<TopTelemetryBarProps> = ({
             );
           })}
         </div>
-        <button
-          type="button"
-          onClick={() => setIsRibbonExpanded(value => !value)}
-          aria-expanded={isRibbonExpanded}
-          aria-controls="hal-primary-workspace-tabs"
-          className="inline-flex items-center gap-1.5 shrink-0 px-2.5 py-2 text-[11px] font-medium text-text-secondary hover:text-text-primary rounded-md border border-border-dim hover:bg-bg-subtle transition-colors"
-          title={isRibbonExpanded ? "Collapse workspace ribbon" : "Expand workspace ribbon"}
-        >
-          {isRibbonExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
-          <span className="hidden sm:inline">{isRibbonExpanded ? "Collapse ribbon" : "Expand ribbon"}</span>
-          <span className="sm:hidden">{isRibbonExpanded ? "Less" : "More"}</span>
-        </button>
-        <div className="hidden xl:flex items-center gap-2 pl-4 border-l border-border-dim shrink-0">
-          <label htmlFor="workspace-territory" className="text-xs text-text-secondary">Territory</label>
+        <div className="hidden md:flex items-center gap-2 pl-4 border-l border-border-dim shrink-0">
+          <label htmlFor="workspace-territory" className="sr-only">Workspace city</label>
           <select
             id="workspace-territory"
-            aria-label="Workspace territory"
+            aria-label="Workspace city"
             value={activeCity}
             onChange={(event) => (setActiveCity ? setActiveCity(event.target.value) : setCity?.(event.target.value))}
             className="max-w-[160px] px-2.5 py-2 rounded-md text-xs font-sans font-medium bg-bg-raised text-text-primary border border-border-dim focus:outline-none focus:border-accent cursor-pointer"
@@ -285,7 +271,6 @@ export const TopTelemetryBar: React.FC<TopTelemetryBarProps> = ({
               <option key={city} value={city}>{city}</option>
             ))}
           </select>
-          <span className="text-xs text-text-secondary pl-2">{activeIndustry.name}</span>
         </div>
       </div>
 

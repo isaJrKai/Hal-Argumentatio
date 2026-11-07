@@ -64,7 +64,7 @@ export default function StaffPanel({ token }: StaffPanelProps) {
   return <div className="space-y-5 min-w-0">
     <div className="flex flex-wrap items-start justify-between gap-3">
       <div><div className="flex items-center gap-2 text-accent mb-2"><Users className="w-4 h-4" /><span className="text-[10px] font-mono font-bold uppercase tracking-[0.18em]">People operations</span></div>
-        <h1 className="text-2xl font-display font-semibold text-text-primary">Staff Management</h1>
+        <h1 className="text-2xl font-display font-semibold text-text-primary">Team</h1>
         <p className="text-sm text-text-secondary mt-1 max-w-2xl">Maintain the real staff roster, responsibilities and availability. Active assignments determine who is currently busy.</p>
       </div>
       <button onClick={() => void loadStaff()} disabled={loading} className="inline-flex items-center gap-2 px-3 py-2 rounded-md border border-border-default bg-bg-raised text-text-secondary text-xs font-mono"><RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} /> Refresh</button>
@@ -82,7 +82,7 @@ export default function StaffPanel({ token }: StaffPanelProps) {
     </form>
 
     {error && <div role="alert" className="border border-danger/30 bg-danger/5 text-danger rounded-lg p-3 text-sm">{error}</div>}
-    {loading ? <div className="p-8 text-center text-sm text-text-tertiary">Loading staff…</div> : staff.length === 0 ? <div className="border border-dashed border-border-default rounded-xl p-10 text-center"><Users className="w-8 h-8 mx-auto text-text-tertiary mb-3" /><h2 className="text-sm font-semibold text-text-primary">No staff records yet</h2><p className="text-xs text-text-secondary mt-2">Add your actual team members to make named task ownership available in Work Queue.</p></div> : <div className="space-y-2">
+    {loading ? <div className="p-8 text-center text-sm text-text-tertiary">Loading staff…</div> : staff.length === 0 ? <div className="border border-dashed border-border-default rounded-xl p-10 text-center"><Users className="w-8 h-8 mx-auto text-text-tertiary mb-3" /><h2 className="text-sm font-semibold text-text-primary">No team members yet</h2><p className="text-xs text-text-secondary mt-2">Add team members to assign named tasks.</p></div> : <div className="space-y-2">
       {staff.map(member => <article key={member.id} className="border border-border-default bg-bg-raised rounded-lg p-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0"><h2 className="text-sm font-semibold text-text-primary">{member.name}</h2><div className="flex flex-wrap items-center gap-2 mt-1"><input aria-label={`Role for ${member.name}`} defaultValue={member.role} onBlur={e => { if (e.target.value.trim() && e.target.value.trim() !== member.role) void updateStaff(member, { role: e.target.value.trim() }); }} maxLength={80} className="max-w-52 bg-bg-base border border-border-default rounded px-2 py-1 text-xs text-text-secondary" />{member.email && <span className="text-xs text-text-secondary">{member.email}</span>}{member.phone && <span className="text-xs text-text-secondary">{member.phone}</span>}</div><p className="text-[10px] text-text-tertiary font-mono mt-2">{member.activeTaskCount} active assignment{member.activeTaskCount === 1 ? '' : 's'} · {member.effectiveAvailability}</p></div>

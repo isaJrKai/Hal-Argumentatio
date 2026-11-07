@@ -613,7 +613,7 @@ export default function NeuralPanel() {
           </div>
           <div>
             <h1 className="text-xl font-bold text-text-primary tracking-tight flex items-center gap-2">
-              Territory & outcome graph
+              Business connections
               <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold border uppercase ${
                 networkData.telemetry ? 'bg-green-500/10 text-green-400 border-green-500/20'
                   : isSyncing ? 'bg-amber-500/10 text-amber-400 border-amber-500/20'
@@ -627,7 +627,7 @@ export default function NeuralPanel() {
         </div>
         <div className="flex items-center gap-3">
           <div className="px-3 py-2 bg-bg-overlay border border-border-dim rounded-lg mr-2 text-xs text-text-secondary">
-            Read-only graph
+            Read-only map
           </div>
           <button onClick={fetchNetwork} className="flex items-center gap-2 px-4 py-2 bg-bg-overlay border border-border-dim hover:border-accent text-text-secondary hover:text-accent rounded-lg text-sm font-medium transition-colors">
             <RefreshCw className={`w-4 h-4 ${isSyncing ? 'animate-spin' : ''}`} />
@@ -639,7 +639,7 @@ export default function NeuralPanel() {
       <div className="flex-1 flex overflow-hidden">
         <div className="w-72 border-r border-border-dim bg-bg-overlay overflow-y-auto shrink-0 flex flex-col z-20 shadow-xl">
           <div className="p-4 border-b border-border-dim">
-            <h3 className="text-xs font-mono font-bold text-text-tertiary uppercase tracking-wider mb-3">Data sources</h3>
+            <h3 className="text-xs font-mono font-bold text-text-tertiary uppercase tracking-wider mb-3">Connected systems</h3>
             <div className="space-y-2">
               {SUBSYSTEMS.map(sys => {
                 const nodeCount = (networkData.nodes || []).filter(n =>
@@ -658,7 +658,7 @@ export default function NeuralPanel() {
             </div>
           </div>
           <div className="p-4 space-y-4">
-            <h3 className="text-xs font-mono font-bold text-text-tertiary uppercase tracking-wider">Graph summary</h3>
+            <h3 className="text-xs font-mono font-bold text-text-tertiary uppercase tracking-wider">Summary</h3>
             <div className="bg-bg-base border border-border-dim rounded-lg p-4 space-y-3">
               <div className="flex justify-between items-center"><span className="text-[10px] font-mono text-text-secondary" >Learning cycles</span><span className="text-xs font-mono font-bold text-text-primary">{learningMetrics?.epoch ?? 'Not measured'}</span></div>
               <div className="flex justify-between items-center"><span className="text-[10px] font-mono text-text-secondary" >Recorded Outcomes</span><span className="text-xs font-mono font-bold text-accent">{learningMetrics?.outcomesDigested ?? '0'}</span></div>

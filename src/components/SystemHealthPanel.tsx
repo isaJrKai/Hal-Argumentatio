@@ -309,14 +309,14 @@ export default function SystemHealthPanel({ token }: SystemHealthPanelProps) {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-border-dim pb-4">
         <div className="space-y-1">
           <span className="text-[10px] font-mono tracking-widest text-accent uppercase">
-            HAL EXECUTIVE DIAGNOSTICS
+            System health
           </span>
           <h1 className="text-xl font-bold text-text-primary tracking-tight flex items-center gap-2">
             <Activity className="w-5 h-5 text-accent animate-pulse" />
-            System Heartbeat
+            System health
           </h1>
           <p className="text-xs text-text-secondary">
-            Live monitoring of HAL's full-stack core engine processes, database transactions, cryptographic encryption status, and background scheduling systems.
+            Check the database, AI providers, encryption and scheduled tasks.
           </p>
         </div>
 
@@ -328,7 +328,7 @@ export default function SystemHealthPanel({ token }: SystemHealthPanelProps) {
           className="flex items-center gap-2 text-text-secondary hover:text-text-primary"
         >
           <RotateCw className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin text-accent' : ''}`} />
-          Run Diagnostics Scan
+          Run checks
         </Button>
       </div>
 
@@ -338,7 +338,7 @@ export default function SystemHealthPanel({ token }: SystemHealthPanelProps) {
         {/* OVERALL HEALTH */}
         <div className="bg-bg-raised border border-border-dim rounded-xl p-4.5 flex flex-col justify-between h-[120px]">
           <div className="flex items-center justify-between">
-            <span className="text-[10px] font-mono text-text-secondary uppercase">HAL Integrity Score</span>
+            <span className="text-[10px] font-mono text-text-secondary uppercase">Overall health</span>
             <Heart className={`w-4 h-4 ${healthScore > 90 ? 'text-positive animate-pulse fill-positive/25' : 'text-amber-500 animate-bounce'}`} />
           </div>
           <div className="mt-2.5">
@@ -352,7 +352,7 @@ export default function SystemHealthPanel({ token }: SystemHealthPanelProps) {
         {/* AI ENGINE STATUS */}
         <div className="bg-bg-raised border border-border-dim rounded-xl p-4.5 flex flex-col justify-between h-[120px]">
           <div className="flex items-center justify-between">
-            <span className="text-[10px] font-mono text-text-secondary uppercase">AI Orchestrator</span>
+            <span className="text-[10px] font-mono text-text-secondary uppercase">AI provider</span>
             <Cpu className="w-4 h-4 text-accent" />
           </div>
           <div className="mt-2.5">
@@ -364,7 +364,7 @@ export default function SystemHealthPanel({ token }: SystemHealthPanelProps) {
         {/* CRYPTO ENGINE SECURITY */}
         <div className="bg-bg-raised border border-border-dim rounded-xl p-4.5 flex flex-col justify-between h-[120px]">
           <div className="flex items-center justify-between">
-            <span className="text-[10px] font-mono text-text-secondary uppercase">PII Guard & Encryption</span>
+            <span className="text-[10px] font-mono text-text-secondary uppercase">Encryption</span>
             <ShieldCheck className="w-4 h-4 text-positive" />
           </div>
           <div className="mt-2.5">
@@ -376,7 +376,7 @@ export default function SystemHealthPanel({ token }: SystemHealthPanelProps) {
         {/* DATABASE LATENCY */}
         <div className="bg-bg-raised border border-border-dim rounded-xl p-4.5 flex flex-col justify-between h-[120px]">
           <div className="flex items-center justify-between">
-            <span className="text-[10px] font-mono text-text-secondary uppercase">Database IO Engine</span>
+            <span className="text-[10px] font-mono text-text-secondary uppercase">Database</span>
             <Database className="w-4 h-4 text-text-primary" />
           </div>
           <div className="mt-2.5">
@@ -400,7 +400,7 @@ export default function SystemHealthPanel({ token }: SystemHealthPanelProps) {
             <div className="flex items-center gap-2 mb-3 border-b border-border-dim pb-2.5 justify-between">
               <div className="flex items-center gap-2">
                 <FileCheck className="w-4 h-4 text-accent" />
-                <h3 className="text-xs font-mono font-bold text-text-primary uppercase tracking-wider">Subsystem Diagnostics Check</h3>
+                <h3 className="text-xs font-mono font-bold text-text-primary uppercase tracking-wider">System checks</h3>
               </div>
               <span className="text-[9px] font-mono text-text-tertiary">LAST SCAN: {lastCheck}</span>
             </div>
@@ -455,17 +455,17 @@ export default function SystemHealthPanel({ token }: SystemHealthPanelProps) {
             <div className="flex items-center gap-2 mb-3 border-b border-border-dim pb-2">
               <Server className="w-4 h-4 text-indigo-400" />
               <h3 className="text-xs font-mono font-bold text-text-primary uppercase tracking-wider">
-                System Telemetry Status
+                Technical details
               </h3>
             </div>
 
             <div className="grid grid-cols-2 gap-4 font-mono text-[10.5px]">
               <div className="border-b border-border-dim/40 py-1 flex flex-col">
-                <span className="text-text-tertiary uppercase text-[8px] tracking-wider">Uptime Counter</span>
+                <span className="text-text-tertiary uppercase text-[8px] tracking-wider">Uptime</span>
                 <span className="text-text-primary font-bold">{uptime}</span>
               </div>
               <div className="border-b border-border-dim/40 py-1 flex flex-col">
-                <span className="text-text-tertiary uppercase text-[8px] tracking-wider">Database Node</span>
+                <span className="text-text-tertiary uppercase text-[8px] tracking-wider">Database</span>
                 <span className="text-text-primary font-bold">PostgreSQL (Neon)</span>
               </div>
               <div className="border-b border-border-dim/40 py-1 flex flex-col">

@@ -415,7 +415,7 @@ export default function App() {
     return () => mq.removeEventListener('change', onChange);
   }, []);
 
-  // Synchronize theme with document element classList to ensure proper background and variable values
+  // Keep document styling and browser chrome aligned with the selected theme.
   useEffect(() => {
     const root = document.documentElement;
     if (theme === 'light') {
@@ -425,6 +425,8 @@ export default function App() {
       root.classList.add('dark-theme');
       root.classList.remove('light-theme');
     }
+    const themeColor = theme === 'light' ? '#f7f9fc' : '#0c0e12';
+    document.querySelector('meta[name="theme-color"]')?.setAttribute('content', themeColor);
   }, [theme]);
 
   // Global fetch interceptor to attach auth tokens, handle transient network hiccups, and catch expired sessions
@@ -611,7 +613,7 @@ export default function App() {
 
   const downloadWindowsShortcut = () => {
     const currentUrl = window.location.origin;
-    const shortcutContent = `[InternetShortcut]\nURL=${currentUrl}\nIconIndex=0\nIconFile=${currentUrl}/icon.jpg\n`;
+    const shortcutContent = `[InternetShortcut]\nURL=${currentUrl}\nIconIndex=0\nIconFile=${currentUrl}/icon.png\n`;
     const blob = new Blob([shortcutContent], { type: 'text/plain' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
@@ -1542,39 +1544,15 @@ export default function App() {
         </Suspense>
       </div>
 
-      {/* METICULOUS BOTTOM STATUS BAR */}
-      <footer className="h-6 shrink-0 border-t border-border-dim/50 bg-bg-overlay text-text-secondary flex items-center justify-between px-4 text-[9.5px] font-mono transition-colors select-none">
-        <div className="flex items-center gap-3">
-          <button 
-            onClick={() => setActiveTab('manual')} 
-            className="text-accent font-semibold hover:underline cursor-pointer"
-          >
-            HAL v2.0
-          </button>
-          <span className="text-text-tertiary">|</span>
-          <button 
-            onClick={() => setActiveTab('credentials')} 
-            className="hover:text-accent hover:underline cursor-pointer flex items-center gap-1"
-          >
-            DATABASE: SERVER-MANAGED
-          </button>
-          <span className="text-text-tertiary">|</span>
-          <button 
-            onClick={() => setActiveTab('leads')} 
-            className="hover:text-accent hover:underline cursor-pointer"
-          >
-            RECORDS: {leads.length} PROSPECTS
-          </button>
-        </div>
-        <div className="flex items-center gap-2">
-          <button 
-            onClick={() => setActiveTab('connectors')} 
-            className="hover:text-accent hover:underline cursor-pointer"
-          >
-            REALTIME_STREAM: ACTIVE
-          </button>
-          <span className="w-1.5 h-1.5 rounded-full bg-positive animate-pulse" />
-        </div>
+      {/* Quiet status: keep the useful record count; keep implementation details in Settings. */}
+      <footer className="h-6 shrink-0 border-t border-border-dim/50 bg-bg-overlay text-text-secondary flex items-center px-4 text-[9.5px] font-mono transition-colors select-none">
+        <button
+          onClick={() => setActiveTab('leads')}
+          className="hover:text-accent hover:underline cursor-pointer"
+          aria-label={`${leads.length} prospects. Open prospects.`}
+        >
+          {leads.length} prospects
+        </button>
       </footer>
 
       {/* APP INSTALLATION MODAL (ADAPTIVE MOBILE & DESKTOP) */}
@@ -1609,7 +1587,7 @@ export default function App() {
               {/* Icon Container */}
               <div className="relative w-20 h-20 mx-auto mb-4">
                 <img
-                  src="/icon.jpg"
+                  src="/icon.png"
                   alt="HALBiz App Icon"
                   className="w-20 h-20 rounded-2xl border-2 border-accent/40 shadow-xl shadow-accent/10 object-cover"
                   referrerPolicy="no-referrer"

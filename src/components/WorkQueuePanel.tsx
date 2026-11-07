@@ -90,7 +90,7 @@ export default function WorkQueuePanel({ token }: WorkQueuePanelProps) {
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({ taskType, title: title.trim(), description: description.trim() || undefined, assignedWorker, ...(assignedWorker === 'human' && assignedStaffId ? { assignedStaffId } : {}), priority, requiresApproval, ...(taskInput ? { input: taskInput } : {}) })
       });
-      const body = await readApiResponse<any>(response, 'Create work item');
+      const body = await readApiResponse<any>(response, 'New task');
       if (!response.ok) throw new Error(body.error || 'Unable to create task.');
       setTitle(''); setDescription(''); setTaskType('research'); setInputJson('{}'); setRequiresApproval(false); setAssignedStaffId('');
       await loadTasks();
@@ -174,9 +174,8 @@ export default function WorkQueuePanel({ token }: WorkQueuePanelProps) {
     <div className="space-y-5 min-w-0">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <div className="flex items-center gap-2 text-accent mb-2"><ListTodo className="w-4 h-4" /><span className="text-[10px] font-mono font-bold uppercase tracking-[0.18em]">Work orchestration</span></div>
-          <h1 className="text-2xl font-display font-semibold text-text-primary">Work Queue</h1>
-          <p className="text-sm text-text-secondary mt-1 max-w-2xl">Assign work to a person or specialist worker, track its state and preserve the execution trail. A queued task is an assignment, not proof that an agent has executed it.</p>
+          <h1 className="text-2xl font-display font-semibold text-text-primary">Tasks</h1>
+          <p className="text-sm text-text-secondary mt-1 max-w-2xl">Assign tasks, track progress and review the execution history. An assignment is not complete until the work is recorded.</p>
         </div>
         <button onClick={() => void loadTasks()} disabled={loading} className="inline-flex items-center gap-2 px-3 py-2 rounded-md border border-border-default bg-bg-raised text-text-secondary hover:text-text-primary disabled:opacity-50 text-xs font-mono"><RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} /> Refresh</button>
       </div>
@@ -190,11 +189,8 @@ export default function WorkQueuePanel({ token }: WorkQueuePanelProps) {
         ))}
       </div>
 
-      <section className="border border-border-default bg-bg-raised rounded-xl p-4 space-y-3">
-        <div className="flex items-center justify-between gap-2">
-          <h2 className="text-sm font-semibold text-text-primary">Worker readiness</h2>
-          <span className="text-[10px] text-text-tertiary font-mono">Verified execution boundaries</span>
-        </div>
+      <details className="border border-border-default bg-bg-raised rounded-xl p-4 space-y-3">
+        <summary className="cursor-pointer text-sm font-semibold text-text-primary">Automation availability</summary>
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-2">
           {workerCapabilities.map(worker => (
             <div key={worker.id} className="rounded-lg border border-border-default bg-bg-base p-3">
@@ -207,10 +203,10 @@ export default function WorkQueuePanel({ token }: WorkQueuePanelProps) {
             </div>
           ))}
         </div>
-      </section>
+      </details>
 
       <form onSubmit={createTask} className="border border-border-default bg-bg-raised rounded-xl p-4 space-y-3">
-        <div className="flex items-center gap-2 text-sm font-semibold text-text-primary"><Plus className="w-4 h-4 text-accent" /> Create work item</div>
+        <div className="flex items-center gap-2 text-sm font-semibold text-text-primary"><Plus className="w-4 h-4 text-accent" /> New task</div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <label className="text-[10px] text-text-tertiary font-mono uppercase">Task title
             <input value={title} onChange={e => setTitle(e.target.value)} maxLength={180} required placeholder="e.g. Audit the selected plumbing prospects" className="mt-1 w-full rounded-md bg-bg-base border border-border-default p-2.5 text-sm text-text-primary outline-none focus:border-accent normal-case" />

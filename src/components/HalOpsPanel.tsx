@@ -178,7 +178,7 @@ export default function HalOpsPanel({
               <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-brand to-transparent" />
               <div className="flex items-center gap-2 mb-6">
                 <Brain className="w-5 h-5 text-brand" />
-                <h3 className="text-sm font-mono font-bold text-text-primary uppercase tracking-wider">Strategy Vector Parameters</h3>
+                <h3 className="text-sm font-mono font-bold text-text-primary uppercase tracking-wider">Outreach forecast settings</h3>
               </div>
               
               <div className="space-y-5">
@@ -227,7 +227,7 @@ export default function HalOpsPanel({
                   className="w-full mt-4 bg-brand hover:bg-brand-dim text-black font-mono font-bold text-xs uppercase tracking-wider py-4 rounded-lg flex items-center justify-center gap-2 transition-all shadow-[0_0_20px_rgba(255,255,255,0.05)] disabled:opacity-50"
                 >
                   {simRunning ? <Loader2 className="w-4 h-4 animate-spin" /> : <Activity className="w-4 h-4" />}
-                  {simRunning ? 'SIMULATING OUTCOMES...' : 'RUN NEURAL SIMULATION'}
+                  {simRunning ? 'Estimating...' : 'Estimate outcomes'}
                 </button>
               </div>
             </div>
@@ -237,14 +237,14 @@ export default function HalOpsPanel({
                {!simResult && !simRunning && (
                  <div className="text-center opacity-40">
                    <Target className="w-12 h-12 mx-auto mb-3 text-text-dim" />
-                   <p className="text-xs font-mono uppercase tracking-wider text-text-dim">Awaiting strategy vectors to predict outcomes...</p>
+                   <p className="text-xs font-mono uppercase tracking-wider text-text-dim">Choose the market, channel and offer to estimate results.</p>
                  </div>
                )}
 
                {simRunning && (
                  <div className="text-center animate-pulse">
                    <Activity className="w-12 h-12 mx-auto mb-3 text-brand" />
-                   <p className="text-xs font-mono uppercase tracking-wider text-brand">Querying historical synaptic weights...</p>
+                   <p className="text-xs font-mono uppercase tracking-wider text-brand">Comparing with available historical results...</p>
                  </div>
                )}
 
@@ -256,12 +256,12 @@ export default function HalOpsPanel({
                  >
                    <div className="flex items-center gap-3 mb-6 border-b border-border-dark pb-4">
                      <TrendingUp className="w-6 h-6 text-brand" />
-                     <h3 className="text-lg font-bold text-text-primary tracking-tight">Predicted Strategy Outcome</h3>
+                     <h3 className="text-lg font-bold text-text-primary tracking-tight">Estimated outcome</h3>
                    </div>
 
                    <div className="grid grid-cols-2 gap-4">
                      <div className="bg-card-dark border border-border-dark rounded-lg p-4">
-                       <span className="block text-[10px] font-mono text-text-dim font-bold uppercase tracking-wider mb-1">Conversion Confidence</span>
+                       <span className="block text-[10px] font-mono text-text-dim font-bold uppercase tracking-wider mb-1">Confidence</span>
                        <div className="flex items-baseline gap-1">
                          <span className={`text-2xl font-bold font-mono ${simResult.confidence >= 70 ? 'text-emerald-400' : simResult.confidence >= 40 ? 'text-amber-400' : 'text-red-400'}`}>
                            {simResult.confidence}%
@@ -269,7 +269,7 @@ export default function HalOpsPanel({
                        </div>
                      </div>
                      <div className="bg-card-dark border border-border-dark rounded-lg p-4">
-                       <span className="block text-[10px] font-mono text-text-dim font-bold uppercase tracking-wider mb-1">Est. Cost Per Lead</span>
+                       <span className="block text-[10px] font-mono text-text-dim font-bold uppercase tracking-wider mb-1">Estimated cost per lead</span>
                        <div className="flex items-baseline gap-1">
                          <span className="text-2xl font-bold font-mono text-text-primary">${simResult.predictedCpl}</span>
                        </div>
@@ -277,7 +277,7 @@ export default function HalOpsPanel({
                    </div>
 
                    <div className="bg-brand/5 border border-brand/20 rounded-lg p-4">
-                     <span className="block text-[10px] font-mono text-brand font-bold uppercase tracking-wider mb-2">Neural Rationale</span>
+                     <span className="block text-[10px] font-mono text-brand font-bold uppercase tracking-wider mb-2">Why this estimate</span>
                      <p className="text-sm text-text-secondary leading-relaxed font-sans">{simResult.rationale}</p>
                    </div>
                  </motion.div>
@@ -300,8 +300,8 @@ export default function HalOpsPanel({
               {/* Core Task Trigger board */}
               <div className="bg-card-dark border border-border-dark rounded-sm p-5">
                 <div className="flex justify-between items-center border-b border-border-dark pb-3 mb-5">
-                  <span className="text-xs font-mono uppercase tracking-wider text-text-primary font-bold">HAL Scheduler Operations</span>
-                  <span className="text-[10px] font-mono text-text-dim uppercase font-bold">Core Algorithms</span>
+                  <span className="text-xs font-mono uppercase tracking-wider text-text-primary font-bold">Scheduled tasks</span>
+                  <span className="text-[10px] font-mono text-text-dim uppercase font-bold">Automations</span>
                 </div>
                 <div className="space-y-4">
                   {operations.map(op => {
@@ -329,7 +329,7 @@ export default function HalOpsPanel({
               {/* Audit Jobs log history */}
               <div className="bg-card-dark border border-border-dark rounded-sm p-5">
                 <div className="flex justify-between items-center border-b border-border-dark pb-3 mb-4">
-                  <span className="text-xs font-mono uppercase tracking-wider text-text-primary font-bold">Scheduler Job Execution Log</span>
+                  <span className="text-xs font-mono uppercase tracking-wider text-text-primary font-bold">Execution history</span>
                   <button onClick={onRefresh} className="text-text-dim hover:text-text-primary transition-colors">
                     <RefreshCw className="w-3.5 h-3.5" />
                   </button>
@@ -377,7 +377,7 @@ export default function HalOpsPanel({
             <div className="bg-card-dark border border-border-dark rounded-sm p-5 h-fit space-y-6">
               <div className="flex items-center gap-2 border-b border-border-dark pb-3">
                 <ShieldAlert className="w-4 h-4 text-brand" />
-                <span className="text-xs font-mono uppercase tracking-wider text-text-primary font-bold">Decision Approver Board</span>
+                <span className="text-xs font-mono uppercase tracking-wider text-text-primary font-bold">Approvals</span>
               </div>
               <p className="text-xs text-text-secondary leading-relaxed font-sans">
                 HAL generates autonomous recommendations based on trend confidence levels. Review and approve budget shifts or active bid updates.
@@ -422,7 +422,7 @@ export default function HalOpsPanel({
 
               {/* Historical Decisions */}
               <div className="space-y-3 pt-3 border-t border-border-dark/60">
-                <span className="text-[10px] font-mono uppercase tracking-widest text-text-dim block font-bold">Decision History Logs</span>
+                <span className="text-[10px] font-mono uppercase tracking-widest text-text-dim block font-bold">Decision history</span>
                 {pastRecs.length === 0 ? (
                   <p className="text-[10px] font-mono text-text-dim uppercase tracking-wider">No past decisions archived.</p>
                 ) : (

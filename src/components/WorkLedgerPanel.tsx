@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Activity, RefreshCw, Search, Clock3, UserRound, Bot, Workflow, AlertCircle } from 'lucide-react';
+import { Activity, RefreshCw, Search, Clock3, UserRound, Bot, AlertCircle } from 'lucide-react';
 
 type WorkEvent = {
   id: string;
@@ -68,15 +68,8 @@ export default function WorkLedgerPanel({ token }: WorkLedgerPanelProps) {
 
   return (
     <div className="space-y-5 min-w-0">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <div className="flex items-center gap-2 text-accent mb-2">
-            <Activity className="w-4 h-4" />
-            <span className="text-[10px] font-mono font-bold uppercase tracking-[0.18em]">Operational memory</span>
-          </div>
-          <h1 className="text-2xl font-display font-semibold text-text-primary">Work History</h1>
-          <p className="text-sm text-text-secondary mt-1 max-w-2xl">A factual timeline of recorded work across HAL. Events retain their tenant, source module, actor and business-record identity.</p>
-        </div>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h1 className="text-xl font-display font-semibold text-text-primary">Activity</h1>
         <button onClick={() => void loadEvents(true)} disabled={refreshing} className="inline-flex items-center gap-2 px-3 py-2 rounded-md border border-border-default bg-bg-raised text-text-secondary hover:text-text-primary disabled:opacity-50 text-xs font-mono">
           <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin' : ''}`} /> Refresh
         </button>
@@ -84,11 +77,11 @@ export default function WorkLedgerPanel({ token }: WorkLedgerPanelProps) {
 
       <div className="flex flex-wrap items-center gap-3 border border-border-default bg-bg-raised rounded-lg p-3">
         <div className="flex items-center gap-2 text-text-tertiary text-xs font-mono">
-          <Workflow className="w-4 h-4" /> {events.length} recorded events
+          {events.length} events
         </div>
         <div className="flex-1 min-w-[220px] relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-tertiary" />
-          <input value={query} onChange={event => setQuery(event.target.value)} placeholder="Filter events, modules, records or agents…" className="w-full pl-9 pr-3 py-2 bg-bg-base border border-border-default rounded-md text-sm text-text-primary placeholder:text-text-tertiary outline-none focus:border-accent" />
+          <input value={query} onChange={event => setQuery(event.target.value)} placeholder="Search activity" className="w-full pl-9 pr-3 py-2 bg-bg-base border border-border-default rounded-md text-sm text-text-primary placeholder:text-text-tertiary outline-none focus:border-accent" />
         </div>
       </div>
 

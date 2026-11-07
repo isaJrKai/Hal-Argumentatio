@@ -101,7 +101,7 @@ export default function RevenueIntelligenceView({ token }: RevenueIntelligenceVi
     return (
       <div className="flex items-center justify-center h-96 text-text-secondary font-mono text-xs">
         <Activity className="w-5 h-5 animate-spin mr-2 text-accent" />
-        Computing Revenue Intelligence Funnels...
+        Computing Revenue performance Funnels...
       </div>
     );
   }
@@ -118,12 +118,11 @@ export default function RevenueIntelligenceView({ token }: RevenueIntelligenceVi
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-border-dim/60 pb-5">
         <div>
           <div className="flex items-center gap-2">
-            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
-            <h1 className="text-xl font-bold font-sans tracking-tight text-text-primary">Revenue Intelligence</h1>
-            <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-accent/10 text-accent font-semibold">PHASE 5 ENGINE</span>
+            <h1 className="text-xl font-bold font-sans tracking-tight text-text-primary">Revenue performance</h1>
+
           </div>
           <p className="text-xs text-text-secondary font-mono mt-1">
-            Bridging Google Ads economic spend with immutable CRM pipeline stages and closed-won revenue.
+            Track campaign costs against qualified leads and recorded deals.
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -132,7 +131,7 @@ export default function RevenueIntelligenceView({ token }: RevenueIntelligenceVi
             className="px-3.5 py-2 bg-accent hover:bg-accent/90 text-white rounded-lg text-xs font-mono font-medium flex items-center gap-2 transition-all shadow-sm cursor-pointer"
           >
             <Plus className="w-3.5 h-3.5" />
-            New Revenue Experiment
+            New experiment
           </button>
         </div>
       </div>
@@ -163,12 +162,12 @@ export default function RevenueIntelligenceView({ token }: RevenueIntelligenceVi
           <div className="text-[10px] text-text-secondary font-mono mt-0.5">{summary.totalLeads || 0} total leads</div>
         </div>
         <div className="p-4 rounded-xl border border-border-dim bg-bg-raised">
-          <div className="text-[10px] font-mono text-text-tertiary uppercase">Cost Per SAL</div>
+          <div className="text-[10px] font-mono text-text-tertiary uppercase">Cost per sales-qualified lead</div>
           <div className="text-lg font-bold font-mono text-text-primary mt-1">{summary.costPerSal == null ? "Unavailable" : `${summary.costPerSal.toFixed(2)}`}</div>
-          <div className="text-[10px] text-text-secondary font-mono mt-0.5">{summary.totalSal || 0} SALs</div>
+          <div className="text-[10px] text-text-secondary font-mono mt-0.5">{summary.totalSal || 0} sales-qualified leads</div>
         </div>
         <div className="p-4 rounded-xl border border-border-dim bg-bg-raised">
-          <div className="text-[10px] font-mono text-text-tertiary uppercase">Customer CAC</div>
+          <div className="text-[10px] font-mono text-text-tertiary uppercase">Cost to acquire a customer</div>
           <div className="text-lg font-bold font-mono text-text-primary mt-1">{summary.cac == null ? "Unavailable" : `${summary.cac.toFixed(2)}`}</div>
           <div className="text-[10px] text-text-secondary font-mono mt-0.5">{summary.totalCustomers || 0} customers</div>
         </div>
@@ -178,7 +177,7 @@ export default function RevenueIntelligenceView({ token }: RevenueIntelligenceVi
           <div className="text-[10px] text-emerald-400/80 font-mono mt-0.5">Lead-linked value; not cash collected</div>
         </div>
         <div className="p-4 rounded-xl border border-border-dim bg-bg-raised">
-          <div className="text-[10px] font-mono text-text-tertiary uppercase">Blended ROAS</div>
+          <div className="text-[10px] font-mono text-text-tertiary uppercase">Ad return (ROAS)</div>
           <div className="text-lg font-bold font-mono text-accent mt-1">{summary.roas == null ? "Unavailable" : `${summary.roas.toFixed(2)}x`}</div>
           <div className="text-[10px] text-accent/80 font-mono mt-0.5">Return on Ad Spend</div>
         </div>
@@ -187,11 +186,11 @@ export default function RevenueIntelligenceView({ token }: RevenueIntelligenceVi
       {/* Sub-tab Navigation */}
       <div className="flex border-b border-border-dim overflow-x-auto gap-2">
         {[
-          { id: 'funnel', label: 'Revenue Funnel & Economics', icon: TrendingUp },
-          { id: 'campaigns', label: 'Campaign Economics', icon: BarChart3 },
-          { id: 'search', label: 'Search Intelligence', icon: Compass },
-          { id: 'geo', label: 'Geo Profitability', icon: Layers },
-          { id: 'experiments', label: 'Experiments & Grounded Decisions', icon: Target }
+          { id: 'funnel', label: 'Revenue funnel', icon: TrendingUp },
+          { id: 'campaigns', label: 'Campaigns', icon: BarChart3 },
+          { id: 'search', label: 'Search terms', icon: Compass },
+          { id: 'geo', label: 'By location', icon: Layers },
+          { id: 'experiments', label: 'Experiments', icon: Target }
         ].map(tab => (
           <button
             key={tab.id}
@@ -214,8 +213,8 @@ export default function RevenueIntelligenceView({ token }: RevenueIntelligenceVi
           <div className="p-6 rounded-xl border border-border-dim bg-bg-raised space-y-5">
             <div className="flex items-center justify-between">
               <div>
-                <h3 className="text-sm font-bold font-mono text-text-primary">Google Ads → Pipeline → Closed Won Revenue Funnel</h3>
-                <p className="text-xs text-text-secondary font-mono mt-0.5">End-to-end multi-stage conversion velocity and cost efficiency</p>
+                <h3 className="text-sm font-bold font-mono text-text-primary">Campaign-to-revenue funnel</h3>
+                <p className="text-xs text-text-secondary font-mono mt-0.5">See how campaign spend turns into recorded deals.</p>
               </div>
             </div>
 
@@ -284,7 +283,7 @@ export default function RevenueIntelligenceView({ token }: RevenueIntelligenceVi
           <div className="p-6 rounded-xl border border-border-dim bg-bg-raised space-y-4">
             <div className="flex items-center gap-2">
               <ShieldAlert className="w-4 h-4 text-accent" />
-              <h3 className="text-sm font-bold font-mono text-text-primary">HAL Grounded Decision Engine</h3>
+              <h3 className="text-sm font-bold font-mono text-text-primary">Recommendations</h3>
             </div>
             {recommendations.map(rec => (
               <div key={rec.id} className="p-4 rounded-lg border border-accent/20 bg-accent/5 space-y-2">
@@ -430,7 +429,7 @@ export default function RevenueIntelligenceView({ token }: RevenueIntelligenceVi
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {experiments.length === 0 ? (
               <div className="col-span-2 p-8 text-center text-text-tertiary font-mono text-xs border border-border-dim rounded-xl">
-                No active revenue experiments. Click "New Revenue Experiment" to initialize an economic test.
+                No active revenue experiments. Click "New experiment" to initialize an economic test.
               </div>
             ) : (
               experiments.map(exp => (

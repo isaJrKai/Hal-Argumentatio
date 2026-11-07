@@ -519,85 +519,36 @@ export default function MapPanel({ leads, token, onOpenWorkQueue }: MapPanelProp
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-bg-raised border border-border-dim p-4.5 rounded-sm">
         <div>
           <h2 className="text-sm font-mono font-bold text-text-primary uppercase tracking-wider flex items-center gap-2">
-            <Globe className="w-4 h-4 text-brand animate-pulse" /> Territory Conquest & Spatial Map
+            <Globe className="w-4 h-4 text-brand animate-pulse" /> Maps
           </h2>
           <p className="text-[11px] text-text-secondary font-sans mt-1">
-            Find real businesses, inspect territories, and move qualified prospects into your CRM.
+            Find nearby businesses, review their details and add prospects to your list.
           </p>
         </div>
 
         <div className="flex flex-wrap items-center gap-2.5">
-          {/* IndexedDB Cache Badge */}
-          <div className="flex items-center gap-2 bg-bg-subtle px-3 py-1.5 border border-border-dim/50 rounded-sm font-mono text-[10px]">
-            <HardDrive className="w-3.5 h-3.5 text-brand" />
-            <span className="text-text-secondary">OFFLINE CACHE:</span>
-            <span className="text-brand font-bold">{cachedCount} LOCATIONS</span>
-            {isUsingOfflineCache && (
-              <span className="bg-amber-500/20 text-amber-400 border border-amber-500/30 text-[8px] font-bold px-1.5 py-0.5 rounded uppercase">
-                ACTIVE
-              </span>
-            )}
-          </div>
-
-          {/* Network Connection Indicator */}
-          <div className="flex items-center gap-2 bg-bg-subtle px-3 py-1.5 border border-border-dim/50 rounded-sm font-mono text-[10px]">
-            {isOnline ? (
-              <>
-                <Wifi className="w-3.5 h-3.5 text-positive" />
-                <span className="text-text-secondary">NETWORK:</span>
-                <span className="text-positive font-bold">ONLINE</span>
-              </>
-            ) : (
-              <>
-                <WifiOff className="w-3.5 h-3.5 text-amber-400 animate-pulse" />
-                <span className="text-text-secondary">NETWORK:</span>
-                <span className="text-amber-400 font-bold">OFFLINE</span>
-              </>
-            )}
-          </div>
+          {!isOnline && (
+            <div role="status" className="flex items-center gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-500">
+              <WifiOff className="w-4 h-4" />
+              Offline · showing saved prospect data
+            </div>
+          )}
         </div>
       </div>
 
-      {/* METRIC CARDS */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="bg-bg-raised border border-border-dim p-4.5 rounded-sm flex items-center justify-between">
-          <div>
-            <span className="text-[10px] font-mono text-text-secondary uppercase">MAPPED PROSPECTS</span>
-            <div className="text-xl font-mono font-bold text-text-primary mt-1">{totalCount}</div>
-            <span className="text-[9px] text-text-dim">
-              {activeZoneId !== 'all' ? `Filtered by Service Zone (${serviceZones.find(z => z.id === activeZoneId)?.name})` : 'Visible ledger listings in selection'}
-            </span>
-          </div>
-          <Compass className="w-8 h-8 text-brand/20 shrink-0" />
-        </div>
-
-        <div className="bg-bg-raised border border-border-dim p-4.5 rounded-sm flex items-center justify-between">
-          <div>
-            <span className="text-[10px] font-mono text-text-secondary uppercase">MARKET CONVERSION</span>
-            <div className="text-xl font-mono font-bold text-positive mt-1">{conversionRate}%</div>
-            <span className="text-[9px] text-text-dim">{convertedCount} of {totalCount} closed won</span>
-          </div>
-          <Activity className="w-8 h-8 text-positive/20 shrink-0" />
-        </div>
-
-        <div className="bg-bg-raised border border-border-dim p-4.5 rounded-sm flex items-center justify-between">
-          <div>
-            <span className="text-[10px] font-mono text-text-secondary uppercase">TOTAL PIPELINE VALUE</span>
-            <div className="text-xl font-mono font-bold text-brand mt-1">
-              ${totalValue.toLocaleString('en-US')} <span className="text-[10px] text-text-secondary">USD</span>
-            </div>
-            <span className="text-[9px] text-text-dim">Aggregated LTV from filtered area</span>
-          </div>
-          <TrendingUp className="w-8 h-8 text-brand/20 shrink-0" />
-        </div>
+      <div className="text-xs text-text-secondary">
+        {totalCount} {totalCount === 1 ? 'prospect' : 'prospects'} shown
+        {activeZoneId !== 'all' && serviceZones.find(z => z.id === activeZoneId)?.name ? ` · ${serviceZones.find(z => z.id === activeZoneId)?.name}` : ''}
       </div>
 
       {/* SPATIAL ZONE DRAWING BAR */}
-      <div className="bg-bg-raised border border-border-dim p-4 rounded-sm space-y-3 font-mono">
+      <details className="bg-bg-raised border border-border-dim p-4 rounded-xl space-y-3">
+        <summary className="cursor-pointer text-sm font-semibold text-text-primary">Map tools · {serviceZones.length} service areas</summary>
+        <div className="pt-3 space-y-3 font-mono">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-2">
             <Crosshair className="w-4 h-4 text-brand" />
-            <span className="text-xs font-bold text-text-primary uppercase">SERVICE ZONE POLYGONS</span>
+            <span className="text-xs font-bold text-text-primary uppercase">Service areas</span>
             <span className="text-[10px] text-text-secondary">({serviceZones.length} defined)</span>
           </div>
 
@@ -608,10 +559,10 @@ export default function MapPanel({ leads, token, onOpenWorkQueue }: MapPanelProp
               onChange={(e) => setActiveZoneId(e.target.value)}
               className="bg-bg-subtle border border-border-dim rounded-sm px-2.5 py-1 text-xs text-text-primary focus:outline-none focus:border-brand"
             >
-              <option value="all">ALL SERVICE ZONES (WHOLE CITY)</option>
+              <option value="all">All areas</option>
               {serviceZones.map(z => (
                 <option key={z.id} value={z.id}>
-                  ZONE: {z.name.toUpperCase()} ({z.city.toUpperCase()})
+                  {z.name} ({z.city})
                 </option>
               ))}
             </select>
@@ -624,7 +575,7 @@ export default function MapPanel({ leads, token, onOpenWorkQueue }: MapPanelProp
               title="Find and save high-confidence named business locations. Unmatched leads remain unpinned."
             >
               {isGeocodingActive ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Compass className="w-3.5 h-3.5" />}
-              <span>{isGeocodingActive ? (geocodingProgress || 'GEOCODING...') : 'GEOCODE BUSINESS PINS'}</span>
+              <span>{isGeocodingActive ? (geocodingProgress || 'GEOCODING...') : 'Locate prospects'}</span>
             </button>
             <div className="basis-full text-[9px] font-mono text-text-dim">
               {geocodingSummary || 'Geoapify · named business matches only · no city-centre pins'}
@@ -641,16 +592,16 @@ export default function MapPanel({ leads, token, onOpenWorkQueue }: MapPanelProp
                 }}
                 className="flex items-center gap-1.5 px-3 py-1 bg-brand text-white text-xs font-bold rounded-sm hover:bg-brand-hover transition-colors cursor-pointer"
               >
-                <Plus className="w-3.5 h-3.5" /> DRAW ZONE POLYGON
+                <Plus className="w-3.5 h-3.5" /> Draw area
               </button>
             ) : (
               <div className="flex items-center gap-2">
                 <span className="text-[11px] text-amber-400 font-bold animate-pulse">
-                  CLICK MAP TO ADD POINTS ({drawingPoints.length} added)
+                  Click the map to draw an area ({drawingPoints.length} points)
                 </span>
                 <input
                   type="text"
-                  placeholder="Zone Name..."
+                  placeholder="Area name"
                   value={newZoneName}
                   onChange={(e) => setNewZoneName(e.target.value)}
                   className="bg-bg-subtle border border-border-dim rounded-sm px-2 py-1 text-xs text-text-primary placeholder:text-text-dim w-36"
@@ -670,7 +621,7 @@ export default function MapPanel({ leads, token, onOpenWorkQueue }: MapPanelProp
                   onClick={handleSaveDrawnZone}
                   className="px-2.5 py-1 bg-positive text-white text-xs font-bold rounded-sm hover:opacity-90 transition-opacity cursor-pointer"
                 >
-                  SAVE ZONE
+                  Save area
                 </button>
                 <button
                   onClick={() => {
@@ -689,7 +640,7 @@ export default function MapPanel({ leads, token, onOpenWorkQueue }: MapPanelProp
         {/* Saved Zones Tag Pills */}
         {serviceZones.length > 0 && (
           <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-border-dim/40">
-            <span className="text-[10px] text-text-dim">SAVED ZONES:</span>
+            <span className="text-[10px] text-text-dim">Saved areas:</span>
             {serviceZones.map(z => (
               <div
                 key={z.id}
@@ -715,14 +666,15 @@ export default function MapPanel({ leads, token, onOpenWorkQueue }: MapPanelProp
             ))}
           </div>
         )}
-      </div>
-
+      
+        </div>
+      </details>
       {/* FILTER PANEL */}
       <div className="bg-bg-raised border border-border-dim p-4.5 rounded-sm space-y-4">
         <div className="flex items-center justify-between border-b border-border-dim/50 pb-2.5">
           <div className="flex items-center gap-2">
             <Filter className="w-3.5 h-3.5 text-brand" />
-            <span className="text-[11px] font-mono font-bold text-text-primary uppercase">Territory Scope & Visualization Settings</span>
+            <span className="text-[11px] font-mono font-bold text-text-primary uppercase">Filters and map layers</span>
           </div>
           {activeOverlay !== 'none' && (
             <span className="bg-amber-500/10 text-amber-400 border border-amber-500/30 text-[9px] font-mono px-2 py-0.5 rounded flex items-center gap-1.5 animate-pulse font-bold">
@@ -734,7 +686,7 @@ export default function MapPanel({ leads, token, onOpenWorkQueue }: MapPanelProp
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 font-mono">
           {/* City Selector */}
           <div className="space-y-1.5">
-            <label className="text-[10px] font-bold text-text-secondary uppercase">SELECT TARGET CITY</label>
+            <label className="text-[10px] font-bold text-text-secondary uppercase">City</label>
             <select
               value={cityFilter}
               onChange={(e) => {
@@ -744,7 +696,7 @@ export default function MapPanel({ leads, token, onOpenWorkQueue }: MapPanelProp
               }}
               className="w-full bg-bg-subtle border border-border-dim hover:border-text-secondary/30 rounded-sm p-2 text-xs text-text-primary focus:outline-none focus:border-brand transition-colors cursor-pointer"
             >
-              <option value="all">ALL TERRITORIES</option>
+              <option value="all">All cities</option>
               {Object.keys(cityCounts).map(city => (
                 <option key={city} value={city.toLowerCase()}>
                   {(city || 'TERRITORY').toUpperCase()} ({cityCounts[city]} leads)
@@ -755,7 +707,7 @@ export default function MapPanel({ leads, token, onOpenWorkQueue }: MapPanelProp
 
           {/* Status Selector */}
           <div className="space-y-1.5">
-            <label className="text-[10px] font-bold text-text-secondary uppercase">PIPELINE STATUS</label>
+            <label className="text-[10px] font-bold text-text-secondary uppercase">Prospect status</label>
             <select
               value={statusFilter}
               onChange={(e) => {
@@ -765,7 +717,7 @@ export default function MapPanel({ leads, token, onOpenWorkQueue }: MapPanelProp
               }}
               className="w-full bg-bg-subtle border border-border-dim hover:border-text-secondary/30 rounded-sm p-2 text-xs text-text-primary focus:outline-none focus:border-brand transition-colors cursor-pointer"
             >
-              <option value="all">ALL PIPELINE STAGES</option>
+              <option value="all">All statuses</option>
               <option value="new">NEW (PROSPECTS)</option>
               <option value="contacted">CONTACTED</option>
               <option value="converted">CONVERTED (CLIENTS)</option>

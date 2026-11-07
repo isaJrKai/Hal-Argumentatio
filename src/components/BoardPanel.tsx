@@ -234,19 +234,11 @@ export default function BoardPanel({ leads, token, onRefresh }: BoardPanelProps)
   return (
     <div className="space-y-6 animate-fadeIn">
       
-      {/* PAGE CONTEXT BRIEFING */}
-      <div className="border-b border-border-dim/60 pb-5 space-y-2">
-        <div className="flex items-center gap-2">
-          <span className="text-[9px] font-mono font-bold tracking-widest text-accent uppercase bg-accent-dim px-2 py-0.5 rounded">Sales & Clients</span>
-          <span className="w-1 h-1 rounded-full bg-text-tertiary" />
-          <span className="text-[10px] font-mono text-text-secondary">INTERACTIVE KANBAN SALES PIPELINE</span>
-        </div>
+      {/* PIPELINE OVERVIEW */}
+      <div className="border-b border-border-dim/60 pb-4">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div>
-            <h2 className="text-xl font-bold tracking-tight text-text-primary">Sales & Clients Pipeline</h2>
-            <p className="text-xs text-text-secondary max-w-2xl mt-0.5 leading-relaxed">
-              Manage your active sales stages and target deals dynamically. Use smooth drag-and-drop cards to shift prospects forward through the acquisition pipeline from lead capture to billing conversion.
-            </p>
+            <h2 className="text-xl font-bold tracking-tight text-text-primary">Sales pipeline</h2>
           </div>
           <div className="flex items-center gap-3 text-xs font-mono shrink-0 flex-wrap">
             <div className="px-3.5 py-1.5 border border-border-dim rounded bg-bg-raised text-center min-w-[90px]">
@@ -268,26 +260,16 @@ export default function BoardPanel({ leads, token, onRefresh }: BoardPanelProps)
         </div>
       </div>
 
-      {/* Kanban Header with custom capabilities */}
-      <div className="bg-bg-raised border border-border-dim p-4 rounded-xl flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h3 className="text-xs font-mono font-bold text-text-primary uppercase tracking-wider">Kanban Stages Management</h3>
-          <p className="text-[11px] text-text-secondary mt-1 font-sans">Rename stages or drag cards to move them through the validated CRM pipeline.</p>
-        </div>
-        <div className="flex flex-wrap gap-3 items-center">
-          <button 
-            onClick={handleResetStages}
-            className="flex items-center gap-1.5 px-2.5 py-1.5 border border-border-dim hover:border-border-strong rounded-sm text-[10px] font-mono text-text-secondary hover:text-text-primary uppercase font-bold tracking-wider transition-colors bg-bg-subtle/50"
-            title="Reset stage names to system defaults"
-          >
-            <RotateCcw className="w-3.5 h-3.5" />
-            Reset Stages
-          </button>
-          <div className="hidden lg:flex items-center gap-1.5 text-[10px] font-mono text-text-secondary font-bold uppercase tracking-wider bg-bg-base px-3 py-1.5 rounded-sm border border-border-dim">
-            <Sparkles className="w-3.5 h-3.5 text-accent animate-pulse" /> 
-            Drag cards or use arrows for permitted stage transitions
-          </div>
-        </div>
+      <div className="flex justify-end">
+        <button
+          onClick={handleResetStages}
+          className="inline-flex items-center gap-1.5 px-3 py-2 border border-border-dim hover:border-border-strong rounded-md text-xs font-medium text-text-secondary hover:text-text-primary transition-colors bg-bg-subtle/50"
+          title="Reset stage names to defaults"
+          aria-label="Reset stage names"
+        >
+          <RotateCcw className="w-3.5 h-3.5" />
+          Reset
+        </button>
       </div>
 
       {/* Grid columns */}
