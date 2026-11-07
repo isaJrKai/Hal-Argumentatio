@@ -361,7 +361,8 @@ export default function LeadMap({
           const lng = Number(element.lon ?? element.center?.lon);
           if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
           const tags = element.tags || {};
-          const name = tags.name || tags.operator || 'Unnamed mapped trade';
+          if (!tags.name && !tags.operator) return;
+          const name = tags.name || tags.operator;
           const craft = tags.craft || 'home service';
           const candidate: OsmTradeCandidate = {
             osmType: String(element.type || 'node'),
