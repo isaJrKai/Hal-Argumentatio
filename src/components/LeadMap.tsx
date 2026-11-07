@@ -149,15 +149,16 @@ export default function LeadMap({
   // Business pins only render when the record has a real coordinate.
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || !mapReady || !window.maplibregl) return;
+    const maplibregl = window.maplibregl;
+    if (!map || !mapReady || !maplibregl) return;
     markersRef.current.forEach(marker => marker.remove());
     markersRef.current = [];
     leads.filter(lead => validCoords(lead.coords)).forEach(lead => {
       const color = lead.status === 'converted' || lead.status === 'closed_won' ? '#15966a'
         : lead.status === 'contacted' ? '#d28a25' : '#3478d4';
-      const marker = new window.maplibregl.Marker({ color })
+      const marker = new maplibregl.Marker({ color })
         .setLngLat([lead.coords!.lng, lead.coords!.lat])
-        .setPopup(new window.maplibregl.Popup({ offset: 22 }).setHTML(
+        .setPopup(new maplibregl.Popup({ offset: 22 }).setHTML(
           `<div style="font:12px system-ui;min-width:180px;color:#17202a">
             <strong>${safeText(lead.businessName)}</strong>
             <div>${safeText(lead.serviceType)} · ${safeText(lead.city)}</div>
@@ -316,7 +317,8 @@ export default function LeadMap({
   // These are OSM community-mapped places, not verified CRM prospects.
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || !mapReady || !osmTradesEnabled || !window.maplibregl) {
+    const maplibregl = window.maplibregl;
+    if (!map || !mapReady || !osmTradesEnabled || !maplibregl) {
       osmMarkersRef.current.forEach(marker => marker.remove());
       osmMarkersRef.current = [];
       if (!osmTradesEnabled) setOsmTradeStatus('OSM trade layer off');
@@ -347,9 +349,9 @@ export default function LeadMap({
           const tags = element.tags || {};
           const name = tags.name || tags.operator || 'Unnamed mapped trade';
           const craft = tags.craft || 'home service';
-          const marker = new window.maplibregl.Marker({ color: '#a56cbd' })
+          const marker = new maplibregl.Marker({ color: '#a56cbd' })
             .setLngLat([lng, lat])
-            .setPopup(new window.maplibregl.Popup({ offset: 20 }).setHTML(
+            .setPopup(new maplibregl.Popup({ offset: 20 }).setHTML(
               `<div style="font:12px system-ui;color:#17202a;min-width:170px"><strong>${safeText(name)}</strong><div>${safeText(craft)}</div><small>OpenStreetMap mapped POI · not independently verified</small>${tags.phone ? `<div>${safeText(tags.phone)}</div>` : ''}${tags.website ? `<div>${safeText(tags.website)}</div>` : ''}</div>`
             )).addTo(map);
           osmMarkersRef.current.push(marker);
