@@ -450,7 +450,7 @@ export default function LeadMap({
       root.appendChild(metrics);
       if (candidate.reviews?.length) {
         const review = document.createElement('p');
-        review.textContent = `“${candidate.reviews[0].text.slice(0, 220)}”`;
+        review.textContent = `“${candidate.reviews[0].text.slice(0, 220)}” — ${candidate.reviews[0].authorName || 'Google reviewer'} · ${candidate.reviews[0].relativeTime || 'public review'}`;
         root.appendChild(review);
       }
       if (candidate.websiteUrl) {
@@ -475,7 +475,7 @@ export default function LeadMap({
       importButton.type = 'button';
       importButton.textContent = 'Add to CRM review queue';
       importButton.style.cssText = 'margin-top:8px;padding:6px 9px;background:#15966a;color:#fff;border:0;cursor:pointer';
-      importButton.addEventListener('click', () => { void onImportTerritoryResult?.(candidate); });
+      importButton.addEventListener('click', () => { void Promise.resolve(onImportTerritoryResult?.(candidate)).catch((error: any) => window.alert(error?.message || 'Could not import this prospect.')); });
       root.appendChild(importButton);
       const marker = new maplibregl.Marker({ color: '#d97706' })
         .setLngLat([Number(candidate.longitude), Number(candidate.latitude)])
