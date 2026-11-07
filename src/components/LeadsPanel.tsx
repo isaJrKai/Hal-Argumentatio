@@ -827,16 +827,12 @@ export default function LeadsPanel({ leads, token, onRefresh }: LeadsPanelProps)
       
       {/* PAGE CONTEXT BRIEFING */}
       <div className="border-b border-border-dim/60 pb-5 space-y-2">
-        <div className="flex items-center gap-2">
-          <span className="text-[9px] font-mono font-bold tracking-widest text-accent uppercase bg-accent-dim px-2 py-0.5 rounded">Memory</span>
-          <span className="w-1 h-1 rounded-full bg-text-tertiary" />
-          <span className="text-[10px] font-mono text-text-secondary">PROSPECT RECORD DATABASE</span>
-        </div>
+
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div>
-            <h2 className="text-xl font-bold tracking-tight text-text-primary">Memory & Leads</h2>
+            <h2 className="text-xl font-bold tracking-tight text-text-primary">Prospects</h2>
             <p className="text-xs text-text-secondary max-w-2xl mt-0.5 leading-relaxed">
-              Maintain the full memory and history of active merchant profiles. Track their contact states, recorded interaction events, technical scores, and revenue conversions seamlessly inside HAL.
+              Manage prospect details, contact history and conversion status in one place.
             </p>
           </div>
           <div className="flex items-center gap-4 text-xs font-mono shrink-0">
@@ -861,22 +857,21 @@ export default function LeadsPanel({ leads, token, onRefresh }: LeadsPanelProps)
             <div className="flex items-center gap-2">
               <Cpu className="w-4 h-4 text-brand animate-pulse" />
               <h3 className="text-xs font-mono font-bold text-text-primary tracking-wider uppercase">
-                HAL Local Market intelligence & Harvester (Phase 2)
+                Find new prospects
               </h3>
             </div>
             <button
               onClick={() => setShowHarvester(!showHarvester)}
               className="text-[10px] font-mono text-brand border border-brand/20 px-2 py-0.5 rounded-sm hover:bg-brand-glow transition-all"
             >
-              {showHarvester ? 'COLLAPSE [-]' : 'OPEN HARVEST CONSOLE [+]'}
+              {showHarvester ? 'Close' : 'Find prospects'}
             </button>
           </div>
 
           {showHarvester && (
             <div className="space-y-4 pt-2 border-t border-border-dark/60">
               <p className="text-[11px] text-text-secondary leading-relaxed font-sans">
-                To fulfill the <strong>Phase 2 Intelligence Target</strong>, HAL bypasses static dummy entries. 
-                Configure a territory and industry vertical below to crawl real-world operating entities, conduct automated technical SEO audits, SSL security checks, and public reviews sentiment gathering.
+                Choose a city and trade to discover real businesses and review their public information.
               </p>
 
               {/* Target Controls Grid */}
@@ -1116,7 +1111,7 @@ export default function LeadsPanel({ leads, token, onRefresh }: LeadsPanelProps)
               }}
               className="text-[10px] font-mono text-brand border border-brand/20 px-2 py-0.5 rounded-sm hover:bg-brand-glow transition-all"
             >
-              {showImportExport ? 'COLLAPSE [-]' : 'OPEN SPREADSHEET CONSOLE [+]'}
+              {showImportExport ? 'Close' : 'OPEN SPREADSHEET CONSOLE [+]'}
             </button>
           </div>
 
