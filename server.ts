@@ -3788,7 +3788,12 @@ app.post('/api/leads/ingest', authenticate, async (req, res) => {
           sentimentScore: null,
           verificationStatus,
           dnsVerified,
-          groundingEvidence: item.groundingEvidence || null,
+          groundingEvidence: {
+            ...(item.groundingEvidence && typeof item.groundingEvidence === 'object' ? item.groundingEvidence : {}),
+            ...(typeof item.address === 'string' && item.address.trim()
+              ? { businessAddress: item.address.trim() }
+              : {})
+          },
           createdAt: now,
           updatedAt: now
         }).returning();
@@ -9129,15 +9134,24 @@ app.post('/api/leads/geocode', authenticate, async (req, res) => {
       // Stay below Geoapify Free's documented 5 requests/second ceiling.
       await new Promise(resolve => setTimeout(resolve, 250));
       try {
+        const publicBusinessAddress = typeof previous.businessAddress === 'string'
+          ? previous.businessAddress.trim()
+          : '';
         const params = new URLSearchParams({
-          name: lead.businessName,
-          city: lead.city,
-          type: 'amenity',
           limit: '5',
           format: 'json',
           lang: 'en',
           apiKey
         });
+        if (publicBusinessAddress) {
+          // Address was captured from a public business source during harvest.
+          params.set('text', [publicBusinessAddress, lead.city].filter(Boolean).join(', '));
+        } else {
+          // Without an address, only accept a named OSM amenity that matches the business name.
+          params.set('name', lead.businessName);
+          params.set('city', lead.city);
+          params.set('type', 'amenity');
+        }
         const response = await fetch('https://api.geoapify.com/v1/geocode/search?' + params.toString(), {
           signal: AbortSignal.timeout(12000)
         });
@@ -9159,6 +9173,7 @@ app.post('/api/leads/geocode', authenticate, async (req, res) => {
           const resultType = String(item.result_type || '').toLowerCase();
           const candidateName = normalizeGeocodeName(item.name || item.address_line1 || '');
           const confidence = Number(item.rank?.confidence ?? 0);
+          const buildingConfidence = Number(item.rank?.confidence_building_level ?? 0);
           const resultCity = normalizeGeocodeName(item.city || '');
           const nameMatches = candidateName.length >= 4 && (
             candidateName === requestedName ||
@@ -9167,9 +9182,12 @@ app.post('/api/leads/geocode', authenticate, async (req, res) => {
           );
           const cityMatches = !resultCity || resultCity === requestedCity ||
             resultCity.includes(requestedCity) || requestedCity.includes(resultCity);
+          const addressMatch = publicBusinessAddress
+            ? ['amenity', 'building', 'house'].includes(resultType) && (confidence >= 0.75 || buildingConfidence >= 0.7)
+            : resultType === 'amenity' && confidence >= 0.75 && nameMatches;
           const lat = Number(item.lat);
           const lng = Number(item.lon);
-          return resultType === 'amenity' && confidence >= 0.75 && nameMatches && cityMatches &&
+          return addressMatch && cityMatches &&
             Number.isFinite(lat) && Number.isFinite(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180;
         });
 
@@ -9187,7 +9205,7 @@ app.post('/api/leads/geocode', authenticate, async (req, res) => {
           formattedAddress: String(match.formatted || match.address_line1 || ''),
           resultType: String(match.result_type),
           confidence: Number(match.rank?.confidence),
-          precision: 'named_business_poi',
+          precision: publicBusinessAddress ? 'public_business_address' : 'named_business_poi',
           geocodedAt: new Date().toISOString(),
           attribution: 'Powered by Geoapify · © OpenStreetMap contributors'
         };
