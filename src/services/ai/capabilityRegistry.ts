@@ -84,6 +84,16 @@ export const HAL_CAPABILITY_REGISTRY: readonly HalCapability[] = [
     approvalRequired: false
   },
   {
+    id: 'territory.search',
+    name: 'Search business territories',
+    description: 'Discover businesses by trade and city using the shared map territory-search service, including sourced coordinates and optional licensed review enrichment. Results are candidates only and are not automatically imported or contacted.',
+    category: 'web',
+    risk: 'read_only',
+    status: 'active',
+    toolNames: ['hal_search_territory'],
+    approvalRequired: false
+  },
+  {
     id: 'websites.audit.connectivity',
     name: 'Check website connectivity',
     description: 'Measure public DNS resolution and pinned HTTP/TLS reachability with explicit limitations.',
