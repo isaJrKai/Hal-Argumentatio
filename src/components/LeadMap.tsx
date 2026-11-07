@@ -61,29 +61,47 @@ let mapLibreLoader: Promise<any> | null = null;
 function loadMapLibre(): Promise<any> {
   if (typeof window !== 'undefined' && window.maplibregl) return Promise.resolve(window.maplibregl);
   if (mapLibreLoader) return mapLibreLoader;
-  mapLibreLoader = new Promise((resolve, reject) => {
-    const cssHref = `https://unpkg.com/maplibre-gl@${MAPLIBRE_VERSION}/dist/maplibre-gl.css`;
-    if (!document.querySelector('link[data-hal-maplibre]')) {
-      const link = document.createElement('link');
-      link.rel = 'stylesheet';
-      link.href = cssHref;
-      link.dataset.halMaplibre = 'true';
-      document.head.appendChild(link);
+
+  mapLibreLoader = new Promise(async (resolve, reject) => {
+    const cdns = [
+      {
+        script: `https://unpkg.com/maplibre-gl@${MAPLIBRE_VERSION}/dist/maplibre-gl.js`,
+        css: `https://unpkg.com/maplibre-gl@${MAPLIBRE_VERSION}/dist/maplibre-gl.css`
+      },
+      {
+        script: `https://cdn.jsdelivr.net/npm/maplibre-gl@${MAPLIBRE_VERSION}/dist/maplibre-gl.js`,
+        css: `https://cdn.jsdelivr.net/npm/maplibre-gl@${MAPLIBRE_VERSION}/dist/maplibre-gl.css`
+      }
+    ];
+
+    const loadScript = (src: string) => new Promise<void>((resolveScript, rejectScript) => {
+      const script = document.createElement('script');
+      script.src = src;
+      script.async = true;
+      script.onload = () => window.maplibregl ? resolveScript() : rejectScript(new Error('MapLibre script loaded without initializing.'));
+      script.onerror = () => rejectScript(new Error('MapLibre CDN request failed.'));
+      document.head.appendChild(script);
+    });
+
+    let lastError: unknown;
+    for (const cdn of cdns) {
+      try {
+        let link = document.querySelector('link[data-hal-maplibre]') as HTMLLinkElement | null;
+        if (!link) {
+          link = document.createElement('link');
+          link.rel = 'stylesheet';
+          link.dataset.halMaplibre = 'true';
+          document.head.appendChild(link);
+        }
+        link.href = cdn.css;
+        await loadScript(cdn.script);
+        resolve(window.maplibregl);
+        return;
+      } catch (error) {
+        lastError = error;
+      }
     }
-    const existing = document.querySelector('script[data-hal-maplibre]') as HTMLScriptElement | null;
-    if (existing) {
-      existing.addEventListener('load', () => resolve(window.maplibregl), { once: true });
-      existing.addEventListener('error', () => reject(new Error('Map library failed to load.')), { once: true });
-      if (window.maplibregl) resolve(window.maplibregl);
-      return;
-    }
-    const script = document.createElement('script');
-    script.src = `https://unpkg.com/maplibre-gl@${MAPLIBRE_VERSION}/dist/maplibre-gl.js`;
-    script.async = true;
-    script.dataset.halMaplibre = 'true';
-    script.onload = () => window.maplibregl ? resolve(window.maplibregl) : reject(new Error('Map library did not initialize.'));
-    script.onerror = () => reject(new Error('Map library failed to load.'));
-    document.head.appendChild(script);
+    reject(lastError || new Error('Map library failed to load from available CDNs.'));
   }).catch(error => {
     mapLibreLoader = null;
     throw error;
@@ -120,8 +138,8 @@ export default function LeadMap({
   useEffect(() => {
     let disposed = false;
     let map: any;
-    loadMapLibre().then(maplibregl => {
-      if (disposed || !containerRef.current) return;
+    if (!containerRef.current) return;
+    try {
       map = new maplibregl.Map({
         container: containerRef.current,
         style: OPENFREEMAP_STYLE,
@@ -134,10 +152,13 @@ export default function LeadMap({
         if (disposed) return;
         setMapReady(true);
       });
+      map.on('error', (event: any) => {
+        if (!disposed && !mapReady) setMapError(event?.error?.message || 'OpenFreeMap tiles or style could not be loaded.');
+      });
       mapRef.current = map;
-    }).catch(error => {
-      if (!disposed) setMapError(error?.message || 'Could not load the free map.');
-    });
+    } catch (error: any) {
+      setMapError(error?.message || 'Could not initialize the map.');
+    }
     return () => {
       disposed = true;
       markersRef.current.forEach(marker => marker.remove());
@@ -161,8 +182,7 @@ export default function LeadMap({
   // Business pins only render when the record has a real coordinate.
   useEffect(() => {
     const map = mapRef.current;
-    const maplibregl = window.maplibregl;
-    if (!map || !mapReady || !maplibregl) return;
+    if (!map || !mapReady) return;
     markersRef.current.forEach(marker => marker.remove());
     markersRef.current = [];
     leads.filter(lead => validCoords(lead.coords)).forEach(lead => {
@@ -218,8 +238,7 @@ export default function LeadMap({
   // interpreted as property damage or contractor demand.
   useEffect(() => {
     const map = mapRef.current;
-    const maplibregl = window.maplibregl;
-    if (!map || !mapReady || !earthquakesEnabled || !maplibregl) {
+    if (!map || !mapReady || !earthquakesEnabled) {
       if (map?.getLayer('hal-quake-circles')) map.removeLayer('hal-quake-circles');
       if (map?.getSource('hal-earthquakes')) map.removeSource('hal-earthquakes');
       if (!earthquakesEnabled) setEarthquakeStatus('Earthquake layer off');
@@ -265,8 +284,7 @@ export default function LeadMap({
   // These are OSM community-mapped places, not verified CRM prospects.
   useEffect(() => {
     const map = mapRef.current;
-    const maplibregl = window.maplibregl;
-    if (!map || !mapReady || !osmTradesEnabled || !maplibregl) {
+    if (!map || !mapReady || !osmTradesEnabled) {
       osmMarkersRef.current.forEach(marker => marker.remove());
       osmMarkersRef.current = [];
       if (!osmTradesEnabled) setOsmTradeStatus('OSM trade layer off');
