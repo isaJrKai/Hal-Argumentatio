@@ -101,7 +101,7 @@ export default function RevenueIntelligenceView({ token }: RevenueIntelligenceVi
     return (
       <div className="flex items-center justify-center h-96 text-text-secondary font-mono text-xs">
         <Activity className="w-5 h-5 animate-spin mr-2 text-accent" />
-        Computing Revenue Intelligence Funnels...
+        Computing Revenue performance Funnels...
       </div>
     );
   }
@@ -119,8 +119,8 @@ export default function RevenueIntelligenceView({ token }: RevenueIntelligenceVi
         <div>
           <div className="flex items-center gap-2">
             <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
-            <h1 className="text-xl font-bold font-sans tracking-tight text-text-primary">Revenue Intelligence</h1>
-            <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-accent/10 text-accent font-semibold">PHASE 5 ENGINE</span>
+            <h1 className="text-xl font-bold font-sans tracking-tight text-text-primary">Revenue performance</h1>
+
           </div>
           <p className="text-xs text-text-secondary font-mono mt-1">
             Bridging Google Ads economic spend with immutable CRM pipeline stages and closed-won revenue.
@@ -214,8 +214,8 @@ export default function RevenueIntelligenceView({ token }: RevenueIntelligenceVi
           <div className="p-6 rounded-xl border border-border-dim bg-bg-raised space-y-5">
             <div className="flex items-center justify-between">
               <div>
-                <h3 className="text-sm font-bold font-mono text-text-primary">Google Ads → Pipeline → Closed Won Revenue Funnel</h3>
-                <p className="text-xs text-text-secondary font-mono mt-0.5">End-to-end multi-stage conversion velocity and cost efficiency</p>
+                <h3 className="text-sm font-bold font-mono text-text-primary">Campaign-to-revenue funnel</h3>
+                <p className="text-xs text-text-secondary font-mono mt-0.5">See how campaign spend turns into recorded deals.</p>
               </div>
             </div>
 
@@ -284,7 +284,7 @@ export default function RevenueIntelligenceView({ token }: RevenueIntelligenceVi
           <div className="p-6 rounded-xl border border-border-dim bg-bg-raised space-y-4">
             <div className="flex items-center gap-2">
               <ShieldAlert className="w-4 h-4 text-accent" />
-              <h3 className="text-sm font-bold font-mono text-text-primary">HAL Grounded Decision Engine</h3>
+              <h3 className="text-sm font-bold font-mono text-text-primary">Recommendations</h3>
             </div>
             {recommendations.map(rec => (
               <div key={rec.id} className="p-4 rounded-lg border border-accent/20 bg-accent/5 space-y-2">
