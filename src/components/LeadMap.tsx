@@ -92,10 +92,13 @@ export default function LeadMap({
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<any>(null);
   const markersRef = useRef<any[]>([]);
+  const osmMarkersRef = useRef<any[]>([]);
   const [mapReady, setMapReady] = useState(false);
   const [mapError, setMapError] = useState('');
   const [weatherEnabled, setWeatherEnabled] = useState(false);
   const [earthquakesEnabled, setEarthquakesEnabled] = useState(false);
+  const [osmTradesEnabled, setOsmTradesEnabled] = useState(false);
+  const [osmTradeStatus, setOsmTradeStatus] = useState('OSM trade layer off');
   const [weatherStatus, setWeatherStatus] = useState('Weather layer off');
   const [earthquakeStatus, setEarthquakeStatus] = useState('Earthquake layer off');
   const [searchText, setSearchText] = useState('');
@@ -131,6 +134,8 @@ export default function LeadMap({
       disposed = true;
       markersRef.current.forEach(marker => marker.remove());
       markersRef.current = [];
+      osmMarkersRef.current.forEach(marker => marker.remove());
+      osmMarkersRef.current = [];
       map?.remove();
       mapRef.current = null;
     };
@@ -309,6 +314,64 @@ export default function LeadMap({
     return () => { cancelled = true; };
   }, [earthquakesEnabled, mapReady]);
 
+
+  // Overpass: retrieve only mapped trade POIs inside the visible map bounds.
+  // These are OSM community-mapped places, not verified CRM prospects.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !mapReady || !osmTradesEnabled) {
+      osmMarkersRef.current.forEach(marker => marker.remove());
+      osmMarkersRef.current = [];
+      if (!osmTradesEnabled) setOsmTradeStatus('OSM trade layer off');
+      return;
+    }
+    let cancelled = false;
+    const loadMappedTrades = async () => {
+      try {
+        const bounds = map.getBounds();
+        const bbox = [bounds.getSouth(), bounds.getWest(), bounds.getNorth(), bounds.getEast()].join(',');
+        const query = `[out:json][timeout:15];(nwr(${bbox})["craft"~"^(plumber|electrician|carpenter|roofer|builder|painter|locksmith|glaziery|tiler|plasterer|hvac|landscaper)$"];);out center tags 250;`;
+        const response = await fetch('https://overpass-api.de/api/interpreter', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8' },
+          body: 'data=' + encodeURIComponent(query),
+          signal: AbortSignal.timeout(18000)
+        });
+        if (!response.ok) throw new Error(`Overpass returned ${response.status}`);
+        const payload = await response.json();
+        if (cancelled) return;
+        osmMarkersRef.current.forEach(marker => marker.remove());
+        osmMarkersRef.current = [];
+        const elements = Array.isArray(payload.elements) ? payload.elements : [];
+        elements.forEach((element: any) => {
+          const lat = Number(element.lat ?? element.center?.lat);
+          const lng = Number(element.lon ?? element.center?.lon);
+          if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
+          const tags = element.tags || {};
+          const name = tags.name || tags.operator || 'Unnamed mapped trade';
+          const craft = tags.craft || 'home service';
+          const marker = new window.maplibregl.Marker({ color: '#a56cbd' })
+            .setLngLat([lng, lat])
+            .setPopup(new window.maplibregl.Popup({ offset: 20 }).setHTML(
+              `<div style="font:12px system-ui;color:#17202a;min-width:170px"><strong>${safeText(name)}</strong><div>${safeText(craft)}</div><small>OpenStreetMap mapped POI · not independently verified</small>${tags.phone ? `<div>${safeText(tags.phone)}</div>` : ''}${tags.website ? `<div>${safeText(tags.website)}</div>` : ''}</div>`
+            )).addTo(map);
+          osmMarkersRef.current.push(marker);
+        });
+        setOsmTradeStatus(`OpenStreetMap · ${osmMarkersRef.current.length} mapped trade POIs in view`);
+      } catch (error: any) {
+        if (!cancelled) setOsmTradeStatus(error?.message || 'OSM trade data unavailable');
+      }
+    };
+    loadMappedTrades();
+    map.on('moveend', loadMappedTrades);
+    return () => {
+      cancelled = true;
+      map.off('moveend', loadMappedTrades);
+      osmMarkersRef.current.forEach(marker => marker.remove());
+      osmMarkersRef.current = [];
+    };
+  }, [osmTradesEnabled, mapReady]);
+
   const handleSearch = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!searchText.trim() || searching || !mapRef.current) return;
@@ -345,6 +408,7 @@ export default function LeadMap({
           </form>
           <button onClick={()=>setWeatherEnabled(value=>!value)} className={`px-3 py-2 text-[9px] font-mono border rounded-sm ${weatherEnabled ? 'bg-sky-700 border-sky-400 text-white' : 'bg-panel-dark border-border-dark text-text-primary'}`}>RAIN / WEATHER {weatherEnabled ? 'ON' : 'OFF'}</button>
           <button onClick={()=>setEarthquakesEnabled(value=>!value)} className={`px-3 py-2 text-[9px] font-mono border rounded-sm ${earthquakesEnabled ? 'bg-amber-700 border-amber-400 text-white' : 'bg-panel-dark border-border-dark text-text-primary'}`}>EARTHQUAKES {earthquakesEnabled ? 'ON' : 'OFF'}</button>
+          <button onClick={()=>setOsmTradesEnabled(value=>!value)} className={`px-3 py-2 text-[9px] font-mono border rounded-sm ${osmTradesEnabled ? 'bg-violet-800 border-violet-400 text-white' : 'bg-panel-dark border-border-dark text-text-primary'}`}>OSM TRADES {osmTradesEnabled ? 'ON' : 'OFF'}</button>
         </div>
       </div>
       <div ref={containerRef} className="w-full flex-1 min-h-[520px]" />
@@ -353,6 +417,7 @@ export default function LeadMap({
         <span>CRM PINS: {preciseLeadCount} located / {leads.length} records · no fabricated coordinates</span>
         <span>{weatherEnabled ? weatherStatus : earthquakeStatus}</span>
         {weatherEnabled && earthquakesEnabled && <span>{earthquakeStatus}</span>}
+        {osmTradesEnabled && <span>{osmTradeStatus}</span>}
         {isDrawingZone && <span className="text-amber-300">DRAWING ZONE · CLICK MAP TO ADD POINTS</span>}
         {cursor && <span>{cursor.lat.toFixed(4)}, {cursor.lng.toFixed(4)}</span>}
         <span>Map © OpenFreeMap · © OpenMapTiles · © OpenStreetMap</span>
