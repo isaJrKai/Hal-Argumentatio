@@ -34,6 +34,7 @@ import {
   askHalBot,
   draftOutreachMessage
 } from './src/lib/gemini';
+import { searchTerritoryBusinesses } from './src/services/territorySearch';
 import { callNemotron } from './src/services/nemotron.ts';
 import { runProviderProbe } from './src/services/aiProviderDiagnostics.ts';
 import { autonomousLearning, getTenantAutonomousLearning } from './src/lib/autonomousLearning';
@@ -3704,6 +3705,28 @@ app.post('/api/leads/harvest', authenticate, async (req, res) => {
   } catch (err: any) {
     console.error('Failed to harvest real business data:', err);
     res.status(500).json({ error: err.message });
+  }
+});
+
+
+// Unified map + AI territory discovery. Results are read-only candidates until
+// explicitly imported through the existing tenant-scoped CRM ingestion flow.
+app.post('/api/maps/territory-search', authenticate, async (req, res) => {
+  const { city, niche, limit, activeAi } = req.body || {};
+  if (typeof city !== 'string' || typeof niche !== 'string' || !city.trim() || !niche.trim()) {
+    return res.status(400).json({ success: false, error: 'city and niche are required.' });
+  }
+  try {
+    const result = await searchTerritoryBusinesses({
+      city: city.trim(),
+      niche: niche.trim(),
+      limit,
+      preferredAI: activeAi
+    });
+    return res.json({ success: true, ...result });
+  } catch (error: any) {
+    console.error('[Territory Search] Failed:', error);
+    return res.status(502).json({ success: false, error: error?.message || 'Territory search failed.' });
   }
 });
 
