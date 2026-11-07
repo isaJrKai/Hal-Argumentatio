@@ -350,6 +350,7 @@ export async function harvestRealBusinesses(
   ownerName?: string;
   email?: string;
   phone?: string;
+  address?: string;
   city: string;
   serviceType: string;
   websiteUrl: string;
@@ -377,11 +378,12 @@ For each business, research and provide verified details:
 2. "ownerName" - Owner, founder, or key manager if known (otherwise omit or null).
 3. "email" - Public contact or dispatch email (e.g. info@domain, service@domain, or office@domain).
 4. "phone" - Actual public operating telephone number.
-5. "city" - "${city}".
+5. "address" - The publicly listed physical business address or shop/service location, only when explicitly supported by a source. Do not substitute a city, district, or guessed location; omit when unavailable.
+6. "city" - "${city}".
 6. "serviceType" - "${niche}".
-7. "websiteUrl" - Official active website URL.
-8. "outreachStrategy" - A cautious outreach angle based only on facts actually present in the search results.
-9. "notes" - State which details are unknown; do not invent ratings, review counts, technical scores, SSL, performance, or sentiment.
+8. "websiteUrl" - Official active website URL.
+9. "outreachStrategy" - A cautious outreach angle based only on facts actually present in the search results.
+10. "notes" - State which details are unknown; do not invent ratings, review counts, technical scores, SSL, performance, or sentiment.
 
 IMPORTANT: Output ONLY a valid JSON array of objects with the keys above inside a markdown json block. Do not include introductory text or commentary outside the JSON block.`;
 
