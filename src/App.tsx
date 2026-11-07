@@ -415,7 +415,7 @@ export default function App() {
     return () => mq.removeEventListener('change', onChange);
   }, []);
 
-  // Synchronize theme with document element classList to ensure proper background and variable values
+  // Keep document styling and browser chrome aligned with the selected theme.
   useEffect(() => {
     const root = document.documentElement;
     if (theme === 'light') {
@@ -425,6 +425,8 @@ export default function App() {
       root.classList.add('dark-theme');
       root.classList.remove('light-theme');
     }
+    const themeColor = theme === 'light' ? '#f7f9fc' : '#0c0e12';
+    document.querySelector('meta[name="theme-color"]')?.setAttribute('content', themeColor);
   }, [theme]);
 
   // Global fetch interceptor to attach auth tokens, handle transient network hiccups, and catch expired sessions
