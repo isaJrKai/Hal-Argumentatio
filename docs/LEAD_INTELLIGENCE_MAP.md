@@ -29,15 +29,20 @@
 - Open-Meteo's free hosted API is for non-commercial use. HAL must replace it with a commercially licensed provider or a self-hosted/appropriately licensed data source before commercial production or a paid buyer deployment.
 - Overpass and Nominatim are shared community services. Queries should stay limited to the visible map viewport or explicit user searches; do not bulk-download OSM data or use the public endpoints as an unrestricted scraping backend.
 - OSM POIs enter the CRM only after an explicit user action on the map popup. Their OSM ID, type, attribution, and coordinates are preserved in the existing `groundingEvidence` JSON field; they remain unverified and require human review before outreach.
-- The existing CRM schema does not have dedicated latitude/longitude columns. The map reads OSM coordinates from the provenance JSON for imported OSM leads; other CRM leads still need a verified coordinate source before they can be pinned.
+- The existing CRM schema does not have dedicated latitude/longitude columns. The map reads OSM and geocoding coordinates from the existing `groundingEvidence` JSONB field, avoiding a risky schema migration.
+- Existing CRM records can be geocoded in tenant-scoped batches of up to 50 using Geoapify. The geocoder searches by business name and city with `type=amenity`; only an exact/prefix name match, matching city, result type `amenity`, and confidence of at least 0.75 are persisted. The geocoding record stores provider, coordinates, formatted address, result type, confidence, timestamp, precision, and attribution.
+- If Geoapify cannot confidently identify a named business, the lead stays in the CRM but remains unpinned. City-only fallback coordinates and synthetic neighbourhood offsets are prohibited.
+- Configure `GEOAPIFY_API_KEY` as a server-side secret before using the geocoding action. Never expose it through a `VITE_` client variable. Geoapify's published Free plan currently allows commercial production use within 3,000 credits/day and rate limits, with required attribution.
 
 ## Verification still required
 
 Run the repository's frozen Bun install, TypeScript check, unit/integration/security tests, and production build on this branch. Then manually verify:
 1. OpenFreeMap loads without a Google Maps key.
-2. Weather cells refresh when the map viewport changes.
-3. USGS events render and event details open.
-4. Overpass POIs appear only for the visible viewport, named POIs can be added to the CRM review queue, and imported records retain OSM provenance and coordinates.
-5. CRM leads without precise coordinates are not assigned invented map positions.
-6. Harvest requests for 50 pass through the UI and authenticated API; actual results may be fewer.
-7. Existing service-zone drawing and CRM selection still work.
+2. With `GEOAPIFY_API_KEY` configured, batch geocoding persists only high-confidence named business POIs; without the key, the endpoint returns a clear configuration error.
+3. No city-centre or synthetic-offset coordinates are used for individual leads.
+4. Weather cells refresh when the map viewport changes.
+5. USGS events render and event details open.
+6. Overpass POIs appear only for the visible viewport, named POIs can be added to the CRM review queue, and imported records retain OSM provenance and coordinates.
+7. CRM leads without precise coordinates are not assigned invented map positions.
+8. Harvest requests for 50 pass through the UI and authenticated API; actual results may be fewer.
+9. Existing service-zone drawing and CRM selection still work.
