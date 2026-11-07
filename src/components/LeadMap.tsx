@@ -35,6 +35,28 @@ export interface OsmTradeCandidate {
   websiteUrl?: string;
 }
 
+export interface TerritorySearchCandidate {
+  businessName: string;
+  city: string;
+  serviceType: string;
+  address?: string;
+  websiteUrl?: string;
+  phone?: string;
+  email?: string;
+  latitude: number | null;
+  longitude: number | null;
+  locationSource: string | null;
+  googleRating: number | null;
+  reviewCount: number | null;
+  googleMapsUrl: string | null;
+  reviews: Array<{ rating: number; text: string; authorName?: string; relativeTime?: string }>;
+  reviewSource: string | null;
+  sourceType: string;
+  verificationStatus: string;
+  notes: string;
+  groundingEvidence?: Record<string, unknown>;
+}
+
 export interface LeadMapProps {
   leads: LeadCoord[];
   onImportOsmPlace?: (candidate: OsmTradeCandidate) => Promise<void> | void;
@@ -48,6 +70,11 @@ export interface LeadMapProps {
   isDrawingZone?: boolean;
   onAddZonePoint?: (point: { lat: number; lng: number }) => void;
   drawingPoints?: Array<{ lat: number; lng: number }>;
+  territoryResults?: TerritorySearchCandidate[];
+  onTerritorySearch?: (query: string) => Promise<void> | void;
+  onImportTerritoryResult?: (candidate: TerritorySearchCandidate) => Promise<void> | void;
+  territorySearchStatus?: string | null;
+  isSearchingTerritory?: boolean;
 }
 
 declare global {
@@ -132,12 +159,14 @@ const safeText = (value: unknown) => String(value ?? '').replace(/[&<>"']/g, cha
 
 export default function LeadMap({
   leads, center, city, selectedLeadId, onSelectLead, onImportOsmPlace, serviceZones = [],
-  isDrawingZone = false, onAddZonePoint, drawingPoints = []
+  isDrawingZone = false, onAddZonePoint, drawingPoints = [], territoryResults = [],
+  onTerritorySearch, onImportTerritoryResult, territorySearchStatus, isSearchingTerritory = false
 }: LeadMapProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<any>(null);
   const markersRef = useRef<any[]>([]);
   const osmMarkersRef = useRef<any[]>([]);
+  const territoryMarkersRef = useRef<any[]>([]);
   const [mapReady, setMapReady] = useState(false);
   const [mapError, setMapError] = useState('');
   const [earthquakesEnabled, setEarthquakesEnabled] = useState(false);
@@ -145,7 +174,6 @@ export default function LeadMap({
   const [osmTradeStatus, setOsmTradeStatus] = useState('OSM trade layer off');
   const [earthquakeStatus, setEarthquakeStatus] = useState('Earthquake layer off');
   const [searchText, setSearchText] = useState('');
-  const [searching, setSearching] = useState(false);
 
   useEffect(() => {
     let disposed = false;
@@ -182,6 +210,8 @@ export default function LeadMap({
       markersRef.current = [];
       osmMarkersRef.current.forEach(marker => marker.remove());
       osmMarkersRef.current = [];
+      territoryMarkersRef.current.forEach(marker => marker.remove());
+      territoryMarkersRef.current = [];
       map?.remove();
       mapRef.current = null;
     };
@@ -389,23 +419,80 @@ export default function LeadMap({
 
   const handleSearch = async (event: React.FormEvent) => {
     event.preventDefault();
-    if (!searchText.trim() || searching || !mapRef.current) return;
-    setSearching(true);
-    try {
-      // Nominatim is used only for explicit, user-initiated single-place searches.
-      const response = await fetch(`https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&q=${encodeURIComponent(searchText.trim())}`, {
-        headers: { 'Accept-Language': 'en' }
-      });
-      if (!response.ok) throw new Error('Location search unavailable');
-      const results = await response.json();
-      if (!results?.length) throw new Error('No matching location found');
-      mapRef.current.flyTo({ center: [Number(results[0].lon), Number(results[0].lat)], zoom: 13, duration: 900 });
-    } catch (error: any) {
-      setMapError(error?.message || 'Location search failed');
-    } finally {
-      setSearching(false);
-    }
+    if (!searchText.trim() || isSearchingTerritory || !onTerritorySearch) return;
+    await onTerritorySearch(searchText.trim());
   };
+
+  // Search candidates are a live, temporary result layer until the operator
+  // explicitly imports a selected business into the CRM.
+  useEffect(() => {
+    const map = mapRef.current;
+    const maplibregl = window.maplibregl;
+    if (!map || !mapReady || !maplibregl) return;
+    territoryMarkersRef.current.forEach(marker => marker.remove());
+    territoryMarkersRef.current = [];
+    const located = territoryResults.filter(item =>
+      Number.isFinite(Number(item.latitude)) && Number.isFinite(Number(item.longitude))
+    );
+    located.forEach(candidate => {
+      const root = document.createElement('div');
+      root.style.cssText = 'min-width:220px;max-width:280px;font:12px system-ui;color:#17202a';
+      const title = document.createElement('strong');
+      title.textContent = candidate.businessName;
+      root.appendChild(title);
+      const address = document.createElement('div');
+      address.textContent = candidate.address || candidate.city;
+      root.appendChild(address);
+      const metrics = document.createElement('div');
+      metrics.textContent = candidate.googleRating == null || candidate.reviewCount == null
+        ? 'Google review data unavailable'
+        : `Google rating ${candidate.googleRating} · ${candidate.reviewCount} reviews`;
+      root.appendChild(metrics);
+      if (candidate.reviews?.length) {
+        const review = document.createElement('p');
+        review.textContent = `“${candidate.reviews[0].text.slice(0, 220)}”`;
+        root.appendChild(review);
+      }
+      if (candidate.websiteUrl) {
+        const website = document.createElement('a');
+        website.href = candidate.websiteUrl;
+        website.target = '_blank';
+        website.rel = 'noreferrer';
+        website.textContent = 'Open website';
+        website.style.display = 'block';
+        root.appendChild(website);
+      }
+      if (candidate.googleMapsUrl) {
+        const maps = document.createElement('a');
+        maps.href = candidate.googleMapsUrl;
+        maps.target = '_blank';
+        maps.rel = 'noreferrer';
+        maps.textContent = 'Open Google Maps listing';
+        maps.style.display = 'block';
+        root.appendChild(maps);
+      }
+      const importButton = document.createElement('button');
+      importButton.type = 'button';
+      importButton.textContent = 'Add to CRM review queue';
+      importButton.style.cssText = 'margin-top:8px;padding:6px 9px;background:#15966a;color:#fff;border:0;cursor:pointer';
+      importButton.addEventListener('click', () => { void onImportTerritoryResult?.(candidate); });
+      root.appendChild(importButton);
+      const marker = new maplibregl.Marker({ color: '#d97706' })
+        .setLngLat([Number(candidate.longitude), Number(candidate.latitude)])
+        .setPopup(new maplibregl.Popup({ offset: 24 }).setDOMContent(root))
+        .addTo(map);
+      territoryMarkersRef.current.push(marker);
+    });
+    if (located.length) {
+      const bounds = new maplibregl.LngLatBounds();
+      located.forEach(candidate => bounds.extend([Number(candidate.longitude), Number(candidate.latitude)]));
+      map.fitBounds(bounds, { padding: 90, maxZoom: 13, duration: 700 });
+    }
+    return () => {
+      territoryMarkersRef.current.forEach(marker => marker.remove());
+      territoryMarkersRef.current = [];
+    };
+  }, [territoryResults, mapReady, onImportTerritoryResult]);
 
   const preciseLeadCount = leads.filter(lead => validCoords(lead.coords)).length;
 
@@ -418,8 +505,8 @@ export default function LeadMap({
         </div>
         <div className="flex flex-wrap gap-2 pointer-events-auto">
           <form onSubmit={handleSearch} className="flex gap-1 bg-panel-dark/95 border border-border-dark rounded-sm p-1">
-            <input value={searchText} onChange={event=>setSearchText(event.target.value)} placeholder="Search a place…" className="w-36 sm:w-48 bg-transparent px-2 py-1 text-[10px] text-text-primary outline-none" />
-            <button disabled={searching} className="px-2 py-1 text-[9px] font-mono bg-brand text-black rounded-sm">{searching ? '…' : 'GO'}</button>
+            <input value={searchText} onChange={event=>setSearchText(event.target.value)} placeholder="Find plumbers near Fredericton…" className="w-44 sm:w-64 bg-transparent px-2 py-1 text-[10px] text-text-primary outline-none" aria-label="Search businesses by trade and city" />
+            <button disabled={isSearchingTerritory || !onTerritorySearch} className="px-2 py-1 text-[9px] font-mono bg-brand text-black rounded-sm">{isSearchingTerritory ? 'SEARCHING…' : 'FIND'}</button>
           </form>
           <span className="px-3 py-2 text-[9px] font-mono border border-border-dark rounded-sm bg-panel-dark text-text-dim" title="Weather is disabled pending a commercially licensed data provider">WEATHER DISABLED · LICENSING</span>
           <button onClick={()=>setEarthquakesEnabled(value=>!value)} className={`px-3 py-2 text-[9px] font-mono border rounded-sm ${earthquakesEnabled ? 'bg-amber-700 border-amber-400 text-white' : 'bg-panel-dark border-border-dark text-text-primary'}`}>EARTHQUAKES {earthquakesEnabled ? 'ON' : 'OFF'}</button>
@@ -433,6 +520,8 @@ export default function LeadMap({
         <span>{earthquakeStatus}</span>
         
         {osmTradesEnabled && <span>{osmTradeStatus}</span>}
+        {territorySearchStatus && <span>{territorySearchStatus}</span>}
+        {territoryResults.length > 0 && <span>SEARCH RESULTS: {territoryResults.length} · {territoryResults.filter(item => item.latitude != null && item.longitude != null).length} LOCATED</span>}
         {isDrawingZone && <span className="text-amber-300">DRAWING ZONE · CLICK MAP TO ADD POINTS</span>}
         <span>Map © OpenFreeMap · © OpenMapTiles · © OpenStreetMap</span>
         
