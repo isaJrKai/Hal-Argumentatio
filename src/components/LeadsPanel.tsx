@@ -1398,7 +1398,7 @@ Next-Gen Waterproofing	Calgary	Waterproofing	Jane Smith	jane@nextgen.ca	403-555-
             <LeadMap 
               leads={mappedLeadsForMap} 
               center={mapCenter} 
-              city={cityFilter === 'all' ? 'Winnipeg' : cityFilter} 
+              city={cityFilter === 'all' ? activeCity : cityFilter} 
               selectedLeadId={selectedLead?.id}
               onSelectLead={(leadId) => {
                 const found = leads.find(l => l.id === leadId);
