@@ -50,6 +50,10 @@ export interface LeadMapProps {
   drawingPoints?: Array<{ lat: number; lng: number }>;
 }
 
+declare global {
+  interface Window { maplibregl?: any; }
+}
+
 const MAPLIBRE_VERSION = '5.6.1';
 const OPENFREEMAP_STYLE = 'https://tiles.openfreemap.org/styles/liberty';
 
