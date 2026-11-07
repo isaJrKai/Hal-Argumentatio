@@ -367,10 +367,10 @@ export async function harvestRealBusinesses(
   dnsVerified?: boolean;
   groundingEvidence?: any;
 }>> {
-  const targetCount = Math.min(Math.max(Number(limit) || 10, 1), 25);
+  const targetCount = Math.min(Math.max(Number(limit) || 10, 1), 50);
   const prompt = `You are HAL's verified territory intelligence discovery engine.
-Search the live web, Google Maps, and local registries for real, active, operating home services or trade contractors in the city of "${city}" for the niche "${niche}".
-Identify and return up to ${targetCount} actual operating businesses.
+Use live Google Search grounding to find real, active, operating home-service or trade contractors in the city of "${city}" for the niche "${niche}". Do not imply that Google Maps, a local registry, or any directory was queried unless the returned search evidence explicitly demonstrates that source.
+Identify and return up to ${targetCount} actual operating businesses. Return fewer when fewer can be grounded; never invent businesses or contact details to fill the requested limit.
 
 For each business, research and provide verified details:
 1. "businessName" - Official registered business or trade name.
