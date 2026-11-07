@@ -110,11 +110,9 @@ export default function LeadMap({
   const osmMarkersRef = useRef<any[]>([]);
   const [mapReady, setMapReady] = useState(false);
   const [mapError, setMapError] = useState('');
-  const [weatherEnabled, setWeatherEnabled] = useState(false);
   const [earthquakesEnabled, setEarthquakesEnabled] = useState(false);
   const [osmTradesEnabled, setOsmTradesEnabled] = useState(false);
   const [osmTradeStatus, setOsmTradeStatus] = useState('OSM trade layer off');
-  const [weatherStatus, setWeatherStatus] = useState('Weather layer off');
   const [earthquakeStatus, setEarthquakeStatus] = useState('Earthquake layer off');
   const [searchText, setSearchText] = useState('');
   const [searching, setSearching] = useState(false);
@@ -214,71 +212,7 @@ export default function LeadMap({
     }
   }, [serviceZones, drawingPoints, mapReady]);
 
-  // Open-Meteo: sample a small grid inside the current viewport and render forecast
-  // precipitation probability as contextual weather cells, not as lead-demand evidence.
-  useEffect(() => {
-    const map = mapRef.current;
-    if (!map || !mapReady || !weatherEnabled) {
-      if (map?.getLayer('hal-weather-fill')) map.removeLayer('hal-weather-fill');
-      if (map?.getSource('hal-weather')) map.removeSource('hal-weather');
-      if (!weatherEnabled) setWeatherStatus('Weather layer off');
-      return;
-    }
-    let cancelled = false;
-    const loadWeather = async () => {
-      try {
-        const bounds = map.getBounds();
-        const west = bounds.getWest(), east = bounds.getEast(), south = bounds.getSouth(), north = bounds.getNorth();
-        const points: Array<{lat:number;lng:number;west:number;east:number;south:number;north:number}> = [];
-        const rows = 4, cols = 4;
-        for (let row=0; row<rows; row++) for (let col=0; col<cols; col++) {
-          const cellWest = west + (east-west)*col/cols;
-          const cellEast = west + (east-west)*(col+1)/cols;
-          const cellSouth = south + (north-south)*row/rows;
-          const cellNorth = south + (north-south)*(row+1)/rows;
-          points.push({ lat:(cellSouth+cellNorth)/2, lng:(cellWest+cellEast)/2, west:cellWest, east:cellEast, south:cellSouth, north:cellNorth });
-        }
-        const params = new URLSearchParams({
-          latitude: points.map(point=>point.lat.toFixed(4)).join(','),
-          longitude: points.map(point=>point.lng.toFixed(4)).join(','),
-          current: 'temperature_2m,precipitation,rain,wind_speed_10m',
-          hourly: 'precipitation_probability,precipitation',
-          forecast_days: '1',
-          timezone: 'auto'
-        });
-        const response = await fetch(`https://api.open-meteo.com/v1/forecast?${params.toString()}`);
-        if (!response.ok) throw new Error(`Weather service returned ${response.status}`);
-        const payload = await response.json();
-        const records = Array.isArray(payload) ? payload : [payload];
-        if (cancelled) return;
-        const features = points.map((point, index) => {
-          const record = records[index] || {};
-          const probability = Math.max(0, ...(record.hourly?.precipitation_probability || []).slice(0, 6).filter(Number.isFinite));
-          const rainMm = Math.max(Number(record.current?.precipitation || 0), ...(record.hourly?.precipitation || []).slice(0, 6).filter(Number.isFinite));
-          return {
-            type: 'Feature',
-            properties: { probability, rainMm, temperature: record.current?.temperature_2m ?? null, wind: record.current?.wind_speed_10m ?? null },
-            geometry: { type: 'Polygon', coordinates: [[[point.west,point.south],[point.east,point.south],[point.east,point.north],[point.west,point.north],[point.west,point.south]]] }
-          };
-        });
-        const geojson = { type: 'FeatureCollection', features };
-        if (map.getSource('hal-weather')) map.getSource('hal-weather').setData(geojson);
-        else {
-          map.addSource('hal-weather', { type: 'geojson', data: geojson });
-          map.addLayer({ id: 'hal-weather-fill', type: 'fill', source: 'hal-weather', paint: {
-            'fill-color': ['case', ['>=',['get','probability'],70], '#2878c8', ['>=',['get','probability'],40], '#53a7b6', '#d5b85a'],
-            'fill-opacity': 0.24, 'fill-outline-color': 'rgba(255,255,255,0.25)'
-          }});
-        }
-        setWeatherStatus('Open-Meteo · next 6 hours · refreshed ' + new Date().toLocaleTimeString());
-      } catch (error: any) {
-        if (!cancelled) setWeatherStatus(error?.message || 'Weather data unavailable');
-      }
-    };
-    loadWeather();
-    map.on('moveend', loadWeather);
-    return () => { cancelled = true; map.off('moveend', loadWeather); };
-  }, [weatherEnabled, mapReady]);
+  // Weather overlay intentionally disabled until HAL uses a commercially licensed provider.
 
   // USGS public GeoJSON feed. Events are displayed as seismic observations, not
   // interpreted as property damage or contractor demand.
@@ -449,7 +383,7 @@ export default function LeadMap({
             <input value={searchText} onChange={event=>setSearchText(event.target.value)} placeholder="Search a place…" className="w-36 sm:w-48 bg-transparent px-2 py-1 text-[10px] text-text-primary outline-none" />
             <button disabled={searching} className="px-2 py-1 text-[9px] font-mono bg-brand text-black rounded-sm">{searching ? '…' : 'GO'}</button>
           </form>
-          <button onClick={()=>setWeatherEnabled(value=>!value)} className={`px-3 py-2 text-[9px] font-mono border rounded-sm ${weatherEnabled ? 'bg-sky-700 border-sky-400 text-white' : 'bg-panel-dark border-border-dark text-text-primary'}`}>RAIN / WEATHER {weatherEnabled ? 'ON' : 'OFF'}</button>
+          <span className="px-3 py-2 text-[9px] font-mono border border-border-dark rounded-sm bg-panel-dark text-text-dim" title="Weather is disabled pending a commercially licensed data provider">WEATHER DISABLED · LICENSING</span>
           <button onClick={()=>setEarthquakesEnabled(value=>!value)} className={`px-3 py-2 text-[9px] font-mono border rounded-sm ${earthquakesEnabled ? 'bg-amber-700 border-amber-400 text-white' : 'bg-panel-dark border-border-dark text-text-primary'}`}>EARTHQUAKES {earthquakesEnabled ? 'ON' : 'OFF'}</button>
           <button onClick={()=>setOsmTradesEnabled(value=>!value)} className={`px-3 py-2 text-[9px] font-mono border rounded-sm ${osmTradesEnabled ? 'bg-violet-800 border-violet-400 text-white' : 'bg-panel-dark border-border-dark text-text-primary'}`}>OSM TRADES {osmTradesEnabled ? 'ON' : 'OFF'}</button>
         </div>
@@ -458,12 +392,12 @@ export default function LeadMap({
       {(!mapReady || mapError) && <div className="absolute inset-0 z-20 flex items-center justify-center bg-panel-dark/90 p-6 text-center"><div className="text-xs font-mono text-text-primary">{mapError || 'Loading OpenFreeMap…'}{mapError && <div className="mt-2 text-text-dim">Check the network connection and refresh the map.</div>}</div></div>}
       <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border-dark bg-panel-dark px-3 py-2 text-[9px] font-mono text-text-dim">
         <span>CRM PINS: {preciseLeadCount} located / {leads.length} records · no fabricated coordinates</span>
-        <span>{weatherEnabled ? weatherStatus : earthquakeStatus}</span>
-        {weatherEnabled && earthquakesEnabled && <span>{earthquakeStatus}</span>}
+        <span>{earthquakeStatus}</span>
+        
         {osmTradesEnabled && <span>{osmTradeStatus}</span>}
         {isDrawingZone && <span className="text-amber-300">DRAWING ZONE · CLICK MAP TO ADD POINTS</span>}
         <span>Map © OpenFreeMap · © OpenMapTiles · © OpenStreetMap</span>
-        {weatherEnabled && <span>Weather: Open-Meteo free tier is non-commercial; replace before commercial production.</span>}
+        
       </div>
     </div>
   );
