@@ -9090,9 +9090,12 @@ app.post('/api/geocode', authenticate, async (req, res) => {
 // attribution evidence. Only high-confidence named business POIs are accepted.
 app.post('/api/leads/geocode', authenticate, async (req, res) => {
   const contractorId = String((req as any).contractorId || '');
-  const leadIds = Array.isArray(req.body?.leadIds)
-    ? [...new Set(req.body.leadIds.filter((id: unknown) => typeof id === 'string' && id.trim()).map((id: string) => id.trim()))]
-    : [];
+  const rawLeadIds: unknown[] = Array.isArray(req.body?.leadIds) ? req.body.leadIds : [];
+  const leadIds: string[] = Array.from(new Set(
+    rawLeadIds
+      .filter((id): id is string => typeof id === 'string' && id.trim().length > 0)
+      .map(id => id.trim())
+  ));
   if (!leadIds.length || leadIds.length > 50) {
     return res.status(400).json({ success: false, error: 'Provide between 1 and 50 lead IDs per geocoding batch.' });
   }
