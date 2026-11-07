@@ -15,7 +15,7 @@ export interface Lead {
   predictedLtvUsd: number | null;
   notes?: string;
   isSynthetic?: boolean;
-  sourceType?: 'live_harvest' | 'ai_discovery_unverified' | 'synthetic_fallback' | 'manual' | 'google_ads' | 'spreadsheet_import' | 'unknown';
+  sourceType?: 'live_harvest' | 'ai_discovery_unverified' | 'synthetic_fallback' | 'manual' | 'google_ads' | 'spreadsheet_import' | 'openstreetmap_poi' | 'unknown';
   verificationStatus?: 'VERIFIED' | 'UNVERIFIED_STAGING' | 'FABRICATED_REJECTED';
   dnsVerified?: boolean;
   groundingEvidence?: {
@@ -27,6 +27,13 @@ export interface Lead {
     isDummyPhone?: boolean;
     reasons?: string[];
     verifiedAt?: string;
+    source?: string;
+    osmType?: string;
+    osmId?: number;
+    latitude?: number;
+    longitude?: number;
+    attribution?: string;
+    verificationNote?: string;
   };
   createdAt: string;
   updatedAt: string;
