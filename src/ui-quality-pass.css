@@ -171,3 +171,24 @@ textarea {
     transition-duration: 0.01ms !important;
   }
 }
+
+
+/* HAL visual system: one calm geometry scale, with full pills kept intentional. */
+:where([class~="rounded-sm"]) { border-radius: 6px !important; }
+:where([class~="rounded"], [class~="rounded-md"]) { border-radius: 10px !important; }
+:where([class~="rounded-lg"]) { border-radius: 12px !important; }
+:where([class~="rounded-xl"]) { border-radius: 16px !important; }
+:where([class~="rounded-2xl"]) { border-radius: 20px !important; }
+:where([class~="rounded-3xl"]) { border-radius: 24px !important; }
+:where([class~="rounded-full"]) { border-radius: 9999px !important; }
+
+:where(button, input, select, textarea, .input, .btn-primary, .btn-ghost, .btn-danger) { border-radius: 10px; }
+:where(.btn-primary, .btn-ghost, .btn-danger) {
+  font-family: var(--font-sans);
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+}
+:where(.badge) { border-radius: 9999px; font-weight: 600; }
+:where(.metric-label, .label) { font-family: var(--font-sans); letter-spacing: 0.045em; }
+:where(.font-display) { font-family: var(--font-sans); }
