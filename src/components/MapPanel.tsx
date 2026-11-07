@@ -519,7 +519,7 @@ export default function MapPanel({ leads, token, onOpenWorkQueue }: MapPanelProp
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-bg-raised border border-border-dim p-4.5 rounded-sm">
         <div>
           <h2 className="text-sm font-mono font-bold text-text-primary uppercase tracking-wider flex items-center gap-2">
-            <Globe className="w-4 h-4 text-brand animate-pulse" /> Territory Conquest & Spatial Map
+            <Globe className="w-4 h-4 text-brand animate-pulse" /> Maps
           </h2>
           <p className="text-[11px] text-text-secondary font-sans mt-1">
             Find real businesses, inspect territories, and move qualified prospects into your CRM.
@@ -527,69 +527,18 @@ export default function MapPanel({ leads, token, onOpenWorkQueue }: MapPanelProp
         </div>
 
         <div className="flex flex-wrap items-center gap-2.5">
-          {/* IndexedDB Cache Badge */}
-          <div className="flex items-center gap-2 bg-bg-subtle px-3 py-1.5 border border-border-dim/50 rounded-sm font-mono text-[10px]">
-            <HardDrive className="w-3.5 h-3.5 text-brand" />
-            <span className="text-text-secondary">OFFLINE CACHE:</span>
-            <span className="text-brand font-bold">{cachedCount} LOCATIONS</span>
-            {isUsingOfflineCache && (
-              <span className="bg-amber-500/20 text-amber-400 border border-amber-500/30 text-[8px] font-bold px-1.5 py-0.5 rounded uppercase">
-                ACTIVE
-              </span>
-            )}
-          </div>
-
-          {/* Network Connection Indicator */}
-          <div className="flex items-center gap-2 bg-bg-subtle px-3 py-1.5 border border-border-dim/50 rounded-sm font-mono text-[10px]">
-            {isOnline ? (
-              <>
-                <Wifi className="w-3.5 h-3.5 text-positive" />
-                <span className="text-text-secondary">NETWORK:</span>
-                <span className="text-positive font-bold">ONLINE</span>
-              </>
-            ) : (
-              <>
-                <WifiOff className="w-3.5 h-3.5 text-amber-400 animate-pulse" />
-                <span className="text-text-secondary">NETWORK:</span>
-                <span className="text-amber-400 font-bold">OFFLINE</span>
-              </>
-            )}
-          </div>
+          {!isOnline && (
+            <div role="status" className="flex items-center gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-500">
+              <WifiOff className="w-4 h-4" />
+              Offline · showing saved prospect data
+            </div>
+          )}
         </div>
       </div>
 
-      {/* METRIC CARDS */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="bg-bg-raised border border-border-dim p-4.5 rounded-sm flex items-center justify-between">
-          <div>
-            <span className="text-[10px] font-mono text-text-secondary uppercase">MAPPED PROSPECTS</span>
-            <div className="text-xl font-mono font-bold text-text-primary mt-1">{totalCount}</div>
-            <span className="text-[9px] text-text-dim">
-              {activeZoneId !== 'all' ? `Filtered by Service Zone (${serviceZones.find(z => z.id === activeZoneId)?.name})` : 'Visible ledger listings in selection'}
-            </span>
-          </div>
-          <Compass className="w-8 h-8 text-brand/20 shrink-0" />
-        </div>
-
-        <div className="bg-bg-raised border border-border-dim p-4.5 rounded-sm flex items-center justify-between">
-          <div>
-            <span className="text-[10px] font-mono text-text-secondary uppercase">MARKET CONVERSION</span>
-            <div className="text-xl font-mono font-bold text-positive mt-1">{conversionRate}%</div>
-            <span className="text-[9px] text-text-dim">{convertedCount} of {totalCount} closed won</span>
-          </div>
-          <Activity className="w-8 h-8 text-positive/20 shrink-0" />
-        </div>
-
-        <div className="bg-bg-raised border border-border-dim p-4.5 rounded-sm flex items-center justify-between">
-          <div>
-            <span className="text-[10px] font-mono text-text-secondary uppercase">TOTAL PIPELINE VALUE</span>
-            <div className="text-xl font-mono font-bold text-brand mt-1">
-              ${totalValue.toLocaleString('en-US')} <span className="text-[10px] text-text-secondary">USD</span>
-            </div>
-            <span className="text-[9px] text-text-dim">Aggregated LTV from filtered area</span>
-          </div>
-          <TrendingUp className="w-8 h-8 text-brand/20 shrink-0" />
-        </div>
+      <div className="text-xs text-text-secondary">
+        {totalCount} {totalCount === 1 ? 'prospect' : 'prospects'} shown
+        {activeZoneId !== 'all' && serviceZones.find(z => z.id === activeZoneId)?.name ? ` · ${serviceZones.find(z => z.id === activeZoneId)?.name}` : ''}
       </div>
 
       {/* SPATIAL ZONE DRAWING BAR */}
@@ -597,7 +546,7 @@ export default function MapPanel({ leads, token, onOpenWorkQueue }: MapPanelProp
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-2">
             <Crosshair className="w-4 h-4 text-brand" />
-            <span className="text-xs font-bold text-text-primary uppercase">SERVICE ZONE POLYGONS</span>
+            <span className="text-xs font-bold text-text-primary uppercase">Service areas</span>
             <span className="text-[10px] text-text-secondary">({serviceZones.length} defined)</span>
           </div>
 
@@ -624,7 +573,7 @@ export default function MapPanel({ leads, token, onOpenWorkQueue }: MapPanelProp
               title="Find and save high-confidence named business locations. Unmatched leads remain unpinned."
             >
               {isGeocodingActive ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Compass className="w-3.5 h-3.5" />}
-              <span>{isGeocodingActive ? (geocodingProgress || 'GEOCODING...') : 'GEOCODE BUSINESS PINS'}</span>
+              <span>{isGeocodingActive ? (geocodingProgress || 'GEOCODING...') : 'Locate prospects'}</span>
             </button>
             <div className="basis-full text-[9px] font-mono text-text-dim">
               {geocodingSummary || 'Geoapify · named business matches only · no city-centre pins'}
@@ -641,7 +590,7 @@ export default function MapPanel({ leads, token, onOpenWorkQueue }: MapPanelProp
                 }}
                 className="flex items-center gap-1.5 px-3 py-1 bg-brand text-white text-xs font-bold rounded-sm hover:bg-brand-hover transition-colors cursor-pointer"
               >
-                <Plus className="w-3.5 h-3.5" /> DRAW ZONE POLYGON
+                <Plus className="w-3.5 h-3.5" /> Draw area
               </button>
             ) : (
               <div className="flex items-center gap-2">
