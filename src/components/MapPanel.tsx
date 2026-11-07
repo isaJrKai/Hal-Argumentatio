@@ -106,7 +106,9 @@ export default function MapPanel({ leads, token, onOpenWorkQueue }: MapPanelProp
       setGeocodingSummary('Sign in to geocode CRM businesses.');
       return;
     }
-    const missingIds = filteredLeads
+    // Geocode the tenant's full CRM dataset, not just currently visible/filtered
+    // map rows. Leads without coordinates are excluded from polygon filters.
+    const missingIds = displayLeads
       .filter(lead => !geocodedCoordsMap[lead.id] && !getPersistedLeadCoords(lead))
       .map(lead => lead.id);
     if (!missingIds.length) {
@@ -359,7 +361,7 @@ export default function MapPanel({ leads, token, onOpenWorkQueue }: MapPanelProp
     });
   }, [displayLeads, searchQuery, cityFilter, statusFilter, activeZoneId, serviceZones]);
 
-  // Coordinate mapper with precise geocoding & neighborhood distribution
+  // Coordinate mapper: only persisted or provider-confirmed business locations are plotted
   const mappedLeadsForMap = useMemo(() => {
     return filteredLeads.map((lead) => {
       const coords = geocodedCoordsMap[lead.id] || getPersistedLeadCoords(lead);
