@@ -367,14 +367,14 @@ export default function IntelligencePanel({
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-border-dim pb-4">
         <div className="space-y-1">
           <span className="text-[10px] font-mono tracking-widest text-accent uppercase">
-            HAL EXECUTIVE INTELLIGENCE
+            Business intelligence
           </span>
           <h1 className="text-xl font-bold text-text-primary tracking-tight flex items-center gap-2">
             <Cpu className="w-5 h-5 text-accent" />
-            Intelligence Engine
+            Business intelligence
           </h1>
           <p className="text-xs text-text-secondary max-w-xl">
-            Coordinate current business work, inspect recorded outcomes, and hand off analysis or artifact revisions to the existing Hermes agent. HAL labels missing data instead of guessing.
+            Ask about prospects, pipeline, revenue and current tasks. HAL separates recorded facts from estimates and asks before consequential actions.
           </p>
         </div>
 
@@ -389,7 +389,7 @@ export default function IntelligencePanel({
             }`}
           >
             <MessageSquare className="w-3.5 h-3.5" />
-            Ask HAL Bot
+            Ask HAL
           </button>
           <button
             onClick={() => setSubTab('forecasts')}
@@ -400,7 +400,7 @@ export default function IntelligencePanel({
             }`}
           >
             <TrendingUp className="w-3.5 h-3.5" />
-            Analytics Forecasts
+            Forecasts
           </button>
           <button
             onClick={() => setSubTab('calculators')}
@@ -411,7 +411,7 @@ export default function IntelligencePanel({
             }`}
           >
             <Calculator className="w-3.5 h-3.5" />
-            Operating Calculators
+            Calculators
           </button>
           <button
             onClick={() => setSubTab('audit')}
@@ -422,7 +422,7 @@ export default function IntelligencePanel({
             }`}
           >
             <ShieldCheck className="w-3.5 h-3.5" />
-            Intelligence Audit & 6D
+            Accuracy
           </button>
         </div>
       </div>
@@ -961,14 +961,14 @@ export default function IntelligencePanel({
             <div>
               <h3 className="text-sm font-bold font-mono text-text-primary tracking-tight uppercase flex items-center gap-2">
                 <ShieldCheck className="w-4 h-4 text-accent" />
-                Phase 6D Intelligence Audit & Accuracy Trends
+                Accuracy and outcomes
               </h3>
               <p className="text-[11px] text-text-secondary font-mono mt-1 uppercase tracking-wider">
-                Deterministic Outcome Tracking, Prediction Accuracy, and Forensic Verification
+                Compare forecasts with recorded outcomes and review accuracy over time.
               </p>
             </div>
             <Button variant="primary" size="sm" onClick={handleMeasureOutcomes} isLoading={loadingOutcomes}>
-              TRIGGER OUTCOME MEASUREMENT
+              Measure outcomes
             </Button>
           </div>
 
@@ -1005,9 +1005,9 @@ export default function IntelligencePanel({
             <div className="flex items-center justify-between border-b border-border-dim pb-3">
               <h4 className="text-xs font-mono font-bold text-text-primary uppercase tracking-wider flex items-center gap-2">
                 <BarChart2 className="w-4 h-4 text-accent" />
-                Prediction Accuracy Trends Over Time
+                Accuracy over time
               </h4>
-              <span className="text-[10px] font-mono text-text-tertiary">Deterministic Historical Evaluation</span>
+              <span className="text-[10px] font-mono text-text-tertiary">Compared with recorded outcomes</span>
             </div>
             <div className="h-64 w-full pt-4">
               {outcomesData.length === 0 ? (
@@ -1040,12 +1040,12 @@ export default function IntelligencePanel({
           <div className="bg-bg-raised border border-border-dim p-6 rounded-xl space-y-4">
             <h4 className="text-xs font-mono font-bold text-text-primary uppercase tracking-wider flex items-center gap-2 border-b border-border-dim pb-3">
               <Terminal className="w-4 h-4 text-accent" />
-              Forensic Intelligence Audit & Mathematical Specifications
+              How accuracy is measured
             </h4>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-xs">
               <div className="bg-bg-overlay p-4 rounded-lg border border-border-dim/60 space-y-2">
                 <span className="text-[10px] font-mono font-bold text-accent uppercase tracking-wider block">
-                  Prediction Accuracy Formula (Auditable Code)
+                  Accuracy formula
                 </span>
                 <div className="p-3 bg-bg-base border border-border-dim rounded font-mono text-[11px] text-accent">
                   1 - abs(expected - actual) / abs(expected)
