@@ -149,13 +149,16 @@ export default function MapPanel({ leads, token, onOpenWorkQueue }: MapPanelProp
           }
         }
         setGeocodedCoordsMap({ ...nextCoords });
+        if (data.providerRateLimited) {
+          throw new Error('Geoapify request limit reached. Completed locations were saved; retry the remaining leads later.');
+        }
       }
       setGeocodedCoordsMap(nextCoords);
       setGeocodingSummary(`Matched ${matchedCount} businesses · ${unmatchedCount} remain unpinned because no confident business location was found.`);
       logEvent('GEOAPIFY_GEOCODE_COMPLETE', `Persisted ${matchedCount} high-confidence business locations; ${unmatchedCount} remain unpinned.`);
     } catch (error: any) {
       const message = error?.message || 'Geocoding failed.';
-      setGeocodingSummary(message);
+      setGeocodingSummary(`${message} ${matchedCount} locations were already saved in this run.`);
       logEvent('GEOAPIFY_GEOCODE_FAILED', message);
     } finally {
       setIsGeocodingActive(false);
