@@ -148,6 +148,7 @@ export default function MapPanel({ leads, token, onOpenWorkQueue }: MapPanelProp
             unmatchedCount++;
           }
         }
+        setGeocodedCoordsMap({ ...nextCoords });
       }
       setGeocodedCoordsMap(nextCoords);
       setGeocodingSummary(`Matched ${matchedCount} businesses · ${unmatchedCount} remain unpinned because no confident business location was found.`);
