@@ -217,9 +217,9 @@ export default function HalLoopOperationsView({ token }: { token?: string | null
             <span className="px-2.5 py-1 text-xs font-semibold bg-indigo-50 text-indigo-700 rounded-full border border-indigo-100 uppercase tracking-wide">
               Phase 7 Engine
             </span>
-            <span className="text-xs text-slate-500 font-medium">Verified Business Loop</span>
+            <span className="text-xs text-slate-500 font-medium">Operations</span>
           </div>
-          <h1 className="text-2xl font-bold text-slate-900 mt-1">HAL Operating Loop Control</h1>
+          <h1 className="text-2xl font-bold text-slate-900 mt-1">Operating loop</h1>
           <p className="text-sm text-slate-600 mt-0.5">
             Continuous, verifiable observation-to-action feedback loops ensuring mathematically safe, gated execution.
           </p>
