@@ -329,7 +329,7 @@ export default function LeadMap({
       try {
         const bounds = map.getBounds();
         const bbox = [bounds.getSouth(), bounds.getWest(), bounds.getNorth(), bounds.getEast()].join(',');
-        const query = `[out:json][timeout:15];(nwr(${bbox})["craft"~"^(plumber|electrician|carpenter|roofer|builder|painter|locksmith|glaziery|tiler|plasterer|hvac|landscaper)$"];);out center tags 250;`;
+        const query = `[out:json][timeout:15];(nwr(${bbox})["craft"~"^(plumber|electrician|carpenter|roofer|builder|painter|locksmith|glaziery|tiler|plasterer|hvac|landscaper)$"];);out center 250;`;
         const response = await fetch('https://overpass-api.de/api/interpreter', {
           method: 'POST',
           headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8' },
