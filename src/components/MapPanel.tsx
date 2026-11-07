@@ -47,42 +47,18 @@ import {
   Maximize2
 } from 'lucide-react';
 
-const API_KEY =
-  process.env.GOOGLE_MAPS_PLATFORM_KEY ||
-  (import.meta as any).env?.VITE_GOOGLE_MAPS_PLATFORM_KEY ||
-  (globalThis as any).GOOGLE_MAPS_PLATFORM_KEY ||
-  '';
-
-const isValidGoogleMapsKey = (key: string): boolean => {
-  if (!key) return false;
-  return /^AIzaSy[A-Za-z0-9_\-]{33}$/.test(key);
-};
-
-const hasValidKey = isValidGoogleMapsKey(API_KEY);
-
 interface MapPanelProps {
   leads: Lead[];
   token: string | null;
   onOpenWorkQueue?: () => void;
 }
 
-// Helper for realistic neighborhood coordinate distribution based on lead ID hash
-function getDeterministicLeadCoords(leadId: string, cityName: string) {
-  const baseCoords = getCityCoordinates(cityName);
-  let hash = 0;
-  for (let i = 0; i < leadId.length; i++) {
-    hash = (hash << 5) - hash + leadId.charCodeAt(i);
-    hash |= 0;
-  }
-  const positiveHash = Math.abs(hash);
-  const angle = (positiveHash % 360) * (Math.PI / 180);
-  // Spread radius across different neighborhoods and commercial corridors (2km to 14km from city center)
-  const radius = 0.02 + ((positiveHash % 100) / 100) * 0.12;
-
-  return {
-    lat: baseCoords.lat + Math.sin(angle) * radius * 0.6,
-    lng: baseCoords.lng + Math.cos(angle) * radius * 0.85
-  };
+function getPersistedLeadCoords(lead: Lead): { lat: number; lng: number } | null {
+  const evidence = lead.groundingEvidence as Record<string, any> | undefined;
+  const lat = Number(lead.latitude ?? evidence?.latitude ?? evidence?.geocoding?.latitude);
+  const lng = Number(lead.longitude ?? evidence?.longitude ?? evidence?.geocoding?.longitude);
+  if (!Number.isFinite(lat) || !Number.isFinite(lng) || Math.abs(lat) > 90 || Math.abs(lng) > 180) return null;
+  return { lat, lng };
 }
 
 export default function MapPanel({ leads, token, onOpenWorkQueue }: MapPanelProps) {
@@ -123,46 +99,65 @@ export default function MapPanel({ leads, token, onOpenWorkQueue }: MapPanelProp
   const [geocodedCoordsMap, setGeocodedCoordsMap] = useState<Record<string, { lat: number; lng: number }>>({});
   const [isGeocodingActive, setIsGeocodingActive] = useState<boolean>(false);
   const [geocodingProgress, setGeocodingProgress] = useState<string | null>(null);
+  const [geocodingSummary, setGeocodingSummary] = useState<string | null>(null);
 
   const handleGeocodeAllLeads = async () => {
+    if (!token) {
+      setGeocodingSummary('Sign in to geocode CRM businesses.');
+      return;
+    }
+    const missingIds = filteredLeads
+      .filter(lead => !geocodedCoordsMap[lead.id] && !getPersistedLeadCoords(lead))
+      .map(lead => lead.id);
+    if (!missingIds.length) {
+      setGeocodingSummary('All filtered leads already have sourced coordinates.');
+      return;
+    }
+
     setIsGeocodingActive(true);
-    setGeocodingProgress(`Initializing Google Maps Geocoding API for ${filteredLeads.length} leads...`);
+    setGeocodingSummary(null);
+    const nextCoords = { ...geocodedCoordsMap };
+    let matchedCount = 0;
+    let unmatchedCount = 0;
+    const batches = Array.from({ length: Math.ceil(missingIds.length / 50) }, (_, index) =>
+      missingIds.slice(index * 50, (index + 1) * 50)
+    );
 
-    const newCoordsMap = { ...geocodedCoordsMap };
-    let successCount = 0;
-
-    for (let i = 0; i < filteredLeads.length; i++) {
-      const lead = filteredLeads[i];
-      setGeocodingProgress(`Geocoding (${i + 1}/${filteredLeads.length}): ${lead.businessName}...`);
-
-      try {
-        const res = await fetch('/api/geocode', {
+    try {
+      for (let index = 0; index < batches.length; index++) {
+        setGeocodingProgress(`Geoapify batch ${index + 1}/${batches.length} · ${batches[index].length} businesses`);
+        const response = await fetch('/api/leads/geocode', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
+            Authorization: `Bearer ${token}`
           },
-          body: JSON.stringify({
-            address: `${lead.businessName}, ${lead.city}`,
-            city: lead.city
-          })
+          body: JSON.stringify({ leadIds: batches[index] })
         });
-        const data = await res.json();
-        if (data.success && data.lat && data.lng) {
-          newCoordsMap[lead.id] = { lat: data.lat, lng: data.lng };
-          successCount++;
+        const data = await response.json();
+        if (!response.ok || !data.success) {
+          throw new Error(data.error || 'Business geocoding failed.');
         }
-      } catch (err) {
-        console.warn(`Geocoding failed for ${lead.businessName}:`, err);
+        for (const result of data.results || []) {
+          if (result.status === 'geocoded' && Number.isFinite(result.lat) && Number.isFinite(result.lng)) {
+            nextCoords[result.leadId] = { lat: result.lat, lng: result.lng };
+            matchedCount++;
+          } else if (result.status === 'no_confident_business_match') {
+            unmatchedCount++;
+          }
+        }
       }
-
-      await new Promise(r => setTimeout(r, 100));
+      setGeocodedCoordsMap(nextCoords);
+      setGeocodingSummary(`Matched ${matchedCount} businesses · ${unmatchedCount} remain unpinned because no confident business location was found.`);
+      logEvent('GEOAPIFY_GEOCODE_COMPLETE', `Persisted ${matchedCount} high-confidence business locations; ${unmatchedCount} remain unpinned.`);
+    } catch (error: any) {
+      const message = error?.message || 'Geocoding failed.';
+      setGeocodingSummary(message);
+      logEvent('GEOAPIFY_GEOCODE_FAILED', message);
+    } finally {
+      setIsGeocodingActive(false);
+      setGeocodingProgress(null);
     }
-
-    setGeocodedCoordsMap(newCoordsMap);
-    setIsGeocodingActive(false);
-    setGeocodingProgress(null);
-    logEvent('GOOGLE_MAPS_GEOCODE_SUCCESS', `Successfully geocoded ${successCount} business locations using Google Maps Geocoding API.`);
   };
 
   // Monitor browser online/offline events
@@ -244,8 +239,8 @@ export default function MapPanel({ leads, token, onOpenWorkQueue }: MapPanelProp
 
   // Log initial map view mounting and map provider resolution
   useEffect(() => {
-    const provider = hasValidKey ? 'Google Maps JS API' : 'OpenStreetMap Real Tile Engine';
-    logEvent('MAP_DASHBOARD_MOUNTED', `Conquest Map opened via ${provider}. Available entries: ${displayLeads.length}`);
+    const provider = 'OpenFreeMap / MapLibre GL JS';
+    logEvent('MAP_DASHBOARD_MOUNTED', `Lead intelligence map opened via ${provider}. Available entries: ${displayLeads.length}`);
 
     const timer = setTimeout(() => {
       setIsInitializingMap(false);
@@ -356,8 +351,8 @@ export default function MapPanel({ leads, token, onOpenWorkQueue }: MapPanelProp
 
       // Filter by Active Polygon Service Zone
       if (activeZone && activeZone.points && activeZone.points.length >= 3) {
-        const leadCoord = getDeterministicLeadCoords(l.id, l.city);
-        return isPointInPolygon(leadCoord, activeZone.points);
+        const leadCoord = getPersistedLeadCoords(l);
+        return leadCoord ? isPointInPolygon(leadCoord, activeZone.points) : false;
       }
 
       return true;
@@ -367,7 +362,7 @@ export default function MapPanel({ leads, token, onOpenWorkQueue }: MapPanelProp
   // Coordinate mapper with precise geocoding & neighborhood distribution
   const mappedLeadsForMap = useMemo(() => {
     return filteredLeads.map((lead) => {
-      const coords = geocodedCoordsMap[lead.id] || getDeterministicLeadCoords(lead.id, lead.city);
+      const coords = geocodedCoordsMap[lead.id] || getPersistedLeadCoords(lead);
 
       return {
         id: lead.id,
@@ -600,11 +595,16 @@ export default function MapPanel({ leads, token, onOpenWorkQueue }: MapPanelProp
               onClick={handleGeocodeAllLeads}
               disabled={isGeocodingActive}
               className="flex items-center gap-1.5 px-3 py-1 bg-brand/20 text-brand border border-brand/40 text-xs font-bold rounded-sm hover:bg-brand/30 transition-colors cursor-pointer disabled:opacity-50"
-              title="Geocode all business addresses using Google Maps Geocoding API for exact physical locations"
+              title="Find and save high-confidence named business locations. Unmatched leads remain unpinned."
             >
               {isGeocodingActive ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Compass className="w-3.5 h-3.5" />}
-              <span>{isGeocodingActive ? (geocodingProgress || 'GEOCODING...') : 'GOOGLE MAPS GEOCODE'}</span>
+              <span>{isGeocodingActive ? (geocodingProgress || 'GEOCODING...') : 'GEOCODE BUSINESS PINS'}</span>
             </button>
+            <div className="basis-full text-[9px] font-mono text-text-dim">
+              {geocodingSummary || 'Geoapify · named business matches only · no city-centre pins'}
+              {' · '}
+              <a href="https://www.geoapify.com/" target="_blank" rel="noreferrer" className="underline">Powered by Geoapify</a>
+            </div>
 
             {/* Draw Polygon Button */}
             {!isDrawingZone ? (
@@ -899,7 +899,7 @@ export default function MapPanel({ leads, token, onOpenWorkQueue }: MapPanelProp
               <div className="font-bold tracking-wider">INITIALIZING TERRITORY CONQUEST MAP...</div>
               <div className="text-[10px] text-text-dim flex items-center gap-1.5">
                 <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                VERIFYING MAP TILE PROVIDER ({hasValidKey ? 'GOOGLE MAPS PLATFORM' : 'OPENSTREETMAP REAL TILES'})...
+                INITIALIZING OPENFREEMAP VECTOR TILES...
               </div>
             </div>
           )}
