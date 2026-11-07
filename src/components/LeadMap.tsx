@@ -81,9 +81,10 @@ const validCoords = (coords?: { lat: number; lng: number } | null) =>
   !!coords && Number.isFinite(coords.lat) && Number.isFinite(coords.lng) &&
   Math.abs(coords.lat) <= 90 && Math.abs(coords.lng) <= 180;
 
-const safeText = (value: unknown) => String(value ?? '').replace(/[&<>"']/g, char => ({
+const HTML_ENTITIES: Record<string, string> = {
   '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
-}[char] || char));
+};
+const safeText = (value: unknown) => String(value ?? '').replace(/[&<>"']/g, char => HTML_ENTITIES[char] || char);
 
 export default function LeadMap({
   leads, center, city, selectedLeadId, onSelectLead, serviceZones = [],
@@ -270,7 +271,7 @@ export default function LeadMap({
   // interpreted as property damage or contractor demand.
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || !mapReady || !earthquakesEnabled) {
+    if (!map || !mapReady || !earthquakesEnabled || !window.maplibregl) {
       if (map?.getLayer('hal-quake-circles')) map.removeLayer('hal-quake-circles');
       if (map?.getSource('hal-earthquakes')) map.removeSource('hal-earthquakes');
       if (!earthquakesEnabled) setEarthquakeStatus('Earthquake layer off');
