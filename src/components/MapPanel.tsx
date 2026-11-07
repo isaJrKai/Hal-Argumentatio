@@ -36,7 +36,6 @@ import {
   RefreshCw,
   Flame,
   Layers,
-  DownloadCloud,
   Crosshair,
   Trash2,
   Plus,
