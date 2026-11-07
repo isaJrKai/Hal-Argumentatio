@@ -1,3 +1,29 @@
+/**
+ * Cross-industry directory of residential and home-service contractor niches.
+ * These are discovery/search terms, not claims that every city has businesses in each trade.
+ */
+export const HOME_SERVICE_NICHES: string[] = [
+  'general contractors', 'custom home builders', 'home additions & extensions', 'new home construction',
+  'framing contractors', 'foundation repair', 'concrete contractors', 'masonry contractors',
+  'kitchen remodeling', 'bathroom remodeling', 'whole-home renovation', 'basement finishing',
+  'roofing contractors', 'roof repair', 'gutter installation & repair', 'siding contractors',
+  'skylight installation', 'insulation contractors', 'window installation & repair', 'door installation',
+  'plumbing contractors', 'emergency plumbers', 'drain cleaning', 'sewer line repair',
+  'water heater installation & repair', 'leak detection', 'septic system services',
+  'hvac contractors', 'air conditioning installation & repair', 'furnace repair', 'heat pump installation',
+  'ventilation & ductwork', 'duct cleaning', 'residential electricians', 'electrical rewiring',
+  'electrical panel upgrades', 'generator installation', 'ev charger installation', 'solar installation',
+  'smart home automation', 'home security systems', 'locksmiths', 'garage door installation & repair',
+  'landscaping contractors', 'lawn care & mowing', 'tree removal & trimming', 'irrigation systems',
+  'hardscaping & paving', 'fencing contractors', 'deck & patio builders', 'pergola installation',
+  'pool installation & maintenance', 'pressure washing', 'exterior painting', 'interior painting',
+  'drywall installation & repair', 'plastering', 'flooring installation', 'tile installation',
+  'cabinet makers & installation', 'carpentry services', 'handyman services', 'home cleaning',
+  'deep cleaning', 'carpet & upholstery cleaning', 'window cleaning', 'move-in / move-out cleaning',
+  'pest control', 'mold remediation', 'water damage restoration', 'fire damage restoration',
+  'flood restoration', 'basement waterproofing', 'chimney services', 'home inspection services'
+];
+
 export interface IndustryMissionBlueprint {
   title: string;
   description: string;
