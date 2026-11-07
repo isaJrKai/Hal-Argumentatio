@@ -542,7 +542,9 @@ export default function MapPanel({ leads, token, onOpenWorkQueue }: MapPanelProp
       </div>
 
       {/* SPATIAL ZONE DRAWING BAR */}
-      <div className="bg-bg-raised border border-border-dim p-4 rounded-sm space-y-3 font-mono">
+      <details className="bg-bg-raised border border-border-dim p-4 rounded-xl space-y-3">
+        <summary className="cursor-pointer text-sm font-semibold text-text-primary">Map tools · {${"serviceZones.length"}} service areas</summary>
+        <div className="pt-3 space-y-3 font-mono">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-2">
             <Crosshair className="w-4 h-4 text-brand" />
@@ -619,7 +621,7 @@ export default function MapPanel({ leads, token, onOpenWorkQueue }: MapPanelProp
                   onClick={handleSaveDrawnZone}
                   className="px-2.5 py-1 bg-positive text-white text-xs font-bold rounded-sm hover:opacity-90 transition-opacity cursor-pointer"
                 >
-                  SAVE ZONE
+                  Save area
                 </button>
                 <button
                   onClick={() => {
@@ -638,7 +640,7 @@ export default function MapPanel({ leads, token, onOpenWorkQueue }: MapPanelProp
         {/* Saved Zones Tag Pills */}
         {serviceZones.length > 0 && (
           <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-border-dim/40">
-            <span className="text-[10px] text-text-dim">SAVED ZONES:</span>
+            <span className="text-[10px] text-text-dim">Saved areas:</span>
             {serviceZones.map(z => (
               <div
                 key={z.id}
@@ -664,14 +666,15 @@ export default function MapPanel({ leads, token, onOpenWorkQueue }: MapPanelProp
             ))}
           </div>
         )}
-      </div>
-
+      
+        </div>
+      </details>
       {/* FILTER PANEL */}
       <div className="bg-bg-raised border border-border-dim p-4.5 rounded-sm space-y-4">
         <div className="flex items-center justify-between border-b border-border-dim/50 pb-2.5">
           <div className="flex items-center gap-2">
             <Filter className="w-3.5 h-3.5 text-brand" />
-            <span className="text-[11px] font-mono font-bold text-text-primary uppercase">Territory Scope & Visualization Settings</span>
+            <span className="text-[11px] font-mono font-bold text-text-primary uppercase">Filters and map layers</span>
           </div>
           {activeOverlay !== 'none' && (
             <span className="bg-amber-500/10 text-amber-400 border border-amber-500/30 text-[9px] font-mono px-2 py-0.5 rounded flex items-center gap-1.5 animate-pulse font-bold">
@@ -683,7 +686,7 @@ export default function MapPanel({ leads, token, onOpenWorkQueue }: MapPanelProp
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 font-mono">
           {/* City Selector */}
           <div className="space-y-1.5">
-            <label className="text-[10px] font-bold text-text-secondary uppercase">SELECT TARGET CITY</label>
+            <label className="text-[10px] font-bold text-text-secondary uppercase">City</label>
             <select
               value={cityFilter}
               onChange={(e) => {
@@ -693,7 +696,7 @@ export default function MapPanel({ leads, token, onOpenWorkQueue }: MapPanelProp
               }}
               className="w-full bg-bg-subtle border border-border-dim hover:border-text-secondary/30 rounded-sm p-2 text-xs text-text-primary focus:outline-none focus:border-brand transition-colors cursor-pointer"
             >
-              <option value="all">ALL TERRITORIES</option>
+              <option value="all">All cities</option>
               {Object.keys(cityCounts).map(city => (
                 <option key={city} value={city.toLowerCase()}>
                   {(city || 'TERRITORY').toUpperCase()} ({cityCounts[city]} leads)
@@ -704,7 +707,7 @@ export default function MapPanel({ leads, token, onOpenWorkQueue }: MapPanelProp
 
           {/* Status Selector */}
           <div className="space-y-1.5">
-            <label className="text-[10px] font-bold text-text-secondary uppercase">PIPELINE STATUS</label>
+            <label className="text-[10px] font-bold text-text-secondary uppercase">Prospect status</label>
             <select
               value={statusFilter}
               onChange={(e) => {
@@ -714,7 +717,7 @@ export default function MapPanel({ leads, token, onOpenWorkQueue }: MapPanelProp
               }}
               className="w-full bg-bg-subtle border border-border-dim hover:border-text-secondary/30 rounded-sm p-2 text-xs text-text-primary focus:outline-none focus:border-brand transition-colors cursor-pointer"
             >
-              <option value="all">ALL PIPELINE STAGES</option>
+              <option value="all">All statuses</option>
               <option value="new">NEW (PROSPECTS)</option>
               <option value="contacted">CONTACTED</option>
               <option value="converted">CONVERTED (CLIENTS)</option>
