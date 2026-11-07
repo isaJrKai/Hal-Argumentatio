@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { Lead } from '../types';
-import LeadMap, { TerritorySearchCandidate } from './LeadMap';
+import LeadMap, { type TerritorySearchCandidate } from './LeadMap';
 import { 
   saveLeadsToIndexedDB, 
   getLeadsFromIndexedDB, 
@@ -341,11 +341,11 @@ export default function MapPanel({ leads, token, onOpenWorkQueue }: MapPanelProp
         urgencyScore: null,
         predictedLtvUsd: null,
         websiteUrl: candidate.websiteUrl,
-        verificationStatus: row.verificationStatus || 'UNVERIFIED_STAGING',
-        sourceType: row.sourceType || candidate.sourceType,
+        verificationStatus: (row.verificationStatus || 'UNVERIFIED_STAGING') as Lead['verificationStatus'],
+        sourceType: (row.sourceType || candidate.sourceType) as Lead['sourceType'],
         groundingEvidence: row.groundingEvidence || {},
-        createdAt: row.createdAt,
-        updatedAt: row.updatedAt
+        createdAt: new Date(row.createdAt || Date.now()).toISOString(),
+        updatedAt: new Date(row.updatedAt || Date.now()).toISOString()
       };
       setDisplayLeads(current => current.some(item => item.id === mapped.id) ? current : [mapped, ...current]);
       setTerritorySearchStatus(`${candidate.businessName} added to CRM · human review task created`);
