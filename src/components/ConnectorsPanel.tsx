@@ -497,7 +497,7 @@ export default function ConnectorsPanel() {
           <ProviderBrandIcon brand="meta" label="Meta" className="h-5 w-5" />
           <span>Meta Ads</span>
           {metaStatus === 'configured' && (
-            <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
+            <span className="w-2 h-2 rounded-full bg-sky-400" title="Credentials saved; live connection not verified." />
           )}
         </button>
 
