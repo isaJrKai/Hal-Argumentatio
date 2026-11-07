@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { INDUSTRY_TAXONOMY, IndustryProfile, getIndustryProfile } from '../config/industryTaxonomy';
+import { INDUSTRY_TAXONOMY, HOME_SERVICE_NICHES, IndustryProfile, getIndustryProfile } from '../config/industryTaxonomy';
 import { GLOBAL_REGIONS, RegionalProfile, resolveRegionalProfile } from '../config/worldModel';
 
 export interface CustomEmailTemplate {
@@ -140,7 +140,7 @@ export const BusinessProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
   // Combined Cities & Niches
   const supportedCities = Array.from(new Set([...defaultCities, ...(workspaceConfig.customCities || [])]));
-  const supportedNiches = Array.from(new Set([...activeIndustry.defaultNiches, ...(workspaceConfig.customNiches || [])]));
+  const supportedNiches = Array.from(new Set([...activeIndustry.defaultNiches, ...HOME_SERVICE_NICHES, ...(workspaceConfig.customNiches || [])]));
 
   // Actions
   const setActiveIndustry = (industryId: string) => {

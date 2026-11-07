@@ -1,7 +1,7 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { Lead, LeadEvent } from '../types';
 import { motion } from 'motion/react';
-import LeadMap from './LeadMap';
+import LeadMap, { OsmTradeCandidate } from './LeadMap';
 import WhiteLabelReportModal from './WhiteLabelReportModal';
 import { useBusinessContext } from '../context/BusinessContext';
 import { getCityCoordinates, CITIES_CONFIG } from '../config/cities';
@@ -127,6 +127,46 @@ export default function LeadsPanel({ leads, token, onRefresh }: LeadsPanelProps)
       setHarvesting(false);
     }
   };
+
+  const handleImportOsmPlace = useCallback(async (candidate: OsmTradeCandidate) => {
+    const res = await fetch('/api/leads/ingest', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify({
+        leads: [{
+          businessName: candidate.name,
+          city: candidate.city,
+          serviceType: candidate.craft,
+          phone: candidate.phone,
+          email: candidate.email,
+          websiteUrl: candidate.websiteUrl,
+          sourceType: 'openstreetmap_poi',
+          verificationStatus: 'UNVERIFIED_STAGING',
+          dnsVerified: false,
+          isSynthetic: false,
+          notes: 'Imported from an OpenStreetMap community-mapped trade POI. This does not establish current operation or contact validity. Human review is required before outreach.',
+          groundingEvidence: {
+            source: 'openstreetmap',
+            osmType: candidate.osmType,
+            osmId: candidate.osmId,
+            latitude: candidate.latitude,
+            longitude: candidate.longitude,
+            attribution: '© OpenStreetMap contributors',
+            verificationNote: 'Community-mapped POI; business operation and contact details are not independently verified.'
+          }
+        }]
+      })
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) throw new Error(data.error || 'Could not add this mapped place to CRM review.');
+    setIngestFeedback(data.count
+      ? `Added ${candidate.name} to the CRM and created a human review task. Verify before outreach.`
+      : `${candidate.name} was already in the CRM or was skipped as a duplicate.`);
+    onRefresh();
+  }, [token, onRefresh]);
 
   const handleIngestSelected = async () => {
     const leadsToIngest = harvestedLeads.filter((_, i) => selectedIndices.has(i));
@@ -294,36 +334,28 @@ export default function LeadsPanel({ leads, token, onRefresh }: LeadsPanelProps)
   }, [leads, searchQuery, cityFilter, statusFilter]);
 
   const mappedLeadsForMap = useMemo(() => {
-    return filteredLeads.map((lead, idx) => {
-      const baseCoords = getCityCoordinates(lead.city);
-      
-      const angle = (idx * 137.5) * (Math.PI / 180);
-      const r = 0.01 + (idx * 0.005);
-      const latOffset = Math.sin(angle) * r * 0.35;
-      const lngOffset = Math.cos(angle) * r * 0.45;
-
-      return {
-        id: lead.id,
-        businessName: lead.businessName,
-        ownerName: lead.ownerName,
-        phone: lead.phone,
-        email: lead.email,
-        city: lead.city,
-        serviceType: lead.serviceType,
-        googleRating: lead.googleRating,
-        reviewCount: lead.reviewCount,
-        seoScore: lead.seoScore,
-        performanceScore: lead.performanceScore,
-        sslStatus: lead.sslStatus,
-        urgencyScore: lead.urgencyScore,
-        predictedLtvUsd: lead.predictedLtvUsd,
-        status: lead.status,
-        coords: {
-          lat: baseCoords.lat + latOffset,
-          lng: baseCoords.lng + lngOffset
-        }
-      };
-    });
+    return filteredLeads.map(lead => ({
+      id: lead.id,
+      businessName: lead.businessName,
+      ownerName: lead.ownerName,
+      phone: lead.phone,
+      email: lead.email,
+      city: lead.city,
+      serviceType: lead.serviceType,
+      googleRating: lead.googleRating,
+      reviewCount: lead.reviewCount,
+      seoScore: lead.seoScore,
+      performanceScore: lead.performanceScore,
+      sslStatus: lead.sslStatus,
+      urgencyScore: lead.urgencyScore,
+      predictedLtvUsd: lead.predictedLtvUsd,
+      status: lead.status,
+      coords: typeof lead.latitude === 'number' && typeof lead.longitude === 'number'
+        ? { lat: lead.latitude, lng: lead.longitude }
+        : typeof lead.groundingEvidence?.latitude === 'number' && typeof lead.groundingEvidence?.longitude === 'number'
+          ? { lat: lead.groundingEvidence.latitude, lng: lead.groundingEvidence.longitude }
+          : null
+    }));
   }, [filteredLeads]);
 
   const mapCenter = useMemo(() => {
@@ -333,8 +365,8 @@ export default function LeadsPanel({ leads, token, onRefresh }: LeadsPanelProps)
     if (filteredLeads.length > 0) {
       return getCityCoordinates(filteredLeads[0].city);
     }
-    return { lat: 49.8951, lng: -97.1384 };
-  }, [cityFilter, filteredLeads]);
+    return getCityCoordinates(activeCity);
+  }, [cityFilter, filteredLeads, activeCity]);
 
   const cities = Array.from(new Set(leads.map(l => l.city)));
 
@@ -910,6 +942,9 @@ export default function LeadsPanel({ leads, token, onRefresh }: LeadsPanelProps)
                       <option value={10}>10 Leads</option>
                       <option value={15}>15 Leads</option>
                       <option value={20}>20 Leads</option>
+                      <option value={30}>30 Leads</option>
+                      <option value={40}>40 Leads</option>
+                      <option value={50}>50 Leads</option>
                     </select>
                   </div>
                   <button
@@ -1405,7 +1440,8 @@ Next-Gen Waterproofing	Calgary	Waterproofing	Jane Smith	jane@nextgen.ca	403-555-
             <LeadMap 
               leads={mappedLeadsForMap} 
               center={mapCenter} 
-              city={cityFilter === 'all' ? 'Winnipeg' : cityFilter} 
+              city={cityFilter === 'all' ? activeCity : cityFilter}
+              onImportOsmPlace={handleImportOsmPlace}
               selectedLeadId={selectedLead?.id}
               onSelectLead={(leadId) => {
                 const found = leads.find(l => l.id === leadId);

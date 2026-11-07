@@ -3698,7 +3698,7 @@ app.post('/api/leads/harvest', authenticate, async (req, res) => {
   }
 
   try {
-    const harvestLimit = Math.min(Math.max(Number(limit) || 10, 1), 25);
+    const harvestLimit = Math.min(Math.max(Number(limit) || 10, 1), 50);
     const harvested = await harvestRealBusinesses(city, niche, activeAi, harvestLimit);
     res.json(harvested);
   } catch (err: any) {
@@ -3788,7 +3788,12 @@ app.post('/api/leads/ingest', authenticate, async (req, res) => {
           sentimentScore: null,
           verificationStatus,
           dnsVerified,
-          groundingEvidence: item.groundingEvidence || null,
+          groundingEvidence: {
+            ...(item.groundingEvidence && typeof item.groundingEvidence === 'object' ? item.groundingEvidence : {}),
+            ...(typeof item.address === 'string' && item.address.trim()
+              ? { businessAddress: item.address.trim() }
+              : {})
+          },
           createdAt: now,
           updatedAt: now
         }).returning();
@@ -9007,99 +9012,242 @@ app.post(['/api/ai/test-timesfm', '/api/forecast/scenario'], authenticate, async
 });
 
 // ─── GEOCODING SERVICE API ────────────────────────────────────────────────────
+// Geoapify is the commercial-use geocoder. Never fall back to city-centre or
+// synthetic coordinates: a missing match must remain unpinned.
+const normalizeGeocodeName = (value: unknown) => String(value || '')
+  .toLowerCase()
+  .normalize('NFKD')
+  .replace(/[\u0300-\u036f]/g, '')
+  .replace(/\b(limited|ltd|incorporated|inc|llc|corp|corporation|company|co)\b/g, '')
+  .replace(/[^a-z0-9]+/g, ' ')
+  .trim();
+
 app.post('/api/geocode', authenticate, async (req, res) => {
-  const { address, city } = req.body;
-  if (!address && !city) {
-    return res.status(400).json({ error: 'address or city is required' });
+  const { address, businessName, city } = req.body || {};
+  if (!address && !businessName) {
+    return res.status(400).json({ success: false, error: 'A business name or street address is required. City-only geocoding is not supported.' });
+  }
+  const apiKey = process.env.GEOAPIFY_API_KEY;
+  if (!apiKey) {
+    return res.status(503).json({ success: false, code: 'GEOCODING_NOT_CONFIGURED', error: 'Geoapify is not configured. Add GEOAPIFY_API_KEY to the server environment.' });
   }
 
-  const query = [address, city].filter(Boolean).join(', ');
-  const apiKey = process.env.GOOGLE_MAPS_PLATFORM_KEY || process.env.VITE_GOOGLE_MAPS_PLATFORM_KEY || '';
+  try {
+    const params = new URLSearchParams({ format: 'json', limit: '5', apiKey });
+    if (businessName) {
+      params.set('name', String(businessName));
+      if (city) params.set('city', String(city));
+      params.set('type', 'amenity');
+    } else {
+      params.set('text', [String(address), city ? String(city) : ''].filter(Boolean).join(', '));
+    }
+    const response = await fetch('https://api.geoapify.com/v1/geocode/search?' + params.toString(), {
+      signal: AbortSignal.timeout(12000)
+    });
+    if (!response.ok) {
+      return res.status(response.status === 429 ? 429 : 502).json({ success: false, error: 'Geoapify geocoding request failed.', providerStatus: response.status });
+    }
+    const payload: any = await response.json();
+    const results = Array.isArray(payload.results) ? payload.results : [];
+    const requestedName = normalizeGeocodeName(businessName);
+    const match = results.find((item: any) => {
+      const confidence = Number(item.rank?.confidence ?? 0);
+      const resultType = String(item.result_type || '').toLowerCase();
+      const candidateName = normalizeGeocodeName(item.name || item.address_line1 || '');
+      const nameMatches = !businessName || (candidateName.length >= 4 && (
+        candidateName === requestedName || candidateName.startsWith(requestedName) || requestedName.startsWith(candidateName)
+      ));
+      const cityName = normalizeGeocodeName(city);
+      const resultCity = normalizeGeocodeName(item.city || '');
+      const cityMatches = !city || !resultCity || resultCity === cityName || resultCity.includes(cityName) || cityName.includes(resultCity);
+      const lat = Number(item.lat);
+      const lng = Number(item.lon);
+      return confidence >= 0.75 && nameMatches && cityMatches &&
+        (businessName ? resultType === 'amenity' : ['amenity', 'building', 'house'].includes(resultType)) &&
+        Number.isFinite(lat) && Number.isFinite(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180;
+    });
+    if (!match) {
+      return res.status(404).json({ success: false, code: 'NO_CONFIDENT_BUSINESS_MATCH', error: 'No sufficiently confident business-level location was found. The lead remains unpinned.' });
+    }
+    return res.json({
+      success: true,
+      lat: Number(match.lat),
+      lng: Number(match.lon),
+      formattedAddress: match.formatted || match.address_line1 || '',
+      resultType: match.result_type,
+      confidence: Number(match.rank?.confidence),
+      provider: 'geoapify',
+      attribution: 'Powered by Geoapify · © OpenStreetMap contributors'
+    });
+  } catch (error: any) {
+    console.error('[Geoapify] Single geocode failed:', error?.message || error);
+    return res.status(502).json({ success: false, error: 'Geocoding provider is temporarily unavailable.' });
+  }
+});
+
+// Persist geocoded coordinates in the existing JSONB evidence field. This keeps
+// the CRM schema backwards-compatible while retaining provider, precision and
+// attribution evidence. Only high-confidence named business POIs are accepted.
+app.post('/api/leads/geocode', authenticate, async (req, res) => {
+  const contractorId = String((req as any).contractorId || '');
+  const rawLeadIds: unknown[] = Array.isArray(req.body?.leadIds) ? req.body.leadIds : [];
+  const leadIds: string[] = Array.from(new Set(
+    rawLeadIds
+      .filter((id): id is string => typeof id === 'string' && id.trim().length > 0)
+      .map(id => id.trim())
+  ));
+  if (!leadIds.length || leadIds.length > 50) {
+    return res.status(400).json({ success: false, error: 'Provide between 1 and 50 lead IDs per geocoding batch.' });
+  }
+
+  const apiKey = process.env.GEOAPIFY_API_KEY;
+  if (!apiKey) {
+    return res.status(503).json({ success: false, code: 'GEOCODING_NOT_CONFIGURED', error: 'Geoapify is not configured. Add GEOAPIFY_API_KEY to the server environment.' });
+  }
 
   try {
-    if (apiKey) {
-      const gRes = await fetch(`https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(query)}&key=${apiKey}`);
-      const gData = await gRes.json();
-      if (gData.status === 'OK' && gData.results && gData.results[0]) {
-        const loc = gData.results[0].geometry.location;
-        return res.json({
-          success: true,
-          lat: loc.lat,
-          lng: loc.lng,
-          formattedAddress: gData.results[0].formatted_address,
-          source: 'google_geocoding_api'
+    const rows = await pgDb.select({
+      id: leads.id,
+      businessName: leads.businessName,
+      city: leads.city,
+      groundingEvidence: leads.groundingEvidence
+    }).from(leads).where(and(
+      eq(leads.contractorId, contractorId),
+      inArray(leads.id, leadIds)
+    ));
+
+    const results: Array<Record<string, unknown>> = [];
+    let geocodedCount = 0;
+    let skippedExistingCount = 0;
+    let providerRateLimited = false;
+
+    for (const lead of rows) {
+      const previous = lead.groundingEvidence && typeof lead.groundingEvidence === 'object'
+        ? lead.groundingEvidence as Record<string, any>
+        : {};
+      const existingLat = Number(previous.latitude ?? previous.geocoding?.latitude);
+      const existingLng = Number(previous.longitude ?? previous.geocoding?.longitude);
+      if (Number.isFinite(existingLat) && Number.isFinite(existingLng) &&
+          Math.abs(existingLat) <= 90 && Math.abs(existingLng) <= 180) {
+        skippedExistingCount++;
+        results.push({ leadId: lead.id, status: 'already_located', lat: existingLat, lng: existingLng });
+        continue;
+      }
+
+      // Stay below Geoapify Free's documented 5 requests/second ceiling.
+      await new Promise(resolve => setTimeout(resolve, 250));
+      try {
+        const publicBusinessAddress = typeof previous.businessAddress === 'string'
+          ? previous.businessAddress.trim()
+          : '';
+        const params = new URLSearchParams({
+          limit: '5',
+          format: 'json',
+          lang: 'en',
+          apiKey
         });
+        if (publicBusinessAddress) {
+          // Address was captured from a public business source during harvest.
+          params.set('text', [publicBusinessAddress, lead.city].filter(Boolean).join(', '));
+        } else {
+          // Without an address, only accept a named OSM amenity that matches the business name.
+          params.set('name', lead.businessName);
+          params.set('city', lead.city);
+          params.set('type', 'amenity');
+        }
+        const response = await fetch('https://api.geoapify.com/v1/geocode/search?' + params.toString(), {
+          signal: AbortSignal.timeout(12000)
+        });
+        if (response.status === 429) {
+          providerRateLimited = true;
+          results.push({ leadId: lead.id, status: 'provider_rate_limited' });
+          break;
+        }
+        if (!response.ok) {
+          results.push({ leadId: lead.id, status: 'provider_error', providerStatus: response.status });
+          continue;
+        }
+
+        const payload: any = await response.json();
+        const candidates = Array.isArray(payload.results) ? payload.results : [];
+        const requestedName = normalizeGeocodeName(lead.businessName);
+        const requestedCity = normalizeGeocodeName(lead.city);
+        const match = candidates.find((item: any) => {
+          const resultType = String(item.result_type || '').toLowerCase();
+          const candidateName = normalizeGeocodeName(item.name || item.address_line1 || '');
+          const confidence = Number(item.rank?.confidence ?? 0);
+          const buildingConfidence = Number(item.rank?.confidence_building_level ?? 0);
+          const resultCity = normalizeGeocodeName(item.city || '');
+          const nameMatches = candidateName.length >= 4 && (
+            candidateName === requestedName ||
+            candidateName.startsWith(requestedName) ||
+            requestedName.startsWith(candidateName)
+          );
+          const cityMatches = !resultCity || resultCity === requestedCity ||
+            resultCity.includes(requestedCity) || requestedCity.includes(resultCity);
+          const addressMatch = publicBusinessAddress
+            ? ['amenity', 'building', 'house'].includes(resultType) && (confidence >= 0.75 || buildingConfidence >= 0.7)
+            : resultType === 'amenity' && confidence >= 0.75 && nameMatches;
+          const lat = Number(item.lat);
+          const lng = Number(item.lon);
+          return addressMatch && cityMatches &&
+            Number.isFinite(lat) && Number.isFinite(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180;
+        });
+
+        if (!match) {
+          results.push({ leadId: lead.id, status: 'no_confident_business_match' });
+          continue;
+        }
+
+        const latitude = Number(match.lat);
+        const longitude = Number(match.lon);
+        const geocoding = {
+          provider: 'geoapify',
+          latitude,
+          longitude,
+          formattedAddress: String(match.formatted || match.address_line1 || ''),
+          resultType: String(match.result_type),
+          confidence: Number(match.rank?.confidence),
+          precision: publicBusinessAddress ? 'public_business_address' : 'named_business_poi',
+          geocodedAt: new Date().toISOString(),
+          attribution: 'Powered by Geoapify · © OpenStreetMap contributors'
+        };
+        const nextEvidence = {
+          ...previous,
+          latitude,
+          longitude,
+          geocoding
+        };
+        await pgDb.update(leads).set({ groundingEvidence: nextEvidence }).where(and(
+          eq(leads.id, lead.id),
+          eq(leads.contractorId, contractorId)
+        ));
+        geocodedCount++;
+        results.push({
+          leadId: lead.id,
+          status: 'geocoded',
+          lat: latitude,
+          lng: longitude,
+          formattedAddress: geocoding.formattedAddress,
+          confidence: geocoding.confidence
+        });
+      } catch (error: any) {
+        results.push({ leadId: lead.id, status: 'provider_error', error: error?.message || 'Geocoding request failed.' });
       }
     }
 
-    // Fallback to OpenStreetMap Nominatim
-    const nomRes = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}`, {
-      headers: { 'User-Agent': 'HALBiz-GeoCoder/1.0' }
-    });
-    const nomData = await nomRes.json();
-    if (Array.isArray(nomData) && nomData.length > 0) {
-      return res.json({
-        success: true,
-        lat: parseFloat(nomData[0].lat),
-        lng: parseFloat(nomData[0].lon),
-        formattedAddress: nomData[0].display_name,
-        source: 'openstreetmap_nominatim'
-      });
-    }
-
-    // Default fallback coordinates if neither succeeds
-    const FALLBACK_CITY_COORDS: Record<string, { lat: number; lng: number }> = {
-      'winnipeg': { lat: 49.8951, lng: -97.1384 },
-      'calgary': { lat: 51.0447, lng: -114.0719 },
-      'edmonton': { lat: 53.5461, lng: -113.4938 },
-      'vancouver': { lat: 49.2827, lng: -123.1207 },
-      'toronto': { lat: 43.6532, lng: -79.3832 },
-      'montreal': { lat: 45.5017, lng: -73.5673 },
-      'seattle': { lat: 47.6062, lng: -122.3321 },
-      'san francisco': { lat: 37.7749, lng: -122.4194 },
-      'los angeles': { lat: 34.0522, lng: -118.2437 },
-      'chicago': { lat: 41.8781, lng: -87.6298 },
-      'new york': { lat: 40.7128, lng: -74.0060 },
-      'austin': { lat: 30.2672, lng: -97.7431 },
-      'denver': { lat: 39.7392, lng: -104.9903 },
-      'miami': { lat: 25.7617, lng: -80.1918 }
-    };
-    const cityKey = city?.toLowerCase()?.trim() || 'winnipeg';
-    const baseCoords = FALLBACK_CITY_COORDS[cityKey] || { lat: 49.8951, lng: -97.1384 };
     return res.json({
       success: true,
-      lat: baseCoords.lat,
-      lng: baseCoords.lng,
-      formattedAddress: query,
-      source: 'city_center_fallback'
+      provider: 'geoapify',
+      geocodedCount,
+      skippedExistingCount,
+      notMatchedCount: results.filter(item => item.status === 'no_confident_business_match').length,
+      providerRateLimited,
+      results
     });
-  } catch (err: any) {
-    console.error('Geocoding error:', err);
-    const FALLBACK_CITY_COORDS: Record<string, { lat: number; lng: number }> = {
-      'winnipeg': { lat: 49.8951, lng: -97.1384 },
-      'calgary': { lat: 51.0447, lng: -114.0719 },
-      'edmonton': { lat: 53.5461, lng: -113.4938 },
-      'vancouver': { lat: 49.2827, lng: -123.1207 },
-      'toronto': { lat: 43.6532, lng: -79.3832 },
-      'montreal': { lat: 45.5017, lng: -73.5673 },
-      'seattle': { lat: 47.6062, lng: -122.3321 },
-      'san francisco': { lat: 37.7749, lng: -122.4194 },
-      'los angeles': { lat: 34.0522, lng: -118.2437 },
-      'chicago': { lat: 41.8781, lng: -87.6298 },
-      'new york': { lat: 40.7128, lng: -74.0060 },
-      'austin': { lat: 30.2672, lng: -97.7431 },
-      'denver': { lat: 39.7392, lng: -104.9903 },
-      'miami': { lat: 25.7617, lng: -80.1918 }
-    };
-    const cityKey = city?.toLowerCase()?.trim() || 'winnipeg';
-    const baseCoords = FALLBACK_CITY_COORDS[cityKey] || { lat: 49.8951, lng: -97.1384 };
-    return res.json({
-      success: true,
-      lat: baseCoords.lat,
-      lng: baseCoords.lng,
-      formattedAddress: query,
-      source: 'error_fallback'
-    });
+  } catch (error: any) {
+    console.error('[Geoapify] CRM batch geocoding failed:', error?.message || error);
+    return res.status(500).json({ success: false, error: 'Could not persist geocoding results for this CRM workspace.' });
   }
 });
 

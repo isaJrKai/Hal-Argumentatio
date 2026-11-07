@@ -6,6 +6,8 @@ export interface Lead {
   email?: string;
   phone?: string;
   city: string;
+  latitude?: number | null;
+  longitude?: number | null;
   serviceType: string;
   source: string;
   status: 'new' | 'contacted' | 'qualified' | 'sal' | 'proposal' | 'closed_won' | 'closed_lost' | 'converted' | 'dead' | 'retained' | 'churned' | 'reactivated';
@@ -13,7 +15,7 @@ export interface Lead {
   predictedLtvUsd: number | null;
   notes?: string;
   isSynthetic?: boolean;
-  sourceType?: 'live_harvest' | 'ai_discovery_unverified' | 'synthetic_fallback' | 'manual' | 'google_ads' | 'spreadsheet_import' | 'unknown';
+  sourceType?: 'live_harvest' | 'ai_discovery_unverified' | 'synthetic_fallback' | 'manual' | 'google_ads' | 'spreadsheet_import' | 'openstreetmap_poi' | 'unknown';
   verificationStatus?: 'VERIFIED' | 'UNVERIFIED_STAGING' | 'FABRICATED_REJECTED';
   dnsVerified?: boolean;
   groundingEvidence?: {
@@ -25,6 +27,25 @@ export interface Lead {
     isDummyPhone?: boolean;
     reasons?: string[];
     verifiedAt?: string;
+    source?: string;
+    osmType?: string;
+    osmId?: number;
+    latitude?: number;
+    longitude?: number;
+    attribution?: string;
+    verificationNote?: string;
+    businessAddress?: string;
+    geocoding?: {
+      provider: 'geoapify';
+      latitude: number;
+      longitude: number;
+      formattedAddress?: string;
+      resultType: string;
+      confidence: number;
+      precision: 'public_business_address' | 'named_business_poi';
+      geocodedAt: string;
+      attribution: string;
+    };
   };
   createdAt: string;
   updatedAt: string;

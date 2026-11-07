@@ -350,6 +350,7 @@ export async function harvestRealBusinesses(
   ownerName?: string;
   email?: string;
   phone?: string;
+  address?: string;
   city: string;
   serviceType: string;
   websiteUrl: string;
@@ -367,21 +368,22 @@ export async function harvestRealBusinesses(
   dnsVerified?: boolean;
   groundingEvidence?: any;
 }>> {
-  const targetCount = Math.min(Math.max(Number(limit) || 10, 1), 25);
+  const targetCount = Math.min(Math.max(Number(limit) || 10, 1), 50);
   const prompt = `You are HAL's verified territory intelligence discovery engine.
-Search the live web, Google Maps, and local registries for real, active, operating home services or trade contractors in the city of "${city}" for the niche "${niche}".
-Identify and return up to ${targetCount} actual operating businesses.
+Use live Google Search grounding to find real, active, operating home-service or trade contractors in the city of "${city}" for the niche "${niche}". Do not imply that Google Maps, a local registry, or any directory was queried unless the returned search evidence explicitly demonstrates that source.
+Identify and return up to ${targetCount} actual operating businesses. Return fewer when fewer can be grounded; never invent businesses or contact details to fill the requested limit.
 
 For each business, research and provide verified details:
 1. "businessName" - Official registered business or trade name.
 2. "ownerName" - Owner, founder, or key manager if known (otherwise omit or null).
 3. "email" - Public contact or dispatch email (e.g. info@domain, service@domain, or office@domain).
 4. "phone" - Actual public operating telephone number.
-5. "city" - "${city}".
-6. "serviceType" - "${niche}".
-7. "websiteUrl" - Official active website URL.
-8. "outreachStrategy" - A cautious outreach angle based only on facts actually present in the search results.
-9. "notes" - State which details are unknown; do not invent ratings, review counts, technical scores, SSL, performance, or sentiment.
+5. "address" - The publicly listed physical business address or shop/service location, only when explicitly supported by a source. Do not substitute a city, district, or guessed location; omit when unavailable.
+6. "city" - "${city}".
+7. "serviceType" - "${niche}".
+8. "websiteUrl" - Official active website URL.
+9. "outreachStrategy" - A cautious outreach angle based only on facts actually present in the search results.
+10. "notes" - State which details are unknown; do not invent ratings, review counts, technical scores, SSL, performance, or sentiment.
 
 IMPORTANT: Output ONLY a valid JSON array of objects with the keys above inside a markdown json block. Do not include introductory text or commentary outside the JSON block.`;
 

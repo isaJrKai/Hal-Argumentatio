@@ -1,38 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { 
-  Map as GoogleMap, 
-  AdvancedMarker, 
-  Pin, 
-  InfoWindow, 
-  useAdvancedMarkerRef, 
-  useMap, 
-  useMapsLibrary 
-} from '@vis.gl/react-google-maps';
-import { 
-  Star, 
-  Shield, 
-  Zap, 
-  Globe, 
-  AlertTriangle, 
-  Search, 
-  Compass, 
-  RotateCcw, 
-  Layers, 
-  Wifi, 
-  WifiOff, 
-  Maximize2, 
-  ChevronRight, 
-  Info, 
-  CheckCircle2,
-  Crosshair,
-  MapPin,
-  X,
-  Loader2,
-  Flame
-} from 'lucide-react';
-import L from 'leaflet';
-import 'leaflet/dist/leaflet.css';
-
+import React, { useEffect, useRef, useState } from 'react';
 import { ServiceZone } from '../lib/indexedDbCache';
 
 export interface LeadCoord {
@@ -48,17 +14,30 @@ export interface LeadCoord {
   seoScore?: number;
   performanceScore?: number;
   sslStatus?: string;
-  urgencyScore: number;
-  predictedLtvUsd: number;
+  urgencyScore: number | null;
+  predictedLtvUsd: number | null;
   status: string;
-  coords: {
-    lat: number;
-    lng: number;
-  };
+  // Coordinates must come from a business record or a verified geocoding result.
+  // City-centroid offsets are deliberately not accepted as business locations.
+  coords?: { lat: number; lng: number } | null;
+}
+
+export interface OsmTradeCandidate {
+  osmType: string;
+  osmId: number;
+  name: string;
+  craft: string;
+  city: string;
+  latitude: number;
+  longitude: number;
+  phone?: string;
+  email?: string;
+  websiteUrl?: string;
 }
 
 export interface LeadMapProps {
   leads: LeadCoord[];
+  onImportOsmPlace?: (candidate: OsmTradeCandidate) => Promise<void> | void;
   center: { lat: number; lng: number };
   city: string;
   selectedLeadId?: string | null;
@@ -71,1070 +50,355 @@ export interface LeadMapProps {
   drawingPoints?: Array<{ lat: number; lng: number }>;
 }
 
-const API_KEY =
-  process.env.GOOGLE_MAPS_PLATFORM_KEY ||
-  (import.meta as any).env?.VITE_GOOGLE_MAPS_PLATFORM_KEY ||
-  (globalThis as any).GOOGLE_MAPS_PLATFORM_KEY ||
-  '';
-
-const isValidGoogleMapsKey = (key: string): boolean => {
-  if (!key) return false;
-  return /^AIzaSy[A-Za-z0-9_\-]{33}$/.test(key);
-};
-
-const hasValidKey = isValidGoogleMapsKey(API_KEY);
-
-// ==========================================
-// 1. Error Boundary for Google Maps
-// ==========================================
-interface MapErrorBoundaryProps {
-  children: React.ReactNode;
-  fallback: React.ReactNode;
+declare global {
+  interface Window { maplibregl?: any; }
 }
 
-interface MapErrorBoundaryState {
-  hasError: boolean;
-}
+const MAPLIBRE_VERSION = '5.6.1';
+const OPENFREEMAP_STYLE = 'https://tiles.openfreemap.org/styles/liberty';
 
-class MapErrorBoundary extends React.Component<MapErrorBoundaryProps, MapErrorBoundaryState> {
-  declare props: MapErrorBoundaryProps;
-  public state: MapErrorBoundaryState = {
-    hasError: false
-  };
-
-  static getDerivedStateFromError(): MapErrorBoundaryState {
-    return { hasError: true };
-  }
-
-  componentDidCatch(error: any) {
-    console.warn('[LeadMap] Google Maps runtime error caught, safely switching to OpenStreetMap Real Tile Engine:', error);
-  }
-
-  render() {
-    if (this.state.hasError) {
-      return (this.props as MapErrorBoundaryProps).fallback;
+let mapLibreLoader: Promise<any> | null = null;
+function loadMapLibre(): Promise<any> {
+  if (typeof window !== 'undefined' && window.maplibregl) return Promise.resolve(window.maplibregl);
+  if (mapLibreLoader) return mapLibreLoader;
+  mapLibreLoader = new Promise((resolve, reject) => {
+    const cssHref = `https://unpkg.com/maplibre-gl@${MAPLIBRE_VERSION}/dist/maplibre-gl.css`;
+    if (!document.querySelector('link[data-hal-maplibre]')) {
+      const link = document.createElement('link');
+      link.rel = 'stylesheet';
+      link.href = cssHref;
+      link.dataset.halMaplibre = 'true';
+      document.head.appendChild(link);
     }
-    return (this.props as MapErrorBoundaryProps).children;
-  }
-}
-
-// ==========================================
-// 2. Google Maps Subcomponents
-// ==========================================
-
-function MapCameraHandler({ center }: { center: { lat: number; lng: number } }) {
-  const map = useMap();
-  useEffect(() => {
-    if (map && center && !isNaN(center.lat) && !isNaN(center.lng)) {
-      map.setCenter(center);
-    }
-  }, [map, center]);
-  return null;
-}
-
-function MapSearchControl({ onPlaceSelected }: { onPlaceSelected: (lat: number, lng: number, name: string) => void }) {
-  const map = useMap();
-  const placesLib = useMapsLibrary('places');
-  const inputRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    if (!placesLib || !map || !inputRef.current) return;
-
-    try {
-      const autocomplete = new placesLib.Autocomplete(inputRef.current, {
-        types: ['geocode', 'establishment'],
-      });
-
-      const listener = autocomplete.addListener('place_changed', () => {
-        const place = autocomplete.getPlace();
-        if (place.geometry && place.geometry.location) {
-          const lat = place.geometry.location.lat();
-          const lng = place.geometry.location.lng();
-          const name = place.formatted_address || place.name || 'Searched Location';
-          
-          map.setCenter({ lat, lng });
-          map.setZoom(13);
-          onPlaceSelected(lat, lng, name);
-        }
-      });
-
-      return () => {
-        if (listener && typeof google !== 'undefined' && google.maps && google.maps.event) {
-          google.maps.event.removeListener(listener);
-        }
-      };
-    } catch (e) {
-      console.warn('Autocomplete init skipped:', e);
-    }
-  }, [placesLib, map, onPlaceSelected]);
-
-  return (
-    <div className="relative max-w-xs flex-1 min-w-[140px] sm:min-w-[180px]">
-      <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-text-dim pointer-events-none" />
-      <input
-        ref={inputRef}
-        type="text"
-        placeholder="Search address or city..."
-        className="w-full bg-bg-dark border border-border-dark hover:border-text-secondary/30 rounded-sm p-1.5 pl-8.5 text-[11px] font-mono text-text-primary placeholder:text-text-dim focus:outline-none focus:border-brand transition-colors"
-      />
-    </div>
-  );
-}
-
-function MapCustomControls({ 
-  mapTypeId, 
-  setMapTypeId 
-}: { 
-  mapTypeId: string; 
-  setMapTypeId: (val: 'roadmap' | 'satellite') => void;
-}) {
-  const map = useMap();
-
-  const handleZoomIn = () => {
-    if (map) {
-      const currentZoom = map.getZoom() || 11;
-      map.setZoom(currentZoom + 1);
-    }
-  };
-
-  const handleZoomOut = () => {
-    if (map) {
-      const currentZoom = map.getZoom() || 11;
-      map.setZoom(currentZoom - 1);
-    }
-  };
-
-  return (
-    <div className="flex items-center gap-2 shrink-0">
-      <div className="flex items-center bg-bg-dark border border-border-dark rounded-sm p-0.5">
-        <button
-          onClick={() => setMapTypeId('roadmap')}
-          className={`px-2 py-1 text-[9px] font-mono rounded-sm transition-colors cursor-pointer ${
-            mapTypeId === 'roadmap' 
-              ? 'bg-brand text-text-primary font-bold' 
-              : 'text-text-dim hover:text-text-primary'
-          }`}
-        >
-          ROADMAP
-        </button>
-        <button
-          onClick={() => setMapTypeId('satellite')}
-          className={`px-2 py-1 text-[9px] font-mono rounded-sm transition-colors cursor-pointer ${
-            mapTypeId === 'satellite' 
-              ? 'bg-brand text-text-primary font-bold' 
-              : 'text-text-dim hover:text-text-primary'
-          }`}
-        >
-          SATELLITE
-        </button>
-      </div>
-
-      <div className="flex items-center bg-bg-dark border border-border-dark rounded-sm p-0.5">
-        <button
-          onClick={handleZoomOut}
-          title="Zoom Out"
-          className="w-6 h-6 flex items-center justify-center text-[12px] font-mono font-bold text-text-dim hover:text-text-primary border-r border-border-dark hover:bg-bg-subtle transition-colors cursor-pointer"
-        >
-          -
-        </button>
-        <button
-          onClick={handleZoomIn}
-          title="Zoom In"
-          className="w-6 h-6 flex items-center justify-center text-[12px] font-mono font-bold text-text-dim hover:text-text-primary hover:bg-bg-subtle transition-colors cursor-pointer"
-        >
-          +
-        </button>
-      </div>
-    </div>
-  );
-}
-
-function MarkerWithInfoWindow({ 
-  lead, 
-  isSelected, 
-  onSelect,
-  key
-}: { 
-  lead: LeadCoord; 
-  isSelected: boolean; 
-  onSelect: () => void;
-  key?: string;
-}) {
-  const [markerRef, marker] = useAdvancedMarkerRef();
-  const [open, setOpen] = useState(false);
-
-  useEffect(() => {
-    if (isSelected) {
-      setOpen(true);
-    }
-  }, [isSelected]);
-
-  let pinBg = '#9ca3af';
-  if (lead.status === 'new') pinBg = '#3b82f6';
-  if (lead.status === 'contacted') pinBg = '#f59e0b';
-  if (lead.status === 'converted') pinBg = '#10b981';
-
-  return (
-    <>
-      <AdvancedMarker 
-        ref={markerRef} 
-        position={lead.coords} 
-        onClick={() => {
-          setOpen(true);
-          onSelect();
-        }}
-        title={lead.businessName}
-      >
-        <Pin background={pinBg} glyphColor="#fff" />
-      </AdvancedMarker>
-      {open && marker && (
-        <InfoWindow anchor={marker} onCloseClick={() => setOpen(false)}>
-          <div className="p-2 text-black max-w-[240px] font-sans text-xs">
-            <h4 className="font-bold text-sm border-b pb-1 mb-1.5">{lead.businessName}</h4>
-            <div className="space-y-1">
-              <p><span className="text-gray-500 font-mono">STATUS:</span> <span className="font-semibold uppercase text-[10px]">{lead.status}</span></p>
-              <p><span className="text-gray-500 font-mono">NICHE:</span> {lead.serviceType}</p>
-              {lead.ownerName && <p><span className="text-gray-500 font-mono">OWNER:</span> {lead.ownerName}</p>}
-              {lead.phone && <p><span className="text-gray-500 font-mono">PHONE:</span> {lead.phone}</p>}
-              
-              <div className="flex gap-2 mt-2 border-t pt-2">
-                <div className="bg-gray-100 px-1.5 py-0.5 rounded text-[10px]">
-                  <span>Speed:</span> <span className="font-bold text-amber-600">{typeof lead.performanceScore === 'number' && Number.isFinite(lead.performanceScore) ? `${lead.performanceScore}/100` : 'Not measured'}</span>
-                </div>
-                <div className="bg-gray-100 px-1.5 py-0.5 rounded text-[10px]">
-                  <span>SEO:</span> <span className="font-bold text-gray-800">{typeof lead.seoScore === 'number' && Number.isFinite(lead.seoScore) ? `${lead.seoScore}/100` : 'Not measured'}</span>
-                </div>
-              </div>
-
-              {lead.googleRating && (
-                <div className="flex items-center gap-1 mt-1 text-amber-500 text-[10px]">
-                  <Star className="w-3 h-3 fill-current" />
-                  <span>{lead.googleRating} ({lead.reviewCount} reviews)</span>
-                </div>
-              )}
-            </div>
-          </div>
-        </InfoWindow>
-      )}
-    </>
-  );
-}
-
-function GoogleHeatmapLayer({ leads, show }: { leads: LeadCoord[]; show: boolean }) {
-  const map = useMap();
-  const visualizationLib = useMapsLibrary('visualization');
-  const heatmapRef = useRef<google.maps.visualization.HeatmapLayer | null>(null);
-
-  useEffect(() => {
-    if (!map || !show) {
-      if (heatmapRef.current) {
-        heatmapRef.current.setMap(null);
-        heatmapRef.current = null;
-      }
+    const existing = document.querySelector('script[data-hal-maplibre]') as HTMLScriptElement | null;
+    if (existing) {
+      existing.addEventListener('load', () => resolve(window.maplibregl), { once: true });
+      existing.addEventListener('error', () => reject(new Error('Map library failed to load.')), { once: true });
+      if (window.maplibregl) resolve(window.maplibregl);
       return;
     }
-
-    if (visualizationLib && window.google && window.google.maps && window.google.maps.visualization) {
-      try {
-        const points = leads.map(l => new google.maps.LatLng(l.coords.lat, l.coords.lng));
-        const HeatmapLayerClass = (visualizationLib as any).HeatmapLayer || google.maps.visualization.HeatmapLayer;
-        
-        if (heatmapRef.current) {
-          heatmapRef.current.setData(points);
-        } else {
-          const heatmap = new HeatmapLayerClass({
-            data: points,
-            map: map,
-            radius: 35,
-            opacity: 0.8,
-            gradient: [
-              'rgba(0, 255, 255, 0)',
-              'rgba(0, 255, 255, 1)',
-              'rgba(0, 191, 255, 1)',
-              'rgba(0, 127, 255, 1)',
-              'rgba(255, 0, 255, 1)',
-              'rgba(255, 0, 0, 1)'
-            ]
-          });
-          heatmapRef.current = heatmap;
-        }
-      } catch (err) {
-        console.warn('[GoogleHeatmapLayer] Visualization error:', err);
-      }
-    }
-
-    return () => {
-      if (heatmapRef.current) {
-        heatmapRef.current.setMap(null);
-        heatmapRef.current = null;
-      }
-    };
-  }, [map, visualizationLib, leads, show]);
-
-  return null;
+    const script = document.createElement('script');
+    script.src = `https://unpkg.com/maplibre-gl@${MAPLIBRE_VERSION}/dist/maplibre-gl.js`;
+    script.async = true;
+    script.dataset.halMaplibre = 'true';
+    script.onload = () => window.maplibregl ? resolve(window.maplibregl) : reject(new Error('Map library did not initialize.'));
+    script.onerror = () => reject(new Error('Map library failed to load.'));
+    document.head.appendChild(script);
+  }).catch(error => {
+    mapLibreLoader = null;
+    throw error;
+  });
+  return mapLibreLoader;
 }
 
-function GoogleMapContainer({ 
-  leads, 
-  center, 
-  city, 
-  selectedLeadId, 
-  onSelectLead,
-  activeOverlay,
-  onChangeOverlay,
-  onSwitchToOffline
-}: LeadMapProps & { onSwitchToOffline: () => void }) {
-  const [mapTypeId, setMapTypeId] = useState<'roadmap' | 'satellite'>('roadmap');
-  const [searchMarkerCoords, setSearchMarkerCoords] = useState<{ lat: number; lng: number } | null>(null);
-  const [searchMarkerName, setSearchMarkerName] = useState<string>('');
+const validCoords = (coords?: { lat: number; lng: number } | null) =>
+  !!coords && Number.isFinite(coords.lat) && Number.isFinite(coords.lng) &&
+  Math.abs(coords.lat) <= 90 && Math.abs(coords.lng) <= 180;
 
-  const mapOptions: google.maps.MapOptions = {
-    disableDefaultUI: true,
-    zoomControl: false,
-    mapTypeControl: false,
-    scaleControl: true,
-    streetViewControl: false,
-    rotateControl: false,
-    fullscreenControl: false,
-    styles: [
-      { elementType: 'geometry', stylers: [{ color: '#0b0f19' }] },
-      { elementType: 'labels.text.stroke', stylers: [{ color: '#0b0f19' }] },
-      { elementType: 'labels.text.fill', stylers: [{ color: '#94a3b8' }] },
-      { featureType: 'administrative.locality', elementType: 'labels.text.fill', stylers: [{ color: '#f8fafc' }] },
-      { featureType: 'poi', elementType: 'geometry', stylers: [{ color: '#1e293b' }] },
-      { featureType: 'poi', elementType: 'labels.text.fill', stylers: [{ color: '#cbd5e1' }] },
-      { featureType: 'poi.business', elementType: 'labels.text.fill', stylers: [{ color: '#38bdf8' }] },
-      { featureType: 'poi.park', elementType: 'geometry', stylers: [{ color: '#0f2922' }] },
-      { featureType: 'poi.park', elementType: 'labels.text.fill', stylers: [{ color: '#34d399' }] },
-      { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#1e293b' }] },
-      { featureType: 'road', elementType: 'geometry.stroke', stylers: [{ color: '#0f172a' }] },
-      { featureType: 'road', elementType: 'labels.text.fill', stylers: [{ color: '#94a3b8' }] },
-      { featureType: 'road.highway', elementType: 'geometry', stylers: [{ color: '#334155' }] },
-      { featureType: 'road.highway', elementType: 'geometry.stroke', stylers: [{ color: '#1e293b' }] },
-      { featureType: 'road.highway', elementType: 'labels.text.fill', stylers: [{ color: '#f1f5f9' }] },
-      { featureType: 'transit', elementType: 'geometry', stylers: [{ color: '#1e293b' }] },
-      { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#090d16' }] },
-      { featureType: 'water', elementType: 'labels.text.fill', stylers: [{ color: '#64748b' }] }
-    ]
-  };
+const HTML_ENTITIES: Record<string, string> = {
+  '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+};
+const safeText = (value: unknown) => String(value ?? '').replace(/[&<>"']/g, char => HTML_ENTITIES[char] || char);
 
-  return (
-    <div className="relative border border-border-dark rounded-sm overflow-hidden flex-1 min-h-[440px] flex flex-col">
-      <GoogleMap
-        defaultCenter={center}
-        defaultZoom={11}
-        mapId="DEMO_MAP_ID"
-        internalUsageAttributionIds={['gmp_mcp_codeassist_v1_aistudio']}
-        style={{ width: '100%', height: '100%' }}
-        options={mapOptions}
-        mapTypeId={mapTypeId}
-      >
-        <MapCameraHandler center={center} />
-        <GoogleHeatmapLayer leads={leads} show={activeOverlay !== 'none'} />
-
-        {/* Overlay Toolbar */}
-        <div className="absolute top-3 left-3 right-3 z-10 flex flex-wrap gap-2 justify-between items-center bg-panel-dark/95 backdrop-blur-sm p-2 border border-border-dark rounded-sm pointer-events-auto shadow-xl">
-          <div className="flex items-center gap-2 text-text-primary px-1">
-            <Globe className="w-3.5 h-3.5 text-brand shrink-0" />
-            <span className="text-[10px] font-mono font-bold uppercase truncate max-w-[120px] sm:max-w-none">
-              {city}
-            </span>
-            <span className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 text-[8px] font-mono px-1.5 py-0.5 rounded flex items-center gap-1">
-              <Wifi className="w-2.5 h-2.5" /> ONLINE MAPS
-            </span>
-          </div>
-          
-          <div className="flex items-center gap-2 flex-1 justify-end">
-            <MapSearchControl onPlaceSelected={(lat, lng, name) => {
-              setSearchMarkerCoords({ lat, lng });
-              setSearchMarkerName(name);
-            }} />
-            
-            <MapCustomControls 
-              mapTypeId={mapTypeId} 
-              setMapTypeId={setMapTypeId} 
-            />
-
-            <button
-              onClick={onSwitchToOffline}
-              className="bg-bg-dark border border-border-dark hover:border-brand text-text-dim hover:text-text-primary px-2 py-1.5 rounded-sm text-[9px] font-mono transition-colors flex items-center gap-1 cursor-pointer"
-              title="Switch to Real OpenStreetMap Tile Matrix"
-            >
-              <WifiOff className="w-3 h-3 text-amber-500" />
-              <span className="hidden sm:inline">OSM REAL TILES</span>
-            </button>
-          </div>
-        </div>
-
-        {activeOverlay !== 'none' && (
-          <div className="absolute bottom-10 right-3 z-10 bg-panel-dark/95 backdrop-blur-md p-2 border border-border-dark rounded-sm shadow-2xl font-mono text-[9px] text-text-primary flex flex-col gap-1.5 pointer-events-auto">
-            <div className="flex items-center gap-1.5 font-bold">
-              <Flame className={`w-3.5 h-3.5 animate-pulse ${activeOverlay === 'revenue' ? 'text-emerald-400' : activeOverlay === 'neural' ? 'text-purple-400' : 'text-cyan-400'}`} />
-              <span className="uppercase">
-                {activeOverlay === 'density' && 'OPPORTUNITY DENSITY SPECTRUM'}
-                {activeOverlay === 'revenue' && 'REVENUE POTENTIAL HEATMAP'}
-                {activeOverlay === 'neural' && 'NEURAL CONVERSION CONFIDENCE'}
-              </span>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="text-[8px] text-text-dim">LOW</span>
-              <div className={`h-2 w-32 rounded-full bg-gradient-to-r ${
-                activeOverlay === 'revenue' ? 'from-emerald-900 via-emerald-500 to-emerald-300' : 
-                activeOverlay === 'neural' ? 'from-indigo-900 via-purple-500 to-fuchsia-400' : 
-                'from-cyan-400 via-blue-500 via-magenta-500 to-red-500'
-              }`} />
-              <span className="text-[8px] font-bold">HIGH</span>
-            </div>
-          </div>
-        )}
-
-        {searchMarkerCoords && (
-          <AdvancedMarker 
-            position={searchMarkerCoords} 
-            title={searchMarkerName}
-            onClick={() => setSearchMarkerCoords(null)}
-          >
-            <Pin background="#ef4444" glyphColor="#fff" borderColor="#b91c1c" />
-          </AdvancedMarker>
-        )}
-
-        {leads.map(lead => (
-          <MarkerWithInfoWindow 
-            key={lead.id} 
-            lead={lead} 
-            isSelected={selectedLeadId === lead.id}
-            onSelect={() => onSelectLead?.(lead.id)}
-          />
-        ))}
-      </GoogleMap>
-    </div>
-  );
-}
-
-// ==========================================
-// 3. OpenStreetMap Real Tile Engine (Leaflet)
-// ==========================================
-
-function OpenStreetMapContainer({
-  leads,
-  center,
-  city,
-  selectedLeadId,
-  onSelectLead,
-  activeOverlay,
-  onChangeOverlay,
-  onSwitchToGoogle,
-  serviceZones,
-  isDrawingZone,
-  onAddZonePoint,
-  drawingPoints
-}: LeadMapProps & { onSwitchToGoogle?: () => void }) {
+export default function LeadMap({
+  leads, center, city, selectedLeadId, onSelectLead, onImportOsmPlace, serviceZones = [],
+  isDrawingZone = false, onAddZonePoint, drawingPoints = []
+}: LeadMapProps) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const mapRef = useRef<L.Map | null>(null);
-  const tileLayerRef = useRef<L.TileLayer | null>(null);
-  const markersRef = useRef<Map<string, L.Marker>>(new Map());
-  const searchMarkerRef = useRef<L.Marker | null>(null);
-  const heatmapLayerGroupRef = useRef<L.LayerGroup | null>(null);
-  const zonesLayerGroupRef = useRef<L.LayerGroup | null>(null);
-  const drawingLayerGroupRef = useRef<L.LayerGroup | null>(null);
+  const mapRef = useRef<any>(null);
+  const markersRef = useRef<any[]>([]);
+  const osmMarkersRef = useRef<any[]>([]);
+  const [mapReady, setMapReady] = useState(false);
+  const [mapError, setMapError] = useState('');
+  const [earthquakesEnabled, setEarthquakesEnabled] = useState(false);
+  const [osmTradesEnabled, setOsmTradesEnabled] = useState(false);
+  const [osmTradeStatus, setOsmTradeStatus] = useState('OSM trade layer off');
+  const [earthquakeStatus, setEarthquakeStatus] = useState('Earthquake layer off');
+  const [searchText, setSearchText] = useState('');
+  const [searching, setSearching] = useState(false);
 
-  const [activeLayer, setActiveLayer] = useState<'dark' | 'streets' | 'satellite'>('dark');
-  const [searchQuery, setSearchQuery] = useState<string>('');
-  const [isSearching, setIsSearching] = useState<boolean>(false);
-  const [cursorGeo, setCursorGeo] = useState<{ lat: number; lng: number } | null>(null);
-
-  // Render Saved Service Zones
   useEffect(() => {
-    const map = mapRef.current;
-    if (!map) return;
-
-    if (zonesLayerGroupRef.current) {
-      map.removeLayer(zonesLayerGroupRef.current);
-      zonesLayerGroupRef.current = null;
-    }
-
-    if (!serviceZones || serviceZones.length === 0) return;
-
-    const group = L.layerGroup().addTo(map);
-
-    serviceZones.forEach(zone => {
-      if (zone.points && zone.points.length >= 3) {
-        const polyPoints: L.LatLngExpression[] = zone.points.map(p => [p.lat, p.lng]);
-        const polygon = L.polygon(polyPoints, {
-          color: zone.color || '#3b82f6',
-          fillColor: zone.color || '#3b82f6',
-          fillOpacity: 0.25,
-          weight: 2
-        }).addTo(group);
-
-        polygon.bindPopup(`
-          <div style="padding: 6px; font-family: monospace; font-size: 11px; color: white; background: #111827; border-radius: 4px;">
-            <div style="font-weight: bold; color: ${zone.color}; text-transform: uppercase;">${zone.name}</div>
-            <div style="font-size: 9px; color: #9ca3af; margin-top: 2px;">CITY: ${(zone.city || 'TERRITORY').toUpperCase()}</div>
-          </div>
-        `);
-      }
+    let disposed = false;
+    let map: any;
+    loadMapLibre().then(maplibregl => {
+      if (disposed || !containerRef.current) return;
+      map = new maplibregl.Map({
+        container: containerRef.current,
+        style: OPENFREEMAP_STYLE,
+        center: [center.lng, center.lat],
+        zoom: 11,
+        attributionControl: true
+      });
+      map.addControl(new maplibregl.NavigationControl({ showCompass: true }), 'bottom-right');
+      map.on('load', () => {
+        if (disposed) return;
+        setMapReady(true);
+      });
+      mapRef.current = map;
+    }).catch(error => {
+      if (!disposed) setMapError(error?.message || 'Could not load the free map.');
     });
-
-    zonesLayerGroupRef.current = group;
-
     return () => {
-      if (zonesLayerGroupRef.current) {
-        map.removeLayer(zonesLayerGroupRef.current);
-        zonesLayerGroupRef.current = null;
-      }
-    };
-  }, [serviceZones]);
-
-  // Handle map click when drawing polygon zone
-  useEffect(() => {
-    const map = mapRef.current;
-    if (!map) return;
-
-    const handleMapClick = (e: L.LeafletMouseEvent) => {
-      if (isDrawingZone && onAddZonePoint) {
-        onAddZonePoint({ lat: e.latlng.lat, lng: e.latlng.lng });
-      }
-    };
-
-    map.on('click', handleMapClick);
-    return () => {
-      map.off('click', handleMapClick);
-    };
-  }, [isDrawingZone, onAddZonePoint]);
-
-  // Render temporary drawing polygon/points
-  useEffect(() => {
-    const map = mapRef.current;
-    if (!map) return;
-
-    if (drawingLayerGroupRef.current) {
-      map.removeLayer(drawingLayerGroupRef.current);
-      drawingLayerGroupRef.current = null;
-    }
-
-    if (!drawingPoints || drawingPoints.length === 0) return;
-
-    const group = L.layerGroup().addTo(map);
-
-    drawingPoints.forEach((pt) => {
-      L.circleMarker([pt.lat, pt.lng], {
-        radius: 5,
-        color: '#ef4444',
-        fillColor: '#ffffff',
-        fillOpacity: 1,
-        weight: 2
-      }).addTo(group);
-    });
-
-    if (drawingPoints.length >= 2) {
-      const linePts: L.LatLngExpression[] = drawingPoints.map(p => [p.lat, p.lng]);
-      L.polyline(linePts, { color: '#ef4444', weight: 2, dashArray: '5, 5' }).addTo(group);
-    }
-
-    drawingLayerGroupRef.current = group;
-
-    return () => {
-      if (drawingLayerGroupRef.current) {
-        map.removeLayer(drawingLayerGroupRef.current);
-        drawingLayerGroupRef.current = null;
-      }
-    };
-  }, [drawingPoints]);
-
-  // Heatmap Density Overlays for Leaflet
-  useEffect(() => {
-    const map = mapRef.current;
-    if (!map) return;
-
-    if (heatmapLayerGroupRef.current) {
-      map.removeLayer(heatmapLayerGroupRef.current);
-      heatmapLayerGroupRef.current = null;
-    }
-
-    if (!activeOverlay || activeOverlay === 'none') return;
-
-    const layerGroup = L.layerGroup().addTo(map);
-
-    leads.forEach(lead => {
-      let weight = 0;
-      let outerColor = '#06b6d4';
-      let midColor = '#d946ef';
-      let innerColor = '#ef4444';
-
-      if (activeOverlay === 'density') {
-        const urgency = typeof lead.urgencyScore === 'number' && Number.isFinite(lead.urgencyScore) ? lead.urgencyScore : 0;
-        const ltv = typeof lead.predictedLtvUsd === 'number' && Number.isFinite(lead.predictedLtvUsd) ? lead.predictedLtvUsd : 0;
-        weight = Math.min(1.0, (urgency / 10) * 0.6 + (ltv / 15000) * 0.4);
-        outerColor = '#06b6d4';
-        midColor = '#d946ef';
-        innerColor = '#ef4444';
-      } else if (activeOverlay === 'revenue') {
-        const ltv = lead.predictedLtvUsd || 0;
-        weight = Math.min(1.0, ltv / 20000);
-        outerColor = '#10b981'; // emerald
-        midColor = '#34d399';
-        innerColor = '#059669';
-      } else if (activeOverlay === 'neural') {
-        const score = typeof lead.urgencyScore === 'number' && Number.isFinite(lead.urgencyScore) ? lead.urgencyScore : 0;
-        weight = score / 10;
-        outerColor = '#8b5cf6'; // violet
-        midColor = '#a855f7'; // purple
-        innerColor = '#d946ef'; // fuchsia
-      }
-
-      if (weight <= 0) return;
-
-      // Outer radial aura
-      L.circle([lead.coords.lat, lead.coords.lng], {
-        radius: 2200 + (weight * 1000),
-        color: 'transparent',
-        fillColor: outerColor,
-        fillOpacity: 0.14,
-        interactive: false
-      }).addTo(layerGroup);
-
-      // Mid warm aura
-      L.circle([lead.coords.lat, lead.coords.lng], {
-        radius: 1200 + (weight * 600),
-        color: 'transparent',
-        fillColor: midColor,
-        fillOpacity: 0.24,
-        interactive: false
-      }).addTo(layerGroup);
-
-      // Inner core
-      L.circle([lead.coords.lat, lead.coords.lng], {
-        radius: 450 + (weight * 300),
-        color: 'transparent',
-        fillColor: innerColor,
-        fillOpacity: 0.45,
-        interactive: false
-      }).addTo(layerGroup);
-    });
-
-    heatmapLayerGroupRef.current = layerGroup;
-
-    return () => {
-      if (heatmapLayerGroupRef.current) {
-        map.removeLayer(heatmapLayerGroupRef.current);
-        heatmapLayerGroupRef.current = null;
-      }
-    };
-  }, [activeOverlay, leads]);
-
-  // Initialize Map
-  useEffect(() => {
-    if (!containerRef.current || mapRef.current) return;
-
-    const map = L.map(containerRef.current, {
-      zoomControl: false,
-      attributionControl: false
-    }).setView([center.lat, center.lng], 11);
-
-    mapRef.current = map;
-
-    // Track cursor coordinates
-    map.on('mousemove', (e: L.LeafletMouseEvent) => {
-      setCursorGeo({ lat: e.latlng.lat, lng: e.latlng.lng });
-    });
-
-    return () => {
-      map.remove();
+      disposed = true;
+      markersRef.current.forEach(marker => marker.remove());
+      markersRef.current = [];
+      osmMarkersRef.current.forEach(marker => marker.remove());
+      osmMarkersRef.current = [];
+      map?.remove();
       mapRef.current = null;
     };
+  // Map is initialized once; camera changes are handled separately.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Update Tile Layer
   useEffect(() => {
     const map = mapRef.current;
-    if (!map) return;
-
-    if (tileLayerRef.current) {
-      map.removeLayer(tileLayerRef.current);
+    if (map && mapReady && validCoords({lat:center.lat,lng:center.lng})) {
+      map.flyTo({ center: [center.lng, center.lat], duration: 700 });
     }
+  }, [center.lat, center.lng, mapReady]);
 
-    let url = 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png';
-    let options: L.TileLayerOptions = {
-      maxZoom: 19,
-      subdomains: 'abcd'
-    };
-
-    if (activeLayer === 'streets') {
-      url = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
-      options = { maxZoom: 19 };
-    } else if (activeLayer === 'satellite') {
-      url = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
-      options = { maxZoom: 18 };
-    }
-
-    const tileLayer = L.tileLayer(url, options).addTo(map);
-    tileLayerRef.current = tileLayer;
-  }, [activeLayer]);
-
-  // Center update
+  // Business pins only render when the record has a real coordinate.
   useEffect(() => {
     const map = mapRef.current;
-    if (map && center && !isNaN(center.lat) && !isNaN(center.lng)) {
-      map.flyTo([center.lat, center.lng], map.getZoom() || 11, { duration: 0.8 });
-    }
-  }, [center]);
-
-  // Lead Markers Update
-  useEffect(() => {
-    const map = mapRef.current;
-    if (!map) return;
-
-    // Clear old markers
+    const maplibregl = window.maplibregl;
+    if (!map || !mapReady || !maplibregl) return;
     markersRef.current.forEach(marker => marker.remove());
-    markersRef.current.clear();
-
-    leads.forEach(lead => {
-      const isSelected = selectedLeadId === lead.id;
-      
-      let color = '#3b82f6'; // new
-      if (lead.status === 'contacted') color = '#f59e0b';
-      if (lead.status === 'converted') color = '#10b981';
-
-      const customHtml = `
-        <div style="position: relative; display: flex; flex-direction: column; align-items: center; cursor: pointer;">
-          ${isSelected ? `<div style="position: absolute; top: -6px; width: 34px; height: 34px; border-radius: 50%; border: 2px solid ${color}; animation: ping 1.5s cubic-bezier(0, 0, 0.2, 1) infinite; opacity: 0.8;"></div>` : ''}
-          <div style="background-color: ${color}; width: 22px; height: 22px; border-radius: 50%; border: 2px solid #111827; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 8px rgba(0,0,0,0.6); transform: ${isSelected ? 'scale(1.3)' : 'scale(1)'}; transition: transform 0.2s;">
-            <div style="width: 8px; height: 8px; background: white; border-radius: 50%;"></div>
-          </div>
-          <div style="margin-top: 2px; background: rgba(15, 23, 42, 0.95); border: 1px solid #374151; padding: 2px 5px; border-radius: 3px; font-size: 9px; font-family: monospace; color: #f8fafc; white-space: nowrap; box-shadow: 0 2px 6px rgba(0,0,0,0.5);">
-            ${lead.businessName}
-          </div>
-        </div>
-      `;
-
-      const icon = L.divIcon({
-        html: customHtml,
-        className: 'custom-osm-pin',
-        iconSize: [28, 40],
-        iconAnchor: [14, 20]
-      });
-
-      const marker = L.marker([lead.coords.lat, lead.coords.lng], { icon }).addTo(map);
-
-      // Popup Content
-      const popupHtml = `
-        <div style="padding: 10px; font-family: sans-serif; font-size: 11px; color: #f3f4f6; width: 220px; background: #111827; border-radius: 4px;">
-          <div style="font-size: 10px; font-family: monospace; color: #3b82f6; text-transform: uppercase; font-weight: bold;">${lead.serviceType}</div>
-          <div style="font-size: 13px; font-weight: bold; margin-bottom: 6px; color: white;">${lead.businessName}</div>
-          
-          <div style="font-size: 10px; color: #9ca3af; margin-bottom: 4px; line-height: 1.4;">
-            <div>CITY: <b style="color:#e5e7eb;">${(lead.city || 'TERRITORY').toUpperCase()}</b></div>
-            ${lead.ownerName ? `<div>OWNER: <b style="color:#e5e7eb;">${lead.ownerName}</b></div>` : ''}
-            ${lead.phone ? `<div>PHONE: <b style="color:#e5e7eb;">${lead.phone}</b></div>` : ''}
-          </div>
-
-          <div style="display: flex; gap: 6px; margin-top: 6px; padding-top: 6px; border-top: 1px solid #374151;">
-            <div style="background: #1f2937; padding: 3px 6px; border-radius: 3px; font-size: 9px; font-family: monospace;">
-              SEO: <b style="color:#10b981;">${typeof lead.seoScore === 'number' && Number.isFinite(lead.seoScore) ? lead.seoScore + '/100' : 'Not measured'}</b>
-            </div>
-            <div style="background: #1f2937; padding: 3px 6px; border-radius: 3px; font-size: 9px; font-family: monospace;">
-              SPEED: <b style="color:#f59e0b;">${typeof lead.performanceScore === 'number' && Number.isFinite(lead.performanceScore) ? lead.performanceScore + '/100' : 'Not measured'}</b>
-            </div>
-          </div>
-
-          ${typeof lead.predictedLtvUsd === 'number' && Number.isFinite(lead.predictedLtvUsd) && lead.predictedLtvUsd >= 0 ? `
-            <div style="margin-top: 6px; background: rgba(59, 130, 246, 0.15); border: 1px solid rgba(59, 130, 246, 0.3); padding: 4px; border-radius: 3px; font-size: 10px; font-family: monospace; color: #60a5fa; text-align: center;">
-              PREDICTED LTV: <b>${lead.predictedLtvUsd.toLocaleString()} USD</b>
-            </div>
-          ` : ''}
-        </div>
-      `;
-
-      marker.bindPopup(popupHtml, {
-        closeButton: true
-      });
-
-      marker.on('click', () => {
-        onSelectLead?.(lead.id);
-      });
-
-      markersRef.current.set(lead.id, marker);
+    markersRef.current = [];
+    leads.filter(lead => validCoords(lead.coords)).forEach(lead => {
+      const color = lead.status === 'converted' || lead.status === 'closed_won' ? '#15966a'
+        : lead.status === 'contacted' ? '#d28a25' : '#3478d4';
+      const marker = new maplibregl.Marker({ color })
+        .setLngLat([lead.coords!.lng, lead.coords!.lat])
+        .setPopup(new maplibregl.Popup({ offset: 22 }).setHTML(
+          `<div style="font:12px system-ui;min-width:180px;color:#17202a">
+            <strong>${safeText(lead.businessName)}</strong>
+            <div>${safeText(lead.serviceType)} · ${safeText(lead.city)}</div>
+            ${lead.phone ? `<div>${safeText(lead.phone)}</div>` : ''}
+            <small>CRM status: ${safeText(lead.status)}</small>
+          </div>`
+        ))
+        .addTo(map);
+      marker.getElement().addEventListener('click', () => onSelectLead?.(lead.id));
+      if (lead.id === selectedLeadId) marker.togglePopup();
+      markersRef.current.push(marker);
     });
-  }, [leads, selectedLeadId]);
+  }, [leads, mapReady, onSelectLead, selectedLeadId]);
 
-  // Center & Open Popup on Selected Lead
+  // Saved service zones and the current drawing preview.
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || !selectedLeadId) return;
-
-    const targetMarker = markersRef.current.get(selectedLeadId);
-    if (targetMarker) {
-      const latLng = targetMarker.getLatLng();
-      map.flyTo([latLng.lat, latLng.lng], Math.max(map.getZoom(), 13), { duration: 0.8 });
-      targetMarker.openPopup();
-    }
-  }, [selectedLeadId]);
-
-  // Search address using OpenStreetMap Nominatim API
-  const handleAddressSearch = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!searchQuery.trim() || !mapRef.current) return;
-
-    setIsSearching(true);
-    try {
-      const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(searchQuery)}`);
-      const data = await res.json();
-
-      if (data && data.length > 0) {
-        const top = data[0];
-        const lat = parseFloat(top.lat);
-        const lon = parseFloat(top.lon);
-
-        if (mapRef.current) {
-          mapRef.current.flyTo([lat, lon], 13, { duration: 1.2 });
-
-          // Add search pin
-          if (searchMarkerRef.current) {
-            searchMarkerRef.current.remove();
-          }
-
-          const searchIcon = L.divIcon({
-            html: `
-              <div style="background: #ef4444; width: 28px; height: 28px; border-radius: 50%; border: 2px solid white; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 10px rgba(239,68,68,0.5);">
-                <div style="width: 10px; height: 10px; background: white; border-radius: 50%;"></div>
-              </div>
-            `,
-            className: 'search-marker-pin',
-            iconSize: [28, 28],
-            iconAnchor: [14, 14]
-          });
-
-          searchMarkerRef.current = L.marker([lat, lon], { icon: searchIcon })
-            .addTo(mapRef.current)
-            .bindPopup(`<div style="color:black; font-weight:bold; font-size:11px;">${top.display_name}</div>`)
-            .openPopup();
-        }
+    if (!map || !mapReady) return;
+    const features: any[] = [];
+    serviceZones.forEach(zone => {
+      if (zone.points?.length >= 3) {
+        const ring = zone.points.map(point => [point.lng, point.lat]);
+        ring.push(ring[0]);
+        features.push({ type: 'Feature', properties: { name: zone.name || 'Service zone' }, geometry: { type: 'Polygon', coordinates: [ring] } });
       }
-    } catch (err) {
-      console.warn('[OpenStreetMap] Address search failed:', err);
+    });
+    if (drawingPoints.length >= 3) {
+      const ring = drawingPoints.map(point => [point.lng, point.lat]);
+      ring.push(ring[0]);
+      features.push({ type: 'Feature', properties: { name: 'Draft service zone' }, geometry: { type: 'Polygon', coordinates: [ring] } });
+    }
+    const data = { type: 'FeatureCollection', features };
+    if (map.getSource('hal-service-zones')) {
+      map.getSource('hal-service-zones').setData(data);
+    } else {
+      map.addSource('hal-service-zones', { type: 'geojson', data });
+      map.addLayer({ id: 'hal-service-zones-fill', type: 'fill', source: 'hal-service-zones', paint: { 'fill-color': '#15966a', 'fill-opacity': 0.16 } });
+      map.addLayer({ id: 'hal-service-zones-outline', type: 'line', source: 'hal-service-zones', paint: { 'line-color': '#15966a', 'line-width': 2, 'line-dasharray': [2, 2] } });
+    }
+  }, [serviceZones, drawingPoints, mapReady]);
+
+  // Weather overlay intentionally disabled until HAL uses a commercially licensed provider.
+
+  // USGS public GeoJSON feed. Events are displayed as seismic observations, not
+  // interpreted as property damage or contractor demand.
+  useEffect(() => {
+    const map = mapRef.current;
+    const maplibregl = window.maplibregl;
+    if (!map || !mapReady || !earthquakesEnabled || !maplibregl) {
+      if (map?.getLayer('hal-quake-circles')) map.removeLayer('hal-quake-circles');
+      if (map?.getSource('hal-earthquakes')) map.removeSource('hal-earthquakes');
+      if (!earthquakesEnabled) setEarthquakeStatus('Earthquake layer off');
+      return;
+    }
+    let cancelled = false;
+    const loadEarthquakes = async () => {
+      try {
+        const response = await fetch('https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/all_week.geojson');
+        if (!response.ok) throw new Error(`USGS feed returned ${response.status}`);
+        const geojson = await response.json();
+        if (cancelled) return;
+        if (map.getSource('hal-earthquakes')) map.getSource('hal-earthquakes').setData(geojson);
+        else {
+          map.addSource('hal-earthquakes', { type: 'geojson', data: geojson });
+          map.addLayer({ id: 'hal-quake-circles', type: 'circle', source: 'hal-earthquakes', paint: {
+            'circle-radius': ['interpolate',['linear'],['get','mag'],0,3,3,6,5,11,7,17],
+            'circle-color': ['interpolate',['linear'],['get','mag'],0,'#e7c45b',3,'#e78b37',5,'#d94b43',7,'#8f283d'],
+            'circle-opacity': 0.78, 'circle-stroke-color': '#fff', 'circle-stroke-width': 1
+          }});
+          map.on('click', 'hal-quake-circles', (event: any) => {
+            const feature = event.features?.[0];
+            if (!feature) return;
+            const props = feature.properties || {};
+            new maplibregl.Popup().setLngLat(event.lngLat).setHTML(
+              `<div style="font:12px system-ui;color:#17202a"><strong>M${safeText(props.mag)}</strong><div>${safeText(props.place)}</div><small>${props.time ? new Date(Number(props.time)).toLocaleString() : 'Time unavailable'}</small><div><a href="${safeText(props.url)}" target="_blank" rel="noreferrer">USGS event details</a></div></div>`
+            ).addTo(map);
+          });
+          map.on('mouseenter', 'hal-quake-circles', () => { map.getCanvas().style.cursor = 'pointer'; });
+          map.on('mouseleave', 'hal-quake-circles', () => { map.getCanvas().style.cursor = ''; });
+        }
+        setEarthquakeStatus(`USGS · past 7 days · ${geojson.features?.length || 0} events`);
+      } catch (error: any) {
+        if (!cancelled) setEarthquakeStatus(error?.message || 'Earthquake feed unavailable');
+      }
+    };
+    loadEarthquakes();
+    return () => { cancelled = true; };
+  }, [earthquakesEnabled, mapReady]);
+
+
+  // Overpass: retrieve only mapped trade POIs inside the visible map bounds.
+  // These are OSM community-mapped places, not verified CRM prospects.
+  useEffect(() => {
+    const map = mapRef.current;
+    const maplibregl = window.maplibregl;
+    if (!map || !mapReady || !osmTradesEnabled || !maplibregl) {
+      osmMarkersRef.current.forEach(marker => marker.remove());
+      osmMarkersRef.current = [];
+      if (!osmTradesEnabled) setOsmTradeStatus('OSM trade layer off');
+      return;
+    }
+    let cancelled = false;
+    const loadMappedTrades = async () => {
+      try {
+        const bounds = map.getBounds();
+        const bbox = [bounds.getSouth(), bounds.getWest(), bounds.getNorth(), bounds.getEast()].join(',');
+        const query = `[out:json][timeout:15];(nwr(${bbox})["craft"~"^(plumber|electrician|carpenter|roofer|builder|painter|locksmith|glaziery|tiler|plasterer|hvac|landscaper)$"];);out center 250;`;
+        const response = await fetch('https://overpass-api.de/api/interpreter', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8' },
+          body: 'data=' + encodeURIComponent(query),
+          signal: AbortSignal.timeout(18000)
+        });
+        if (!response.ok) throw new Error(`Overpass returned ${response.status}`);
+        const payload = await response.json();
+        if (cancelled) return;
+        osmMarkersRef.current.forEach(marker => marker.remove());
+        osmMarkersRef.current = [];
+        const elements = Array.isArray(payload.elements) ? payload.elements : [];
+        elements.forEach((element: any) => {
+          const lat = Number(element.lat ?? element.center?.lat);
+          const lng = Number(element.lon ?? element.center?.lon);
+          if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
+          const tags = element.tags || {};
+          if (!tags.name && !tags.operator) return;
+          const name = tags.name || tags.operator;
+          const craft = tags.craft || 'home service';
+          const candidate: OsmTradeCandidate = {
+            osmType: String(element.type || 'node'),
+            osmId: Number(element.id),
+            name: String(name),
+            craft: String(craft),
+            city: String(tags['addr:city'] || city),
+            latitude: lat,
+            longitude: lng,
+            phone: tags.phone ? String(tags.phone) : undefined,
+            email: tags.email ? String(tags.email) : undefined,
+            websiteUrl: tags.website ? String(tags.website) : undefined
+          };
+          const popup = new maplibregl.Popup({ offset: 20 }).setHTML(
+            `<div style="font:12px system-ui;color:#17202a;min-width:180px"><strong>${safeText(name)}</strong><div>${safeText(craft)}</div><small>OpenStreetMap mapped POI · not independently verified</small>${tags.phone ? `<div>${safeText(tags.phone)}</div>` : ''}${tags.website ? `<div>${safeText(tags.website)}</div>` : ''}${onImportOsmPlace ? '<button type="button" data-hal-import-osm style="margin-top:8px;padding:6px 9px;background:#166534;color:white;border:0;border-radius:4px;cursor:pointer">Add to CRM review queue</button>' : ''}</div>`
+          );
+          popup.on('open', () => {
+            const button = popup.getElement()?.querySelector('[data-hal-import-osm]') as HTMLButtonElement | null;
+            if (!button || !onImportOsmPlace) return;
+            button.addEventListener('click', async () => {
+              button.disabled = true;
+              button.textContent = 'ADDING…';
+              try {
+                await onImportOsmPlace(candidate);
+                button.textContent = 'ADDED TO REVIEW';
+              } catch {
+                button.disabled = false;
+                button.textContent = 'RETRY IMPORT';
+              }
+            }, { once: true });
+          });
+          const marker = new maplibregl.Marker({ color: '#a56cbd' })
+            .setLngLat([lng, lat])
+            .setPopup(popup)
+            .addTo(map);
+          osmMarkersRef.current.push(marker);
+        });
+        setOsmTradeStatus(`OpenStreetMap · ${osmMarkersRef.current.length} mapped trade POIs in view`);
+      } catch (error: any) {
+        if (!cancelled) setOsmTradeStatus(error?.message || 'OSM trade data unavailable');
+      }
+    };
+    loadMappedTrades();
+    map.on('moveend', loadMappedTrades);
+    return () => {
+      cancelled = true;
+      map.off('moveend', loadMappedTrades);
+      osmMarkersRef.current.forEach(marker => marker.remove());
+      osmMarkersRef.current = [];
+    };
+  }, [osmTradesEnabled, mapReady, onImportOsmPlace, city]);
+
+  const handleSearch = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!searchText.trim() || searching || !mapRef.current) return;
+    setSearching(true);
+    try {
+      // Nominatim is used only for explicit, user-initiated single-place searches.
+      const response = await fetch(`https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&q=${encodeURIComponent(searchText.trim())}`, {
+        headers: { 'Accept-Language': 'en' }
+      });
+      if (!response.ok) throw new Error('Location search unavailable');
+      const results = await response.json();
+      if (!results?.length) throw new Error('No matching location found');
+      mapRef.current.flyTo({ center: [Number(results[0].lon), Number(results[0].lat)], zoom: 13, duration: 900 });
+    } catch (error: any) {
+      setMapError(error?.message || 'Location search failed');
     } finally {
-      setIsSearching(false);
+      setSearching(false);
     }
   };
 
-  return (
-    <div className="relative border border-border-dark rounded-sm overflow-hidden flex-1 min-h-[440px] flex flex-col bg-[#0b0e14] select-none">
-      {/* Top Toolbar */}
-      <div className="absolute top-3 left-3 right-3 z-20 flex flex-wrap gap-2 justify-between items-center bg-panel-dark/95 backdrop-blur-md p-2 border border-border-dark rounded-sm shadow-2xl">
-        <div className="flex items-center gap-2 px-1">
-          <Globe className="w-4 h-4 text-brand animate-pulse shrink-0" />
-          <div className="flex flex-col">
-            <span className="text-[10px] font-mono font-bold text-text-primary uppercase tracking-wider">
-              {city}
-            </span>
-            <span className="text-[8px] font-mono text-emerald-400 flex items-center gap-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping" />
-              OPENSTREETMAP REAL TILES
-            </span>
-          </div>
-        </div>
+  const preciseLeadCount = leads.filter(lead => validCoords(lead.coords)).length;
 
-        <div className="flex items-center gap-2 flex-1 justify-end">
-          {/* Address & City Search */}
-          <form onSubmit={handleAddressSearch} className="relative max-w-xs flex-1 min-w-[140px] sm:min-w-[180px]">
-            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-text-dim pointer-events-none" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={e => setSearchQuery(e.target.value)}
-              placeholder="Search OSM address or city..."
-              className="w-full bg-bg-dark border border-border-dark hover:border-text-secondary/30 rounded-sm p-1.5 pl-8.5 pr-6 text-[11px] font-mono text-text-primary placeholder:text-text-dim focus:outline-none focus:border-brand transition-colors"
-            />
-            {isSearching && (
-              <div className="absolute right-2 top-1/2 -translate-y-1/2 w-3 h-3 border-2 border-brand border-t-transparent rounded-full animate-spin" />
-            )}
+  return (
+    <div className="relative border border-border-dark rounded-sm overflow-hidden bg-[#0b0e14] min-h-[520px] flex flex-col">
+      <div className="absolute top-3 left-3 right-3 z-10 flex flex-wrap gap-2 items-center justify-between pointer-events-none">
+        <div className="bg-panel-dark/95 border border-border-dark rounded-sm px-3 py-2 pointer-events-auto">
+          <div className="text-[10px] font-mono font-bold text-text-primary uppercase">{city} · TERRITORY INTELLIGENCE</div>
+          <div className="text-[9px] text-emerald-400 font-mono">OPENFREEMAP · OPENSTREETMAP DATA</div>
+        </div>
+        <div className="flex flex-wrap gap-2 pointer-events-auto">
+          <form onSubmit={handleSearch} className="flex gap-1 bg-panel-dark/95 border border-border-dark rounded-sm p-1">
+            <input value={searchText} onChange={event=>setSearchText(event.target.value)} placeholder="Search a place…" className="w-36 sm:w-48 bg-transparent px-2 py-1 text-[10px] text-text-primary outline-none" />
+            <button disabled={searching} className="px-2 py-1 text-[9px] font-mono bg-brand text-black rounded-sm">{searching ? '…' : 'GO'}</button>
           </form>
-
-          {/* Layer Selector */}
-          <div className="flex items-center bg-bg-dark border border-border-dark rounded-sm p-0.5">
-            <button
-              onClick={() => setActiveLayer('dark')}
-              className={`px-2 py-1 text-[9px] font-mono rounded-sm transition-colors cursor-pointer ${
-                activeLayer === 'dark' ? 'bg-brand text-text-primary font-bold' : 'text-text-dim hover:text-text-primary'
-              }`}
-            >
-              DARK
-            </button>
-            <button
-              onClick={() => setActiveLayer('streets')}
-              className={`px-2 py-1 text-[9px] font-mono rounded-sm transition-colors cursor-pointer ${
-                activeLayer === 'streets' ? 'bg-brand text-text-primary font-bold' : 'text-text-dim hover:text-text-primary'
-              }`}
-            >
-              STREETS
-            </button>
-            <button
-              onClick={() => setActiveLayer('satellite')}
-              className={`px-2 py-1 text-[9px] font-mono rounded-sm transition-colors cursor-pointer ${
-                activeLayer === 'satellite' ? 'bg-brand text-text-primary font-bold' : 'text-text-dim hover:text-text-primary'
-              }`}
-            >
-              SATELLITE
-            </button>
-          </div>
-
-          {/* Zoom controls */}
-          <div className="flex items-center bg-bg-dark border border-border-dark rounded-sm p-0.5">
-            <button
-              onClick={() => mapRef.current?.zoomOut()}
-              className="w-6 h-6 flex items-center justify-center text-[12px] font-mono font-bold text-text-dim hover:text-text-primary border-r border-border-dark hover:bg-bg-subtle transition-colors cursor-pointer"
-              title="Zoom Out"
-            >
-              -
-            </button>
-            <button
-              onClick={() => mapRef.current?.zoomIn()}
-              className="w-6 h-6 flex items-center justify-center text-[12px] font-mono font-bold text-text-dim hover:text-text-primary border-r border-border-dark hover:bg-bg-subtle transition-colors cursor-pointer"
-              title="Zoom In"
-            >
-              +
-            </button>
-            <button
-              onClick={() => mapRef.current?.flyTo([center.lat, center.lng], 11)}
-              className="w-6 h-6 flex items-center justify-center text-text-dim hover:text-brand hover:bg-bg-subtle transition-colors cursor-pointer"
-              title="Recenter Map"
-            >
-              <RotateCcw className="w-3 h-3" />
-            </button>
-          </div>
-
-          {/* Google Maps toggle if valid key */}
-          {hasValidKey && onSwitchToGoogle && (
-            <button
-              onClick={onSwitchToGoogle}
-              className="bg-bg-dark border border-border-dark hover:border-brand text-text-dim hover:text-text-primary px-2 py-1.5 rounded-sm text-[9px] font-mono transition-colors flex items-center gap-1 cursor-pointer"
-              title="Switch to Google Maps JS API"
-            >
-              <Wifi className="w-3 h-3 text-emerald-400" />
-              <span className="hidden sm:inline">GOOGLE MAPS</span>
-            </button>
-          )}
+          <span className="px-3 py-2 text-[9px] font-mono border border-border-dark rounded-sm bg-panel-dark text-text-dim" title="Weather is disabled pending a commercially licensed data provider">WEATHER DISABLED · LICENSING</span>
+          <button onClick={()=>setEarthquakesEnabled(value=>!value)} className={`px-3 py-2 text-[9px] font-mono border rounded-sm ${earthquakesEnabled ? 'bg-amber-700 border-amber-400 text-white' : 'bg-panel-dark border-border-dark text-text-primary'}`}>EARTHQUAKES {earthquakesEnabled ? 'ON' : 'OFF'}</button>
+          <button onClick={()=>setOsmTradesEnabled(value=>!value)} className={`px-3 py-2 text-[9px] font-mono border rounded-sm ${osmTradesEnabled ? 'bg-violet-800 border-violet-400 text-white' : 'bg-panel-dark border-border-dark text-text-primary'}`}>OSM TRADES {osmTradesEnabled ? 'ON' : 'OFF'}</button>
         </div>
       </div>
-
-      {/* Real Map Leaflet Container */}
-      <div ref={containerRef} className="w-full h-full flex-1 min-h-[380px] z-0" />
-
-      {activeOverlay !== 'none' && (
-        <div className="absolute bottom-12 right-3 z-20 bg-panel-dark/95 backdrop-blur-md p-2 border border-border-dark rounded-sm shadow-2xl font-mono text-[9px] text-text-primary flex flex-col gap-1.5 pointer-events-auto">
-          <div className="flex items-center gap-1.5 font-bold">
-            <Flame className={`w-3.5 h-3.5 animate-pulse ${activeOverlay === 'revenue' ? 'text-emerald-400' : activeOverlay === 'neural' ? 'text-purple-400' : 'text-cyan-400'}`} />
-            <span className="uppercase">
-              {activeOverlay === 'density' && 'OPPORTUNITY DENSITY SPECTRUM'}
-              {activeOverlay === 'revenue' && 'REVENUE POTENTIAL HEATMAP'}
-              {activeOverlay === 'neural' && 'NEURAL CONVERSION CONFIDENCE'}
-            </span>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="text-[8px] text-text-dim">LOW</span>
-            <div className={`h-2 w-32 rounded-full bg-gradient-to-r ${
-              activeOverlay === 'revenue' ? 'from-emerald-900 via-emerald-500 to-emerald-300' : 
-              activeOverlay === 'neural' ? 'from-indigo-900 via-purple-500 to-fuchsia-400' : 
-              'from-cyan-400 via-blue-500 via-magenta-500 to-red-500'
-            }`} />
-            <span className="text-[8px] font-bold">HIGH</span>
-          </div>
-        </div>
-      )}
-
-      {/* Bottom Status Bar */}
-      <div className="flex flex-col sm:flex-row gap-2 justify-between items-center px-3 py-2 bg-panel-dark/95 border-t border-border-dark text-[9px] font-mono text-text-dim shrink-0 z-20">
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-1.5">
-            <span className="w-2 h-2 rounded-full bg-[#3b82f6]" />
-            <span>NEW PROSPECT ({leads.filter(l => l.status === 'new').length})</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <span className="w-2 h-2 rounded-full bg-[#f59e0b]" />
-            <span>CONTACTED ({leads.filter(l => l.status === 'contacted').length})</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <span className="w-2 h-2 rounded-full bg-[#10b981]" />
-            <span>CONVERTED ({leads.filter(l => l.status === 'converted').length})</span>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-3">
-          {cursorGeo && (
-            <span>
-              CURSOR: {cursorGeo.lat.toFixed(4)}° N, {cursorGeo.lng.toFixed(4)}° W
-            </span>
-          )}
-          <span>REAL TILES ACTIVE (OSM/CARTO/ESRI)</span>
-        </div>
+      <div ref={containerRef} className="w-full flex-1 min-h-[520px]" />
+      {(!mapReady || mapError) && <div className="absolute inset-0 z-20 flex items-center justify-center bg-panel-dark/90 p-6 text-center"><div className="text-xs font-mono text-text-primary">{mapError || 'Loading OpenFreeMap…'}{mapError && <div className="mt-2 text-text-dim">Check the network connection and refresh the map.</div>}</div></div>}
+      <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border-dark bg-panel-dark px-3 py-2 text-[9px] font-mono text-text-dim">
+        <span>CRM PINS: {preciseLeadCount} located / {leads.length} records · no fabricated coordinates</span>
+        <span>{earthquakeStatus}</span>
+        
+        {osmTradesEnabled && <span>{osmTradeStatus}</span>}
+        {isDrawingZone && <span className="text-amber-300">DRAWING ZONE · CLICK MAP TO ADD POINTS</span>}
+        <span>Map © OpenFreeMap · © OpenMapTiles · © OpenStreetMap</span>
+        
       </div>
-    </div>
-  );
-}
-
-// ==========================================
-// 4. Main Exported LeadMap Component
-// ==========================================
-
-export default function LeadMap(props: LeadMapProps) {
-  const [useOsmMode, setUseOsmMode] = useState<boolean>(!hasValidKey);
-  const [isAuthFailed, setIsAuthFailed] = useState<boolean>(false);
-  const [isLoadingGoogleScript, setIsLoadingGoogleScript] = useState<boolean>(hasValidKey);
-
-  // Catch global Google Maps auth failures (e.g. InvalidKeyMapError)
-  useEffect(() => {
-    const prevAuthFailure = (window as any).gm_authFailure;
-    (window as any).gm_authFailure = () => {
-      console.warn('[LeadMap] Google Maps authentication failed (InvalidKeyMapError). Safely switching to OpenStreetMap Real Tile Engine.');
-      setIsAuthFailed(true);
-      setIsLoadingGoogleScript(false);
-      if (typeof prevAuthFailure === 'function') {
-        prevAuthFailure();
-      }
-    };
-  }, []);
-
-  // Simulate or track Google Maps lazy load initialization timeout
-  useEffect(() => {
-    if (!hasValidKey) {
-      setIsLoadingGoogleScript(false);
-      return;
-    }
-
-    const timer = setTimeout(() => {
-      setIsLoadingGoogleScript(false);
-    }, 1200);
-
-    return () => clearTimeout(timer);
-  }, []);
-
-  // If key is missing or auth failed or user toggled OSM mode
-  if (!hasValidKey || isAuthFailed || useOsmMode) {
-    return (
-      <OpenStreetMapContainer 
-        {...props} 
-        onSwitchToGoogle={hasValidKey && !isAuthFailed ? () => setUseOsmMode(false) : undefined}
-      />
-    );
-  }
-
-  // Render Google Maps wrapped inside ErrorBoundary and Loading Overlay
-  return (
-    <div className="relative w-full h-full min-h-[440px] flex flex-col">
-      {isLoadingGoogleScript && (
-        <div className="absolute inset-0 z-50 bg-panel-dark/95 backdrop-blur-md flex flex-col items-center justify-center space-y-3 font-mono text-xs">
-          <Compass className="w-8 h-8 text-brand animate-spin" />
-          <div className="text-text-primary font-bold">INITIALIZING GOOGLE MAPS PLATFORM...</div>
-          <div className="text-[10px] text-text-dim">Fetching territory vector tiles & geolocation libraries...</div>
-        </div>
-      )}
-      <MapErrorBoundary fallback={<OpenStreetMapContainer {...props} />}>
-        <GoogleMapContainer 
-          {...props} 
-          onSwitchToOffline={() => setUseOsmMode(true)}
-        />
-      </MapErrorBoundary>
     </div>
   );
 }
