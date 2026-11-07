@@ -34,6 +34,7 @@ export interface Lead {
     longitude?: number;
     attribution?: string;
     verificationNote?: string;
+    businessAddress?: string;
     geocoding?: {
       provider: 'geoapify';
       latitude: number;
@@ -41,7 +42,7 @@ export interface Lead {
       formattedAddress?: string;
       resultType: string;
       confidence: number;
-      precision: 'named_business_poi';
+      precision: 'public_business_address' | 'named_business_poi';
       geocodedAt: string;
       attribution: string;
     };
