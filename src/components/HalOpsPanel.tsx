@@ -227,7 +227,7 @@ export default function HalOpsPanel({
                   className="w-full mt-4 bg-brand hover:bg-brand-dim text-black font-mono font-bold text-xs uppercase tracking-wider py-4 rounded-lg flex items-center justify-center gap-2 transition-all shadow-[0_0_20px_rgba(255,255,255,0.05)] disabled:opacity-50"
                 >
                   {simRunning ? <Loader2 className="w-4 h-4 animate-spin" /> : <Activity className="w-4 h-4" />}
-                  {simRunning ? 'SIMULATING OUTCOMES...' : 'RUN NEURAL SIMULATION'}
+                  {simRunning ? 'Estimating...' : 'Estimate outcomes'}
                 </button>
               </div>
             </div>
@@ -261,7 +261,7 @@ export default function HalOpsPanel({
 
                    <div className="grid grid-cols-2 gap-4">
                      <div className="bg-card-dark border border-border-dark rounded-lg p-4">
-                       <span className="block text-[10px] font-mono text-text-dim font-bold uppercase tracking-wider mb-1">Conversion Confidence</span>
+                       <span className="block text-[10px] font-mono text-text-dim font-bold uppercase tracking-wider mb-1">Confidence</span>
                        <div className="flex items-baseline gap-1">
                          <span className={`text-2xl font-bold font-mono ${simResult.confidence >= 70 ? 'text-emerald-400' : simResult.confidence >= 40 ? 'text-amber-400' : 'text-red-400'}`}>
                            {simResult.confidence}%
@@ -269,7 +269,7 @@ export default function HalOpsPanel({
                        </div>
                      </div>
                      <div className="bg-card-dark border border-border-dark rounded-lg p-4">
-                       <span className="block text-[10px] font-mono text-text-dim font-bold uppercase tracking-wider mb-1">Est. Cost Per Lead</span>
+                       <span className="block text-[10px] font-mono text-text-dim font-bold uppercase tracking-wider mb-1">Estimated cost per lead</span>
                        <div className="flex items-baseline gap-1">
                          <span className="text-2xl font-bold font-mono text-text-primary">${simResult.predictedCpl}</span>
                        </div>
