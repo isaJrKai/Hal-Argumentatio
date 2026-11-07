@@ -611,7 +611,7 @@ export default function App() {
 
   const downloadWindowsShortcut = () => {
     const currentUrl = window.location.origin;
-    const shortcutContent = `[InternetShortcut]\nURL=${currentUrl}\nIconIndex=0\nIconFile=${currentUrl}/icon.jpg\n`;
+    const shortcutContent = `[InternetShortcut]\nURL=${currentUrl}\nIconIndex=0\nIconFile=${currentUrl}/icon.png\n`;
     const blob = new Blob([shortcutContent], { type: 'text/plain' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
@@ -1585,7 +1585,7 @@ export default function App() {
               {/* Icon Container */}
               <div className="relative w-20 h-20 mx-auto mb-4">
                 <img
-                  src="/icon.jpg"
+                  src="/icon.png"
                   alt="HALBiz App Icon"
                   className="w-20 h-20 rounded-2xl border-2 border-accent/40 shadow-xl shadow-accent/10 object-cover"
                   referrerPolicy="no-referrer"
