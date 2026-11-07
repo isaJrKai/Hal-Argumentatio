@@ -239,6 +239,7 @@ export default function BoardPanel({ leads, token, onRefresh }: BoardPanelProps)
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div>
             <h2 className="text-xl font-bold tracking-tight text-text-primary">Sales pipeline</h2>
+            <p className="text-sm text-text-secondary max-w-2xl mt-1 leading-relaxed">Turn business opportunities into revenue. Track prospect follow-ups, manage deals and see where each opportunity stands — from first contact through to closing.</p>
           </div>
           <div className="flex items-center gap-3 text-xs font-mono shrink-0 flex-wrap">
             <div className="px-3.5 py-1.5 border border-border-dim rounded bg-bg-raised text-center min-w-[90px]">

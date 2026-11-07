@@ -389,7 +389,7 @@ export default function SkillsPanel({ token }: SkillsPanelProps) {
                 onClick={() => setSelectedSkill(s)}
                 className={`w-full text-left p-3.5 rounded-sm border transition-all flex items-start gap-3.5 cursor-pointer relative group ${
                   isSelected 
-                    ? 'bg-accent-dim/40 border-accent/50 shadow-md shadow-accent/5' 
+                    ? 'bg-accent-dim/40 border-accent/50' 
                     : 'bg-bg-raised border-border-dim hover:border-border-strong hover:bg-bg-subtle'
                 }`}
               >
