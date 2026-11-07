@@ -348,6 +348,7 @@ export default function MapPanel({ leads, token, onOpenWorkQueue }: MapPanelProp
         updatedAt: new Date(row.updatedAt || Date.now()).toISOString()
       };
       setDisplayLeads(current => current.some(item => item.id === mapped.id) ? current : [mapped, ...current]);
+      setTerritoryResults(current => current.filter(item => item.businessName !== candidate.businessName));
       setTerritorySearchStatus(`${candidate.businessName} added to CRM · human review task created`);
     } else {
       setTerritorySearchStatus(`${candidate.businessName} already exists in CRM or was skipped as a duplicate.`);
