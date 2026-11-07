@@ -1,12 +1,12 @@
 {
   "name": "HALBiz Business Intelligence",
   "short_name": "HALBiz",
-  "description": "A configurable business intelligence workspace.",
+  "description": "Business intelligence for contractor businesses.",
   "start_url": "/",
   "display": "standalone",
   "orientation": "any",
-  "background_color": "#151A1D",
-  "theme_color": "#151A1D",
+  "background_color": "#0c0e12",
+  "theme_color": "#0c0e12",
   "icons": [
     {
       "src": "/hal-mark.svg",
