@@ -853,19 +853,31 @@ export default function MapPanel({ leads, token, onOpenWorkQueue }: MapPanelProp
             </select>
           </div>
 
-          {/* Search Box */}
+          {/* Existing CRM search, with an explicit action to discover new territory prospects */}
           <div className="space-y-1.5">
-            <label className="text-[10px] font-bold text-text-secondary uppercase">SEARCH CRITERIA</label>
-            <div className="relative">
-              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-text-dim" />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search business, niche, owner..."
-                className="w-full bg-bg-subtle border border-border-dim hover:border-text-secondary/30 rounded-sm p-2 pl-8.5 text-xs text-text-primary placeholder:text-text-dim focus:outline-none focus:border-brand transition-colors"
-              />
+            <label className="text-[10px] font-bold text-text-secondary uppercase">SEARCH</label>
+            <div className="flex gap-1.5">
+              <div className="relative min-w-0 flex-1">
+                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-text-dim" />
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Business, trade, owner or “plumbers near Kampala”"
+                  className="w-full bg-bg-subtle border border-border-dim hover:border-text-secondary/30 rounded-sm p-2 pl-8.5 text-xs text-text-primary placeholder:text-text-dim focus:outline-none focus:border-brand transition-colors"
+                />
+              </div>
+              <button
+                type="button"
+                onClick={() => void handleTerritorySearch(searchQuery)}
+                disabled={isSearchingTerritory || !searchQuery.trim()}
+                title="Discover new businesses for this trade and territory"
+                className="shrink-0 rounded-sm border border-brand/50 bg-brand/10 px-2.5 text-[9px] font-mono font-bold text-brand hover:bg-brand/20 disabled:opacity-40"
+              >
+                {isSearchingTerritory ? 'SEARCHING…' : 'DISCOVER'}
+              </button>
             </div>
+            {territorySearchStatus && <p className="text-[9px] text-text-secondary">{territorySearchStatus}</p>}
           </div>
 
           {/* Heatmap Density Layer Toggle */}
