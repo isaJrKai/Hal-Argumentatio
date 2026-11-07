@@ -98,9 +98,9 @@ export default function FinancialsPanel({ token }: FinancialsPanelProps) {
               Phase 5: Financial Intelligence
             </span>
             <span className="w-1 h-1 rounded-full bg-text-tertiary" />
-            <span className="text-[10px] font-mono text-text-secondary">RETAINER REVENUE & UNIT ECONOMICS</span>
+            <span className="text-[10px] font-mono text-text-secondary">Financial overview</span>
           </div>
-          <h2 className="text-xl font-bold tracking-tight text-text-primary mt-1">Financial Intelligence & Retainers</h2>
+          <h2 className="text-xl font-bold tracking-tight text-text-primary mt-1">Financials</h2>
           <p className="text-xs text-text-secondary max-w-2xl mt-0.5">
             Contract-based MRR and annualized run-rate from active client retainers. Unit economics and forecasts appear when supporting historical data is available.
           </p>
@@ -111,7 +111,7 @@ export default function FinancialsPanel({ token }: FinancialsPanelProps) {
           className="px-3 py-1.5 bg-bg-raised border border-border-dim hover:border-brand text-text-primary rounded-sm font-mono text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 transition-colors cursor-pointer self-start md:self-auto"
         >
           <RefreshCw className="w-3 h-3 text-brand" />
-          <span>Refresh Financials</span>
+          <span>Refresh</span>
         </button>
       </div>
 
