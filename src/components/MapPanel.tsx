@@ -1,6 +1,6 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { Lead } from '../types';
-import LeadMap from './LeadMap';
+import LeadMap, { TerritorySearchCandidate } from './LeadMap';
 import { 
   saveLeadsToIndexedDB, 
   getLeadsFromIndexedDB, 
@@ -71,6 +71,10 @@ export default function MapPanel({ leads, token, onOpenWorkQueue }: MapPanelProp
   const [queueFeedback, setQueueFeedback] = useState<string | null>(null);
   const [isInitializingMap, setIsInitializingMap] = useState<boolean>(true);
   const [activeOverlay, setActiveOverlay] = useState<string>('none');
+  const [territoryResults, setTerritoryResults] = useState<TerritorySearchCandidate[]>([]);
+  const [territorySearchStatus, setTerritorySearchStatus] = useState<string | null>(null);
+  const [isSearchingTerritory, setIsSearchingTerritory] = useState(false);
+
 
   // IndexedDB Caching & Offline Fallback state
   const [displayLeads, setDisplayLeads] = useState<Lead[]>(leads);
@@ -254,6 +258,102 @@ export default function MapPanel({ leads, token, onOpenWorkQueue }: MapPanelProp
 
     return () => clearTimeout(timer);
   }, []);
+
+  const handleTerritorySearch = useCallback(async (query: string) => {
+    if (!token) {
+      setTerritorySearchStatus('Sign in to search and save territory prospects.');
+      return;
+    }
+    const match = query.match(/^(.+?)\\s+(?:near|in|around)\\s+(.+)$/i);
+    const niche = match?.[1]?.trim() || (cityFilter !== 'all' ? query.trim() : '');
+    const city = match?.[2]?.trim() || (cityFilter !== 'all' ? cityFilter : '');
+    if (!niche || !city) {
+      setTerritorySearchStatus('Use a search like “plumbers near Fredericton” or choose a city first.');
+      return;
+    }
+    setIsSearchingTerritory(true);
+    setTerritorySearchStatus(`Searching for ${niche} in ${city}…`);
+    setTerritoryResults([]);
+    try {
+      const response = await fetch('/api/maps/territory-search', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ city, niche, limit: 30, activeAi: localStorage.getItem('hal_active_ai') || 'gemini' })
+      });
+      const data = await response.json();
+      if (!response.ok || !data.success) throw new Error(data.error || 'Territory search failed.');
+      const results = Array.isArray(data.results) ? data.results : [];
+      setTerritoryResults(results);
+      setTerritorySearchStatus(`${results.length} candidates · ${results.filter((item: TerritorySearchCandidate) => item.latitude != null && item.longitude != null).length} located · Reviews ${data.providers?.reviews || 'unavailable'}`);
+      if (!results.length) setTerritorySearchStatus(`No candidates found for ${niche} in ${city}. Try a broader trade or nearby city.`);
+      logEvent('MAP_TERRITORY_SEARCH', `Searched ${niche} in ${city}; received ${results.length} candidates.`);
+    } catch (error: any) {
+      setTerritorySearchStatus(error?.message || 'Territory search failed.');
+    } finally {
+      setIsSearchingTerritory(false);
+    }
+  }, [token, cityFilter]);
+
+  const handleImportTerritoryResult = useCallback(async (candidate: TerritorySearchCandidate) => {
+    if (!token) throw new Error('Sign in before importing prospects.');
+    const response = await fetch('/api/leads/ingest', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({
+        leads: [{
+          businessName: candidate.businessName,
+          city: candidate.city,
+          serviceType: candidate.serviceType,
+          address: candidate.address,
+          websiteUrl: candidate.websiteUrl,
+          phone: candidate.phone,
+          email: candidate.email,
+          sourceType: candidate.sourceType,
+          verificationStatus: candidate.verificationStatus || 'UNVERIFIED_STAGING',
+          isSynthetic: false,
+          notes: candidate.notes || 'Discovered through HAL territory search. Verify details before outreach.',
+          groundingEvidence: {
+            ...(candidate.groundingEvidence || {}),
+            source: 'hal_territory_search',
+            latitude: candidate.latitude,
+            longitude: candidate.longitude,
+            locationSource: candidate.locationSource,
+            googleMapsUrl: candidate.googleMapsUrl,
+            reviewSource: candidate.reviewSource
+          }
+        }]
+      })
+    });
+    const data = await response.json();
+    if (!response.ok || !data.success) throw new Error(data.error || 'Could not add this business to CRM.');
+    const added = Array.isArray(data.leads) ? data.leads : [];
+    if (added.length) {
+      const row = added[0];
+      const mapped: Lead = {
+        id: row.id,
+        contractorId: row.contractorId,
+        businessName: row.businessName,
+        ownerName: row.ownerName || undefined,
+        city: row.city,
+        serviceType: row.niche || candidate.serviceType,
+        source: row.source || 'harvested_intelligence',
+        status: row.status || 'new',
+        urgencyScore: null,
+        predictedLtvUsd: null,
+        websiteUrl: candidate.websiteUrl,
+        verificationStatus: row.verificationStatus || 'UNVERIFIED_STAGING',
+        sourceType: row.sourceType || candidate.sourceType,
+        groundingEvidence: row.groundingEvidence || {},
+        createdAt: row.createdAt,
+        updatedAt: row.updatedAt
+      };
+      setDisplayLeads(current => current.some(item => item.id === mapped.id) ? current : [mapped, ...current]);
+      setTerritorySearchStatus(`${candidate.businessName} added to CRM · human review task created`);
+    } else {
+      setTerritorySearchStatus(`${candidate.businessName} already exists in CRM or was skipped as a duplicate.`);
+    }
+    logEvent('MAP_TERRITORY_PROSPECT_IMPORTED', `Imported ${candidate.businessName} from territory search.`);
+  }, [token]);
 
   // Download / Pre-cache City Tile Package
   const handlePrecacheCity = async (cityName: string) => {
@@ -927,6 +1027,11 @@ export default function MapPanel({ leads, token, onOpenWorkQueue }: MapPanelProp
               isDrawingZone={isDrawingZone}
               onAddZonePoint={handleAddZonePoint}
               drawingPoints={drawingPoints}
+              territoryResults={territoryResults}
+              onTerritorySearch={handleTerritorySearch}
+              onImportTerritoryResult={handleImportTerritoryResult}
+              territorySearchStatus={territorySearchStatus}
+              isSearchingTerritory={isSearchingTerritory}
             />
           </div>
         </div>
