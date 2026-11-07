@@ -324,7 +324,7 @@ export default function OverviewPanel({
                 Welcome back, {contractorFirstName}.
               </h2>
               <p className="text-xs text-text-secondary leading-relaxed">
-                Operating workspace configured for <span className="font-medium text-text-primary">{(activeNiche || 'Contracting').toUpperCase()}</span> services in <span className="font-medium text-text-primary">{activeCity}</span>. Performance trends will populate as records accumulate.
+                Your <span className="font-medium text-text-primary">{(activeNiche || 'Contracting').toUpperCase()}</span> workspace in <span className="font-medium text-text-primary">{activeCity}</span>.
               </p>
             </div>
 
@@ -338,10 +338,6 @@ export default function OverviewPanel({
                   <li className="flex items-start gap-1.5">
                     <span className="text-warning font-bold">•</span>
                     <span>{activeCampaignsCount} active campaign{activeCampaignsCount === 1 ? '' : 's'} recorded</span>
-                  </li>
-                  <li className="flex items-start gap-1.5">
-                    <span className="text-text-tertiary font-bold">•</span>
-                    <span>Calendar sync pending for scheduled visits</span>
                   </li>
                 </ul>
               </div>
@@ -1190,83 +1186,15 @@ export default function OverviewPanel({
           </div>
         </section>
 
-        {/* TODAY'S ACTION PRIORITIES & SCHEDULE */}
+        {/* One honest task state; the full schedule remains available on demand. */}
         <section className={`border rounded-xl p-5 shadow-sm ${cardBg} lg:col-span-5 md:col-span-2 col-span-1 flex flex-col justify-between`}>
           <div>
-            <div className="flex justify-between items-center mb-3.5">
-              <div>
-                <span className="text-[10px] font-mono tracking-widest text-text-tertiary uppercase font-bold block">TODAY'S ACTION PRIORITIES</span>
-                <span className="text-xs font-sans font-semibold text-text-primary">Scheduled Business Tasks</span>
-              </div>
-              <span className="text-[9px] font-mono font-bold text-accent px-2 py-0.5 rounded bg-accent-dim">TASKS</span>
-            </div>
-            
-            <div className="space-y-2.5">
-              <div className="p-2.5 rounded-lg border border-border-dim bg-bg-subtle/50 space-y-1.5">
-                <div className="flex justify-between items-center text-[9px] font-mono">
-                  <span className="text-accent font-bold uppercase flex items-center gap-1">
-                    <span className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse" /> TASK STATUS NOT TRACKED
-                  </span>
-                  <span className="text-text-tertiary">—</span>
-                </div>
-                <p className="text-[11px] font-sans font-medium text-text-primary leading-tight">
-                  No verified follow-up task is recorded for {activeCity}
-                </p>
-                <button 
-                  onClick={() => setActiveTab('leads')}
-                  className="text-[10px] font-mono text-accent hover:underline flex items-center gap-1 font-bold pt-0.5"
-                >
-                  View Leads in Prospect Finder <ArrowUpRight className="w-3 h-3" />
-                </button>
-              </div>
-
-              <div className="p-2.5 rounded-lg border border-border-dim bg-bg-subtle/50 space-y-1.5">
-                <div className="flex justify-between items-center text-[9px] font-mono">
-                  <span className="text-warning font-bold uppercase flex items-center gap-1">
-                    <span className="w-1.5 h-1.5 rounded-full bg-warning" /> TASK STATUS NOT TRACKED
-                  </span>
-                  <span className="text-text-tertiary">—</span>
-                </div>
-                <p className="text-[11px] font-sans font-medium text-text-primary leading-tight">
-                  No proposal review task is recorded.
-                </p>
-                <button 
-                  onClick={() => setActiveTab('board')}
-                  className="text-[10px] font-mono text-warning hover:underline flex items-center gap-1 font-bold pt-0.5"
-                >
-                  Review in Sales Pipeline <ArrowUpRight className="w-3 h-3" />
-                </button>
-              </div>
-
-              <div className="p-2.5 rounded-lg border border-border-dim bg-bg-subtle/50 space-y-1.5">
-                <div className="flex justify-between items-center text-[9px] font-mono">
-                  <span className="text-positive font-bold uppercase flex items-center gap-1">
-                    <span className="w-1.5 h-1.5 rounded-full bg-positive" /> TASK STATUS NOT TRACKED
-                  </span>
-                  <span className="text-text-tertiary">—</span>
-                </div>
-                <p className="text-[11px] font-sans font-medium text-text-primary leading-tight">
-                  No campaign approval task is recorded.
-                </p>
-                <button 
-                  onClick={() => setActiveTab('campaigns')}
-                  className="text-[10px] font-mono text-positive hover:underline flex items-center gap-1 font-bold pt-0.5"
-                >
-                  Open Campaigns <ArrowUpRight className="w-3 h-3" />
-                </button>
-              </div>
-            </div>
+            <span className="text-xs font-semibold text-text-primary">Tasks</span>
+            <p className="text-sm text-text-secondary mt-2">Task status is not yet tracked on this overview.</p>
           </div>
-
-          <div className="pt-3 border-t border-border-dim/60 mt-3 flex items-center justify-between">
-            <span className="text-[9.5px] font-mono text-text-tertiary">Territory: {activeCity}, {regionalProfile.countryCode}</span>
-            <button 
-              onClick={() => setActiveTab('scheduler')}
-              className="text-xs font-mono font-bold text-accent hover:underline flex items-center gap-1"
-            >
-              Open Daily Task Schedule <ArrowUpRight className="w-3 h-3" />
-            </button>
-          </div>
+          <button onClick={() => setActiveTab('scheduler')} className="text-xs font-semibold text-accent hover:underline flex items-center gap-1 mt-4">
+            Open task schedule <ArrowUpRight className="w-3 h-3" />
+          </button>
         </section>
 
         {/* RECENT BUSINESS ACTIVITY */}
