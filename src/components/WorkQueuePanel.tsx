@@ -174,9 +174,9 @@ export default function WorkQueuePanel({ token }: WorkQueuePanelProps) {
     <div className="space-y-5 min-w-0">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <div className="flex items-center gap-2 text-accent mb-2"><ListTodo className="w-4 h-4" /><span className="text-[10px] font-mono font-bold uppercase tracking-[0.18em]">Work orchestration</span></div>
-          <h1 className="text-2xl font-display font-semibold text-text-primary">Work Queue</h1>
-          <p className="text-sm text-text-secondary mt-1 max-w-2xl">Assign work to a person or specialist worker, track its state and preserve the execution trail. A queued task is an assignment, not proof that an agent has executed it.</p>
+          <div className="flex items-center gap-2 text-accent mb-2"><ListTodo className="w-4 h-4" /><span className="text-[10px] font-mono font-bold uppercase tracking-[0.18em]">Tasks</span></div>
+          <h1 className="text-2xl font-display font-semibold text-text-primary">Tasks</h1>
+          <p className="text-sm text-text-secondary mt-1 max-w-2xl">Assign tasks, track progress and review the execution history. An assignment is not complete until the work is recorded.</p>
         </div>
         <button onClick={() => void loadTasks()} disabled={loading} className="inline-flex items-center gap-2 px-3 py-2 rounded-md border border-border-default bg-bg-raised text-text-secondary hover:text-text-primary disabled:opacity-50 text-xs font-mono"><RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} /> Refresh</button>
       </div>
@@ -193,7 +193,7 @@ export default function WorkQueuePanel({ token }: WorkQueuePanelProps) {
       <section className="border border-border-default bg-bg-raised rounded-xl p-4 space-y-3">
         <div className="flex items-center justify-between gap-2">
           <h2 className="text-sm font-semibold text-text-primary">Worker readiness</h2>
-          <span className="text-[10px] text-text-tertiary font-mono">Verified execution boundaries</span>
+          <span className="text-[10px] text-text-tertiary font-mono">Execution availability</span>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-2">
           {workerCapabilities.map(worker => (
