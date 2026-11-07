@@ -36,6 +36,7 @@ import { analyzeCampaignPerformance } from '../../lib/campaignAnomaly';
 import { classifyHermesToolResult } from '../../lib/hermesExecution';
 import { claimHermesWorkTask, heartbeatHermesWorkTask, failExpiredHermesWorkTask } from '../../lib/hermesTaskClaim';
 import { validateDomainAndDns } from '../../lib/networkVerification';
+import { searchTerritoryBusinesses } from '../../services/territorySearch';
 
 export const HAL_MCP_TOOLS: McpToolDefinition[] = [
   {
@@ -211,6 +212,19 @@ export const HAL_MCP_TOOLS: McpToolDefinition[] = [
         niche: { type: 'string' }
       },
       required: ['url']
+    }
+  },
+  {
+    name: 'hal_search_territory',
+    description: 'Searches a city or territory for a specified trade or business type using the same live discovery, geocoding, and optional Google Places review enrichment used by the map. Returns source-aware candidates and coordinates where confidently matched. Does not automatically create CRM records or contact businesses.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        city: { type: 'string', description: 'Target city or territory, e.g. Fredericton, NB or Calgary, AB.' },
+        niche: { type: 'string', description: 'Business type or trade, e.g. plumbers, roofers, electricians.' },
+        limit: { type: 'number', description: 'Maximum number of candidates, 1-50 (default 20).' }
+      },
+      required: ['city', 'niche']
     }
   }
 ];
@@ -931,6 +945,17 @@ export async function executeMcpTool(
       }
 
       return { success: true, taskId: task.id, toolId, receipt: execution.receipt, artifact };
+    }
+
+    case 'hal_search_territory': {
+      const city = typeof rawParams?.city === 'string' ? rawParams.city.trim() : '';
+      const niche = typeof rawParams?.niche === 'string' ? rawParams.niche.trim() : '';
+      if (!city || !niche || city.length > 160 || niche.length > 120) {
+        throw new Error('A valid city/territory and business type are required.');
+      }
+      const requested = Number(rawParams?.limit);
+      const limit = Number.isFinite(requested) ? Math.min(50, Math.max(1, Math.floor(requested))) : 20;
+      return searchTerritoryBusinesses({ city, niche, limit });
     }
 
     default:
