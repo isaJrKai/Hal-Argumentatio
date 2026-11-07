@@ -12,8 +12,9 @@ import {
   Activity,
   ListTodo,
   Compass,
-  Bot,
- } from 'lucide-react';import { useBusinessContext } from '../context/BusinessContext';
+  Bot
+} from 'lucide-react';
+import { useBusinessContext } from '../context/BusinessContext';
 
 interface TopTelemetryBarProps {
   activeTab: string;
