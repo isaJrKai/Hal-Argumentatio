@@ -71,10 +71,8 @@ export interface LeadMapProps {
   onAddZonePoint?: (point: { lat: number; lng: number }) => void;
   drawingPoints?: Array<{ lat: number; lng: number }>;
   territoryResults?: TerritorySearchCandidate[];
-  onTerritorySearch?: (query: string) => Promise<void> | void;
   onImportTerritoryResult?: (candidate: TerritorySearchCandidate) => Promise<void> | void;
   territorySearchStatus?: string | null;
-  isSearchingTerritory?: boolean;
 }
 
 declare global {
@@ -160,7 +158,7 @@ const safeText = (value: unknown) => String(value ?? '').replace(/[&<>"']/g, cha
 export default function LeadMap({
   leads, center, city, selectedLeadId, onSelectLead, onImportOsmPlace, serviceZones = [],
   isDrawingZone = false, onAddZonePoint, drawingPoints = [], territoryResults = [],
-  onTerritorySearch, onImportTerritoryResult, territorySearchStatus, isSearchingTerritory = false
+  onImportTerritoryResult, territorySearchStatus
 }: LeadMapProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<any>(null);
