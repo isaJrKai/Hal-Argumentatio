@@ -22,8 +22,22 @@ export interface LeadCoord {
   coords?: { lat: number; lng: number } | null;
 }
 
+export interface OsmTradeCandidate {
+  osmType: string;
+  osmId: number;
+  name: string;
+  craft: string;
+  city: string;
+  latitude: number;
+  longitude: number;
+  phone?: string;
+  email?: string;
+  websiteUrl?: string;
+}
+
 export interface LeadMapProps {
   leads: LeadCoord[];
+  onImportOsmPlace?: (candidate: OsmTradeCandidate) => Promise<void> | void;
   center: { lat: number; lng: number };
   city: string;
   selectedLeadId?: string | null;
@@ -87,7 +101,7 @@ const HTML_ENTITIES: Record<string, string> = {
 const safeText = (value: unknown) => String(value ?? '').replace(/[&<>"']/g, char => HTML_ENTITIES[char] || char);
 
 export default function LeadMap({
-  leads, center, city, selectedLeadId, onSelectLead, serviceZones = [],
+  leads, center, city, selectedLeadId, onSelectLead, onImportOsmPlace, serviceZones = [],
   isDrawingZone = false, onAddZonePoint, drawingPoints = []
 }: LeadMapProps) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -349,11 +363,40 @@ export default function LeadMap({
           const tags = element.tags || {};
           const name = tags.name || tags.operator || 'Unnamed mapped trade';
           const craft = tags.craft || 'home service';
+          const candidate: OsmTradeCandidate = {
+            osmType: String(element.type || 'node'),
+            osmId: Number(element.id),
+            name: String(name),
+            craft: String(craft),
+            city: String(tags['addr:city'] || city),
+            latitude: lat,
+            longitude: lng,
+            phone: tags.phone ? String(tags.phone) : undefined,
+            email: tags.email ? String(tags.email) : undefined,
+            websiteUrl: tags.website ? String(tags.website) : undefined
+          };
+          const popup = new maplibregl.Popup({ offset: 20 }).setHTML(
+            `<div style="font:12px system-ui;color:#17202a;min-width:180px"><strong>${safeText(name)}</strong><div>${safeText(craft)}</div><small>OpenStreetMap mapped POI · not independently verified</small>${tags.phone ? `<div>${safeText(tags.phone)}</div>` : ''}${tags.website ? `<div>${safeText(tags.website)}</div>` : ''}${onImportOsmPlace ? '<button type="button" data-hal-import-osm style="margin-top:8px;padding:6px 9px;background:#166534;color:white;border:0;border-radius:4px;cursor:pointer">Add to CRM review queue</button>' : ''}</div>`
+          );
+          popup.on('open', () => {
+            const button = popup.getElement()?.querySelector('[data-hal-import-osm]') as HTMLButtonElement | null;
+            if (!button || !onImportOsmPlace) return;
+            button.addEventListener('click', async () => {
+              button.disabled = true;
+              button.textContent = 'ADDING…';
+              try {
+                await onImportOsmPlace(candidate);
+                button.textContent = 'ADDED TO REVIEW';
+              } catch {
+                button.disabled = false;
+                button.textContent = 'RETRY IMPORT';
+              }
+            }, { once: true });
+          });
           const marker = new maplibregl.Marker({ color: '#a56cbd' })
             .setLngLat([lng, lat])
-            .setPopup(new maplibregl.Popup({ offset: 20 }).setHTML(
-              `<div style="font:12px system-ui;color:#17202a;min-width:170px"><strong>${safeText(name)}</strong><div>${safeText(craft)}</div><small>OpenStreetMap mapped POI · not independently verified</small>${tags.phone ? `<div>${safeText(tags.phone)}</div>` : ''}${tags.website ? `<div>${safeText(tags.website)}</div>` : ''}</div>`
-            )).addTo(map);
+            .setPopup(popup)
+            .addTo(map);
           osmMarkersRef.current.push(marker);
         });
         setOsmTradeStatus(`OpenStreetMap · ${osmMarkersRef.current.length} mapped trade POIs in view`);
@@ -369,7 +412,7 @@ export default function LeadMap({
       osmMarkersRef.current.forEach(marker => marker.remove());
       osmMarkersRef.current = [];
     };
-  }, [osmTradesEnabled, mapReady]);
+  }, [osmTradesEnabled, mapReady, onImportOsmPlace, city]);
 
   const handleSearch = async (event: React.FormEvent) => {
     event.preventDefault();
