@@ -61,30 +61,60 @@ let mapLibreLoader: Promise<any> | null = null;
 function loadMapLibre(): Promise<any> {
   if (typeof window !== 'undefined' && window.maplibregl) return Promise.resolve(window.maplibregl);
   if (mapLibreLoader) return mapLibreLoader;
-  mapLibreLoader = new Promise((resolve, reject) => {
-    const cssHref = `https://unpkg.com/maplibre-gl@${MAPLIBRE_VERSION}/dist/maplibre-gl.css`;
-    if (!document.querySelector('link[data-hal-maplibre]')) {
-      const link = document.createElement('link');
-      link.rel = 'stylesheet';
-      link.href = cssHref;
-      link.dataset.halMaplibre = 'true';
-      document.head.appendChild(link);
+
+  mapLibreLoader = (async () => {
+    const unpkgBase = `https://unpkg.com/maplibre-gl@${MAPLIBRE_VERSION}/dist`;
+    const jsdelivrBase = `https://cdn.jsdelivr.net/npm/maplibre-gl@${MAPLIBRE_VERSION}/dist`;
+
+    let stylesheet = document.querySelector('link[data-hal-maplibre]') as HTMLLinkElement | null;
+    if (!stylesheet) {
+      stylesheet = document.createElement('link');
+      stylesheet.rel = 'stylesheet';
+      stylesheet.href = `${unpkgBase}/maplibre-gl.css`;
+      stylesheet.dataset.halMaplibre = 'true';
+      stylesheet.onerror = () => {
+        // A blocked CDN must not leave MapLibre's controls and attribution unstyled.
+        stylesheet!.href = `${jsdelivrBase}/maplibre-gl.css`;
+      };
+      document.head.appendChild(stylesheet);
     }
+
     const existing = document.querySelector('script[data-hal-maplibre]') as HTMLScriptElement | null;
     if (existing) {
-      existing.addEventListener('load', () => resolve(window.maplibregl), { once: true });
-      existing.addEventListener('error', () => reject(new Error('Map library failed to load.')), { once: true });
-      if (window.maplibregl) resolve(window.maplibregl);
-      return;
+      if (window.maplibregl) return window.maplibregl;
+      await new Promise<void>((resolve, reject) => {
+        existing.addEventListener('load', () => resolve(), { once: true });
+        existing.addEventListener('error', () => reject(new Error('Existing MapLibre script failed.')), { once: true });
+      });
+      if (window.maplibregl) return window.maplibregl;
+      existing.remove();
     }
-    const script = document.createElement('script');
-    script.src = `https://unpkg.com/maplibre-gl@${MAPLIBRE_VERSION}/dist/maplibre-gl.js`;
-    script.async = true;
-    script.dataset.halMaplibre = 'true';
-    script.onload = () => window.maplibregl ? resolve(window.maplibregl) : reject(new Error('Map library did not initialize.'));
-    script.onerror = () => reject(new Error('Map library failed to load.'));
-    document.head.appendChild(script);
-  }).catch(error => {
+
+    const sources = [
+      `${unpkgBase}/maplibre-gl.js`,
+      `${jsdelivrBase}/maplibre-gl.js`
+    ];
+    let lastError: unknown;
+    for (const src of sources) {
+      const script = document.createElement('script');
+      script.src = src;
+      script.async = true;
+      script.dataset.halMaplibre = 'true';
+      try {
+        await new Promise<void>((resolve, reject) => {
+          script.onload = () => resolve();
+          script.onerror = () => reject(new Error(`Could not load MapLibre from ${new URL(src).hostname}.`));
+          document.head.appendChild(script);
+        });
+        if (window.maplibregl) return window.maplibregl;
+        throw new Error('MapLibre loaded but did not initialize.');
+      } catch (error) {
+        lastError = error;
+        script.remove();
+      }
+    }
+    throw lastError instanceof Error ? lastError : new Error('Map library failed to load from both CDNs.');
+  })().catch(error => {
     mapLibreLoader = null;
     throw error;
   });
@@ -132,7 +162,15 @@ export default function LeadMap({
       map.addControl(new maplibregl.NavigationControl({ showCompass: true }), 'bottom-right');
       map.on('load', () => {
         if (disposed) return;
+        setMapError('');
         setMapReady(true);
+      });
+      // Surface style/network failures instead of leaving the map stuck on
+      // "Loading OpenFreeMap…" forever when the style endpoint cannot load.
+      map.on('error', (event: any) => {
+        if (disposed || map.isStyleLoaded()) return;
+        const message = event?.error?.message || 'The map style or tiles could not be loaded.';
+        setMapError(message);
       });
       mapRef.current = map;
     }).catch(error => {
