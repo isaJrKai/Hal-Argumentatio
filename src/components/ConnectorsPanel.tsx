@@ -442,22 +442,19 @@ export default function ConnectorsPanel() {
             </Badge>
           </div>
           <p className="text-sm text-zinc-600 dark:text-zinc-400 mt-1 max-w-2xl">
-            Integration status is shown only where configuration or live verification is available. A saved token alone does not prove that a service is connected.
+            A saved credential does not confirm a live connection. Run a test to verify each integration.
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
-          <Button 
-            variant="outline" 
-            size="sm" 
-            onClick={handlePurgeMockData}
-            disabled={isPurging}
-            className="text-xs border-amber-500/30 text-amber-600 dark:text-amber-400 hover:bg-amber-500/10"
-          >
-            <Trash2 className="w-3.5 h-3.5 mr-1.5" />
-            {isPurging ? 'Purging...' : 'Purge All Mock Seeds'}
-          </Button>
-        </div>
+        <details className="relative">
+          <summary className="cursor-pointer text-xs text-text-secondary hover:text-text-primary">Advanced</summary>
+          <div className="absolute right-0 z-10 mt-2 rounded-lg border border-border-default bg-bg-raised p-3 shadow-lg">
+            <Button variant="outline" size="sm" onClick={handlePurgeMockData} disabled={isPurging} className="text-xs border-amber-500/30 text-amber-600 dark:text-amber-400 hover:bg-amber-500/10">
+              <Trash2 className="w-3.5 h-3.5 mr-1.5" />
+              {isPurging ? 'Removing demo data...' : 'Remove demo data'}
+            </Button>
+          </div>
+        </details>
       </div>
 
       {/* Navigation Tabs */}
@@ -487,7 +484,6 @@ export default function ConnectorsPanel() {
         >
           <MessageSquare className="w-4 h-4" />
           <span>Messaging</span>
-          <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
         </button>
 
         <button
@@ -515,7 +511,6 @@ export default function ConnectorsPanel() {
         >
           <Database className="w-4 h-4" />
           <span>Infrastructure</span>
-          <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
         </button>
       </div>
 
