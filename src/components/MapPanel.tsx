@@ -8,10 +8,7 @@ import {
   saveServiceZone,
   getServiceZones,
   deleteServiceZone,
-  saveTilePackage,
-  getTilePackages,
   ServiceZone,
-  TilePackage
 } from '../lib/indexedDbCache';
 import { isPointInPolygon } from '../lib/geoUtils';
 import { CITIES_CONFIG, CITY_COORDS_MAP, getCityCoordinates } from '../config/cities';
@@ -86,9 +83,6 @@ export default function MapPanel({ leads, token, onOpenWorkQueue }: MapPanelProp
   );
 
   // Offline Tile Packages
-  const [tilePackages, setTilePackages] = useState<TilePackage[]>([]);
-  const [isDownloadingTiles, setIsDownloadingTiles] = useState<boolean>(false);
-  const [downloadProgress, setDownloadProgress] = useState<string | null>(null);
 
   // Service Zones state
   const [serviceZones, setServiceZones] = useState<ServiceZone[]>([]);
@@ -184,17 +178,6 @@ export default function MapPanel({ leads, token, onOpenWorkQueue }: MapPanelProp
     };
   }, []);
 
-  // Load Saved Service Zones & Tile Packages
-  useEffect(() => {
-    async function loadAuxData() {
-      const zones = await getServiceZones();
-      setServiceZones(zones);
-      const pkgs = await getTilePackages();
-      setTilePackages(pkgs);
-    }
-    loadAuxData();
-  }, []);
-
   // Sync incoming leads with IndexedDB local cache or fallback to cached items
   useEffect(() => {
     let isMounted = true;
@@ -271,6 +254,8 @@ export default function MapPanel({ leads, token, onOpenWorkQueue }: MapPanelProp
       setTerritorySearchStatus('Use a search like “plumbers near Fredericton” or choose a city first.');
       return;
     }
+    setCityFilter(city.toLowerCase());
+    setActiveZoneId('all');
     setIsSearchingTerritory(true);
     setTerritorySearchStatus(`Searching for ${niche} in ${city}…`);
     setTerritoryResults([]);
@@ -355,46 +340,6 @@ export default function MapPanel({ leads, token, onOpenWorkQueue }: MapPanelProp
     }
     logEvent('MAP_TERRITORY_PROSPECT_IMPORTED', `Imported ${candidate.businessName} from territory search.`);
   }, [token]);
-
-  // Download / Pre-cache City Tile Package
-  const handlePrecacheCity = async (cityName: string) => {
-    setIsDownloadingTiles(true);
-    setDownloadProgress(`Scanning vector tiles for ${cityName.toUpperCase()}...`);
-    
-    try {
-      await new Promise(r => setTimeout(r, 600));
-      setDownloadProgress(`Downloading high-res zoom layers (Z10-Z16) for ${cityName.toUpperCase()}...`);
-      await new Promise(r => setTimeout(r, 800));
-
-      const pkg: TilePackage = {
-        city: cityName.toLowerCase(),
-        tileCount: 384,
-        sizeKb: 4920,
-        downloadedAt: new Date().toISOString()
-      };
-
-      await saveTilePackage(pkg);
-      const updatedPkgs = await getTilePackages();
-      setTilePackages(updatedPkgs);
-
-      // Cache all leads in this city to IndexedDB
-      await saveLeadsToIndexedDB(displayLeads);
-      const cacheInfo = await getLeadsFromIndexedDB();
-      setCachedCount(cacheInfo.count);
-      setLastCachedTime(cacheInfo.lastCachedAt);
-
-      logEvent('OFFLINE_TILE_PACKAGE_SAVED', `Pre-cached 384 offline map tiles and territory data for ${cityName.toUpperCase()}.`);
-      setDownloadProgress(`Pre-caching complete! ${cityName.toUpperCase()} offline map ready.`);
-      
-      setTimeout(() => {
-        setIsDownloadingTiles(false);
-        setDownloadProgress(null);
-      }, 1500);
-    } catch (err) {
-      setIsDownloadingTiles(false);
-      setDownloadProgress(null);
-    }
-  };
 
   // Add a point while drawing polygon
   const handleAddZonePoint = (point: { lat: number; lng: number }) => {
@@ -578,26 +523,11 @@ export default function MapPanel({ leads, token, onOpenWorkQueue }: MapPanelProp
             <Globe className="w-4 h-4 text-brand animate-pulse" /> Territory Conquest & Spatial Map
           </h2>
           <p className="text-[11px] text-text-secondary font-sans mt-1">
-            Visual spatial intelligence engine with offline tile packages, interactive polygon service zones, and local SEO metrics.
+            Find real businesses, inspect territories, and move qualified prospects into your CRM.
           </p>
         </div>
 
         <div className="flex flex-wrap items-center gap-2.5">
-          {/* Pre-cache City Tile Button */}
-          <button
-            onClick={() => handlePrecacheCity(cityFilter === 'all' ? 'winnipeg' : cityFilter)}
-            disabled={isDownloadingTiles}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-brand/10 hover:bg-brand/20 border border-brand/40 text-brand font-mono text-[10px] font-bold rounded-sm transition-all cursor-pointer disabled:opacity-50"
-            title="Download full offline map tiles and territory data for the active city"
-          >
-            {isDownloadingTiles ? (
-              <Loader2 className="w-3.5 h-3.5 animate-spin" />
-            ) : (
-              <DownloadCloud className="w-3.5 h-3.5" />
-            )}
-            <span>PRE-CACHE {cityFilter === 'all' ? 'TERRITORY' : (cityFilter || 'TERRITORY').toUpperCase()}</span>
-          </button>
-
           {/* IndexedDB Cache Badge */}
           <div className="flex items-center gap-2 bg-bg-subtle px-3 py-1.5 border border-border-dim/50 rounded-sm font-mono text-[10px]">
             <HardDrive className="w-3.5 h-3.5 text-brand" />
@@ -628,16 +558,6 @@ export default function MapPanel({ leads, token, onOpenWorkQueue }: MapPanelProp
           </div>
         </div>
       </div>
-
-      {/* Download Progress Banner */}
-      {downloadProgress && (
-        <div className="bg-brand/10 border border-brand/30 p-3 rounded-sm flex items-center justify-between text-brand font-mono text-[11px] animate-pulse">
-          <div className="flex items-center gap-2">
-            <DownloadCloud className="w-4 h-4 shrink-0" />
-            <span className="font-bold">{downloadProgress}</span>
-          </div>
-        </div>
-      )}
 
       {/* METRIC CARDS */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
