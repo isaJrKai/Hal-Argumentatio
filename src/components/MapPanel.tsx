@@ -960,10 +960,8 @@ export default function MapPanel({ leads, token, onOpenWorkQueue }: MapPanelProp
               onAddZonePoint={handleAddZonePoint}
               drawingPoints={drawingPoints}
               territoryResults={territoryResults}
-              onTerritorySearch={handleTerritorySearch}
               onImportTerritoryResult={handleImportTerritoryResult}
               territorySearchStatus={territorySearchStatus}
-              isSearchingTerritory={isSearchingTerritory}
             />
           </div>
         </div>
