@@ -118,7 +118,6 @@ export default function RevenueIntelligenceView({ token }: RevenueIntelligenceVi
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-border-dim/60 pb-5">
         <div>
           <div className="flex items-center gap-2">
-            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
             <h1 className="text-xl font-bold font-sans tracking-tight text-text-primary">Revenue performance</h1>
 
           </div>
