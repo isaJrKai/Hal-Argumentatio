@@ -81,42 +81,37 @@
 
   --font-sans: "DM Sans", ui-sans-serif, system-ui, -apple-system, sans-serif;
   --font-serif: "Newsreader", Garamond, Georgia, serif;
-  --font-display: "Newsreader", Garamond, Georgia, serif;
+  --font-display: "DM Sans", ui-sans-serif, system-ui, -apple-system, sans-serif;
   --font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, monospace;
 }
 
 .light-theme {
-  --bg-base: #f7f5f0;       /* Natural warm archival paper parchment */
-  --bg-raised: #ffffff;     /* Crisp archival deckled paper */
-  --bg-overlay: #ffffff;    /* Pure paper sheet */
-  --bg-subtle: #ece7dc;     /* Soft pressed paper / hover state */
-
-  --border-dim: #e4decfa0;   /* Delicate ruled pencil line */
-  --border-default: #d3ccbd; /* Crisp paper boundary */
-  --border-strong: #8c826e;  /* Deep structural ink rule */
-
-  --text-primary: #181714;   /* Deep soot & iron gall black ink - ultra-crisp */
-  --text-secondary: #48453d; /* Sepia-toned charcoal ink */
-  --text-tertiary: #7d786d;  /* Muted wash ink */
-
-  --accent: #1d4ed8;         /* Deep executive cobalt blue */
-  --accent-dim: rgba(29, 78, 216, 0.08);
-  --accent-mid: rgba(29, 78, 216, 0.16);
+  --bg-base: #f7f9fc;
+  --bg-raised: #ffffff;
+  --bg-overlay: #ffffff;
+  --bg-subtle: #eef2f7;
+  --border-dim: #e6ebf2;
+  --border-default: #d7e0ec;
+  --border-strong: #a8b8cc;
+  --text-primary: #172033;
+  --text-secondary: #526078;
+  --text-tertiary: #718096;
+  --accent: #2563eb;
+  --accent-dim: rgba(37, 99, 235, 0.08);
+  --accent-mid: rgba(37, 99, 235, 0.16);
   --accent-contrast: #ffffff;
-
-  --color-positive: #166534; /* Rich forest bookcloth green - deep readability */
-  --color-positive-dim: rgba(22, 101, 52, 0.09);
-  --color-warning: #b45309;  /* Burnt ochre / amber seal */
+  --color-positive: #15803d;
+  --color-positive-dim: rgba(21, 128, 61, 0.09);
+  --color-warning: #b45309;
   --color-warning-dim: rgba(180, 83, 9, 0.09);
-  --color-negative: #b91c1c; /* Crimson vermilion ink */
+  --color-negative: #b91c1c;
   --color-negative-dim: rgba(185, 28, 28, 0.09);
-  --color-info: #0369a1;     /* Deep sapphire ink */
+  --color-info: #0369a1;
   --color-info-dim: rgba(3, 105, 161, 0.09);
-  --color-neutral: #6b665c;
-
+  --color-neutral: #64748b;
   --font-sans: "DM Sans", ui-sans-serif, system-ui, -apple-system, sans-serif;
   --font-serif: "Newsreader", Garamond, Georgia, serif;
-  --font-display: "Newsreader", Garamond, Georgia, serif;
+  --font-display: "DM Sans", ui-sans-serif, system-ui, -apple-system, sans-serif;
   --font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, monospace;
 }
 
@@ -194,7 +189,7 @@ body {
   text-transform: uppercase;
   padding: 0 16px;
   height: 32px;
-  border-radius: 3px;
+  border-radius: 10px;
   border: none;
   cursor: pointer;
   display: inline-flex;
@@ -226,7 +221,7 @@ body {
   text-transform: uppercase;
   padding: 0 16px;
   height: 32px;
-  border-radius: 3px;
+  border-radius: 10px;
   cursor: pointer;
   display: inline-flex;
   align-items: center;
@@ -257,7 +252,7 @@ body {
   text-transform: uppercase;
   padding: 0 16px;
   height: 32px;
-  border-radius: 3px;
+  border-radius: 10px;
   cursor: pointer;
   display: inline-flex;
   align-items: center;
@@ -278,7 +273,7 @@ body {
   align-items: center;
   gap: 4px;
   padding: 2px 8px;
-  border-radius: 3px;
+  border-radius: 10px;
   font-family: var(--font-mono);
   font-size: 10px;
   font-weight: 600;
@@ -293,7 +288,7 @@ body {
 .input {
   background: var(--bg-raised);
   border: 1px solid var(--border-default);
-  border-radius: 3px;
+  border-radius: 10px;
   color: var(--text-primary);
   font-family: var(--font-sans);
   font-size: 13px;
@@ -320,7 +315,7 @@ body {
 }
 ::-webkit-scrollbar-thumb {
   background: var(--border-dim);
-  border-radius: 3px;
+  border-radius: 10px;
 }
 ::-webkit-scrollbar-thumb:hover {
   background: var(--accent);
@@ -393,7 +388,7 @@ body {
   );
   background-size: 200% 100%;
   animation: shimmer 1.5s infinite;
-  border-radius: 3px;
+  border-radius: 10px;
 }
 
 /* Legacy Class Adaptive Mappings to Preserve Brand Integrity in Light/Dark Mode */
