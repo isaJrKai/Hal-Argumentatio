@@ -71,10 +71,8 @@ export interface LeadMapProps {
   onAddZonePoint?: (point: { lat: number; lng: number }) => void;
   drawingPoints?: Array<{ lat: number; lng: number }>;
   territoryResults?: TerritorySearchCandidate[];
-  onTerritorySearch?: (query: string) => Promise<void> | void;
   onImportTerritoryResult?: (candidate: TerritorySearchCandidate) => Promise<void> | void;
   territorySearchStatus?: string | null;
-  isSearchingTerritory?: boolean;
 }
 
 declare global {
@@ -160,7 +158,7 @@ const safeText = (value: unknown) => String(value ?? '').replace(/[&<>"']/g, cha
 export default function LeadMap({
   leads, center, city, selectedLeadId, onSelectLead, onImportOsmPlace, serviceZones = [],
   isDrawingZone = false, onAddZonePoint, drawingPoints = [], territoryResults = [],
-  onTerritorySearch, onImportTerritoryResult, territorySearchStatus, isSearchingTerritory = false
+  onImportTerritoryResult, territorySearchStatus
 }: LeadMapProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<any>(null);
@@ -173,7 +171,6 @@ export default function LeadMap({
   const [osmTradesEnabled, setOsmTradesEnabled] = useState(false);
   const [osmTradeStatus, setOsmTradeStatus] = useState('OSM trade layer off');
   const [earthquakeStatus, setEarthquakeStatus] = useState('Earthquake layer off');
-  const [searchText, setSearchText] = useState('');
 
   useEffect(() => {
     let disposed = false;
@@ -417,12 +414,6 @@ export default function LeadMap({
     };
   }, [osmTradesEnabled, mapReady, onImportOsmPlace, city]);
 
-  const handleSearch = async (event: React.FormEvent) => {
-    event.preventDefault();
-    if (!searchText.trim() || isSearchingTerritory || !onTerritorySearch) return;
-    await onTerritorySearch(searchText.trim());
-  };
-
   // Search candidates are a live, temporary result layer until the operator
   // explicitly imports a selected business into the CRM.
   useEffect(() => {
@@ -504,10 +495,6 @@ export default function LeadMap({
           <div className="text-[9px] text-emerald-400 font-mono">OPENFREEMAP · OPENSTREETMAP DATA</div>
         </div>
         <div className="flex flex-wrap gap-2 pointer-events-auto">
-          <form onSubmit={handleSearch} className="flex gap-1 bg-panel-dark/95 border border-border-dark rounded-sm p-1">
-            <input value={searchText} onChange={event=>setSearchText(event.target.value)} placeholder="Find plumbers near Fredericton…" className="w-44 sm:w-64 bg-transparent px-2 py-1 text-[10px] text-text-primary outline-none" aria-label="Search businesses by trade and city" />
-            <button disabled={isSearchingTerritory || !onTerritorySearch} className="px-2 py-1 text-[9px] font-mono bg-brand text-black rounded-sm">{isSearchingTerritory ? 'SEARCHING…' : 'FIND'}</button>
-          </form>
           <span className="px-3 py-2 text-[9px] font-mono border border-border-dark rounded-sm bg-panel-dark text-text-dim" title="Weather is disabled pending a commercially licensed data provider">WEATHER DISABLED · LICENSING</span>
           <button onClick={()=>setEarthquakesEnabled(value=>!value)} className={`px-3 py-2 text-[9px] font-mono border rounded-sm ${earthquakesEnabled ? 'bg-amber-700 border-amber-400 text-white' : 'bg-panel-dark border-border-dark text-text-primary'}`}>EARTHQUAKES {earthquakesEnabled ? 'ON' : 'OFF'}</button>
           <button onClick={()=>setOsmTradesEnabled(value=>!value)} className={`px-3 py-2 text-[9px] font-mono border rounded-sm ${osmTradesEnabled ? 'bg-violet-800 border-violet-400 text-white' : 'bg-panel-dark border-border-dark text-text-primary'}`}>OSM TRADES {osmTradesEnabled ? 'ON' : 'OFF'}</button>
