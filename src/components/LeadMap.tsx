@@ -514,6 +514,28 @@ export default function LeadMap({
         </div>
       </div>
       <div ref={containerRef} className="w-full flex-1 min-h-[520px]" />
+      {territoryResults.length > 0 && (
+        <div className="max-h-56 overflow-y-auto border-t border-border-dark bg-panel-dark/95 p-3 space-y-2">
+          <div className="text-[9px] font-mono uppercase tracking-wider text-text-dim">Territory candidates · select a pin or review the list</div>
+          {territoryResults.map((candidate, index) => (
+            <div key={`${candidate.businessName}-${index}`} className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-border-dark/70 pb-2">
+              <div className="min-w-0">
+                <div className="text-xs font-semibold text-text-primary">{candidate.businessName}</div>
+                <div className="text-[10px] text-text-dim">{candidate.address || candidate.city} · {candidate.latitude != null ? 'Located' : 'Location not confidently matched'}</div>
+                <div className="text-[10px] text-text-secondary">
+                  {candidate.googleRating == null || candidate.reviewCount == null ? 'Review data unavailable' : `★ ${candidate.googleRating} · ${candidate.reviewCount} reviews`}
+                  {candidate.reviews?.[0]?.text ? ` · “${candidate.reviews[0].text.slice(0, 120)}”` : ''}
+                </div>
+                <div className="flex gap-3 text-[10px]">
+                  {candidate.websiteUrl && <a className="text-brand underline" href={candidate.websiteUrl} target="_blank" rel="noreferrer">Website</a>}
+                  {candidate.googleMapsUrl && <a className="text-brand underline" href={candidate.googleMapsUrl} target="_blank" rel="noreferrer">Google Maps</a>}
+                </div>
+              </div>
+              <button type="button" onClick={() => void Promise.resolve(onImportTerritoryResult?.(candidate)).catch((error: any) => window.alert(error?.message || 'Could not import this prospect.'))} className="shrink-0 px-3 py-2 text-[9px] font-mono border border-brand/60 text-brand hover:bg-brand/10">ADD TO CRM</button>
+            </div>
+          ))}
+        </div>
+      )}
       {(!mapReady || mapError) && <div className="absolute inset-0 z-20 flex items-center justify-center bg-panel-dark/90 p-6 text-center"><div className="text-xs font-mono text-text-primary">{mapError || 'Loading OpenFreeMap…'}{mapError && <div className="mt-2 text-text-dim">Check the network connection and refresh the map.</div>}</div></div>}
       <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border-dark bg-panel-dark px-3 py-2 text-[9px] font-mono text-text-dim">
         <span>CRM PINS: {preciseLeadCount} located / {leads.length} records · no fabricated coordinates</span>
