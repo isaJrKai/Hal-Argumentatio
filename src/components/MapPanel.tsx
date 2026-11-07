@@ -522,7 +522,7 @@ export default function MapPanel({ leads, token, onOpenWorkQueue }: MapPanelProp
             <Globe className="w-4 h-4 text-brand animate-pulse" /> Maps
           </h2>
           <p className="text-[11px] text-text-secondary font-sans mt-1">
-            Find real businesses, inspect territories, and move qualified prospects into your CRM.
+            Find nearby businesses, review their details and add prospects to your list.
           </p>
         </div>
 
@@ -557,10 +557,10 @@ export default function MapPanel({ leads, token, onOpenWorkQueue }: MapPanelProp
               onChange={(e) => setActiveZoneId(e.target.value)}
               className="bg-bg-subtle border border-border-dim rounded-sm px-2.5 py-1 text-xs text-text-primary focus:outline-none focus:border-brand"
             >
-              <option value="all">ALL SERVICE ZONES (WHOLE CITY)</option>
+              <option value="all">All areas</option>
               {serviceZones.map(z => (
                 <option key={z.id} value={z.id}>
-                  ZONE: {z.name.toUpperCase()} ({z.city.toUpperCase()})
+                  {z.name} ({z.city})
                 </option>
               ))}
             </select>
@@ -595,11 +595,11 @@ export default function MapPanel({ leads, token, onOpenWorkQueue }: MapPanelProp
             ) : (
               <div className="flex items-center gap-2">
                 <span className="text-[11px] text-amber-400 font-bold animate-pulse">
-                  CLICK MAP TO ADD POINTS ({drawingPoints.length} added)
+                  Click the map to draw an area ({drawingPoints.length} points)
                 </span>
                 <input
                   type="text"
-                  placeholder="Zone Name..."
+                  placeholder="Area name"
                   value={newZoneName}
                   onChange={(e) => setNewZoneName(e.target.value)}
                   className="bg-bg-subtle border border-border-dim rounded-sm px-2 py-1 text-xs text-text-primary placeholder:text-text-dim w-36"
