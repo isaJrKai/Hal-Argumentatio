@@ -3698,7 +3698,7 @@ app.post('/api/leads/harvest', authenticate, async (req, res) => {
   }
 
   try {
-    const harvestLimit = Math.min(Math.max(Number(limit) || 10, 1), 25);
+    const harvestLimit = Math.min(Math.max(Number(limit) || 10, 1), 50);
     const harvested = await harvestRealBusinesses(city, niche, activeAi, harvestLimit);
     res.json(harvested);
   } catch (err: any) {
