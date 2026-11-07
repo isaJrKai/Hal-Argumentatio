@@ -104,7 +104,6 @@ export default function LeadMap({
   const [earthquakeStatus, setEarthquakeStatus] = useState('Earthquake layer off');
   const [searchText, setSearchText] = useState('');
   const [searching, setSearching] = useState(false);
-  const [cursor, setCursor] = useState<{lat:number; lng:number} | null>(null);
 
   useEffect(() => {
     let disposed = false;
@@ -123,7 +122,6 @@ export default function LeadMap({
         if (disposed) return;
         setMapReady(true);
       });
-      map.on('mousemove', (event: any) => setCursor({ lat: event.lngLat.lat, lng: event.lngLat.lng }));
       mapRef.current = map;
     }).catch(error => {
       if (!disposed) setMapError(error?.message || 'Could not load the free map.');
@@ -271,7 +269,8 @@ export default function LeadMap({
   // interpreted as property damage or contractor demand.
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || !mapReady || !earthquakesEnabled || !window.maplibregl) {
+    const maplibregl = window.maplibregl;
+    if (!map || !mapReady || !earthquakesEnabled || !maplibregl) {
       if (map?.getLayer('hal-quake-circles')) map.removeLayer('hal-quake-circles');
       if (map?.getSource('hal-earthquakes')) map.removeSource('hal-earthquakes');
       if (!earthquakesEnabled) setEarthquakeStatus('Earthquake layer off');
@@ -296,7 +295,7 @@ export default function LeadMap({
             const feature = event.features?.[0];
             if (!feature) return;
             const props = feature.properties || {};
-            new window.maplibregl.Popup().setLngLat(event.lngLat).setHTML(
+            new maplibregl.Popup().setLngLat(event.lngLat).setHTML(
               `<div style="font:12px system-ui;color:#17202a"><strong>M${safeText(props.mag)}</strong><div>${safeText(props.place)}</div><small>${props.time ? new Date(Number(props.time)).toLocaleString() : 'Time unavailable'}</small><div><a href="${safeText(props.url)}" target="_blank" rel="noreferrer">USGS event details</a></div></div>`
             ).addTo(map);
           });
@@ -317,7 +316,7 @@ export default function LeadMap({
   // These are OSM community-mapped places, not verified CRM prospects.
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || !mapReady || !osmTradesEnabled) {
+    if (!map || !mapReady || !osmTradesEnabled || !window.maplibregl) {
       osmMarkersRef.current.forEach(marker => marker.remove());
       osmMarkersRef.current = [];
       if (!osmTradesEnabled) setOsmTradeStatus('OSM trade layer off');
@@ -417,7 +416,6 @@ export default function LeadMap({
         {weatherEnabled && earthquakesEnabled && <span>{earthquakeStatus}</span>}
         {osmTradesEnabled && <span>{osmTradeStatus}</span>}
         {isDrawingZone && <span className="text-amber-300">DRAWING ZONE · CLICK MAP TO ADD POINTS</span>}
-        {cursor && <span>{cursor.lat.toFixed(4)}, {cursor.lng.toFixed(4)}</span>}
         <span>Map © OpenFreeMap · © OpenMapTiles · © OpenStreetMap</span>
         {weatherEnabled && <span>Weather: Open-Meteo free tier is non-commercial; replace before commercial production.</span>}
       </div>
