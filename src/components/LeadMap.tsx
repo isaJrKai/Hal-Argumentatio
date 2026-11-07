@@ -1,6 +1,4 @@
 import React, { useEffect, useRef, useState } from 'react';
-import maplibregl from 'maplibre-gl';
-import 'maplibre-gl/dist/maplibre-gl.css';
 import { ServiceZone } from '../lib/indexedDbCache';
 
 export interface LeadCoord {
@@ -52,7 +50,60 @@ export interface LeadMapProps {
   drawingPoints?: Array<{ lat: number; lng: number }>;
 }
 
+const MAPLIBRE_VERSION = '5.6.1';
 const OPENFREEMAP_STYLE = 'https://tiles.openfreemap.org/styles/liberty';
+
+let mapLibreLoader: Promise<any> | null = null;
+function loadMapLibre(): Promise<any> {
+  if (typeof window !== 'undefined' && window.maplibregl) return Promise.resolve(window.maplibregl);
+  if (mapLibreLoader) return mapLibreLoader;
+
+  mapLibreLoader = new Promise(async (resolve, reject) => {
+    const cdns = [
+      {
+        script: `https://unpkg.com/maplibre-gl@${MAPLIBRE_VERSION}/dist/maplibre-gl.js`,
+        css: `https://unpkg.com/maplibre-gl@${MAPLIBRE_VERSION}/dist/maplibre-gl.css`
+      },
+      {
+        script: `https://cdn.jsdelivr.net/npm/maplibre-gl@${MAPLIBRE_VERSION}/dist/maplibre-gl.js`,
+        css: `https://cdn.jsdelivr.net/npm/maplibre-gl@${MAPLIBRE_VERSION}/dist/maplibre-gl.css`
+      }
+    ];
+
+    const loadScript = (src: string) => new Promise<void>((resolveScript, rejectScript) => {
+      const script = document.createElement('script');
+      script.src = src;
+      script.async = true;
+      script.onload = () => window.maplibregl ? resolveScript() : rejectScript(new Error('MapLibre script loaded without initializing.'));
+      script.onerror = () => rejectScript(new Error('MapLibre CDN request failed.'));
+      document.head.appendChild(script);
+    });
+
+    let lastError: unknown;
+    for (const cdn of cdns) {
+      try {
+        let link = document.querySelector('link[data-hal-maplibre]') as HTMLLinkElement | null;
+        if (!link) {
+          link = document.createElement('link');
+          link.rel = 'stylesheet';
+          link.dataset.halMaplibre = 'true';
+          document.head.appendChild(link);
+        }
+        link.href = cdn.css;
+        await loadScript(cdn.script);
+        resolve(window.maplibregl);
+        return;
+      } catch (error) {
+        lastError = error;
+      }
+    }
+    reject(lastError || new Error('Map library failed to load from available CDNs.'));
+  }).catch(error => {
+    mapLibreLoader = null;
+    throw error;
+  });
+  return mapLibreLoader;
+}
 
 const validCoords = (coords?: { lat: number; lng: number } | null) =>
   !!coords && Number.isFinite(coords.lat) && Number.isFinite(coords.lng) &&
