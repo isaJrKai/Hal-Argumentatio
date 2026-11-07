@@ -14,8 +14,8 @@ export interface LeadCoord {
   seoScore?: number;
   performanceScore?: number;
   sslStatus?: string;
-  urgencyScore: number;
-  predictedLtvUsd: number;
+  urgencyScore: number | null;
+  predictedLtvUsd: number | null;
   status: string;
   // Coordinates must come from a business record or a verified geocoding result.
   // City-centroid offsets are deliberately not accepted as business locations.
@@ -421,6 +421,7 @@ export default function LeadMap({
         {isDrawingZone && <span className="text-amber-300">DRAWING ZONE · CLICK MAP TO ADD POINTS</span>}
         {cursor && <span>{cursor.lat.toFixed(4)}, {cursor.lng.toFixed(4)}</span>}
         <span>Map © OpenFreeMap · © OpenMapTiles · © OpenStreetMap</span>
+        {weatherEnabled && <span>Weather: Open-Meteo free tier is non-commercial; replace before commercial production.</span>}
       </div>
     </div>
   );
