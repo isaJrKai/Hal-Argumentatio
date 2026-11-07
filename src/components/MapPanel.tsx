@@ -264,7 +264,7 @@ export default function MapPanel({ leads, token, onOpenWorkQueue }: MapPanelProp
       setTerritorySearchStatus('Sign in to search and save territory prospects.');
       return;
     }
-    const match = query.match(/^(.+?)\\s+(?:near|in|around)\\s+(.+)$/i);
+    const match = query.match(/^(.+?)\s+(?:near|in|around)\s+(.+)$/i);
     const niche = match?.[1]?.trim() || (cityFilter !== 'all' ? query.trim() : '');
     const city = match?.[2]?.trim() || (cityFilter !== 'all' ? cityFilter : '');
     if (!niche || !city) {
