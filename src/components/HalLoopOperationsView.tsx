@@ -214,14 +214,11 @@ export default function HalLoopOperationsView({ token }: { token?: string | null
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white border border-slate-200 rounded-xl p-6 shadow-xs">
         <div>
           <div className="flex items-center gap-2">
-            <span className="px-2.5 py-1 text-xs font-semibold bg-indigo-50 text-indigo-700 rounded-full border border-indigo-100 uppercase tracking-wide">
-              Phase 7 Engine
-            </span>
             <span className="text-xs text-slate-500 font-medium">Operations</span>
           </div>
           <h1 className="text-2xl font-bold text-slate-900 mt-1">Operating loop</h1>
           <p className="text-sm text-slate-600 mt-0.5">
-            Continuous, verifiable observation-to-action feedback loops ensuring mathematically safe, gated execution.
+            Review how HAL monitors work, recommends actions and records approvals.
           </p>
         </div>
         <div className="flex items-center gap-3">
