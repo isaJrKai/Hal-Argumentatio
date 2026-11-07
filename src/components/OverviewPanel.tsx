@@ -94,7 +94,7 @@ export default function OverviewPanel({
     lowVal: isDark ? '#10b981' : '#166534',
   };
 
-  // Interactive Opportunity Segmentation Selection
+  // Interactive Prospect breakdown Selection
   const [selectedSegment, setSelectedSegment] = useState<'High Value' | 'Medium Value' | 'Low Value' | null>(null);
   const [selectedLeadForDetail, setSelectedLeadForDetail] = useState<Lead | null>(null);
   const [copiedPitch, setCopiedPitch] = useState(false);
@@ -668,7 +668,7 @@ export default function OverviewPanel({
           <div className="flex justify-between items-start mb-3 pb-3 border-b border-border-dim/40">
             <div>
               <div className="flex items-center gap-2">
-                <h3 className="text-sm font-semibold tracking-tight text-text-primary">Pipeline Conversion Flow</h3>
+                <h3 className="text-sm font-semibold tracking-tight text-text-primary">Pipeline stages</h3>
                 {selectedStage && (
                   <span className="px-2 py-0.5 bg-accent text-accent-contrast font-sans text-xs font-semibold rounded-md flex items-center gap-1">
                     <Filter className="w-3 h-3" /> Filtering: {selectedStage}
@@ -908,7 +908,7 @@ export default function OverviewPanel({
           <div className="flex justify-between items-start mb-3 pb-3 border-b border-border-dim/40">
             <div>
               <div className="flex items-center gap-2">
-                <h3 className="text-sm font-semibold tracking-tight text-text-primary">Opportunity Segmentation</h3>
+                <h3 className="text-sm font-semibold tracking-tight text-text-primary">Prospect breakdown</h3>
                 <span className="text-xs font-sans bg-accent-dim text-accent border border-accent/20 px-2 py-0.5 rounded-md font-medium">
                   Interactive
                 </span>
@@ -1110,7 +1110,7 @@ export default function OverviewPanel({
               <div>
                 <div className="flex items-center gap-2">
                   <Globe className="w-4 h-4 text-accent" />
-                  <h3 className="text-sm font-semibold tracking-tight text-text-primary">Connected Business Apps</h3>
+                  <h3 className="text-sm font-semibold tracking-tight text-text-primary">Connected apps</h3>
                 </div>
                 <p className="text-xs text-text-tertiary mt-0.5">
                   Provider credentials and verified connection status
