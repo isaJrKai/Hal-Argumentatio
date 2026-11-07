@@ -1542,39 +1542,15 @@ export default function App() {
         </Suspense>
       </div>
 
-      {/* METICULOUS BOTTOM STATUS BAR */}
-      <footer className="h-6 shrink-0 border-t border-border-dim/50 bg-bg-overlay text-text-secondary flex items-center justify-between px-4 text-[9.5px] font-mono transition-colors select-none">
-        <div className="flex items-center gap-3">
-          <button 
-            onClick={() => setActiveTab('manual')} 
-            className="text-accent font-semibold hover:underline cursor-pointer"
-          >
-            HAL v2.0
-          </button>
-          <span className="text-text-tertiary">|</span>
-          <button 
-            onClick={() => setActiveTab('credentials')} 
-            className="hover:text-accent hover:underline cursor-pointer flex items-center gap-1"
-          >
-            DATABASE: SERVER-MANAGED
-          </button>
-          <span className="text-text-tertiary">|</span>
-          <button 
-            onClick={() => setActiveTab('leads')} 
-            className="hover:text-accent hover:underline cursor-pointer"
-          >
-            RECORDS: {leads.length} PROSPECTS
-          </button>
-        </div>
-        <div className="flex items-center gap-2">
-          <button 
-            onClick={() => setActiveTab('connectors')} 
-            className="hover:text-accent hover:underline cursor-pointer"
-          >
-            REALTIME_STREAM: ACTIVE
-          </button>
-          <span className="w-1.5 h-1.5 rounded-full bg-positive animate-pulse" />
-        </div>
+      {/* Quiet status: keep the useful record count; keep implementation details in Settings. */}
+      <footer className="h-6 shrink-0 border-t border-border-dim/50 bg-bg-overlay text-text-secondary flex items-center px-4 text-[9.5px] font-mono transition-colors select-none">
+        <button
+          onClick={() => setActiveTab('leads')}
+          className="hover:text-accent hover:underline cursor-pointer"
+          aria-label={`${leads.length} prospects. Open prospects.`}
+        >
+          {leads.length} prospects
+        </button>
       </footer>
 
       {/* APP INSTALLATION MODAL (ADAPTIVE MOBILE & DESKTOP) */}

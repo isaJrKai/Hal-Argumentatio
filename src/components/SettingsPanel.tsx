@@ -523,7 +523,11 @@ export default function SettingsPanel({
       </div>
 
       {activeSubTab === 'about' ? (
-        <div className="pt-2">
+        <div className="pt-2 space-y-4">
+          <div className="flex items-center justify-between gap-3 border-b border-border-dim pb-3 text-xs text-text-secondary">
+            <span>HAL</span>
+            <span className="font-mono">Version 2.0</span>
+          </div>
           <HalOperatingManualPanel initialDocId={initialDocId} />
         </div>
       ) : (
