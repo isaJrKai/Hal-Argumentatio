@@ -6,7 +6,7 @@
 - MapLibre GL JS is loaded from a pinned CDN version so this change does not require a package-lock or bun.lock rewrite.
 - Existing CRM leads are plotted only when their record contains valid latitude/longitude coordinates. City-centroid offsets are not valid business locations and have been removed.
 - The OSM Trades layer queries the visible map bounding box through Overpass for named mapped craft POIs. A user can add one to the CRM review queue; it is tagged as `openstreetmap_poi`, marked `UNVERIFIED_STAGING`, and given a human review task.
-- The Weather layer samples a 4x4 grid within the visible viewport using Open-Meteo current conditions and near-term precipitation forecast. It is contextual weather, not proof of demand or damage.
+- The weather overlay is intentionally disabled. It will be re-enabled only after integration of a commercially licensed weather data provider.
 - The Earthquakes layer reads the USGS past-week GeoJSON feed and displays event magnitude and source details.
 - Saved service-zone polygons and drawing interactions remain supported.
 - The contractor niche directory now includes a broad home-service taxonomy across construction, plumbing, HVAC, electrical, roofing, landscaping, renovation, exterior work, cleaning, pest control, and restoration.
@@ -18,7 +18,7 @@
 |---|---|---|---|
 | Basemap | OpenFreeMap / OpenStreetMap | Map geometry and labels | Business existence or contact validity |
 | OSM Trades | Overpass API | A community-mapped POI and its OSM tags | Current operation, phone validity, or completeness |
-| Weather | Open-Meteo | Modelled weather conditions/forecast at sampled grid points | Property damage or contractor demand |
+| Weather | Disabled pending commercial licensing | No weather data is currently displayed | Property damage or contractor demand |
 | Earthquakes | USGS GeoJSON | Reported seismic events and magnitudes | Damage at a particular property |
 | CRM pins | Lead record coordinates | The recorded coordinates, if present | Accuracy beyond the evidence used to record them |
 | Web harvest | Gemini Google Search grounding | Search-grounded business candidates and source evidence | A direct Google Maps or registry integration |
@@ -26,7 +26,7 @@
 ## Important licensing / operational notes
 
 - OpenFreeMap's public instance is offered without API keys or registration; retain visible attribution.
-- Open-Meteo's free hosted API is for non-commercial use. HAL must replace it with a commercially licensed provider or a self-hosted/appropriately licensed data source before commercial production or a paid buyer deployment.
+- The Open-Meteo free hosted API integration is disabled because its free hosted terms are non-commercial. Re-enable weather only after selecting and verifying a commercially licensed provider or self-hosted/appropriately licensed source.
 - Overpass and Nominatim are shared community services. Queries should stay limited to the visible map viewport or explicit user searches; do not bulk-download OSM data or use the public endpoints as an unrestricted scraping backend.
 - OSM POIs enter the CRM only after an explicit user action on the map popup. Their OSM ID, type, attribution, and coordinates are preserved in the existing `groundingEvidence` JSON field; they remain unverified and require human review before outreach.
 - The existing CRM schema does not have dedicated latitude/longitude columns. The map reads OSM and geocoding coordinates from the existing `groundingEvidence` JSONB field, avoiding a risky schema migration.
@@ -40,7 +40,7 @@ Run the repository's frozen Bun install, TypeScript check, unit/integration/secu
 1. OpenFreeMap loads without a Google Maps key.
 2. With `GEOAPIFY_API_KEY` configured, batch geocoding persists only high-confidence named business POIs; without the key, the endpoint returns a clear configuration error.
 3. No city-centre or synthetic-offset coordinates are used for individual leads.
-4. Weather cells refresh when the map viewport changes.
+4. Weather controls remain visibly disabled; no Open-Meteo requests are made.
 5. USGS events render and event details open.
 6. Overpass POIs appear only for the visible viewport, named POIs can be added to the CRM review queue, and imported records retain OSM provenance and coordinates.
 7. CRM leads without precise coordinates are not assigned invented map positions.
