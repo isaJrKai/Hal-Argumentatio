@@ -357,13 +357,13 @@ export default function MapPanel({ leads, token, onOpenWorkQueue }: MapPanelProp
 
       // Filter by Active Polygon Service Zone
       if (activeZone && activeZone.points && activeZone.points.length >= 3) {
-        const leadCoord = getPersistedLeadCoords(l);
+        const leadCoord = geocodedCoordsMap[l.id] || getPersistedLeadCoords(l);
         return leadCoord ? isPointInPolygon(leadCoord, activeZone.points) : false;
       }
 
       return true;
     });
-  }, [displayLeads, searchQuery, cityFilter, statusFilter, activeZoneId, serviceZones]);
+  }, [displayLeads, searchQuery, cityFilter, statusFilter, activeZoneId, serviceZones, geocodedCoordsMap]);
 
   // Coordinate mapper: only persisted or provider-confirmed business locations are plotted
   const mappedLeadsForMap = useMemo(() => {
@@ -914,7 +914,7 @@ export default function MapPanel({ leads, token, onOpenWorkQueue }: MapPanelProp
             <LeadMap
               leads={mappedLeadsForMap}
               center={mapCenter}
-              city={cityFilter === 'all' ? 'All Territories' : cityFilter}
+              city={cityFilter === 'all' ? (filteredLeads[0]?.city || 'Winnipeg') : cityFilter}
               selectedLeadId={selectedLeadId}
               onSelectLead={handleSelectLead}
               activeOverlay={activeOverlay}
