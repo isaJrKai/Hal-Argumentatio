@@ -14,7 +14,8 @@
     "test:integration": "vitest run tests/integration",
     "test:security": "vitest run tests/security",
     "test:api": "vitest run tests/api",
-    "test:ci": "tsc --noEmit && vitest run"
+    "test:ci": "tsc --noEmit && vitest run",
+    "provision:buyer-demo": "tsx scripts/provision-buyer-demo.ts"
   },
   "dependencies": {
     "@electric-sql/pglite": "^0.5.15",
