@@ -4,7 +4,6 @@ import { createPortal } from 'react-dom';
 interface GuidedTourProps {
   isOpen: boolean;
   showWelcome: boolean;
-  activeTab: string;
   setActiveTab: (tab: string) => void;
   onStart: () => void;
   onDismiss: () => void;
@@ -53,7 +52,6 @@ const TOUR_STEPS = [
 export default function GuidedTour({
   isOpen,
   showWelcome,
-  activeTab,
   setActiveTab,
   onStart,
   onDismiss,
@@ -71,22 +69,24 @@ export default function GuidedTour({
 
     setActiveTab(step.tab);
     let frame = 0;
-    const locateTarget = () => {
-      const target = document.querySelector<HTMLElement>('[data-tour="' + step.target + '"]');
-      if (!target) {
+    const target = document.querySelector<HTMLElement>('[data-tour="' + step.target + '"]');
+    if (target) target.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
+
+    const updatePosition = () => {
+      const currentTarget = document.querySelector<HTMLElement>('[data-tour="' + step.target + '"]');
+      if (!currentTarget) {
         setTargetRect(null);
         return;
       }
-      target.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
       if (frame) window.cancelAnimationFrame(frame);
       frame = window.requestAnimationFrame(() => {
-        const rect = target.getBoundingClientRect();
+        const rect = currentTarget.getBoundingClientRect();
         setTargetRect(rect.width > 0 && rect.height > 0 ? rect : null);
       });
     };
 
-    locateTarget();
-    const handleViewportChange = () => locateTarget();
+    updatePosition();
+    const handleViewportChange = () => updatePosition();
     window.addEventListener('resize', handleViewportChange);
     window.addEventListener('scroll', handleViewportChange, true);
     return () => {
@@ -136,7 +136,14 @@ export default function GuidedTour({
 
   return createPortal(
     <div className="fixed inset-0" style={{ zIndex: 10000 }}>
-      <div className="absolute inset-0 bg-slate-950/65" />
+      {targetRect ? (
+        <>
+          <div className="fixed left-0 top-0 w-full bg-slate-950/65" style={{ height: targetRect.top }} />
+          <div className="fixed left-0 bottom-0 w-full bg-slate-950/65" style={{ height: Math.max(0, window.innerHeight - targetRect.bottom) }} />
+          <div className="fixed bg-slate-950/65" style={{ left: 0, top: targetRect.top, width: targetRect.left, height: targetRect.height }} />
+          <div className="fixed bg-slate-950/65" style={{ left: targetRect.right, top: targetRect.top, width: Math.max(0, window.innerWidth - targetRect.right), height: targetRect.height }} />
+        </>
+      ) : <div className="absolute inset-0 bg-slate-950/65" />}
       {showWelcome && !isOpen ? (
         <div className="absolute inset-0 flex items-center justify-center p-4">
           <section
