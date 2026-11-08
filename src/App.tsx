@@ -270,14 +270,18 @@ export default function App() {
   const [isGuidedTourOpen, setIsGuidedTourOpen] = useState(false);
   const [showGuidedTourWelcome, setShowGuidedTourWelcome] = useState(false);
 
+  const guidedTourPromptKey = contractor?.id
+    ? 'hal_guided_tour_prompted_v1_' + contractor.id
+    : 'hal_guided_tour_prompted_v1_' + (contractor?.email || 'account');
+
   useEffect(() => {
-    if (token && !reviewMode && !readLocalStorage('hal_guided_tour_prompted_v1')) {
+    if (token && contractor && !reviewMode && !readLocalStorage(guidedTourPromptKey)) {
       setShowGuidedTourWelcome(true);
     }
-  }, [token, reviewMode]);
+  }, [token, contractor?.id, contractor?.email, reviewMode, guidedTourPromptKey]);
 
   const dismissGuidedTourWelcome = () => {
-    writeLocalStorage('hal_guided_tour_prompted_v1', '1');
+    writeLocalStorage(guidedTourPromptKey, '1');
     setShowGuidedTourWelcome(false);
   };
 
