@@ -4,35 +4,33 @@ The buyer demo is deliberately disabled by default.
 
 ## Provision the isolated demo tenant
 
-1. Run `npm run provision:buyer-demo` against the intended PostgreSQL database with `HAL_DEMO_PROVISION_CONFIRM=true`, `HAL_DEMO_ACCOUNT_ID` and `HAL_DEMO_EMAIL` set. The script creates only the dedicated ordinary contractor account; it does not copy owner data or create sample business records.
-2. Populate it only with synthetic demonstration records. Do not copy the owner's workspace, customer records, provider credentials, API keys, or personal data.
-3. Verify that its role is `user` and account status is `active`.
-4. Set these Render environment variables:
+1. Against the intended PostgreSQL database, run `npm run provision:buyer-demo` with:
+   - `HAL_DEMO_PROVISION_CONFIRM=true`
+   - `HAL_DEMO_ACCOUNT_ID=<unique demo tenant ID>`
+   - `HAL_DEMO_EMAIL=<dedicated demo email>`
+2. Populate the tenant only with synthetic demonstration records. Never copy the owner's workspace, customer records, provider credentials, API keys, or personal data.
+3. Verify that the account has role `user` and status `active`.
+4. Verify tenant isolation and read-only behaviour before exposing the demo.
+5. Set these Render environment variables:
    - `HAL_DEMO_LOGIN_ENABLED=true`
    - `HAL_DEMO_ACCOUNT_ID=<the dedicated demo contractor ID>`
-5. Deploy the reviewed branch and confirm `GET /api/auth/demo/status` returns `{"enabled":true}`.
+6. Deploy the reviewed change and confirm `GET /api/auth/demo/status` returns `{"enabled":true}`.
 
-<!-- Provisioning note: never enable the public endpoint before the demo tenant has been populated and verified. -->
-
-<!-- The remaining checklist is intentionally retained for operator verification. -->
-
-<!--
-1. Create a dedicated ordinary contractor account in the production PostgreSQL database.
-2. Populate it only with synthetic demonstration records. Do not copy the owner's workspace, customer records, provider credentials, API keys, or personal data.
-3. Verify that its role is `user` and account status is `active`.
-The app's login screen then displays **Explore buyer demo**. It requests a two-hour JWT for that one account without asking the visitor for an email, password, or Google identity.
+The login screen displays **Explore buyer demo** only when the backend confirms that the configured account exists, is active, and is not an administrator.
 
 ## Security behaviour
 
-- The endpoint is disabled unless both deployment settings are present.
-- It can only issue a session for the explicitly configured contractor ID.
+- Disabled by default; both deployment settings are required.
+- Issues a two-hour JWT only for the explicitly configured demo contractor.
 - Administrator and suspended accounts are rejected.
-- Sessions expire after two hours.
-- Authentication middleware centrally rejects all non-read HTTP methods for the configured demo tenant.
-- Do not use this account for real customer information or connect live provider credentials to it.
-- The demo tenant must contain synthetic records and be independently checked for tenant isolation before enabling public access.
-- Demo login is rate-limited using the existing authentication rate limiter.
+- Authenticated demo sessions can use safe read methods only: `GET`, `HEAD`, and `OPTIONS`.
+- All authenticated write methods are rejected centrally, not merely hidden in the interface.
+- Public sign-in is rate-limited to 10 attempts per IP per 15 minutes.
+- Do not store real customer information or live provider credentials in the demo tenant.
 
-## Important limitation
+## Important limitations
 
-The code does not automatically populate the demo tenant or change Render settings. Provision and verify the isolated tenant first; only then enable the environment variables. The demo button remains unavailable until the backend reports that demo access is enabled.
+- The provisioning script creates the isolated account only. It does not copy existing owner data or fabricate sample business records.
+- The demo account must be populated with clearly synthetic examples before it is useful for a buyer walkthrough.
+- The code does not change Render settings, create the production account, or deploy itself.
+- Do not enable public demo access until the sample data and tenant isolation have been verified.
