@@ -515,6 +515,7 @@ function recordAuthSuccess(req: express.Request, email: string) {
 // ─── AUTHENTICATION & SECURITY SUBSYSTEM ────────────────────────────────────
 // Uses strict fail-closed HMAC-SHA256 JWT tokens with timing-safe signature verification.
 import { signToken, verifyToken, DecodedToken } from './src/lib/auth.ts';
+import { getConfiguredDemoAccountId, isDemoReadOnlyMethod } from './src/lib/demoAccess.ts';
 
 // SSE Real-time clients list with tenant binding
 interface SseClient {
@@ -611,6 +612,17 @@ async function authenticate(req: express.Request, res: express.Response, next: e
 
     if (contractor.accountStatus === 'suspended') {
       return res.status(403).json({ error: 'This account is suspended. Contact the platform administrator.' });
+    }
+
+    // Buyer-demo sessions are strictly read-only. Enforce this centrally so
+    // every authenticated mutation route is protected, not just selected UI actions.
+    const demoAccountId = getConfiguredDemoAccountId();
+    if (demoAccountId && contractor.id === demoAccountId && !isDemoReadOnlyMethod(req.method)) {
+      res.setHeader('Cache-Control', 'no-store');
+      return res.status(403).json({
+        error: 'This buyer demo workspace is read-only. Changes are disabled during evaluation.',
+        code: 'DEMO_READ_ONLY'
+      });
     }
 
     (req as any).contractorId = contractor.id;
@@ -1180,6 +1192,62 @@ app.post('/api/auth/register', async (req, res) => {
   } catch (error: any) {
     console.error('[HAL Registration Error]', error?.message || error);
     return res.status(503).json({ error: 'Registration service unavailable. Please try again later.' });
+  }
+});
+
+// Public buyer-demo access. The demo tenant must be provisioned separately and
+// explicitly enabled by deployment configuration; this endpoint never creates an account.
+app.get('/api/auth/demo/status', (_req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  return res.json({ enabled: Boolean(getConfiguredDemoAccountId()) });
+});
+
+app.post('/api/auth/demo', async (req, res) => {
+  const demoAccountId = getConfiguredDemoAccountId();
+  if (!demoAccountId) {
+    return res.status(404).json({ error: 'Buyer demo access is not enabled.' });
+  }
+  if (!checkRateLimit(req, res, 'halbiz-buyer-demo')) return;
+
+  try {
+    const [demoAccount] = await pgDb.select().from(contractors)
+      .where(eq(contractors.id, demoAccountId)).limit(1);
+    // Never issue a public session for an administrator or suspended/missing account.
+    if (!demoAccount || demoAccount.role === 'admin' || demoAccount.accountStatus !== 'active') {
+      console.error('[HAL demo auth] Configured buyer demo account is missing or ineligible.');
+      return res.status(503).json({ error: 'Buyer demo access is temporarily unavailable.' });
+    }
+
+    const token = signToken({
+      contractorId: demoAccount.id,
+      email: demoAccount.email,
+      role: 'user'
+    }, undefined, 2 * 60 * 60);
+
+    recordAuthSuccess(req, 'halbiz-buyer-demo');
+    void persistAuditLog({
+      contractorId: demoAccount.id,
+      action: 'BUYER_DEMO_LOGIN',
+      details: 'A time-limited buyer evaluation session was issued.'
+    });
+
+    res.setHeader('Cache-Control', 'no-store');
+    return res.json({
+      token,
+      contractor: {
+        id: demoAccount.id,
+        email: demoAccount.email,
+        name: demoAccount.companyName || 'HALBiz Buyer Demo',
+        role: 'user',
+        marketId: 'market_default',
+        demo: true,
+        readOnly: true
+      },
+      expiresInSeconds: 2 * 60 * 60
+    });
+  } catch (error) {
+    console.error('[HAL demo auth] Buyer demo sign-in failed:', error);
+    return res.status(503).json({ error: 'Buyer demo access is temporarily unavailable.' });
   }
 });
 
