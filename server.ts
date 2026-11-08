@@ -435,6 +435,26 @@ interface AuthFailure {
   updatedAt: number;
 }
 const loginFailures = new Map<string, AuthFailure>();
+const demoLoginAttempts = new Map<string, { count: number; resetAt: number }>();
+function checkDemoLoginRateLimit(req: express.Request, res: express.Response): boolean {
+  const ip = getClientIp(req);
+  const now = Date.now();
+  for (const [key, value] of demoLoginAttempts) {
+    if (value.resetAt <= now) demoLoginAttempts.delete(key);
+  }
+  const current = demoLoginAttempts.get(ip);
+  if (!current || current.resetAt <= now) {
+    demoLoginAttempts.set(ip, { count: 1, resetAt: now + 15 * 60 * 1000 });
+    return true;
+  }
+  current.count += 1;
+  if (current.count > 10) {
+    res.setHeader('Retry-After', Math.ceil((current.resetAt - now) / 1000).toString());
+    res.status(429).json({ error: 'Demo sign-in limit reached. Please try again later.' });
+    return false;
+  }
+  return true;
+}
 let lastLoginFailurePruneAt = 0;
 function pruneLoginFailures(now: number) {
   if (now - lastLoginFailurePruneAt < 60_000 && loginFailures.size < 20_000) return;
@@ -1197,9 +1217,23 @@ app.post('/api/auth/register', async (req, res) => {
 
 // Public buyer-demo access. The demo tenant must be provisioned separately and
 // explicitly enabled by deployment configuration; this endpoint never creates an account.
-app.get('/api/auth/demo/status', (_req, res) => {
+app.get('/api/auth/demo/status', async (_req, res) => {
   res.setHeader('Cache-Control', 'no-store');
-  return res.json({ enabled: Boolean(getConfiguredDemoAccountId()) });
+  const demoAccountId = getConfiguredDemoAccountId();
+  if (!demoAccountId) return res.json({ enabled: false });
+  try {
+    const [account] = await pgDb.select({
+      id: contractors.id,
+      role: contractors.role,
+      accountStatus: contractors.accountStatus
+    }).from(contractors).where(eq(contractors.id, demoAccountId)).limit(1);
+    return res.json({
+      enabled: Boolean(account && account.role !== 'admin' && account.accountStatus === 'active')
+    });
+  } catch (error) {
+    console.error('[HAL demo auth] Demo availability check failed:', error);
+    return res.json({ enabled: false });
+  }
 });
 
 app.post('/api/auth/demo', async (req, res) => {
@@ -1207,7 +1241,7 @@ app.post('/api/auth/demo', async (req, res) => {
   if (!demoAccountId) {
     return res.status(404).json({ error: 'Buyer demo access is not enabled.' });
   }
-  if (!checkRateLimit(req, res, 'halbiz-buyer-demo')) return;
+  if (!checkDemoLoginRateLimit(req, res)) return;
 
   try {
     const [demoAccount] = await pgDb.select().from(contractors)
