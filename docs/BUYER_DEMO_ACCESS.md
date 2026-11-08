@@ -4,7 +4,7 @@ The buyer demo is deliberately disabled by default.
 
 ## Provision the isolated demo tenant
 
-1. Create a dedicated ordinary contractor account in the production PostgreSQL database.
+1. Run `npm run provision:buyer-demo` against the intended PostgreSQL database with `HAL_DEMO_PROVISION_CONFIRM=true`, `HAL_DEMO_ACCOUNT_ID` and `HAL_DEMO_EMAIL` set. The script creates only the dedicated ordinary contractor account; it does not copy owner data or create sample business records.
 2. Populate it only with synthetic demonstration records. Do not copy the owner's workspace, customer records, provider credentials, API keys, or personal data.
 3. Verify that its role is `user` and account status is `active`.
 4. Set these Render environment variables:
@@ -12,6 +12,14 @@ The buyer demo is deliberately disabled by default.
    - `HAL_DEMO_ACCOUNT_ID=<the dedicated demo contractor ID>`
 5. Deploy the reviewed branch and confirm `GET /api/auth/demo/status` returns `{"enabled":true}`.
 
+<!-- Provisioning note: never enable the public endpoint before the demo tenant has been populated and verified. -->
+
+<!-- The remaining checklist is intentionally retained for operator verification. -->
+
+<!--
+1. Create a dedicated ordinary contractor account in the production PostgreSQL database.
+2. Populate it only with synthetic demonstration records. Do not copy the owner's workspace, customer records, provider credentials, API keys, or personal data.
+3. Verify that its role is `user` and account status is `active`.
 The app's login screen then displays **Explore buyer demo**. It requests a two-hour JWT for that one account without asking the visitor for an email, password, or Google identity.
 
 ## Security behaviour
