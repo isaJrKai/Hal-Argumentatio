@@ -169,7 +169,7 @@ export default function GuidedTour({
             role="dialog"
             aria-modal="false"
             aria-labelledby="hal-tour-welcome-title"
-            className="w-full max-w-md rounded-2xl border border-border-default bg-bg-raised p-6 shadow-2xl text-text-primary"
+            className="pointer-events-auto w-full rounded-2xl border border-border-default bg-bg-raised p-6 shadow-2xl text-text-primary"
           >
             <div className="flex items-center gap-3 mb-4">
               <img src="/hal-mark.svg" alt="" className="w-9 h-9 rounded-lg border border-border-dim" />
