@@ -64,6 +64,7 @@ const SettingsPanel = lazy(() => import('./components/SettingsPanel'));
 const MissionsPanel = lazy(() => import('./components/MissionsPanel'));
 const SkillsPanel = lazy(() => import('./components/SkillsPanel'));
 const CommandPalette = lazy(() => import('./components/CommandPalette'));
+const GuidedTour = lazy(() => import('./components/GuidedTour'));
 const HalOperatingManualPanel = lazy(() => import('./components/HalOperatingManualPanel'));
 const GoogleDrivePanel = lazy(() => import('./components/GoogleDrivePanel'));
 const ConnectorsPanel = lazy(() => import('./components/ConnectorsPanel'));
@@ -266,6 +267,28 @@ export default function App() {
 
   // Active Panel Tab
   const [activeTab, setActiveTab] = useState('overview');
+  const [isGuidedTourOpen, setIsGuidedTourOpen] = useState(false);
+  const [showGuidedTourWelcome, setShowGuidedTourWelcome] = useState(false);
+
+  const guidedTourPromptKey = contractor?.id
+    ? 'hal_guided_tour_prompted_v1_' + contractor.id
+    : 'hal_guided_tour_prompted_v1_' + (contractor?.email || 'account');
+
+  useEffect(() => {
+    if (token && contractor && !reviewMode && !readLocalStorage(guidedTourPromptKey)) {
+      setShowGuidedTourWelcome(true);
+    }
+  }, [token, contractor?.id, contractor?.email, reviewMode, guidedTourPromptKey]);
+
+  const dismissGuidedTourWelcome = () => {
+    writeLocalStorage(guidedTourPromptKey, '1');
+    setShowGuidedTourWelcome(false);
+  };
+
+  const startGuidedTour = () => {
+    dismissGuidedTourWelcome();
+    setIsGuidedTourOpen(true);
+  };
 
   // Business Data Store
   const [leads, setLeads] = useState<Lead[]>([]);
@@ -1066,6 +1089,16 @@ export default function App() {
   return (
     <InspectorProvider>
       <div className={`h-[100dvh] min-h-[100vh] flex flex-col font-sans overflow-hidden select-none selection:bg-accent/30 selection:text-white transition-colors duration-200 ${theme === 'light' ? 'light-theme' : 'dark-theme'} ${baseBg}`}>
+        <Suspense fallback={null}>
+          <GuidedTour
+            isOpen={isGuidedTourOpen}
+            showWelcome={showGuidedTourWelcome}
+            setActiveTab={setActiveTab}
+            onStart={startGuidedTour}
+            onDismiss={dismissGuidedTourWelcome}
+            onClose={() => setIsGuidedTourOpen(false)}
+          />
+        </Suspense>
 
       {/* PUBLIC COMMUNITY SANDBOX BANNER (REDDIT / SHARED LINK VISITORS) */}
       {isSharedPreview && (
@@ -1208,6 +1241,9 @@ export default function App() {
                 </div>
                 <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-accent-dim text-accent font-bold">v2.0</span>
               </div>
+              <button type="button" onClick={() => { setIsMobileMenuOpen(false); startGuidedTour(); }} className="flex items-center gap-2 w-full h-9 px-2 rounded-md text-[11px] font-medium text-text-secondary hover:text-text-primary hover:bg-bg-subtle transition-colors cursor-pointer">
+                <BookOpen className="w-3.5 h-3.5" /> Take a guided tour
+              </button>
             </motion.aside>
         )}
       </AnimatePresence>
@@ -1286,6 +1322,15 @@ export default function App() {
               </div>
               <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-accent-dim text-accent font-bold">v2.0</span>
             </div>
+            <button
+              type="button"
+              onClick={startGuidedTour}
+              className="flex items-center gap-2 w-full h-8 px-2.5 rounded-md text-[11px] font-medium text-text-secondary hover:text-text-primary hover:bg-bg-subtle transition-colors cursor-pointer"
+              aria-label="Replay HAL guided tour"
+            >
+              <BookOpen className="w-3.5 h-3.5" />
+              <span>Take a guided tour</span>
+            </button>
 
             {!isAppInstalled && (
               <button
