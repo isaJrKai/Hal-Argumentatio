@@ -47,6 +47,25 @@ export default function AuthPage({ onAuthSuccess }: AuthPageProps) {
   const [success, setSuccess] = useState<string | null>(null);
 
 
+  const handleDemoLogin = async () => {
+    setLoading(true);
+    setError(null);
+    setSuccess(null);
+    try {
+      const res = await fetch('/api/auth/demo', { method: 'POST' });
+      const data = await parseApiResponse(res);
+      if (!res.ok) throw new Error(data.error || 'Buyer demo sign-in is unavailable.');
+      if (typeof data.token !== 'string' || !data.token || !data.contractor || typeof data.contractor.id !== 'string') {
+        throw new Error('The server did not return a valid demo session.');
+      }
+      onAuthSuccess(data.token, data.contractor);
+    } catch (err: any) {
+      setError(err instanceof Error ? err.message : 'Buyer demo sign-in could not be completed.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -357,6 +376,17 @@ export default function AuthPage({ onAuthSuccess }: AuthPageProps) {
               <span className="px-3 text-[10px] font-mono text-text-dim uppercase tracking-widest">or</span>
               <div className="flex-1 border-t border-border-dark" />
             </div>
+
+            {isLogin && (
+              <button
+                type="button"
+                disabled={loading}
+                onClick={handleDemoLogin}
+                className="w-full border border-brand/40 bg-brand/10 hover:bg-brand/15 text-brand font-semibold text-xs py-2.5 px-4 rounded-sm flex items-center justify-center gap-2 transition-colors disabled:opacity-50"
+              >
+                {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Explore buyer demo'}
+              </button>
+            )}
 
             {/* Google account sign-in */}
             <button
