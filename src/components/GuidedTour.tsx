@@ -18,6 +18,12 @@ const TOUR_STEPS = [
     description: 'The Overview brings your key business activity together. See your current opportunities, revenue signals and recommended next actions without jumping between modules.',
   },
   {
+    target: 'global-search',
+    tab: 'overview',
+    title: 'Find what you need quickly',
+    description: 'Use the workspace search to jump to prospects, deals and tools without having to browse every section.',
+  },
+  {
     target: 'tab-leads',
     tab: 'leads',
     title: 'Find and qualify prospects',
