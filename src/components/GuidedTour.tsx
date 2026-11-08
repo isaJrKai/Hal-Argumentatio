@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 
 interface GuidedTourProps {
@@ -65,6 +65,7 @@ export default function GuidedTour({
 }: GuidedTourProps) {
   const [stepIndex, setStepIndex] = useState(0);
   const [targetRect, setTargetRect] = useState<DOMRect | null>(null);
+  const welcomeRef = useRef<HTMLElement | null>(null);
   const step = TOUR_STEPS[stepIndex];
 
   useEffect(() => {
@@ -106,6 +107,17 @@ export default function GuidedTour({
     if (!isOpen) setStepIndex(0);
   }, [isOpen]);
 
+  // The first-run welcome is intentionally non-modal: clicking anywhere outside
+  // it dismisses the prompt while allowing the underlying workspace action through.
+  useEffect(() => {
+    if (!showWelcome || isOpen) return;
+    const dismissOnOutsidePointer = (event: PointerEvent) => {
+      if (!welcomeRef.current?.contains(event.target as Node)) onDismiss();
+    };
+    document.addEventListener('pointerdown', dismissOnOutsidePointer);
+    return () => document.removeEventListener('pointerdown', dismissOnOutsidePointer);
+  }, [showWelcome, isOpen, onDismiss]);
+
   useEffect(() => {
     if (!isOpen) return;
     const onKeyDown = (event: KeyboardEvent) => {
@@ -141,20 +153,21 @@ export default function GuidedTour({
       };
 
   return createPortal(
-    <div className="fixed inset-0" style={{ zIndex: 10000 }}>
-      {targetRect ? (
+    <div className={showWelcome && !isOpen ? "fixed inset-0 pointer-events-none" : "fixed inset-0"} style={{ zIndex: 10000 }}>
+      {isOpen && targetRect ? (
         <>
           <div className="fixed left-0 top-0 w-full bg-slate-950/65" style={{ height: targetRect.top }} />
           <div className="fixed left-0 bottom-0 w-full bg-slate-950/65" style={{ height: Math.max(0, window.innerHeight - targetRect.bottom) }} />
           <div className="fixed bg-slate-950/65" style={{ left: 0, top: targetRect.top, width: targetRect.left, height: targetRect.height }} />
           <div className="fixed bg-slate-950/65" style={{ left: targetRect.right, top: targetRect.top, width: Math.max(0, window.innerWidth - targetRect.right), height: targetRect.height }} />
         </>
-      ) : <div className="absolute inset-0 bg-slate-950/65" />}
+      ) : isOpen ? <div className="absolute inset-0 bg-slate-950/65" /> : null}
       {showWelcome && !isOpen ? (
-        <div className="absolute inset-0 flex items-center justify-center p-4">
+        <div className="absolute bottom-5 right-5 w-[min(420px,calc(100vw-40px))] p-2 sm:bottom-6 sm:right-6">
           <section
+            ref={welcomeRef}
             role="dialog"
-            aria-modal="true"
+            aria-modal="false"
             aria-labelledby="hal-tour-welcome-title"
             className="w-full max-w-md rounded-2xl border border-border-default bg-bg-raised p-6 shadow-2xl text-text-primary"
           >
