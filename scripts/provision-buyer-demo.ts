@@ -11,7 +11,7 @@ async function main() {
   }
   const id = process.env.HAL_DEMO_ACCOUNT_ID?.trim();
   const email = process.env.HAL_DEMO_EMAIL?.trim().toLowerCase();
-  if (!id || !email || !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email)) {
+  if (!id || !email || !email.includes('@') || !email.split('@')[1]?.includes('.')) {
     throw new Error('Set HAL_DEMO_ACCOUNT_ID and a valid HAL_DEMO_EMAIL before provisioning.');
   }
 
