@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { motion } from 'motion/react';
 import { Shield, Eye, EyeOff, Loader2 } from 'lucide-react';
 import { googleSignIn } from '../services/googleAuth';
@@ -45,6 +45,23 @@ export default function AuthPage({ onAuthSuccess }: AuthPageProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [demoEnabled, setDemoEnabled] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    fetch('/api/auth/demo/status')
+      .then(async (res) => {
+        if (!res.ok) return { enabled: false };
+        return res.json();
+      })
+      .then((data) => {
+        if (active) setDemoEnabled(data?.enabled === true);
+      })
+      .catch(() => {
+        if (active) setDemoEnabled(false);
+      });
+    return () => { active = false; };
+  }, []);
 
 
   const handleDemoLogin = async () => {
@@ -377,7 +394,7 @@ export default function AuthPage({ onAuthSuccess }: AuthPageProps) {
               <div className="flex-1 border-t border-border-dark" />
             </div>
 
-            {isLogin && (
+            {isLogin && demoEnabled && (
               <button
                 type="button"
                 disabled={loading}
