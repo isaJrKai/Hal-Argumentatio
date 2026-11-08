@@ -181,7 +181,6 @@ export default function GuidedTour({
                 top: targetRect.top - 4,
                 width: targetRect.width + 8,
                 height: targetRect.height + 8,
-                boxShadow: '0 0 0 9999px rgba(8, 13, 22, 0.66)',
                 pointerEvents: 'none',
                 zIndex: 10001,
               }}
