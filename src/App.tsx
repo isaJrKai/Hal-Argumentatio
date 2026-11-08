@@ -1089,7 +1089,6 @@ export default function App() {
           <GuidedTour
             isOpen={isGuidedTourOpen}
             showWelcome={showGuidedTourWelcome}
-            activeTab={activeTab}
             setActiveTab={setActiveTab}
             onStart={startGuidedTour}
             onDismiss={dismissGuidedTourWelcome}
