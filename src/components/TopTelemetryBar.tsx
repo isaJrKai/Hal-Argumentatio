@@ -120,6 +120,7 @@ export const TopTelemetryBar: React.FC<TopTelemetryBarProps> = ({
 
         {/* Global Search Bar (⌘K) */}
         <div 
+          data-tour="global-search"
           onClick={onOpenCommandPalette}
           className="flex-1 max-w-lg mx-2 sm:mx-4 flex items-center justify-between bg-bg-subtle hover:bg-bg-base border border-border-default hover:border-accent/60 rounded-lg px-3 py-1.5 transition-all cursor-pointer shadow-xs group min-w-0"
         >
@@ -245,6 +246,7 @@ export const TopTelemetryBar: React.FC<TopTelemetryBarProps> = ({
             return (
               <button
                 key={tab.id}
+                data-tour={'tab-' + tab.id}
                 onClick={() => setActiveTab(tab.id)}
                 className={`flex items-center gap-2 px-3.5 py-2 text-xs font-sans whitespace-nowrap shrink-0 border-b-2 transition-all cursor-pointer ${
                   isActive
