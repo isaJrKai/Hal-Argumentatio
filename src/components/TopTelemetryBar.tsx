@@ -126,7 +126,7 @@ export const TopTelemetryBar: React.FC<TopTelemetryBarProps> = ({
         >
           <div className="flex items-center gap-2 text-text-secondary group-hover:text-text-primary min-w-0">
             <Search className="w-3.5 h-3.5 text-text-tertiary group-hover:text-accent transition-colors shrink-0" />
-            <span className="hidden xs:inline text-xs font-sans truncate">Search prospects, deals or tools</span><span className="xs:hidden text-xs font-sans truncate">Search</span>
+            <span className="hidden sm:inline text-xs font-sans truncate">Search prospects, deals or tools</span><span className="sm:hidden text-xs font-sans truncate">Search</span>
           </div>
           <kbd className="hidden sm:inline-flex items-center gap-0.5 px-2 py-0.5 text-[10px] font-mono font-semibold bg-bg-raised text-text-secondary rounded border border-border-dim shrink-0">
             ⌘K
