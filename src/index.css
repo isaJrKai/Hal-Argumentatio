@@ -432,3 +432,103 @@ body {
     transition-duration: 0.01ms !important;
   }
 }
+
+
+/* Phone-first workspace fit. Scoped to the active workspace so desktop layouts remain unchanged. */
+@media (max-width: 767px) {
+  html, body, #root {
+    max-width: 100%;
+    overflow-x: clip;
+  }
+
+  .hal-mobile-workspace,
+  .hal-mobile-workspace > *,
+  .hal-mobile-workspace :is(.grid, .flex) > * {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .hal-mobile-workspace :is(input, select, textarea) {
+    box-sizing: border-box;
+    max-width: 100%;
+    font-size: 16px;
+  }
+
+  .hal-mobile-workspace :is(button, a, input, select, textarea) {
+    touch-action: manipulation;
+  }
+
+  .hal-map-workspace {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .hal-map-workspace .hal-map-canvas {
+    height: clamp(290px, 44dvh, 420px) !important;
+    min-height: 290px !important;
+    max-height: 420px !important;
+  }
+
+  .hal-map-workspace .hal-map-lead-list {
+    height: 340px !important;
+    min-height: 260px;
+    max-height: 420px;
+  }
+
+  .hal-map-workspace details,
+  .hal-map-workspace > div {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .hal-map-workspace :is(input, select, button) {
+    max-width: 100%;
+  }
+
+  .hal-chat-workspace {
+    width: 100%;
+    min-width: 0;
+    min-height: max(500px, calc(100dvh - 168px));
+    height: max(500px, calc(100dvh - 168px));
+  }
+
+  .hal-chat-workspace > main {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .hal-chat-messages {
+    padding: 14px 10px 18px;
+    overscroll-behavior: contain;
+  }
+
+  .hal-chat-messages > div {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .hal-chat-messages article > div:nth-child(2) {
+    max-width: min(92%, 42rem);
+    overflow-wrap: anywhere;
+  }
+
+  .hal-chat-composer {
+    padding-bottom: calc(12px + env(safe-area-inset-bottom));
+  }
+
+  .hal-chat-composer form {
+    align-items: stretch;
+  }
+
+  .hal-chat-composer textarea {
+    min-height: 48px;
+    max-height: 144px;
+    font-size: 16px;
+  }
+
+  .hal-chat-composer button[type="submit"] {
+    min-width: 48px;
+    min-height: 48px;
+    flex: 0 0 48px;
+  }
+}
