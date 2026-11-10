@@ -138,27 +138,35 @@ export default function LeadMap({
   useEffect(() => {
     let disposed = false;
     let map: any;
+
     if (!containerRef.current) return;
-    try {
-      map = new maplibregl.Map({
-        container: containerRef.current,
-        style: OPENFREEMAP_STYLE,
-        center: [center.lng, center.lat],
-        zoom: 11,
-        attributionControl: true
-      });
-      map.addControl(new maplibregl.NavigationControl({ showCompass: true }), 'bottom-right');
-      map.on('load', () => {
-        if (disposed) return;
-        setMapReady(true);
-      });
-      map.on('error', (event: any) => {
-        if (!disposed && !mapReady) setMapError(event?.error?.message || 'OpenFreeMap tiles or style could not be loaded.');
-      });
-      mapRef.current = map;
-    } catch (error: any) {
-      setMapError(error?.message || 'Could not initialize the map.');
-    }
+
+    loadMapLibre().then(maplibregl => {
+      if (disposed || !containerRef.current) return;
+
+      try {
+        map = new maplibregl.Map({
+          container: containerRef.current,
+          style: OPENFREEMAP_STYLE,
+          center: [center.lng, center.lat],
+          zoom: 11,
+          attributionControl: true
+        });
+        map.addControl(new maplibregl.NavigationControl({ showCompass: true }), 'bottom-right');
+        map.on('load', () => {
+          if (!disposed) setMapReady(true);
+        });
+        map.on('error', (event: any) => {
+          if (!disposed) setMapError(event?.error?.message || 'OpenFreeMap tiles or style could not be loaded.');
+        });
+        mapRef.current = map;
+      } catch (error: any) {
+        if (!disposed) setMapError(error?.message || 'Could not initialize the map.');
+      }
+    }).catch(error => {
+      if (!disposed) setMapError(error?.message || 'Could not load the free map.');
+    });
+
     return () => {
       disposed = true;
       markersRef.current.forEach(marker => marker.remove());
@@ -182,7 +190,8 @@ export default function LeadMap({
   // Business pins only render when the record has a real coordinate.
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || !mapReady) return;
+    const maplibregl = typeof window !== 'undefined' ? window.maplibregl : undefined;
+    if (!map || !mapReady || !maplibregl) return;
     markersRef.current.forEach(marker => marker.remove());
     markersRef.current = [];
     leads.filter(lead => validCoords(lead.coords)).forEach(lead => {
@@ -238,7 +247,8 @@ export default function LeadMap({
   // interpreted as property damage or contractor demand.
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || !mapReady || !earthquakesEnabled) {
+    const maplibregl = typeof window !== 'undefined' ? window.maplibregl : undefined;
+    if (!map || !mapReady || !maplibregl || !earthquakesEnabled) {
       if (map?.getLayer('hal-quake-circles')) map.removeLayer('hal-quake-circles');
       if (map?.getSource('hal-earthquakes')) map.removeSource('hal-earthquakes');
       if (!earthquakesEnabled) setEarthquakeStatus('Earthquake layer off');
@@ -284,7 +294,8 @@ export default function LeadMap({
   // These are OSM community-mapped places, not verified CRM prospects.
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || !mapReady || !osmTradesEnabled) {
+    const maplibregl = typeof window !== 'undefined' ? window.maplibregl : undefined;
+    if (!map || !mapReady || !maplibregl || !osmTradesEnabled) {
       osmMarkersRef.current.forEach(marker => marker.remove());
       osmMarkersRef.current = [];
       if (!osmTradesEnabled) setOsmTradeStatus('OSM trade layer off');
