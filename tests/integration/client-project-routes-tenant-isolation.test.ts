@@ -76,6 +76,7 @@ describe('client project HTTP route tenant isolation', () => {
 
   afterAll(async () => {
     if (dbAvailable) {
+      await pool.query('DELETE FROM connector_credentials WHERE contractor_id = ANY($1::text[])', [[tenantA, tenantB]]);
       await pool.query('DELETE FROM work_events WHERE contractor_id = ANY($1::text[])', [[tenantA, tenantB]]);
       await pool.query('DELETE FROM invoice_payments WHERE contractor_id = ANY($1::text[])', [[tenantA, tenantB]]);
       await pool.query('DELETE FROM invoices WHERE contractor_id = ANY($1::text[])', [[tenantA, tenantB]]);
@@ -89,6 +90,41 @@ describe('client project HTTP route tenant isolation', () => {
       await pool.query('DELETE FROM contractors WHERE id = ANY($1::text[])', [[tenantA, tenantB]]);
     }
     await pool.end().catch(() => {});
+  });
+
+
+  it('keeps connector credentials isolated across authenticated HTTP tenants', async (ctx) => {
+    if (!dbAvailable) return ctx.skip();
+
+    const secretA = 'tenant-a-connector-secret-' + suffix;
+    const saved = await request(app)
+      .post('/api/connectors/credentials')
+      .set('Authorization', `Bearer ${tokenA}`)
+      .send({ service: 'stripe', keyVal: secretA });
+    expect(saved.status).toBe(200);
+    expect(saved.body).toMatchObject({ success: true, service: 'stripe', configured: true });
+    expect(JSON.stringify(saved.body)).not.toContain(secretA);
+
+    const tenantAStatus = await request(app)
+      .get('/api/connectors/credentials')
+      .set('Authorization', `Bearer ${tokenA}`);
+    expect(tenantAStatus.status).toBe(200);
+    expect(tenantAStatus.body.configured.stripe).toBe(true);
+    expect(JSON.stringify(tenantAStatus.body)).not.toContain(secretA);
+
+    const tenantBStatus = await request(app)
+      .get('/api/connectors/credentials')
+      .set('Authorization', `Bearer ${tokenB}`);
+    expect(tenantBStatus.status).toBe(200);
+    expect(tenantBStatus.body.configured.stripe).not.toBe(true);
+
+    const stored = await pool.query(
+      'SELECT contractor_id, encrypted_value FROM connector_credentials WHERE contractor_id = $1 AND service = $2',
+      [tenantA, 'stripe']
+    );
+    expect(stored.rows).toHaveLength(1);
+    expect(stored.rows[0].contractor_id).toBe(tenantA);
+    expect(stored.rows[0].encrypted_value).not.toBe(secretA);
   });
 
   it('completes the persisted proposal-to-revenue-to-delivery CRM lifecycle over HTTP', async (ctx) => {
