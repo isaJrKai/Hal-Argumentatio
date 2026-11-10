@@ -45,7 +45,10 @@ describe('Legacy MCP tenant isolation', () => {
     expect(route).toContain('.returning({ id: hermesLabArtifacts.id })');
     expect(route).toContain("if (!updatedArtifact)");
     expect(route).toContain("res.status(404)");
-    expect(route).not.toContain("res.json({ success: true, message: 'Artifact updated successfully' })");
+    const notFoundCheck = route.indexOf("if (!updatedArtifact)");
+    const successResponse = route.indexOf("return res.json({ success: true, message: 'Artifact updated successfully' })");
+    expect(notFoundCheck).toBeGreaterThanOrEqual(0);
+    expect(successResponse).toBeGreaterThan(notFoundCheck);
   });
 
 });
