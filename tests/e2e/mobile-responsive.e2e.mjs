@@ -143,3 +143,27 @@ test('mobile navigation keeps its guided-tour action reachable on short screens'
   expect(bounds).not.toBeNull();
   expect(bounds.y + bounds.height, 'guided tour action should remain inside the drawer viewport').toBeLessThanOrEqual(421);
 });
+
+
+test('existing guided tour stays within a narrow phone viewport', async ({ page }) => {
+  const width = 320;
+  const height = 640;
+  await openReviewWorkspace(page, width);
+  await page.setViewportSize({ width, height });
+  await page.getByRole('button', { name: 'Open navigation menu' }).click();
+  const drawer = page.getByRole('dialog', { name: 'Main navigation' });
+  await drawer.getByRole('button', { name: 'Take a guided tour' }).click();
+
+  const welcome = page.getByRole('dialog', { name: 'A quick tour of your workspace' });
+  await expect(welcome).toBeVisible();
+  await welcome.getByRole('button', { name: 'Start tour' }).click();
+
+  const step = page.locator('[aria-labelledby="hal-tour-step-title"]');
+  await expect(step).toBeVisible();
+  const bounds = await step.boundingBox();
+  expect(bounds).not.toBeNull();
+  expect(bounds.x).toBeGreaterThanOrEqual(0);
+  expect(bounds.y).toBeGreaterThanOrEqual(0);
+  expect(bounds.x + bounds.width, 'tour card should fit phone width').toBeLessThanOrEqual(width + 1);
+  expect(bounds.y + bounds.height, 'tour card should fit phone height').toBeLessThanOrEqual(height + 1);
+});
