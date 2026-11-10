@@ -104,6 +104,10 @@ interface EngineStatus {
   provider: string;
   activeEngine: string;
   activeModel: string;
+  status?: string;
+  runtime?: string;
+  officialNousRuntimeConnected?: boolean;
+  modelAttribution?: string;
   providers: {
     openrouter: boolean;
     huggingface: boolean;
@@ -598,13 +602,16 @@ export default function HermesLabPanel({ token }: { token: string | null }) {
           <div>
             <div className="flex items-center gap-2 flex-wrap">
               <h2 className="text-xl font-bold tracking-tight text-text-primary">Business assistant & tools</h2>
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-accent-dim text-accent border border-accent/20">
+                {engineStatus?.activeEngine || 'HAL CUSTOM RUNTIME'}
+              </span>
               <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center gap-1">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 " />
                 {engineStatus?.provider && engineStatus.provider !== 'fallback' ? `${engineStatus.provider.toUpperCase()} Configured · not tested` : 'Fallback mode'}
               </span>
             </div>
             <p className="text-xs text-text-secondary mt-0.5">
-              Create and manage landing pages, ads and other business materials.
+              HAL's current custom agent runtime. The official Nous Hermes runtime is not connected yet.
             </p>
           </div>
         </div>
@@ -1022,7 +1029,7 @@ export default function HermesLabPanel({ token }: { token: string | null }) {
                 </span>
               </div>
               <span className="text-[10px] font-mono text-text-tertiary">
-                {engineStatus?.activeModel || 'Direct Nous Research Engine'}
+                {engineStatus?.activeModel || 'Exact model not yet attributed'}
               </span>
             </div>
 
