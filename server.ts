@@ -5214,7 +5214,7 @@ app.post('/api/intelligence/chat', authenticate, async (req, res) => {
       reply: result.text, 
       sources: result.sources,
       toolCalls: result.toolCalls || [],
-      provider: result.provider || activeAi || 'automatic',
+      provider: result.provider || null,
       model: result.model || null,
       userMessage: userMsg,
       modelMessage: modelMsg
