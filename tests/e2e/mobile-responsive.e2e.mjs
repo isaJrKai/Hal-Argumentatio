@@ -128,3 +128,18 @@ test('desktop navigation and workspace layout remain available at tablet and des
     await expectNoPageOverflow(page, width);
   }
 });
+
+
+test('mobile navigation keeps its guided-tour action reachable on short screens', async ({ page }) => {
+  await openReviewWorkspace(page, 320);
+  await page.setViewportSize({ width: 320, height: 420 });
+  await page.getByRole('button', { name: 'Open navigation menu' }).click();
+
+  const drawer = page.getByRole('dialog', { name: 'Main navigation' });
+  await expect(drawer).toBeVisible();
+  const tourAction = drawer.getByRole('button', { name: 'Take a guided tour' });
+  await expect(tourAction).toBeVisible();
+  const bounds = await tourAction.boundingBox();
+  expect(bounds).not.toBeNull();
+  expect(bounds.y + bounds.height, 'guided tour action should remain inside the drawer viewport').toBeLessThanOrEqual(421);
+});
