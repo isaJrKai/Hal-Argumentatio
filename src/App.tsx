@@ -1194,9 +1194,9 @@ export default function App() {
             role="dialog"
             aria-modal="true"
             aria-label="Main navigation"
-            className={`fixed top-0 bottom-0 left-0 w-72 max-w-[85vw] z-50 flex flex-col justify-between select-none border-r md:hidden shadow-2xl h-full ${sidebarBg}`}
+            className={`fixed inset-y-0 left-0 w-72 max-w-[85vw] z-50 flex flex-col justify-start select-none border-r md:hidden shadow-2xl h-full overflow-hidden hal-mobile-nav-drawer ${sidebarBg}`}
           >
-              <div className="flex flex-col flex-1 overflow-hidden">
+              <div className="flex flex-col flex-1 min-h-0 overflow-hidden hal-mobile-nav-content">
                 {/* Mobile Header Bar with Close Button */}
                 <div className="p-3 border-b flex items-center justify-between border-border-dim/40">
                   <span className="text-xs font-mono font-bold tracking-wider text-text-tertiary uppercase">Navigation</span>
@@ -1246,21 +1246,21 @@ export default function App() {
               </div>
 
               {/* Footer of Mobile Menu */}
-              <div className="p-3.5 border-t bg-bg-overlay/60 flex items-center justify-between text-xs font-sans text-text-tertiary border-border-dim/40">
+              <div className="p-3.5 border-t bg-bg-overlay/60 flex items-center justify-between text-xs font-sans text-text-tertiary border-border-dim/40 shrink-0 hal-mobile-nav-footer">
                 <div className="flex items-center gap-2">
                   <img src="/hal-mark.svg" alt="" className="w-5 h-5 rounded-md" />
                   <span className="font-semibold text-text-secondary text-xs">HALBiz</span>
                 </div>
                 <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-accent-dim text-accent font-bold">v2.0</span>
               </div>
-              <button type="button" onClick={() => { setIsMobileMenuOpen(false); startGuidedTour(); }} className="flex items-center gap-2 w-full h-9 px-2 rounded-md text-[11px] font-medium text-text-secondary hover:text-text-primary hover:bg-bg-subtle transition-colors cursor-pointer">
+              <button type="button" onClick={() => { setIsMobileMenuOpen(false); startGuidedTour(); }} className="flex items-center gap-2 w-full h-9 px-2 rounded-md text-[11px] font-medium text-text-secondary hover:text-text-primary hover:bg-bg-subtle transition-colors cursor-pointer shrink-0 hal-mobile-nav-action">
                 <BookOpen className="w-3.5 h-3.5" /> Take a guided tour
               </button>
               {!isAppInstalled && (
                 <button
                   type="button"
                   onClick={() => { setIsMobileMenuOpen(false); handleInstallClick(); }}
-                  className="flex items-center gap-2 w-full min-h-10 px-2 rounded-md text-[11px] font-semibold text-accent hover:text-text-primary hover:bg-accent-dim transition-colors cursor-pointer"
+                  className="flex items-center gap-2 w-full min-h-10 px-2 rounded-md text-[11px] font-semibold text-accent hover:text-text-primary hover:bg-accent-dim transition-colors cursor-pointer shrink-0 hal-mobile-nav-action"
                 >
                   <Download className="w-3.5 h-3.5" /> Install HALBiz
                 </button>
@@ -1384,7 +1384,7 @@ export default function App() {
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -6 }}
                   transition={{ duration: 0.15 }}
-                  className="panel h-full"
+                  className="panel h-full hal-mobile-workspace"
                 >
                   <ErrorBoundary>
                     <Suspense fallback={

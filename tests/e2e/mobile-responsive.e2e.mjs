@@ -29,6 +29,12 @@ for (const width of mobileWidths) {
     await drawer.getByText('Maps & Lead Intelligence', { exact: true }).click();
     await expect(drawer).toBeHidden();
     await expect(page.getByText('TERRITORY LEDGER LIST')).toBeVisible({ timeout: 30000 });
+    const mapCanvas = page.locator('.hal-map-canvas');
+    await expect(mapCanvas).toBeVisible();
+    const mapBounds = await mapCanvas.boundingBox();
+    expect(mapBounds).not.toBeNull();
+    expect(mapBounds.width, `map should fit ${width}px viewport`).toBeLessThanOrEqual(width + 1);
+    expect(mapBounds.height, 'mobile map should stay within the compact workspace height').toBeLessThanOrEqual(421);
     await expectNoPageOverflow(page, width);
   });
 
@@ -38,6 +44,11 @@ for (const width of mobileWidths) {
     const drawer = page.getByRole('dialog', { name: 'Main navigation' });
     await drawer.getByText('HAL Chat', { exact: true }).click();
     await expect(drawer).toBeHidden();
+    const composer = page.locator('.hal-chat-composer');
+    await expect(composer).toBeVisible();
+    const composerBounds = await composer.boundingBox();
+    expect(composerBounds).not.toBeNull();
+    expect(composerBounds.width, `chat composer should fit ${width}px viewport`).toBeLessThanOrEqual(width + 1);
     const openHistory = page.getByRole('button', { name: 'Open chat history' });
     await expect(openHistory).toBeVisible();
     await openHistory.click();
@@ -54,4 +65,101 @@ test('desktop workspace keeps its wide layout without horizontal page overflow',
   await expect(page.getByText('HALBiz', { exact: false }).first()).toBeVisible();
   await expect(page.getByRole('button', { name: 'Open navigation menu' })).toBeHidden();
   await expectNoPageOverflow(page, 1280);
+});
+
+
+test('core workspaces remain reachable and fit on a phone', async ({ page }) => {
+  const width = 390;
+  await openReviewWorkspace(page, width);
+
+  const coreWorkspaces = [
+    'Overview',
+    'Prospects',
+    'Sales Pipeline',
+    'Tasks',
+    'HAL Chat'
+  ];
+
+  for (const label of coreWorkspaces) {
+    await page.getByRole('button', { name: 'Open navigation menu' }).click();
+    const drawer = page.getByRole('dialog', { name: 'Main navigation' });
+    await expect(drawer).toBeVisible();
+    await drawer.getByText(label, { exact: true }).first().click();
+    await expect(drawer).toBeHidden();
+
+    const workspace = page.locator('.hal-mobile-workspace');
+    await expect(workspace).toBeVisible();
+    const bounds = await workspace.boundingBox();
+    expect(bounds).not.toBeNull();
+    expect(bounds.width, `${label} should fit the ${width}px phone viewport`).toBeLessThanOrEqual(width + 1);
+    await expectNoPageOverflow(page, width);
+
+    if (label === 'HAL Chat') {
+      await expect(page.locator('.hal-chat-composer textarea')).toBeVisible();
+    }
+  }
+});
+
+test('mobile chat composer remains reachable in a short-height viewport', async ({ page }) => {
+  await openReviewWorkspace(page, 390);
+  await page.setViewportSize({ width: 390, height: 420 });
+  await page.getByRole('button', { name: 'Open navigation menu' }).click();
+  const drawer = page.getByRole('dialog', { name: 'Main navigation' });
+  await drawer.getByText('HAL Chat', { exact: true }).click();
+
+  const composer = page.locator('.hal-chat-composer');
+  await expect(composer).toBeVisible();
+  const bounds = await composer.boundingBox();
+  expect(bounds).not.toBeNull();
+  expect(bounds.y + bounds.height, 'composer should remain inside the short viewport').toBeLessThanOrEqual(421);
+});
+
+test('desktop navigation and workspace layout remain available at tablet and desktop widths', async ({ page }) => {
+  for (const width of [768, 1024, 1280, 1440]) {
+    await page.setViewportSize({ width, height: 900 });
+    await page.goto('/?review=1');
+    await expect(page.locator('#hal-primary-workspace-tabs')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Open navigation menu' })).toBeHidden();
+    const workspace = page.locator('.hal-mobile-workspace');
+    await expect(workspace).toBeVisible();
+    const bounds = await workspace.boundingBox();
+    expect(bounds).not.toBeNull();
+    expect(bounds.width, `desktop workspace should remain usable at ${width}px`).toBeGreaterThan(400);
+    await expectNoPageOverflow(page, width);
+  }
+});
+
+
+test('mobile navigation keeps its guided-tour action reachable on short screens', async ({ page }) => {
+  await openReviewWorkspace(page, 320);
+  await page.setViewportSize({ width: 320, height: 420 });
+  await page.getByRole('button', { name: 'Open navigation menu' }).click();
+
+  const drawer = page.getByRole('dialog', { name: 'Main navigation' });
+  await expect(drawer).toBeVisible();
+  const tourAction = drawer.getByRole('button', { name: 'Take a guided tour' });
+  await expect(tourAction).toBeVisible();
+  const bounds = await tourAction.boundingBox();
+  expect(bounds).not.toBeNull();
+  expect(bounds.y + bounds.height, 'guided tour action should remain inside the drawer viewport').toBeLessThanOrEqual(421);
+});
+
+
+test('existing guided tour stays within a narrow phone viewport', async ({ page }) => {
+  const width = 320;
+  const height = 640;
+  await openReviewWorkspace(page, width);
+  await page.setViewportSize({ width, height });
+  await page.getByRole('button', { name: 'Open navigation menu' }).click();
+  const drawer = page.getByRole('dialog', { name: 'Main navigation' });
+  await drawer.getByRole('button', { name: 'Take a guided tour' }).click();
+
+  const step = page.locator('[aria-labelledby="hal-tour-step-title"]');
+  await expect(step).toBeVisible();
+  const bounds = await step.boundingBox();
+  expect(bounds).not.toBeNull();
+  expect(bounds.x).toBeGreaterThanOrEqual(0);
+  expect(bounds.y).toBeGreaterThanOrEqual(0);
+  expect(bounds.x + bounds.width, 'tour card should fit phone width').toBeLessThanOrEqual(width + 1);
+  expect(bounds.y + bounds.height, 'tour card should fit phone height').toBeLessThanOrEqual(height + 1);
 });
