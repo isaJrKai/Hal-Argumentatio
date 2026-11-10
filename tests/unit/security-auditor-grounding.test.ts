@@ -49,13 +49,19 @@ describe('security auditor evidence grounding', () => {
     expect(result.evidence).not.toHaveProperty('ipAddresses');
   });
 
-  it('labels network failures as unmeasured rather than inventing findings', async () => {
-    validateMock.mockRejectedValue(new Error('probe unavailable'));
+  it('reports a failed network probe without inventing findings', async () => {
+    validateMock.mockResolvedValue({
+      hostname: 'example.com',
+      dnsResolved: true,
+      httpReachable: false,
+      sslSecured: false,
+      rejectionReason: 'HTTPS and HTTP probes failed'
+    });
 
     const result = await securityAuditorSkill.execute({ websiteUrl: 'https://example.com' }, 'tenant-1');
 
-    expect(result.report).toContain('DNS resolution:** Not measured in this run');
-    expect(result.report).toContain('Probe error:** probe unavailable');
+    expect(result.report).toContain('HTTP reachability:** Not reachable');
+    expect(result.report).toContain('Probe error:** HTTPS and HTTP probes failed');
     expect(result.report).not.toContain('Missing | High');
   });
 });
