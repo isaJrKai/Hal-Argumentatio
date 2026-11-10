@@ -1244,6 +1244,15 @@ export default function App() {
               <button type="button" onClick={() => { setIsMobileMenuOpen(false); startGuidedTour(); }} className="flex items-center gap-2 w-full h-9 px-2 rounded-md text-[11px] font-medium text-text-secondary hover:text-text-primary hover:bg-bg-subtle transition-colors cursor-pointer">
                 <BookOpen className="w-3.5 h-3.5" /> Take a guided tour
               </button>
+              {!isAppInstalled && (
+                <button
+                  type="button"
+                  onClick={() => { setIsMobileMenuOpen(false); handleInstallClick(); }}
+                  className="flex items-center gap-2 w-full min-h-10 px-2 rounded-md text-[11px] font-semibold text-accent hover:text-text-primary hover:bg-accent-dim transition-colors cursor-pointer"
+                >
+                  <Download className="w-3.5 h-3.5" /> Install HALBiz
+                </button>
+              )}
             </motion.aside>
         )}
       </AnimatePresence>
