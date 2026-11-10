@@ -66,3 +66,65 @@ test('desktop workspace keeps its wide layout without horizontal page overflow',
   await expect(page.getByRole('button', { name: 'Open navigation menu' })).toBeHidden();
   await expectNoPageOverflow(page, 1280);
 });
+
+
+test('core workspaces remain reachable and fit on a phone', async ({ page }) => {
+  const width = 390;
+  await openReviewWorkspace(page, width);
+
+  const coreWorkspaces = [
+    'Overview',
+    'Prospects',
+    'Sales Pipeline',
+    'Tasks',
+    'HAL Chat'
+  ];
+
+  for (const label of coreWorkspaces) {
+    await page.getByRole('button', { name: 'Open navigation menu' }).click();
+    const drawer = page.getByRole('dialog', { name: 'Main navigation' });
+    await expect(drawer).toBeVisible();
+    await drawer.getByText(label, { exact: true }).first().click();
+    await expect(drawer).toBeHidden();
+
+    const workspace = page.locator('.hal-mobile-workspace');
+    await expect(workspace).toBeVisible();
+    const bounds = await workspace.boundingBox();
+    expect(bounds).not.toBeNull();
+    expect(bounds.width, `${label} should fit the ${width}px phone viewport`).toBeLessThanOrEqual(width + 1);
+    await expectNoPageOverflow(page, width);
+
+    if (label === 'HAL Chat') {
+      await expect(page.locator('.hal-chat-composer textarea')).toBeVisible();
+    }
+  }
+});
+
+test('mobile chat composer remains reachable in a short-height viewport', async ({ page }) => {
+  await openReviewWorkspace(page, 390);
+  await page.setViewportSize({ width: 390, height: 420 });
+  await page.getByRole('button', { name: 'Open navigation menu' }).click();
+  const drawer = page.getByRole('dialog', { name: 'Main navigation' });
+  await drawer.getByText('HAL Chat', { exact: true }).click();
+
+  const composer = page.locator('.hal-chat-composer');
+  await expect(composer).toBeVisible();
+  const bounds = await composer.boundingBox();
+  expect(bounds).not.toBeNull();
+  expect(bounds.y + bounds.height, 'composer should remain inside the short viewport').toBeLessThanOrEqual(421);
+});
+
+test('desktop navigation and workspace layout remain available at tablet and desktop widths', async ({ page }) => {
+  for (const width of [768, 1024, 1280, 1440]) {
+    await page.setViewportSize({ width, height: 900 });
+    await page.goto('/?review=1');
+    await expect(page.locator('#hal-primary-workspace-tabs')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Open navigation menu' })).toBeHidden();
+    const workspace = page.locator('.hal-mobile-workspace');
+    await expect(workspace).toBeVisible();
+    const bounds = await workspace.boundingBox();
+    expect(bounds).not.toBeNull();
+    expect(bounds.width, `desktop workspace should remain usable at ${width}px`).toBeGreaterThan(400);
+    await expectNoPageOverflow(page, width);
+  }
+});
