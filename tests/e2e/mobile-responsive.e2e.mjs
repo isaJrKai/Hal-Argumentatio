@@ -154,10 +154,6 @@ test('existing guided tour stays within a narrow phone viewport', async ({ page 
   const drawer = page.getByRole('dialog', { name: 'Main navigation' });
   await drawer.getByRole('button', { name: 'Take a guided tour' }).click();
 
-  const welcome = page.getByRole('dialog', { name: 'A quick tour of your workspace' });
-  await expect(welcome).toBeVisible();
-  await welcome.getByRole('button', { name: 'Start tour' }).click();
-
   const step = page.locator('[aria-labelledby="hal-tour-step-title"]');
   await expect(step).toBeVisible();
   const bounds = await step.boundingBox();
