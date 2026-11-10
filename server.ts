@@ -12225,7 +12225,7 @@ async function startServer() {
       if (status) updateData.status = status;
       if (title) updateData.title = title;
 
-      await pgDb
+      const [updatedArtifact] = await pgDb
         .update(hermesLabArtifacts)
         .set(updateData)
         .where(
@@ -12233,9 +12233,14 @@ async function startServer() {
             eq(hermesLabArtifacts.id, id),
             eq(hermesLabArtifacts.contractorId, contractorId)
           )
-        );
+        )
+        .returning({ id: hermesLabArtifacts.id });
 
-      res.json({ success: true, message: 'Artifact updated successfully' });
+      if (!updatedArtifact) {
+        return res.status(404).json({ success: false, error: 'Artifact not found' });
+      }
+
+      return res.json({ success: true, message: 'Artifact updated successfully' });
     } catch (err: any) {
       res.status(500).json({ success: false, error: err.message });
     }
