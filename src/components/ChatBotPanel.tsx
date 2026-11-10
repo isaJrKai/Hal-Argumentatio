@@ -207,7 +207,7 @@ export const ChatBotPanel: React.FC<Props> = ({ token }) => {
   const projectName = projects.find(p => p.id === activeProjectId)?.name || 'All chats';
 
   return (
-    <div className="flex h-full min-h-0 w-full overflow-hidden bg-bg-base text-text-primary">
+    <div className="flex h-full min-h-0 w-full overflow-hidden bg-bg-base text-text-primary hal-chat-workspace">
       {sidebarOpen && <button type="button" aria-label="Close chat history" onClick={() => setSidebarOpen(false)} className="md:hidden fixed inset-0 z-30 bg-black/55" />}
       {sidebarOpen && <aside className="w-64 shrink-0 border-r border-border-dim bg-bg-raised flex flex-col min-h-0 max-md:fixed max-md:inset-y-0 max-md:left-0 max-md:z-40 max-md:w-[min(20rem,88vw)] max-md:shadow-2xl">
         <div className="p-3 flex items-center gap-2">
@@ -238,7 +238,7 @@ export const ChatBotPanel: React.FC<Props> = ({ token }) => {
           </div>
           <button onClick={() => setGrounding(!grounding)} className={`shrink-0 px-2 py-1.5 rounded-lg border text-[10px] flex items-center gap-1.5 max-w-[45vw] ${grounding ? 'border-cyan-500/40 bg-cyan-500/10 text-cyan-500' : 'border-border-dim text-text-tertiary'}`}><Globe className="w-3.5 h-3.5"/> Search grounding</button>
         </header>
-        <section className="flex-1 min-h-0 overflow-y-auto px-4 sm:px-8 py-6">
+        <section className="flex-1 min-h-0 overflow-y-auto px-4 sm:px-8 py-6 hal-chat-messages">
           <div className="max-w-3xl mx-auto space-y-6">
             {!messages.length && <div className="min-h-[55vh] flex flex-col justify-center items-center text-center gap-4">
               <div className="w-12 h-12 rounded-2xl bg-cyan-500/10 flex items-center justify-center text-cyan-500"><Sparkles className="w-6 h-6"/></div>
@@ -263,7 +263,7 @@ export const ChatBotPanel: React.FC<Props> = ({ token }) => {
             <div ref={endRef}/>
           </div>
         </section>
-        <footer className="shrink-0 border-t border-border-dim bg-bg-raised/70 p-3 sm:p-4">
+        <footer className="shrink-0 border-t border-border-dim bg-bg-raised/70 p-3 sm:p-4 hal-chat-composer">
           <form onSubmit={event => { event.preventDefault(); sendMessage(); }} className="max-w-3xl mx-auto flex items-end gap-2">
             <textarea value={inputText} onChange={event => setInputText(event.target.value)} onKeyDown={event => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); sendMessage(); } }} placeholder="Message HAL… (Enter to send, Shift+Enter for a new line)" rows={2} className="flex-1 resize-none rounded-2xl border border-border-dim bg-bg-base px-4 py-3 text-sm outline-none focus:border-cyan-500 text-text-primary" disabled={loading}/>
             <button type="submit" disabled={!inputText.trim() || loading} className="p-3 rounded-xl bg-cyan-600 hover:bg-cyan-500 disabled:opacity-40 text-white"><Send className="w-4 h-4"/></button>
