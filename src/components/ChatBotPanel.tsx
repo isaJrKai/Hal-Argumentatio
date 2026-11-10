@@ -30,7 +30,7 @@ export const ChatBotPanel: React.FC<Props> = ({ token }) => {
   const [inputText, setInputText] = useState('');
   const [loading, setLoading] = useState(false);
   const [grounding, setGrounding] = useState(false);
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(() => typeof window !== 'undefined' && window.matchMedia('(min-width: 768px)').matches);
   const [showArchived, setShowArchived] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const endRef = useRef<HTMLDivElement>(null);
@@ -106,6 +106,7 @@ export const ChatBotPanel: React.FC<Props> = ({ token }) => {
       setActiveProjectId(projectId);
       setActiveConversationId(created.id);
       setMessages([]);
+      setSidebarOpen(false);
     } catch (error: any) { showToast({ title: 'Could not create chat', message: error.message, type: 'error' }); }
   };
 
@@ -200,20 +201,21 @@ export const ChatBotPanel: React.FC<Props> = ({ token }) => {
 
   return (
     <div className="flex h-full min-h-0 w-full overflow-hidden bg-bg-base text-text-primary">
-      {sidebarOpen && <aside className="w-64 shrink-0 border-r border-border-dim bg-bg-raised flex flex-col min-h-0">
+      {sidebarOpen && <button type="button" aria-label="Close chat history" onClick={() => setSidebarOpen(false)} className="md:hidden fixed inset-0 z-30 bg-black/55" />}
+      {sidebarOpen && <aside className="w-64 shrink-0 border-r border-border-dim bg-bg-raised flex flex-col min-h-0 max-md:fixed max-md:inset-y-0 max-md:left-0 max-md:z-40 max-md:w-[min(20rem,88vw)] max-md:shadow-2xl">
         <div className="p-3 flex items-center gap-2">
           <button onClick={() => createConversation(activeProjectId)} className="flex-1 flex items-center justify-center gap-2 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white px-3 py-2 text-xs font-semibold"><Plus className="w-4 h-4"/> New chat</button>
-          <button onClick={() => setSidebarOpen(false)} title="Collapse sidebar" className="p-2 rounded-lg hover:bg-bg-subtle text-text-secondary"><ChevronLeft className="w-4 h-4"/></button>
+          <button onClick={() => setSidebarOpen(false)} title="Close chat history" aria-label="Close chat history" className="p-2 rounded-lg hover:bg-bg-subtle text-text-secondary"><ChevronLeft className="w-4 h-4"/></button>
         </div>
         <div className="px-3 pb-2 flex items-center justify-between"><span className="text-[10px] uppercase tracking-wider font-semibold text-text-tertiary">Projects</span><button onClick={createProject} title="Create project" className="p-1.5 rounded hover:bg-bg-subtle"><FolderPlus className="w-4 h-4"/></button></div>
         <div className="px-2 space-y-1 overflow-y-auto max-h-[38%]">
           <button onClick={() => setActiveProjectId(null)} className={`w-full text-left px-2.5 py-2 rounded-lg text-xs ${!activeProjectId ? 'bg-bg-subtle text-text-primary' : 'text-text-secondary hover:bg-bg-subtle'}`}>All chats</button>
-          {projects.filter(p => !p.archivedAt).map(project => <button key={project.id} onClick={() => { setActiveProjectId(project.id); const next = conversations.find(c => c.projectId === project.id && !c.archivedAt); setActiveConversationId(next?.id || null); }} className={`w-full text-left px-2.5 py-2 rounded-lg text-xs truncate ${activeProjectId === project.id ? 'bg-cyan-500/10 text-cyan-500' : 'text-text-secondary hover:bg-bg-subtle'}`}><span className="mr-2 text-cyan-500">▦</span>{project.name}</button>)}
+          {projects.filter(p => !p.archivedAt).map(project => <button key={project.id} onClick={() => { setActiveProjectId(project.id); const next = conversations.find(c => c.projectId === project.id && !c.archivedAt); setActiveConversationId(next?.id || null); setSidebarOpen(false); }} className={`w-full text-left px-2.5 py-2 rounded-lg text-xs truncate ${activeProjectId === project.id ? 'bg-cyan-500/10 text-cyan-500' : 'text-text-secondary hover:bg-bg-subtle'}`}><span className="mr-2 text-cyan-500">▦</span>{project.name}</button>)}
         </div>
         <div className="mt-4 px-3 pb-2 flex items-center justify-between"><span className="text-[10px] uppercase tracking-wider font-semibold text-text-tertiary">{showArchived ? 'Archived chats' : 'Recent chats'}</span><button onClick={() => setShowArchived(!showArchived)} className="text-[10px] text-cyan-500 hover:underline">{showArchived ? 'Recent' : 'Archived'}</button></div>
         <div className="flex-1 min-h-0 overflow-y-auto px-2 pb-3 space-y-1">
           {visibleConversations.map(conversation => <div key={conversation.id} className={`group flex items-center gap-1 rounded-lg ${activeConversationId === conversation.id ? 'bg-bg-subtle' : 'hover:bg-bg-subtle'}`}>
-            <button onClick={() => { setActiveProjectId(conversation.projectId || null); setActiveConversationId(conversation.id); }} className="flex-1 min-w-0 text-left px-2.5 py-2 text-xs truncate text-text-secondary"><MessageSquare className="w-3 h-3 inline mr-2 opacity-60"/>{conversation.title}</button>
+            <button onClick={() => { setActiveProjectId(conversation.projectId || null); setActiveConversationId(conversation.id); setSidebarOpen(false); }} className="flex-1 min-w-0 text-left px-2.5 py-2 text-xs truncate text-text-secondary"><MessageSquare className="w-3 h-3 inline mr-2 opacity-60"/>{conversation.title}</button>
             <button onClick={() => archiveConversation(conversation)} title={conversation.archivedAt ? 'Restore chat' : 'Archive chat'} className="p-1.5 opacity-0 group-hover:opacity-100 text-text-tertiary hover:text-cyan-500"><Archive className="w-3 h-3"/></button>
             <button onClick={() => deleteConversation(conversation)} title="Delete chat" className="p-1.5 mr-1 opacity-0 group-hover:opacity-100 text-text-tertiary hover:text-rose-500"><Trash2 className="w-3 h-3"/></button>
           </div>)}
@@ -221,13 +223,13 @@ export const ChatBotPanel: React.FC<Props> = ({ token }) => {
         </div>
       </aside>}
       <main className="flex-1 min-w-0 flex flex-col min-h-0">
-        <header className="h-14 shrink-0 border-b border-border-dim bg-bg-raised/80 flex items-center justify-between px-4 gap-3">
+        <header className="min-h-14 shrink-0 border-b border-border-dim bg-bg-raised/80 flex items-center justify-between px-2 sm:px-4 gap-2">
           <div className="flex items-center gap-2 min-w-0">
-            {!sidebarOpen && <button onClick={() => setSidebarOpen(true)} title="Open sidebar" className="p-2 rounded-lg hover:bg-bg-subtle"><ChevronRight className="w-4 h-4"/></button>}
+            {!sidebarOpen && <button onClick={() => setSidebarOpen(true)} title="Open chat history" aria-label="Open chat history" className="p-2 rounded-lg hover:bg-bg-subtle shrink-0"><ChevronRight className="w-4 h-4"/></button>}
             <div className="w-8 h-8 rounded-lg bg-cyan-500/10 border border-cyan-500/25 flex items-center justify-center text-cyan-500"><Bot className="w-4 h-4"/></div>
             <div className="min-w-0"><div className="text-xs font-semibold truncate">{activeConversation?.title || 'HAL AI'}</div><div className="text-[10px] text-text-tertiary truncate">{projectName} · Project-aware conversations</div></div>
           </div>
-          <button onClick={() => setGrounding(!grounding)} className={`shrink-0 px-2.5 py-1.5 rounded-lg border text-[10px] flex items-center gap-1.5 ${grounding ? 'border-cyan-500/40 bg-cyan-500/10 text-cyan-500' : 'border-border-dim text-text-tertiary'}`}><Globe className="w-3.5 h-3.5"/> Search grounding</button>
+          <button onClick={() => setGrounding(!grounding)} className={`shrink-0 px-2 py-1.5 rounded-lg border text-[10px] flex items-center gap-1.5 max-w-[45vw] ${grounding ? 'border-cyan-500/40 bg-cyan-500/10 text-cyan-500' : 'border-border-dim text-text-tertiary'}`}><Globe className="w-3.5 h-3.5"/> Search grounding</button>
         </header>
         <section className="flex-1 min-h-0 overflow-y-auto px-4 sm:px-8 py-6">
           <div className="max-w-3xl mx-auto space-y-6">
