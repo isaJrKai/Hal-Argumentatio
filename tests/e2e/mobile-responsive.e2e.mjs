@@ -29,6 +29,12 @@ for (const width of mobileWidths) {
     await drawer.getByText('Maps & Lead Intelligence', { exact: true }).click();
     await expect(drawer).toBeHidden();
     await expect(page.getByText('TERRITORY LEDGER LIST')).toBeVisible({ timeout: 30000 });
+    const mapCanvas = page.locator('.hal-map-canvas');
+    await expect(mapCanvas).toBeVisible();
+    const mapBounds = await mapCanvas.boundingBox();
+    expect(mapBounds).not.toBeNull();
+    expect(mapBounds.width, `map should fit ${width}px viewport`).toBeLessThanOrEqual(width + 1);
+    expect(mapBounds.height, 'mobile map should stay within the compact workspace height').toBeLessThanOrEqual(421);
     await expectNoPageOverflow(page, width);
   });
 
@@ -38,6 +44,11 @@ for (const width of mobileWidths) {
     const drawer = page.getByRole('dialog', { name: 'Main navigation' });
     await drawer.getByText('HAL Chat', { exact: true }).click();
     await expect(drawer).toBeHidden();
+    const composer = page.locator('.hal-chat-composer');
+    await expect(composer).toBeVisible();
+    const composerBounds = await composer.boundingBox();
+    expect(composerBounds).not.toBeNull();
+    expect(composerBounds.width, `chat composer should fit ${width}px viewport`).toBeLessThanOrEqual(width + 1);
     const openHistory = page.getByRole('button', { name: 'Open chat history' });
     await expect(openHistory).toBeVisible();
     await openHistory.click();
