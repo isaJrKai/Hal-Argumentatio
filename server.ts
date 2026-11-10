@@ -4866,7 +4866,7 @@ app.post('/api/intelligence/chat', authenticate, async (req, res) => {
     ].join('\\n');
     formattedHistory.unshift({ role: 'model', parts: [{ text: sharedOperationalContext }] });
     const contextReadyAt = performance.now();
-    const contextCharacterCount = sharedOperationalContext.length + formattedHistory.reduce((sum, turn) => sum + turn.parts.reduce((partSum, part) => partSum + part.text.length, 0), 0);
+    const contextCharacterCount = sharedOperationalContext.length + formattedHistory.reduce((sum, turn) => sum + turn.parts.reduce((partSum, part) => partSum + (typeof part.text === 'string' ? part.text.length : 0), 0), 0);
 
     // 2. Add the User's message to the persistent database
     const timestampDate = new Date();
@@ -4934,7 +4934,7 @@ app.post('/api/intelligence/chat', authenticate, async (req, res) => {
         contractorId, eventType: 'assistant.responded', entityType: 'conversation', entityId: conversationId,
         actorType: 'agent', actorId: activeAi || 'hal_assistant', sourceModule: 'hal_assistant',
         correlationId: conversationId, summary: 'HAL generated a response using conversation and bounded workspace context.',
-        payload: { groundingEnabled: !!enableGrounding, projectId: conversation.projectId || null, sourcesCount: result.sources?.length || 0, toolNames: result.toolCalls?.map(call => call.name) || [], provider: result.provider || activeAi || 'automatic', model: result.model || null }
+        payload: { groundingEnabled: !!enableGrounding, projectId: conversation.projectId || null, sourcesCount: result.sources?.length || 0, toolNames: result.toolCalls?.map(call => call.name) || [], provider: result.provider || null, model: result.model || null }
       });
     } catch (ledgerError) {
       // Work History is a secondary audit append; it must not suppress a valid Copilot reply.
