@@ -45,6 +45,7 @@ import {
   Bot,
   MessageSquare,
   LineChart,
+  ListTodo,
   RefreshCw,
   Send
 } from 'lucide-react';
