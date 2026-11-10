@@ -66,7 +66,7 @@ export const securityAuditorSkill: Skill = {
         httpReachable: evidence.httpReachable,
         httpStatus: evidence.httpStatus,
         sslSecured: evidence.sslSecured,
-        ipAddresses: evidence.dnsResolved ? evidence.ipAddresses : undefined,
+        ...(evidence.dnsResolved && evidence.ipAddresses ? { ipAddresses: evidence.ipAddresses } : {}),
         rejectionReason: evidence.rejectionReason
       } : null,
       executedAt: checkedAt
