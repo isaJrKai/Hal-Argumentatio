@@ -45,6 +45,7 @@ import {
   Bot,
   MessageSquare,
   LineChart,
+  ListTodo,
   RefreshCw,
   Send
 } from 'lucide-react';
@@ -1023,6 +1024,17 @@ export default function App() {
 
   // Structured navigation hierarchy for left panel (tools not represented in the top ribbon)
   const navigationGroups = [
+    {
+      group: 'CORE WORKSPACES',
+      items: [
+        { id: 'overview', label: 'Overview', icon: Activity },
+        { id: 'leads', label: 'Prospects', icon: Compass },
+        { id: 'map', label: 'Maps & Lead Intelligence', icon: Map },
+        { id: 'board', label: 'Sales Pipeline', icon: Users },
+        { id: 'work-queue', label: 'Tasks', icon: ListTodo },
+        { id: 'chat', label: 'HAL Chat', icon: Bot },
+      ]
+    },
     {
       group: 'OPERATING INTELLIGENCE',
       items: [

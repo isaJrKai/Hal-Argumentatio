@@ -513,7 +513,7 @@ export default function MapPanel({ leads, token, onOpenWorkQueue }: MapPanelProp
   };
 
   return (
-    <div className="space-y-6 select-none">
+    <div className="space-y-4 sm:space-y-6 select-none min-w-0">
       
       {/* HEADER BAR WITH INDEXEDDB CACHE STATUS */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-bg-raised border border-border-dim p-4.5 rounded-sm">
@@ -778,9 +778,9 @@ export default function MapPanel({ leads, token, onOpenWorkQueue }: MapPanelProp
       </div>
 
       {/* PRIMARY GRID - LIST + MAP */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 sm:gap-5 min-w-0">
         {/* LEADS LIST SIDEBAR */}
-        <div className="lg:col-span-4 flex flex-col h-[550px] bg-bg-raised border border-border-dim rounded-sm overflow-hidden">
+        <div className="order-2 lg:order-1 lg:col-span-4 flex flex-col h-[360px] lg:h-[550px] bg-bg-raised border border-border-dim rounded-sm overflow-hidden">
           <div className="bg-bg-subtle border-b border-border-dim p-3 flex justify-between items-center shrink-0">
             <span className="text-[10px] font-mono font-bold text-text-primary uppercase">TERRITORY LEDGER LIST</span>
             <span className="bg-bg-raised border border-border-dim px-1.5 py-0.5 rounded-sm text-[9px] font-mono text-brand">
@@ -882,7 +882,7 @@ export default function MapPanel({ leads, token, onOpenWorkQueue }: MapPanelProp
         </div>
 
         {/* MAP CONTAINER WITH LOADING OVERLAY */}
-        <div className="lg:col-span-8 bg-bg-raised border border-border-dim rounded-sm flex flex-col h-[550px] relative overflow-hidden">
+        <div className="order-1 lg:order-2 lg:col-span-8 bg-bg-raised border border-border-dim rounded-sm flex flex-col h-[60dvh] min-h-[420px] max-h-[720px] lg:h-[550px] lg:min-h-0 lg:max-h-none relative overflow-hidden">
           {isInitializingMap && (
             <div className="absolute inset-0 z-50 bg-panel-dark/95 backdrop-blur-md flex flex-col items-center justify-center space-y-3 font-mono text-xs text-text-primary">
               <Compass className="w-8 h-8 text-brand animate-spin" />
