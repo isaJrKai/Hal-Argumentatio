@@ -12111,33 +12111,24 @@ async function startServer() {
     const hasGemini = !!process.env.GEMINI_API_KEY;
     const hasNvidia = !!process.env.NVIDIA_API_KEY;
 
-    let activeEngine = 'Deterministic Fallback';
-    let activeModel = 'Local Template Generator';
-    let provider = 'fallback';
-
-    if (hasOpenRouter) {
-      activeEngine = 'Nous Hermes 3 (70B / 405B)';
-      activeModel = 'nousresearch/hermes-3-llama-3.1-70b';
-      provider = 'openrouter';
-    } else if (hasHf) {
-      activeEngine = 'Nous Hermes 3 (Hugging Face)';
-      activeModel = 'NousResearch/Hermes-3-Llama-3.1-8B';
-      provider = 'huggingface';
-    } else if (hasGemini) {
-      activeEngine = 'Gemini 2.5 Flash Structured Cascade';
-      activeModel = 'gemini-2.5-flash';
-      provider = 'gemini';
-    } else if (hasNvidia) {
-      activeEngine = 'NVIDIA Nemotron 3.5 Lightning';
-      activeModel = 'nvidia/nemotron-3.5-lightning-30b-a3b';
-      provider = 'nvidia';
-    }
+    // Credential presence describes configuration only. It does not prove that
+    // a provider is reachable or identify the model used by a completed request.
+    const provider = hasOpenRouter ? 'openrouter'
+      : hasHf ? 'huggingface'
+      : hasGemini ? 'gemini'
+      : hasNvidia ? 'nvidia'
+      : 'fallback';
+    const configured = provider !== 'fallback';
 
     res.json({
       success: true,
       provider,
-      activeEngine,
-      activeModel,
+      activeEngine: 'HAL custom Hermes runtime',
+      activeModel: 'Not yet attributed — exact model must be recorded from the inference response',
+      status: configured ? 'configured_unverified' : 'provider_unavailable',
+      runtime: 'hal_custom_typescript',
+      officialNousRuntimeConnected: false,
+      modelAttribution: 'unavailable_until_request_level_telemetry',
       providers: {
         openrouter: hasOpenRouter,
         huggingface: hasHf,
