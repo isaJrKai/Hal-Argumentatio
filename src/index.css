@@ -488,8 +488,48 @@ body {
   .hal-chat-workspace {
     width: 100%;
     min-width: 0;
-    min-height: max(500px, calc(100dvh - 168px));
-    height: max(500px, calc(100dvh - 168px));
+    min-height: 0;
+    height: 100%;
+  }
+
+  .hal-mobile-nav-drawer {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  .hal-mobile-nav-content {
+    min-height: 0;
+  }
+
+  .hal-mobile-nav-content > div[aria-label="Navigation"] {
+    flex: 0 0 auto;
+  }
+
+  .hal-mobile-nav-footer {
+    padding-bottom: max(12px, env(safe-area-inset-bottom));
+  }
+
+  .hal-mobile-nav-action {
+    min-height: 44px;
+    padding-left: 14px;
+    padding-right: 14px;
+  }
+
+  .hal-mobile-workspace :is(table) {
+    display: block;
+    width: 100%;
+    max-width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .hal-mobile-workspace :is(pre, code) {
+    max-width: 100%;
+    overflow-wrap: anywhere;
+    white-space: pre-wrap;
+  }
+
+  .hal-mobile-workspace :is(input, select, textarea) {
+    min-width: 0;
   }
 
   .hal-chat-workspace > main {
