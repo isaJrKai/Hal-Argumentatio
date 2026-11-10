@@ -1384,7 +1384,7 @@ export default function App() {
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -6 }}
                   transition={{ duration: 0.15 }}
-                  className="panel h-full"
+                  className="panel h-full hal-mobile-workspace"
                 >
                   <ErrorBoundary>
                     <Suspense fallback={
