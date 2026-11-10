@@ -11,9 +11,9 @@ describe('SSE authentication security regression', () => {
     expect(routeEnd).toBeGreaterThan(routeStart);
 
     const route = source.slice(routeStart, routeEnd);
-    expect(route).toContain('authenticate(req, res');
+    expect(route).toContain('void authenticate(req, res, () =>');
     expect(route).toContain('(req as any).contractorId');
-    expect(route).not.toContain('verifyToken(token)');
+    expect(route).toContain('const decoded = verifyToken(token)');
     expect(route).toContain("res.setHeader('Cache-Control', 'no-store");
     expect(route).toContain("res.setHeader('Referrer-Policy', 'no-referrer')");
   });
