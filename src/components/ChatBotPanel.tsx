@@ -31,6 +31,13 @@ export const ChatBotPanel: React.FC<Props> = ({ token }) => {
   const [loading, setLoading] = useState(false);
   const [grounding, setGrounding] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(() => typeof window !== 'undefined' && window.matchMedia('(min-width: 768px)').matches);
+
+  useEffect(() => {
+    const desktop = window.matchMedia('(min-width: 768px)');
+    const syncSidebarForBreakpoint = (event: MediaQueryListEvent) => setSidebarOpen(event.matches);
+    desktop.addEventListener('change', syncSidebarForBreakpoint);
+    return () => desktop.removeEventListener('change', syncSidebarForBreakpoint);
+  }, []);
   const [showArchived, setShowArchived] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const endRef = useRef<HTMLDivElement>(null);
@@ -209,7 +216,7 @@ export const ChatBotPanel: React.FC<Props> = ({ token }) => {
         </div>
         <div className="px-3 pb-2 flex items-center justify-between"><span className="text-[10px] uppercase tracking-wider font-semibold text-text-tertiary">Projects</span><button onClick={createProject} title="Create project" className="p-1.5 rounded hover:bg-bg-subtle"><FolderPlus className="w-4 h-4"/></button></div>
         <div className="px-2 space-y-1 overflow-y-auto max-h-[38%]">
-          <button onClick={() => setActiveProjectId(null)} className={`w-full text-left px-2.5 py-2 rounded-lg text-xs ${!activeProjectId ? 'bg-bg-subtle text-text-primary' : 'text-text-secondary hover:bg-bg-subtle'}`}>All chats</button>
+          <button onClick={() => { setActiveProjectId(null); setSidebarOpen(false); }} className={`w-full text-left px-2.5 py-2 rounded-lg text-xs ${!activeProjectId ? 'bg-bg-subtle text-text-primary' : 'text-text-secondary hover:bg-bg-subtle'}`}>All chats</button>
           {projects.filter(p => !p.archivedAt).map(project => <button key={project.id} onClick={() => { setActiveProjectId(project.id); const next = conversations.find(c => c.projectId === project.id && !c.archivedAt); setActiveConversationId(next?.id || null); setSidebarOpen(false); }} className={`w-full text-left px-2.5 py-2 rounded-lg text-xs truncate ${activeProjectId === project.id ? 'bg-cyan-500/10 text-cyan-500' : 'text-text-secondary hover:bg-bg-subtle'}`}><span className="mr-2 text-cyan-500">▦</span>{project.name}</button>)}
         </div>
         <div className="mt-4 px-3 pb-2 flex items-center justify-between"><span className="text-[10px] uppercase tracking-wider font-semibold text-text-tertiary">{showArchived ? 'Archived chats' : 'Recent chats'}</span><button onClick={() => setShowArchived(!showArchived)} className="text-[10px] text-cyan-500 hover:underline">{showArchived ? 'Recent' : 'Archived'}</button></div>
