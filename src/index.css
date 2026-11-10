@@ -500,10 +500,6 @@ body {
     min-height: 0;
   }
 
-  .hal-mobile-nav-content > div[aria-label="Navigation"] {
-    flex: 0 0 auto;
-  }
-
   .hal-mobile-nav-footer {
     padding-bottom: max(12px, env(safe-area-inset-bottom));
   }
