@@ -3,8 +3,8 @@ import { validateDomainAndDns } from '../lib/networkVerification';
 
 export const securityAuditorSkill: Skill = {
   id: 'security_auditor',
-  name: 'SSL & Header Security Auditor',
-  description: "Audits SSL/TLS certificates, response headers, and domain trust parameters to ensure client compliance and browser trust using NEMOTRON.",
+  name: 'Domain & TLS Verification',
+  description: "Performs a live DNS, HTTP reachability, and HTTPS connection check. Response headers are not scanned by this tool.",
   category: 'research',
   icon: 'Globe',
   inputs: [
