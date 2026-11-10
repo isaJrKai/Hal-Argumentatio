@@ -77,14 +77,14 @@ export const TopTelemetryBar: React.FC<TopTelemetryBarProps> = ({
     <div className="w-full bg-bg-raised border-b border-border-dim text-text-primary select-none z-30 shrink-0 transition-colors duration-200">
       
       {/* ─── ROW 1: PRIMARY BRAND & GLOBAL SEARCH ─── */}
-      <div className="h-13 px-3 sm:px-5 flex items-center justify-between border-b border-border-dim gap-3">
+      <div className="min-h-12 sm:h-13 px-2.5 sm:px-5 flex items-center justify-between border-b border-border-dim gap-2 sm:gap-3">
         
         {/* Left: Mobile hamburger + Brand */}
-        <div className="flex items-center gap-2.5 shrink-0">
+        <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
           {onOpenMobileMenu && (
             <button
               onClick={onOpenMobileMenu}
-              className="md:hidden p-2 rounded-lg text-text-tertiary hover:text-text-primary hover:bg-bg-subtle transition-colors cursor-pointer"
+              className="md:hidden min-h-10 min-w-10 p-2 rounded-lg text-text-tertiary hover:text-text-primary hover:bg-bg-subtle transition-colors cursor-pointer flex items-center justify-center"
               title="Open Navigation Menu"
               aria-label="Open navigation menu"
             >
@@ -108,8 +108,8 @@ export const TopTelemetryBar: React.FC<TopTelemetryBarProps> = ({
             className="flex items-center gap-2.5 cursor-pointer group"
           >
             <div className="flex items-center gap-2.5">
-              <img src="/hal-mark.svg" alt="HAL" className="w-8 h-8 rounded-lg ring-1 ring-border-dim/80 shadow-sm" />
-              <span className="text-lg font-semibold tracking-tight text-text-primary font-display">HAL<span className="text-accent">Biz</span></span>
+              <img src="/hal-mark.svg" alt="HAL" className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg ring-1 ring-border-dim/80 shadow-sm" />
+              <span className="text-base sm:text-lg font-semibold tracking-tight text-text-primary font-display">HAL<span className="text-accent">Biz</span></span>
             </div>
             <div className="hidden sm:block h-3.5 w-px bg-border-dim" />
             <span className="hidden sm:block text-xs font-medium text-text-secondary font-sans truncate">
@@ -122,11 +122,11 @@ export const TopTelemetryBar: React.FC<TopTelemetryBarProps> = ({
         <div 
           data-tour="global-search"
           onClick={onOpenCommandPalette}
-          className="flex-1 max-w-lg mx-2 sm:mx-4 flex items-center justify-between bg-bg-subtle hover:bg-bg-base border border-border-default hover:border-accent/60 rounded-lg px-3 py-1.5 transition-all cursor-pointer shadow-xs group min-w-0"
+          className="flex-1 max-w-lg mx-1 sm:mx-4 flex items-center justify-between bg-bg-subtle hover:bg-bg-base border border-border-default hover:border-accent/60 rounded-lg px-2.5 sm:px-3 py-1.5 transition-all cursor-pointer shadow-xs group min-w-0 min-h-9"
         >
           <div className="flex items-center gap-2 text-text-secondary group-hover:text-text-primary min-w-0">
             <Search className="w-3.5 h-3.5 text-text-tertiary group-hover:text-accent transition-colors shrink-0" />
-            <span className="text-xs font-sans truncate">Search prospects, deals or tools</span>
+            <span className="hidden sm:inline text-xs font-sans truncate">Search prospects, deals or tools</span><span className="sm:hidden text-xs font-sans truncate">Search</span>
           </div>
           <kbd className="hidden sm:inline-flex items-center gap-0.5 px-2 py-0.5 text-[10px] font-mono font-semibold bg-bg-raised text-text-secondary rounded border border-border-dim shrink-0">
             ⌘K
@@ -141,7 +141,7 @@ export const TopTelemetryBar: React.FC<TopTelemetryBarProps> = ({
             <button
               id="download-app-header-btn"
               onClick={onInstallClick}
-              className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg bg-accent hover:bg-accent/85 text-black text-xs font-mono font-bold transition-all cursor-pointer shadow-sm hover:shadow active:scale-95 group shrink-0"
+              className="hidden sm:flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg bg-accent hover:bg-accent/85 text-black text-xs font-mono font-bold transition-all cursor-pointer shadow-sm hover:shadow active:scale-95 group shrink-0"
               title="Download & Install HAL Desktop or Mobile App (Disappears once downloaded)"
             >
               <Download className="w-3.5 h-3.5 text-black group-hover:translate-y-0.5 transition-transform" />
@@ -237,8 +237,8 @@ export const TopTelemetryBar: React.FC<TopTelemetryBarProps> = ({
       </div>
 
       {/* ─── ROW 2: PRIMARY WORKSPACE TABS (DOMAINS) ─── */}
-      <div className="px-3 sm:px-5 flex items-center justify-between border-b border-border-dim bg-bg-base transition-colors duration-200">
-        <div id="hal-primary-workspace-tabs" className="flex flex-wrap items-center gap-1 no-scrollbar py-0.5 min-w-0">
+      <div className="hidden md:flex px-3 sm:px-5 items-center justify-between border-b border-border-dim bg-bg-base transition-colors duration-200">
+        <div id="hal-primary-workspace-tabs" className="flex flex-nowrap items-center gap-1 no-scrollbar py-0.5 min-w-0 overflow-x-auto">
           {topNavTabs.map((tab) => {
             const isActive = activeTab === tab.id;
             const Icon = tab.icon;
