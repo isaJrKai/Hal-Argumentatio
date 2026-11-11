@@ -14,7 +14,7 @@ No client, lead, sale, payment, or revenue test records were created.
 
 The release candidate now changes the save contract so `POST /api/landing-pages/save` creates or updates a tenant-owned `draft`, not a publicly accessible `ready` artifact. The save response no longer returns a public URL. The Landing Page Studio labels the saved artifact private and does not expose a Live link unless the artifact is already in a published state. Unknown artifact IDs no longer fall back to rendering the default plumbing template.
 
-The integration test now asserts that a saved draft is not publicly reachable and that another tenant cannot overwrite the artifact by reusing its ID. The explicit publish action now requires the hash returned by the latest save. The server recomputes the hash from the stored page configuration and rendered output, compares it in constant time, and records the approving tenant and version hash before making the artifact public. Any subsequent save returns the artifact to private draft state.
+The integration test now asserts that a saved draft is not publicly reachable and that another tenant cannot overwrite the artifact by reusing its ID. A Playwright browser test also exercises the Landing Page Studio save → private draft → explicit publish → edit/revoke sequence against the real application and PostgreSQL. The explicit publish action now requires the hash returned by the latest save. The server recomputes the hash from the stored page configuration and rendered output, compares it in constant time, and records the approving tenant and version hash before making the artifact public. Any subsequent save returns the artifact to private draft state.
 
 ## Confirmed implementation
 
