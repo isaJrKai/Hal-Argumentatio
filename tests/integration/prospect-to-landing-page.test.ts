@@ -160,8 +160,9 @@ describe('upstream prospect import and landing-page artifact persistence', () =>
       .set('Authorization', `Bearer ${tokenA}`)
       .send({ id: artifactId, title: 'Prospect flow test page', pageConfig });
     expect(saved.status).toBe(200);
-    expect(saved.body).toMatchObject({ success: true, id: artifactId, contractorId: tenantA });
-    expect(saved.body.liveUrl).toBe(`/landing/${artifactId}`);
+    expect(saved.body).toMatchObject({ success: true, id: artifactId, contractorId: tenantA, status: 'draft' });
+    expect(saved.body.liveUrl).toBeUndefined();
+    expect(saved.body.message).toMatch(/not public until explicitly approved and published/i);
 
     // server.ts deliberately registers the Hermes artifact-list route only
     // during production startup. Tests import the Express app without starting
@@ -177,10 +178,22 @@ describe('upstream prospect import and landing-page artifact persistence', () =>
       contractor_id: tenantA,
       tool_id: 'landing_page',
       title: 'Prospect flow test page',
-      status: 'ready'
+      status: 'draft'
     });
     expect(stored.content.pageConfig.businessName).toBe('Fixture Prospect Services');
     expect(stored.content.renderedOutput).toContain('Fixture Prospect Services');
+
+    const tenantBWrite = await request(app)
+      .post('/api/landing-pages/save')
+      .set('Authorization', `Bearer ${tokenB}`)
+      .send({ id: artifactId, title: 'Attempted foreign overwrite', pageConfig: { ...pageConfig, businessName: 'Tenant B' } });
+    expect(tenantBWrite.status).toBe(404);
+    const unchanged = await pool.query(
+      'SELECT title, content FROM hermes_lab_artifacts WHERE id = $1 AND contractor_id = $2',
+      [artifactId, tenantA]
+    );
+    expect(unchanged.rows[0].title).toBe('Prospect flow test page');
+    expect(unchanged.rows[0].content.pageConfig.businessName).toBe('Fixture Prospect Services');
 
     const tenantBArtifacts = await pool.query(
       'SELECT id FROM hermes_lab_artifacts WHERE id = $1 AND contractor_id = $2',
