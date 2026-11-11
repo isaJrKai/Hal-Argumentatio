@@ -2183,6 +2183,7 @@ app.post('/api/landing-pages/save', authenticate, async (req, res) => {
     // Never trust client-supplied rendered HTML. Render from the validated,
     // tenant-owned configuration using the escaping server-side generator.
     const ownedRenderedHtml = generateLandingPageHtml(ownedPageConfig);
+    const versionHash = crypto.createHash('sha256').update(JSON.stringify({ pageConfig: ownedPageConfig, renderedOutput: ownedRenderedHtml })).digest('hex');
 
     const [artifactWithId] = await pgDb
       .select()
@@ -2210,6 +2211,7 @@ app.post('/api/landing-pages/save', authenticate, async (req, res) => {
             renderedOutput: ownedRenderedHtml
           },
           status: 'draft',
+          metadata: { ...((existing?.metadata && typeof existing.metadata === 'object') ? existing.metadata as Record<string, unknown> : {}), versionHash, publicationApproval: null },
           updatedAt: new Date()
         })
         .where(and(eq(hermesLabArtifacts.id, artifactId), eq(hermesLabArtifacts.contractorId, contractorId)));
@@ -2235,6 +2237,7 @@ app.post('/api/landing-pages/save', authenticate, async (req, res) => {
       id: artifactId,
       contractorId,
       status: 'draft',
+      versionHash,
       message: 'Draft saved. It is not public until explicitly approved and published.'
     });
   } catch (err: any) {
@@ -2243,6 +2246,81 @@ app.post('/api/landing-pages/save', authenticate, async (req, res) => {
   }
 });
 
+
+app.post('/api/landing-pages/:id/publish', authenticate, async (req, res) => {
+  const contractorId = (req as any).contractorId;
+  const artifactId = req.params.id;
+  const expectedVersionHash = typeof req.body?.expectedVersionHash === 'string'
+    ? req.body.expectedVersionHash.trim().toLowerCase()
+    : '';
+
+  if (!/^[a-f0-9]{64}$/.test(expectedVersionHash)) {
+    return res.status(400).json({ success: false, error: 'A valid saved version hash is required for publication approval.' });
+  }
+
+  try {
+    const [artifact] = await pgDb.select().from(hermesLabArtifacts).where(and(
+      eq(hermesLabArtifacts.id, artifactId),
+      eq(hermesLabArtifacts.contractorId, contractorId),
+      eq(hermesLabArtifacts.toolId, 'landing_page')
+    ));
+    if (!artifact) return res.status(404).json({ success: false, error: 'Landing page draft not found.' });
+
+    const content = artifact.content as any;
+    if (!content?.pageConfig || typeof content?.renderedOutput !== 'string') {
+      return res.status(409).json({ success: false, error: 'Landing page draft is incomplete and cannot be published.' });
+    }
+    const actualVersionHash = crypto.createHash('sha256')
+      .update(JSON.stringify({ pageConfig: content.pageConfig, renderedOutput: content.renderedOutput }))
+      .digest('hex');
+    const expected = Buffer.from(expectedVersionHash, 'hex');
+    const actual = Buffer.from(actualVersionHash, 'hex');
+    if (expected.length !== actual.length || !crypto.timingSafeEqual(expected, actual)) {
+      return res.status(409).json({ success: false, error: 'The saved draft changed. Save and review the latest version before approving publication.' });
+    }
+
+    const approvedAt = new Date();
+    const previousMetadata = artifact.metadata && typeof artifact.metadata === 'object'
+      ? artifact.metadata as Record<string, unknown>
+      : {};
+    await pgDb.transaction(async (tx) => {
+      await tx.update(hermesLabArtifacts).set({
+        status: 'ready',
+        metadata: {
+          ...previousMetadata,
+          versionHash: actualVersionHash,
+          publicationApproval: {
+            approvedBy: contractorId,
+            approvedAt: approvedAt.toISOString(),
+            versionHash: actualVersionHash
+          }
+        },
+        updatedAt: approvedAt
+      }).where(and(
+        eq(hermesLabArtifacts.id, artifactId),
+        eq(hermesLabArtifacts.contractorId, contractorId),
+        eq(hermesLabArtifacts.status, 'draft')
+      ));
+      await recordWorkEvent(tx, {
+        contractorId,
+        eventType: 'landing_page.published',
+        entityType: 'landing_page',
+        entityId: artifactId,
+        actorType: 'human',
+        actorId: contractorId,
+        sourceModule: 'landing_page_studio',
+        correlationId: artifactId,
+        summary: `Approved publication of landing page: ${artifact.title}.`,
+        payload: { versionHash: actualVersionHash, approvedAt: approvedAt.toISOString() }
+      });
+    });
+
+    return res.json({ success: true, id: artifactId, status: 'ready', versionHash: actualVersionHash, liveUrl: `/landing/${artifactId}` });
+  } catch (err: any) {
+    console.error('[Publish Landing Page Error]', err);
+    return res.status(500).json({ success: false, error: 'Could not publish the approved landing-page version.' });
+  }
+});
 app.get('/api/public/form/dispatch', async (req, res) => {
   const landingPageId = typeof req.query.landingPageId === 'string' ? req.query.landingPageId.trim() : '';
   if (!landingPageId || landingPageId.length > 128) {
