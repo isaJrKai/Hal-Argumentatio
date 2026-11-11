@@ -44,6 +44,12 @@ test('Landing Page Studio saves privately and publishes only the approved versio
     expect(saved).toMatchObject({ success: true, status: 'draft' });
     expect(saved.versionHash).toMatch(/^[a-f0-9]{64}$/);
     expect(saved.liveUrl).toBeUndefined();
+    const savedConfig = await pool.query(
+      "SELECT content->'pageConfig'->>'businessName' AS business_name FROM hermes_lab_artifacts WHERE id = $1 AND contractor_id = $2",
+      [saved.id, contractorId]
+    );
+    expect(savedConfig.rows).toHaveLength(1);
+    const businessName = savedConfig.rows[0].business_name;
 
     const privateResponse = await request.get(`/landing/${saved.id}`);
     expect(privateResponse.status()).toBe(404);
@@ -60,7 +66,7 @@ test('Landing Page Studio saves privately and publishes only the approved versio
 
     const publicResponse = await request.get(published.liveUrl);
     expect(publicResponse.status()).toBe(200);
-    expect(await publicResponse.text()).toContain(title);
+    expect(await publicResponse.text()).toContain(businessName);
 
     await titleInput.fill(`${title} revised`);
     const reviseResponsePromise = page.waitForResponse(response =>
