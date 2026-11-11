@@ -2187,7 +2187,33 @@ app.post('/api/landing-pages/save', authenticate, async (req, res) => {
 
   try {
     const artifactId = typeof id === 'string' && id.length > 5 ? id : ('lp_' + crypto.randomUUID().slice(0, 8));
-    const ownedPageConfig = { ...pageConfig, id: artifactId, contractorId };
+    const sourceLeadId = typeof pageConfig.sourceLeadId === 'string' ? pageConfig.sourceLeadId.trim() : '';
+    let sourceLeadEvidence: Record<string, unknown> | null = null;
+    if (sourceLeadId) {
+      const [sourceLead] = await pgDb.select().from(leads).where(and(
+        eq(leads.id, sourceLeadId),
+        eq(leads.contractorId, contractorId)
+      ));
+      if (!sourceLead) return res.status(404).json({ success: false, error: 'Source prospect not found.' });
+      if (sourceLead.isSynthetic || sourceLead.verificationStatus !== 'VERIFIED' || !sourceLead.dnsVerified) {
+        return res.status(409).json({ success: false, error: 'A lead-grounded page requires a non-synthetic prospect with current verified DNS evidence.' });
+      }
+      sourceLeadEvidence = {
+        leadId: sourceLead.id,
+        businessName: sourceLead.businessName,
+        city: sourceLead.city,
+        websiteUrl: sourceLead.websiteUrl,
+        verificationStatus: sourceLead.verificationStatus,
+        dnsVerified: sourceLead.dnsVerified,
+        groundingEvidence: sourceLead.groundingEvidence
+      };
+    }
+    const ownedPageConfig = {
+      ...pageConfig,
+      id: artifactId,
+      contractorId,
+      ...(sourceLeadId ? { sourceLeadId, sourceLeadEvidence } : {})
+    };
     // Never trust client-supplied rendered HTML. Render from the validated,
     // tenant-owned configuration using the escaping server-side generator.
     const ownedRenderedHtml = generateLandingPageHtml(ownedPageConfig);
@@ -2279,6 +2305,28 @@ app.post('/api/landing-pages/:id/publish', authenticate, async (req, res) => {
     }
 
     const content = artifact.content as any;
+    const sourceLeadId = typeof content?.pageConfig?.sourceLeadId === 'string' ? content.pageConfig.sourceLeadId : '';
+    if (sourceLeadId) {
+      const [sourceLead] = await pgDb.select().from(leads).where(and(
+        eq(leads.id, sourceLeadId),
+        eq(leads.contractorId, contractorId)
+      ));
+      if (!sourceLead || sourceLead.isSynthetic || sourceLead.verificationStatus !== 'VERIFIED' || !sourceLead.dnsVerified) {
+        return res.status(409).json({ success: false, error: 'The source prospect is no longer verified. Re-verify it before publication.' });
+      }
+      const currentEvidence = {
+        leadId: sourceLead.id,
+        businessName: sourceLead.businessName,
+        city: sourceLead.city,
+        websiteUrl: sourceLead.websiteUrl,
+        verificationStatus: sourceLead.verificationStatus,
+        dnsVerified: sourceLead.dnsVerified,
+        groundingEvidence: sourceLead.groundingEvidence
+      };
+      if (stableLandingPageJson(currentEvidence) !== stableLandingPageJson(content.pageConfig.sourceLeadEvidence)) {
+        return res.status(409).json({ success: false, error: 'Source prospect evidence changed. Rebuild and review the draft before publication.' });
+      }
+    }
     if (!content?.pageConfig || typeof content?.renderedOutput !== 'string') {
       return res.status(409).json({ success: false, error: 'Landing page draft is incomplete and cannot be published.' });
     }
