@@ -2184,10 +2184,14 @@ app.post('/api/landing-pages/save', authenticate, async (req, res) => {
     // tenant-owned configuration using the escaping server-side generator.
     const ownedRenderedHtml = generateLandingPageHtml(ownedPageConfig);
 
-    const [existing] = await pgDb
+    const [artifactWithId] = await pgDb
       .select()
       .from(hermesLabArtifacts)
-      .where(and(eq(hermesLabArtifacts.id, artifactId), eq(hermesLabArtifacts.contractorId, contractorId)));
+      .where(eq(hermesLabArtifacts.id, artifactId));
+    if (artifactWithId && artifactWithId.contractorId !== contractorId) {
+      return res.status(404).json({ success: false, error: 'Landing page not found.' });
+    }
+    const existing = artifactWithId;
 
     await recordWorkEvent(pgDb, {
       contractorId, eventType: existing ? 'landing_page.updated' : 'landing_page.saved',
@@ -2205,7 +2209,7 @@ app.post('/api/landing-pages/save', authenticate, async (req, res) => {
             pageConfig: ownedPageConfig,
             renderedOutput: ownedRenderedHtml
           },
-          status: 'ready',
+          status: 'draft',
           updatedAt: new Date()
         })
         .where(and(eq(hermesLabArtifacts.id, artifactId), eq(hermesLabArtifacts.contractorId, contractorId)));
@@ -2230,7 +2234,8 @@ app.post('/api/landing-pages/save', authenticate, async (req, res) => {
       success: true,
       id: artifactId,
       contractorId,
-      liveUrl: `/landing/${artifactId}`
+      status: 'draft',
+      message: 'Draft saved. It is not public until explicitly approved and published.'
     });
   } catch (err: any) {
     console.error('[Save Landing Page Error]', err);
