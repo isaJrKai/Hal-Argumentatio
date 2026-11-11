@@ -58,6 +58,7 @@ export const LandingPageStudioPanel: React.FC<{ token: string | null }> = ({ tok
   // Active configuration state
   const [config, setConfig] = useState<LandingPageConfig>(() => {
     const base = JSON.parse(JSON.stringify(TRADE_TEMPLATES.plumbing));
+    base.id = `lp_${crypto.randomUUID().replace(/-/g, '')}`;
     if (workspaceConfig.agencyName) base.businessName = workspaceConfig.agencyName;
     if (regionalProfile.city) base.city = regionalProfile.city;
     if (workspaceConfig.contactPhone) base.phone = workspaceConfig.contactPhone;
