@@ -225,5 +225,29 @@ describe('upstream prospect import and landing-page artifact persistence', () =>
     const publicPublished = await request(app).get(`/landing/${artifactId}`);
     expect(publicPublished.status).toBe(200);
     expect(publicPublished.text).toContain('Fixture Prospect Services');
+
+    const revisedPageConfig = { ...pageConfig, title: 'Revised prospect flow page' };
+    const revisedSave = await request(app)
+      .post('/api/landing-pages/save')
+      .set('Authorization', `Bearer ${tokenA}`)
+      .send({ id: artifactId, title: revisedPageConfig.title, pageConfig: revisedPageConfig });
+    expect(revisedSave.status).toBe(200);
+    expect(revisedSave.body.status).toBe('draft');
+    expect(revisedSave.body.versionHash).not.toBe(saved.body.versionHash);
+    const unpublishedRevision = await request(app).get(`/landing/${artifactId}`);
+    expect(unpublishedRevision.status).toBe(404);
+
+    const staleApproval = await request(app)
+      .post(`/api/landing-pages/${artifactId}/publish`)
+      .set('Authorization', `Bearer ${tokenA}`)
+      .send({ expectedVersionHash: saved.body.versionHash });
+    expect(staleApproval.status).toBe(409);
+
+    const revisedApproval = await request(app)
+      .post(`/api/landing-pages/${artifactId}/publish`)
+      .set('Authorization', `Bearer ${tokenA}`)
+      .send({ expectedVersionHash: revisedSave.body.versionHash });
+    expect(revisedApproval.status).toBe(200);
+    expect(revisedApproval.body.versionHash).toBe(revisedSave.body.versionHash);
   });
 });
