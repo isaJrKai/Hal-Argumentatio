@@ -76,6 +76,7 @@ export const LandingPageStudioPanel: React.FC<{ token: string | null }> = ({ tok
   const [mobileActiveView, setMobileActiveView] = useState<'editor' | 'preview'>('editor');
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [savedVersionHash, setSavedVersionHash] = useState<string>('');
   const [copiedLink, setCopiedLink] = useState(false);
   const [showAiModal, setShowAiModal] = useState(false);
   const [showHistoryModal, setShowHistoryModal] = useState(false);
@@ -144,6 +145,7 @@ export const LandingPageStudioPanel: React.FC<{ token: string | null }> = ({ tok
           setArtifacts(landers);
           const first = landers[0];
           setSelectedArtifactId(first.id);
+          setSavedVersionHash(typeof first.metadata?.versionHash === 'string' ? first.metadata.versionHash : '');
 
           // If artifact has saved pageConfig, restore it
           if (first.content?.pageConfig) {
@@ -175,6 +177,7 @@ export const LandingPageStudioPanel: React.FC<{ token: string | null }> = ({ tok
     const found = artifacts.find(a => a.id === id);
     if (found) {
       setSelectedArtifactId(found.id);
+      setSavedVersionHash(typeof found.metadata?.versionHash === 'string' ? found.metadata.versionHash : '');
       if (found.content?.pageConfig) {
         setConfig({ ...found.content.pageConfig, contractorId: found.content.pageConfig.contractorId || found.contractorId });
       } else {
@@ -215,6 +218,7 @@ export const LandingPageStudioPanel: React.FC<{ token: string | null }> = ({ tok
       if (res.ok && data.success) {
         const savedConfig = { ...config, id: data.id || config.id, contractorId: data.contractorId || config.contractorId };
         setConfig(savedConfig);
+        setSavedVersionHash(data.versionHash || '');
         saveSnapshot(`Saved: ${config.title}`, savedConfig);
         showToast({
           title: 'Landing Page Saved',
@@ -236,7 +240,32 @@ export const LandingPageStudioPanel: React.FC<{ token: string | null }> = ({ tok
     }
   };
 
-  // Copy live link to clipboard
+
+  const handlePublishPage = async () => {
+    if (!config.id || !savedVersionHash) {
+      showToast({ title: 'Save required', message: 'Save the current page before approving publication.', type: 'info' });
+      return;
+    }
+    if (!window.confirm('Publish this exact saved version publicly?')) return;
+    try {
+      const response = await fetch(`/api/landing-pages/${encodeURIComponent(config.id)}/publish`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({ expectedVersionHash: savedVersionHash })
+      });
+      const result = await response.json();
+      if (!response.ok || !result.success) throw new Error(result.error || 'Publication approval failed.');
+      showToast({ title: 'Page Published', message: `The approved version is now live at ${result.liveUrl}`, type: 'success' });
+      await fetchArtifacts();
+    } catch (error: any) {
+      showToast({ title: 'Publication blocked', message: error.message || 'Could not publish this version.', type: 'error' });
+    }
+  };
+
+    // Copy live link to clipboard
   const handleCopyLink = () => {
     if (!isPublished) {
       showToast({ title: 'Approval required', message: 'Save this as a draft first, then publish it through the approval workflow.', type: 'info' });
@@ -667,6 +696,16 @@ export const LandingPageStudioPanel: React.FC<{ token: string | null }> = ({ tok
           >
             <Save className="w-3.5 h-3.5" />
             <span>{isSaving ? 'Saving...' : 'Save'}</span>
+          </button>
+
+          {/* Explicit publication approval for the exact saved version */}
+          <button
+            type="button"
+            disabled={!savedVersionHash || isSaving || isPublished}
+            onClick={handlePublishPage}
+            className="px-3 py-1.5 rounded-xl border border-emerald-600/50 bg-emerald-700 hover:bg-emerald-600 disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold text-xs transition"
+          >
+            {isPublished ? 'Published' : 'Approve & Publish'}
           </button>
 
           {/* Copy URL */}
