@@ -66,7 +66,7 @@ test('Prospects UI imports an allowlisted fixture, verifies it, and creates a pr
     leadId = ingestResult.leads[0].id;
 
     await expect(page.getByText(businessName, { exact: true }).first()).toBeVisible();
-    await page.getByText(businessName, { exact: true }).first().click();
+    await page.locator('h4').filter({ hasText: businessName }).click();
 
     const groundingPromise = page.waitForResponse(response =>
       response.url().includes(`/api/leads/${leadId}/verify-grounding`) && response.request().method() === 'POST'
