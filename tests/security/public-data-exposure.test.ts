@@ -43,7 +43,10 @@ describe('Public data exposure security', () => {
     expect(saveEnd).toBeGreaterThan(saveStart);
     const saveRoute = source.slice(saveStart, saveEnd);
     expect(saveRoute).toContain('!pageConfig');
-    expect(saveRoute).toContain('const ownedPageConfig = { ...pageConfig, id: artifactId, contractorId }');
+    expect(saveRoute).toContain('const ownedPageConfig = {');
+    expect(saveRoute).toContain('id: artifactId');
+    expect(saveRoute).toContain('contractorId');
+    expect(saveRoute).toContain('sourceLeadEvidence');
     expect(saveRoute).toContain('generateLandingPageHtml(ownedPageConfig)');
     expect(saveRoute).not.toContain('const ownedRenderedHtml = ownedPageConfig ? generateLandingPageHtml(ownedPageConfig) : renderedHtml');
   });
