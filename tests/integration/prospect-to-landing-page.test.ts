@@ -164,6 +164,9 @@ describe('upstream prospect import and landing-page artifact persistence', () =>
     expect(saved.body.liveUrl).toBeUndefined();
     expect(saved.body.message).toMatch(/not public until explicitly approved and published/i);
 
+    const publicDraft = await request(app).get(`/landing/${artifactId}`);
+    expect(publicDraft.status).toBe(404);
+
     // server.ts deliberately registers the Hermes artifact-list route only
     // during production startup. Tests import the Express app without starting
     // listeners, so verify the persisted artifact and tenant boundary directly.
