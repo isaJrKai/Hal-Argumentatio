@@ -20,6 +20,7 @@ const artifactId = `lp_test_${suffix}`;
 let dbAvailable = false;
 let tokenA = '';
 let tokenB = '';
+let fixtureLeadId = '';
 
 async function login(email: string) {
   const response = await request(app).post('/api/auth/login').send({ email, password });
@@ -120,6 +121,7 @@ describe('upstream prospect import and landing-page artifact persistence', () =>
     expect(first.status).toBe(200);
     expect(first.body).toMatchObject({ success: true, count: 1, queuedTasks: 1, skippedCount: 0 });
     const leadId = first.body.leads[0].id as string;
+    fixtureLeadId = leadId;
 
     const duplicate = await request(app)
       .post('/api/leads/ingest')
@@ -154,6 +156,12 @@ describe('upstream prospect import and landing-page artifact persistence', () =>
 
   it('saves a tenant-owned landing-page artifact and verifies persisted tenant isolation', async (ctx) => {
     if (!dbAvailable) return ctx.skip();
+
+    const unverifiedLeadSave = await request(app)
+      .post('/api/landing-pages/save')
+      .set('Authorization', `Bearer ${tokenA}`)
+      .send({ id: `lp_unverified_${suffix}`, title: 'Must remain blocked', pageConfig: { ...pageConfig, sourceLeadId: fixtureLeadId } });
+    expect(unverifiedLeadSave.status).toBe(409);
 
     const saved = await request(app)
       .post('/api/landing-pages/save')
