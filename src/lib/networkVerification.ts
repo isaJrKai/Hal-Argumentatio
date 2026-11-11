@@ -43,6 +43,7 @@ export interface GroundingVerificationResult {
     phoneValid: boolean;
     isDummyPhone: boolean;
     reasons: string[];
+    businessIdentityConfirmed: boolean;
     verifiedAt: string;
   };
 }
@@ -225,11 +226,20 @@ export function isPubliclyRoutableIp(address: string): boolean {
 async function resolveDnsWithTimeout(hostname: string, timeoutMs = 4000): Promise<{ resolved: boolean; ips?: string[]; resolvedHostname?: string; error?: string }> {
   const tryLookup = async (host: string) => {
     const lookupPromise = dns.promises.lookup(host, { all: true, verbatim: true });
-    const timeoutPromise = new Promise<never>((_, reject) =>
-      setTimeout(() => reject(new Error('DNS resolution timed out after ' + timeoutMs + 'ms')), timeoutMs)
-    );
-    const results = await Promise.race([lookupPromise, timeoutPromise]);
-    return Array.isArray(results) ? results.map((item: any) => item.address as string) : [];
+    let timeout: ReturnType<typeof setTimeout> | undefined;
+    try {
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        timeout = setTimeout(
+          () => reject(new Error('DNS resolution timed out after ' + timeoutMs + 'ms')),
+          timeoutMs
+        );
+      });
+      const results = await Promise.race([lookupPromise, timeoutPromise]);
+      return Array.isArray(results) ? results.map((item: any) => item.address as string) : [];
+    } finally {
+      // Do not leave one pending timer per successful DNS lookup on the server.
+      if (timeout) clearTimeout(timeout);
+    }
   };
 
   try {
@@ -381,33 +391,45 @@ export async function verifyLeadGrounding(lead: {
   websiteUrl?: string;
   phone?: string;
   isSynthetic?: boolean;
+  businessIdentityConfirmed?: boolean;
 }): Promise<GroundingVerificationResult> {
   const reasons: string[] = [];
 
-  // Flag if explicitly marked synthetic
   if (lead.isSynthetic) {
     reasons.push('Lead is explicitly marked as synthetic/simulated');
   }
 
-  // 1. Validate Phone
   const phoneValidation = validatePhoneNumber(lead.phone || '');
   if (!phoneValidation.isValid) {
     reasons.push(`Phone validation failed: ${phoneValidation.rejectionReason}`);
   }
 
-  // 2. Validate Domain
   const domainValidation = await validateDomainAndDns(lead.websiteUrl || '');
   if (!domainValidation.dnsResolved) {
-    reasons.push(`Domain validation failed: ${domainValidation.rejectionReason}`);
+    reasons.push(`Domain validation failed: ${domainValidation.rejectionReason || 'No verified public DNS result'}`);
+  }
+  if (!domainValidation.httpReachable) {
+    reasons.push('The submitted website did not return a confirmed reachable HTTP response.');
   }
 
-  const isGroundTruth = phoneValidation.isValid && domainValidation.dnsResolved && !lead.isSynthetic;
+  const businessIdentityConfirmed = lead.businessIdentityConfirmed === true;
+  if (!businessIdentityConfirmed) {
+    reasons.push('DNS resolution and phone-number format do not prove these contact details belong to the named business; human/source confirmation is required.');
+  }
 
-  let status: GroundingVerificationResult['status'] = 'VERIFIED';
-  if (lead.isSynthetic || phoneValidation.isDummyFictional || !domainValidation.dnsResolved) {
+  const isGroundTruth = Boolean(
+    !lead.isSynthetic &&
+    phoneValidation.isValid &&
+    domainValidation.dnsResolved &&
+    domainValidation.httpReachable &&
+    businessIdentityConfirmed
+  );
+
+  let status: GroundingVerificationResult['status'] = 'UNVERIFIED_STAGING';
+  if (lead.isSynthetic || phoneValidation.isDummyFictional) {
     status = 'FABRICATED_REJECTED';
-  } else if (!phoneValidation.isValid || !domainValidation.httpReachable) {
-    status = 'UNVERIFIED_STAGING';
+  } else if (isGroundTruth) {
+    status = 'VERIFIED';
   }
 
   return {
@@ -422,6 +444,7 @@ export async function verifyLeadGrounding(lead: {
       phoneValid: phoneValidation.isValid,
       isDummyPhone: phoneValidation.isDummyFictional,
       reasons,
+      businessIdentityConfirmed,
       verifiedAt: new Date().toISOString()
     }
   };
@@ -556,4 +579,176 @@ export async function verifyAndGateLeadOutreach(lead: {
   }
 
   enforceFailClosedOutreachGate(lead);
+}
+
+
+export interface PublicWebsiteFetchResult {
+  requestedUrl: string;
+  finalUrl: string;
+  statusCode: number;
+  contentType: string;
+  headers: Record<string, string>;
+  body: string;
+  fetchedAt: string;
+  resolvedHostname: string;
+  resolvedIps: string[];
+}
+
+/**
+ * Fetches one public HTML page for passive analysis. DNS is resolved and every
+ * answer must be globally routable; the connection is pinned to a validated IP.
+ * Redirects are returned, never followed. No scripts, forms, cookies or assets
+ * are executed or fetched. The body is strictly size- and time-bounded.
+ */
+export async function fetchPublicWebsitePage(
+  rawUrl: string,
+  options: { timeoutMs?: number; maxBytes?: number } = {}
+): Promise<PublicWebsiteFetchResult> {
+  const timeoutMs = Math.min(Math.max(options.timeoutMs ?? 7000, 1000), 10000);
+  const maxBytes = Math.min(Math.max(options.maxBytes ?? 512 * 1024, 16 * 1024), 1024 * 1024);
+  let url: URL;
+  try {
+    url = new URL(/^[a-z][a-z0-9+.-]*:\/\//i.test(rawUrl.trim()) ? rawUrl.trim() : 'https://' + rawUrl.trim());
+  } catch {
+    throw new Error('Enter a valid website URL.');
+  }
+  if (
+    !['http:', 'https:'].includes(url.protocol) ||
+    url.username || url.password || url.port ||
+    !url.hostname || isIP(url.hostname) ||
+    url.hostname === 'localhost' || url.hostname.endsWith('.localhost') ||
+    url.hostname.endsWith('.local')
+  ) {
+    throw new Error('Only public HTTP(S) websites on standard ports can be inspected.');
+  }
+
+  let resolvedIps: string[];
+  let dnsTimer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    const records = await Promise.race([
+      dns.promises.lookup(url.hostname, { all: true, verbatim: true }),
+      new Promise<never>((_resolve, reject) => {
+        dnsTimer = setTimeout(() => reject(new Error('DNS resolution timed out.')), timeoutMs);
+      })
+    ]);
+    resolvedIps = records.map(record => record.address);
+  } catch (error: any) {
+    throw new Error('Website DNS lookup failed: ' + (error?.message || 'No DNS records returned'));
+  } finally {
+    if (dnsTimer) clearTimeout(dnsTimer);
+  }
+  if (!resolvedIps.length) {
+    throw new Error('Website DNS lookup failed: no DNS records returned');
+  }
+  if (resolvedIps.some(address => !isPubliclyRoutableIp(address))) {
+    throw new Error('Website resolves to a private, reserved, or non-public network address; request blocked.');
+  }
+
+  const hostname = url.hostname;
+  const address = resolvedIps[0];
+  const transport = url.protocol === 'https:' ? https : http;
+  const requestPath = `${url.pathname || '/'}${url.search}`;
+
+  return await new Promise<PublicWebsiteFetchResult>((resolve, reject) => {
+    let settled = false;
+    const finishError = (error: Error) => {
+      if (settled) return;
+      settled = true;
+      reject(error);
+    };
+    const request = transport.request({
+      protocol: url.protocol,
+      hostname,
+      path: requestPath,
+      method: 'GET',
+      agent: false,
+      servername: url.protocol === 'https:' ? hostname : undefined,
+      headers: {
+        Host: hostname,
+        'User-Agent': 'HAL-Public-Website-Audit/1.0',
+        Accept: 'text/html,application/xhtml+xml;q=0.9'
+      },
+      lookup: (_host: string, _options: any, callback: (error: NodeJS.ErrnoException | null, address: string, family: number) => void) => {
+        callback(null, address, isIP(address));
+      }
+    } as any, response => {
+      const statusCode = response.statusCode || 0;
+      const contentType = String(response.headers['content-type'] || '').toLowerCase();
+      const headers: Record<string, string> = {};
+      for (const name of [
+        'strict-transport-security',
+        'content-security-policy',
+        'x-frame-options',
+        'x-content-type-options',
+        'referrer-policy',
+        'permissions-policy',
+        'location',
+        'cache-control',
+        'content-type'
+      ]) {
+        const value = response.headers[name];
+        if (typeof value === 'string') headers[name] = value.slice(0, 2000);
+      }
+
+      if (statusCode >= 300 && statusCode < 400) {
+        response.resume();
+        settled = true;
+        resolve({
+          requestedUrl: url.toString(),
+          finalUrl: url.toString(),
+          statusCode,
+          contentType,
+          headers,
+          body: '',
+          fetchedAt: new Date().toISOString(),
+          resolvedHostname: hostname,
+          resolvedIps: resolvedIps
+        });
+        return;
+      }
+      if (!contentType.includes('text/html') && !contentType.includes('application/xhtml+xml')) {
+        response.resume();
+        finishError(new Error(`Website returned non-HTML content (${contentType || 'unknown content type'}).`));
+        return;
+      }
+      const declaredLength = Number(response.headers['content-length'] || 0);
+      if (declaredLength > maxBytes) {
+        response.destroy();
+        finishError(new Error(`Website page exceeds the ${maxBytes}-byte inspection limit.`));
+        return;
+      }
+
+      const chunks: Buffer[] = [];
+      let totalBytes = 0;
+      response.on('data', (chunk: Buffer | string) => {
+        const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+        totalBytes += buffer.length;
+        if (totalBytes > maxBytes) {
+          response.destroy(new Error(`Website page exceeds the ${maxBytes}-byte inspection limit.`));
+          return;
+        }
+        chunks.push(buffer);
+      });
+      response.on('end', () => {
+        if (settled) return;
+        settled = true;
+        resolve({
+          requestedUrl: url.toString(),
+          finalUrl: url.toString(),
+          statusCode,
+          contentType,
+          headers,
+          body: Buffer.concat(chunks).toString('utf8'),
+          fetchedAt: new Date().toISOString(),
+          resolvedHostname: hostname,
+          resolvedIps: resolvedIps
+        });
+      });
+      response.on('error', error => finishError(error));
+    });
+
+    request.setTimeout(timeoutMs, () => request.destroy(new Error('Website page fetch timed out.')));
+    request.on('error', error => finishError(error));
+    request.end();
+  });
 }

@@ -229,6 +229,9 @@ export default function LeadsPanel({ leads, token, onRefresh }: LeadsPanelProps)
   const [probingGroundingId, setProbingGroundingId] = useState<string | null>(null);
   const [verifyingAllGrounding, setVerifyingAllGrounding] = useState(false);
   const [groundingFeedback, setGroundingFeedback] = useState<string | null>(null);
+  const [identitySourceUrl, setIdentitySourceUrl] = useState('');
+  const [identityConfirmationNotes, setIdentityConfirmationNotes] = useState('');
+  const [confirmingIdentity, setConfirmingIdentity] = useState(false);
 
   const handleProbeGrounding = async (leadId: string) => {
     setProbingGroundingId(leadId);
@@ -258,6 +261,42 @@ export default function LeadsPanel({ leads, token, onRefresh }: LeadsPanelProps)
       setGroundingFeedback(err.message || 'Error probing network grounding');
     } finally {
       setProbingGroundingId(null);
+    }
+  };
+
+  const handleConfirmBusinessIdentity = async (leadId: string) => {
+    if (!identitySourceUrl.trim() || identityConfirmationNotes.trim().length < 10) {
+      setGroundingFeedback('Add the public source URL and describe what you checked (at least 10 characters).');
+      return;
+    }
+    setConfirmingIdentity(true);
+    setGroundingFeedback(null);
+    try {
+      const res = await fetch(`/api/leads/${encodeURIComponent(leadId)}/confirm-identity`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          confirmed: true,
+          sourceUrl: identitySourceUrl.trim(),
+          notes: identityConfirmationNotes.trim()
+        })
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.success) throw new Error(data.error || `Identity confirmation failed (HTTP ${res.status}).`);
+      setGroundingFeedback('Business identity confirmed and saved. Outreach gate is now eligible, subject to the channel-specific consent and delivery checks.');
+      setSelectedLead(prev => prev && prev.id === leadId
+        ? { ...prev, verificationStatus: 'VERIFIED', groundingEvidence: { ...(prev as any).groundingEvidence, businessIdentityConfirmed: true, identityConfirmation: data.identityConfirmation } }
+        : prev);
+      setIdentitySourceUrl('');
+      setIdentityConfirmationNotes('');
+      onRefresh();
+    } catch (err: any) {
+      setGroundingFeedback(err?.message || 'Could not confirm business identity.');
+    } finally {
+      setConfirmingIdentity(false);
     }
   };
 
@@ -1534,6 +1573,7 @@ Next-Gen Waterproofing	Calgary	Waterproofing	Jane Smith	jane@nextgen.ca	403-555-
             selectedLead.phone === '555-0100' ||
             (selectedLead.notes && selectedLead.notes.includes('[SYNTHETIC FALLBACK]'))
           );
+          const savedWebsiteAudit = (selectedLead as any).groundingEvidence?.websiteAudit || null;
 
           return (
             <div className="space-y-6">
@@ -1653,7 +1693,7 @@ Next-Gen Waterproofing	Calgary	Waterproofing	Jane Smith	jane@nextgen.ca	403-555-
                     <span className="text-text-secondary">Fail-Closed Outreach Gate:</span>
                     {selectedLead.verificationStatus === 'VERIFIED' ? (
                       <span className="text-emerald-400 font-bold text-[10px]">
-                        AUTHORIZED FOR AUTONOMOUS DISPATCH
+                        IDENTITY VERIFIED; CHANNEL GATES APPLY
                       </span>
                     ) : (
                       <span className="text-rose-400 font-bold text-[10px]">
@@ -1663,6 +1703,35 @@ Next-Gen Waterproofing	Calgary	Waterproofing	Jane Smith	jane@nextgen.ca	403-555-
                   </div>
                 </div>
               </div>
+
+              {selectedLead.verificationStatus !== 'VERIFIED' && !isSelectedSynthetic && (
+                <div className="border-t border-border-dark/60 pt-4 space-y-3">
+                  <div className="space-y-1">
+                    <span className="text-[10px] font-mono uppercase tracking-widest text-text-dim block font-bold">Human identity confirmation</span>
+                    <p className="text-[10px] text-text-secondary leading-relaxed">A DNS and phone-format check does not prove this contact belongs to the named business. After checking an official website or trusted public listing, record the source and what you verified.</p>
+                  </div>
+                  <input
+                    value={identitySourceUrl}
+                    onChange={e => setIdentitySourceUrl(e.target.value)}
+                    placeholder="Public source URL (official site or business listing)"
+                    className="w-full bg-bg-base border border-border-dark rounded-sm px-3 py-2 text-[11px] text-text-primary"
+                  />
+                  <textarea
+                    value={identityConfirmationNotes}
+                    onChange={e => setIdentityConfirmationNotes(e.target.value)}
+                    placeholder="What did you verify? e.g. business name and listed phone match the official contact page."
+                    rows={3}
+                    className="w-full bg-bg-base border border-border-dark rounded-sm px-3 py-2 text-[11px] text-text-primary resize-y"
+                  />
+                  <button
+                    onClick={() => handleConfirmBusinessIdentity(selectedLead.id)}
+                    disabled={confirmingIdentity || selectedLead.verificationStatus === 'FABRICATED_REJECTED'}
+                    className="text-[10px] font-mono font-bold px-3 py-2 rounded-sm bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 disabled:opacity-50"
+                  >
+                    {confirmingIdentity ? 'Saving confirmation...' : 'Confirm business identity'}
+                  </button>
+                </div>
+              )}
 
             {/* Phase 2: Sourced Intelligence Audit Metrics */}
             {selectedLead.websiteUrl && (
@@ -1725,6 +1794,51 @@ Next-Gen Waterproofing	Calgary	Waterproofing	Jane Smith	jane@nextgen.ca	403-555-
                       )}
                     </div>
                   </div>
+                </div>
+
+                <div className="border-t border-border-dark/60 pt-4">
+                  <div className="flex items-center justify-between gap-2 mb-2">
+                    <span className="text-[10px] font-mono uppercase tracking-widest text-text-dim font-bold">Latest Saved Website Audit</span>
+                    {savedWebsiteAudit ? (
+                      <span className={`text-[9px] font-mono font-bold uppercase px-2 py-0.5 rounded border ${savedWebsiteAudit.status === 'measured' ? 'text-emerald-300 border-emerald-500/30 bg-emerald-500/10' : 'text-amber-300 border-amber-500/30 bg-amber-500/10'}`}>
+                        {savedWebsiteAudit.status === 'measured' ? 'MEASURED' : 'REVIEW REQUIRED'}
+                      </span>
+                    ) : (
+                      <span className="text-[9px] font-mono text-text-tertiary uppercase">Not run</span>
+                    )}
+                  </div>
+                  {savedWebsiteAudit ? (
+                    <div className="bg-card-inner p-3 rounded-sm border border-border-dark/60 space-y-2 font-mono text-[10px]">
+                      <div className="flex justify-between gap-3">
+                        <span className="text-text-secondary">Audited URL</span>
+                        <span className="text-text-primary text-right break-all">{savedWebsiteAudit.websiteUrl || selectedLead.websiteUrl}</span>
+                      </div>
+                      <div className="flex justify-between gap-3">
+                        <span className="text-text-secondary">HTTP status</span>
+                        <span className="text-text-primary">{savedWebsiteAudit.evidence?.statusCode ?? 'Not available'}</span>
+                      </div>
+                      <div className="flex justify-between gap-3">
+                        <span className="text-text-secondary">Page title</span>
+                        <span className="text-text-primary text-right max-w-[65%] break-words">{savedWebsiteAudit.measurements?.title || 'Not found'}</span>
+                      </div>
+                      <div className="flex justify-between gap-3">
+                        <span className="text-text-secondary">Audited at</span>
+                        <span className="text-text-primary">{savedWebsiteAudit.auditedAt ? new Date(savedWebsiteAudit.auditedAt).toLocaleString() : 'Not recorded'}</span>
+                      </div>
+                      {Array.isArray(savedWebsiteAudit.findings) && savedWebsiteAudit.findings.length > 0 ? (
+                        <ul className="list-disc pl-4 space-y-1 text-amber-200/90">
+                          {savedWebsiteAudit.findings.slice(0, 8).map((finding: string, index: number) => <li key={index}>{finding}</li>)}
+                        </ul>
+                      ) : (
+                        <p className="text-text-secondary">No findings were recorded within the limited single-page inspection scope.</p>
+                      )}
+                      <p className="text-text-tertiary text-[9px]">Single public HTML page only. No rankings, traffic, Core Web Vitals, conversion rates, or exploitability were measured.</p>
+                    </div>
+                  ) : (
+                    <p className="text-[10px] text-text-secondary bg-card-inner p-3 rounded-sm border border-border-dark/60">
+                      No website audit is saved to this lead yet. Run the existing Website Review & Technical Audit skill and select this prospect to attach its measured findings here.
+                    </p>
+                  )}
                 </div>
 
                 <div>

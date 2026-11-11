@@ -12,7 +12,7 @@ export const geoSkill: Skill = {
       label: 'Target City',
       type: 'string',
       required: true,
-      defaultValue: 'Winnipeg',
+      defaultValue: '',
     }
   ],
   execute: async (inputs, contractorId) => {
@@ -24,7 +24,7 @@ export const geoSkill: Skill = {
     try {
       // 1. Geocode the city via Open-Meteo's open service
       const geocodeUrl = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(city)}&count=1&language=en&format=json`;
-      const geoRes = await fetch(geocodeUrl);
+      const geoRes = await fetch(geocodeUrl, { signal: AbortSignal.timeout(7000) });
       if (!geoRes.ok) {
         throw new Error(`Geocoding request failed: ${geoRes.statusText}`);
       }
@@ -39,7 +39,7 @@ export const geoSkill: Skill = {
 
       // 2. Query actual weather data using Open-Meteo
       const weatherUrl = `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current_weather=true&hourly=precipitation,rain,snowfall&timezone=auto`;
-      const weatherRes = await fetch(weatherUrl);
+      const weatherRes = await fetch(weatherUrl, { signal: AbortSignal.timeout(7000) });
       if (!weatherRes.ok) {
         throw new Error(`Weather forecasting query failed: ${weatherRes.statusText}`);
       }
@@ -49,20 +49,26 @@ export const geoSkill: Skill = {
       const temp = current.temperature;
       const windspeed = current.windspeed;
       const weathercode = current.weathercode;
+      if (!Number.isFinite(temp) || !Number.isFinite(windspeed) || !Number.isFinite(weathercode)) {
+        throw new Error('Weather provider response did not include valid current weather measurements.');
+      }
       const hourly = weatherData.hourly || {};
-      const precipArray = hourly.precipitation || [0];
-      const recentPrecipSum = precipArray.slice(0, 12).reduce((sum: number, val: number) => sum + val, 0); // last 12 hrs
+      const precipArray = hourly.precipitation;
+      if (!Array.isArray(precipArray) || precipArray.length < 12 || !precipArray.slice(0, 12).every((value: unknown) => Number.isFinite(value))) {
+        throw new Error('Weather provider response did not include a complete next-12-hour precipitation series.');
+      }
+      const next12hPrecipitation = precipArray.slice(0, 12).reduce((sum: number, val: number) => sum + val, 0); // next 12 forecast hours
 
       // 3. Compute Home Services & Trade Demand Indices (HAL Heuristics)
       // High precipitation = high emergency service demand
-      const emergencyDemandIndex = Math.min(10, Math.round((recentPrecipSum * 2) + (weathercode === 80 || weathercode === 81 || weathercode === 82 ? 5 : 2)));
+      const emergencyDemandIndex = Math.min(10, Math.round((next12hPrecipitation * 2) + (weathercode === 80 || weathercode === 81 || weathercode === 82 ? 5 : 2)));
       // Temperature extremes = high HVAC & exterior demand
       const climateDemandIndex = Math.min(10, Math.round(temp < 0 ? Math.abs(temp) / 4 : temp > 28 ? (temp - 25) * 1.5 : 1));
 
       // 4. Formulate contextual strategic suggestions
       let strategy = '';
       if (emergencyDemandIndex > 6) {
-        strategy = `🚨 WARNING: High localized rainfall detected (${recentPrecipSum.toFixed(1)}mm). Emergency service demand is spiking. Recommend immediate email/text push to ${name} database for high-intent emergency service ads.`;
+        strategy = `🚨 WARNING: High localized rainfall detected (${next12hPrecipitation.toFixed(1)}mm in the next 12 forecast hours). Emergency service demand is spiking. Recommend immediate email/text push to ${name} database for high-intent emergency service ads.`;
       } else if (climateDemandIndex > 7) {
         strategy = `⚠️ EXTREME TEMPERATURE ADVISORY: Local temperature in ${name} is ${temp}°C. Climate control and exterior systems will face surge loads. Pivot ad bid strategies to capture emergency breakdown repairs.`;
       } else {
@@ -78,37 +84,19 @@ export const geoSkill: Skill = {
         temperature: temp,
         windspeed,
         weathercode,
-        recentPrecipitationMm: Number(recentPrecipSum.toFixed(2)),
+        next12hPrecipitationMm: Number(next12hPrecipitation.toFixed(2)),
         demandIndices: {
           emergencyDemand: emergencyDemandIndex,
           climateDemand: climateDemandIndex,
         },
         strategicActionableDirective: strategy,
+        demandIndexMethod: 'HAL heuristic based on current weather and the next 12 forecast hours; not a measured service-demand forecast.',
         fetchedAt: new Date().toISOString()
       };
 
     } catch (err: any) {
-      console.warn('Weather API failed, resolving graceful heuristic fallback:', err.message);
-      
-      // Beautiful, fallback system
-      const fallbackTemp = city.toLowerCase() === 'winnipeg' ? -5 : 12;
-      return {
-        success: true,
-        city,
-        region: 'Manitoba',
-        country: 'Canada',
-        coordinates: { latitude: 49.8951, longitude: -97.1384 },
-        temperature: fallbackTemp,
-        windspeed: 15,
-        weathercode: 3,
-        recentPrecipitationMm: 1.5,
-        demandIndices: {
-          sumpPumpDemand: 4,
-          hvacDemand: 6,
-        },
-        strategicActionableDirective: `Weather fallback mode active. Baseline Winnipeg temperature resolved at ${fallbackTemp}°C. Run static ad budget optimization models.`,
-        fetchedAt: new Date().toISOString()
-      };
+      console.warn('Live geocoding or weather data unavailable:', err?.message || err);
+      throw new Error(`Live weather data for "${city}" is unavailable right now. No substitute location or synthetic weather values were used.`);
     }
   }
 };

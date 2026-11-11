@@ -4,7 +4,7 @@ import { generateResponse } from '../services/nemotron';
 export const reviewBoosterSkill: Skill = {
   id: 'review_booster',
   name: 'Reputation & Review Booster',
-  description: "Constructs highly persuasive customer outreach sequences optimized for securing 5-star Google ratings using NEMOTRON.",
+  description: "Drafts neutral, honest review requests for all eligible customers. Does not incentivize reviews, filter negative feedback, or promise a rating outcome.",
   category: 'outreach',
   icon: 'Mail',
   inputs: [
@@ -20,7 +20,7 @@ export const reviewBoosterSkill: Skill = {
       label: 'Service Performed',
       type: 'string',
       required: true,
-      defaultValue: 'A/C Repair',
+      defaultValue: '',
     },
     {
       name: 'channel',
@@ -40,17 +40,17 @@ export const reviewBoosterSkill: Skill = {
 
 
     const systemPrompt = `You are HAL, the expert Customer Relations and Reputation Strategist. 
-You write extremely professional, direct, conversion-optimized review request scripts. No exclamation marks, no desperate filler.`;
+You write professional, neutral review requests. Ask for an honest review, never ask specifically for a positive or 5-star rating, never offer incentives, and never filter customers based on expected sentiment. Do not invent response-rate statistics.`;
 
-    const userPrompt = `Draft a review-acquisition script for a homeowner customer:
+    const userPrompt = `Draft a neutral request for an honest review from a customer:
 - Client Name: ${clientName}
 - Service Performed: ${servicePerformed}
 - Outreach Medium: ${channel}
 
 Structure the output as follows:
-1. COGNITIVE REASONING: Explain why this specific script layout minimizes friction and maximizes follow-through rates.
+1. REQUEST APPROACH: Explain how the wording is neutral and does not pressure the customer.
 2. OUTREACH TEMPLATE: The exact message copy ready for SMS or Email dispatch.
-3. CONVERSION BEST PRACTICES: 3 concrete action-points to implement when prompting homeowners for Google feedback.`;
+3. COMPLIANCE PRACTICES: 3 concrete actions that preserve unbiased review collection and comply with platform rules.`;
 
     let reportText = '';
 
@@ -71,10 +71,10 @@ Structure the output as follows:
 - **Gratitude Framing**: Reminds them of the exact value delivered (${servicePerformed}) and uses personal accountability rather than automated system wording.
 
 ### OUTREACH TEMPLATE (SMS Medium)
-"Hi ${clientName}, this is our service team. Hope your ${servicePerformed} is running perfectly. If you have 20 seconds, would you mind leaving us an honest rating on Google? It helps local homeowners find us. Click here: [INSERT_GOOGLE_REVIEW_LINK] - Thank you!"
+"Hi ${clientName}, this is our service team. We would appreciate an honest review of your ${servicePerformed} experience. Please share what went well and what we could improve. It helps local homeowners find us. Click here: [INSERT_GOOGLE_REVIEW_LINK] - Thank you!"
 
 ### CONVERSION BEST PRACTICES
-1. **Timing Priority**: Dispatch the message within 2 hours of completing the job. Feedback response rates drop by 65% after 24 hours.
+1. **Timing Priority**: Dispatch the message within 2 hours of completing the job. Send the request after the service is complete, at a time consistent with the customer's communication preferences.
 2. **Personal Ask**: The technician should mention the request verbally prior to leaving the property.
 3. **One-Click Link**: Always supply a direct link to the Google Business profile review modal, not just the website.`;
       } else {
@@ -87,9 +87,9 @@ Structure the output as follows:
 
 "Dear ${clientName},
 
-Thank you for trusting us to handle your ${servicePerformed} yesterday. Our goal is always to deliver clean, professional, and reliable work.
+Thank you for choosing us for your ${servicePerformed}. Our goal is always to deliver clean, professional, and reliable work.
 
-If you are satisfied with our service, would you be open to writing a brief 1-2 sentence review of your experience? Your feedback helps our family-owned business grow and assists other families in our community in finding reliable technicians.
+Would you be open to writing an honest 1–2 sentence review of your experience, whether positive or negative? Your feedback helps us improve and helps other customers make informed decisions.
 
 You can leave your feedback in just one click here:
 [INSERT_GOOGLE_REVIEW_LINK]
@@ -102,7 +102,7 @@ Our Service Team"
 ### CONVERSION BEST PRACTICES
 1. **Remove Form Obstacles**: Keep the review link completely isolated on its own line for maximum layout visual hierarchy.
 2. **Follow-Up Cadence**: If they do not respond to the first request, send a single polite follow-up exactly 3 days later.
-3. **Incentivize Techs**: Offer technicians a $10 bonus for every review that mentions their name to drive team alignment.`;
+3. **No incentives or gating**: Do not offer rewards for reviews, ask only satisfied customers, or suppress negative feedback.`;
       }
     }
 

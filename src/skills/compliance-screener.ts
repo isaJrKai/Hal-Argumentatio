@@ -1,88 +1,55 @@
 import { Skill } from './types';
-import { generateResponse } from '../services/nemotron';
 
 export const complianceScreenerSkill: Skill = {
   id: 'compliance_screener',
-  name: 'KYC/KYB, AML & Sanctions Compliance Screener',
-  description: 'Runs real-time screenings against global sanctions watchlists (OFAC, EU, UN), politically exposed persons (PEP) registers, and adverse media databases.',
+  name: 'KYC/KYB Screening Preparation',
+  description: 'Prepares a source-led compliance screening checklist. No sanctions, PEP, beneficial-ownership, or adverse-media database is queried by this capability; results remain unknown until an authorized screening provider is connected.',
   category: 'research',
   icon: 'Shield',
   inputs: [
-    {
-      name: 'subjectName',
-      label: 'Subject / Company Name',
-      type: 'string',
-      required: true,
-      defaultValue: '',
-    },
-    {
-      name: 'country',
-      label: 'Country of Operation',
-      type: 'string',
-      required: true,
-      defaultValue: 'United States',
-    }
+    { name: 'subjectName', label: 'Subject / Company Name', type: 'string', required: true, defaultValue: '' },
+    { name: 'country', label: 'Country of Operation', type: 'string', required: true, defaultValue: '' }
   ],
-  execute: async (inputs, contractorId) => {
-    const { subjectName, country } = inputs;
-    if (!subjectName) {
-      throw new Error('Subject Name is required for Compliance Screening');
+  execute: async (inputs) => {
+    const subjectName = String(inputs.subjectName || '').trim();
+    const country = String(inputs.country || '').trim();
+    if (!subjectName || !country) {
+      throw new Error('Subject Name and Country of Operation are required.');
     }
 
-    const systemPrompt = `You are HAL, Chief AML Compliance Auditor. 
-Your tone is clinical, exact, and risk-sensitive. Use clean data structures and highly detailed compliance analysis tables.`;
-
-    const userPrompt = `Perform a KYC/KYB & Sanctions Compliance check for:
-- Subject Name: ${subjectName}
-- Country of Operation: ${country}
-
-Output an AML audit dossier:
-1. SANCTIONS WATCHLIST MATCHES: Check OFAC SDN, UK HM Treasury, EU Financial Sanctions, and UN lists.
-2. PEP (POLITICALLY EXPOSED PERSON) SCREENING: Analyze associated board members, directors, and beneficial owners.
-3. ADVERSE MEDIA PROFILE: Detail media sentiment, regulatory enforcement actions, or operational integrity flags.
-4. FINAL AML CERTIFICATION STATUS: State the Risk Rating (Low / Medium / High / Critical) and recommended mitigation measures.`;
-
-    let reportText = '';
-
-    try {
-      reportText = await generateResponse(
-        userPrompt,
-        systemPrompt,
-        0.1
-      );
-    } catch (err) {
-      console.error('NEMOTRON call failed during Compliance Screening. Using fallback.', err);
-    }
-
-    if (!reportText) {
-      reportText = `### SANCTIONS WATCHLIST MATCHES
-- **Subject Name**: ${subjectName}
-- **Country**: ${country}
-- **OFAC SDN List**: NO MATCH (0% similarity match on principal and sub-aliases)
-- **EU/UN Sanctions Register**: NO MATCH
-- **UK HM Treasury Consolidated List**: NO MATCH
-
-### PEP (POLITICALLY EXPOSED PERSON) SCREENING
-- **Ultimate Beneficial Owners (UBO)**: Mapped 3 active corporate officers.
-- **PEP Register Hits**: NO HITS (All identified officers are cleared of political ties, public office exposure, or state-owned enterprise leadership).
-
-### ADVERSE MEDIA PROFILE
-- **Web & News Crawler Analysis**: Scanned major local and international business registers.
-- **Negative News Volume**: 0 articles flagged. No historical associations with financial fraud, embezzlement, environmental damage, or labor violations.
-
-### FINAL AML CERTIFICATION STATUS
-- **AML RISK LEVEL**: **LOW RISK**
-- **Action Plan**:
-  1. No enhanced due diligence (EDD) required. Proceed with standard customer due diligence (CDD).
-  2. Re-screen automatically in 12 months (standard annual compliance cycle).
-  3. Log current beneficial owner registrations in compliance archives.`;
-    }
+    const report = [
+      '### KYC / KYB SCREENING STATUS',
+      '- **Subject:** ' + subjectName,
+      '- **Country:** ' + country,
+      '- **Screening performed:** No',
+      '- **Sanctions result:** Unknown — no sanctions-list provider was queried.',
+      '- **PEP result:** Unknown — no PEP data provider was queried.',
+      '- **Adverse-media result:** Unknown — no news or adverse-media search was performed.',
+      '- **Beneficial ownership:** Not established.',
+      '',
+      '### REQUIRED CHECKS BEFORE A DECISION',
+      '- Verify the legal entity and registration number with the official corporate registry in the relevant jurisdiction.',
+      '- Screen the exact legal name and known aliases against current official sanctions lists (including OFAC, UN, EU, and applicable national lists).',
+      '- Identify and verify beneficial owners and relevant directors using authoritative records.',
+      '- Screen relevant persons for PEP exposure and adverse media using a documented, authorized source.',
+      '- Resolve potential name matches using date of birth, jurisdiction, identifiers, and source records; do not treat a name-only match as a confirmed hit.',
+      '- Record source URLs, retrieval dates, reviewer, match rationale, and escalation outcome.',
+      '',
+      '### DECISION',
+      '**No AML risk rating or clearance can be issued from this result.** Do not approve, reject, or onboard the subject on the basis of this checklist alone.'
+    ].join('\n');
 
     return {
       success: true,
       subjectName,
       country,
-      report: reportText,
+      screeningPerformed: false,
+      evidenceStatus: 'no_external_screening_provider_queried',
+      sanctionsMatches: null,
+      pepMatches: null,
+      adverseMediaMatches: null,
+      riskRating: null,
+      report,
       executedAt: new Date().toISOString()
     };
   }

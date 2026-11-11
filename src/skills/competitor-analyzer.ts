@@ -4,7 +4,7 @@ import { generateResponse } from '../services/nemotron';
 export const competitorAnalyzerSkill: Skill = {
   id: 'competitor_analyzer',
   name: 'Local Competitor & Maps Analyzer',
-  description: "Audits localized Google Maps pack competitors, identifies reviews deficits, and drafts a market penetration plan using NEMOTRON.",
+  description: "Builds a competitor research plan from user-supplied competitor names. Does not query live Google Maps, rankings, reviews, or market-share data.",
   category: 'research',
   icon: 'Map',
   inputs: [
@@ -27,7 +27,7 @@ export const competitorAnalyzerSkill: Skill = {
       label: 'Direct Competitors (Comma separated)',
       type: 'string',
       required: false,
-      defaultValue: 'Roto-Rooter, Benjamin Franklin Plumbing',
+      defaultValue: '',
     }
   ],
   execute: async (inputs, contractorId) => {
@@ -38,18 +38,21 @@ export const competitorAnalyzerSkill: Skill = {
 
 
 
-    const systemPrompt = `You are HAL, the premier Local Market Penetration Planner. 
-Your analysis is Swiss-style, objective, data-driven, and highly actionable. No fluff or conversational filler.`;
-
-    const userPrompt = `Generate a localized competitor maps pack audit and strategic penetration plan:
-- Target Territory: ${city}
-- Industry Niche: ${niche}
-- Provided Competitor Names: ${competitorNames || 'Unspecified'}
-
-Compile the report following this structure:
-1. TERRITORY PENETRATION DIFFICULTY: Map the baseline competition volume in ${city} for ${niche} services and determine if the market is saturated or open.
-2. COMPETITIVE DEFICIT MATRIX: Contrast the main visual indicators (Review counts, rating averages, website speed, photo density, and GMB posting activity).
-3. MAPS PACK PENETRATION PLAN: A 4-step tactical blueprint on how to secure a top-3 spot in the local maps pack.`;
+    const systemPrompt = 'You are HAL, a careful local-market research planner. Do not invent live Google Maps results, competitor ratings, review counts, posting frequency, market saturation, rankings, or market share. Clearly distinguish supplied names from verified external facts.';
+    const userPrompt = [
+      'Create a localized competitor research plan, not a claim that a live audit has been run.',
+      'Target territory: ' + city,
+      'Industry niche: ' + niche,
+      'User-supplied competitor names: ' + (competitorNames || 'None'),
+      '',
+      'Requirements:',
+      '1. State that no live Google Maps or search results were queried.',
+      '2. Provide a comparison template for rating, review count/date, website, service area, photos, and posting activity. Leave unknown values blank or unavailable.',
+      '3. Suggest testable research questions without claiming market saturation or competitor weaknesses.',
+      '4. Provide ethical local SEO steps without promising a top-three Maps position.',
+      '5. Do not invent statistics, ratings, review counts, market share, backlinks, or ranking positions.',
+      'Return concise Markdown.'
+    ].join('\n');
 
     let reportText = '';
 
@@ -64,20 +67,26 @@ Compile the report following this structure:
     }
 
     if (!reportText) {
-      reportText = `### TERRITORY PENETRATION DIFFICULTY
-The baseline market saturation level for **${niche}** services in **${city}** is rated as **MEDIUM-HIGH**. High volume national franchises like **${competitorNames || 'Roto-Rooter'}** dominate localized search nodes, but they exhibit significant customer service review fatigue, showing rating averages below 4.4. This creates a highly profitable organic entry window for a dedicated, high-quality local provider.
-
-### COMPETITIVE DEFICIT MATRIX
-An audit of local directory listings and map-pack positions highlights the following gaps:
-- **Review Volume Gaps**: National chains possess higher overall numbers but lack continuous fresh reviews. Most review cycles are stale (older than 60 days).
-- **GMB Post Frequencies**: Under 15% of active local providers publish weekly Google Business updates, resulting in stagnant listing trust weights.
-- **Visual Deficit**: Competitor profiles rely on generic stock photography. Original, geo-tagged on-site team photos are missing, reducing customer trust metrics.
-
-### MAPS PACK PENETRATION PLAN
-1. **Target Specific Sub-Zip Codes**: Focus listing keywords on smaller high-value surrounding neighborhoods rather than the generic city center to secure immediate map pack visibility.
-2. **Execute a 30-Day Photo Blitz**: Upload 25 original, high-resolution, mobile-captured, geo-tagged photos of real service vans and technicians at actual jobs inside the target zip codes.
-3. **Automate Fresh Review Capture**: Implement a post-service trigger via SMS (e.g., using the Reputation booster script) to generate a constant run of 5-star reviews containing niche-related keywords (like "${niche} repair in ${city}").
-4. **Publish Weekly Local Offers**: Maintain continuous algorithmic activity on your listing by publishing a weekly "Local Special Offer" post with a direct call-to-action button linking to your conversion landing page.`;
+      const names = String(competitorNames || '').split(',').map(name => name.trim()).filter(Boolean);
+      reportText = [
+        '### RESEARCH SCOPE',
+        'No live Google Maps or search-results data was queried. The names below are user-supplied and have not been independently verified.',
+        '',
+        '### COMPETITOR COMPARISON TEMPLATE',
+        ...(names.length ? names.map(name => '- ' + name + ': rating unknown; review count unknown; recent review activity unknown; website and service area require checking.') : ['- No competitor names were supplied. Identify nearby providers from current public listings before comparing them.']),
+        '',
+        '### TESTABLE OPPORTUNITIES',
+        '- Compare service coverage, contact options, project evidence, accessibility, and clarity of service pages using current public sources.',
+        '- Record source URLs and observation dates. Do not infer customer dissatisfaction from review counts alone.',
+        '',
+        '### LOCAL SEO PLAN',
+        '- Complete the business profile accurately and keep hours, categories, services, and contact details current.',
+        '- Publish genuine project photos and useful service-area information.',
+        '- Request honest reviews from all eligible customers without incentives or review gating.',
+        '- Track actual enquiries and outcomes before attributing revenue or ranking changes.',
+        '',
+        '**Unavailable:** market saturation, Maps rankings, competitor ratings, review volumes, backlink counts, and share of voice.'
+      ].join('\n');
     }
 
     return {
@@ -85,6 +94,7 @@ An audit of local directory listings and map-pack positions highlights the follo
       city,
       niche,
       competitorNames,
+      evidenceStatus: 'no_live_competitor_data_queried',
       report: reportText,
       executedAt: new Date().toISOString()
     };

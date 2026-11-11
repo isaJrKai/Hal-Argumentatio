@@ -1,85 +1,65 @@
 import { Skill } from './types';
-import { generateResponse } from '../services/nemotron';
 
 export const patentLandscapeSkill: Skill = {
   id: 'patent_landscape',
-  name: 'IP, Patent & Trademark Landscape Auditor',
-  description: 'Audits trademark registry databases, analyzes patent portfolios, and maps regulatory compliance barriers for new business brands or local products.',
-  category: 'seo', // Maps nicely under SEO/Semantic Category
+  name: 'IP Search Preparation & Landscape Plan',
+  description: 'Prepares a trademark, patent, and regulatory research plan. It does not query trademark registries, patent databases, or issue legal clearance.',
+  category: 'research',
   icon: 'Globe',
   inputs: [
-    {
-      name: 'proposedBrand',
-      label: 'Proposed Brand / Product Name',
-      type: 'string',
-      required: true,
-      defaultValue: '',
-    },
-    {
-      name: 'industrySector',
-      label: 'Industry / Product Sector',
-      type: 'string',
-      required: true,
-      defaultValue: 'SaaS Software',
-    }
+    { name: 'proposedBrand', label: 'Proposed Brand / Product Name', type: 'string', required: true, defaultValue: '' },
+    { name: 'industrySector', label: 'Industry / Product Sector', type: 'string', required: true, defaultValue: '' },
+    { name: 'jurisdiction', label: 'Target Jurisdictions', type: 'string', required: false, defaultValue: '' }
   ],
-  execute: async (inputs, contractorId) => {
-    const { proposedBrand, industrySector } = inputs;
-    if (!proposedBrand) {
-      throw new Error('Proposed Brand Name is required for IP Landscape Audit');
-    }
+  execute: async (inputs) => {
+    const proposedBrand = String(inputs.proposedBrand || '').trim();
+    const industrySector = String(inputs.industrySector || '').trim();
+    const jurisdiction = String(inputs.jurisdiction || '').trim();
+    if (!proposedBrand || !industrySector) throw new Error('Proposed Brand and Industry Sector are required.');
 
-    const systemPrompt = `You are HAL, Chief intellectual Property & Regulatory Compliance Counsel. 
-Your tone is clinical, meticulous, and legally robust. Use high-density bullet points and precise legal risk tiers.`;
-
-    const userPrompt = `Audit the intellectual property landscape for the proposed concept:
-- Proposed Brand: ${proposedBrand}
-- Industry Sector: ${industrySector}
-
-Generate an IP Clearance Dossier:
-1. TRADEMARK SEARCH ANALYSIS: Audit major trademark systems (USPTO, WIPO) for phonetically or semantically similar marks in matching international classes.
-2. PATENT FILING LANDSCAPE: Map active patent portfolios, competitive overlaps, or high-risk claims in the specified tech space.
-3. REGULATORY COMPLIANCE AND LICENSING: List state/federal licensing, FCC/FDA, data privacy (GDPR/CCPA), or certifications required.
-4. INTELLECTUAL PROPERTY ACTION PLAN: 3 strategic steps to clear, register, and safeguard the brand.`;
-
-    let reportText = '';
-
-    try {
-      reportText = await generateResponse(
-        userPrompt,
-        systemPrompt,
-        0.15
-      );
-    } catch (err) {
-      console.error('NEMOTRON call failed during IP Landscape Audit. Using fallback.', err);
-    }
-
-    if (!reportText) {
-      reportText = `### TRADEMARK SEARCH ANALYSIS
-- **Proposed Mark**: ${proposedBrand}
-- **Industry Classification**: Class 9 (Software) / Class 42 (SaaS)
-- **USPTO Database Sweep**: No exact duplicates detected. 2 semantically related marks found with low risk of consumer confusion.
-- **WIPO Madrid Register**: Clear. No international filings present with conflicting semantic elements.
-
-### PATENT FILING LANDSCAPE
-- **Competitive Patent Overlaps**: Low risk of utility patent encroachment. Most core concepts in ${proposedBrand}'s proposed sector rely on standard public domain cloud architectures.
-- **Defensive Recommendations**: Standardize software implementations using proprietary microservices to leverage trade secret protections.
-
-### REGULATORY COMPLIANCE & LICENSING
-- **Privacy Framework Standards**: Must maintain strict compliance with GDPR and California Consumer Privacy Act (CCPA) standards since it targets digital audiences.
-- **Corporate Certifications**: Recommend pursuing SOC 2 Type II compliance within 12 months to establish client trust.
-
-### INTELLECTUAL PROPERTY ACTION PLAN
-1. **File USPTO Intent-to-Use (ITU) Application**: Register "${proposedBrand}" immediately under Class 42 to secure priority dates.
-2. **Draft Comprehensive Terms of Service & Privacy Policy**: Ensure robust data ownership covenants protecting internal algorithm weights.
-3. **Establish Trademark Watch Program**: Automate weekly sweeps of newly filed applications in matching sectors to prevent infringement.`;
-    }
+    const report = [
+      '### IP RESEARCH SCOPE',
+      '- **Proposed mark:** ' + proposedBrand,
+      '- **Industry:** ' + industrySector,
+      '- **Jurisdictions:** ' + (jurisdiction || 'Not supplied'),
+      '- **Registry searches performed:** No',
+      '- **Trademark clearance:** Not assessed',
+      '- **Patent freedom-to-operate:** Not assessed',
+      '- **Regulatory determination:** Not assessed',
+      '',
+      '### TRADEMARK SEARCH PLAN',
+      '- Search exact, phonetic, visual, and conceptually similar marks in each target jurisdiction.',
+      '- Check relevant goods/services classes and related classes.',
+      '- Review pending, registered, expired, opposed, and cancelled records.',
+      '- Retain registry URLs, application numbers, status, owner, filing date, and retrieval date.',
+      '- Escalate confusingly similar marks to qualified trademark counsel; do not rely on a name-only search.',
+      '',
+      '### PATENT LANDSCAPE PLAN',
+      '- Search relevant patent databases using product functions, technical features, inventors, assignees, and classifications.',
+      '- Review claim scope, priority dates, family members, legal status, and jurisdictions.',
+      '- Separate expired patents, pending applications, and active granted claims.',
+      '- Obtain a professional freedom-to-operate opinion before commercial launch where appropriate.',
+      '',
+      '### REGULATORY AND LICENSING PLAN',
+      '- Identify applicable sector regulators and product/service-specific licences in each target jurisdiction.',
+      '- Map privacy, consumer protection, safety, labelling, and certification obligations to the actual product.',
+      '- Record official regulator sources and effective dates.',
+      '',
+      '**Decision status: NOT CLEARED.** No USPTO, WIPO, patent-office, or regulator database was queried by this skill. No absence of conflicts or legal safety can be inferred.'
+    ].join('\n');
 
     return {
       success: true,
       proposedBrand,
       industrySector,
-      report: reportText,
+      jurisdiction: jurisdiction || null,
+      searchPerformed: false,
+      clearanceStatus: 'NOT_ASSESSED',
+      trademarkMatches: null,
+      patentFindings: null,
+      regulatoryFindings: null,
+      evidenceStatus: 'research_plan_only_no_registry_queries',
+      report,
       executedAt: new Date().toISOString()
     };
   }

@@ -49,6 +49,7 @@ import { buildHalMcpServer } from './src/services/mcp/halMcpServer';
 import { HERMES_LAB_CATALOG, executeHermesLabTool, chatWithHermesAgent, LabToolType } from './src/services/hermesLab';
 import { generateContractorLandingPage, regenerateLandingSection } from './src/services/landingGenerator';
 import { generateLandingPageHtml } from './src/components/landing/htmlGenerator';
+import type { LandingPageConfig } from './src/components/landing/types';
 import { validateCrmTransition, isKnownCrmStage } from './src/lib/crmStateMachine';
 import { buildFinancialSnapshotCore } from './src/lib/financialSnapshot';
 import { getRevenueAmountUsd } from './src/lib/revenueAmounts';
@@ -2168,73 +2169,263 @@ app.post('/api/landing-pages/regenerate-section', authenticate, async (req, res)
 
 app.post('/api/landing-pages/save', authenticate, async (req, res) => {
   const contractorId = (req as any).contractorId;
-  const { id, title, pageConfig } = req.body || {};
+  const { id, title, pageConfig, leadId } = req.body || {};
 
   if (typeof title !== 'string' || !title.trim() || title.length > 160 ||
       !pageConfig || typeof pageConfig !== 'object' || Array.isArray(pageConfig) ||
       JSON.stringify(pageConfig).length > 80_000 ||
-      (id !== undefined && (typeof id !== 'string' || id.length > 128))) {
-    return res.status(400).json({ success: false, error: 'A valid title and landing-page configuration are required.' });
+      (id !== undefined && (typeof id !== 'string' || id.length > 128)) ||
+      (leadId !== undefined && leadId !== null && (typeof leadId !== 'string' || leadId.length > 128))) {
+    return res.status(400).json({ success: false, error: 'A valid title, landing-page configuration, and optional saved lead are required.' });
   }
 
   try {
     const artifactId = typeof id === 'string' && id.length > 5 ? id : ('lp_' + crypto.randomUUID().slice(0, 8));
-    const ownedPageConfig = { ...pageConfig, id: artifactId, contractorId };
+    let sourceLead: any = null;
+    const requestedLeadId = typeof leadId === 'string' && leadId.trim()
+      ? leadId.trim()
+      : (typeof pageConfig.sourceLeadId === 'string' ? pageConfig.sourceLeadId.trim() : '');
+
+    if (requestedLeadId) {
+      const [ownedLead] = await pgDb.select().from(leads).where(and(
+        eq(leads.id, requestedLeadId),
+        eq(leads.contractorId, contractorId)
+      )).limit(1);
+      if (!ownedLead) return res.status(404).json({ success: false, error: 'The selected prospect was not found in this workspace.' });
+      sourceLead = ownedLead;
+    }
+
+    const sourcePhone = sourceLead
+      ? (sourceLead.phoneEncrypted ? (decrypt(sourceLead.phoneEncrypted) || sourceLead.phone) : sourceLead.phone)
+      : null;
+    const sourceEvidence = sourceLead?.groundingEvidence && typeof sourceLead.groundingEvidence === 'object'
+      ? sourceLead.groundingEvidence as Record<string, any>
+      : {};
+    const sourceAudit = sourceEvidence.websiteAudit && typeof sourceEvidence.websiteAudit === 'object'
+      ? sourceEvidence.websiteAudit
+      : null;
+    const ownedPageConfig: Record<string, any> = {
+      ...pageConfig,
+      ...(sourceLead ? {
+        businessName: sourceLead.businessName,
+        city: sourceLead.city,
+        ...(sourcePhone ? { phone: sourcePhone } : {})
+      } : {}),
+      id: artifactId,
+      contractorId,
+      ...(sourceLead ? { sourceLeadId: sourceLead.id } : {})
+    };
+    let savedTitle = title.trim();
+
+    if (sourceLead) {
+      const trade = String(sourceLead.niche || pageConfig.trade || 'services').replace(/_/g, ' ');
+      savedTitle = `${sourceLead.businessName} — ${trade} Services in ${sourceLead.city}`;
+      ownedPageConfig.title = savedTitle;
+
+      if (ownedPageConfig.seo && typeof ownedPageConfig.seo === 'object') {
+        if (/your business name|your service area/i.test(String(ownedPageConfig.seo.metaTitle || ''))) {
+          ownedPageConfig.seo.metaTitle = `${sourceLead.businessName} — ${trade} in ${sourceLead.city}`;
+        }
+        if (/your business name|your service area/i.test(String(ownedPageConfig.seo.metaDescription || ''))) {
+          ownedPageConfig.seo.metaDescription = `${sourceLead.businessName} provides ${trade} services in ${sourceLead.city}. Contact the business for current service details.`;
+        }
+      }
+
+      if (ownedPageConfig.sections?.hero) {
+        if (/in your area/i.test(String(ownedPageConfig.sections.hero.headline || ''))) {
+          ownedPageConfig.sections.hero.headline = `${trade} services in ${sourceLead.city}`;
+        }
+        if (/describe the services your business provides/i.test(String(ownedPageConfig.sections.hero.subheadline || ''))) {
+          ownedPageConfig.sections.hero.subheadline = `Contact ${sourceLead.businessName} to discuss ${trade} services in ${sourceLead.city}. Confirm availability and scope with the team.`;
+        }
+      }
+      if (/add the business address or remove/i.test(String(ownedPageConfig.sections?.footer?.address || ''))) {
+        ownedPageConfig.sections.footer.address = '';
+      }
+    }
+
     // Never trust client-supplied rendered HTML. Render from the validated,
     // tenant-owned configuration using the escaping server-side generator.
-    const ownedRenderedHtml = generateLandingPageHtml(ownedPageConfig);
+    const ownedRenderedHtml = generateLandingPageHtml(ownedPageConfig as LandingPageConfig);
 
     const [existing] = await pgDb
       .select()
       .from(hermesLabArtifacts)
       .where(and(eq(hermesLabArtifacts.id, artifactId), eq(hermesLabArtifacts.contractorId, contractorId)));
 
+    const content = {
+      pageConfig: ownedPageConfig,
+      renderedOutput: ownedRenderedHtml,
+      sourceLeadId: sourceLead?.id || null,
+      sourceAuditId: sourceAudit?.auditId || null,
+      sourceAuditAt: sourceAudit?.auditedAt || null
+    };
+
     await recordWorkEvent(pgDb, {
-      contractorId, eventType: existing ? 'landing_page.updated' : 'landing_page.saved',
-      entityType: 'landing_page', entityId: artifactId, actorType: 'human', actorId: contractorId,
-      sourceModule: 'landing_page_studio', correlationId: artifactId,
-      summary: `${existing ? 'Updated' : 'Saved'} landing page: ${title}.`, payload: { title }
+      contractorId,
+      eventType: existing ? 'landing_page.updated' : 'landing_page.saved',
+      entityType: 'landing_page',
+      entityId: artifactId,
+      actorType: 'human',
+      actorId: contractorId,
+      sourceModule: 'landing_page_studio',
+      correlationId: artifactId,
+      summary: `${existing ? 'Updated' : 'Saved'} landing page: ${savedTitle}.`,
+      payload: { title: savedTitle, sourceLeadId: sourceLead?.id || null, sourceAuditId: sourceAudit?.auditId || null }
     });
 
     if (existing) {
-      await pgDb
-        .update(hermesLabArtifacts)
-        .set({
-          title,
-          content: {
-            pageConfig: ownedPageConfig,
-            renderedOutput: ownedRenderedHtml
-          },
-          status: 'ready',
-          updatedAt: new Date()
-        })
-        .where(and(eq(hermesLabArtifacts.id, artifactId), eq(hermesLabArtifacts.contractorId, contractorId)));
+      await pgDb.update(hermesLabArtifacts).set({
+        title: savedTitle,
+        content,
+        status: 'draft',
+        updatedAt: new Date()
+      }).where(and(eq(hermesLabArtifacts.id, artifactId), eq(hermesLabArtifacts.contractorId, contractorId)));
     } else {
       await pgDb.insert(hermesLabArtifacts).values({
         id: artifactId,
         contractorId,
         toolId: 'landing_page',
         category: 'web',
-        title,
-        status: 'ready',
-        content: {
-          pageConfig: ownedPageConfig,
-          renderedOutput: ownedRenderedHtml
-        },
+        title: savedTitle,
+        status: 'draft',
+        content,
         createdAt: new Date(),
         updatedAt: new Date()
       });
     }
 
-    res.json({
+    return res.json({
       success: true,
       id: artifactId,
       contractorId,
-      liveUrl: `/landing/${artifactId}`
+      title: savedTitle,
+      sourceLeadId: sourceLead?.id || null,
+      sourceAuditId: sourceAudit?.auditId || null,
+      draftUrl: `/landing/${artifactId}`,
+      published: false
     });
   } catch (err: any) {
     console.error('[Save Landing Page Error]', err);
-    res.status(500).json({ success: false, error: err.message });
+    return res.status(503).json({ success: false, error: err.message || 'Landing page could not be saved.' });
+  }
+});
+
+
+app.post('/api/landing-pages/:id/publish', authenticate, async (req, res) => {
+  const contractorId = (req as any).contractorId;
+  if (req.body?.confirmPublish !== true || req.body?.contentReviewed !== true) {
+    return res.status(400).json({ success: false, error: 'Explicit publish confirmation and content-review acknowledgement are required.' });
+  }
+
+  try {
+    const [artifact] = await pgDb.select().from(hermesLabArtifacts).where(and(
+      eq(hermesLabArtifacts.id, req.params.id),
+      eq(hermesLabArtifacts.contractorId, contractorId),
+      eq(hermesLabArtifacts.toolId, 'landing_page')
+    )).limit(1);
+    if (!artifact) return res.status(404).json({ success: false, error: 'Landing page draft not found.' });
+
+    const content = artifact.content && typeof artifact.content === 'object'
+      ? artifact.content as Record<string, any>
+      : {};
+    const pageConfig = content.pageConfig && typeof content.pageConfig === 'object'
+      ? content.pageConfig as Record<string, any>
+      : {};
+    if (!String(pageConfig.businessName || '').trim() || !String(pageConfig.city || '').trim() ||
+        String(pageConfig.businessName).trim().toLowerCase() === 'your business name' ||
+        String(pageConfig.city).trim().toLowerCase() === 'your service area' ||
+        /your business name|your service area/i.test(String(pageConfig.title || artifact.title || ''))) {
+      return res.status(409).json({ success: false, error: 'Replace the template page title, business name, and service area with accurate details before publishing.' });
+    }
+
+    const seoConfig = pageConfig.seo && typeof pageConfig.seo === 'object' ? pageConfig.seo : {};
+    if (/your business name|your service area|learn about the services offered by/i.test(String(seoConfig.metaTitle || '')) ||
+        /your business name|your service area|learn about the services offered by/i.test(String(seoConfig.metaDescription || ''))) {
+      return res.status(409).json({ success: false, code: 'SEO_PLACEHOLDER_CONTENT', error: 'Replace the default SEO title and description with accurate business-specific metadata before publishing.' });
+    }
+
+    const pageSections = pageConfig.sections && typeof pageConfig.sections === 'object' ? pageConfig.sections : {};
+    const heroBadge = String(pageSections.hero?.badgeText || '');
+    const licenseText = String(pageConfig.licenseNumber || '');
+    const serviceTitle = String(pageSections.services?.title || '');
+    const serviceSubtitle = String(pageSections.services?.subtitle || '');
+    const footerAddress = String(pageSections.footer?.address || '');
+    if (/add verified|remove this field|placeholder/i.test(heroBadge) ||
+        /add verified|remove this field|placeholder/i.test(licenseText) ||
+        /suggested services/i.test(serviceTitle) ||
+        /keep only the services your business actually provides/i.test(serviceSubtitle) ||
+        /add the business address or remove/i.test(footerAddress)) {
+      return res.status(409).json({
+        success: false,
+        code: 'TEMPLATE_CONTENT_REQUIRES_REVIEW',
+        error: 'This page still contains template instructions or placeholder content. Replace or remove each placeholder before publishing.'
+      });
+    }
+
+    const sourceLeadId = typeof content.sourceLeadId === 'string'
+      ? content.sourceLeadId
+      : (typeof pageConfig.sourceLeadId === 'string' ? pageConfig.sourceLeadId : '');
+    if (sourceLeadId) {
+      const [sourceLead] = await pgDb.select({
+        id: leads.id,
+        businessName: leads.businessName,
+        city: leads.city,
+        verificationStatus: leads.verificationStatus,
+        groundingEvidence: leads.groundingEvidence,
+        isSynthetic: leads.isSynthetic
+      }).from(leads).where(and(
+        eq(leads.id, sourceLeadId),
+        eq(leads.contractorId, contractorId)
+      )).limit(1);
+      if (!sourceLead) return res.status(409).json({ success: false, error: 'Linked prospect is no longer available in this workspace.' });
+      const identityEvidence = sourceLead.groundingEvidence && typeof sourceLead.groundingEvidence === 'object'
+        ? sourceLead.groundingEvidence as Record<string, any>
+        : {};
+      if (sourceLead.isSynthetic || sourceLead.verificationStatus !== 'VERIFIED' || identityEvidence.businessIdentityConfirmed !== true) {
+        return res.status(409).json({
+          success: false,
+          code: 'SOURCE_LEAD_NOT_VERIFIED',
+          error: 'This page is linked to a prospect whose business identity has not been human-confirmed. Verify the prospect before publishing.'
+        });
+      }
+      if (pageConfig.businessName !== sourceLead.businessName || pageConfig.city !== sourceLead.city) {
+        return res.status(409).json({ success: false, error: 'The page business name or city no longer matches its verified CRM prospect. Reload the prospect context and save again.' });
+      }
+    }
+
+    const now = new Date();
+    await pgDb.update(hermesLabArtifacts).set({
+      status: 'deployed',
+      updatedAt: now
+    }).where(and(
+      eq(hermesLabArtifacts.id, artifact.id),
+      eq(hermesLabArtifacts.contractorId, contractorId)
+    ));
+
+    await recordWorkEvent(pgDb, {
+      contractorId,
+      eventType: 'landing_page.published',
+      entityType: 'landing_page',
+      entityId: artifact.id,
+      actorType: 'human',
+      actorId: contractorId,
+      sourceModule: 'landing_page_studio',
+      correlationId: artifact.id,
+      summary: `Published landing page: ${artifact.title}.`,
+      payload: { sourceLeadId: sourceLeadId || null, sourceAuditId: content.sourceAuditId || null, contentReviewed: true, publishedAt: now.toISOString() }
+    });
+
+    return res.json({
+      success: true,
+      id: artifact.id,
+      status: 'deployed',
+      liveUrl: `/landing/${artifact.id}`,
+      publishedAt: now.toISOString()
+    });
+  } catch (err: any) {
+    console.error('[Publish Landing Page Error]', err);
+    return res.status(503).json({ success: false, error: 'Landing page could not be published. Please retry.' });
   }
 });
 
@@ -2484,7 +2675,7 @@ app.get('/api/leads', authenticate, async (req, res) => {
         : l.verificationStatus;
       return {
         ...l,
-        sourceType: l.externalSource || l.externalCrmId ? (l.externalSource || l.sourceType || 'unknown') : 'unknown',
+        sourceType: l.externalSource || l.externalCrmId ? (l.externalSource || l.sourceType || 'unknown') : (l.sourceType || 'unknown'),
         verificationStatus: safeVerificationStatus,
         dnsVerified: hasCurrentGroundingEvidence ? l.dnsVerified : false,
         // These columns historically had schema defaults without source evidence.
@@ -2743,17 +2934,21 @@ app.post('/api/leads/:id/verify-grounding', authenticate, async (req, res) => {
     }
 
     const rawPhone = lead.phoneEncrypted ? (decrypt(lead.phoneEncrypted) || lead.phone) : lead.phone;
+    const existingGroundingEvidence = lead.groundingEvidence && typeof lead.groundingEvidence === 'object'
+      ? lead.groundingEvidence as Record<string, any>
+      : {};
     const verification = await verifyLeadGrounding({
       businessName: lead.businessName,
       websiteUrl: lead.websiteUrl || undefined,
       phone: rawPhone || undefined,
-      isSynthetic: Boolean(lead.isSynthetic)
+      isSynthetic: Boolean(lead.isSynthetic),
+      businessIdentityConfirmed: existingGroundingEvidence.businessIdentityConfirmed === true
     });
 
     const [updatedLead] = await pgDb.update(leads).set({
       verificationStatus: verification.status,
       dnsVerified: verification.evidence.dnsResolved,
-      groundingEvidence: verification.evidence,
+      groundingEvidence: { ...existingGroundingEvidence, ...verification.evidence, network: verification.evidence },
       updatedAt: new Date()
     }).where(and(eq(leads.id, leadId), eq(leads.contractorId, contractorId))).returning();
 
@@ -2784,6 +2979,109 @@ app.post('/api/leads/:id/verify-grounding', authenticate, async (req, res) => {
   }
 });
 
+app.post('/api/leads/:id/confirm-identity', authenticate, async (req, res) => {
+  const contractorId = (req as any).contractorId;
+  const leadId = req.params.id;
+  const { confirmed, sourceUrl, notes } = req.body || {};
+
+  if (confirmed !== true || typeof sourceUrl !== 'string' || typeof notes !== 'string' || notes.trim().length < 10) {
+    return res.status(400).json({
+      error: 'Explicit confirmation, a public source URL, and at least 10 characters describing the identity check are required.'
+    });
+  }
+
+  let parsedSource: URL;
+  try {
+    parsedSource = new URL(sourceUrl.trim());
+  } catch {
+    return res.status(400).json({ error: 'Enter a valid public source URL.' });
+  }
+  if (!['http:', 'https:'].includes(parsedSource.protocol) || parsedSource.username || parsedSource.password || parsedSource.port) {
+    return res.status(400).json({ error: 'The identity source must be a public HTTP(S) URL on a standard port.' });
+  }
+
+  try {
+    const [lead] = await pgDb.select().from(leads)
+      .where(and(eq(leads.id, leadId), eq(leads.contractorId, contractorId)));
+    if (!lead) return res.status(404).json({ error: 'Lead not found.' });
+    if (lead.isSynthetic) return res.status(409).json({ error: 'Synthetic leads cannot be identity-confirmed.' });
+
+    const existingEvidence = lead.groundingEvidence && typeof lead.groundingEvidence === 'object'
+      ? lead.groundingEvidence as Record<string, any>
+      : {};
+    const networkEvidence = existingEvidence.network && typeof existingEvidence.network === 'object'
+      ? existingEvidence.network
+      : existingEvidence;
+
+    if (networkEvidence.dnsResolved !== true || networkEvidence.httpReachable !== true || networkEvidence.phoneValid !== true) {
+      return res.status(409).json({
+        error: 'Run the live network/phone verification first. DNS, HTTP reachability, and phone-format checks must pass before human identity confirmation.',
+        verificationStatus: lead.verificationStatus
+      });
+    }
+
+    const now = new Date();
+    const identityConfirmation = {
+      method: 'human_review',
+      confirmed: true,
+      sourceUrl: parsedSource.toString(),
+      notes: notes.trim().slice(0, 1000),
+      confirmedBy: contractorId,
+      confirmedAt: now.toISOString()
+    };
+    const [updatedLead] = await pgDb.update(leads).set({
+      verificationStatus: 'VERIFIED',
+      dnsVerified: true,
+      groundingEvidence: {
+        ...existingEvidence,
+        ...networkEvidence,
+        network: networkEvidence,
+        businessIdentityConfirmed: true,
+        identityConfirmation
+      },
+      updatedAt: now
+    }).where(and(eq(leads.id, leadId), eq(leads.contractorId, contractorId))).returning();
+
+    await pgDb.insert(leadEvents).values({
+      id: crypto.randomUUID(),
+      leadId,
+      eventType: 'GroundingVerified',
+      newStage: lead.status,
+      notes: `Human confirmed the business identity using ${parsedSource.hostname}. Network and phone checks had already passed.`
+    });
+
+    await recordWorkEvent(pgDb, {
+      contractorId,
+      eventType: 'lead.identity_confirmed',
+      entityType: 'lead',
+      entityId: leadId,
+      actorType: 'human',
+      actorId: contractorId,
+      sourceModule: 'lead_verification',
+      correlationId: leadId,
+      summary: `Human-confirmed business identity for ${lead.businessName}.`,
+      payload: { sourceUrl: parsedSource.toString(), confirmedAt: now.toISOString() }
+    });
+
+    await persistAuditLog({
+      contractorId,
+      action: 'LEAD_IDENTITY_CONFIRMED',
+      details: `Human confirmed business identity for lead ${leadId} using ${parsedSource.hostname}.`
+    });
+
+    return res.json({
+      success: true,
+      leadId: updatedLead.id,
+      verificationStatus: updatedLead.verificationStatus,
+      businessIdentityConfirmed: true,
+      identityConfirmation
+    });
+  } catch (err: any) {
+    console.error('[HAL lead identity confirmation] Failed:', err);
+    return res.status(503).json({ error: 'Business identity confirmation could not be saved. Please retry.' });
+  }
+});
+
 app.post('/api/leads/verify-all', authenticate, async (req, res) => {
   const contractorId = (req as any).contractorId;
   try {
@@ -2792,17 +3090,21 @@ app.post('/api/leads/verify-all', authenticate, async (req, res) => {
 
     for (const lead of allLeads) {
       const rawPhone = lead.phoneEncrypted ? (decrypt(lead.phoneEncrypted) || lead.phone) : lead.phone;
+      const existingGroundingEvidence = lead.groundingEvidence && typeof lead.groundingEvidence === 'object'
+        ? lead.groundingEvidence as Record<string, any>
+        : {};
       const verification = await verifyLeadGrounding({
         businessName: lead.businessName,
         websiteUrl: lead.websiteUrl || undefined,
         phone: rawPhone || undefined,
-        isSynthetic: Boolean(lead.isSynthetic)
+        isSynthetic: Boolean(lead.isSynthetic),
+        businessIdentityConfirmed: existingGroundingEvidence.businessIdentityConfirmed === true
       });
 
       await pgDb.update(leads).set({
         verificationStatus: verification.status,
         dnsVerified: verification.evidence.dnsResolved,
-        groundingEvidence: verification.evidence,
+        groundingEvidence: { ...existingGroundingEvidence, ...verification.evidence, network: verification.evidence },
         updatedAt: new Date()
       }).where(and(eq(leads.id, lead.id), eq(leads.contractorId, contractorId)));
 
@@ -3617,6 +3919,40 @@ app.put('/api/leads/:id', authenticate, async (req, res) => {
     if (suppliedDealValue !== undefined) safeUpdates.predictedLtv = newDealValue;
     if (updates.websiteUrl !== undefined) safeUpdates.websiteUrl = String(updates.websiteUrl);
     if (updates.gmbListingUrl !== undefined) safeUpdates.gmbListingUrl = String(updates.gmbListingUrl);
+
+    const identityFieldsChanged = [
+      'businessName', 'ownerName', 'city', 'websiteUrl', 'phone', 'email'
+    ].some(field => updates[field] !== undefined && String(updates[field] ?? '') !== String(
+      field === 'businessName' ? currentLead.businessName || '' :
+      field === 'ownerName' ? currentLead.ownerName || '' :
+      field === 'city' ? currentLead.city || '' :
+      field === 'websiteUrl' ? currentLead.websiteUrl || '' :
+      field === 'phone' ? (currentLead.phoneEncrypted ? (decrypt(currentLead.phoneEncrypted) || '') : currentLead.phone || '') :
+      field === 'email' ? (currentLead.emailEncrypted ? (decrypt(currentLead.emailEncrypted) || '') : currentLead.email || '') : ''
+    ));
+    if (identityFieldsChanged) {
+      const previousEvidence = currentLead.groundingEvidence && typeof currentLead.groundingEvidence === 'object'
+        ? currentLead.groundingEvidence as Record<string, any>
+        : {};
+      const previousAudit = previousEvidence.websiteAudit && typeof previousEvidence.websiteAudit === 'object'
+        ? previousEvidence.websiteAudit
+        : null;
+      safeUpdates.verificationStatus = 'UNVERIFIED_STAGING';
+      safeUpdates.dnsVerified = false;
+      safeUpdates.groundingEvidence = {
+        ...previousEvidence,
+        businessIdentityConfirmed: false,
+        identityConfirmation: null,
+        ...(previousAudit ? {
+          websiteAudit: {
+            ...previousAudit,
+            status: 'stale',
+            staleAt: new Date().toISOString(),
+            staleReason: 'A core business identity field changed; rerun the website audit and reconfirm the prospect identity.'
+          }
+        } : {})
+      };
+    }
 
     // Cryptographic PII handling remains inside the existing field whitelist.
     if (updates.email !== undefined) {
@@ -4758,22 +5094,92 @@ app.get('/api/skills', authenticate, (req, res) => {
 app.post('/api/skills/:id/execute', authenticate, async (req, res) => {
   const contractorId = (req as any).contractorId;
   const { id } = req.params;
-  const { inputs } = req.body;
+  const submittedInputs = req.body?.inputs && typeof req.body.inputs === 'object' && !Array.isArray(req.body.inputs)
+    ? req.body.inputs
+    : {};
 
   try {
-    const result = await executeSkill(id, inputs || {}, contractorId);
-    
-    // Log Audit Action
+    let executionInputs = { ...submittedInputs };
+    let auditLead: typeof leads.$inferSelect | null = null;
+
+    if (id === 'website_audit' && typeof executionInputs.leadId === 'string' && executionInputs.leadId.trim()) {
+      const [ownedLead] = await pgDb.select().from(leads).where(and(
+        eq(leads.id, executionInputs.leadId.trim()),
+        eq(leads.contractorId, contractorId)
+      )).limit(1);
+      if (!ownedLead) return res.status(404).json({ error: 'The selected lead was not found in this workspace.' });
+      if (!ownedLead.websiteUrl) return res.status(400).json({ error: 'This lead has no saved website URL. Add and verify its public website before auditing.' });
+      auditLead = ownedLead;
+      // The saved tenant-owned lead is authoritative. Do not let a browser change
+      // the target URL or business name while claiming the audit belongs to it.
+      executionInputs = {
+        ...executionInputs,
+        websiteUrl: ownedLead.websiteUrl,
+        businessName: ownedLead.businessName
+      };
+    }
+
+    const result = await executeSkill(id, executionInputs, contractorId);
+
+    if (id === 'website_audit' && auditLead && result?.success === true) {
+      const existingEvidence = auditLead.groundingEvidence && typeof auditLead.groundingEvidence === 'object'
+        ? auditLead.groundingEvidence as Record<string, any>
+        : {};
+      const auditId = crypto.randomUUID();
+      const auditRecord = {
+        auditId,
+        status: result.status,
+        websiteUrl: result.websiteUrl,
+        auditedAt: result.auditedAt || new Date().toISOString(),
+        evidence: result.evidence || null,
+        measurements: result.measurements || null,
+        securityHeaders: result.securityHeaders || null,
+        missingSecurityHeaders: result.missingSecurityHeaders || [],
+        findings: result.findings || [],
+        report: result.report || null
+      };
+
+      await pgDb.update(leads).set({
+        groundingEvidence: { ...existingEvidence, websiteAudit: auditRecord },
+        updatedAt: new Date()
+      }).where(and(eq(leads.id, auditLead.id), eq(leads.contractorId, contractorId)));
+
+      await pgDb.insert(leadEvents).values({
+        id: crypto.randomUUID(),
+        leadId: auditLead.id,
+        eventType: 'WebsiteAuditCompleted',
+        newStage: auditLead.status,
+        notes: `Website audit ${auditRecord.status} recorded for ${auditRecord.websiteUrl} at ${auditRecord.auditedAt}.`
+      });
+
+      await recordWorkEvent(pgDb, {
+        contractorId,
+        eventType: 'website.audit_completed',
+        entityType: 'lead',
+        entityId: auditLead.id,
+        actorType: 'human',
+        actorId: contractorId,
+        sourceModule: 'website_auditor',
+        correlationId: auditId,
+        summary: `Recorded a ${auditRecord.status} website audit for ${auditLead.businessName}.`,
+        payload: { auditId, websiteUrl: auditRecord.websiteUrl, status: auditRecord.status, findingCount: auditRecord.findings.length }
+      });
+
+      result.leadId = auditLead.id;
+      result.auditId = auditId;
+      result.persistedToLead = true;
+    }
+
     await persistAuditLog({
       contractorId,
       action: 'SKILL_EXECUTED',
       details: `Executed intelligence skill: "${id}"`
     });
 
-    res.json(result);
+    return res.json(result);
   } catch (err: any) {
     console.error(`Skill "${id}" execution failed:`, err);
-    res.status(500).json({ error: err.message });
+    return res.status(503).json({ error: err.message || 'Skill execution could not be completed.' });
   }
 });
 
@@ -7535,7 +7941,7 @@ app.post('/api/admin/git/push', authenticate, requireRole('admin'), (_req, res) 
 
 app.post('/api/proposals/generate', authenticate, async (req, res) => {
   const contractorId = (req as any).contractorId;
-  const { leadId, packageTier, monthlyRetainerUsd, setupFeeUsd, auditScores } = req.body || {};
+  const { leadId, packageTier, monthlyRetainerUsd, setupFeeUsd } = req.body || {};
 
   const retainer = Number(monthlyRetainerUsd);
   const setup = Number(setupFeeUsd);
@@ -7548,33 +7954,57 @@ app.post('/api/proposals/generate', authenticate, async (req, res) => {
     });
   }
 
-  if (auditScores !== undefined && (!auditScores || typeof auditScores !== 'object' || Array.isArray(auditScores))) {
-    return res.status(400).json({ error: 'Audit evidence must be a structured object.' });
-  }
-
   try {
     const [lead] = await pgDb.select({
       id: leads.id,
       businessName: leads.businessName,
-      ownerName: leads.ownerName
+      ownerName: leads.ownerName,
+      groundingEvidence: leads.groundingEvidence
     }).from(leads)
       .where(and(eq(leads.id, leadId.trim()), eq(leads.contractorId, contractorId)))
       .limit(1);
     if (!lead) return res.status(404).json({ error: 'Lead not found or inaccessible.' });
 
+    const leadEvidence = lead.groundingEvidence && typeof lead.groundingEvidence === 'object'
+      ? lead.groundingEvidence as Record<string, any>
+      : {};
+    const websiteAudit = leadEvidence.websiteAudit && typeof leadEvidence.websiteAudit === 'object'
+      ? leadEvidence.websiteAudit
+      : null;
+    const landingArtifacts = await pgDb.select().from(hermesLabArtifacts).where(and(
+      eq(hermesLabArtifacts.contractorId, contractorId),
+      eq(hermesLabArtifacts.toolId, 'landing_page')
+    )).orderBy(desc(hermesLabArtifacts.updatedAt)).limit(200);
+    const landingPageArtifact = landingArtifacts.find((artifact: any) => {
+      const content = artifact.content && typeof artifact.content === 'object' ? artifact.content as Record<string, any> : {};
+      const pageConfig = content.pageConfig && typeof content.pageConfig === 'object' ? content.pageConfig as Record<string, any> : {};
+      return content.sourceLeadId === lead.id || pageConfig.sourceLeadId === lead.id;
+    }) || null;
     const highlights: string[] = [];
-    const appendScore = (key: string, label: string) => {
-      const value = auditScores?.[key];
-      if (value === undefined || value === null || value === '') return;
-      const score = Number(value);
-      if (Number.isFinite(score) && score >= 0 && score <= 100) {
-        highlights.push(`${label}: ${score}/100 (recorded audit value)`);
+    if (websiteAudit?.status === 'measured') {
+      const measurements = websiteAudit.measurements || {};
+      highlights.push(`HAL inspected ${websiteAudit.websiteUrl || 'the saved website'} on ${websiteAudit.auditedAt || 'an unrecorded date'}.`);
+      if (websiteAudit.evidence?.statusCode) highlights.push(`Observed HTTP status: ${websiteAudit.evidence.statusCode}.`);
+      if (measurements.title) highlights.push(`Observed page title: ${String(measurements.title).slice(0, 160)}.`);
+      if (measurements.metaDescription) highlights.push('Meta description was present in the fetched HTML.');
+      else highlights.push('No meta description was observed in the fetched HTML.');
+      if (typeof measurements.viewportConfigured === 'boolean') highlights.push(`Responsive viewport meta tag: ${measurements.viewportConfigured ? 'present' : 'not observed'}.`);
+      if (Number.isFinite(measurements.imagesMissingAlt)) highlights.push(`Images without non-empty alt text: ${measurements.imagesMissingAlt} of ${measurements.imageCount || 0}.`);
+      if (Array.isArray(websiteAudit.findings)) {
+        for (const finding of websiteAudit.findings.slice(0, 6)) {
+          if (typeof finding === 'string' && finding.trim()) highlights.push(finding.trim().slice(0, 400));
+        }
       }
-    };
-    appendScore('mobileSpeedScore', 'Mobile Speed Score');
-    appendScore('seoHealthScore', 'SEO Health Score');
-    if (typeof auditScores?.sslStatus === 'string' && auditScores.sslStatus.trim()) {
-      highlights.push(`SSL Status: ${auditScores.sslStatus.trim()}`);
+    } else if (websiteAudit?.status === 'redirect_not_followed') {
+      highlights.push('A website audit was attempted but stopped at a redirect. Review the destination before drawing conclusions.');
+    } else {
+      highlights.push('No measured website audit is currently saved to this lead. This proposal contains no website-specific findings.');
+    }
+
+    if (landingPageArtifact) {
+      highlights.push(`Saved Landing Page Studio artifact: ${landingPageArtifact.title} (status: ${landingPageArtifact.status}).`);
+    } else {
+      highlights.push('No Landing Page Studio artifact is linked to this prospect yet.');
     }
 
     const proposal = {
@@ -7596,6 +8026,11 @@ app.post('/api/proposals/generate', authenticate, async (req, res) => {
       // No attributable revenue model exists to support an ROI estimate.
       roiEstimateAnnualUsd: null,
       auditHighlights: highlights,
+      auditEvidenceStatus: websiteAudit?.status || 'not_available',
+      sourceAuditId: websiteAudit?.auditId || null,
+      sourceAuditAt: websiteAudit?.auditedAt || null,
+      landingPageArtifactId: landingPageArtifact?.id || null,
+      landingPageStatus: landingPageArtifact?.status || null,
       validUntil: new Date(Date.now() + 14 * 24 * 3600 * 1000).toISOString(),
       persistenceStatus: 'persisted_draft'
     };
@@ -7626,6 +8061,8 @@ app.post('/api/proposals/generate', authenticate, async (req, res) => {
         packageTier,
         monthlyRetainerUsd: retainer,
         setupFeeUsd: setup,
+        sourceAuditId: websiteAudit?.auditId || null,
+        landingPageArtifactId: landingPageArtifact?.id || null,
         persistenceStatus: 'persisted_draft'
       }
       });
@@ -11280,6 +11717,108 @@ async function startServer() {
   }
 
   // ─── PHASE 6D: OUTCOME TRACKING & LEARNING LOOP ENDPOINTS ───────────────────
+
+  app.get('/api/intelligence/prospect-funnel', authenticate, async (req, res) => {
+    const contractorId = (req as any).contractorId;
+    try {
+      const [leadRows, pageRows, proposalRows] = await Promise.all([
+        pgDb.select({
+          id: leads.id,
+          verificationStatus: leads.verificationStatus,
+          groundingEvidence: leads.groundingEvidence,
+          isSynthetic: leads.isSynthetic
+        }).from(leads).where(eq(leads.contractorId, contractorId)),
+        pgDb.select({
+          id: hermesLabArtifacts.id,
+          status: hermesLabArtifacts.status,
+          content: hermesLabArtifacts.content
+        }).from(hermesLabArtifacts).where(and(
+          eq(hermesLabArtifacts.contractorId, contractorId),
+          eq(hermesLabArtifacts.toolId, 'landing_page')
+        )),
+        pgDb.select({
+          id: proposals.id,
+          leadId: proposals.leadId,
+          status: proposals.status
+        }).from(proposals).where(eq(proposals.contractorId, contractorId))
+      ]);
+
+      const realLeads = leadRows.filter(lead => !lead.isSynthetic);
+      const measuredAuditLeadIds = new Set<string>();
+      const staleAuditLeadIds = new Set<string>();
+      for (const lead of realLeads) {
+        const evidence = lead.groundingEvidence && typeof lead.groundingEvidence === 'object'
+          ? lead.groundingEvidence as Record<string, any>
+          : {};
+        const audit = evidence.websiteAudit && typeof evidence.websiteAudit === 'object'
+          ? evidence.websiteAudit
+          : null;
+        if (audit?.status === 'measured') measuredAuditLeadIds.add(lead.id);
+        if (audit?.status === 'stale') staleAuditLeadIds.add(lead.id);
+      }
+
+      const linkedPageLeadIds = new Set<string>();
+      const publishedPageLeadIds = new Set<string>();
+      let draftPageCount = 0;
+      for (const page of pageRows) {
+        const content = page.content && typeof page.content === 'object'
+          ? page.content as Record<string, any>
+          : {};
+        const pageConfig = content.pageConfig && typeof content.pageConfig === 'object'
+          ? content.pageConfig as Record<string, any>
+          : {};
+        const sourceLeadId = typeof content.sourceLeadId === 'string'
+          ? content.sourceLeadId
+          : (typeof pageConfig.sourceLeadId === 'string' ? pageConfig.sourceLeadId : '');
+        if (sourceLeadId && realLeads.some(lead => lead.id === sourceLeadId)) {
+          linkedPageLeadIds.add(sourceLeadId);
+          if (page.status === 'ready' || page.status === 'deployed') publishedPageLeadIds.add(sourceLeadId);
+        }
+        if (page.status === 'draft') draftPageCount += 1;
+      }
+
+      const proposalStatusCounts: Record<string, number> = {};
+      let acceptedProposalCount = 0;
+      for (const proposal of proposalRows) {
+        const status = String(proposal.status || 'unknown').toLowerCase();
+        proposalStatusCounts[status] = (proposalStatusCounts[status] || 0) + 1;
+        if (status.includes('accept') || status.includes('approved')) acceptedProposalCount += 1;
+      }
+
+      const totalProspects = realLeads.length;
+      return res.json({
+        scope: 'authenticated tenant records only',
+        generatedAt: new Date().toISOString(),
+        counts: {
+          totalProspects,
+          verifiedProspects: realLeads.filter(lead => lead.verificationStatus === 'VERIFIED').length,
+          unverifiedProspects: realLeads.filter(lead => lead.verificationStatus !== 'VERIFIED').length,
+          measuredWebsiteAudits: measuredAuditLeadIds.size,
+          staleWebsiteAudits: staleAuditLeadIds.size,
+          prospectsWithLinkedLandingPages: linkedPageLeadIds.size,
+          prospectsWithPublishedLandingPages: publishedPageLeadIds.size,
+          privateLandingPageDrafts: draftPageCount,
+          proposals: proposalRows.length,
+          acceptedProposals: acceptedProposalCount
+        },
+        proposalStatusCounts,
+        rates: {
+          measuredAuditPerProspect: totalProspects ? measuredAuditLeadIds.size / totalProspects : null,
+          linkedPagePerProspect: totalProspects ? linkedPageLeadIds.size / totalProspects : null,
+          proposalPerProspect: totalProspects ? proposalRows.length / totalProspects : null
+        },
+        limitations: [
+          'Counts are based on saved tenant records, not market-wide activity.',
+          'A proposal count is not evidence of client acceptance or revenue.',
+          'Landing-page drafts are private until explicitly published.',
+          'Revenue is intentionally excluded; use recorded paid invoices and attributable outcome records for financial reporting.'
+        ]
+      });
+    } catch (err: any) {
+      console.error('[HAL prospect funnel intelligence] Failed:', err);
+      return res.status(503).json({ error: 'Prospect funnel metrics are temporarily unavailable.' });
+    }
+  });
 
   app.get('/api/revenue/outcomes', authenticate, async (req, res) => {
     const contractorId = (req as any).contractorId;

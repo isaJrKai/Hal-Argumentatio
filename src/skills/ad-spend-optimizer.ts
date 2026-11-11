@@ -13,35 +13,39 @@ export const adSpendOptimizerSkill: Skill = {
       label: 'Monthly Ad Spend ($)',
       type: 'number',
       required: true,
-      defaultValue: 1500,
+      defaultValue: '',
     },
     {
       name: 'costPerLead',
       label: 'Current Cost Per Lead ($)',
       type: 'number',
       required: true,
-      defaultValue: 75,
+      defaultValue: '',
     },
     {
       name: 'conversionRate',
       label: 'Lead-to-Job Conversion (%)',
       type: 'number',
       required: true,
-      defaultValue: 15,
+      defaultValue: '',
     },
     {
       name: 'averageContractValue',
       label: 'Average Job Value ($)',
       type: 'number',
       required: true,
-      defaultValue: 1200,
+      defaultValue: '',
     }
   ],
   execute: async (inputs, contractorId) => {
-    const monthlyBudget = Number(inputs.monthlyBudget || 1500);
-    const costPerLead = Number(inputs.costPerLead || 75);
-    const conversionRate = Number(inputs.conversionRate || 15) / 100;
-    const averageContractValue = Number(inputs.averageContractValue || 1200);
+    const monthlyBudget = Number(inputs.monthlyBudget);
+    const costPerLead = Number(inputs.costPerLead);
+    const conversionRateInput = Number(inputs.conversionRate);
+    const conversionRate = conversionRateInput / 100;
+    const averageContractValue = Number(inputs.averageContractValue);
+    if (![monthlyBudget, costPerLead, conversionRateInput, averageContractValue].every(Number.isFinite) || monthlyBudget <= 0 || costPerLead <= 0 || conversionRateInput < 0 || conversionRateInput > 100 || averageContractValue <= 0) {
+      throw new Error('Enter a positive budget, positive CPL, a conversion rate from 0 to 100, and a positive average job value.');
+    }
 
     // Calculate baseline math
     const expectedLeads = Math.floor(monthlyBudget / costPerLead);
@@ -50,9 +54,9 @@ export const adSpendOptimizerSkill: Skill = {
     const adSpendRoi = monthlyBudget > 0 ? (grossRevenue - monthlyBudget) / monthlyBudget : 0;
 
     const systemPrompt = `You are HAL, the premier Financial and Marketing Analytics Optimizer. 
-You generate Swiss-style, objective, highly precise cost-efficiency recommendations. No fluff, no exclamation marks.`;
+You generate careful scenario analysis. Do not describe user-entered assumptions as independently measured facts. Do not claim a CPL is healthy for an industry without verified industry benchmarks. Do not invent funnel causes or guaranteed improvement.`;
 
-    const userPrompt = `Analyze the following performance metrics and write a highly analytical budget-optimization report:
+    const userPrompt = `Analyze the following user-supplied scenario assumptions. These are not independently verified campaign measurements. Write a budget scenario report:
 - Monthly Budget: $${monthlyBudget}
 - Cost Per Lead (CPL): $${costPerLead}
 - Lead-to-Job Conversion Rate: ${(conversionRate * 100).toFixed(1)}%
@@ -63,9 +67,9 @@ You generate Swiss-style, objective, highly precise cost-efficiency recommendati
 - Net ROI Factor: ${(adSpendRoi * 100).toFixed(1)}%
 
 Please compile the report following this strict structure:
-1. COST ACCRUAL ASSESSMENT: Evaluate if the current CPL of $${costPerLead} is healthy for their industry niche, and outline conversion-funnel bottlenecks.
+1. INPUT SCENARIO: Explain the arithmetic and assumptions; do not label CPL healthy/unhealthy without a benchmark or infer why leads fail to convert.
 2. OPTIMAL RE-ALLOCATION RATIOS: Recommend a split of the budget between Google Local Services Ads (LSA), standard Google Search Ads, and organic SEO.
-3. 90-DAY FORECAST MATRIX: A Markdown table demonstrating expected leads, jobs, and ROI improvements if conversion rate is increased by 5%.`;
+3. SENSITIVITY SCENARIO: A Markdown table showing the arithmetic if conversion rate increases by five percentage points. Clearly label this as hypothetical, not a forecast.`;
 
     let reportText = '';
 
@@ -83,7 +87,7 @@ Please compile the report following this strict structure:
       reportText = `### COST ACCRUAL ASSESSMENT
 The current acquisition metrics indicate a Cost Per Lead (CPL) of **$${costPerLead}**. With a budget of **$${monthlyBudget}**, this returns **${expectedLeads} leads/month**. The lead-to-job conversion rate of **${(conversionRate * 100).toFixed(0)}%** yields **${expectedJobs} completed jobs**, generating **$${grossRevenue} gross revenue** (${(adSpendRoi * 100).toFixed(0)}% ROI). 
 
-The primary friction point is the **Conversion Rate**. At **${(conversionRate * 100).toFixed(0)}%**, you are losing up to 85% of inbound inquiries due to delays in lead response or lack of automated text-back systems.
+This is a scenario calculation only. The conversion rate does not reveal why other leads did not become jobs; response delays or process issues would need separate evidence.
 
 ### OPTIMAL RE-ALLOCATION RATIOS
 To maximize customer acquisition value, we recommend restructuring the budget as follows:
@@ -91,14 +95,14 @@ To maximize customer acquisition value, we recommend restructuring the budget as
 - **Google Search Ads (30%)**: Allocate $${(monthlyBudget * 0.3).toFixed(0)} for high-intent transactional keywords (e.g. "emergency services near me").
 - **Speed Optimization & Local SEO (20%)**: Reinvest $${(monthlyBudget * 0.2).toFixed(0)} into page speed and review capture pipelines to lift organic traffic and conversion rates.
 
-### 90-DAY FORECAST MATRIX (WITH +5% CONVERSION RATE UPLIFT)
+### HYPOTHETICAL SENSITIVITY SCENARIO (WITH +5 PERCENTAGE-POINT CONVERSION CHANGE)
 | Metric | Current State | Proposed (+5% Conversion Uplift) | Net Delta |
 | :--- | :--- | :--- | :--- |
-| **Monthly Budget** | $${monthlyBudget} | $${monthlyBudget} | $0 |
-| **Leads Sourced** | ${expectedLeads} | ${expectedLeads} | 0 |
+| **Monthly Budget** | ${monthlyBudget} | ${monthlyBudget} | $0 |
+| **Illustrative Leads** | ${expectedLeads} | ${expectedLeads} | 0 |
 | **Conversion Rate** | ${(conversionRate * 100).toFixed(1)}% | ${(conversionRate * 100 + 5).toFixed(1)}% | +5.0% |
-| **Jobs Completed** | ${expectedJobs} | ${Math.floor(expectedLeads * (conversionRate + 0.05))} | +${Math.floor(expectedLeads * (conversionRate + 0.05)) - expectedJobs} |
-| **Gross Revenue** | $${grossRevenue} | $${Math.floor(expectedLeads * (conversionRate + 0.05)) * averageContractValue} | +$${(Math.floor(expectedLeads * (conversionRate + 0.05)) * averageContractValue) - grossRevenue} |
+| **Illustrative Jobs** | ${expectedJobs} | ${Math.floor(expectedLeads * (conversionRate + 0.05))} | +${Math.floor(expectedLeads * (conversionRate + 0.05)) - expectedJobs} |
+| **Illustrative Gross Revenue** | ${grossRevenue} | ${Math.floor(expectedLeads * (conversionRate + 0.05)) * averageContractValue} | +${(Math.floor(expectedLeads * (conversionRate + 0.05)) * averageContractValue) - grossRevenue} |
 | **Net ROI** | ${(adSpendRoi * 100).toFixed(0)}% | ${(((Math.floor(expectedLeads * (conversionRate + 0.05)) * averageContractValue) - monthlyBudget) / monthlyBudget * 100).toFixed(0)}% | +${((((Math.floor(expectedLeads * (conversionRate + 0.05)) * averageContractValue) - monthlyBudget) / monthlyBudget) - adSpendRoi).toFixed(2).replace('-', '')}% |`;
     }
 
@@ -109,6 +113,8 @@ To maximize customer acquisition value, we recommend restructuring the budget as
       conversionRate,
       averageContractValue,
       grossRevenue,
+      evidenceStatus: 'user_supplied_scenario_assumptions',
+      scenarioOnly: true,
       report: reportText,
       executedAt: new Date().toISOString()
     };

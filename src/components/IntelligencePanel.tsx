@@ -63,6 +63,9 @@ export default function IntelligencePanel({
   const [outcomesData, setOutcomesData] = useState<any[]>([]);
   const [outcomesSummary, setOutcomesSummary] = useState<any>(null);
   const [loadingOutcomes, setLoadingOutcomes] = useState(false);
+  const [prospectFunnel, setProspectFunnel] = useState<any>(null);
+  const [loadingProspectFunnel, setLoadingProspectFunnel] = useState(false);
+  const [prospectFunnelError, setProspectFunnelError] = useState('');
 
   useEffect(() => {
     const fetchOutcomes = async () => {
@@ -89,6 +92,29 @@ export default function IntelligencePanel({
     };
     fetchOutcomes();
   }, [token]);
+
+  const fetchProspectFunnel = async () => {
+    const authToken = token || localStorage.getItem('halbiz_auth_token') || '';
+    if (!authToken) return;
+    setLoadingProspectFunnel(true);
+    setProspectFunnelError('');
+    try {
+      const res = await fetch('/api/intelligence/prospect-funnel', {
+        headers: { Authorization: `Bearer ${authToken}` }
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+      setProspectFunnel(data);
+    } catch (err: any) {
+      setProspectFunnelError(err?.message || 'Prospect funnel metrics could not be loaded.');
+    } finally {
+      setLoadingProspectFunnel(false);
+    }
+  };
+
+  useEffect(() => {
+    if (subTab === 'audit') fetchProspectFunnel();
+  }, [subTab, token]);
 
   const handleMeasureOutcomes = async () => {
     const authToken = token || localStorage.getItem('halbiz_auth_token') || '';
@@ -970,6 +996,47 @@ export default function IntelligencePanel({
             <Button variant="primary" size="sm" onClick={handleMeasureOutcomes} isLoading={loadingOutcomes}>
               Measure outcomes
             </Button>
+          </div>
+
+          {/* Existing CRM-to-proposal workflow, counted from tenant-owned records */}
+          <div className="bg-bg-raised border border-border-dim p-5 rounded-xl space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div>
+                <h4 className="text-xs font-mono font-bold text-text-primary uppercase tracking-wider">Prospect-to-Proposal Funnel</h4>
+                <p className="text-[10px] text-text-secondary mt-1">Saved records in this workspace only. These counts are not market estimates or revenue attribution.</p>
+              </div>
+              <Button variant="secondary" size="sm" onClick={fetchProspectFunnel} isLoading={loadingProspectFunnel}>
+                REFRESH FUNNEL
+              </Button>
+            </div>
+            {prospectFunnelError ? (
+              <p className="text-xs text-red-400">{prospectFunnelError}</p>
+            ) : (
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                {[
+                  ['Prospects', prospectFunnel?.counts?.totalProspects],
+                  ['Identity verified', prospectFunnel?.counts?.verifiedProspects],
+                  ['Measured website audits', prospectFunnel?.counts?.measuredWebsiteAudits],
+                  ['Stale audits', prospectFunnel?.counts?.staleWebsiteAudits],
+                  ['Linked landing pages', prospectFunnel?.counts?.prospectsWithLinkedLandingPages],
+                  ['Published pages', prospectFunnel?.counts?.prospectsWithPublishedLandingPages],
+                  ['Private page drafts', prospectFunnel?.counts?.privateLandingPageDrafts],
+                  ['Proposals', prospectFunnel?.counts?.proposals],
+                  ['Accepted proposals', prospectFunnel?.counts?.acceptedProposals]
+                ].map(([label, value]) => (
+                  <div key={String(label)} className="bg-bg-base border border-border-dim rounded-lg p-3">
+                    <div className="text-[9px] uppercase tracking-wider text-text-tertiary font-mono">{label}</div>
+                    <div className="text-xl font-bold font-mono text-text-primary mt-1">
+                      {loadingProspectFunnel && value === undefined ? '—' : Number(value || 0).toLocaleString()}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+            <p className="text-[9px] text-text-tertiary font-mono">
+              {prospectFunnel?.generatedAt ? `Updated ${new Date(prospectFunnel.generatedAt).toLocaleString()}. ` : ''}
+              Synthetic leads are excluded. Draft pages are not public. Proposal counts do not imply acceptance or payment.
+            </p>
           </div>
 
           {/* Summary Metric Cards */}
