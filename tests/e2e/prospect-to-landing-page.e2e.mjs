@@ -76,6 +76,12 @@ test('Prospects UI imports an allowlisted fixture, verifies it, and creates a pr
     expect(groundingResponse.ok()).toBeTruthy();
     const grounding = await groundingResponse.json();
     expect(grounding).toMatchObject({ success: true, leadId, verificationStatus: 'VERIFIED', dnsVerified: true });
+    expect(grounding.evidence).toMatchObject({
+      hostname: 'example.com',
+      dnsResolved: true,
+      httpReachable: true,
+      sslSecured: true
+    });
 
     const leadRow = await pool.query(
       'SELECT contractor_id, verification_status, dns_verified, is_synthetic, grounding_evidence FROM leads WHERE id = $1',
@@ -88,7 +94,12 @@ test('Prospects UI imports an allowlisted fixture, verifies it, and creates a pr
       dns_verified: true,
       is_synthetic: false
     });
-    expect(leadRow.rows[0].grounding_evidence.hostname).toBe('example.com');
+    expect(leadRow.rows[0].grounding_evidence).toMatchObject({
+      hostname: 'example.com',
+      dnsResolved: true,
+      httpReachable: true,
+      sslSecured: true
+    });
 
     await page.getByRole('button', { name: 'Create Landing Page Draft' }).click();
     await expect(page.getByRole('heading', { name: 'Contractor Landing Page Studio' })).toBeVisible();
