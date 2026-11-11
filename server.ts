@@ -8454,7 +8454,12 @@ app.put('/api/projects/:id', authenticate, async (req, res) => {
 
     // Accept only fields used by the delivery workflow; tenant ownership and
     // immutable identifiers can never be changed by a client-supplied payload.
-    const safeUpdates: Partial<typeof clientProjects.$inferInsert> = { updatedAt: new Date() };
+    // PostgreSQL timestamps may retain the same millisecond as the previous
+    // write. Force a strictly increasing version so a concurrent request that
+    // read the old row cannot pass the optimistic-concurrency predicate.
+    const previousUpdatedAt = new Date(existingProject.updatedAt).getTime();
+    const nextUpdatedAt = new Date(Math.max(Date.now(), previousUpdatedAt + 1));
+    const safeUpdates: Partial<typeof clientProjects.$inferInsert> = { updatedAt: nextUpdatedAt };
     if (Array.isArray(updates.milestones)) safeUpdates.milestones = updates.milestones;
     if (Array.isArray(updates.assets)) safeUpdates.assets = updates.assets;
     if (updates.status !== undefined) {
