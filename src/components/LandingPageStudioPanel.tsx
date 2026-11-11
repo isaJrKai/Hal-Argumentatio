@@ -115,6 +115,7 @@ export const LandingPageStudioPanel: React.FC<{ token: string | null }> = ({ tok
 
   // Live URL for current page
   const liveUrl = typeof window !== 'undefined' ? `${window.location.origin}/landing/${config.id}` : '';
+  const isPublished = artifacts.some((artifact: any) => artifact.id === config.id && ['ready', 'deployed'].includes(artifact.status));
 
   // Record a version snapshot
   const saveSnapshot = (label: string, snapshotConfig: LandingPageConfig) => {
@@ -217,7 +218,7 @@ export const LandingPageStudioPanel: React.FC<{ token: string | null }> = ({ tok
         saveSnapshot(`Saved: ${config.title}`, savedConfig);
         showToast({
           title: 'Landing Page Saved',
-          message: `Changes published live to ${data.liveUrl}`,
+          message: 'Draft saved securely. It is not public until explicitly approved and published.',
           type: 'success'
         });
         fetchArtifacts();
@@ -237,6 +238,10 @@ export const LandingPageStudioPanel: React.FC<{ token: string | null }> = ({ tok
 
   // Copy live link to clipboard
   const handleCopyLink = () => {
+    if (!isPublished) {
+      showToast({ title: 'Approval required', message: 'Save this as a draft first, then publish it through the approval workflow.', type: 'info' });
+      return;
+    }
     navigator.clipboard.writeText(liveUrl);
     setCopiedLink(true);
     showToast({
@@ -684,16 +689,26 @@ export const LandingPageStudioPanel: React.FC<{ token: string | null }> = ({ tok
             <Download className="w-4 h-4" />
           </button>
 
-          {/* Open Live */}
-          <a
-            href={liveUrl}
-            target="_blank"
-            rel="noreferrer"
-            className="px-3 py-1.5 rounded-xl bg-bg-subtle hover:bg-slate-700 text-text-primary font-bold text-xs transition flex items-center gap-1.5 border border-border-dim"
-          >
-            <ExternalLink className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">Live</span>
-          </a>
+          {/* Public page is unavailable until a separate approval/publish action exists. */}
+          {isPublished ? (
+            <a
+              href={liveUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="px-3 py-1.5 rounded-xl bg-bg-subtle hover:bg-slate-700 text-text-primary font-bold text-xs transition flex items-center gap-1.5 border border-border-dim"
+            >
+              <ExternalLink className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Live</span>
+            </a>
+          ) : (
+            <span
+              aria-label="Draft not published"
+              title="This draft is private until an explicit publish approval is implemented."
+              className="px-3 py-1.5 rounded-xl bg-bg-subtle text-text-tertiary font-bold text-xs border border-border-dim"
+            >
+              Draft · Private
+            </span>
+          )}
         </div>
 
         {/* Mobile View Toggle (Editor vs Preview) */}
