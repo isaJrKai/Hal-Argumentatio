@@ -2284,7 +2284,7 @@ app.post('/api/landing-pages/:id/publish', authenticate, async (req, res) => {
       ? artifact.metadata as Record<string, unknown>
       : {};
     await pgDb.transaction(async (tx) => {
-      await tx.update(hermesLabArtifacts).set({
+      const publishedRows = await tx.update(hermesLabArtifacts).set({
         status: 'ready',
         metadata: {
           ...previousMetadata,
@@ -2300,7 +2300,10 @@ app.post('/api/landing-pages/:id/publish', authenticate, async (req, res) => {
         eq(hermesLabArtifacts.id, artifactId),
         eq(hermesLabArtifacts.contractorId, contractorId),
         eq(hermesLabArtifacts.status, 'draft')
-      ));
+      )).returning({ id: hermesLabArtifacts.id });
+      if (publishedRows.length !== 1) {
+        throw new Error('Landing page changed before publication approval could be committed.');
+      }
       await recordWorkEvent(tx, {
         contractorId,
         eventType: 'landing_page.published',
