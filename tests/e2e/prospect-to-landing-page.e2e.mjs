@@ -84,7 +84,7 @@ test('Prospects UI imports an allowlisted fixture, verifies it, and creates a pr
     });
 
     const leadRow = await pool.query(
-      'SELECT contractor_id, verification_status, dns_verified, is_synthetic, grounding_evidence FROM leads WHERE id = $1',
+      'SELECT contractor_id, verification_status, dns_verified, is_synthetic, grounding_evidence, seo_score, performance_score, ssl_status FROM leads WHERE id = $1',
       [leadId]
     );
     expect(leadRow.rows).toHaveLength(1);
@@ -94,6 +94,9 @@ test('Prospects UI imports an allowlisted fixture, verifies it, and creates a pr
       dns_verified: true,
       is_synthetic: false
     });
+    expect(leadRow.rows[0].seo_score).toBeNull();
+    expect(leadRow.rows[0].performance_score).toBeNull();
+    expect(leadRow.rows[0].ssl_status).toBeNull();
     expect(leadRow.rows[0].grounding_evidence).toMatchObject({
       hostname: 'example.com',
       dnsResolved: true,
