@@ -10,6 +10,12 @@ This audit traces the CRM/finance lifecycle from repository code and tests. A ro
 
 No client, lead, sale, payment, or revenue test records were created.
 
+## Landing-page publication safety correction in progress
+
+The release candidate now changes the save contract so `POST /api/landing-pages/save` creates or updates a tenant-owned `draft`, not a publicly accessible `ready` artifact. The save response no longer returns a public URL. The Landing Page Studio labels the saved artifact private and does not expose a Live link unless the artifact is already in a published state. Unknown artifact IDs no longer fall back to rendering the default plumbing template.
+
+The integration test now asserts that a saved draft is not publicly reachable and that another tenant cannot overwrite the artifact by reusing its ID. A separate explicit approval/publish action and its version-hash gate are still required before this workflow is complete; this branch deliberately does not invent that approval mechanism.
+
 ## Confirmed implementation
 
 - Lead discovery UI calls authenticated `POST /api/leads/harvest`; selected prospects are sent to `POST /api/leads/ingest`. The UI reports imported records and human review task counts.
