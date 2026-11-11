@@ -2166,6 +2166,14 @@ app.post('/api/landing-pages/regenerate-section', authenticate, async (req, res)
   }
 });
 
+const stableLandingPageJson = (value: any): string => {
+  if (Array.isArray(value)) return `[${value.map(stableLandingPageJson).join(',')}]`;
+  if (value && typeof value === 'object') {
+    return `{${Object.keys(value).sort().map(key => `${JSON.stringify(key)}:${stableLandingPageJson(value[key])}`).join(',')}}`;
+  }
+  return JSON.stringify(value);
+};
+
 app.post('/api/landing-pages/save', authenticate, async (req, res) => {
   const contractorId = (req as any).contractorId;
   const { id, title, pageConfig } = req.body || {};
@@ -2183,7 +2191,7 @@ app.post('/api/landing-pages/save', authenticate, async (req, res) => {
     // Never trust client-supplied rendered HTML. Render from the validated,
     // tenant-owned configuration using the escaping server-side generator.
     const ownedRenderedHtml = generateLandingPageHtml(ownedPageConfig);
-    const versionHash = crypto.createHash('sha256').update(JSON.stringify({ pageConfig: ownedPageConfig, renderedOutput: ownedRenderedHtml })).digest('hex');
+    const versionHash = crypto.createHash('sha256').update(stableLandingPageJson({ pageConfig: ownedPageConfig, renderedOutput: ownedRenderedHtml })).digest('hex');
 
     const [artifactWithId] = await pgDb
       .select()
@@ -2275,7 +2283,7 @@ app.post('/api/landing-pages/:id/publish', authenticate, async (req, res) => {
       return res.status(409).json({ success: false, error: 'Landing page draft is incomplete and cannot be published.' });
     }
     const actualVersionHash = crypto.createHash('sha256')
-      .update(JSON.stringify({ pageConfig: content.pageConfig, renderedOutput: content.renderedOutput }))
+      .update(stableLandingPageJson({ pageConfig: content.pageConfig, renderedOutput: content.renderedOutput }))
       .digest('hex');
     const expected = Buffer.from(expectedVersionHash, 'hex');
     const actual = Buffer.from(actualVersionHash, 'hex');
