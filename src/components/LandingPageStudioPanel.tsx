@@ -49,8 +49,9 @@ import { SeoSchemaPanel } from './landing/SeoSchemaPanel';
 import { AiGeneratorModal } from './landing/AiGeneratorModal';
 import { QualityGatePanel } from './landing/QualityGatePanel';
 import { useInspector } from '../context/InspectorContext';
+import { Lead } from '../types';
 
-export const LandingPageStudioPanel: React.FC<{ token: string | null }> = ({ token }) => {
+export const LandingPageStudioPanel: React.FC<{ token: string | null; leadContext?: Lead | null }> = ({ token, leadContext }) => {
   const { regionalProfile, activeNiche, workspaceConfig } = useBusinessContext();
   const { showToast } = useToast();
   const { openInspector, registerDataChangeCallback } = useInspector();
@@ -172,6 +173,24 @@ export const LandingPageStudioPanel: React.FC<{ token: string | null }> = ({ tok
   useEffect(() => {
     fetchArtifacts();
   }, [token]);
+
+  // Start a fresh page draft from a prospect only after the live grounding gate passes.
+  useEffect(() => {
+    if (!leadContext) return;
+    setConfig(prev => ({
+      ...prev,
+      id: `lp_${crypto.randomUUID().replace(/-/g, '')}`,
+      title: `${leadContext.businessName} — Website Draft`,
+      businessName: leadContext.businessName,
+      city: leadContext.city,
+      phone: leadContext.phone || prev.phone,
+      sourceLeadId: leadContext.id,
+      sourceLeadEvidence: null
+    }));
+    setSelectedArtifactId('');
+    setSavedVersionHash('');
+    setArtifacts([]);
+  }, [leadContext?.id]);
 
   // Handle switching artifacts
   const handleSelectArtifact = (id: string) => {
