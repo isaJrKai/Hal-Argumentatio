@@ -2222,7 +2222,8 @@ app.post('/api/landing-pages/save', authenticate, async (req, res) => {
         toolId: 'landing_page',
         category: 'web',
         title,
-        status: 'ready',
+        status: 'draft',
+        metadata: { versionHash, publicationApproval: null },
         content: {
           pageConfig: ownedPageConfig,
           renderedOutput: ownedRenderedHtml
