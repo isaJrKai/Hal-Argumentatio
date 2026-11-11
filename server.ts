@@ -56,6 +56,7 @@ import { buildPasswordResetResponse } from './src/lib/passwordResetResponse';
 import { verifyFirebaseGoogleIdToken } from './src/lib/firebaseGoogleIdentity';
 import { getClientIp } from './src/lib/clientIp';
 import { pruneBoundedMap } from './src/lib/boundedMap';
+import { isInsufficientTimesFmHistory } from './src/lib/timesfmError';
 import { recordWorkEvent, getRecentWorkEvents, getEntityWorkEvents } from './src/lib/workLedger';
 import { canHumanUpdateWorkTask, canTransitionWorkTask, listWorkTasks, getWorkTask, requiresWorkTaskApproval, ensureLeadReviewTask } from './src/lib/workTasks';
 import { validateStaffInput, getEffectiveStaffAvailability } from './src/lib/staff';
@@ -9123,8 +9124,7 @@ app.post(['/api/ai/test-timesfm', '/api/forecast/scenario'], authenticate, async
     return res.json(result);
   } catch (err: any) {
     const message = String(err?.message || 'Forecast unavailable');
-    const insufficientHistory = message.toLowerCase().includes('no tenant-scoped google ads history')
-      || message.toLowerCase().includes('insufficient google ads history');
+    const insufficientHistory = isInsufficientTimesFmHistory(err);
     const status = insufficientHistory || message.includes('Forecast unavailable') ? 409
       : message.includes('TimesFM') ? 503
       : 500;
