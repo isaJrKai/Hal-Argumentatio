@@ -293,6 +293,7 @@ export default function App() {
 
   // Business Data Store
   const [leads, setLeads] = useState<Lead[]>([]);
+  const [landingLeadContext, setLandingLeadContext] = useState<any | null>(null);
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [revenues, setRevenues] = useState<Revenue[]>([]);
   const [forecasts, setForecasts] = useState<Forecast[]>([]);
@@ -1432,6 +1433,10 @@ export default function App() {
                       leads={leads}
                       token={token}
                       onRefresh={fetchAllData}
+                      onCreateLandingPage={(lead) => {
+                        setLandingLeadContext(lead);
+                        setActiveTab('landing-studio');
+                      }}
                     />
                   )}
 
@@ -1578,7 +1583,7 @@ export default function App() {
                   )}
 
                   {activeTab === 'landing-studio' && (
-                    <LandingPageStudioPanel token={token} />
+                    <LandingPageStudioPanel token={token} leadContext={landingLeadContext} />
                   )}
 
                   {activeTab === 'form-builder' && (
