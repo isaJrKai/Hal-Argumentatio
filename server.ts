@@ -2045,7 +2045,7 @@ app.get('/landing/:id', async (req, res) => {
       try {
         const { TRADE_TEMPLATES } = await import('./src/components/landing/templates');
         const { generateLandingPageHtml } = await import('./src/components/landing/htmlGenerator');
-        const matched = Object.values(TRADE_TEMPLATES).find(t => t.id === id || t.trade === id) || (TRADE_TEMPLATES as any)[id] || TRADE_TEMPLATES.plumbing;
+        const matched = Object.values(TRADE_TEMPLATES).find(t => t.id === id || t.trade === id) || (TRADE_TEMPLATES as any)[id];
         if (matched) {
           const generated = generateLandingPageHtml(matched);
           res.setHeader('Content-Type', 'text/html; charset=utf-8');
