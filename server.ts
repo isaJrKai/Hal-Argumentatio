@@ -2266,6 +2266,9 @@ app.post('/api/landing-pages/:id/publish', authenticate, async (req, res) => {
       eq(hermesLabArtifacts.toolId, 'landing_page')
     ));
     if (!artifact) return res.status(404).json({ success: false, error: 'Landing page draft not found.' });
+    if (artifact.status !== 'draft') {
+      return res.status(409).json({ success: false, error: 'Only a private draft can be approved for publication.' });
+    }
 
     const content = artifact.content as any;
     if (!content?.pageConfig || typeof content?.renderedOutput !== 'string') {
@@ -2321,6 +2324,9 @@ app.post('/api/landing-pages/:id/publish', authenticate, async (req, res) => {
 
     return res.json({ success: true, id: artifactId, status: 'ready', versionHash: actualVersionHash, liveUrl: `/landing/${artifactId}` });
   } catch (err: any) {
+    if (String(err?.message || '').includes('changed before publication approval')) {
+      return res.status(409).json({ success: false, error: 'The draft changed before approval could be committed. Review and approve the latest version.' });
+    }
     console.error('[Publish Landing Page Error]', err);
     return res.status(500).json({ success: false, error: 'Could not publish the approved landing-page version.' });
   }
