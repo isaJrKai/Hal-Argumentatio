@@ -167,6 +167,18 @@ describe('upstream prospect import and landing-page artifact persistence', () =>
     const publicDraft = await request(app).get(`/landing/${artifactId}`);
     expect(publicDraft.status).toBe(404);
 
+    const wrongVersion = await request(app)
+      .post(`/api/landing-pages/${artifactId}/publish`)
+      .set('Authorization', `Bearer ${tokenA}`)
+      .send({ expectedVersionHash: '0'.repeat(64) });
+    expect(wrongVersion.status).toBe(409);
+
+    const foreignPublish = await request(app)
+      .post(`/api/landing-pages/${artifactId}/publish`)
+      .set('Authorization', `Bearer ${tokenB}`)
+      .send({ expectedVersionHash: saved.body.versionHash });
+    expect(foreignPublish.status).toBe(404);
+
     // server.ts deliberately registers the Hermes artifact-list route only
     // during production startup. Tests import the Express app without starting
     // listeners, so verify the persisted artifact and tenant boundary directly.
@@ -203,5 +215,15 @@ describe('upstream prospect import and landing-page artifact persistence', () =>
       [artifactId, tenantB]
     );
     expect(tenantBArtifacts.rows).toHaveLength(0);
+
+    const ownerPublish = await request(app)
+      .post(`/api/landing-pages/${artifactId}/publish`)
+      .set('Authorization', `Bearer ${tokenA}`)
+      .send({ expectedVersionHash: saved.body.versionHash });
+    expect(ownerPublish.status).toBe(200);
+    expect(ownerPublish.body).toMatchObject({ success: true, id: artifactId, status: 'ready', versionHash: saved.body.versionHash });
+    const publicPublished = await request(app).get(`/landing/${artifactId}`);
+    expect(publicPublished.status).toBe(200);
+    expect(publicPublished.text).toContain('Fixture Prospect Services');
   });
 });
