@@ -1781,23 +1781,54 @@ app.get('/api/events', (req, res) => {
     res.setHeader('Connection', 'keep-alive');
     res.flushHeaders();
 
-    const pingInterval = setInterval(() => {
+    let revalidationInProgress = false;
+    let streamClosed = false;
+    let client: SseClient;
+    let pingInterval: NodeJS.Timeout;
+    const closeStream = () => {
+      if (streamClosed) return;
+      streamClosed = true;
+      clearInterval(pingInterval);
+      sseClients = sseClients.filter(c => c !== client);
+      if (!res.writableEnded && !res.destroyed) res.end();
+    };
+    pingInterval = setInterval(async () => {
+      if (revalidationInProgress || res.writableEnded || res.destroyed) return;
+      revalidationInProgress = true;
       try {
+        const decoded = verifyToken(token);
+        if (!decoded || decoded.contractorId !== contractorId) {
+          closeStream();
+          return;
+        }
+        const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+        const revoked = await pgDb.select({ tokenHash: revokedTokens.tokenHash })
+          .from(revokedTokens)
+          .where(and(eq(revokedTokens.tokenHash, tokenHash), gt(revokedTokens.expiresAt, new Date())))
+          .limit(1);
+        const [account] = await pgDb.select({ id: contractors.id, accountStatus: contractors.accountStatus })
+          .from(contractors).where(eq(contractors.id, contractorId)).limit(1);
+        if (revoked.length || !account || account.accountStatus === 'suspended') {
+          closeStream();
+          return;
+        }
         res.write(':\n\n');
         const heartbeatEvent = { type: 'heartbeat', timestamp: new Date().toISOString() };
         res.write(`data: ${JSON.stringify(heartbeatEvent)}\n\n`);
-      } catch {
-        clearInterval(pingInterval);
+      } catch (error) {
+        console.error('[HAL SSE] Session revalidation failed; closing stream:', error);
+        closeStream();
+      } finally {
+        revalidationInProgress = false;
       }
     }, 15000);
 
-    const client: SseClient = { contractorId, res, pingInterval };
+    client = { contractorId, res, pingInterval };
     sseClients.push(client);
 
-    req.on('close', () => {
-      clearInterval(pingInterval);
-      sseClients = sseClients.filter(c => c !== client);
-    });
+    // EventSource GET request completion is not the lifetime of its response stream.
+    res.on('close', closeStream);
+    res.on('error', closeStream);
   });
 });
 
