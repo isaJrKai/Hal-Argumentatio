@@ -33,5 +33,14 @@ describe('SSE authentication security regression', () => {
     expect(route).toContain("account.accountStatus === 'suspended'");
     expect(route).toContain('closeStream();');
     expect(route).toContain('res.end()');
+    // SSE framing requires actual LF delimiters represented by one JS escape.
+    // Double-escaped \\n sequences are literal text and break EventSource parsing.
+    expect(route).toContain(String.raw`res.write(':
+
+');`);
+    expect(route).toContain(String.raw`data: ${JSON.stringify(heartbeatEvent)}
+
+`);
+    expect(route).not.toContain(String.raw`res.write(':\\n\\n');`);
   });
 });
