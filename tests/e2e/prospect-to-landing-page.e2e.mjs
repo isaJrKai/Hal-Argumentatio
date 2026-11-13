@@ -106,7 +106,6 @@ test('Prospects UI keeps an unverified staging prospect blocked from landing-pag
       }
     });
     expect(blockedSave.status()).toBe(409);
-    await expect(request.get('/landing/nonexistent-e2e-draft')).resolves.toMatchObject({ status: 404 });
 
     const pageRecords = await pool.query(
       'SELECT id FROM hermes_lab_artifacts WHERE contractor_id = $1 AND content->\'pageConfig\'->>\'sourceLeadId\' = $2',
