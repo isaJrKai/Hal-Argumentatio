@@ -7,7 +7,7 @@ const pool = new Pool({
   connectionString: process.env.DATABASE_URL || 'postgres://postgres:postgres@127.0.0.1:5432/hal_test'
 });
 
-test('Prospects UI imports an allowlisted fixture, verifies it, and creates a private lead-grounded page', async ({ page, request }) => {
+test('Prospects UI keeps an unverified staging prospect blocked from landing-page creation', async ({ page, request }) => {
   test.setTimeout(180000);
   const suffix = randomUUID().replace(/-/g, '');
   const email = `prospect-page-e2e-${suffix}@example.test`;
@@ -29,8 +29,8 @@ test('Prospects UI imports an allowlisted fixture, verifies it, and creates a pr
       localStorage.setItem('token', value);
     }, registered.token);
 
-    // Deterministic candidate fixture: the only network target probed is the
-    // reserved example.com test domain, never a real prospect website.
+    // The fixture is intentionally unverified and uses the reserved example.com
+    // domain. It must never become eligible merely because a probe resolves DNS.
     await page.route('**/api/leads/harvest', route => route.fulfill({
       status: 200,
       contentType: 'application/json',
@@ -45,7 +45,7 @@ test('Prospects UI imports an allowlisted fixture, verifies it, and creates a pr
         verificationStatus: 'UNVERIFIED_STAGING',
         dnsVerified: false,
         isSynthetic: false,
-        notes: 'Deterministic E2E fixture. Not a real prospect; website probe is restricted to example.com.'
+        notes: 'Deterministic E2E fixture. Not a real prospect; reserved example.com must remain unverified.'
       }])
     }));
 
@@ -75,60 +75,44 @@ test('Prospects UI imports an allowlisted fixture, verifies it, and creates a pr
     const groundingResponse = await groundingPromise;
     expect(groundingResponse.ok()).toBeTruthy();
     const grounding = await groundingResponse.json();
-    expect(grounding).toMatchObject({ success: true, leadId, verificationStatus: 'VERIFIED', dnsVerified: true });
+    expect(grounding).toMatchObject({ success: true, leadId, verificationStatus: 'UNVERIFIED_STAGING' });
     expect(grounding.evidence).toMatchObject({
       hostname: 'example.com',
-      dnsResolved: true,
-      httpReachable: true,
-      sslSecured: true
+      phoneValid: true
     });
 
     const leadRow = await pool.query(
-      'SELECT contractor_id, verification_status, dns_verified, is_synthetic, grounding_evidence, seo_score, performance_score, ssl_status FROM leads WHERE id = $1',
+      'SELECT contractor_id, verification_status, dns_verified, is_synthetic FROM leads WHERE id = $1',
       [leadId]
     );
     expect(leadRow.rows).toHaveLength(1);
     expect(leadRow.rows[0]).toMatchObject({
       contractor_id: contractorId,
-      verification_status: 'VERIFIED',
-      dns_verified: true,
+      verification_status: 'UNVERIFIED_STAGING',
       is_synthetic: false
     });
-    expect(leadRow.rows[0].seo_score).toBeNull();
-    expect(leadRow.rows[0].performance_score).toBeNull();
-    expect(leadRow.rows[0].ssl_status).toBeNull();
-    expect(leadRow.rows[0].grounding_evidence).toMatchObject({
-      hostname: 'example.com',
-      dnsResolved: true,
-      httpReachable: true,
-      sslSecured: true
+
+    const blockedButton = page.getByRole('button', { name: 'Verify Prospect Before Creating Draft' });
+    await expect(blockedButton).toBeVisible();
+    await expect(blockedButton).toBeDisabled();
+
+    // Bypass the UI deliberately: the API must enforce the same tenant-owned
+    // grounding precondition and reject draft creation with HTTP 409.
+    const blockedSave = await request.post('/api/landing-pages/save', {
+      headers: { Authorization: `Bearer ${registered.token}` },
+      data: {
+        title: businessName,
+        pageConfig: { businessName, sourceLeadId: leadId }
+      }
     });
+    expect(blockedSave.status()).toBe(409);
+    await expect(request.get('/landing/nonexistent-e2e-draft')).resolves.toMatchObject({ status: 404 });
 
-    await page.getByRole('button', { name: 'Create Landing Page Draft' }).click();
-    await expect(page.getByRole('heading', { name: 'Contractor Landing Page Studio' })).toBeVisible();
-
-    const savePromise = page.waitForResponse(response =>
-      response.url().includes('/api/landing-pages/save') && response.request().method() === 'POST'
+    const pageRecords = await pool.query(
+      'SELECT id FROM hermes_lab_artifacts WHERE contractor_id = $1 AND content->\'pageConfig\'->>\'sourceLeadId\' = $2',
+      [contractorId, leadId]
     );
-    await page.getByRole('button', { name: 'Save', exact: true }).click();
-    const saveResponse = await savePromise;
-    expect(saveResponse.ok()).toBeTruthy();
-    const saved = await saveResponse.json();
-    expect(saved).toMatchObject({ success: true, status: 'draft' });
-
-    const pageRecord = await pool.query(
-      "SELECT content->'pageConfig'->>'sourceLeadId' AS source_lead_id, content->'pageConfig'->'sourceLeadEvidence'->>'verificationStatus' AS source_verification, content->'pageConfig'->>'businessName' AS business_name FROM hermes_lab_artifacts WHERE id = $1 AND contractor_id = $2",
-      [saved.id, contractorId]
-    );
-    expect(pageRecord.rows).toHaveLength(1);
-    expect(pageRecord.rows[0]).toMatchObject({
-      source_lead_id: leadId,
-      source_verification: 'VERIFIED',
-      business_name: businessName
-    });
-
-    const publicDraft = await request.get(`/landing/${saved.id}`);
-    expect(publicDraft.status()).toBe(404);
+    expect(pageRecords.rows).toHaveLength(0);
   } finally {
     if (contractorId) {
       await pool.query('DELETE FROM work_events WHERE contractor_id = $1', [contractorId]);
