@@ -339,7 +339,7 @@ export async function validateDomainAndDns(
       httpReachable: false,
       sslSecured: false,
       hostname,
-      ipAddresses: dnsResult.ips,
+      // Never return private/reserved DNS answers to callers or user-facing reports.
       rejectionReason: 'DNS resolved to a non-public or reserved network address'
     };
   }
