@@ -1782,12 +1782,15 @@ app.get('/api/events', (req, res) => {
     res.flushHeaders();
 
     let revalidationInProgress = false;
+    let streamClosed = false;
     let client: SseClient;
     let pingInterval: NodeJS.Timeout;
     const closeStream = () => {
+      if (streamClosed) return;
+      streamClosed = true;
       clearInterval(pingInterval);
       sseClients = sseClients.filter(c => c !== client);
-      if (!res.writableEnded) res.end();
+      if (!res.writableEnded && !res.destroyed) res.end();
     };
     pingInterval = setInterval(async () => {
       if (revalidationInProgress || res.writableEnded) return;
