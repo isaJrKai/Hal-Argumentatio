@@ -251,6 +251,35 @@ describe('upstream prospect import and landing-page artifact persistence', () =>
       .send({ expectedVersionHash: saved.body.versionHash });
     expect(staleApproval.status).toBe(409);
 
+    // Simulate a concurrent save advancing the persisted version marker after
+    // the publish handler's initial read but before its conditional UPDATE.
+    // The stored content still matches the user's approval, so only the
+    // database-level compare-and-swap can reject this stale publication.
+    await pool.query(
+      `UPDATE hermes_lab_artifacts
+       SET metadata = jsonb_set(COALESCE(metadata, '{}'::jsonb), '{versionHash}', to_jsonb($3::text), true)
+       WHERE id = $1 AND contractor_id = $2`,
+      [artifactId, tenantA, 'f'.repeat(64)]
+    );
+    const racedApproval = await request(app)
+      .post(`/api/landing-pages/${artifactId}/publish`)
+      .set('Authorization', `Bearer ${tokenA}`)
+      .send({ expectedVersionHash: revisedSave.body.versionHash });
+    expect(racedApproval.status).toBe(409);
+    const stillPrivate = await pool.query(
+      'SELECT status FROM hermes_lab_artifacts WHERE id = $1 AND contractor_id = $2',
+      [artifactId, tenantA]
+    );
+    expect(stillPrivate.rows[0].status).toBe('draft');
+
+    // Restore the current version marker; the same explicit approval can now
+    // publish only the exact version that was reviewed.
+    await pool.query(
+      `UPDATE hermes_lab_artifacts
+       SET metadata = jsonb_set(COALESCE(metadata, '{}'::jsonb), '{versionHash}', to_jsonb($3::text), true)
+       WHERE id = $1 AND contractor_id = $2`,
+      [artifactId, tenantA, revisedSave.body.versionHash]
+    );
     const revisedApproval = await request(app)
       .post(`/api/landing-pages/${artifactId}/publish`)
       .set('Authorization', `Bearer ${tokenA}`)
