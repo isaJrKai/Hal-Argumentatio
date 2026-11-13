@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest';
+import dns from 'node:dns';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { isPubliclyRoutableIp } from '../../src/lib/networkVerification';
 
 describe('public IP allowlist for outbound website probes', () => {
