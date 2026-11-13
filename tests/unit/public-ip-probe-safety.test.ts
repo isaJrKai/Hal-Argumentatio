@@ -1,6 +1,6 @@
 import dns from 'node:dns';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { isPubliclyRoutableIp } from '../../src/lib/networkVerification';
+import { isPubliclyRoutableIp, validateDomainAndDns } from '../../src/lib/networkVerification';
 
 describe('public IP allowlist for outbound website probes', () => {
   it('allows ordinary globally routable IPv4 and IPv6 addresses', () => {
