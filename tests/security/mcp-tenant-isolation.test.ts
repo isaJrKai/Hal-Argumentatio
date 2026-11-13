@@ -35,4 +35,20 @@ describe('Legacy MCP tenant isolation', () => {
     const route = source.slice(start, end);
     expect(route).toContain('.where(eq(schedulerJobs.contractorId, contractorId))');
   });
+  it('returns not found when a tenant updates an artifact it does not own', () => {
+    const server = readFileSync(path.resolve(process.cwd(), 'server.ts'), 'utf8');
+    const start = server.indexOf("app.patch('/api/hermes/artifacts/:id', authenticate");
+    const end = server.indexOf("app.get('/api/hermes/diagnostics'", start);
+    expect(start).toBeGreaterThanOrEqual(0);
+    expect(end).toBeGreaterThan(start);
+    const route = server.slice(start, end);
+    expect(route).toContain('.returning({ id: hermesLabArtifacts.id })');
+    expect(route).toContain("if (!updatedArtifact)");
+    expect(route).toContain("res.status(404)");
+    const notFoundCheck = route.indexOf("if (!updatedArtifact)");
+    const successResponse = route.indexOf("return res.json({ success: true, message: 'Artifact updated successfully' })");
+    expect(notFoundCheck).toBeGreaterThanOrEqual(0);
+    expect(successResponse).toBeGreaterThan(notFoundCheck);
+  });
+
 });
