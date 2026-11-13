@@ -2359,7 +2359,11 @@ app.post('/api/landing-pages/:id/publish', authenticate, async (req, res) => {
       }).where(and(
         eq(hermesLabArtifacts.id, artifactId),
         eq(hermesLabArtifacts.contractorId, contractorId),
-        eq(hermesLabArtifacts.status, 'draft')
+        eq(hermesLabArtifacts.status, 'draft'),
+        // Compare-and-swap the persisted approval hash in the same SQL UPDATE.
+        // A concurrent save changes metadata.versionHash and makes this update
+        // affect zero rows, even if the earlier SELECT saw the old content.
+        sql`${hermesLabArtifacts.metadata}->>'versionHash' = ${actualVersionHash}`
       )).returning({ id: hermesLabArtifacts.id });
       if (publishedRows.length !== 1) {
         throw new Error('Landing page changed before publication approval could be committed.');
