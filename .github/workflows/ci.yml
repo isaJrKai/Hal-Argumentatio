@@ -56,7 +56,22 @@ jobs:
       - name: Install Playwright for browser workflow verification
         run: npm install --no-save --no-package-lock @playwright/test@1.55.0
       - name: Install Chromium for browser workflow verification
-        run: npx playwright install --with-deps chromium
+        shell: bash
+        run: |
+          # GitHub-hosted runners occasionally lose DNS while apt installs
+          # Playwright's OS dependencies. Retry the complete install rather
+          # than treating a transient package-mirror outage as a code failure.
+          for attempt in 1 2 3; do
+            if npx playwright install --with-deps chromium; then
+              exit 0
+            fi
+            if [ "$attempt" -lt 3 ]; then
+              echo "Chromium/system dependency installation failed (attempt $attempt/3); retrying in 15 seconds."
+              sleep 15
+            fi
+          done
+          echo "Chromium/system dependency installation failed after 3 attempts."
+          exit 1
       - name: Run browser-level proposal acceptance workflow
         run: npx playwright test
       - name: Audit production dependency advisories

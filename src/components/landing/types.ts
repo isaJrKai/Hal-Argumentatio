@@ -91,6 +91,8 @@ export interface PricingTierItem {
 export interface LandingPageConfig {
   id: string;
   contractorId?: string;
+  sourceLeadId?: string;
+  sourceLeadEvidence?: Record<string, unknown> | null;
   title: string;
   trade: TradeType;
   businessName: string;

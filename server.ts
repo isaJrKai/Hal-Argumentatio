@@ -2045,7 +2045,7 @@ app.get('/landing/:id', async (req, res) => {
       try {
         const { TRADE_TEMPLATES } = await import('./src/components/landing/templates');
         const { generateLandingPageHtml } = await import('./src/components/landing/htmlGenerator');
-        const matched = Object.values(TRADE_TEMPLATES).find(t => t.id === id || t.trade === id) || (TRADE_TEMPLATES as any)[id] || TRADE_TEMPLATES.plumbing;
+        const matched = Object.values(TRADE_TEMPLATES).find(t => t.id === id || t.trade === id) || (TRADE_TEMPLATES as any)[id];
         if (matched) {
           const generated = generateLandingPageHtml(matched);
           res.setHeader('Content-Type', 'text/html; charset=utf-8');
@@ -2166,6 +2166,14 @@ app.post('/api/landing-pages/regenerate-section', authenticate, async (req, res)
   }
 });
 
+const stableLandingPageJson = (value: any): string => {
+  if (Array.isArray(value)) return `[${value.map(stableLandingPageJson).join(',')}]`;
+  if (value && typeof value === 'object') {
+    return `{${Object.keys(value).sort().map(key => `${JSON.stringify(key)}:${stableLandingPageJson(value[key])}`).join(',')}}`;
+  }
+  return JSON.stringify(value);
+};
+
 app.post('/api/landing-pages/save', authenticate, async (req, res) => {
   const contractorId = (req as any).contractorId;
   const { id, title, pageConfig } = req.body || {};
@@ -2179,15 +2187,46 @@ app.post('/api/landing-pages/save', authenticate, async (req, res) => {
 
   try {
     const artifactId = typeof id === 'string' && id.length > 5 ? id : ('lp_' + crypto.randomUUID().slice(0, 8));
-    const ownedPageConfig = { ...pageConfig, id: artifactId, contractorId };
+    const sourceLeadId = typeof pageConfig.sourceLeadId === 'string' ? pageConfig.sourceLeadId.trim() : '';
+    let sourceLeadEvidence: Record<string, unknown> | null = null;
+    if (sourceLeadId) {
+      const [sourceLead] = await pgDb.select().from(leads).where(and(
+        eq(leads.id, sourceLeadId),
+        eq(leads.contractorId, contractorId)
+      ));
+      if (!sourceLead) return res.status(404).json({ success: false, error: 'Source prospect not found.' });
+      if (sourceLead.isSynthetic || sourceLead.verificationStatus !== 'VERIFIED' || !sourceLead.dnsVerified) {
+        return res.status(409).json({ success: false, error: 'A lead-grounded page requires a non-synthetic prospect with current verified DNS evidence.' });
+      }
+      sourceLeadEvidence = {
+        leadId: sourceLead.id,
+        businessName: sourceLead.businessName,
+        city: sourceLead.city,
+        websiteUrl: sourceLead.websiteUrl,
+        verificationStatus: sourceLead.verificationStatus,
+        dnsVerified: sourceLead.dnsVerified,
+        groundingEvidence: sourceLead.groundingEvidence
+      };
+    }
+    const ownedPageConfig = {
+      ...pageConfig,
+      id: artifactId,
+      contractorId,
+      ...(sourceLeadId ? { sourceLeadId, sourceLeadEvidence } : {})
+    };
     // Never trust client-supplied rendered HTML. Render from the validated,
     // tenant-owned configuration using the escaping server-side generator.
     const ownedRenderedHtml = generateLandingPageHtml(ownedPageConfig);
+    const versionHash = crypto.createHash('sha256').update(stableLandingPageJson({ pageConfig: ownedPageConfig, renderedOutput: ownedRenderedHtml })).digest('hex');
 
-    const [existing] = await pgDb
+    const [artifactWithId] = await pgDb
       .select()
       .from(hermesLabArtifacts)
-      .where(and(eq(hermesLabArtifacts.id, artifactId), eq(hermesLabArtifacts.contractorId, contractorId)));
+      .where(eq(hermesLabArtifacts.id, artifactId));
+    if (artifactWithId && artifactWithId.contractorId !== contractorId) {
+      return res.status(404).json({ success: false, error: 'Landing page not found.' });
+    }
+    const existing = artifactWithId;
 
     await recordWorkEvent(pgDb, {
       contractorId, eventType: existing ? 'landing_page.updated' : 'landing_page.saved',
@@ -2205,7 +2244,8 @@ app.post('/api/landing-pages/save', authenticate, async (req, res) => {
             pageConfig: ownedPageConfig,
             renderedOutput: ownedRenderedHtml
           },
-          status: 'ready',
+          status: 'draft',
+          metadata: { ...((existing?.metadata && typeof existing.metadata === 'object') ? existing.metadata as Record<string, unknown> : {}), versionHash, publicationApproval: null },
           updatedAt: new Date()
         })
         .where(and(eq(hermesLabArtifacts.id, artifactId), eq(hermesLabArtifacts.contractorId, contractorId)));
@@ -2216,7 +2256,8 @@ app.post('/api/landing-pages/save', authenticate, async (req, res) => {
         toolId: 'landing_page',
         category: 'web',
         title,
-        status: 'ready',
+        status: 'draft',
+        metadata: { versionHash, publicationApproval: null },
         content: {
           pageConfig: ownedPageConfig,
           renderedOutput: ownedRenderedHtml
@@ -2230,7 +2271,9 @@ app.post('/api/landing-pages/save', authenticate, async (req, res) => {
       success: true,
       id: artifactId,
       contractorId,
-      liveUrl: `/landing/${artifactId}`
+      status: 'draft',
+      versionHash,
+      message: 'Draft saved. It is not public until explicitly approved and published.'
     });
   } catch (err: any) {
     console.error('[Save Landing Page Error]', err);
@@ -2238,6 +2281,116 @@ app.post('/api/landing-pages/save', authenticate, async (req, res) => {
   }
 });
 
+
+app.post('/api/landing-pages/:id/publish', authenticate, async (req, res) => {
+  const contractorId = (req as any).contractorId;
+  const artifactId = req.params.id;
+  const expectedVersionHash = typeof req.body?.expectedVersionHash === 'string'
+    ? req.body.expectedVersionHash.trim().toLowerCase()
+    : '';
+
+  if (!/^[a-f0-9]{64}$/.test(expectedVersionHash)) {
+    return res.status(400).json({ success: false, error: 'A valid saved version hash is required for publication approval.' });
+  }
+
+  try {
+    const [artifact] = await pgDb.select().from(hermesLabArtifacts).where(and(
+      eq(hermesLabArtifacts.id, artifactId),
+      eq(hermesLabArtifacts.contractorId, contractorId),
+      eq(hermesLabArtifacts.toolId, 'landing_page')
+    ));
+    if (!artifact) return res.status(404).json({ success: false, error: 'Landing page draft not found.' });
+    if (artifact.status !== 'draft') {
+      return res.status(409).json({ success: false, error: 'Only a private draft can be approved for publication.' });
+    }
+
+    const content = artifact.content as any;
+    const sourceLeadId = typeof content?.pageConfig?.sourceLeadId === 'string' ? content.pageConfig.sourceLeadId : '';
+    if (sourceLeadId) {
+      const [sourceLead] = await pgDb.select().from(leads).where(and(
+        eq(leads.id, sourceLeadId),
+        eq(leads.contractorId, contractorId)
+      ));
+      if (!sourceLead || sourceLead.isSynthetic || sourceLead.verificationStatus !== 'VERIFIED' || !sourceLead.dnsVerified) {
+        return res.status(409).json({ success: false, error: 'The source prospect is no longer verified. Re-verify it before publication.' });
+      }
+      const currentEvidence = {
+        leadId: sourceLead.id,
+        businessName: sourceLead.businessName,
+        city: sourceLead.city,
+        websiteUrl: sourceLead.websiteUrl,
+        verificationStatus: sourceLead.verificationStatus,
+        dnsVerified: sourceLead.dnsVerified,
+        groundingEvidence: sourceLead.groundingEvidence
+      };
+      if (stableLandingPageJson(currentEvidence) !== stableLandingPageJson(content.pageConfig.sourceLeadEvidence)) {
+        return res.status(409).json({ success: false, error: 'Source prospect evidence changed. Rebuild and review the draft before publication.' });
+      }
+    }
+    if (!content?.pageConfig || typeof content?.renderedOutput !== 'string') {
+      return res.status(409).json({ success: false, error: 'Landing page draft is incomplete and cannot be published.' });
+    }
+    const actualVersionHash = crypto.createHash('sha256')
+      .update(stableLandingPageJson({ pageConfig: content.pageConfig, renderedOutput: content.renderedOutput }))
+      .digest('hex');
+    const expected = Buffer.from(expectedVersionHash, 'hex');
+    const actual = Buffer.from(actualVersionHash, 'hex');
+    if (expected.length !== actual.length || !crypto.timingSafeEqual(expected, actual)) {
+      return res.status(409).json({ success: false, error: 'The saved draft changed. Save and review the latest version before approving publication.' });
+    }
+
+    const approvedAt = new Date();
+    const previousMetadata = artifact.metadata && typeof artifact.metadata === 'object'
+      ? artifact.metadata as Record<string, unknown>
+      : {};
+    await pgDb.transaction(async (tx) => {
+      const publishedRows = await tx.update(hermesLabArtifacts).set({
+        status: 'ready',
+        metadata: {
+          ...previousMetadata,
+          versionHash: actualVersionHash,
+          publicationApproval: {
+            approvedBy: contractorId,
+            approvedAt: approvedAt.toISOString(),
+            versionHash: actualVersionHash
+          }
+        },
+        updatedAt: approvedAt
+      }).where(and(
+        eq(hermesLabArtifacts.id, artifactId),
+        eq(hermesLabArtifacts.contractorId, contractorId),
+        eq(hermesLabArtifacts.status, 'draft'),
+        // Compare-and-swap the persisted approval hash in the same SQL UPDATE.
+        // A concurrent save changes metadata.versionHash and makes this update
+        // affect zero rows, even if the earlier SELECT saw the old content.
+        sql`${hermesLabArtifacts.metadata}->>'versionHash' = ${actualVersionHash}`
+      )).returning({ id: hermesLabArtifacts.id });
+      if (publishedRows.length !== 1) {
+        throw new Error('Landing page changed before publication approval could be committed.');
+      }
+      await recordWorkEvent(tx, {
+        contractorId,
+        eventType: 'landing_page.published',
+        entityType: 'landing_page',
+        entityId: artifactId,
+        actorType: 'human',
+        actorId: contractorId,
+        sourceModule: 'landing_page_studio',
+        correlationId: artifactId,
+        summary: `Approved publication of landing page: ${artifact.title}.`,
+        payload: { versionHash: actualVersionHash, approvedAt: approvedAt.toISOString() }
+      });
+    });
+
+    return res.json({ success: true, id: artifactId, status: 'ready', versionHash: actualVersionHash, liveUrl: `/landing/${artifactId}` });
+  } catch (err: any) {
+    if (String(err?.message || '').includes('changed before publication approval')) {
+      return res.status(409).json({ success: false, error: 'The draft changed before approval could be committed. Review and approve the latest version.' });
+    }
+    console.error('[Publish Landing Page Error]', err);
+    return res.status(500).json({ success: false, error: 'Could not publish the approved landing-page version.' });
+  }
+});
 app.get('/api/public/form/dispatch', async (req, res) => {
   const landingPageId = typeof req.query.landingPageId === 'string' ? req.query.landingPageId.trim() : '';
   if (!landingPageId || landingPageId.length > 128) {
@@ -8305,7 +8458,12 @@ app.put('/api/projects/:id', authenticate, async (req, res) => {
 
     // Accept only fields used by the delivery workflow; tenant ownership and
     // immutable identifiers can never be changed by a client-supplied payload.
-    const safeUpdates: Partial<typeof clientProjects.$inferInsert> = { updatedAt: new Date() };
+    // PostgreSQL timestamps may retain the same millisecond as the previous
+    // write. Force a strictly increasing version so a concurrent request that
+    // read the old row cannot pass the optimistic-concurrency predicate.
+    const previousUpdatedAt = new Date(existingProject.updatedAt).getTime();
+    const nextUpdatedAt = new Date(Math.max(Date.now(), previousUpdatedAt + 1));
+    const safeUpdates: Partial<typeof clientProjects.$inferInsert> = { updatedAt: nextUpdatedAt };
     if (Array.isArray(updates.milestones)) safeUpdates.milestones = updates.milestones;
     if (Array.isArray(updates.assets)) safeUpdates.assets = updates.assets;
     if (updates.status !== undefined) {

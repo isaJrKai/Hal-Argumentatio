@@ -20,6 +20,7 @@ const artifactId = `lp_test_${suffix}`;
 let dbAvailable = false;
 let tokenA = '';
 let tokenB = '';
+let fixtureLeadId = '';
 
 async function login(email: string) {
   const response = await request(app).post('/api/auth/login').send({ email, password });
@@ -120,6 +121,7 @@ describe('upstream prospect import and landing-page artifact persistence', () =>
     expect(first.status).toBe(200);
     expect(first.body).toMatchObject({ success: true, count: 1, queuedTasks: 1, skippedCount: 0 });
     const leadId = first.body.leads[0].id as string;
+    fixtureLeadId = leadId;
 
     const duplicate = await request(app)
       .post('/api/leads/ingest')
@@ -155,13 +157,35 @@ describe('upstream prospect import and landing-page artifact persistence', () =>
   it('saves a tenant-owned landing-page artifact and verifies persisted tenant isolation', async (ctx) => {
     if (!dbAvailable) return ctx.skip();
 
+    const unverifiedLeadSave = await request(app)
+      .post('/api/landing-pages/save')
+      .set('Authorization', `Bearer ${tokenA}`)
+      .send({ id: `lp_unverified_${suffix}`, title: 'Must remain blocked', pageConfig: { ...pageConfig, sourceLeadId: fixtureLeadId } });
+    expect(unverifiedLeadSave.status).toBe(409);
+
     const saved = await request(app)
       .post('/api/landing-pages/save')
       .set('Authorization', `Bearer ${tokenA}`)
       .send({ id: artifactId, title: 'Prospect flow test page', pageConfig });
     expect(saved.status).toBe(200);
-    expect(saved.body).toMatchObject({ success: true, id: artifactId, contractorId: tenantA });
-    expect(saved.body.liveUrl).toBe(`/landing/${artifactId}`);
+    expect(saved.body).toMatchObject({ success: true, id: artifactId, contractorId: tenantA, status: 'draft' });
+    expect(saved.body.liveUrl).toBeUndefined();
+    expect(saved.body.message).toMatch(/not public until explicitly approved and published/i);
+
+    const publicDraft = await request(app).get(`/landing/${artifactId}`);
+    expect(publicDraft.status).toBe(404);
+
+    const wrongVersion = await request(app)
+      .post(`/api/landing-pages/${artifactId}/publish`)
+      .set('Authorization', `Bearer ${tokenA}`)
+      .send({ expectedVersionHash: '0'.repeat(64) });
+    expect(wrongVersion.status).toBe(409);
+
+    const foreignPublish = await request(app)
+      .post(`/api/landing-pages/${artifactId}/publish`)
+      .set('Authorization', `Bearer ${tokenB}`)
+      .send({ expectedVersionHash: saved.body.versionHash });
+    expect(foreignPublish.status).toBe(404);
 
     // server.ts deliberately registers the Hermes artifact-list route only
     // during production startup. Tests import the Express app without starting
@@ -177,15 +201,90 @@ describe('upstream prospect import and landing-page artifact persistence', () =>
       contractor_id: tenantA,
       tool_id: 'landing_page',
       title: 'Prospect flow test page',
-      status: 'ready'
+      status: 'draft'
     });
     expect(stored.content.pageConfig.businessName).toBe('Fixture Prospect Services');
     expect(stored.content.renderedOutput).toContain('Fixture Prospect Services');
+
+    const tenantBWrite = await request(app)
+      .post('/api/landing-pages/save')
+      .set('Authorization', `Bearer ${tokenB}`)
+      .send({ id: artifactId, title: 'Attempted foreign overwrite', pageConfig: { ...pageConfig, businessName: 'Tenant B' } });
+    expect(tenantBWrite.status).toBe(404);
+    const unchanged = await pool.query(
+      'SELECT title, content FROM hermes_lab_artifacts WHERE id = $1 AND contractor_id = $2',
+      [artifactId, tenantA]
+    );
+    expect(unchanged.rows[0].title).toBe('Prospect flow test page');
+    expect(unchanged.rows[0].content.pageConfig.businessName).toBe('Fixture Prospect Services');
 
     const tenantBArtifacts = await pool.query(
       'SELECT id FROM hermes_lab_artifacts WHERE id = $1 AND contractor_id = $2',
       [artifactId, tenantB]
     );
     expect(tenantBArtifacts.rows).toHaveLength(0);
+
+    const ownerPublish = await request(app)
+      .post(`/api/landing-pages/${artifactId}/publish`)
+      .set('Authorization', `Bearer ${tokenA}`)
+      .send({ expectedVersionHash: saved.body.versionHash });
+    expect(ownerPublish.status).toBe(200);
+    expect(ownerPublish.body).toMatchObject({ success: true, id: artifactId, status: 'ready', versionHash: saved.body.versionHash });
+    const publicPublished = await request(app).get(`/landing/${artifactId}`);
+    expect(publicPublished.status).toBe(200);
+    expect(publicPublished.text).toContain('Fixture Prospect Services');
+
+    const revisedPageConfig = { ...pageConfig, title: 'Revised prospect flow page' };
+    const revisedSave = await request(app)
+      .post('/api/landing-pages/save')
+      .set('Authorization', `Bearer ${tokenA}`)
+      .send({ id: artifactId, title: revisedPageConfig.title, pageConfig: revisedPageConfig });
+    expect(revisedSave.status).toBe(200);
+    expect(revisedSave.body.status).toBe('draft');
+    expect(revisedSave.body.versionHash).not.toBe(saved.body.versionHash);
+    const unpublishedRevision = await request(app).get(`/landing/${artifactId}`);
+    expect(unpublishedRevision.status).toBe(404);
+
+    const staleApproval = await request(app)
+      .post(`/api/landing-pages/${artifactId}/publish`)
+      .set('Authorization', `Bearer ${tokenA}`)
+      .send({ expectedVersionHash: saved.body.versionHash });
+    expect(staleApproval.status).toBe(409);
+
+    // Simulate a concurrent save advancing the persisted version marker after
+    // the publish handler's initial read but before its conditional UPDATE.
+    // The stored content still matches the user's approval, so only the
+    // database-level compare-and-swap can reject this stale publication.
+    await pool.query(
+      `UPDATE hermes_lab_artifacts
+       SET metadata = jsonb_set(COALESCE(metadata, '{}'::jsonb), '{versionHash}', to_jsonb($3::text), true)
+       WHERE id = $1 AND contractor_id = $2`,
+      [artifactId, tenantA, 'f'.repeat(64)]
+    );
+    const racedApproval = await request(app)
+      .post(`/api/landing-pages/${artifactId}/publish`)
+      .set('Authorization', `Bearer ${tokenA}`)
+      .send({ expectedVersionHash: revisedSave.body.versionHash });
+    expect(racedApproval.status).toBe(409);
+    const stillPrivate = await pool.query(
+      'SELECT status FROM hermes_lab_artifacts WHERE id = $1 AND contractor_id = $2',
+      [artifactId, tenantA]
+    );
+    expect(stillPrivate.rows[0].status).toBe('draft');
+
+    // Restore the current version marker; the same explicit approval can now
+    // publish only the exact version that was reviewed.
+    await pool.query(
+      `UPDATE hermes_lab_artifacts
+       SET metadata = jsonb_set(COALESCE(metadata, '{}'::jsonb), '{versionHash}', to_jsonb($3::text), true)
+       WHERE id = $1 AND contractor_id = $2`,
+      [artifactId, tenantA, revisedSave.body.versionHash]
+    );
+    const revisedApproval = await request(app)
+      .post(`/api/landing-pages/${artifactId}/publish`)
+      .set('Authorization', `Bearer ${tokenA}`)
+      .send({ expectedVersionHash: revisedSave.body.versionHash });
+    expect(revisedApproval.status).toBe(200);
+    expect(revisedApproval.body.versionHash).toBe(revisedSave.body.versionHash);
   });
 });

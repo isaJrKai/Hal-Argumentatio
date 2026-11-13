@@ -45,9 +45,10 @@ interface LeadsPanelProps {
   leads: Lead[];
   token: string;
   onRefresh: () => void;
+  onCreateLandingPage?: (lead: Lead) => void;
 }
 
-export default function LeadsPanel({ leads, token, onRefresh }: LeadsPanelProps) {
+export default function LeadsPanel({ leads, token, onRefresh, onCreateLandingPage }: LeadsPanelProps) {
   const { activeCity, activeNiche, activeIndustry, supportedNiches, supportedCities, addCustomCity } = useBusinessContext();
 
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
@@ -1603,6 +1604,22 @@ Next-Gen Waterproofing	Calgary	Waterproofing	Jane Smith	jane@nextgen.ca	403-555-
                   {selectedLead.notes || 'No profile notes captured.'}
                 </div>
               </div>
+
+              {onCreateLandingPage && (
+                <button
+                  type="button"
+                  disabled={selectedLead.verificationStatus !== 'VERIFIED' || !selectedLead.dnsVerified || isSelectedSynthetic}
+                  onClick={() => onCreateLandingPage(selectedLead)}
+                  title={selectedLead.verificationStatus === 'VERIFIED' && selectedLead.dnsVerified && !isSelectedSynthetic
+                    ? 'Create a private landing-page draft from this verified prospect'
+                    : 'Run the live grounding probe and verify this prospect before creating a lead-grounded page'}
+                  className="w-full px-3 py-2 rounded-sm border border-brand/40 bg-brand/10 text-brand hover:bg-brand/15 disabled:opacity-40 disabled:cursor-not-allowed text-xs font-mono font-bold uppercase tracking-wider"
+                >
+                  {selectedLead.verificationStatus === 'VERIFIED' && selectedLead.dnsVerified && !isSelectedSynthetic
+                    ? 'Create Landing Page Draft'
+                    : 'Verify Prospect Before Creating Draft'}
+                </button>
+              )}
 
               {/* Fail-Closed Network Grounding & DNS Audit Panel */}
               <div className="border-t border-border-dark/60 pt-4 space-y-3">
