@@ -1826,10 +1826,10 @@ app.get('/api/events', (req, res) => {
     client = { contractorId, res, pingInterval };
     sseClients.push(client);
 
-    req.on('close', () => {
-      clearInterval(pingInterval);
-      sseClients = sseClients.filter(c => c !== client);
-    });
+    // The request body is complete immediately for EventSource GETs; listen
+    // to the response socket instead so the stream survives after headers flush.
+    res.on('close', closeStream);
+    res.on('error', closeStream);
   });
 });
 
