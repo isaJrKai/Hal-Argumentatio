@@ -9,7 +9,6 @@ describe('SSE authentication security regression', () => {
     const routeEnd = source.indexOf('// Apply a small, independent IP budget', routeStart);
     expect(routeStart).toBeGreaterThanOrEqual(0);
     expect(routeEnd).toBeGreaterThan(routeStart);
-
     const route = source.slice(routeStart, routeEnd);
     expect(route).toContain('void authenticate(req, res, () =>');
     expect(route).toContain('(req as any).contractorId');
@@ -31,16 +30,14 @@ describe('SSE authentication security regression', () => {
     expect(route).toContain('.from(revokedTokens)');
     expect(route).toContain('.from(contractors)');
     expect(route).toContain("account.accountStatus === 'suspended'");
-    expect(route).toContain('closeStream();');
-    expect(route).toContain('res.end()');
-    // SSE framing requires actual LF delimiters represented by one JS escape.
-    // Double-escaped \\n sequences are literal text and break EventSource parsing.
-    expect(route).toContain(String.raw`res.write(':
-
-');`);
-    expect(route).toContain(String.raw`data: ${JSON.stringify(heartbeatEvent)}
-
-`);
-    expect(route).not.toContain(String.raw`res.write(':\\n\\n');`);
+    expect(route).toContain('streamClosed = true');
+    expect(route).toContain('res.on(\'close\', closeStream)');
+    expect(route).toContain('res.on(\'error\', closeStream)');
+    expect(route).not.toContain("req.on('close'");
+    expect(route).toContain('if (!res.writableEnded && !res.destroyed) res.end()');
+    // EventSource requires LF framing; double-escaped sequences are literal text.
+    expect(route).toContain("res.write(':\\n\\n');");
+    expect(route).toContain("res.write(`data: \${JSON.stringify(heartbeatEvent)}\\n\\n`);");
+    expect(route).not.toContain("res.write(':\\\\n\\\\n');");
   });
 });
