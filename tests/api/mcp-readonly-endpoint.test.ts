@@ -8,17 +8,17 @@ import supertest from 'supertest';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { buildHalMcpServer } from '../../src/services/mcp/halMcpServer';
 
-describe('HAL Read-Only MCP Endpoint (/mcp/:secret)', () => {
+describe('HAL Read-Only MCP Endpoint (/mcp header authentication)', () => {
   const TEST_VALID_SECRET = 'this-is-a-valid-test-mcp-secret-24chars';
 
   function createTestApp(secretEnvValue: string | undefined) {
     const app = express();
 
-    app.post('/mcp/:secret', express.json(), async (req, res) => {
+    app.post('/mcp', express.json(), async (req, res) => {
       const expected = secretEnvValue ?? '';
-      const a = Buffer.from(req.params.secret);
+      const a = Buffer.from(req.get('x-hal-mcp-secret') ?? '', 'utf8');
       const b = Buffer.from(expected);
-      if (expected.length < 24 || a.length !== b.length || !crypto.timingSafeEqual(a, b)) {
+      if (b.length < 24 || a.length !== b.length || !crypto.timingSafeEqual(a, b)) {
         return res.status(404).json({ error: 'Not found' });
       }
       const server = buildHalMcpServer();
@@ -34,14 +34,14 @@ describe('HAL Read-Only MCP Endpoint (/mcp/:secret)', () => {
       await transport.handleRequest(req, res, req.body);
     });
 
-    app.all('/mcp/:secret', (_req, res) => res.status(405).json({ error: 'Use POST' }));
+    app.all('/mcp', (_req, res) => res.status(405).json({ error: 'Use POST' }));
     return app;
   }
 
   it('rejects with 404 if MCP_SECRET is missing from environment', async () => {
     const app = createTestApp(undefined);
     const res = await supertest(app)
-      .post('/mcp/some-random-secret-key-1234')
+      .post('/mcp').set('x-hal-mcp-secret', 'some-random-secret-key-1234')
       .send({});
     expect(res.status).toBe(404);
     expect(res.body).toEqual({ error: 'Not found' });
@@ -50,7 +50,7 @@ describe('HAL Read-Only MCP Endpoint (/mcp/:secret)', () => {
   it('rejects with 404 if MCP_SECRET is shorter than 24 characters', async () => {
     const app = createTestApp('short-secret-123');
     const res = await supertest(app)
-      .post('/mcp/short-secret-123')
+      .post('/mcp').set('x-hal-mcp-secret', 'short-secret-123')
       .send({});
     expect(res.status).toBe(404);
     expect(res.body).toEqual({ error: 'Not found' });
@@ -59,19 +59,25 @@ describe('HAL Read-Only MCP Endpoint (/mcp/:secret)', () => {
   it('rejects with 404 if provided secret does not match MCP_SECRET', async () => {
     const app = createTestApp(TEST_VALID_SECRET);
     const res = await supertest(app)
-      .post('/mcp/wrong-secret-token-that-is-over-24-chars-long')
+      .post('/mcp').set('x-hal-mcp-secret', 'wrong-secret-token-that-is-over-24-chars-long')
       .send({});
     expect(res.status).toBe(404);
     expect(res.body).toEqual({ error: 'Not found' });
   });
 
-  it('returns 405 on non-POST requests to /mcp/:secret', async () => {
+  it('does not accept credentials embedded in the URL path', async () => {
     const app = createTestApp(TEST_VALID_SECRET);
-    const getRes = await supertest(app).get(`/mcp/${TEST_VALID_SECRET}`);
+    const res = await supertest(app).post(`/mcp/${TEST_VALID_SECRET}`).send({});
+    expect(res.status).toBe(404);
+  });
+
+  it('returns 405 on non-POST requests to /mcp', async () => {
+    const app = createTestApp(TEST_VALID_SECRET);
+    const getRes = await supertest(app).get('/mcp');
     expect(getRes.status).toBe(405);
     expect(getRes.body).toEqual({ error: 'Use POST' });
 
-    const putRes = await supertest(app).put(`/mcp/${TEST_VALID_SECRET}`);
+    const putRes = await supertest(app).put('/mcp');
     expect(putRes.status).toBe(405);
   });
 
