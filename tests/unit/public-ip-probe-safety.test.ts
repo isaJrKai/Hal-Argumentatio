@@ -40,4 +40,37 @@ describe('public IP allowlist for outbound website probes', () => {
     expect(isPubliclyRoutableIp('not-an-ip')).toBe(false);
     expect(isPubliclyRoutableIp('127.0.0.999')).toBe(false);
   });
+
+  it('does not return private DNS answers when a target is rejected', async () => {
+    const lookup = vi.spyOn(dns.promises, 'lookup').mockResolvedValue([
+      { address: '10.20.30.40', family: 4 },
+      { address: '8.8.8.8', family: 4 }
+    ] as any);
+    try {
+      const result = await validateDomainAndDns('https://mixed-dns.example', { probeHttp: false });
+      expect(result.dnsResolved).toBe(false);
+      expect(result.rejectionReason).toContain('non-public or reserved');
+      expect(result).not.toHaveProperty('ipAddresses');
+      expect(lookup).toHaveBeenCalledOnce();
+    } finally {
+      vi.restoreAllMocks();
+    }
+  });
+
+  it('clears the DNS timeout after a successful lookup', async () => {
+    vi.useFakeTimers();
+    const lookup = vi.spyOn(dns.promises, 'lookup').mockResolvedValue([
+      { address: '8.8.8.8', family: 4 }
+    ] as any);
+    try {
+      const result = await validateDomainAndDns('https://public.example', { probeHttp: false, timeoutMs: 4000 });
+      expect(result.dnsResolved).toBe(true);
+      expect(lookup).toHaveBeenCalledOnce();
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      vi.useRealTimers();
+      vi.restoreAllMocks();
+    }
+  });
+
 });
