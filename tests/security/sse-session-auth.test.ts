@@ -26,8 +26,8 @@ describe('SSE authentication security regression', () => {
     expect(routeEnd).toBeGreaterThan(routeStart);
     const route = source.slice(routeStart, routeEnd);
     expect(route).toContain('setInterval(async () =>');
-    expect(route).toContain("res.write(':\\\\n\\\\n')");
-    expect(route).toContain('JSON.stringify(heartbeatEvent)}\\\\n\\\\n`');
+    expect(route).toContain("res.write(':\\n\\n')");
+    expect(route).toContain('JSON.stringify(heartbeatEvent)}\\n\\n`');
     expect(route).toContain('decoded.contractorId !== contractorId');
     expect(route).toContain('.from(revokedTokens)');
     expect(route).toContain('.from(contractors)');
