@@ -185,7 +185,7 @@ app.use((req, res, next) => {
   const origin = req.headers.origin;
   res.header('Vary', 'Origin');
   res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS');
-  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, X-Active-AI, Cache-Control');
+  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, X-Active-AI, Cache-Control, X-HAL-MCP-Secret');
   res.header('Access-Control-Max-Age', '86400');
 
   if (origin && corsAllowedOrigins.has(origin)) {
@@ -576,12 +576,14 @@ async function broadcastNotification(contractorId: string, type: string, title: 
 }
 
 // ─── READ-ONLY MODEL CONTEXT PROTOCOL (MCP) ENDPOINT ────────────────────────
-// Registered BEFORE JWT auth and SPA catch-all routes. Protected strictly by URL secret.
-app.post('/mcp/:secret', express.json(), async (req, res) => {
+// Registered BEFORE JWT auth and SPA catch-all routes. The shared secret is
+// accepted only in a dedicated header so it is never placed in request URLs.
+app.post('/mcp', express.json(), async (req, res) => {
   const expected = process.env.MCP_SECRET ?? '';
-  const a = Buffer.from(req.params.secret);
-  const b = Buffer.from(expected);
-  if (expected.length < 24 || a.length !== b.length || !crypto.timingSafeEqual(a, b)) {
+  const provided = req.get('x-hal-mcp-secret') ?? '';
+  const a = Buffer.from(provided, 'utf8');
+  const b = Buffer.from(expected, 'utf8');
+  if (b.length < 24 || a.length !== b.length || !crypto.timingSafeEqual(a, b)) {
     return res.status(404).json({ error: 'Not found' });
   }
   const server = buildHalMcpServer();
@@ -596,7 +598,7 @@ app.post('/mcp/:secret', express.json(), async (req, res) => {
   await server.connect(transport);
   await transport.handleRequest(req, res, req.body);
 });
-app.all('/mcp/:secret', (_req, res) => res.status(405).json({ error: 'Use POST' }));
+app.all('/mcp', (_req, res) => res.status(405).json({ error: 'Use POST' }));
 
 // Middleware: Authenticate Contractor via JWT
 // Middleware: Authenticate Contractor via JWT and current persisted account state.
