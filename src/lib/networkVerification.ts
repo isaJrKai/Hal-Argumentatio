@@ -225,11 +225,20 @@ export function isPubliclyRoutableIp(address: string): boolean {
 async function resolveDnsWithTimeout(hostname: string, timeoutMs = 4000): Promise<{ resolved: boolean; ips?: string[]; resolvedHostname?: string; error?: string }> {
   const tryLookup = async (host: string) => {
     const lookupPromise = dns.promises.lookup(host, { all: true, verbatim: true });
-    const timeoutPromise = new Promise<never>((_, reject) =>
-      setTimeout(() => reject(new Error('DNS resolution timed out after ' + timeoutMs + 'ms')), timeoutMs)
-    );
-    const results = await Promise.race([lookupPromise, timeoutPromise]);
-    return Array.isArray(results) ? results.map((item: any) => item.address as string) : [];
+    let timeout: ReturnType<typeof setTimeout> | undefined;
+    try {
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        timeout = setTimeout(
+          () => reject(new Error('DNS resolution timed out after ' + timeoutMs + 'ms')),
+          timeoutMs
+        );
+      });
+      const results = await Promise.race([lookupPromise, timeoutPromise]);
+      return Array.isArray(results) ? results.map((item: any) => item.address as string) : [];
+    } finally {
+      // Successful DNS lookups must not leave a pending timeout per request.
+      if (timeout) clearTimeout(timeout);
+    }
   };
 
   try {
