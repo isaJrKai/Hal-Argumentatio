@@ -1811,9 +1811,9 @@ app.get('/api/events', (req, res) => {
           closeStream();
           return;
         }
-        res.write(':\\n\\n');
+        res.write(':\n\n');
         const heartbeatEvent = { type: 'heartbeat', timestamp: new Date().toISOString() };
-        res.write(`data: ${JSON.stringify(heartbeatEvent)}\\n\\n`);
+        res.write(`data: ${JSON.stringify(heartbeatEvent)}\n\n`);
       } catch (error) {
         // Fail closed if authoritative session state cannot be verified.
         console.error('[HAL SSE] Session revalidation failed; closing stream:', error);
