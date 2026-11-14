@@ -56,6 +56,7 @@ import { buildPasswordResetResponse } from './src/lib/passwordResetResponse';
 import { verifyFirebaseGoogleIdToken } from './src/lib/firebaseGoogleIdentity';
 import { getClientIp } from './src/lib/clientIp';
 import { pruneBoundedMap } from './src/lib/boundedMap';
+import { isInsufficientTimesFmHistory } from './src/lib/timesfmError';
 import { recordWorkEvent, getRecentWorkEvents, getEntityWorkEvents } from './src/lib/workLedger';
 import { canHumanUpdateWorkTask, canTransitionWorkTask, listWorkTasks, getWorkTask, requiresWorkTaskApproval, ensureLeadReviewTask } from './src/lib/workTasks';
 import { validateStaffInput, getEffectiveStaffAvailability } from './src/lib/staff';
@@ -9313,16 +9314,27 @@ app.post(['/api/ai/test-timesfm', '/api/forecast/scenario'], authenticate, async
 
     return res.json(result);
   } catch (err: any) {
-    console.error('TimesFM Brain execution error:', err);
     const message = String(err?.message || 'Forecast unavailable');
-    const status = message.includes('Forecast unavailable') ? 409
+    const insufficientHistory = isInsufficientTimesFmHistory(err);
+    const status = insufficientHistory || message.includes('Forecast unavailable') ? 409
       : message.includes('TimesFM') ? 503
       : 500;
+
+    // Missing tenant history is a normal data-readiness state, not an inference outage.
+    if (insufficientHistory) {
+      console.info('[TimesFM Brain] Forecast not generated: tenant has no eligible Google Ads history.');
+    } else {
+      console.error('TimesFM Brain execution error:', err);
+    }
+
     return res.status(status).json({
       success: false,
+      ...(insufficientHistory ? { code: 'INSUFFICIENT_HISTORY' } : {}),
       error: status === 503
         ? 'TimesFM inference is currently unavailable. No substitute forecast was generated.'
-        : message
+        : insufficientHistory
+          ? 'No forecast is available yet. Import verified Google Ads history covering at least eight complete weeks, then try again.'
+          : message
     });
   }
 });
